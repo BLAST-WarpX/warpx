@@ -118,39 +118,38 @@ namespace {
 #endif
     )
     {
-        amrex::ParticleReal dxp_save = 0_prt;
-        amrex::ParticleReal dyp_save = 0_prt;
-        amrex::ParticleReal dzp_save = 0_prt;
 
         auto idxg2 = static_cast<amrex::ParticleReal>(dinv.x*dinv.x);
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
+        // Picard iteration loop for self-consistent update of particle position and velocity.
+        //    - velocity push
+        //    - position push
+        // The initial velocity is either the time-centered velocity from the end of the
+        // previous nonlinear iteration or the velocity at the start of the step if being
+        // called from the suborbit routine.
+        //
+        // An initial position push is done prior to the loop. This serves two purposes:
+        // 1) compute an initial change in position for the relative norm calculation.
+        // 2) provides a more accurate starting point on the initial nonlinear step.
+        //
+        // Note: The charge-conserving deposits assume the change in position is consistent with
+        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires finishing the iterations
+        // with the position updated, even in situations where convergence is not obtained.
+
+        // Perform an initial position push
+        amrex::ParticleReal dxp = 0.0_prt;
+        amrex::ParticleReal dyp = 0.0_prt;
+        amrex::ParticleReal dzp = 0.0_prt;
+        UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
+        xp = xp_n + dxp;
+        yp = yp_n + dyp;
+        zp = zp_n + dzp;
+        setPosition(ip, xp, yp, zp);
+
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
-
-            // Position advance starts from the position at the start of the step.
-            // On the first iteration, the velocity is an estimate, either the value
-            // at the start of the step (with suborbits) or the value from the previous
-            // overall iteration.
-            // A converged advance will have the postions advanced using the
-            // time-centered velocity.
-
-            amrex::ParticleReal dxp = 0.0_prt;
-            amrex::ParticleReal dyp = 0.0_prt;
-            amrex::ParticleReal dzp = 0.0_prt;
-            UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
-            xp = xp_n + dxp;
-            yp = yp_n + dyp;
-            zp = zp_n + dzp;
-            setPosition(ip, xp, yp, zp);
-
-            PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save,
-                         idxg2, idyg2, idzg2, step_norm, iter);
-            if (step_norm < particle_tolerance) {
-                convergence = true;
-                break;
-            }
 
             amrex::ParticleReal Exp = Ex_external_particle;
             amrex::ParticleReal Eyp = Ey_external_particle;
@@ -219,24 +218,33 @@ namespace {
             amrex::ignore_unused(qed_control);
 #endif
 
-            // Take average to get the time centered value
+            // Take average to get the time-centered value
             ux[ip] = 0.5_prt*(ux[ip] + uxp_n);
             uy[ip] = 0.5_prt*(uy[ip] + uyp_n);
             uz[ip] = 0.5_prt*(uz[ip] + uzp_n);
 
-        }
+            // Save position change from previous position push for relative norm calculation
+            const amrex::ParticleReal dxp_save = dxp;
+            const amrex::ParticleReal dyp_save = dyp;
+            const amrex::ParticleReal dzp_save = dzp;
 
-        // The Charge-conserving deposits assume the change in position is consistent with
-        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires an additional position
-        // update for unconverged particles. Note that there are several modes of operation
-        // with the implicit solvers that only perform a single Picard iteration. This final
-        // position push is necessary for achieving the intended behavior in these situations.
-        if (!convergence) {
-            xp = xp_n;
-            yp = yp_n;
-            zp = zp_n;
-            UpdatePositionImplicit(xp, yp, zp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
+            // Update the particle position using the time-centered velocity
+            dxp = 0.0;
+            dyp = 0.0;
+            dzp = 0.0;
+            UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
+            xp = xp_n + dxp;
+            yp = yp_n + dyp;
+            zp = zp_n + dzp;
             setPosition(ip, xp, yp, zp);
+
+            // Check for convergence based on the relative norm of the position change
+            PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save, idxg2, idyg2, idzg2, step_norm);
+            if (step_norm < particle_tolerance) {
+                convergence = true;
+                break;
+            }
+
         }
 
         return convergence;
