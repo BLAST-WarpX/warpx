@@ -2253,10 +2253,10 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
     });
 
     // Check for out of range particles
-    amrex::Gpu::synchronize();
+    amrex::Gpu::streamSynchronize();
     const int num_out_of_range_particles = out_of_range_particles.dataValue();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
-                                     "out of range particles found in deposition");
+                                     "Out of range particles found in deposition.");
 }
 
 /**

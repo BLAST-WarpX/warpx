@@ -76,6 +76,7 @@ namespace {
         amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
         int const & max_iterations,
+        [[maybe_unused]] int const * out_of_range_ptr,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
@@ -424,6 +425,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     // Check for out of range particles in gather routine
     amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_ptr = out_of_range_particles.dataPtr();
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
@@ -478,7 +480,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
         bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             step_norm, particle_tolerance, max_iterations,
+                             step_norm, particle_tolerance, max_iterations, out_of_range_ptr,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
                              Bx_external_particle, By_external_particle, Bz_external_particle,
                              Bxp, Byp, Bzp,
@@ -530,7 +532,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::Gpu::synchronize();
     const int num_out_of_range_particles = out_of_range_particles.dataValue();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
-                                     "out of range particles found in gather");
+                                     "Out of range particles found in gather.");
 
     // Setup for handling the unconverged particles. A list of their indices is
     // gathered, their weights saved, and their weight set to zero (so they
@@ -790,6 +792,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
 
+    // Check for out of range particles in gather routine
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_ptr = out_of_range_particles.dataPtr();
+
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
@@ -869,7 +875,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Try advancing the particle one suborbit step
             bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
-                                 step_norm, particle_tolerance, max_iterations,
+                                 step_norm, particle_tolerance, max_iterations, out_of_range_ptr,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
                                  Bx_external_particle, By_external_particle, Bz_external_particle,
                                  Bxp, Byp, Bzp,
@@ -1127,4 +1133,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     });
 
     amrex::Gpu::streamSynchronize();
+
+    // Check for out of range particles
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "Out of range particles found in gather.");
+
 }
