@@ -124,7 +124,7 @@ namespace {
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
         // Perform an initial position push prior to the Picard loop. This serves two purposes:
-        // 1) compute an initial change in position for the relative norm calculation
+        // 1) compute an initial change in position for the step norm calculation
         // 2) provides a more accurate starting point on the initial nonlinear step
         amrex::ParticleReal dxp = 0.0_prt;
         amrex::ParticleReal dyp = 0.0_prt;
@@ -221,7 +221,7 @@ namespace {
             uy[ip] = 0.5_prt*(uy[ip] + uyp_n);
             uz[ip] = 0.5_prt*(uz[ip] + uzp_n);
 
-            // Save position change from previous position push for relative norm calculation
+            // Save position change from previous position push for step norm calculation
             const amrex::ParticleReal dxp_save = dxp;
             const amrex::ParticleReal dyp_save = dyp;
             const amrex::ParticleReal dzp_save = dzp;
@@ -236,7 +236,7 @@ namespace {
             zp = zp_n + dzp;
             setPosition(ip, xp, yp, zp);
 
-            // Check for convergence based on the relative norm of the position change
+            // Check for convergence based on the step norm of the position change
             PositionNorm(dxp, dyp, dzp, dxp_save, dyp_save, dzp_save, idxg2, idyg2, idzg2, step_norm);
             if (step_norm < particle_tolerance) {
                 convergence = true;
