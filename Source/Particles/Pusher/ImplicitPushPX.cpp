@@ -76,7 +76,7 @@ namespace {
         amrex::ParticleReal & step_norm,
         amrex::ParticleReal const & particle_tolerance,
         int const & max_iterations,
-        [[maybe_unused]] int const * out_of_range_ptr,
+        [[maybe_unused]] int * out_of_range_ptr,
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
