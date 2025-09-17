@@ -123,22 +123,9 @@ namespace {
         auto idyg2 = static_cast<amrex::ParticleReal>(dinv.y*dinv.y);
         auto idzg2 = static_cast<amrex::ParticleReal>(dinv.z*dinv.z);
 
-        // Picard iteration loop for self-consistent update of particle position and velocity.
-        //    - velocity push
-        //    - position push
-        // The initial velocity is either the time-centered velocity from the end of the
-        // previous nonlinear iteration or the velocity at the start of the step if being
-        // called from the suborbit routine.
-        //
-        // An initial position push is done prior to the loop. This serves two purposes:
+        // Perform an initial position push prior to the Picard loop. This serves two purposes:
         // 1) compute an initial change in position for the relative norm calculation
         // 2) provides a more accurate starting point on the initial nonlinear step
-        //
-        // Note: The charge-conserving deposits assume the change in position is consistent with
-        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires finishing the iterations
-        // with the position updated, even in situations where convergence is not obtained.
-
-        // Perform an initial position push
         amrex::ParticleReal dxp = 0.0_prt;
         amrex::ParticleReal dyp = 0.0_prt;
         amrex::ParticleReal dzp = 0.0_prt;
@@ -147,6 +134,17 @@ namespace {
         yp = yp_n + dyp;
         zp = zp_n + dzp;
         setPosition(ip, xp, yp, zp);
+
+        // Picard iteration loop for self-consistent update of particle position and velocity.
+        //    - velocity push
+        //    - position push
+        // The initial velocity is either the time-centered velocity from the end of the
+        // previous nonlinear iteration or the velocity at the start of the step if being
+        // called from the suborbit routine.
+        //
+        // Note: The charge-conserving deposits assume the change in position is consistent with
+        // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires finishing the iterations
+        // with the position updated, even in situations where convergence is not obtained.
 
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
