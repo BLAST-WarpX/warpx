@@ -1738,6 +1738,13 @@ WarpX::ReadExternalFieldFromFile (
                                   problo[1] + j *dx[1],
                                   problo[2] + k *dx[2]));
                 mffab(i,j,k) = external_field_view(pos);
+                if (i==3 || j==3 || k==3) {
+                    // print out a few values for verification
+                    // (only for a few points to avoid too much printing)
+                amrex::Print(0) << i << " " << j << " " << k << " "
+                                << F_name << " " << F_component << " "
+                                << mffab(i,j,k) << "\n";
+                }
             }
 
         ); // End ParallelFor

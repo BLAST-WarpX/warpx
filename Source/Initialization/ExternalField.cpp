@@ -199,6 +199,8 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
     auto iseries = series.iterations.begin()->second;
     auto F = iseries.meshes[F_name];
 
+    auto dOrder = F.getAttribute("dataOrder").get<std::string>();
+
 #if (AMREX_SPACEDIM > 1)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(F.getAttribute("dataOrder").get<std::string>() == "C",
                                      "Reading from files with non-C dataOrder is not implemented");
@@ -209,8 +211,10 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
 
 #if defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z",
-                                     "3D expects axisLabels {x, y, z}");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE((dOrder == "C" && axisLabels.at(0) == "z" && axisLabels.at(1) == "y" && axisLabels.at(2) == "x") ||
+                                     (dOrder == "F" && axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z"),
+                                     "3D expects axisLabels {x, y, z} if dataOrder is F, or {z, y, x} if dataOrder is C"
+                                    );
 #elif defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "z",
