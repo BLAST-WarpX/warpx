@@ -131,8 +131,8 @@ namespace {
         // called from the suborbit routine.
         //
         // An initial position push is done prior to the loop. This serves two purposes:
-        // 1) compute an initial change in position for the relative norm calculation.
-        // 2) provides a more accurate starting point on the initial nonlinear step.
+        // 1) compute an initial change in position for the relative norm calculation
+        // 2) provides a more accurate starting point on the initial nonlinear step
         //
         // Note: The charge-conserving deposits assume the change in position is consistent with
         // the velocity: (xp^{n+1}-xp^n)/dt = vp^{n+1/2}. This requires finishing the iterations
@@ -229,9 +229,9 @@ namespace {
             const amrex::ParticleReal dzp_save = dzp;
 
             // Update the particle position using the time-centered velocity
-            dxp = 0.0;
-            dyp = 0.0;
-            dzp = 0.0;
+            dxp = 0.0_prt;
+            dyp = 0.0_prt;
+            dzp = 0.0_prt;
             UpdatePositionImplicit(dxp, dyp, dzp, uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip], 0.5_rt*dt);
             xp = xp_n + dxp;
             yp = yp_n + dyp;
