@@ -23,7 +23,8 @@ ablastr::utils::write_used_inputs_file (std::string const & filename, bool verbo
     }
 
     if (verbose) {
-        amrex::Print() << "For full input parameters, see the file: " << filename << "\n\n";
+        amrex::Print() << std::endl;
+        amrex::Print() << "Full list of used input parameters available in the file '" << filename << "'.\n\n";
     }
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
