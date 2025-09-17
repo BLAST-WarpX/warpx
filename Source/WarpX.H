@@ -465,13 +465,13 @@ public:
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
+    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveF (         amrex::Real dt, int const rho_comp);
     void EvolveF (int lev, amrex::Real dt, int const rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingStage subcycling_stage, amrex::Real start_time);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
@@ -602,7 +602,7 @@ public:
                               PatchType patch_type);
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
-    void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingStage subcycling_stage, amrex::Real cur_time);
+    void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -646,7 +646,7 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingStage subcycling_stage=SubcyclingStage::None, bool skip_current=false,
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
                                   ImplicitOptions const * implicit_options = nullptr);
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
                                   ImplicitOptions const * implicit_options = nullptr);

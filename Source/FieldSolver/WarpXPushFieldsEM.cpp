@@ -936,17 +936,17 @@ WarpX::PushPSATD (amrex::Real start_time)
         amrex::Real const new_time = start_time + spectral_solver_fp[lev]->m_dt;
         ApplyEfieldBoundary(lev, PatchType::fine, new_time);
         if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, new_time); }
-        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingStage::FirstHalf, new_time);
-        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, SubcyclingStage::FirstHalf, new_time); }
+        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::FirstHalf, new_time);
+        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, SubcyclingHalf::FirstHalf, new_time); }
     }
 #endif
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, SubcyclingStage subcycling_stage, amrex::Real start_time)
+WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, subcycling_stage, start_time);
+        EvolveB(lev, a_dt, subcycling_half, start_time);
     }
 
     // Allow execution of Python callback after B-field push
@@ -954,18 +954,18 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingStage subcycling_stage, amrex::Real 
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingStage subcycling_stage, amrex::Real start_time)
+WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
     WARPX_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, subcycling_stage, start_time);
+    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, subcycling_stage, start_time);
+        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingStage subcycling_stage, amrex::Real start_time)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
@@ -992,7 +992,7 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingStage
     }
 
     amrex::Real const new_time = start_time + a_dt;
-    ApplyBfieldBoundary(lev, patch_type, subcycling_stage, new_time);
+    ApplyBfieldBoundary(lev, patch_type, subcycling_half, new_time);
 }
 
 

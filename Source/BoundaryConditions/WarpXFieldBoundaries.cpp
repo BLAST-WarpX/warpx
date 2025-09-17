@@ -177,7 +177,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
 #endif
 }
 
-void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, SubcyclingStage subcycling_stage, amrex::Real time)
+void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real time)
 {
     using ablastr::fields::Direction;
 
@@ -237,7 +237,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
     // This is because the formula used for Silver-Mueller assumes that
     // E and B are staggered in time, which is only true after the first half-push
     if (lev == 0) {
-        if (subcycling_stage == SubcyclingStage::FirstHalf) {
+        if (subcycling_half == SubcyclingHalf::FirstHalf) {
             if(::isAnyBoundary<FieldBoundaryType::Absorbing_SilverMueller>(field_boundary_lo, field_boundary_hi)){
                 auto Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
                 auto Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);

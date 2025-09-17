@@ -509,7 +509,7 @@ WarpX::OneStep_nosub (Real cur_time)
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
-        EvolveB(0.5_rt * dt[0], SubcyclingStage::FirstHalf, cur_time); // We now have B^{n+1/2}
+        EvolveB(0.5_rt * dt[0], SubcyclingHalf::FirstHalf, cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         if (m_em_solver_medium == MediumForEM::Vacuum) {
@@ -525,7 +525,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/1);
         EvolveG(0.5_rt * dt[0]);
-        EvolveB(0.5_rt * dt[0], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
+        EvolveB(0.5_rt * dt[0], SubcyclingHalf::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
             DampPML();
@@ -912,8 +912,8 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         }
         ApplyEfieldBoundary(lev, PatchType::fine, cur_time + dt[0]);
         if (lev > 0) { ApplyEfieldBoundary(lev, PatchType::coarse, cur_time + dt[0]); }
-        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingStage::FirstHalf, cur_time + dt[0]);
-        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, SubcyclingStage::FirstHalf, cur_time + dt[0]); }
+        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::FirstHalf, cur_time + dt[0]);
+        if (lev > 0) { ApplyBfieldBoundary(lev, PatchType::coarse, SubcyclingHalf::FirstHalf, cur_time + dt[0]); }
     }
 
     // Damp fields in PML before exchanging guard cells
@@ -974,7 +974,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     bool const skip_lev0_coarse_patch = true;
 
     // i) Push particles and fields on the fine patch (first fine step)
-    PushParticlesandDeposit(fine_lev, cur_time, SubcyclingStage::FirstHalf);
+    PushParticlesandDeposit(fine_lev, cur_time, SubcyclingHalf::FirstHalf);
     RestrictCurrentFromFineToCoarsePatch(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
@@ -994,7 +994,7 @@ WarpX::OneStep_sub1 (Real cur_time)
             fine_lev, PatchType::fine, 0, 2*ncomps);
     }
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf, cur_time);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
@@ -1004,7 +1004,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     EvolveE(fine_lev, PatchType::fine, dt[fine_lev], cur_time);
     FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
@@ -1018,7 +1018,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     // ii) Push particles on the coarse patch and mother grid.
     // Push the fields on the coarse patch and mother grid
     // by only half a coarse step (first half)
-    PushParticlesandDeposit(coarse_lev, cur_time, SubcyclingStage::None);
+    PushParticlesandDeposit(coarse_lev, cur_time, SubcyclingHalf::None);
     ::StoreCurrent(coarse_lev, m_fields);
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
@@ -1035,7 +1035,7 @@ WarpX::OneStep_sub1 (Real cur_time)
             coarse_lev, 0, ncomps);
     }
 
-    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::FirstHalf, cur_time);
+    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
     FillBoundaryF(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolverF);
@@ -1043,7 +1043,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time);
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldGather);
 
-    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::FirstHalf, cur_time);
+    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingHalf::FirstHalf, cur_time);
     EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], /*rho_comp=*/0);
     FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather,
                     WarpX::sync_nodal_points);
@@ -1060,7 +1060,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryAux(guard_cells.ng_UpdateAux);
 
     // iv) Push particles and fields on the fine patch (second fine step)
-    PushParticlesandDeposit(fine_lev, cur_time + dt[fine_lev], SubcyclingStage::SecondHalf);
+    PushParticlesandDeposit(fine_lev, cur_time + dt[fine_lev], SubcyclingHalf::SecondHalf);
     RestrictCurrentFromFineToCoarsePatch(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
@@ -1078,7 +1078,7 @@ WarpX::OneStep_sub1 (Real cur_time)
             fine_lev, PatchType::fine, 0, ncomps);
     }
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::FirstHalf, cur_time + dt[fine_lev]);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time + dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/0);
     FillBoundaryB(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver);
     FillBoundaryF(fine_lev, PatchType::fine, guard_cells.ng_FieldSolverF);
@@ -1087,7 +1087,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryE(fine_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                     WarpX::sync_nodal_points);
 
-    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 1.5_rt*dt[fine_lev]);
+    EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::SecondHalf, cur_time + 1.5_rt*dt[fine_lev]);
     EvolveF(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
@@ -1123,7 +1123,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryE(fine_lev, PatchType::coarse, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
 
-    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
+    EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingHalf::SecondHalf, cur_time + 0.5_rt * dt[fine_lev]);
     EvolveF(fine_lev, PatchType::coarse, dt[fine_lev], /*rho_comp=*/1);
 
     if (do_pml) {
@@ -1142,7 +1142,7 @@ WarpX::OneStep_sub1 (Real cur_time)
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                   WarpX::sync_nodal_points);
 
-    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingStage::SecondHalf, cur_time + 0.5_rt*dt[coarse_lev]);
+    EvolveB(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], SubcyclingHalf::SecondHalf, cur_time + 0.5_rt*dt[coarse_lev]);
     EvolveF(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], /*rho_comp=*/1);
 
     if (do_pml) {
@@ -1220,7 +1220,7 @@ WarpX::PushParticlesandDeposit (
         PushParticlesandDeposit(
             lev,
             cur_time,
-            SubcyclingStage::None,
+            SubcyclingHalf::None,
             skip_current,
             implicit_options
         );
@@ -1231,7 +1231,7 @@ void
 WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
-    SubcyclingStage subcycling_stage,
+    SubcyclingHalf subcycling_half,
     bool skip_current,
     ImplicitOptions const * implicit_options
 )
@@ -1260,7 +1260,7 @@ WarpX::PushParticlesandDeposit (
         current_fp_string,
         cur_time,
         dt[lev],
-        subcycling_stage,
+        subcycling_half,
         skip_current,
         implicit_options
     );

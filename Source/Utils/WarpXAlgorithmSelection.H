@@ -158,8 +158,8 @@ AMREX_ENUM(ReductionType,
            Sum,
            Integral = Sum);
 
-/** \brief Subcycling stage selector */
-AMREX_ENUM(SubcyclingStage,
+/** \brief Subcycling half selector */
+AMREX_ENUM(SubcyclingHalf,
            FirstHalf,
            SecondHalf,
            None,

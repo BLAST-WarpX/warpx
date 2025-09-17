@@ -180,7 +180,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         const long np_to_push,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
-                                        SubcyclingStage subcycling_stage)
+                                        SubcyclingHalf subcycling_half)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -224,7 +224,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      subcycling_stage);
+                                      subcycling_half);
 
     if (!done_injecting_lev) {
 
@@ -269,7 +269,7 @@ void
 RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                         int lev,
                                         const std::string& current_fp_string,
-                                        Real t, Real dt, SubcyclingStage subcycling_stage, bool skip_deposition,
+                                        Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                         ImplicitOptions const * /*implicit_options*/)
 {
 
@@ -295,7 +295,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, subcycling_stage, skip_deposition, nullptr);
+                                       t, dt, subcycling_half, skip_deposition, nullptr);
 }
 
 void

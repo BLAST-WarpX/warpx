@@ -106,7 +106,7 @@ void WarpX::HybridPICEvolveFields ()
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            SubcyclingStage::FirstHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -140,7 +140,7 @@ void WarpX::HybridPICEvolveFields ()
             rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            SubcyclingStage::SecondHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }

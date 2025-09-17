@@ -111,7 +111,7 @@ public:
         std::string const& current_fp_string,
         amrex::Real t,
         amrex::Real dt,
-        SubcyclingStage subcycling_stage=SubcyclingStage::None,
+        SubcyclingHalf subcycling_half=SubcyclingHalf::None,
         bool skip_deposition=false,
         ImplicitOptions const * implicit_options = nullptr
     );

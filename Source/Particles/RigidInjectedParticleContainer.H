@@ -69,7 +69,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 SubcyclingStage subcycling_stage=SubcyclingStage::None,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
@@ -85,7 +85,7 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         SubcyclingStage subcycling_stage=SubcyclingStage::None) override;
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None) override;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,

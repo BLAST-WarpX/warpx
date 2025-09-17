@@ -238,7 +238,7 @@ public:
     virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
                          int lev,
                          const std::string& current_fp_string,
-                         amrex::Real t, amrex::Real dt, SubcyclingStage subcycling_stage=SubcyclingStage::None, bool skip_deposition=false,
+                         amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;

@@ -68,7 +68,7 @@ public:
     void Evolve (ablastr::fields::MultiFabRegister& fields,
                  int lev,
                  const std::string& current_fp_string,
-                 amrex::Real t, amrex::Real dt, SubcyclingStage subcycling_stage=SubcyclingStage::None,
+                 amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) final;
 
