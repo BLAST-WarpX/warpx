@@ -2319,7 +2319,10 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    // Guards used here because out of range particles are found in the kernal when on CPU
+#if defined(AMREX_USE_GPU)
     amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+#endif
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -2364,10 +2367,12 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
     });
 
     // Check for out of range particles
+#if defined(AMREX_USE_GPU)
     amrex::Gpu::synchronize();
     const int num_out_of_range_particles = out_of_range_particles.dataValue();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
                                      "out of range particles found in deposition");
+#endif
 
 }
 
