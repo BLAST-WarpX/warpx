@@ -85,25 +85,14 @@ If your project leads to a scientific publication, please consider citing all co
                   Zhao, Yinjian and
                   Zhu, Kevin Z. and
                   Zoni, Edoardo},
-          title        = {WarpX: an advanced electromagnetic & electrostatic Particle-In-Cell code},
-          year         = 2018,
-          publisher    = {Zenodo},
-          version      = {25.08},
-          doi          = {10.5281/zenodo.16750069},
-          url          = {https://doi.org/10.5281/zenodo.16750069},
-          swhid        = {swh:1:dir:12d584a99e9625391d4bc82fbbca1a089652f3f8
-                           ;origin=https://doi.org/10.5281/zenodo.4571577;vis
-                           it=swh:1:snp:42a98189c61704a75545d176f00552bd43071
-                           d45;anchor=swh:1:rel:5843c56c1006a8673ba5ea31e0fc8
-                           0fd36afcf45;path=BLAST-WarpX-warpx-6680268
-                          },
+          title          = {WarpX: an advanced Particle-In-Cell code},
+          year         = 2025,
+          publisher = {Zenodo},
+          version    = {25.09},
+          doi           = {10.5281/zenodo.17080408},
+          url            = {https://doi.org/10.5281/zenodo.17080408},
+          howpublished = {https://github.com/BLAST-WarpX}
 }
-         title        = {{openPMD: A meta data standard for particle and mesh based data}},
-         year         = 2015,
-         publisher    = {Zenodo},
-         doi          = {10.5281/zenodo.591699},
-         url          = {https://www.openPMD.org},
-         howpublished = {https://github.com/openPMD}
        }
 
    .. tab-item:: Word
