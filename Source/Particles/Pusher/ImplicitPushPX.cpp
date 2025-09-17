@@ -422,6 +422,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
     int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
+    // Check for out of range particles in gather routine
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
@@ -522,6 +525,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         }
 
     });
+
+    // Check for out of range particles
+    amrex::Gpu::synchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "out of range particles found in gather");
 
     // Setup for handling the unconverged particles. A list of their indices is
     // gathered, their weights saved, and their weight set to zero (so they

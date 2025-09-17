@@ -1604,7 +1604,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in x");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
@@ -1613,7 +1613,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     }
     if (cell_crossings_y > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in x");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_y = " + std::to_string(cell_crossings_y) +
                      " is greater than the maximum allowed = " +
@@ -1622,7 +1622,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     }
     if (cell_crossings_z > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in z");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
@@ -1814,7 +1814,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in x");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
@@ -1823,7 +1823,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     }
     if (cell_crossings_z > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in z");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
@@ -1997,7 +1997,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_z > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in z");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
@@ -2084,7 +2084,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
 #if defined(AMREX_USE_GPU)
-        amrex::Abort("Error: Too many cell crossings in x");
+        amrex::Gpu::Atomic::Add(out_of_range_particles.data(),1);
 #else
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
@@ -2217,6 +2217,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
         np_to_deposit,
@@ -2249,6 +2251,12 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
+
+    // Check for out of range particles
+    amrex::Gpu::synchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "out of range particles found in deposition");
 }
 
 /**
@@ -2311,6 +2319,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
         np_to_deposit,
@@ -2352,6 +2362,13 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
+
+    // Check for out of range particles
+    amrex::Gpu::synchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "out of range particles found in deposition");
+
 }
 
 /**
