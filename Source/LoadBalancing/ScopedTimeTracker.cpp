@@ -17,10 +17,11 @@ namespace warpx::load_balancing
 {
 
     bool ScopedTimeTracker::do_tracking = false;
-    amrex::Vector<amrex::LayoutData<amrex::Real>> ScopedTimeTracker::all_times = amrex::Vector<amrex::LayoutData<amrex::Real>>{};
+    amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real>>> ScopedTimeTracker::all_times =
+        amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real>>>{};
 
     [[nodiscard]]
-    const amrex::Vector<amrex::LayoutData<amrex::Real>>& ScopedTimeTracker::view_tracked_times ()
+    const amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real>>>& ScopedTimeTracker::view_tracked_times ()
     {
         return ScopedTimeTracker::all_times;
     }
@@ -32,9 +33,9 @@ namespace warpx::load_balancing
     }
 
     ScopedTimeTracker::ScopedTimeTracker (
-        const int lev, const int mfi_iter_index, const bool enabled_local):
+        const int lev, const amrex::MFIter& mfi_iter, const bool enabled_local):
         m_lev{lev},
-        m_index{mfi_iter_index},
+        m_index{mfi_iter.index()},
         m_enabled_local{enabled_local}
     {
         if (ScopedTimeTracker::do_tracking && m_enabled_local)
@@ -69,28 +70,34 @@ namespace warpx::load_balancing
         all_times.resize(max_num_levels);
     }
 
-    void ScopedTimeTracker::resize_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
+    void ScopedTimeTracker::allocate_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
     {
-        all_times.at(lev) = amrex::LayoutData<amrex::Real>{ba, dm};
+        all_times.at(lev) = std::make_unique<amrex::LayoutData<amrex::Real>>(ba, dm);
+    }
+
+    void ScopedTimeTracker::clear_level (const int lev)
+    {
+        all_times.at(lev).reset();
     }
 
     void ScopedTimeTracker::reset_values ()
     {
-        for (auto& lev_data : ScopedTimeTracker::all_times){
+        /*for (auto& lev_data : ScopedTimeTracker::all_times){
             const auto& idxs = lev_data.IndexArray();
             for (const auto& idx : idxs){
                 lev_data[idx] = 0.0;
             }
-        }
+        }*/
     }
 
     void ScopedTimeTracker::reset_values (const int lev)
     {
-        auto& lev_data = ScopedTimeTracker::all_times[lev];
+        /*auto& lev_data = ScopedTimeTracker::all_times[lev];
         const auto& idxs = lev_data.IndexArray();
         for (const auto& idx : idxs){
             lev_data[idx] = 0.0;
-        }
+        }*/
+       amrex::ignore_unused(lev);
     }
 
     void ScopedTimeTracker::record_time ()
@@ -100,14 +107,14 @@ namespace warpx::load_balancing
             amrex::Gpu::synchronize();
             const auto end_time = static_cast<amrex::Real>(amrex::second());
             const auto wall_time = end_time - m_start_time;
-            amrex::HostDevice::Atomic::Add(&all_times[m_lev][m_index], wall_time);
+            amrex::HostDevice::Atomic::Add(&(*all_times[m_lev])[m_index], wall_time);
         }
     }
 
     [[nodiscard]]
     ScopedTimeTracker get_scoped_time_tracker (
-        int lev, int mfi_iter_index, bool enabled_local)
+        int lev, const amrex::MFIter& mfi_iter, bool enabled_local)
     {
-        return ScopedTimeTracker {lev, mfi_iter_index, enabled_local};
+        return ScopedTimeTracker {lev, mfi_iter, enabled_local};
     }
 }

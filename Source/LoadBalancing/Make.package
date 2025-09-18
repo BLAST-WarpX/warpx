@@ -1,4 +1,5 @@
-
+CEXE_sources += HeuristicCostsTracker.cpp
+CEXE_sources += LoadBalancer.cpp
 CEXE_sources += ScopedTimeTracker.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/LoadBalancing
