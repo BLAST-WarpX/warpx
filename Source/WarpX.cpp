@@ -38,7 +38,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
-#include "LoadBalacing/LoadBalancer.H"
+#include "LoadBalancing/LoadBalancer.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -424,9 +424,6 @@ WarpX::WarpX ()
     do_pml_Lo.resize(nlevs_max);
     do_pml_Hi.resize(nlevs_max);
 
-    costs.resize(nlevs_max);
-    load_balance_efficiency.resize(nlevs_max);
-
     m_field_factory.resize(nlevs_max);
 
     if (m_em_solver_medium == MediumForEM::Macroscopic) {
@@ -467,8 +464,9 @@ WarpX::WarpX ()
 
     m_accelerator_lattice.resize(nlevs_max);
 
-    m_load_balancer = std::make_unique<load_balancing::LoadBalancer>{
-        nox, electromagnetic_solver_id};
+    m_load_balancer = std::make_unique<load_balancing::LoadBalancer>(
+        nox, electromagnetic_solver_id);
+    m_load_balancer->resize(nlevs_max);
 }
 
 WarpX::~WarpX ()
@@ -2134,8 +2132,7 @@ WarpX::ClearLevel (int lev)
     }
 #endif
 
-    costs[lev].reset();
-    load_balance_efficiency[lev] = -1;
+    m_load_balancer->clear_level(lev);
 }
 
 void
@@ -2895,10 +2892,8 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         }
     }
 
-    if (load_balance_intervals.isActivated())
-    {
-        costs[lev] = std::make_unique<LayoutData<Real>>(ba, dm);
-        load_balance_efficiency[lev] = -1;
+    if (m_load_balancer->is_active()){
+        m_load_balancer->allocate_level(lev, ba, dm);
     }
 }
 

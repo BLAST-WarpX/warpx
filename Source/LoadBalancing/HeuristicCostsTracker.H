@@ -10,16 +10,17 @@
 
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_LayoutData.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Vector.H>
 
 #include <array>
+#include <memory>
 
 namespace warpx::load_balancing
 {
     class HeuristicCostsTracker
     {
-
-    using namespace amrex;
 
     public:
         // Default values for particle and cell weights for costs update for
@@ -27,21 +28,25 @@ namespace warpx::load_balancing
         // Default values listed here for the case AMREX_USE_GPU are determined
         // from single-GPU tests on Summit. Values for order 4 are only a guess.
         static constexpr int max_supported_order = 4;
-        static constexpr costs_heuristic_cells_wt_gpu_fdtd_default  =
-            std::array<amrex::Real, max_supported_order>{0.401_rt, 0.268_rt, 0.145_rt, 0.100_rt};
-        static constexpr costs_heuristic_cells_wt_gpu_psatd_default =
-            std::array<amrex::Real, max_supported_order>{0.575_rt, 0.405_rt, 0.250_rt, 0.200_rt};
-        static constexpr costs_heuristic_cells_wt_cpu_default       =
-            std::array<amrex::Real, max_supported_order>{0.1_rt, 0.1_rt, 0.1_rt, 0.1_rt};
+        static constexpr auto costs_heuristic_cells_wt_gpu_fdtd_default  =
+            std::array<amrex::Real, max_supported_order>{0.401, 0.268, 0.145, 0.100};
+        static constexpr auto costs_heuristic_cells_wt_gpu_psatd_default =
+            std::array<amrex::Real, max_supported_order>{0.575, 0.405, 0.250, 0.200};
+        static constexpr auto costs_heuristic_cells_wt_cpu_default       =
+            std::array<amrex::Real, max_supported_order>{0.1, 0.1, 0.1, 0.1};
 
-        static constexpr costs_heuristic_particles_wt_gpu_fdtd_default  =
-            std::array<amrex::Real, max_supported_order>{0.599_rt, 0.732_rt, 0.855_rt, 0.900_rt};
-        static constexpr costs_heuristic_particles_wt_gpu_psatd_default =
-            std::array<amrex::Real, max_supported_order>{0.425_rt, 0.595_rt, 0.750_rt, 0.800_rt};
-        static constexpr costs_heuristic_particles_wt_cpu_default       =
-            std::array<amrex::Real, max_supported_order>{0.9_rt, 0.9_rt, 0.9_rt, 0.9_rt};
+        static constexpr auto costs_heuristic_particles_wt_gpu_fdtd_default  =
+            std::array<amrex::Real, max_supported_order>{0.599, 0.732, 0.855, 0.900};
+        static constexpr auto costs_heuristic_particles_wt_gpu_psatd_default =
+            std::array<amrex::Real, max_supported_order>{0.425, 0.595, 0.750, 0.800};
+        static constexpr auto costs_heuristic_particles_wt_cpu_default       =
+            std::array<amrex::Real, max_supported_order>{0.9, 0.9, 0.9, 0.9};
 
         HeuristicCostsTracker (int particle_shape, ElectromagneticSolverAlgo em_solver_id);
+
+        void resize (int nlevs_max);
+        void clear_level (int lev);
+        void allocate_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
 
     private:
         /** Weight factor for cells in `Heuristic` costs update.
@@ -57,6 +62,8 @@ namespace warpx::load_balancing
         * uniform plasma on a domain of size 128 by 128 by 128, from which the approximate
         * time per iteration per particle is computed. */
         amrex::Real costs_heuristic_particles_wt = amrex::Real(0);
+
+        amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real>>> m_costs;
     };
 }
 

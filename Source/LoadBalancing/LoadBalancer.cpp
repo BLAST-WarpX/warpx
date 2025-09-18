@@ -23,6 +23,10 @@ namespace warpx::load_balancing
         m_load_balance_intervals = utils::parser::IntervalsParser{
             load_balance_intervals_string_vec};
 
+        if (!this->is_active()){
+            return;
+        }
+
         pp_algo.query("load_balance_with_sfc", m_load_balance_with_sfc);
 
         // Knapsack factor only used with non-SFC strategy
@@ -38,5 +42,49 @@ namespace warpx::load_balancing
         if (WarpX::load_balance_costs_update_algo==CostsUpdateAlgo::Heuristic) {
             m_heuristic_cost_tracker = HeuristicCostsTracker{particle_shape, em_solver_id};
         }
+        else{
+            ScopedTimeTracker::toggle_tracking(true);
+        }
+    }
+
+    void LoadBalancer::resize (const int nlevs_max)
+    {
+        if (m_costs_update_algo == CostsUpdateAlgo::Timers){
+            ScopedTimeTracker::resize(nlevs_max);
+        }
+        else {
+            m_heuristic_cost_tracker.value().resize(nlevs_max);
+        }
+
+        m_load_balance_efficiency.resize(nlevs_max);
+    }
+
+    void LoadBalancer::clear_level (const int lev)
+    {
+        if (m_costs_update_algo == CostsUpdateAlgo::Timers){
+            ScopedTimeTracker::clear_level(lev);
+        }
+        else {
+            m_heuristic_cost_tracker.value().clear_level(lev);
+        }
+
+        m_load_balance_efficiency.at(lev) = -1;
+    }
+
+    bool LoadBalancer::is_active ()
+    {
+        return m_load_balance_intervals.isActivated();
+    }
+
+    void LoadBalancer::allocate_level (
+        const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
+    {
+        if (m_costs_update_algo == CostsUpdateAlgo::Timers){
+            ScopedTimeTracker::allocate_level(lev, ba, dm);
+        }
+        else {
+            m_heuristic_cost_tracker.value().allocate_level(lev, ba, dm);
+        }
+        m_load_balance_efficiency[lev] = -1;
     }
 }

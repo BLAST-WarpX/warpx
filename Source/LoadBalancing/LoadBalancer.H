@@ -15,6 +15,8 @@
 #include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_Enum.H>
 
 #include <memory>
@@ -40,6 +42,12 @@ namespace warpx::load_balancing
         static constexpr auto default_load_balance_efficiency_ratio_threshold = amrex::Real{1.1};
 
         LoadBalancer (int particle_shape, ElectromagneticSolverAlgo em_solver_id);
+
+        void resize (int nlevs_max);
+        void clear_level (int lev);
+        void allocate_level (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
+
+        [[nodiscard]] bool is_active ();
 
     private:
         /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
@@ -68,7 +76,7 @@ namespace warpx::load_balancing
         /** Records a number corresponding to the load balance cost update strategy
         *  being used (0 or 1 corresponding to timers or heuristic).
         */
-        auto m_costs_update_algo = CostsUpdateAlgo::Default;
+        CostsUpdateAlgo m_costs_update_algo = CostsUpdateAlgo::Default;
 
         std::optional<HeuristicCostsTracker> m_heuristic_cost_tracker = std::nullopt;
     };

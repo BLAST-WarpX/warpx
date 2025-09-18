@@ -49,4 +49,19 @@ namespace warpx::load_balancing
 #endif // AMREX_USE_GPU
         }
     }
+
+    void HeuristicCostsTracker::resize (const int nlevs_max)
+    {
+        m_costs.resize(nlevs_max);
+    }
+
+    void HeuristicCostsTracker::clear_level (const int lev)
+    {
+        m_costs.at(lev).reset();
+    }
+
+    void HeuristicCostsTracker::allocate_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
+    {
+        m_costs.at(lev) = std::make_unique<amrex::LayoutData<amrex::Real>>(ba, dm);
+    }
 }
