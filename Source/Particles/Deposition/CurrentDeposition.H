@@ -1483,6 +1483,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                                        amrex::Array4<amrex::Real>const & Jy_arr,
                                        amrex::Array4<amrex::Real>const & Jz_arr,
                                        int const max_crossings,
+                                       int* out_of_range_particles_ptr,
                                        amrex::Real const dt,
                                        amrex::XDim3 const & dinv,
                                        amrex::XDim3 const & xyzmin,
@@ -1603,9 +1604,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_x > max_crossings) {
-#if defined(AMREX_USE_GPU)
-        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles.data(),1);
-#else
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
@@ -1996,9 +1996,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
     // Abort if cell crossings are larger than permitted
     if (cell_crossings_z > max_crossings) {
-#if defined(AMREX_USE_GPU)
-        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles.data(),1);
-#else
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
         amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
                      " is greater than the maximum allowed = " +
                      std::to_string(max_crossings));
@@ -2218,6 +2217,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
     amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_particles_ptr = out_of_range_particles.dataPtr();
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -2248,6 +2248,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
             VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp[ip], uyp[ip], uzp[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                          out_of_range_particles_ptr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
@@ -2320,9 +2321,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
     // Guards used here because out of range particles are found in the kernal when on CPU
-#if defined(AMREX_USE_GPU)
     amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
-#endif
+    int* out_of_range_particles_ptr = out_of_range_particles.dataPtr();
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -2362,17 +2362,16 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                          out_of_range_particles_ptr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
 
     // Check for out of range particles
-#if defined(AMREX_USE_GPU)
     amrex::Gpu::synchronize();
     const int num_out_of_range_particles = out_of_range_particles.dataValue();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
                                      "out of range particles found in deposition");
-#endif
 
 }
 
