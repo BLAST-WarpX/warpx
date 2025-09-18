@@ -54,21 +54,7 @@
 
 using namespace amrex;
 
-void
-WarpX::CheckLoadBalance (int step)
-{
-    if (step > 0 && load_balance_intervals.contains(step+1))
-    {
-        LoadBalance();
 
-        // Reset the costs to 0
-        ResetCosts();
-    }
-    if (!costs.empty())
-    {
-        RescaleCosts(step);
-    }
-}
 
 void
 WarpX::LoadBalance ()
@@ -327,79 +313,4 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
     // not needed yet
 }
 
-void
-WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > >& a_costs)
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
 
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const auto & mypc_ref = GetPartContainer();
-        const auto nSpecies = mypc_ref.nSpecies();
-
-        // Species loop
-        for (int i_s = 0; i_s < nSpecies; ++i_s)
-        {
-            auto & myspc = mypc_ref.GetParticleContainer(i_s);
-
-            // Particle loop
-            for (WarpXParIter pti(myspc, lev); pti.isValid(); ++pti)
-            {
-                (*a_costs[lev])[pti.index()] += costs_heuristic_particles_wt*pti.numParticles();
-            }
-        }
-
-        // Cell loop
-        MultiFab* Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
-        for (MFIter mfi(*Ex, false); mfi.isValid(); ++mfi)
-        {
-            const Box& gbx = mfi.growntilebox();
-            (*a_costs[lev])[mfi.index()] += costs_heuristic_cells_wt*gbx.numPts();
-        }
-    }
-}
-
-void
-WarpX::ResetCosts ()
-{
-    AMREX_ALWAYS_ASSERT(!costs.empty());
-    AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr)
-        {
-            // Reset costs
-            (*costs[lev])[i] = 0.0;
-        }
-    }
-}
-
-void
-WarpX::RescaleCosts (int step)
-{
-    // rescale is only used for timers
-    if (WarpX::load_balance_costs_update_algo != LoadBalanceCostsUpdateAlgo::Timers)
-    {
-        return;
-    }
-
-    AMREX_ALWAYS_ASSERT(costs.size() == finest_level + 1);
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        if (costs[lev])
-        {
-            // Perform running average of the costs
-            // (Giving more importance to most recent costs; only needed
-            // for timers update, heuristic load balance considers the
-            // instantaneous costs)
-            for (const auto& i : costs[lev]->IndexArray())
-            {
-                (*costs[lev])[i] *= (1._rt - 2._rt/load_balance_intervals.localPeriod(step+1));
-            }
-        }
-    }
-}

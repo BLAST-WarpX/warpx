@@ -23,6 +23,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
 #include "Initialization/ExternalField_fwd.H"
+#include "LoadBalancing/LoadBalancer_fwd.H"
 #include "Particles/ParticleBoundaryBuffer_fwd.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer_fwd.H"
@@ -188,10 +189,6 @@ public:
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
     EvolveScheme evolve_scheme = EvolveScheme::Default;
-    /** Records a number corresponding to the load balance cost update strategy
-     *  being used (0 or 1 corresponding to timers or heuristic).
-     */
-    static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
     /** Integer that correspond to macroscopic Maxwell solver algorithm
      *  (BackwardEuler - 0, Lax-Wendroff - 1)
      */
@@ -400,12 +397,6 @@ public:
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
-    static amrex::LayoutData<amrex::Real>* getCosts (int lev);
-
-    void setLoadBalanceEfficiency (int lev, amrex::Real efficiency);
-
-    amrex::Real getLoadBalanceEfficiency (int lev);
-
     static amrex::IntVect filter_npass_each_dir;
     BilinearFilter bilinear_filter;
     amrex::Vector< std::unique_ptr<NCIGodfreyFilter> > nci_godfrey_filter_exeybz;
@@ -534,25 +525,6 @@ public:
     /** \brief perform load balance; compute and communicate new `amrex::DistributionMapping`
      */
     void LoadBalance ();
-
-    /** \brief resets costs to zero
-     */
-    void ResetCosts ();
-
-    /** Perform running average of the LB costs
-     *
-     * Only needed for timers cost update, heuristic load balance considers the
-     * instantaneous costs.
-     * This gives more importance to most recent costs.
-     */
-    void RescaleCosts (int step);
-
-    /** \brief returns the load balance interval
-     */
-    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
-    {
-        return load_balance_intervals;
-    }
 
     /**
      * \brief Private function for spectral solver
@@ -869,13 +841,6 @@ public:
      * \param[in] lev level of the Multifabs that is initialized
      */
     void InitializeEBGridData(int lev);
-
-    /** \brief adds particle and cell contributions in cells to compute heuristic
-     * cost in each box on each level, and records in `costs`
-     * @param[in] costs vector of (`unique_ptr` to) vectors; expected to be initialized
-     * to correct number of boxes and boxes per level
-     */
-    void ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > >& costs);
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
@@ -1298,39 +1263,7 @@ private:
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
 
     // Load balancing
-    /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
-     * for getting steps at which load balancing is performed */
-    utils::parser::IntervalsParser load_balance_intervals;
-    /** Collection of LayoutData to keep track of weights used in load balancing
-     * routines. Contains timer-based or heuristic-based costs depending on input option */
-    amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > > costs;
-    /** Load balance with 'space filling curve' strategy. */
-    int load_balance_with_sfc = 0;
-    /** Controls the maximum number of boxes that can be assigned to a rank during
-     * load balance via the 'knapsack' strategy; e.g., if there are 4 boxes per rank,
-     * `load_balance_knapsack_factor=2` limits the maximum number of boxes that can
-     * be assigned to a rank to 8. */
-    amrex::Real load_balance_knapsack_factor = amrex::Real(1.24);
-    /** Threshold value that controls whether to adopt the proposed distribution
-     * mapping during load balancing.  The new distribution mapping is adopted
-     * if the ratio of proposed distribution mapping efficiency to current
-     * distribution mapping efficiency is larger than the threshold; 'efficiency'
-     * here means the average cost per MPI rank.  */
-    amrex::Real load_balance_efficiency_ratio_threshold = amrex::Real(1.1);
-    /** Current load balance efficiency for each level.  */
-    amrex::Vector<amrex::Real> load_balance_efficiency;
-    /** Weight factor for cells in `Heuristic` costs update.
-     * Default values on GPU are determined from single-GPU tests on Summit.
-     * The problem setup for these tests is an empty (i.e. no particles) domain
-     * of size 256 by 256 by 256 cells, from which the average time per iteration
-     * per cell is computed. */
-    amrex::Real costs_heuristic_cells_wt = amrex::Real(0);
-    /** Weight factor for particles in `Heuristic` costs update.
-     * Default values on GPU are determined from single-GPU tests on Summit.
-     * The problem setup for these tests is a high-ppc (27 particles per cell)
-     * uniform plasma on a domain of size 128 by 128 by 128, from which the approximate
-     * time per iteration per particle is computed. */
-    amrex::Real costs_heuristic_particles_wt = amrex::Real(0);
+    std::unique_ptr<warpx::load_balancing::LoadBalancer> m_load_balancer;
 
     // Determines timesteps for override sync
     utils::parser::IntervalsParser override_sync_intervals;

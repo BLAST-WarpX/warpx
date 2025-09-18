@@ -5,9 +5,48 @@
  * License: BSD-3-Clause-LBNL
  */
 
- #include "HeuristicCostsTracker.H"
+#include "HeuristicCostsTracker.H"
+
+#include "Utils/TextMsg.H"
+
+#include "AMReX_ParmParse.H"
 
 namespace warpx::load_balancing
 {
+    HeuristicCostsTracker::HeuristicCostsTracker (
+        const int particle_shape, const ElectromagneticSolverAlgo em_solver_id)
+    {
+        const auto pp_algo = amrex::ParmParse pp_algo{"algo"};
 
+        const bool has_custom_value_for_cells = utils::parser::queryWithParser(
+            pp_algo, "costs_heuristic_cells_wt", m_costs_heuristic_cells_wt);
+
+        const bool has_custom_value_for_particles = utils::parser::queryWithParser(
+            pp_algo, "costs_heuristic_particles_wt", m_costs_heuristic_particles_wt);
+
+        // Set default values for particle and cell weights for costs update;
+        // Default values listed here for the case AMREX_USE_GPU are determined
+        // from single-GPU tests on Summit.
+        if ((!has_custom_value_for_cells) && (!has_custom_value_for_particles)){
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (particle_shape > 0) && (particle_shape <= max_supported_order),
+                "Only shape function orders between 1 and " +
+                std::to_string(max_supported_order) +
+                " have default cost heuristics.");
+
+#ifdef AMREX_USE_GPU
+            if (em_solver_id == ElectromagneticSolverAlgo::PSATD) {
+                m_costs_heuristic_cells_wt     = costs_heuristic_cells_wt_gpu_psatd_default[particle_shape];
+                m_costs_heuristic_particles_wt = costs_heuristic_particles_wt_gpu_psatd_default[particle_shape];
+            } else { // FDTD
+                m_costs_heuristic_cells_wt     = costs_heuristic_cells_wt_gpu_fdtd_default[particle_shape];
+                m_costs_heuristic_particles_wt = costs_heuristic_particles_wt_gpu_fdtd_default[particle_shape];
+            }
+#else // CPU
+            m_costs_heuristic_cells_wt     = costs_heuristic_cells_wt_cpu_default[particle_shape];
+            m_costs_heuristic_particles_wt = costs_heuristic_particles_wt_cpu_default[particle_shape];
+#endif // AMREX_USE_GPU
+        }
+    }
 }

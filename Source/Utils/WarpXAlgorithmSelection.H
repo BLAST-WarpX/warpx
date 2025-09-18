@@ -111,14 +111,6 @@ AMREX_ENUM(TimeDependencyRho,
            Quadratic,
            Default = Linear);
 
-/** Strategy to compute weights for use in load balance.
- */
-AMREX_ENUM(LoadBalanceCostsUpdateAlgo,
-           Timers,     //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
-           Heuristic,  /**< load balance according to weights computed from number of cells
-                          and number of particles per box (i.e., with `costs_heuristic`) */
-           Default = Timers);
-
 /** Field boundary conditions at the domain boundary
  */
 AMREX_ENUM(FieldBoundaryType,

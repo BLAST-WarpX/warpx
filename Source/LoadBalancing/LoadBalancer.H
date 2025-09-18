@@ -10,14 +10,27 @@
 
 #include "LoadBalancer_fwd.H"
 
+#include "HeuristicCostsTracker.H"
 #include "ScopedTimeTracker.H"
 #include "Utils/Parser/IntervalsParser.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <AMReX_Enum.H>
 
 #include <memory>
 #include <optional>
 
 namespace warpx::load_balancing
 {
+
+    /** Strategy to compute weights for use in load balance.
+    */
+    AMREX_ENUM(CostsUpdateAlgo,
+           Timers,     //!< load balance according to in-code timer-based weights (i.e., with  `costs`)
+           Heuristic,  /**< load balance according to weights computed from number of cells
+                          and number of particles per box (i.e., with `costs_heuristic`) */
+           Default = Timers);
+
     class LoadBalancer
     {
 
@@ -26,7 +39,7 @@ namespace warpx::load_balancing
         static constexpr auto default_load_balance_knapsack_factor            = amrex::Real{1.24};
         static constexpr auto default_load_balance_efficiency_ratio_threshold = amrex::Real{1.1};
 
-        LoadBalancer ();
+        LoadBalancer (int particle_shape, ElectromagneticSolverAlgo em_solver_id);
 
     private:
         /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
@@ -51,7 +64,153 @@ namespace warpx::load_balancing
 
         /** Current load balance efficiency for each level.  */
         amrex::Vector<amrex::Real> m_load_balance_efficiency;
+
+        /** Records a number corresponding to the load balance cost update strategy
+        *  being used (0 or 1 corresponding to timers or heuristic).
+        */
+        auto m_costs_update_algo = CostsUpdateAlgo::Default;
+
+        std::optional<HeuristicCostsTracker> m_heuristic_cost_tracker = std::nullopt;
     };
 }
 
 #endif //WARPX_LOAD_BALANCING_LOAD_BALANCER_H_
+
+/*
+amrex::LayoutData<amrex::Real>*
+WarpX::getCosts (int lev)
+{
+    if (m_instance)
+    {
+        return m_instance->costs[lev].get();
+    } else
+    {
+        return nullptr;
+    }
+}
+
+void
+WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
+{
+    if (m_instance)
+    {
+        m_instance->load_balance_efficiency[lev] = efficiency;
+    } else
+    {
+        return;
+    }
+}
+
+amrex::Real
+WarpX::getLoadBalanceEfficiency (const int lev)
+{
+    if (m_instance)
+    {
+        return m_instance->load_balance_efficiency[lev];
+    } else
+    {
+        return -1;
+    }
+}
+
+
+void
+WarpX::ResetCosts ()
+{
+    AMREX_ALWAYS_ASSERT(!costs.empty());
+    AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        const auto iarr = costs[lev]->IndexArray();
+        for (const auto& i : iarr)
+        {
+            // Reset costs
+            (*costs[lev])[i] = 0.0;
+        }
+    }
+}
+
+void
+WarpX::RescaleCosts (int step)
+{
+    // rescale is only used for timers
+    if (WarpX::load_balance_costs_update_algo != LoadBalanceCostsUpdateAlgo::Timers)
+    {
+        return;
+    }
+
+    AMREX_ALWAYS_ASSERT(costs.size() == finest_level + 1);
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        if (costs[lev])
+        {
+            // Perform running average of the costs
+            // (Giving more importance to most recent costs; only needed
+            // for timers update, heuristic load balance considers the
+            // instantaneous costs)
+            for (const auto& i : costs[lev]->IndexArray())
+            {
+                (*costs[lev])[i] *= (1._rt - 2._rt/load_balance_intervals.localPeriod(step+1));
+            }
+        }
+    }
+}
+
+void
+WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > >& a_costs)
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        const auto & mypc_ref = GetPartContainer();
+        const auto nSpecies = mypc_ref.nSpecies();
+
+        // Species loop
+        for (int i_s = 0; i_s < nSpecies; ++i_s)
+        {
+            auto & myspc = mypc_ref.GetParticleContainer(i_s);
+
+            // Particle loop
+            for (WarpXParIter pti(myspc, lev); pti.isValid(); ++pti)
+            {
+                (*a_costs[lev])[pti.index()] += costs_heuristic_particles_wt*pti.numParticles();
+            }
+        }
+
+        // Cell loop
+        MultiFab* Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
+        for (MFIter mfi(*Ex, false); mfi.isValid(); ++mfi)
+        {
+            const Box& gbx = mfi.growntilebox();
+            (*a_costs[lev])[mfi.index()] += costs_heuristic_cells_wt*gbx.numPts();
+        }
+    }
+}
+
+    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
+    {
+        return load_balance_intervals;
+    }
+
+void
+WarpX::CheckLoadBalance (int step)
+{
+    if (step > 0 && load_balance_intervals.contains(step+1))
+    {
+        LoadBalance();
+
+        // Reset the costs to 0
+        ResetCosts();
+    }
+    if (!costs.empty())
+    {
+        RescaleCosts(step);
+    }
+}
+
+
+*/

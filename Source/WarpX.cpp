@@ -38,6 +38,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
+#include "LoadBalacing/LoadBalancer.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -99,6 +100,7 @@
 #include <utility>
 
 using namespace amrex;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 int WarpX::do_moving_window = 0;
@@ -432,62 +434,6 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // Set default values for particle and cell weights for costs update;
-    // Default values listed here for the case AMREX_USE_GPU are determined
-    // from single-GPU tests on Summit.
-    if (costs_heuristic_cells_wt<=0. && costs_heuristic_particles_wt<=0.
-        && WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Heuristic)
-    {
-#ifdef AMREX_USE_GPU
-        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
-            switch (WarpX::nox)
-            {
-                case 1:
-                    costs_heuristic_cells_wt = 0.575_rt;
-                    costs_heuristic_particles_wt = 0.425_rt;
-                    break;
-                case 2:
-                    costs_heuristic_cells_wt = 0.405_rt;
-                    costs_heuristic_particles_wt = 0.595_rt;
-                    break;
-                case 3:
-                    costs_heuristic_cells_wt = 0.250_rt;
-                    costs_heuristic_particles_wt = 0.750_rt;
-                    break;
-                case 4:
-                    // this is only a guess
-                    costs_heuristic_cells_wt = 0.200_rt;
-                    costs_heuristic_particles_wt = 0.800_rt;
-                    break;
-            }
-        } else { // FDTD
-            switch (WarpX::nox)
-            {
-                case 1:
-                    costs_heuristic_cells_wt = 0.401_rt;
-                    costs_heuristic_particles_wt = 0.599_rt;
-                    break;
-                case 2:
-                    costs_heuristic_cells_wt = 0.268_rt;
-                    costs_heuristic_particles_wt = 0.732_rt;
-                    break;
-                case 3:
-                    costs_heuristic_cells_wt = 0.145_rt;
-                    costs_heuristic_particles_wt = 0.855_rt;
-                    break;
-                case 4:
-                    // this is only a guess
-                    costs_heuristic_cells_wt = 0.100_rt;
-                    costs_heuristic_particles_wt = 0.900_rt;
-                    break;
-            }
-        }
-#else // CPU
-        costs_heuristic_cells_wt = 0.1_rt;
-        costs_heuristic_particles_wt = 0.9_rt;
-#endif // AMREX_USE_GPU
-    }
-
     // Allocate field solver objects
 #ifdef WARPX_USE_FFT
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -521,6 +467,8 @@ WarpX::WarpX ()
 
     m_accelerator_lattice.resize(nlevs_max);
 
+    m_load_balancer = std::make_unique<load_balancing::LoadBalancer>{
+        nox, electromagnetic_solver_id};
 }
 
 WarpX::~WarpX ()
@@ -1373,26 +1321,6 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
                 "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
-        }
-
-        // Load balancing parameters
-        std::vector<std::string> load_balance_intervals_string_vec = {"0"};
-        pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
-        load_balance_intervals = utils::parser::IntervalsParser(
-            load_balance_intervals_string_vec);
-        pp_algo.query("load_balance_with_sfc", load_balance_with_sfc);
-        // Knapsack factor only used with non-SFC strategy
-        if (!load_balance_with_sfc) {
-            pp_algo.query("load_balance_knapsack_factor", load_balance_knapsack_factor);
-        }
-        utils::parser::queryWithParser(pp_algo, "load_balance_efficiency_ratio_threshold",
-                        load_balance_efficiency_ratio_threshold);
-        pp_algo.query_enum_sloppy("load_balance_costs_update", load_balance_costs_update_algo, "-_");
-        if (WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Heuristic) {
-            utils::parser::queryWithParser(
-                pp_algo, "costs_heuristic_cells_wt", costs_heuristic_cells_wt);
-            utils::parser::queryWithParser(
-                pp_algo, "costs_heuristic_particles_wt", costs_heuristic_particles_wt);
         }
 
         // Parse algo.particle_shape and check that input is acceptable
@@ -3283,41 +3211,7 @@ WarpX::getPMLdirections() const
     return dirsWithPML;
 }
 
-amrex::LayoutData<amrex::Real>*
-WarpX::getCosts (int lev)
-{
-    if (m_instance)
-    {
-        return m_instance->costs[lev].get();
-    } else
-    {
-        return nullptr;
-    }
-}
 
-void
-WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
-{
-    if (m_instance)
-    {
-        m_instance->load_balance_efficiency[lev] = efficiency;
-    } else
-    {
-        return;
-    }
-}
-
-amrex::Real
-WarpX::getLoadBalanceEfficiency (const int lev)
-{
-    if (m_instance)
-    {
-        return m_instance->load_balance_efficiency[lev];
-    } else
-    {
-        return -1;
-    }
-}
 
 
 void
