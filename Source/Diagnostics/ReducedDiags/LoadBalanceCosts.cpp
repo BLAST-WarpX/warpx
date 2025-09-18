@@ -80,6 +80,9 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
 
+    // get MultiParticleContainer class object
+    const auto & mypc = warpx.GetPartContainer();
+
     // judge if the diags should be done
     // costs is initialized only if we're doing load balance
     if (!m_intervals.contains(step+1) ||
@@ -109,11 +112,15 @@ void LoadBalanceCosts::ComputeDiags (int step)
 
     // read in WarpX costs to local copy; compute if using `Heuristic` update
     amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > > costs;
+    amrex::Vector<std::unique_ptr<amrex::LayoutData<std::size_t> > > mem_used;
 
     costs.resize(nLevels);
+    mem_used.resize(nLevels);
     for (int lev = 0; lev < nLevels; ++lev)
     {
         costs[lev] = std::make_unique<LayoutData<Real>>(*WarpX::getCosts(lev));
+        mem_used[lev] = std::make_unique<LayoutData<std::size_t>>(warpx.boxArray(lev), warpx.DistributionMap(lev));
+        mypc.CapacityOfParticlesInGrid(*mem_used[lev], lev);
     }
 
     if (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Heuristic)
@@ -151,8 +158,9 @@ void LoadBalanceCosts::ComputeDiags (int step)
 #endif
             m_data[shift_m_data + mfi.index()*m_nDataFields + 6] = static_cast<amrex::Real>(tbx.d_numPts()); // note: difference to volume
             m_data[shift_m_data + mfi.index()*m_nDataFields + 7] = countBoxMacroParticles(mfi, lev);
+            m_data[shift_m_data + mfi.index()*m_nDataFields + 8] = (*mem_used[lev])[mfi.index()];
 #ifdef AMREX_USE_GPU
-            m_data[shift_m_data + mfi.index()*m_nDataFields + 8] = amrex::Gpu::Device::deviceId();
+            m_data[shift_m_data + mfi.index()*m_nDataFields + 9] = amrex::Gpu::Device::deviceId();
 #endif
             // ...
         }
@@ -326,6 +334,8 @@ void LoadBalanceCosts::WriteToFile (int step) const
             ofstmp << "[" << c++ << "]num_cells_" + std::to_string(boxNumber) + "()";
             ofstmp << m_sep;
             ofstmp << "[" << c++ << "]num_macro_particles_" + std::to_string(boxNumber) + "()";
+            ofstmp << m_sep;
+            ofstmp << "[" << c++ << "]particles_mem_" + std::to_string(boxNumber) + "()";
 #ifdef AMREX_USE_GPU
             ofstmp << m_sep;
             ofstmp << "[" << c++ << "]gpu_ID_box_" + std::to_string(boxNumber) + "()";
