@@ -791,7 +791,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                        amrex::CompileTimeOptions<no_qed  ,has_qed>,
                                        amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
                        {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
-                       num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
+                       num_unconverged_particles, [=,count_particles_ptr=out_of_range_particles_ptr] AMREX_GPU_DEVICE (long i,
                                                                  auto exteb_control, auto qed_control, auto depos_order_control)
     {
 
@@ -1030,28 +1030,28 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                         VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr, max_crossings,
-                                                            out_of_range_particles_ptr,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_two) {
                         VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr, max_crossings,
-                                                            out_of_range_particles_ptr,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_three) {
                         VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr, max_crossings,
-                                                            out_of_range_particles_ptr,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_four) {
                         VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr, max_crossings,
-                                                            out_of_range_particles_ptr,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                 }
