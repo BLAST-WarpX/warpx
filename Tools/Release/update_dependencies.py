@@ -42,6 +42,14 @@ def update(args):
         repo_dict["picsar"]["tags"] = (
             "https://api.github.com/repos/ECP-WarpX/picsar/tags"
         )
+    if args.all or args.pybind11:
+        repo_dict["pybind11"] = {}
+        repo_dict["pybind11"]["commit"] = (
+            "https://api.github.com/repos/pybind/pybind11/commits/master"
+        )
+        repo_dict["pybind11"]["tags"] = (
+            "https://api.github.com/repos/pybind/pybind11/tags"
+        )
     if args.all or args.warpx:
         repo_dict["warpx"] = {}
         repo_dict["warpx"]["commit"] = (
@@ -56,6 +64,7 @@ def update(args):
         "amrex": "AMReX",
         "pyamrex": "pyAMReX",
         "picsar": "PICSAR",
+        "pybind11": "pybind11",
         "warpx": "WarpX",
     }
 
@@ -157,6 +166,14 @@ if __name__ == "__main__":
         dest="picsar",
     )
 
+    # add arguments: pybind11 option
+    parser.add_argument(
+        "--pybind11",
+        help="Update pybind11 only",
+        action="store_true",
+        dest="pybind11",
+    )
+
     # add arguments: WarpX option
     parser.add_argument(
         "--warpx",
@@ -178,7 +195,9 @@ if __name__ == "__main__":
 
     # set args.all automatically
     args.all = (
-        False if (args.amrex or args.pyamrex or args.picsar or args.warpx) else True
+        False
+        if (args.amrex or args.pyamrex or args.picsar or args.pybind11 or args.warpx)
+        else True
     )
 
     # update
