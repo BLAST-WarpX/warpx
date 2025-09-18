@@ -38,7 +38,6 @@
 #   endif
 #endif
 #include "AcceleratorLattice/AcceleratorLattice.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
