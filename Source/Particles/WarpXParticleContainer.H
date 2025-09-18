@@ -589,6 +589,7 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    void setDoNotGather (int flag) { do_not_gather = flag; }
 
     bool HasiAttrib (const std::string& name)
     {

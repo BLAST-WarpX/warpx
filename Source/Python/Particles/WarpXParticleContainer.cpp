@@ -145,5 +145,9 @@ void init_WarpXParticleContainer (py::module& m)
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
             py::arg("flag")
         )
+        .def("set_do_not_gather",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotGather(flag); },
+            py::arg("flag")
+        )
     ;
 }
