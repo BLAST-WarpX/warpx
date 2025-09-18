@@ -7,7 +7,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Evolve/WarpXDtType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
@@ -107,7 +106,7 @@ void WarpX::HybridPICEvolveFields ()
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::FirstHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -141,7 +140,7 @@ void WarpX::HybridPICEvolveFields ()
             rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::SecondHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }

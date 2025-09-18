@@ -12,8 +12,8 @@
 #define WARPX_ParticleContainer_H_
 
 #include "MultiParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Collision/CollisionHandler.H"
 #ifdef WARPX_QED
@@ -111,10 +111,9 @@ public:
         std::string const& current_fp_string,
         amrex::Real t,
         amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
+        SubcyclingHalf subcycling_half=SubcyclingHalf::None,
         bool skip_deposition=false,
-        bool deposit_mass_matrices=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     );
 
     /**

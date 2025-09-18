@@ -1855,7 +1855,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     n0: float
         Reference plasma density in m^-3.
 
-    gamma: float, default=3/2
+    gamma: float, default=5/3
         Exponent in calculation of electron pressure.
 
     n_floor: float, optional
@@ -3122,6 +3122,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
 
+        self.self_fields_required_precision = kw.pop(
+            "warpx_self_fields_required_precision", None
+        )
+        self.self_fields_absolute_tolerance = kw.pop(
+            "warpx_self_fields_absolute_tolerance", None
+        )
+        self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
+        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -3217,6 +3226,15 @@ class Simulation(picmistandard.PICMI_Simulation):
             else:
                 interpolation_order = particle_shape
             pywarpx.algo.particle_shape = interpolation_order
+
+        pywarpx.warpx.self_fields_required_precision = (
+            self.self_fields_required_precision
+        )
+        pywarpx.warpx.self_fields_absolute_tolerance = (
+            self.self_fields_absolute_tolerance
+        )
+        pywarpx.warpx.self_fields_max_iters = self.self_fields_max_iters
+        pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
 
         self.solver.solver_initialize_inputs()
 

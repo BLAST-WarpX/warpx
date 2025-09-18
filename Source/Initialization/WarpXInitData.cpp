@@ -911,7 +911,7 @@ WarpX::AddExternalFields (int const lev)
 
 void
 WarpX::InitDiagnostics () {
-    multi_diags->InitData();
+    multi_diags->InitData(*mypc);
     reduced_diags->InitData();
 }
 
@@ -925,8 +925,6 @@ WarpX::InitFromScratch ()
     if (m_implicit_solver) {
 
         m_implicit_solver->Define(this);
-        m_implicit_solver->GetParticleSolverParams( max_particle_its_in_implicit_scheme,
-                                                    particle_tol_in_implicit_scheme );
         m_implicit_solver->CreateParticleAttributes();
     }
 

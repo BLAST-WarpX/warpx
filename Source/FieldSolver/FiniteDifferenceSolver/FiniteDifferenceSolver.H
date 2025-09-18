@@ -16,7 +16,6 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include "BoundaryConditions/PML_fwd.H"
-#include "Evolve/WarpXDtType.H"
 #include "HybridPICModel/HybridPICModel_fwd.H"
 #include "MacroscopicProperties/MacroscopicProperties_fwd.H"
 
@@ -72,7 +71,7 @@ class FiniteDifferenceSolver
         void EvolveF ( amrex::MultiFab* Ffield,
                        ablastr::fields::VectorField const& Efield,
                        amrex::MultiFab* rhofield,
-                       int rhocomp,
+                       int rho_comp,
                        amrex::Real dt );
 
         void EvolveG (amrex::MultiFab* Gfield,
@@ -250,7 +249,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField const & Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >
@@ -309,7 +308,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField const & Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >
@@ -366,7 +365,7 @@ class FiniteDifferenceSolver
             amrex::MultiFab* Ffield,
             ablastr::fields::VectorField Efield,
             amrex::MultiFab* rhofield,
-            int rhocomp,
+            int rho_comp,
             amrex::Real dt );
 
         template< typename T_Algo >

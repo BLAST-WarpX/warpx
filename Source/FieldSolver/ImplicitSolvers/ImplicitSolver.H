@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
@@ -50,14 +52,9 @@ public:
 
     virtual void PrintParameters () const = 0;
 
-    void GetParticleSolverParams (int&  a_max_particle_iter,
-                                  amrex::ParticleReal&  a_particle_tol ) const
-    {
-        a_max_particle_iter = m_max_particle_iterations;
-        a_particle_tol = m_particle_tolerance;
-    }
-
     void CreateParticleAttributes () const;
+
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
@@ -145,13 +142,30 @@ protected:
      * \brief tolerance used by the iterative method used to obtain a self-consistent
      *  update of the particle positions and velocities for given E and B on the grid
      */
-    amrex::ParticleReal m_particle_tolerance = 1.0e-10;
+    amrex::ParticleReal m_particle_tolerance = amrex::ParticleReal(1.0e-10);
 
     /**
      * \brief maximum iterations for the iterative method used to obtain a self-consistent
      *  update of the particle positions and velocities for given E and B on the grid
      */
     int m_max_particle_iterations = 21;
+
+    /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
+
+    /**
+     * \brief whether to skip the full Picard update of particls on the initial newton step
+     */
+    bool m_skip_particle_picard_init = false;
 
     /**
      * \brief Whether to use mass matrices for the implicit solver
@@ -196,7 +210,7 @@ protected:
      */
     void InitializeMassMatrices ();
 
-    void PrintMassMatricesParameters () const;
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
