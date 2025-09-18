@@ -91,7 +91,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  const long offset,
                                  const long np_to_push,
                                  int lev, int gather_lev,
-                                 amrex::Real dt, ScaleFields /*scaleFields*/, DtType a_dt_type)
+                                 amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half)
 {
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -126,7 +126,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     }
 #endif
 
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    const int do_copy = (m_do_back_transformed_particles && (subcycling_half!=SubcyclingHalf::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
@@ -235,7 +235,7 @@ void
 PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  int lev,
                                  const std::string& current_fp_string,
-                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                 Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                  ImplicitOptions const * /*implicit_options*/)
 {
     // This does gather, push and deposit.
@@ -243,6 +243,6 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, nullptr);
+                                       t, dt, subcycling_half, skip_deposition, nullptr);
 
 }

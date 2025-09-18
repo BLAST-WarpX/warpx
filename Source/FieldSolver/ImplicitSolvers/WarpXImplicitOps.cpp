@@ -9,7 +9,6 @@
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
@@ -76,7 +75,7 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[1], *a_Bn[lev][1], 0, 0, ncomps, a_Bn[lev][1]->nGrowVect());
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
-    EvolveB(a_thetadt, DtType::Full, start_time);
+    EvolveB(a_thetadt, SubcyclingHalf::None, start_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -87,7 +86,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
     using warpx::fields::FieldType;
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
-    ApplyBfieldBoundary(0, PatchType::fine, DtType::Full, a_time);
+    ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 

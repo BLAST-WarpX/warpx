@@ -49,7 +49,7 @@ void FiniteDifferenceSolver::EvolveF (
     amrex::MultiFab* Ffield,
     ablastr::fields::VectorField const& Efield,
     amrex::MultiFab* const rhofield,
-    int const rhocomp,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Select algorithm (The choice of algorithm is a runtime option,
@@ -57,25 +57,25 @@ void FiniteDifferenceSolver::EvolveF (
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
 
-        EvolveFCylindrical <CylindricalYeeAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCylindrical <CylindricalYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
 #elif defined(WARPX_DIM_RSPHERE)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
 
-        EvolveFSpherical <SphericalYeeAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFSpherical <SphericalYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
 #else
     if (m_grid_type == GridType::Collocated) {
 
-        EvolveFCartesian <CartesianNodalAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianNodalAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
 
-        EvolveFCartesian <CartesianYeeAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
-        EvolveFCartesian <CartesianCKCAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianCKCAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
 #endif
     } else {
@@ -92,7 +92,7 @@ void FiniteDifferenceSolver::EvolveFCartesian (
     amrex::MultiFab* Ffield,
     ablastr::fields::VectorField const Efield,
     amrex::MultiFab* const rhofield,
-    int const rhocomp,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -126,7 +126,7 @@ void FiniteDifferenceSolver::EvolveFCartesian (
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 F(i, j, k) += dt * (
-                    - rho(i, j, k, rhocomp) * inv_epsilon0
+                    - rho(i, j, k, rho_comp) * inv_epsilon0
                     + T_Algo::DownwardDx(Ex, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDy(Ey, coefs_y, n_coefs_y, i, j, k)
                     + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, k) );
@@ -145,7 +145,7 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
     amrex::MultiFab* Ffield,
     ablastr::fields::VectorField const & Efield,
     amrex::MultiFab* const rhofield,
-    int const rhocomp,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -178,10 +178,10 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
         Real constexpr inv_epsilon0 = 1./PhysConst::ep0;
 
         // Use the right shift in components:
-        // - the first WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho old (i.e. rhocomp=0)
-        // - the next WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho new (i.e. rhocomp=1)
+        // - the first WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho old (i.e. rho_comp=0)
+        // - the next WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho new (i.e. rho_comp=1)
         int rho_shift = 0;
-        if (rhocomp == 1) {
+        if (rho_comp == 1) {
             rho_shift = WarpX::ncomps;
         }
 
@@ -235,7 +235,7 @@ void FiniteDifferenceSolver::EvolveFSpherical (
     amrex::MultiFab* Ffield,
     ablastr::fields::VectorField const & Efield,
     amrex::MultiFab* const rhofield,
-    int const rhocomp,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -263,10 +263,10 @@ void FiniteDifferenceSolver::EvolveFSpherical (
         Real constexpr inv_epsilon0 = 1./PhysConst::ep0;
 
         // Use the right shift in components:
-        // - the first component corresponds to rho old (i.e. rhocomp=0)
-        // - the next component corresponds to rho new (i.e. rhocomp=1)
+        // - the first component corresponds to rho old (i.e. rho_comp=0)
+        // - the next component corresponds to rho new (i.e. rho_comp=1)
         int rho_shift = 0;
-        if (rhocomp == 1) {
+        if (rho_comp == 1) {
             rho_shift = WarpX::ncomps;
         }
 
