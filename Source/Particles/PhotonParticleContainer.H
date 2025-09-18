@@ -8,7 +8,6 @@
 #ifndef WARPX_PhotonParticleContainer_H_
 #define WARPX_PhotonParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "PhysicalParticleContainer.H"
@@ -52,7 +51,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
@@ -68,7 +67,7 @@ public:
                         long np_to_push,
                         int lev, int gather_lev,
                         amrex::Real dt, ScaleFields scaleFields,
-                        DtType a_dt_type) override;
+                        SubcyclingHalf subcycling_half) override;
 
     // Do nothing
     void PushP (int /*lev*/,

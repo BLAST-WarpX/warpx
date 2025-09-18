@@ -8,7 +8,6 @@
 #ifndef WARPX_RigidInjectedParticleContainer_H_
 #define WARPX_RigidInjectedParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "PhysicalParticleContainer.H"
@@ -70,7 +69,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
@@ -86,7 +85,7 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full) override;
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None) override;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,

@@ -9,6 +9,7 @@
 #include "ComputeDiagFunctors/PartPerCellFunctor.H"
 #include "ComputeDiagFunctors/PartPerGridFunctor.H"
 #include "ComputeDiagFunctors/ParticleReductionFunctor.H"
+#include "ComputeDiagFunctors/PhiFunctor.H"
 #include "ComputeDiagFunctors/TemperatureFunctor.H"
 #include "ComputeDiagFunctors/RhoFunctor.H"
 #include "Diagnostics/Diagnostics.H"
@@ -493,8 +494,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("G"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "phi" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::phi_fp, lev), lev, m_crse_ratio,
-                                                        false, ncomp);
+            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(lev, m_crse_ratio, false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("phi"), ncomp);
             }
@@ -886,7 +886,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "G" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "phi" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::phi_fp, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "part_per_cell" ){
             m_all_field_functors[lev][comp] = std::make_unique<PartPerCellFunctor>(nullptr, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "part_per_grid" ){
