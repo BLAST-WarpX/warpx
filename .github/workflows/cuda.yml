@@ -5,6 +5,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
@@ -127,7 +128,9 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         git clone https://github.com/AMReX-Codes/amrex.git ../amrex
-        cd ../amrex && git checkout --detach 25.06 && cd -
+        dependencies_file="./dependencies.json"
+        amrex_commit=$(jq -r '.commit_amrex' "${dependencies_file}")
+        cd ../amrex && git checkout --detach ${amrex_commit} && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s

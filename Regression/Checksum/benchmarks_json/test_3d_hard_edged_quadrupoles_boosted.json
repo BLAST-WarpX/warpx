@@ -11,9 +11,9 @@
     "jz": 1.0378980680353126e-07
   },
   "electron": {
-    "particle_momentum_x": 5.95547592772293e-26,
-    "particle_momentum_y": 1.4193083995658448e-35,
-    "particle_momentum_z": 3.468728458259219e-23,
+    "particle_momentum_x": 5.955475927681812e-26,
+    "particle_momentum_y": 1.46132715323797e-35,
+    "particle_momentum_z": 3.468728458259192e-23,
     "particle_position_x": 0.04996023704068632,
     "particle_position_y": 8.398113213240246e-15,
     "particle_position_z": 0.10931682580470413,

@@ -119,8 +119,6 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
     }
 
-    pc_tmp = std::make_unique<PhysicalParticleContainer>(amr_core);
-
     // Setup particle collisions
     collisionhandler = std::make_unique<CollisionHandler>(this);
 
@@ -412,7 +410,6 @@ MultiParticleContainer::AllocData ()
     for (auto& pc : allcontainers) {
         pc->AllocData();
     }
-    pc_tmp->AllocData();
 }
 
 void
@@ -423,8 +420,6 @@ MultiParticleContainer::InitData ()
     for (auto& pc : allcontainers) {
         pc->InitData();
     }
-    pc_tmp->InitData();
-
 }
 
 void
@@ -435,7 +430,6 @@ MultiParticleContainer::PostRestart ()
     for (auto& pc : allcontainers) {
         pc->PostRestart();
     }
-    pc_tmp->PostRestart();
 }
 
 void
@@ -460,8 +454,8 @@ void
 MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
-                                Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                bool deposit_mass_matrices, PushType push_type)
+                                Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
@@ -474,14 +468,20 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
-        if (deposit_mass_matrices) {
-            fields.get(FieldType::MassMatrices, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{2}, lev)->setVal(0.0);
+        if (implicit_options && implicit_options->deposit_mass_matrices) {
+            fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{2}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, deposit_mass_matrices, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, implicit_options);
     }
 }
 
@@ -591,6 +591,36 @@ MultiParticleContainer::DepositCharge (
         WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
     }
 #endif
+}
+
+void
+MultiParticleContainer::DepositTemperatures (
+    ablastr::fields::MultiFabRegister & fields,
+    const amrex::Real relative_time)
+{
+    using ablastr::fields::Direction;
+
+    // Call the deposition kernel for each species
+    for (auto& pc : allcontainers)
+    {
+        // If this species does not use temperature deposition then skip to next one
+        if (!pc->getTemperatureDepositionFlag()) { continue; }
+
+        // Generate Name to look up temperature MF in the register
+        const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
+        ablastr::fields::MultiLevelVectorField T_vf =
+            fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
+
+        // Clear temperature MF for this species
+        for (int idim = 0; idim < 3; ++idim) {
+            for (int lev = 0; lev <= WarpX::GetInstance().finestLevel(); ++lev) {
+                T_vf[lev][Direction{idim}]->setVal(0.0_rt);
+            }
+        }
+
+        // Accumulate velocities for this species
+        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+    }
 }
 
 std::unique_ptr<MultiFab>
@@ -1034,10 +1064,10 @@ MultiParticleContainer::doFieldIonization (int lev,
 }
 
 void
-MultiParticleContainer::doCollisions ( Real cur_time, amrex::Real dt )
+MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
     WARPX_PROFILE("MultiParticleContainer::doCollisions()");
-    collisionhandler->doCollisions(cur_time, dt, this);
+    collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
 void MultiParticleContainer::doResampling (
@@ -1125,7 +1155,7 @@ void MultiParticleContainer::InitQuantumSync ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
 
@@ -1183,7 +1213,7 @@ void MultiParticleContainer::InitBreitWheeler ()
     // bw_minimum_chi_phot is the minimum chi parameter to be
     // considered for pair production. If a photon has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real bw_minimum_chi_part;
+    amrex::Real bw_minimum_chi_part = 0;
     if(!utils::parser::queryWithParser(pp_qed_bw, "chi_min", bw_minimum_chi_part)) {
         WARPX_ABORT_WITH_MESSAGE("qed_bw.chi_min should be provided!");
     }
@@ -1247,7 +1277,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){
@@ -1337,7 +1367,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
     // bw_minimum_chi_phot is the minimum chi parameter to be
     // considered for pair production. If a photon has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real bw_minimum_chi_part;
+    amrex::Real bw_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_bw, "chi_min", bw_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){

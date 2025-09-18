@@ -16,6 +16,7 @@
 #   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
+#   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 
 #include "Utils/TextMsg.H"
@@ -43,9 +44,16 @@ void FiniteDifferenceSolver::ComputeCurlA (
         );
 
 #else
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev
         );
+    } else {
+        ComputeCurlACartesian <CartesianNodalAlgorithm> (
+            Bfield, Afield, eb_update_B, lev
+        );
+    }
 
 #endif
     } else {
@@ -58,8 +66,11 @@ void FiniteDifferenceSolver::ComputeCurlA (
 //   * \brief Calculate B from the curl of A
 //   * i.e. B = curl(A) output field on B field mesh staggering
 //   *
-//   * \param[out] curlField  output of curl operation
-//   * \param[in] field   input staggered field, should be on E/J/A mesh staggering
+//   * \param[out] Bfield  output of curl operation
+//   * \param[in] Afield   input staggered field, should be on E/J/A mesh staggering
+//   * \param[in] eb_update_B specifies where the plasma current should be calculated.
+//   * \param[in] lev refinement level
+
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>

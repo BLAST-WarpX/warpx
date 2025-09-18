@@ -13,6 +13,7 @@
 #include "Particles/Collision/BinaryCollision/NuclearFusion/TwoProductFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/ProtonBoronFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/TwoProductInitializeMomentum.H"
+#include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonInitializeMomentum.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -69,6 +70,7 @@ public:
      *
      * @param[in] n_total_pairs how many binary collisions have been performed in this tile
      * @param[in, out] ptile1,ptile2 the particle tiles of the two colliding species
+     * @param[in, out] pc_products particle container of the product particles.
      * @param[out] tile_products array containing tile data of the product particles.
      * @param[in] m1 mass of the first colliding particle species
      * @param[in] m2 mass of the second colliding particle species
@@ -105,7 +107,8 @@ public:
                     const SmartCopy* AMREX_RESTRICT copy_species2,
                     const index_type* AMREX_RESTRICT p_pair_indices_1,
                     const index_type* AMREX_RESTRICT p_pair_indices_2,
-                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight
+                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+                    const amrex::ParticleReal* /*p_product_data*/
                     ) const
     {
         using namespace amrex::literals;
@@ -232,7 +235,14 @@ public:
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         engine);
                 }
-
+                else if(t_collision_type == CollisionType::LinearCompton){
+                    LinearComptonInitializeMomentum(soa_1, soa_2,
+                        soa_products_data[0], soa_products_data[1],
+                        p_pair_indices_1[i], p_pair_indices_2[i],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        engine);
+                }
             }
         });
 
@@ -304,7 +314,8 @@ public:
                     const index_type* /*p_mask*/, const amrex::Vector<index_type>& /*products_np*/,
                     const SmartCopy* /*copy_species1*/, const SmartCopy* /*copy_species2*/,
                     const index_type* /*p_pair_indices_1*/, const index_type* /*p_pair_indices_2*/,
-                    const amrex::ParticleReal* /*p_pair_reaction_weight*/
+                    const amrex::ParticleReal* /*p_pair_reaction_weight*/,
+                    const amrex::ParticleReal* AMREX_RESTRICT /*p_product_data*/
                     ) const
     {
         return {};

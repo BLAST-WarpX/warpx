@@ -17,6 +17,7 @@
 #   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
+#   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 #include "HybridPICModel/HybridPICModel.H"
 #include "Utils/TextMsg.H"
@@ -47,9 +48,16 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
         );
 
 #else
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
             Jfield, Bfield, eb_update_E, lev
         );
+    } else {
+        CalculateCurrentAmpereCartesian <CartesianNodalAlgorithm> (
+            Jfield, Bfield, eb_update_E, lev
+        );
+    }
 
 #endif
     } else {
@@ -64,6 +72,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
 //   *
 //   * \param[out] Jfield  vector of total current MultiFabs at a given level
 //   * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
+//   * \param[in] eb_update_E specifies where the plasma current should be calculated.
+//   * \param[in] lev refinement level
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>
@@ -500,12 +510,18 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         );
 
 #else
-
+    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
-
+    } else {
+        HybridPICSolveECartesian <CartesianNodalAlgorithm> (
+            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            eb_update_E, lev, hybrid_model, solve_for_Faraday
+        );
+    }
 #endif
     } else {
         amrex::Abort(Utils::TextMsg::Err(
@@ -1154,200 +1170,197 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
         // Loop over the cells and update the E field
-        amrex::ParallelFor(tex, tey, tez,
+        // Ex calculation
+        amrex::ParallelFor(tex, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-            // Ex calculation
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+            // Skip field update in the embedded boundaries
+            if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
 
-                // Skip field update in the embedded boundaries
-                if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
+            // Interpolate to get the appropriate charge density in space
+            const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                // Interpolate to get the appropriate charge density in space
-                const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
+            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                Ex(i, j, k) = 0._rt;
+            } else {
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                const Real grad_Pe = (!solve_for_Faraday) ?
+                    T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
+                    : 0._rt;
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Ex(i, j, k) = 0._rt;
-                } else {
-                    // Get the gradient of the electron pressure if the longitudinal part of
-                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
-                        : 0._rt;
+                // interpolate the nodal neE values to the Yee grid
+                const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                    // interpolate the nodal neE values to the Yee grid
-                    const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
+                // safety condition since we divide by rho
+                const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                    // safety condition since we divide by rho
-                    const auto rho_val_limited = std::max(rho_val, rho_floor);
+                Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+            }
 
-                    Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+            // Add resistivity only if E field value is used to update B
+            if (solve_for_Faraday) {
+                Real jtot_val = 0._rt;
+                if (resistivity_has_J_dependence) {
+                    // Interpolate current to appropriate staggering to match E field
+                    const Real jx_val = Jx(i, j, k);
+                    const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
+                    const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
+                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
-                    Real jtot_val = 0._rt;
-                    if (resistivity_has_J_dependence) {
-                        // Interpolate current to appropriate staggering to match E field
-                        const Real jx_val = Jx(i, j, k);
-                        const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
-                        const Real jz_val = Interp(Jz, Jz_stag, Ex_stag, coarsen, i, j, k, 0);
-                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+
+                if (include_hyper_resistivity_term) {
+
+                    // Interpolate B field to appropriate staggering to match E field
+                    Real btot_val = 0._rt;
+                    if (hyper_resistivity_has_B_dependence) {
+                        const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
+                        const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
+                        const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
+                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
 
-                    if (include_hyper_resistivity_term) {
-
-                        // Interpolate B field to appropriate staggering to match E field
-                        Real btot_val = 0._rt;
-                        if (hyper_resistivity_has_B_dependence) {
-                            const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
-                            const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
-                            const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
-                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                        }
-
-                        auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
-                            + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
-                            + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
-
-                        Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
-                    }
-                }
-
-                if (include_external_fields && (rho_val >= rho_floor)) {
-                    Ex(i, j, k) -= Ex_ext(i, j, k);
-                }
-            },
-
-            // Ey calculation
-            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-
-                // Skip field update in the embedded boundaries
-                if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
-
-                // Interpolate to get the appropriate charge density in space
-                const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
-
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Ey(i, j, k) = 0._rt;
-                } else {
-                    // Get the gradient of the electron pressure if the longitudinal part of
-                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
-                        : 0._rt;
-
-                    // interpolate the nodal neE values to the Yee grid
-                    const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
-
-                    // safety condition since we divide by rho
-                    const auto rho_val_limited = std::max(rho_val, rho_floor);
-
-                    Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
-                }
-
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
-                    Real jtot_val = 0._rt;
-                    if (resistivity_has_J_dependence) {
-                        // Interpolate current to appropriate staggering to match E field
-                        const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
-                        const Real jy_val = Jy(i, j, k);
-                        const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
-                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
-                    }
-
-                    Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
-
-                    if (include_hyper_resistivity_term) {
-
-                        // Interpolate B field to appropriate staggering to match E field
-                        Real btot_val = 0._rt;
-                        if (hyper_resistivity_has_B_dependence) {
-                            const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
-                            const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
-                            const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
-                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                        }
-
-                        auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
-                            + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
-                            + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
-
-                        Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
-                    }
-                }
-
-                if (include_external_fields && (rho_val >= rho_floor)) {
-                    Ey(i, j, k) -= Ey_ext(i, j, k);
-                }
-            },
-
-            // Ez calculation
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
-
-                // Skip field update in the embedded boundaries
-                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
-
-                // Interpolate to get the appropriate charge density in space
-                const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
-
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Ez(i, j, k) = 0._rt;
-                } else {
-                    // Get the gradient of the electron pressure if the longitudinal part of
-                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
-                        : 0._rt;
-
-                    // interpolate the nodal neE values to the Yee grid
-                    const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
-
-                    // safety condition since we divide by rho
-                    const auto rho_val_limited = std::max(rho_val, rho_floor);
-
-                    Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
-                }
-
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
-                    Real jtot_val = 0._rt;
-                    if (resistivity_has_J_dependence) {
-                        // Interpolate current to appropriate staggering to match E field
-                        const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
-                        const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
-                        const Real jz_val = Jz(i, j, k);
-                        jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
-                    }
-
-                    Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
-
-                    if (include_hyper_resistivity_term) {
-
-                        // Interpolate B field to appropriate staggering to match E field
-                        Real btot_val = 0._rt;
-                        if (hyper_resistivity_has_B_dependence) {
-                            const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
-                            const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
-                            const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
-                            btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
-                        }
-
-                        auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
-                            + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
-                            + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
-
-                        Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
-                    }
-                }
-
-                if (include_external_fields && (rho_val >= rho_floor)) {
-                    Ez(i, j, k) -= Ez_ext(i, j, k);
+                    Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
                 }
             }
-        );
+
+            if (include_external_fields && (rho_val >= rho_floor)) {
+                Ex(i, j, k) -= Ex_ext(i, j, k);
+            }
+        });
+
+        // Ey calculation
+        amrex::ParallelFor(tey, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+            // Skip field update in the embedded boundaries
+            if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+
+            // Interpolate to get the appropriate charge density in space
+            const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+
+            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                Ey(i, j, k) = 0._rt;
+            } else {
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                const Real grad_Pe = (!solve_for_Faraday) ?
+                    T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
+                    : 0._rt;
+
+                // interpolate the nodal neE values to the Yee grid
+                const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
+
+                // safety condition since we divide by rho
+                const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+            }
+
+            // Add resistivity only if E field value is used to update B
+            if (solve_for_Faraday) {
+                Real jtot_val = 0._rt;
+                if (resistivity_has_J_dependence) {
+                    // Interpolate current to appropriate staggering to match E field
+                    const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const Real jy_val = Jy(i, j, k);
+                    const Real jz_val = Interp(Jz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
+                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                }
+
+                Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
+
+                if (include_hyper_resistivity_term) {
+
+                    // Interpolate B field to appropriate staggering to match E field
+                    Real btot_val = 0._rt;
+                    if (hyper_resistivity_has_B_dependence) {
+                        const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
+                        const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
+                        const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
+                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                    }
+
+                    auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
+
+                    Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
+                }
+            }
+
+            if (include_external_fields && (rho_val >= rho_floor)) {
+                Ey(i, j, k) -= Ey_ext(i, j, k);
+            }
+        });
+
+        // Ez calculation
+        amrex::ParallelFor(tez, [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+            // Skip field update in the embedded boundaries
+            if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+
+            // Interpolate to get the appropriate charge density in space
+            const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+
+            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                Ez(i, j, k) = 0._rt;
+            } else {
+                // Get the gradient of the electron pressure if the longitudinal part of
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
+                const Real grad_Pe = (!solve_for_Faraday) ?
+                    T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
+                    : 0._rt;
+
+                // interpolate the nodal neE values to the Yee grid
+                const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
+
+                // safety condition since we divide by rho
+                const auto rho_val_limited = std::max(rho_val, rho_floor);
+
+                Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+            }
+
+            // Add resistivity only if E field value is used to update B
+            if (solve_for_Faraday) {
+                Real jtot_val = 0._rt;
+                if (resistivity_has_J_dependence) {
+                    // Interpolate current to appropriate staggering to match E field
+                    const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
+                    const Real jz_val = Jz(i, j, k);
+                    jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
+                }
+
+                Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
+
+                if (include_hyper_resistivity_term) {
+
+                    // Interpolate B field to appropriate staggering to match E field
+                    Real btot_val = 0._rt;
+                    if (hyper_resistivity_has_B_dependence) {
+                        const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
+                        const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
+                        const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
+                        btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
+                    }
+
+                    auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+
+                    Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
+                }
+            }
+
+            if (include_external_fields && (rho_val >= rho_floor)) {
+                Ez(i, j, k) -= Ez_ext(i, j, k);
+            }
+        });
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {

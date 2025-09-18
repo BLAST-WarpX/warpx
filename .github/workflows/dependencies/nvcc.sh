@@ -67,3 +67,6 @@ sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.c
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
+
+# install command-line JSON processor jq
+sudo apt-get install -y jq
