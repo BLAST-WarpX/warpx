@@ -243,10 +243,10 @@ Known System Issues
       warpx.field_io_nfiles = <1-per-node>
       warpx.particle_io_nfiles = <1-per-node>
 
-      # This parameters are for a workaround needed for simulations on FRONTIER
+      # These parameters are for a workaround needed for simulations on FRONTIER
       # and enable checkpointing
-      vismf.noFlushAfterWrite = true
-      vismf.barrierAfterLevel = true
+      vismf.noflushafterwrite = true
+      vismf.barrierafterlevel = true
 
    Execute ``lfs getstripe -d <dir>`` to show the default progressive file layout.
    For further tuning, consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
