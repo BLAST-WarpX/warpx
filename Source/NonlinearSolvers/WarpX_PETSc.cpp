@@ -323,7 +323,20 @@ void KSP_impl::createObjects(const VecType& a_vec)
     this->m_ndofs_g = this->m_U.nDOF_global();
 
     // create vectors
-    VecCreateMPI(PETSC_COMM_WORLD, this->m_ndofs_l, this->m_ndofs_g, &this->m_x->obj);
+    VecCreate(PETSC_COMM_WORLD, &this->m_x->obj);
+#ifdef AMREX_USE_GPU
+#ifdef AMREX_USE_CUDA
+    VecSetType(this->m_x->obj, VECCUDA);
+#elif defined AMREX_USE_HIP
+    VecSetType(this->m_x->obj, VECHIP);
+#else
+    WARPX_ABORT_WITH_MESSAGE("KSP_impl::createObjects() - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
+    VecSetType(this->m_x->obj, VECSTANDARD);
+#endif
+    VecSetSizes(this->m_x->obj, this->m_ndofs_l, this->m_ndofs_g);
+    VecSetFromOptions(this->m_x->obj);
     VecDuplicate(this->m_x->obj, &this->m_b->obj);
 
     // create matrix operator
@@ -363,13 +376,23 @@ void KSP_impl::createObjects(const VecType& a_vec)
         MatSetSizes( this->m_P->obj,
                      this->m_ndofs_l, this->m_ndofs_l,
                      PETSC_DETERMINE, PETSC_DETERMINE );
+#if defined AMREX_USE_GPU
+#if defined AMREX_USE_CUDA
+        MatSetType( this->m_P->obj, MATAIJCUSPARSE);
+#elif defined AMREX_USE_HIP
+        MatSetType( this->m_P->obj, MATAIJHIPSPARSE);
+#else
+        WARPX_ABORT_WITH_MESSAGE("KSP_impl::createObjects() - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
         MatSetType( this->m_P->obj, MATAIJ );
         MatMPIAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
-                                             1 /*a_ops->numPCMatBands()-1*/, NULL);
-        MatSeqAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL);
+                                                   1 /*a_ops->numPCMatBands()-1*/, NULL);
+#endif
         MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
         MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
         MatSetUp(this->m_P->obj);
+        MatSetFromOptions(this->m_P->obj);
         KSPSetOperators( m_ksp->obj, this->m_A->obj, this->m_P->obj );
     }
     KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
@@ -377,6 +400,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     if (m_verbose > 0) {
         KSPMonitorSet( m_ksp->obj, printKSPResidual, NULL, NULL );
     }
+    KSPSetFromOptions(m_ksp->obj);
 
     // it is now defined
     this->m_is_defined = true;
@@ -489,7 +513,19 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     this->m_x = new VecObj;
     this->m_b = new VecObj;
 
-    VecCreateMPI(PETSC_COMM_WORLD, this->m_ndofs_l, this->m_ndofs_g, &this->m_x->obj);
+    VecCreate(PETSC_COMM_WORLD, &this->m_x->obj);
+#if defined AMREX_USE_GPU
+#if defined AMREX_USE_CUDA
+    VecSetType(this->m_x->obj, VECCUDA);
+#elif defined AMREX_USE_HIP
+    VecSetType(this->m_x->obj, VECHIP);
+#else
+    WARPX_ABORT_WITH_MESSAGE("SNES_impl::SNES_impl() - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
+    VecSetType(this->m_x->obj, VECSTANDARD);
+#endif
+    VecSetSizes(this->m_x->obj, this->m_ndofs_l, this->m_ndofs_g);
     VecDuplicate(this->m_x->obj, &this->m_b->obj);
 
     SNESCreate(PETSC_COMM_WORLD, &m_snes->obj);
@@ -534,10 +570,19 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
         MatSetSizes( this->m_P->obj,
                      this->m_ndofs_l, this->m_ndofs_l,
                      PETSC_DETERMINE, PETSC_DETERMINE );
+#if defined AMREX_USE_GPU
+#if defined AMREX_USE_CUDA
+        MatSetType( this->m_P->obj, MATAIJCUSPARSE);
+#elif defined AMREX_USE_HIP
+        MatSetType( this->m_P->obj, MATAIJHIPSPARSE);
+#else
+        WARPX_ABORT_WITH_MESSAGE("SNES_impl::SNES_impl() - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
         MatSetType( this->m_P->obj, MATAIJ );
         MatMPIAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
-                                             1 /*a_ops->numPCMatBands()-1*/, NULL);
-        MatSeqAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL);
+                                                   1 /*a_ops->numPCMatBands()-1*/, NULL);
+#endif
         MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
         MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
         MatSetUp(this->m_P->obj);
