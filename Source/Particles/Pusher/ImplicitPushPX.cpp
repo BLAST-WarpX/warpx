@@ -245,6 +245,8 @@ namespace {
                 break;
             }
         }
+
+        return convergence;
     }
 }
 
