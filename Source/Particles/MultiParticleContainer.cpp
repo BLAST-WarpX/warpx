@@ -810,14 +810,18 @@ MultiParticleContainer::NumberOfParticlesInGrid (int lev) const
     }
 }
 
-amrex::LayoutData<std::size_t>
-MultiParticleContainer::CapacityOfParticlesInGrid (int lev) const
+void
+MultiParticleContainer::CapacityOfParticlesInGrid (amrex::LayoutData<std::size_t>& mem, int lev) const
 {
-    amrex::LayoutData<std::size_t> mem(pc->boxArray(lev), pc->DistributionMap(lev));
+    WarpX & warpx = WarpX::GetInstance();
+
     for (auto& pc : allcontainers) {
-        pc->CapacityOfParticlesInGrid(mem, lev);
+        amrex::LayoutData<std::size_t> tmpmem(warpx.boxArray(lev), warpx.DistributionMap(lev));
+        pc->CapacityOfParticlesInGrid(tmpmem, lev);
+        for (amrex::MFIter mfi(tmpmem); mfi.isValid(); ++mfi) {
+            mem[mfi.index()] += tmpmem[mfi];
+        }
     }
-    return mem;
 }
 
 void
