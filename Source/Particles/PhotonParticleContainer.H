@@ -53,8 +53,8 @@ public:
                  amrex::Real dt,
                  SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
-                 DtType position_push_type=DtType::Full,
-                 DtType momentum_push_type=DtType::Full,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
     void PushPX (WarpXParIter& pti,
@@ -70,8 +70,8 @@ public:
                         int lev, int gather_lev,
                         amrex::Real dt, ScaleFields scaleFields,
                         SubcyclingHalf subcycling_half,
-                        DtType position_push_type=DtType::Full,
-                        DtType momentum_push_type=DtType::Full) override;
+                        PositionPushType position_push_type=PositionPushType::Full,
+                        MomentumPushType momentum_push_type=MomentumPushType::Full) override;
 
     // Do nothing
     void PushP (int /*lev*/,

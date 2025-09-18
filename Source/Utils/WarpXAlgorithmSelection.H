@@ -165,13 +165,24 @@ AMREX_ENUM(SubcyclingHalf,
            None,
            Default = None);
 
-/** \brief For advanced algorithms that split the
- *         position or momentum push in substeps */
-AMREX_ENUM(DtType,
-           FirstHalf,
-           SecondHalf,
-           Full,
-           None,
-           Default = Full);
+/** \brief For advanced algorithms that split the position push in substeps */
+AMREX_ENUM(
+    PositionPushType,
+    None,
+    Full,
+    FirstHalf,
+    SecondHalf,
+    Default = Full
+);
+
+/** \brief For advanced algorithms that split the momentum push in substeps */
+AMREX_ENUM(
+    MomentumPushType,
+    None,
+    Full,
+    FirstHalf,
+    SecondHalf,
+    Default = Full
+);
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

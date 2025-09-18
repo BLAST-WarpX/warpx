@@ -108,8 +108,8 @@ public:
                  amrex::Real dt,
                  SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
-                 DtType position_push_type=DtType::Full,
-                 DtType momentum_push_type=DtType::Full,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
     /**
@@ -128,8 +128,8 @@ public:
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
                          SubcyclingHalf subcycling_half=SubcyclingHalf::None,
-                         DtType position_push_type=DtType::Full,
-                         DtType momentum_push_type=DtType::Full);
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
 
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,

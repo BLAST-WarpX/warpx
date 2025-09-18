@@ -237,8 +237,8 @@ public:
                          int lev,
                          const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
-                         DtType position_push_type=DtType::Full,
-                         DtType momentum_push_type=DtType::Full,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;

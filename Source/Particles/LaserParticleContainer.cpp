@@ -562,8 +562,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
                                 Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
-                                DtType /*position_push_type*/,
-                                DtType /*momentum_push_type*/,
+                                PositionPushType /*position_push_type*/,
+                                MomentumPushType /*momentum_push_type*/,
                                 ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;

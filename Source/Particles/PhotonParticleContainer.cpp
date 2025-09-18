@@ -92,8 +92,8 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  const long np_to_push,
                                  int lev, int gather_lev,
                                  amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half,
-                                 DtType position_push_type,
-                                 DtType /*momentum_push_type*/)
+                                 PositionPushType position_push_type,
+                                 MomentumPushType /*momentum_push_type*/)
 {
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -229,7 +229,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #endif
 
             amrex::Real position_dt = dt;
-            if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+            if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
                 position_dt *= 0.5_rt;
             }
             UpdatePositionPhoton(x, y, z, ux[i], uy[i], uz[i], position_dt);
@@ -243,8 +243,8 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  int lev,
                                  const std::string& current_fp_string,
                                  Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
-                                 DtType position_push_type,
-                                 DtType momentum_push_type,
+                                 PositionPushType position_push_type,
+                                 MomentumPushType momentum_push_type,
                                  ImplicitOptions const * /*implicit_options*/)
 {
     // This does gather, push and deposit.

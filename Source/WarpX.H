@@ -647,13 +647,13 @@ public:
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
-                                  DtType position_push_type=DtType::Full,
-                                  DtType momentum_push_type=DtType::Full,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
 
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  DtType position_push_type=DtType::Full,
-                                  DtType momentum_push_type=DtType::Full,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).

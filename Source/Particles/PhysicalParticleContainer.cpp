@@ -421,8 +421,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                    int lev,
                                    const std::string& current_fp_string,
                                    Real /*t*/, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
-                                   DtType position_push_type,
-                                   DtType momentum_push_type,
+                                   PositionPushType position_push_type,
+                                   MomentumPushType momentum_push_type,
                                    ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
@@ -457,12 +457,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         has_rho &&
         !skip_deposition &&
         !do_not_deposit &&
-        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
+        (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::FirstHalf)
     );
     bool const split_particles = (
         do_splitting &&
         (subcycling_half == SubcyclingHalf::None || subcycling_half == SubcyclingHalf::SecondHalf) &&
-        (position_push_type == DtType::Full || position_push_type == DtType::SecondHalf)
+        (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::SecondHalf)
     );
 
 #ifdef AMREX_USE_OMP
@@ -1225,8 +1225,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                    int lev, int gather_lev,
                                    amrex::Real dt, ScaleFields scaleFields,
                                    SubcyclingHalf subcycling_half,
-                                   DtType position_push_type,
-                                   DtType momentum_push_type)
+                                   PositionPushType position_push_type,
+                                   MomentumPushType momentum_push_type)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -1253,12 +1253,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // Auxiliary booleans
     bool const gather_fields = (
         !do_not_gather &&
-        momentum_push_type != DtType::None
+        momentum_push_type != MomentumPushType::None
     );
     bool const copy_particle_attribs = (
         m_do_back_transformed_particles &&
         (subcycling_half != SubcyclingHalf::SecondHalf) &&
-        (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
+        (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::FirstHalf)
     );
 
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
@@ -1411,7 +1411,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 
 #ifdef WARPX_QED
-        if (momentum_push_type != DtType::None) {
+        if (momentum_push_type != MomentumPushType::None) {
             if (!do_sync) {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -1431,7 +1431,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             }
         }
 #else
-        if (momentum_push_type != DtType::None) {
+        if (momentum_push_type != MomentumPushType::None) {
             doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
@@ -1441,7 +1441,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #endif
 
         amrex::Real position_dt = dt;
-        if (position_push_type == DtType::FirstHalf || position_push_type == DtType::SecondHalf) {
+        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
             position_dt *= 0.5_rt;
         }
         UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt);

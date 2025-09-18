@@ -181,8 +181,8 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
                                         SubcyclingHalf subcycling_half,
-                                        DtType position_push_type,
-                                        DtType momentum_push_type)
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -275,8 +275,8 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
                                         int lev,
                                         const std::string& current_fp_string,
                                         Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
-                                        DtType position_push_type,
-                                        DtType momentum_push_type,
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type,
                                         ImplicitOptions const * /*implicit_options*/)
 {
 

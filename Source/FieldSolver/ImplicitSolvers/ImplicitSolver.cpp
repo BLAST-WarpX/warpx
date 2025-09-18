@@ -708,8 +708,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const bool skip_current = false;
-    DtType position_push_type = DtType::Full;
-    DtType momentum_push_type = DtType::Full;
+    PositionPushType position_push_type = PositionPushType::Full;
+    MomentumPushType momentum_push_type = MomentumPushType::Full;
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;

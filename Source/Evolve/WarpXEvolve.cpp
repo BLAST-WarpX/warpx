@@ -415,8 +415,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/DtType::FirstHalf,
-                        /*momentum_push_type=*/DtType::Full
+                        /*position_push_type=*/PositionPushType::FirstHalf,
+                        /*momentum_push_type=*/MomentumPushType::Full
                     );
 
                     // perform particle collisions
@@ -431,8 +431,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/DtType::SecondHalf,
-                        /*momentum_push_type=*/DtType::None
+                        /*position_push_type=*/PositionPushType::SecondHalf,
+                        /*momentum_push_type=*/MomentumPushType::None
                     );
                 }
                 // without splitting of position push
@@ -449,8 +449,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/DtType::Full,
-                        /*momentum_push_type=*/DtType::Full
+                        /*position_push_type=*/PositionPushType::Full,
+                        /*momentum_push_type=*/MomentumPushType::Full
                     );
                 }
             }
@@ -463,8 +463,8 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_current=*/true,
-                    /*position_push_type=*/DtType::Full,
-                    /*momentum_push_type=*/DtType::Full
+                    /*position_push_type=*/PositionPushType::Full,
+                    /*momentum_push_type=*/MomentumPushType::Full
                 );
             }
         }
@@ -1283,8 +1283,8 @@ void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool skip_current,
-    DtType position_push_type,
-    DtType momentum_push_type,
+    PositionPushType position_push_type,
+    MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
 )
 {
@@ -1309,8 +1309,8 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     SubcyclingHalf subcycling_half,
     bool skip_current,
-    DtType position_push_type,
-    DtType momentum_push_type,
+    PositionPushType position_push_type,
+    MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
 )
 {
