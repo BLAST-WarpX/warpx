@@ -8,7 +8,6 @@
  */
 #include "LaserParticleContainer.H"
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
@@ -562,7 +561,7 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
+                                Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
                                 DtType /*position_push_type*/,
                                 DtType /*momentum_push_type*/,
                                 ImplicitOptions const * implicit_options)

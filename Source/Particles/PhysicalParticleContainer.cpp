@@ -420,7 +420,7 @@ void
 PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                    int lev,
                                    const std::string& current_fp_string,
-                                   Real /*t*/, Real dt, DtType a_dt_type, bool skip_deposition,
+                                   Real /*t*/, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                    DtType position_push_type,
                                    DtType momentum_push_type,
                                    ImplicitOptions const * implicit_options)
@@ -461,7 +461,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     );
     bool const split_particles = (
         do_splitting &&
-        (a_dt_type == DtType::Full || a_dt_type == DtType::SecondHalf) &&
+        (subcycling_half == SubcyclingHalf::None || subcycling_half == SubcyclingHalf::SecondHalf) &&
         (position_push_type == DtType::Full || position_push_type == DtType::SecondHalf)
     );
 
@@ -578,7 +578,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_type);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), subcycling_half, position_push_type, momentum_push_type);
                 } else if (push_type == PushType::Implicit) {
                     long const offset = 0;
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
@@ -630,7 +630,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type, position_push_type, momentum_push_type);
+                               lev, lev-1, dt, ScaleFields(false), subcycling_half, position_push_type, momentum_push_type);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -1224,7 +1224,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                    const long np_to_push,
                                    int lev, int gather_lev,
                                    amrex::Real dt, ScaleFields scaleFields,
-                                   DtType a_dt_type,
+                                   SubcyclingHalf subcycling_half,
                                    DtType position_push_type,
                                    DtType momentum_push_type)
 {
@@ -1257,7 +1257,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     );
     bool const copy_particle_attribs = (
         m_do_back_transformed_particles &&
-        (a_dt_type != DtType::SecondHalf) &&
+        (subcycling_half != SubcyclingHalf::SecondHalf) &&
         (position_push_type == DtType::Full || position_push_type == DtType::FirstHalf)
     );
 

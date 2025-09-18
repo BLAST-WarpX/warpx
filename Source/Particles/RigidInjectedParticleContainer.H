@@ -8,7 +8,6 @@
 #ifndef WARPX_RigidInjectedParticleContainer_H_
 #define WARPX_RigidInjectedParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "PhysicalParticleContainer.H"
@@ -70,7 +69,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  DtType position_push_type=DtType::Full,
                  DtType momentum_push_type=DtType::Full,
@@ -88,7 +87,7 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full,
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                          DtType position_push_type=DtType::Full,
                          DtType momentum_push_type=DtType::Full) override;
 

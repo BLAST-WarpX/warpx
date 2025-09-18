@@ -75,7 +75,7 @@ class LibWarpX:
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
         try:
             _prob_lo = geometry.prob_lo
-            _dims = geometry.dims
+            _dims = str(geometry.dims)
         except AttributeError:
             raise Exception(
                 "The shared object could not be loaded. The geometry must be setup before the WarpX pybind11 module can be accessesd. The geometry determines which version of the shared object to load."
