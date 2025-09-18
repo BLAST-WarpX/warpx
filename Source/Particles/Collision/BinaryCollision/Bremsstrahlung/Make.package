@@ -1,0 +1,4 @@
+CEXE_sources += BremsstrahlungFunc.cpp
+CEXE_sources += PhotonCreationFunc.cpp
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/Bremsstrahlung

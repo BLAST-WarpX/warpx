@@ -92,11 +92,12 @@ private:
                                   if false, m_varnames is updated
      */
     void AddRZModesToOutputNames (const std::string& field, int ncomp, bool cellcenter_data);
+
     /** This function allocates and initializes particle buffers for all the snapshots.
-     * This is currently an empty function:
-     * The particle containers required for this must be added to populate this function.
+     *  \param[in] mpc a constant reference to the multi-particle container.
      */
-    void InitializeParticleBuffer () override;
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
+
     /** This function prepares the current z coordinate in the boosted-frame and lab-frame as required by
         the particle and fields.
      */
@@ -136,6 +137,7 @@ private:
      *  m_t_lab, and z-positions for the i^th snapshot, i_buffer, and level, lev.
      * \param[in] i_buffer i^th snapshot or buffer
      * \param[in] lev mesh-refinement level for which the field and/or particle buffer data is initialized.
+     * \param[in] restart whether this is called upon restarting a previous simulation
      */
     void InitializeBufferData ( int i_buffer , int lev, bool restart=false) override;
     /** Whether to compute back-tranformed values for field-data.

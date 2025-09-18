@@ -8,13 +8,14 @@
 #ifndef WARPX_RigidInjectedParticleContainer_H_
 #define WARPX_RigidInjectedParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "PhysicalParticleContainer.H"
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
+#include <AMReX_Enum.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
@@ -23,6 +24,8 @@
 
 #include <iosfwd>
 #include <string>
+
+AMREX_ENUM(RigidAdvanceMode, vz, vzbar, v);
 
 /**
  * When injecting a particle beam (typically for a plasma wakefield
@@ -66,10 +69,9 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
-                 PushType push_type=PushType::Explicit) override;
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
     void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -83,7 +85,7 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full) override;
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None) override;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -101,7 +103,7 @@ private:
 
     // User input quantities
     amrex::ParticleReal zinject_plane = 0.;
-    bool rigid_advance = true; // When true, particles are advance with vzbar before injection
+    RigidAdvanceMode rigid_advance_mode = RigidAdvanceMode::vzbar;
 
     amrex::ParticleReal vzbeam_ave_boosted;
 

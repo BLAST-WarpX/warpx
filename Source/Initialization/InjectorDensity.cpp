@@ -32,6 +32,11 @@ void InjectorDensity::clear ()
         object.predefined.clear();
         break;
     }
+    case Type::fromfile:
+    {
+        object.fromfile.clear();
+        break;
+    }
     default:
         return;
     }
@@ -68,4 +73,16 @@ InjectorDensityPredefined::InjectorDensityPredefined (
 // So we rely on clear() to free memory if needed.
 void InjectorDensityPredefined::clear ()
 {
+}
+
+InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name)
+{
+    m_external_field_reader = new ExternalFieldReader(a_file_name, "density", "");
+    m_external_field_view = m_external_field_reader->getView();
+}
+
+void InjectorDensityFromFile::clear ()
+{
+    delete m_external_field_reader;
+    m_external_field_reader = nullptr;
 }

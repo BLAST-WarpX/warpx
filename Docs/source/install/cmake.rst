@@ -96,6 +96,7 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_OPENPMD``             **ON**/OFF                                   openPMD I/O (HDF5, ADIOS)
 ``WarpX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)
 ``WarpX_PARTICLE_PRECISION``  SINGLE/**DOUBLE**                            Particle floating point precision (single/double), defaults to WarpX_PRECISION value if not set
+``WarpX_FASTMATH``            ON/**OFF**                                   Enable fast-math optimizations
 ``WarpX_FFT``                 ON/**OFF**                                   FFT-based solvers
 ``WarpX_PYTHON``              ON/**OFF**                                   Python bindings
 ``WarpX_QED``                 **ON**/OFF                                   QED support (requires PICSAR)

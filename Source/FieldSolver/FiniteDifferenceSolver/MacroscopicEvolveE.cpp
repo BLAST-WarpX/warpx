@@ -170,66 +170,67 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
         // starting component to interpolate macro properties to Ex, Ey, Ez locations
         const int scomp = 0;
         // Loop over the cells and update the fields
-        amrex::ParallelFor(tex, tey, tez,
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+        // Ex update
+        amrex::ParallelFor(tex, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field push in the embedded boundaries
-                if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
+            // Skip field push in the embedded boundaries
+            if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
 
-                // Interpolate conductivity, sigma, to Ex position on the grid
-                amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
-                                                                                  Ex_stag, macro_cr, i, j, k, scomp);
-                // Interpolated permittivity, epsilon, to Ex position on the grid
-                amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
-                                                                                    Ex_stag, macro_cr, i, j, k, scomp);
-                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
-                Ex(i, j, k) = alpha * Ex(i, j, k)
-                            + beta * ( - T_Algo::DownwardDz(Hy, coefs_z, n_coefs_z, i, j, k,0)
-                                       + T_Algo::DownwardDy(Hz, coefs_y, n_coefs_y, i, j, k,0)
-                                     ) - beta * jx(i, j, k);
-            },
+            // Interpolate conductivity, sigma, to Ex position on the grid
+            amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
+                                                                                Ex_stag, macro_cr, i, j, k, scomp);
+            // Interpolated permittivity, epsilon, to Ex position on the grid
+            amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
+                                                                                Ex_stag, macro_cr, i, j, k, scomp);
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            Ex(i, j, k) = alpha * Ex(i, j, k)
+                        + beta * ( - T_Algo::DownwardDz(Hy, coefs_z, n_coefs_z, i, j, k,0)
+                                    + T_Algo::DownwardDy(Hz, coefs_y, n_coefs_y, i, j, k,0)
+                                    ) - beta * jx(i, j, k);
+        });
 
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+        // Ey update
+        amrex::ParallelFor(tey, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field push in the embedded boundaries
-                if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+            // Skip field push in the embedded boundaries
+            if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
 
-                // Interpolate conductivity, sigma, to Ey position on the grid
-                amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
-                                                                                  Ey_stag, macro_cr, i, j, k, scomp);
-                // Interpolated permittivity, epsilon, to Ey position on the grid
-                amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
-                                                                                    Ey_stag, macro_cr, i, j, k, scomp);
-                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            // Interpolate conductivity, sigma, to Ey position on the grid
+            amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
+                                                                                Ey_stag, macro_cr, i, j, k, scomp);
+            // Interpolated permittivity, epsilon, to Ey position on the grid
+            amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
+                                                                                Ey_stag, macro_cr, i, j, k, scomp);
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
 
-                Ey(i, j, k) = alpha * Ey(i, j, k)
-                            + beta * ( - T_Algo::DownwardDx(Hz, coefs_x, n_coefs_x, i, j, k,0)
-                                       + T_Algo::DownwardDz(Hx, coefs_z, n_coefs_z, i, j, k,0)
-                                     ) - beta * jy(i, j, k);
-            },
+            Ey(i, j, k) = alpha * Ey(i, j, k)
+                        + beta * ( - T_Algo::DownwardDx(Hz, coefs_x, n_coefs_x, i, j, k,0)
+                                    + T_Algo::DownwardDz(Hx, coefs_z, n_coefs_z, i, j, k,0)
+                                    ) - beta * jy(i, j, k);
+        });
 
-            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+        // Ez update
+        amrex::ParallelFor(tez, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field push in the embedded boundaries
-                if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+            // Skip field push in the embedded boundaries
+            if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
 
-                // Interpolate conductivity, sigma, to Ez position on the grid
-                amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
-                                                                                  Ez_stag, macro_cr, i, j, k, scomp);
-                // Interpolated permittivity, epsilon, to Ez position on the grid
-                amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
-                                                                                    Ez_stag, macro_cr, i, j, k, scomp);
-                const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-                const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            // Interpolate conductivity, sigma, to Ez position on the grid
+            amrex::Real const sigma_interp = ablastr::coarsen::sample::Interp(sigma_arr, sigma_stag,
+                                                                                Ez_stag, macro_cr, i, j, k, scomp);
+            // Interpolated permittivity, epsilon, to Ez position on the grid
+            amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
+                                                                                Ez_stag, macro_cr, i, j, k, scomp);
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
 
-                Ez(i, j, k) = alpha * Ez(i, j, k)
-                            + beta * ( - T_Algo::DownwardDy(Hx, coefs_y, n_coefs_y, i, j, k,0)
-                                       + T_Algo::DownwardDx(Hy, coefs_x, n_coefs_x, i, j, k,0)
-                                     ) - beta * jz(i, j, k);
-            }
-        );
+            Ez(i, j, k) = alpha * Ez(i, j, k)
+                        + beta * ( - T_Algo::DownwardDy(Hx, coefs_y, n_coefs_y, i, j, k,0)
+                                    + T_Algo::DownwardDx(Hy, coefs_x, n_coefs_x, i, j, k,0)
+                                    ) - beta * jz(i, j, k);
+        });
     }
 }
 

@@ -11,6 +11,7 @@
  */
 #include "WarpX.H"
 
+#include "BoundaryConditions/FieldBoundaries.H"
 #include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
@@ -37,6 +38,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
+#include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -75,6 +77,7 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IArrayBox.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_LayoutData.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MakeType.H>
@@ -84,7 +87,7 @@
 #include <AMReX_Print.H>
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
-#include <AMReX_iMultiFab.H>
+#include <AMReX_TagBox.H>
 
 #include <algorithm>
 #include <cmath>
@@ -115,8 +118,6 @@ Vector<int> WarpX::boost_direction = {0,0,0};
 bool WarpX::compute_max_step_from_btd = false;
 Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
-int WarpX::max_particle_its_in_implicit_scheme = 21;
-ParticleReal WarpX::particle_tol_in_implicit_scheme = 1.e-10;
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
 bool WarpX::do_single_precision_comms = false;
@@ -277,7 +278,15 @@ void WarpX::MakeWarpX ()
         moving_window_dir, moving_window_v);
 
     ConvertLabParamsToBoost();
-    ReadBCParams();
+
+    std::tie(field_boundary_lo, field_boundary_hi) =
+        warpx::boundary_conditions::parse_field_boundaries();
+
+    const auto is_field_boundary_periodic =
+        warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
+
+    std::tie(particle_boundary_lo, particle_boundary_hi) =
+        warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
     CheckGriddingForRZSpectral();
 
@@ -557,6 +566,23 @@ WarpX::ReadParameters ()
         }
 #endif
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})
+        ),
+        "PEC boundary not implemented for PSATD, yet!");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})
+        ),
+        "PMC boundary not implemented for PSATD, yet!");
+
+
         pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
@@ -723,6 +749,18 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "The FFT Poisson solver only works in 3D.");
 #endif
+
+        const bool is_any_boundary_open =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
+
+        if(is_any_boundary_open){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction,
+                "Field open boundary conditions are only implemented for the FFT-based Poisson solver");
+        }
+
+
 #ifndef WARPX_USE_FFT
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
@@ -1407,6 +1445,7 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
+            // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
                 evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
@@ -3279,6 +3318,54 @@ WarpX::getLoadBalanceEfficiency (const int lev)
         return -1;
     }
 }
+
+
+void
+WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
+{
+    const auto problo = Geom(lev).ProbLoArray();
+    const auto dx = Geom(lev).CellSizeArray();
+
+    amrex::ParserExecutor<3> ref_parser;
+    if (ref_patch_parser) { ref_parser = ref_patch_parser->compile<3>(); }
+    const auto ftlo = fine_tag_lo;
+    const auto fthi = fine_tag_hi;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(tags); mfi.isValid(); ++mfi)
+    {
+        const Box& bx = mfi.fabbox();
+        const auto& fab = tags.array(mfi);
+        ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            const RealVect pos {AMREX_D_DECL((i+0.5_rt)*dx[0]+problo[0],
+                                       (j+0.5_rt)*dx[1]+problo[1],
+                                       (k+0.5_rt)*dx[2]+problo[2])};
+            bool tag_val = false;
+            if (ref_parser) {
+#if defined (WARPX_DIM_3D)
+                tag_val = (ref_parser(pos[0], pos[1], pos[2]) == 1);
+#elif defined (WARPX_DIM_XZ) || defined (WARPX_DIM_RZ)
+                const auto unused = 0.0_rt;
+                tag_val = (ref_parser(pos[0], unused, pos[1]) == 1);
+#elif defined (WARPX_DIM_1D_Z)
+                const auto unused = 0.0_rt;
+                tag_val = (ref_parser(unused, unused, pos[0]) == 1);
+#elif defined (WARPX_DIM_RCYLINDER) || defined (WARPX_DIM_RSPHERE)
+                const auto unused = 0.0_rt;
+                tag_val = (ref_parser(pos[0], unused, unused) == 1);
+#endif
+            } else {
+                tag_val = (pos > ftlo && pos < fthi);
+            }
+            if (tag_val) {
+                fab(i,j,k) = TagBox::SET;
+            }
+        });
+    }
+}
+
 
 void
 WarpX::BuildBufferMasks ()

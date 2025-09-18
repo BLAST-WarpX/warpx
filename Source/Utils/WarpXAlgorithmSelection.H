@@ -158,4 +158,11 @@ AMREX_ENUM(ReductionType,
            Sum,
            Integral = Sum);
 
+/** \brief Subcycling half selector */
+AMREX_ENUM(SubcyclingHalf,
+           FirstHalf,
+           SecondHalf,
+           None,
+           Default = None);
+
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

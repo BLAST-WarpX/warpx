@@ -173,7 +173,7 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
             // find the last index i_slice where
             // the start value of m_slices[i_slice] is greater than temp_slices' start_value
             int i_slice = 0;
-            while (temp_slice.getStart() > m_slices[i_slice].getStart() && i_slice < static_cast<int>(m_slices.size()))
+            while (i_slice < static_cast<int>(m_slices.size()) && temp_slice.getStart() > m_slices[i_slice].getStart())
             {
                 i_slice++;
             }

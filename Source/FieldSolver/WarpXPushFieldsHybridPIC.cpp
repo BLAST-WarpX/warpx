@@ -7,7 +7,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Evolve/WarpXDtType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
@@ -18,6 +17,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Communication.H>
 
 
 using namespace amrex;
@@ -106,7 +106,7 @@ void WarpX::HybridPICEvolveFields ()
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::FirstHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -140,7 +140,7 @@ void WarpX::HybridPICEvolveFields ()
             rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::SecondHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -240,6 +240,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // Perform current deposition at t_{n-1/2}.
     mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
 
+    // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
+    // Perform Temperature Deposition at time t_{n}
+    mypc->DepositTemperatures(m_fields, 0.0_rt);
+
     // Deposit cold-relativistic fluid charge and current
     if (do_fluid_species) {
         int const lev = 0;
@@ -260,13 +264,26 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // for the hybrid-PIC solver since current values are interpolated to
     // a nodal grid
     for (int lev = 0; lev <= finest_level; ++lev) {
+        ablastr::utils::communication::FillBoundary(
+            *m_fields.get(FieldType::rho_fp, lev),
+            m_fields.get(FieldType::rho_fp, lev)->nGrowVect(),
+            WarpX::do_single_precision_comms,
+            Geom(lev).periodicity(),
+            true
+        );
         for (int idim = 0; idim < 3; ++idim) {
-            m_fields.get(FieldType::current_fp, Direction{idim}, lev)->FillBoundary(Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
+                m_fields.get(FieldType::current_fp, Direction{idim}, lev)->nGrowVect(),
+                WarpX::do_single_precision_comms,
+                Geom(lev).periodicity(),
+                true
+            );
         }
     }
 }
 
-void WarpX::HybridPICDepositInitialRhoAndJ ()
+void WarpX::HybridPICInitializeRhoJandB ()
 {
     // The Ohm's law solver requires two timesteps' values for the charge
     // and current densities. This function is called at the start of
@@ -280,6 +297,33 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
         // This is not a restart, so the rho_fp and current_fp multifabs are
         // still empty.
         HybridPICDepositRhoAndJ();
+
+        // Handle field splitting for Hybrid field push
+        if (m_hybrid_pic_model->m_add_external_fields) {
+            // Get the external fields
+            // Currently t_new is what t_old will be when entering the solver since
+            // after initialization the t_old is set to t_new, then t_new is incremented by dt
+            m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+                gett_new(0),
+                0.5_rt*dt[0]);
+
+            // If using split fields, add the external field at t=0
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                for (int idim = 0; idim < 3; ++idim) {
+                    // Check to make sure field only contains numeric values
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev)->is_finite(),
+                        "Non-finite value detected in external B-field at t=0."
+                    );
+
+                    MultiFab::Add(
+                        *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                        *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                        0, 0, 1,
+                        m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+                }
+            }
+        }
     }
 
     // Copy the rho_fp values to rho_fp_temp and the current_fp values to

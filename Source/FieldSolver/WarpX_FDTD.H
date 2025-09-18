@@ -49,7 +49,7 @@ void warpx_computedivb(
         amrex::ignore_unused(j, Bx, dxinv);
         amrex::ignore_unused(k, By, dyinv);
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        WARPX_ABORT_WITH_MESSAGE("Collocated non-Cartesian grids are not a currently supported mode for computing div B.");
+        amrex::Abort("Collocated non-Cartesian grids are not a currently supported mode for computing div B.");
 #endif
     } else {
 #if defined WARPX_DIM_3D
