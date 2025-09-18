@@ -157,18 +157,13 @@ protected:
     bool m_particle_suborbits = false;
 
     /**
-     * \brief whether to skip the full Picard update of particles on the initial newton step
-     */
-    bool m_skip_particle_picard_init = false;
-
-    /**
      * \brief whether the details of unconverged particles are printed out during
      * the particle evolve loops
      */
     bool m_print_unconverged_particle_details = false;
 
     /**
-     * \brief whether to skip the full Picard update of particls on the initial newton step
+     * \brief whether to skip the full Picard update of particles on the initial newton step
      */
     bool m_skip_particle_picard_init = false;
 
