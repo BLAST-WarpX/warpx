@@ -165,6 +165,12 @@ AMREX_ENUM(SubcyclingHalf,
            None,
            Default = None);
 
+/** \brief Particle push scheme */
+AMREX_ENUM(PushType,
+           Explicit,  //!< Standard leap-frog scheme
+           Implicit,  //!< Crank-Nicolson scheme (e.g., equations (15)-(18) in (Chen et al, JCP 407, 2020))
+           Default = Explicit);
+
 /** \brief For advanced algorithms that split the position push in substeps */
 AMREX_ENUM(
     PositionPushType,

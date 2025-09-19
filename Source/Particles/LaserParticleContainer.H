@@ -9,7 +9,6 @@
 #ifndef WARPX_LaserParticleContainer_H_
 #define WARPX_LaserParticleContainer_H_
 
-#include "Evolve/WarpXPushType.H"
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
 

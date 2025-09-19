@@ -8,7 +8,6 @@
  */
 #include "LaserParticleContainer.H"
 
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
 #include "Particles/LaserParticleContainer.H"
