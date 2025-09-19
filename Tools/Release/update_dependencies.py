@@ -90,17 +90,22 @@ def update(args):
     # loop over repositories and update dependencies data
     for repo_name, repo_subdict in repo_dict.items():
         print(f"\nUpdating {repo_labels[repo_name]}...")
+
         # set keys to access dependencies data
         commit_key = f"commit_{repo_name}"
         version_key = f"version_{repo_name}"
+
         # get new commit information
         commit_response = requests.get(repo_subdict["commit"])
         commit_dict = commit_response.json()
+
         # set new commit
         repo_commit_sha = commit_dict["sha"]
+
         # get new version tag information
         tags_response = requests.get(repo_subdict["tags"])
         tags_list = tags_response.json()
+
         # filter out old-format tags for specific repositories
         tags_list_filtered = copy.deepcopy(tags_list)
         if repo_name == "amrex":
@@ -115,6 +120,7 @@ def update(args):
                 for tag_dict in tags_list
                 if (tag_dict["name"] != "PICSARlite-0.1")
             ]
+
         # set new version tag
         if repo_name == "warpx":
             # current date version for the WarpX release update
@@ -122,8 +128,10 @@ def update(args):
         else:
             # latest available tag (index 0) for all other dependencies
             repo_version_tag = tags_list_filtered[0]["name"]
+
         # use version tag instead of commit sha for a release update
         new_commit_sha = repo_version_tag if args.release else repo_commit_sha
+
         # update commit
         if repo_name != "warpx":
             print(f"- old commit: {dependencies_data[commit_key]}")
@@ -133,6 +141,7 @@ def update(args):
             else:
                 print("Updating commit...")
                 dependencies_data[f"commit_{repo_name}"] = new_commit_sha
+
         # update version
         print(f"- old version: {dependencies_data[version_key]}")
         print(f"- new version: {repo_version_tag}")
