@@ -441,6 +441,11 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
             m_use_mass_matrices = true;
         }
+        if (m_use_mass_matrices_jacobian) {
+            // Default m_skip_particle_picard_init to true if using suborbits
+            if (m_particle_suborbits) { m_skip_particle_picard_init = true; }
+            pp.query("skip_particle_picard_init", m_skip_particle_picard_init);
+        }
 #if defined(WARPX_DIM_RCYLINDER)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
@@ -706,10 +711,18 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
-    options.nonlinear_iteration = a_nl_iter;
-    options.max_particle_iterations = m_max_particle_iterations;
-    options.particle_tolerance = m_particle_tolerance;
     options.linear_stage_of_jfnk = a_from_jacobian;
+
+    if (a_nl_iter == 0 && !a_from_jacobian &&
+        m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
+        // Only do a single Picard iteration for particles on the initial Newton step
+        options.max_particle_iterations = 1;
+        options.particle_tolerance = 0.0;
+    }
+    else {
+        options.max_particle_iterations = m_max_particle_iterations;
+        options.particle_tolerance = m_particle_tolerance;
+    }
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
@@ -799,6 +812,9 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
         amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
         if (m_use_mass_matrices) {
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            if (m_use_mass_matrices_jacobian) {
+                amrex::Print() << "        skip particle picard init:  " << (m_skip_particle_picard_init ? "true":"false") << "\n";
+            }
             amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
             amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";

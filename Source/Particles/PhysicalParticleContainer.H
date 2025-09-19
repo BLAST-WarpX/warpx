@@ -10,7 +10,6 @@
 #ifndef WARPX_PhysicalParticleContainer_H_
 #define WARPX_PhysicalParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ElementaryProcess/Ionization.H"
@@ -24,6 +23,7 @@
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
 #include "Particles/Deposition/TemperatureDepositionTypes.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
@@ -91,7 +91,7 @@ public:
      * \param current_fp_string Current (coarse or fine patch) identifier in fields
      * \param t Current physical time
      * \param dt Time Step by which particles are advanced
-     * \param a_dt_type Type of time step (used for sub-cycling)
+     * \param subcycling_half Type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition
      * \param implicit_options Structure with specific options for implicit methods
      *
@@ -104,7 +104,7 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
@@ -120,7 +120,7 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None);
 
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,

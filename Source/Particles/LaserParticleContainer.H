@@ -9,7 +9,6 @@
 #ifndef WARPX_LaserParticleContainer_H_
 #define WARPX_LaserParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Evolve/WarpXPushType.H"
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
@@ -69,7 +68,7 @@ public:
     void Evolve (ablastr::fields::MultiFabRegister& fields,
                  int lev,
                  const std::string& current_fp_string,
-                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
+                 amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
                  ImplicitOptions const * implicit_options = nullptr) final;
 
