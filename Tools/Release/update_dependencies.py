@@ -50,6 +50,14 @@ def update(args):
         repo_dict["pybind11"]["tags"] = (
             "https://api.github.com/repos/pybind/pybind11/tags"
         )
+    if args.all or args.picmi:
+        repo_dict["picmi"] = {}
+        repo_dict["picmi"]["commit"] = (
+            "https://api.github.com/repos/picmi-standard/picmi/commits/master"
+        )
+        repo_dict["picmi"]["tags"] = (
+            "https://api.github.com/repos/picmi-standard/picmi/tags"
+        )
     if args.all or args.warpx:
         repo_dict["warpx"] = {}
         repo_dict["warpx"]["commit"] = (
@@ -65,6 +73,7 @@ def update(args):
         "pyamrex": "pyAMReX",
         "picsar": "PICSAR",
         "pybind11": "pybind11",
+        "picmi": "PICMI",
         "warpx": "WarpX",
     }
 
@@ -174,6 +183,14 @@ if __name__ == "__main__":
         dest="pybind11",
     )
 
+    # add arguments: PICMI option
+    parser.add_argument(
+        "--picmi",
+        help="Update PICMI only",
+        action="store_true",
+        dest="picmi",
+    )
+
     # add arguments: WarpX option
     parser.add_argument(
         "--warpx",
@@ -196,7 +213,14 @@ if __name__ == "__main__":
     # set args.all automatically
     args.all = (
         False
-        if (args.amrex or args.pyamrex or args.picsar or args.pybind11 or args.warpx)
+        if (
+            args.amrex
+            or args.pyamrex
+            or args.picsar
+            or args.pybind11
+            or args.picmi
+            or args.warpx
+        )
         else True
     )
 
