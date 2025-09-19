@@ -2092,6 +2092,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
         )
+        self.effective_potential_time_filter_param = kw.pop(
+            "warpx_effective_potential_time_filter_param", None
+        )
+        self.effective_potential_density_floor = kw.pop(
+            "warpx_effective_potential_density_floor", None
+        )
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
@@ -2116,6 +2122,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
                 pywarpx.warpx.do_electrostatic = "labframe-effective-potential"
                 pywarpx.warpx.effective_potential_factor = (
                     self.effective_potential_factor
+                )
+                pywarpx.warpx.effective_potential_time_filter_param = (
+                    self.effective_potential_time_filter_param
+                )
+                pywarpx.warpx.effective_potential_density_floor = (
+                    self.effective_potential_density_floor
                 )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"

@@ -35,13 +35,13 @@ public:
         MultiFluidContainer* mfl,
         int max_level) override;
 
-    void ComputeSigma ( ) const;
+    void ComputeSigma ();
 
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield
-    ) const;
+    );
 
     /**
      * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
@@ -71,6 +71,7 @@ public:
     ) const;
 
     std::unique_ptr<amrex::MultiFab> m_sigma;
+    bool m_overwrite_sigma;
 };
 
 #endif // WARPX_EFFECTIVEPOTENTIALES_H_
