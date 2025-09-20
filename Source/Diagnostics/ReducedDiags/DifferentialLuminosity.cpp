@@ -347,7 +347,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
 
             Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
 
-            Real const dL_dEcom = PhysConst::c * std::sqrt( radicand ) * w1[j_1] * w2[j_2] / dV / bin_size * dt; // m^-2 eV^-1
+            Real const dL_dEcom = PhysConst::c * std::sqrt( radicand ) * min_N * w1[j_1] * w2[j_2] / dV / bin_size * dt; // m^-2 eV^-1
 
             amrex::HostDevice::Atomic::Add(&dptr_data[bin], dL_dEcom);
 
