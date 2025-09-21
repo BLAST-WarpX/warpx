@@ -1945,7 +1945,16 @@ are applied to the particles directly, at each timestep. As a results, these fie
         .. note::
 
             When using ``read_from_file``, the fields loaded from the file will be interpolated
-            to the resolution of the grid used for the simulation.
+            to the resolution of the grid used for the simulation. These fields are seen by the diagnostics.
+
+        The time dependency of the E- and B-field can be specified by the input parameter:
+
+        * ``particles.read_fields_E_dependency(t)``
+
+        * ``particles.read_fields_B_dependency(t)``
+
+        The time dependency scales the E- and B-field uniformly in space by the given function.
+
 
     * ``repeated_plasma_lens``: apply a series of plasma lenses.
       The properties of the lenses are defined in the lab frame by the input parameters:
