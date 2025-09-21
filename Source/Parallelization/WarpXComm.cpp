@@ -153,8 +153,6 @@ WarpX::UpdateAuxilaryData ()
 
             const amrex::ParticleReal time_factor = mypc->m_Bfield_time_partparser(t_new[lev]);
 
-            std::cout << " B field time factor " << time_factor << std::endl;
-
             ablastr::fields::VectorField Bfield_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
             const auto& B_ext_lev = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
 
