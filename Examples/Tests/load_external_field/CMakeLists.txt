@@ -65,10 +65,10 @@ add_warpx_test(
 # ---- Time dependency tests ----
 
 add_warpx_test(
-    test_3d_load_external_field_particle_picmi_time   # name
+    test_3d_load_external_field_particle_time_picmi   # name
     3                                                 # dims
     1                                                 # nprocs
-    inputs_test_3d_load_external_field_particle_picmi_time.py   # inputs
+    inputs_test_3d_load_external_field_particle_time_picmi.py   # inputs
     "analysis_time_scaling.py --pf0 diags/diag1000000 --pfN diags/diag1000300 --component Bz --expected_ratio 0.5 --rtol 1e-6 --min_abs 1e-12"    "analysis_default_regression.py --path diags/diag1000300"   # checksum (optional regression)
     OFF                                              # dependency
 )
