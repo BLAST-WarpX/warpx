@@ -137,6 +137,8 @@ WarpX::UpdateAuxilaryData ()
     for (int lev = 0; lev <= finest_level; ++lev) {
         if (mypc->m_E_ext_particle_s == "read_from_file") {
 
+            // Scale the field read from file (E_ext) by a scalar time dependency and add it to Efield_aux
+
             const amrex::ParticleReal time_factor = mypc->m_Efield_time_partparser(t_new[lev]);
 
             ablastr::fields::VectorField Efield_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
@@ -150,6 +152,8 @@ WarpX::UpdateAuxilaryData ()
                  guard_cells.ng_FieldGather);
         }
         if (mypc->m_B_ext_particle_s == "read_from_file") {
+
+            // Scale the field read from file (B_ext) by a scalar time dependency and add it to Bfield_aux
 
             const amrex::ParticleReal time_factor = mypc->m_Bfield_time_partparser(t_new[lev]);
 
