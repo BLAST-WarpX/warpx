@@ -29,7 +29,6 @@ warpx.numprocs = 1 1 1
 amr.max_level = 0
 geometry.dims = 3
 
-# CHANGED: 3D domain (match your 3D PICMI case)
 geometry.prob_lo =  -1.0  -1.0  0.0
 geometry.prob_hi =   1.0   1.0  5.0
 
