@@ -238,11 +238,14 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
-        // FIXME Use position_push_type here as well?
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
         constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
+        amrex::Real position_dt = dt;
+        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
+            position_dt *= 0.5_rt;
+        }
         amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
             amrex::ParticleReal xp, yp, zp;
             GetPosition(i, xp, yp, zp);
@@ -251,17 +254,17 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                 yp = y_save[i];
                 zp = z_save[i];
                 if (rigid == RigidAdvanceMode::vzbar) {
-                    zp += dt * vz_ave_boosted;
+                    zp += position_dt * vz_ave_boosted;
                 } else {
                     const amrex::ParticleReal gi =
                         1._prt /
                         std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
                                             uz[i] * uz[i]) *
                                                inv_csq);
-                    zp += dt * uz[i] * gi;
+                    zp += position_dt * uz[i] * gi;
                     if (rigid == RigidAdvanceMode::v) {
-                        xp += dt * ux[i] * gi;
-                        yp += dt * uy[i] * gi;
+                        xp += position_dt * ux[i] * gi;
+                        yp += position_dt * uy[i] * gi;
                     }
                 }
                 SetPosition(i, xp, yp, zp);
