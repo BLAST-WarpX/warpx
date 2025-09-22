@@ -16,7 +16,7 @@ def load_plotfile_arrays(path, comp):
         arr = pf.get(comp, level=0)  # numpy array (nx, ny, nz) or (nr, nz)
         t = float(pf.time())  # seconds
         return arr, t
-    except Exception:
+    except ImportError:
         import yt
 
         ds = yt.load(path)
