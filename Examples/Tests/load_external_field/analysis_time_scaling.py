@@ -8,26 +8,17 @@ import numpy as np
 
 
 def load_plotfile_arrays(path, comp):
-    # Prefer AMReX's native plotfile reader; fall back to yt.
-    try:
-        from amrex import plotfile as amr
+    import yt
 
-        pf = amr.PlotFile(path)
-        arr = pf.get(comp, level=0)  # numpy array (nx, ny, nz) or (nr, nz)
-        t = float(pf.time())  # seconds
-        return arr, t
-    except ImportError:
-        import yt
-
-        ds = yt.load(path)
-        if hasattr(ds, "force_periodicity"):
-            ds.force_periodicity()
-        ad = ds.covering_grid(
-            level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
-        )
-        arr = ad[("boxlib", comp)].squeeze().v
-        t = float(ds.current_time.in_units("s"))
-        return arr, t
+    ds = yt.load(path)
+    if hasattr(ds, "force_periodicity"):
+        ds.force_periodicity()
+    ad = ds.covering_grid(
+        level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
+    )
+    arr = ad[("boxlib", comp)].squeeze().v
+    t = float(ds.current_time.in_units("s"))
+    return arr, t
 
 
 def main():
