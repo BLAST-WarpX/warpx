@@ -142,7 +142,6 @@ void DifferentialLuminosity::ComputeDiags (int step)
     const Real dt = warpx.getdt(0);
     // get cell volume
     Geometry const & geom = warpx.Geom(0);
-    // is this valid in non-cartesian?
     const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
 
     // declare local variables
