@@ -228,7 +228,7 @@ MultiParticleContainer::ReadParameters ()
         if (m_E_ext_particle_s == "read_from_file") {
             // store the mathematical expression as string
             std::string str_E_ext_time_function = 1.0;
-            const bool depends_on_t = utils::parser::Query_parserString(
+            utils::parser::Query_parserString(
                 pp_particles, "read_fields_E_dependency(t)",
                 str_E_ext_time_function);
 
