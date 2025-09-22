@@ -9,6 +9,7 @@
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
 #include "Fields.H"
+#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
 #if (defined WARPX_QED)
 #   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #endif
