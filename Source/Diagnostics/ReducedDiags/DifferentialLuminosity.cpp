@@ -161,17 +161,12 @@ void DifferentialLuminosity::ComputeDiags (int step)
 
     amrex::Real* const AMREX_RESTRICT dptr_data = d_data.dataPtr();
 
-    // is this needed?
-    // Enable tiling
-    amrex::MFItInfo info;
-    if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
-
     int const nlevs = std::max(0, species_1.finestLevel()+1); // species_1 ?
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev < nlevs; ++lev) {
-        for (amrex::MFIter mfi = species_1.MakeMFIter(lev, info); mfi.isValid(); ++mfi){
+        for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
