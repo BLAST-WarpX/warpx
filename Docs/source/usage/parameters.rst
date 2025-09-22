@@ -155,6 +155,11 @@ Overall simulation parameters
         - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
           When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
 
+          - ``implicit_evolve.skip_particle_picard_init`` (`bool`, default: false).
+            When `true` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
+            This can enhance the overall efficiency of the Newton solver.
+            Default is true if ``implicit_evolve.particle_suborbits = true``.
+
         - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
           When `true`, the plasma response is captured in the preconditioner.
           Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
@@ -1058,6 +1063,8 @@ Particle initialization
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant `double` scalars) then the species will use these, unless overwritten in the input file (see ``<species_name>.mass``, ``<species_name>.charge`` or ``<species_name>.species_type``).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
       For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-developers>`.
+      See `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
+      for an example of how to prepare the openPMD data file.
 
     * ``NFluxPerCell``: Continuously inject a flux of macroparticles from a surface. The emitting surface can be chosen to be either a plane
       defined by the user (using some of the parameters listed below), or the embedded boundary (see :ref:`Embedded Boundary Conditions <running-cpp-parameters-eb>`).
@@ -2095,6 +2102,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
+    - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
+      This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
@@ -2112,8 +2121,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
       of a single electron in a strong electromagnetic field.
 
 * ``<collision_name>.species`` (`strings`)
-    If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
+    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, or ``bremsstrahlung``, this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
+    With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
@@ -2122,11 +2132,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
-    the new macroparticles created by the reaction.
+    Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
+    The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
     If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
+    If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
 * ``<collision_name>.ndt`` (`int`) optional
@@ -2259,6 +2270,22 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.ionization_target_species`` (`string`)
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
+
+* ``<collision_name>.Z`` (`integer`)
+    Only for ``bremsstrahlung``. The atomic number of the target ion species.
+    Currently, only the values 1, 2, 5, 6 are supported.
+
+* ``<collision_name>.multiplier`` (`float`)
+    Only for ``bremsstrahlung``. Multiplier for the collision probability.
+    Any resulting photons will have the electron weight divided the multiplier.
+    The default is 1. This must be greater than or equal to 1.
+
+* ``<collision_name>.create_photons`` (`integer`)
+    Only for ``bremsstrahlung``. Whether photons will be created, defaults to 1 (true).
+
+* ``<collision_name>.koT1_cut`` (`float`)
+    Only for ``bremsstrahlung``. Minimum energy of the photons created.
+    This is relative to the electron energy, defaulting to 1.e-4.
 
 * ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
     For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
@@ -2927,6 +2954,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
      ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
      Default: ``f`` (full diagnostics)
+
+* ``<diag_name>.buffer_flush_limit_btd`` (`integer`; defaults to 5) optional, only read if ``<diag_name>.diag_type = BackTransformed``
+    This parameter is intended for ADIOS backend to group every N buffers (N is the value of this parameter) and then flush to disk.
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
     `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.

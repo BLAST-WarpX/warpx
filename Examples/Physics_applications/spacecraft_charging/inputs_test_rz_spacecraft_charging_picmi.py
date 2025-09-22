@@ -35,10 +35,8 @@ class SpaceChargeFieldCorrector(object):
         self.spacecraft_capacitance = None
 
         # shortcuts
-        self.dir_r, self.dir_z = (
-            libwarpx.libwarpx_so.Direction(0),
-            libwarpx.libwarpx_so.Direction(2),
-        )
+        Direction = libwarpx.libwarpx_so.Direction
+        self.dir_r, self.dir_z = (Direction.r, Direction.z)
 
     def correct_space_charge_fields(self, q=None):
         """

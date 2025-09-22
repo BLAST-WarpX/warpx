@@ -1341,7 +1341,7 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      macroscopic_solver_algo, "-_");
+                                      m_macroscopic_solver_algo, "-_");
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||

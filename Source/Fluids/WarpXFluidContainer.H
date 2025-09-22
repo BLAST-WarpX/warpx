@@ -7,7 +7,6 @@
 #ifndef WARPX_WarpXFluidContainer_H_
 #define WARPX_WarpXFluidContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "MultiFluidContainer.H"
 
