@@ -166,6 +166,13 @@ WarpX::Evolve (int numsteps)
     bool collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
     bool collisions_split_position_push = false;
     pp_collisions.query("split_position_push", collisions_split_position_push);
+    if (collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
+        ablastr::warn_manager::WMRecordWarning(
+            "Collisions",
+            "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
+            ablastr::warn_manager::WarnPriority::low
+        );
+    }
 
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
@@ -415,8 +422,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/PositionPushType::FirstHalf,
-                        /*momentum_push_type=*/MomentumPushType::Full
+                        PositionPushType::FirstHalf,
+                        MomentumPushType::Full
                     );
 
                     // perform particle collisions
@@ -431,8 +438,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/PositionPushType::SecondHalf,
-                        /*momentum_push_type=*/MomentumPushType::None
+                        PositionPushType::SecondHalf,
+                        MomentumPushType::None
                     );
                 }
                 // without splitting of position push
@@ -449,8 +456,8 @@ void WarpX::OneStep (
                     PushParticlesandDeposit(
                         a_cur_time,
                         /*skip_current=*/true,
-                        /*position_push_type=*/PositionPushType::Full,
-                        /*momentum_push_type=*/MomentumPushType::Full
+                        PositionPushType::Full,
+                        MomentumPushType::Full
                     );
                 }
             }
@@ -463,8 +470,8 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_current=*/true,
-                    /*position_push_type=*/PositionPushType::Full,
-                    /*momentum_push_type=*/MomentumPushType::Full
+                    PositionPushType::Full,
+                    MomentumPushType::Full
                 );
             }
         }
