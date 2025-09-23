@@ -219,69 +219,20 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             // Extract low-level (cell-level) data
             auto const n_cells = static_cast<int>(bins_1.numBins());
 
-        // Compute the number of independent pairs in each cell. This is equal to
-        // the number of particles in whichever species has fewer
-            amrex::Gpu::DeviceVector<index_type> n_ind_pairs_in_each_cell(n_cells+1);
-            index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = n_ind_pairs_in_each_cell.dataPtr();
+	    IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
+	    indep_pairs.shuffle(indices_1, indices_2);
 
-            amrex::ParallelFor( n_cells+1,
-                [=] AMREX_GPU_DEVICE (int i_cell) noexcept
-                {
-                    if (i_cell < n_cells)
-                    {
-                        const auto n_part_in_cell_1 = cell_offsets_1[i_cell+1] - cell_offsets_1[i_cell];
-                        const auto n_part_in_cell_2 = cell_offsets_2[i_cell+1] - cell_offsets_2[i_cell];
-                        p_n_ind_pairs_in_each_cell[i_cell] = amrex::min(n_part_in_cell_1, n_part_in_cell_2);
-                    }
-                    else
-                    {
-                        p_n_ind_pairs_in_each_cell[i_cell] = 0;
-                    }
-                }
-            );
-
-            // start indices of independent collisions.
-            amrex::Gpu::DeviceVector<index_type> coll_offsets(n_cells+1);
-            // number of total independent collision pairs
-            const auto n_independent_pairs = (int) amrex::Scan::ExclusiveSum(n_cells+1,
-            p_n_ind_pairs_in_each_cell, coll_offsets.data(), amrex::Scan::RetSum{true});
-            index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
-
-            // shuffle each species.
-        // we launch 2*n_cells threads to process both species simultaneously
-            amrex::ParallelForRNG( 2*n_cells,
-            [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-        {
-        int i_cell = i < n_cells ? i : i - n_cells;
-
-        // The particles from species1 that are in the cell `i_cell` are
-        // given by the `indices_1[cell_start_1:cell_stop_1]`
-        index_type const cell_start_1 = cell_offsets_1[i_cell];
-        index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-        // Same for species 2
-        index_type const cell_start_2 = cell_offsets_2[i_cell];
-        index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-        // Do not collide if one species is missing in the cell
-        if ( cell_stop_1 - cell_start_1 < 1 ||
-             cell_stop_2 - cell_start_2 < 1 ) { return; }
-
-        if (i < n_cells) {
-            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-        } else {
-            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
-        }
-        });
+	    int n_independent_pairs = indep_pairs.numIndependentPairs();
+	    const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
             amrex::ParallelFor( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
             {
-        // to avoid type mismatch errors
-        auto ui_coll = (index_type)i_coll;
+                // to avoid type mismatch errors
+                auto ui_coll = (index_type)i_coll;
 
-        // Use a bisection algorithm to find the index of the cell in which this pair is located
-        const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
+                // Use a bisection algorithm to find the index of the cell in which this pair is located
+                const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
 
                 // The particles from species1 that are in the cell `i_cell` are
                 // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -292,20 +243,20 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                 index_type const cell_start_2 = cell_offsets_2[i_cell];
                 index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
-        const index_type NI1 = cell_stop_1 - cell_start_1;
-        const index_type NI2 = cell_stop_2 - cell_start_2;
-        const index_type max_N = amrex::max(NI1,NI2);
-        const index_type min_N = amrex::min(NI1,NI2);
+                const index_type NI1 = cell_stop_1 - cell_start_1;
+                const index_type NI2 = cell_stop_2 - cell_start_2;
+                const index_type max_N = amrex::max(NI1,NI2);
+                const index_type min_N = amrex::min(NI1,NI2);
 
-        // collision number of the cell
-        const index_type coll_idx = ui_coll - p_coll_offsets[i_cell];
-        index_type i_1 = cell_start_1 + coll_idx;
-        index_type i_2 = cell_start_2 + coll_idx;
+                // collision number of the cell
+                const index_type coll_idx = ui_coll - p_coll_offsets[i_cell];
+                index_type i_1 = cell_start_1 + coll_idx;
+                index_type i_2 = cell_start_2 + coll_idx;
 
-        // we will start from collision number = coll_idx and then add
-        // stride (smaller set size) until we do all collisions (larger set size)
-        for (index_type k = coll_idx; k < max_N; k += min_N)
-        {
+                // we will start from collision number = coll_idx and then add
+                // stride (smaller set size) until we do all collisions (larger set size)
+                for (index_type k = coll_idx; k < max_N; k += min_N)
+                {
                     index_type const j_1 = indices_1[i_1];
                     index_type const j_2 = indices_2[i_2];
 
@@ -369,11 +320,11 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                     amrex::HostDevice::Atomic::Add(&data, d2L_dE1_dE2);
 
                     if (max_N == NI1) {
-            i_1 += min_N;
-            }
-            if (max_N == NI2) {
-            i_2 += min_N;
-            }
+                        i_1 += min_N;
+                    }
+                    if (max_N == NI2) {
+                        i_2 += min_N;
+                    }
                 } // k
             }); // cells
         } // boxes
