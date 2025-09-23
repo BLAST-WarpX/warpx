@@ -252,12 +252,12 @@ namespace {
  * \brief The routine finds particles that require suborbiting.
  *        The indices and the weights of such particles are saved.
  *
- * \param[in] pti The WarpXParIter holding the particles to push
- * \param[in] offset The particle index offset for the particles to be pushed
- * \param[in] np_to_push The number of particles to push
+ * \param[in] pti                           The WarpXParIter holding the particles to push
+ * \param[in] offset                        The particle index offset for the particles to be pushed
+ * \param[in] np_to_push                    The number of particles to push
  * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
- * \param[in/out] unconverged_indices The list of indices of unconverged particles
- * \param[in/out] saved_weights The saved weights of the unconverged particles
+ * \param[in/out] unconverged_indices       The list of indices of unconverged particles
+ * \param[in/out] saved_weights             The saved weights of the unconverged particles
  */
 void
 PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
@@ -323,7 +323,7 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
              amrex::Scan::Type::exclusive, amrex::Scan::retSum);
 
          WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
-                                          "ImplicitPushXP: wrong number of invalid particles found");
+                                          "FindSuborbitParticles: wrong number of invalid particles found");
     }
 
 }
