@@ -2139,7 +2139,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
     if using ``inverse_bremsstrahlung``, this should be the photon species being absorbed and the electron
-    species colliding with, in that order.
+    species they are colliding with, in that order.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
