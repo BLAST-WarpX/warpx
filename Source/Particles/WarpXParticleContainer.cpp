@@ -749,7 +749,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
@@ -758,7 +758,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
@@ -767,7 +767,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
@@ -776,7 +776,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 }
@@ -786,28 +786,28 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                     doVillasenorDepositionShapeNExplicit<1>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
                     doVillasenorDepositionShapeNExplicit<2>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
                     doVillasenorDepositionShapeNExplicit<3>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
                     doVillasenorDepositionShapeNExplicit<4>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                        jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 }

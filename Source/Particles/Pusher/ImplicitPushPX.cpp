@@ -790,7 +790,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::ParticleReal m = this-> mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
-    const int max_crossings = WarpX::particle_max_grid_crossings;
     const auto do_crr = do_classical_radiation_reaction;
 #ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
@@ -943,25 +942,25 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 if constexpr (depos_order_control == order_one) {
                     VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                         ux[ip], uy[ip], uz[ip], gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                        Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_two) {
                     VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                         ux[ip], uy[ip], uz[ip], gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                        Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_three) {
                     VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                         ux[ip], uy[ip], uz[ip], gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                        Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
                 else if constexpr (depos_order_control == order_four) {
                     VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                         ux[ip], uy[ip], uz[ip], gaminv,
-                                                        Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                        Jx_arr, Jy_arr, Jz_arr,
                                                         dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                 }
 
