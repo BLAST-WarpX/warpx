@@ -708,8 +708,6 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // deposit currents, giving J at n+1/2
     // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
     const bool skip_current = false;
-    PositionPushType position_push_type = PositionPushType::Full;
-    MomentumPushType momentum_push_type = MomentumPushType::Full;
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
@@ -728,7 +726,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, position_push_type, momentum_push_type, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::Full, MomentumPushType::Full, &options);
         if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
@@ -741,7 +739,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     }
     else {  // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, position_push_type, momentum_push_type, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::Full, MomentumPushType::Full, &options);
     }
 
     // Apply BCs to J and communicate
