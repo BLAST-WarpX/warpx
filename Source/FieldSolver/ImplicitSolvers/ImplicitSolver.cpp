@@ -100,8 +100,13 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
 void ImplicitSolver::SaveEandJ ()
 {
 
-    // Copy Efield_fp and current_fp to Efield_fp_save and current_fp_save
-    // Do this BEFORE call to SyncCurrentAndRho()
+    // Copy Efield_fp to E0 and add J0 to current_fp.
+    // Do this BEFORE call to SyncCurrentAndRho().
+    //
+    // J during the linear stage of JFNK is computed as J(E=E0+dE) = J_suborbit + J0 + MM*(E - E0),
+    // where MM are the mass matrices (i.e., dJ/dE), E0 is the electric field at the start of the Newton step,
+    // J0 is the current associated with particles that are included in the MM using E0, and J_suborbit is the
+    // current associated with particles that have suborbits.
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -121,7 +126,7 @@ void ImplicitSolver::SaveEandJ ()
 
 }
 
-void ImplicitSolver::ComputeJfromMassMatrices ( bool  a_J_from_MM_only )
+void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
     using namespace amrex::literals;
@@ -752,7 +757,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
         ComputeJfromMassMatrices( J_from_MM_only );
     }
-    else {  // Conventional particle-suppressed JFNK
+    else { // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
     }
