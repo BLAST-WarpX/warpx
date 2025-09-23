@@ -252,12 +252,12 @@ namespace {
  * \brief The routine finds particles that require suborbiting.
  *        The indices and the weights of such particles are saved.
  *
- * \param[in] pti                           The WarpXParIter holding the particles to push
- * \param[in] offset                        The particle index offset for the particles to be pushed
- * \param[in] np_to_push                    The number of particles to push
- * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
- * \param[in/out] unconverged_indices       The list of indices of unconverged particles
- * \param[in/out] saved_weights             The saved weights of the unconverged particles
+ * \param[in] pti                            The WarpXParIter holding the particles to push
+ * \param[in] offset                         The particle index offset for the particles to be pushed
+ * \param[in] np_to_push                     The number of particles to push
+ * \param[in/out] num_unconverged_particles  Number of unconverged particles
+ * \param[in/out] unconverged_indices        The list of indices of unconverged particles
+ * \param[in/out] saved_weights              The saved weights of the unconverged particles
  */
 void
 PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
@@ -265,13 +265,10 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
                                                   long np_to_push,
                                                   long & num_unconverged_particles,
                                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights )
+                                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
     // If no particles, do not do anything
     if (np_to_push == 0) { return; }
-
-    auto& attribs = pti.GetAttribs();
-    amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
@@ -293,6 +290,38 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
     // gathered, their weights saved, and their weight set to zero (so they
     // don't contribute to the current density).
     num_unconverged_particles = *(unconverged_particles.copyToHost());
+    SetupSuborbitParticles(pti, offset, np_to_push, num_unconverged_particles,
+                           unconverged_indices, saved_weights);
+
+}
+
+/*
+ * \brief Setup for handling the suborbit particles. A list of their indices is
+ *        gathered, their weights saved, and their weight set to zero (so they
+ *        don't contribute to the current density).
+ *
+ * \param[in] pti                        The WarpXParIter holding the particles to push
+ * \param[in] offset                     The particle index offset for the particles to be pushed
+ * \param[in] np_to_push                 The number of particles to push
+ * \param[in] num_unconverged_particles  Number of unconverged particles
+ * \param[in/out] unconverged_indices    The list of indices of unconverged particles
+ * \param[in/out] saved_weights          The saved weights of the unconverged particles
+ */
+void
+PhysicalParticleContainer::SetupSuborbitParticles (WarpXParIter & pti,
+                                                   long offset,
+                                                   long np_to_push,
+                                                   long num_unconverged_particles,
+                                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                                   amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
+{
+    // If no unconverged particles, do not do anything
+    if (num_unconverged_particles == 0) { return; }
+
+    auto& attribs = pti.GetAttribs();
+    amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
+
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
     auto num_previous = unconverged_indices.size();
     unconverged_indices.resize(num_previous + num_unconverged_particles);
@@ -323,7 +352,7 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
              amrex::Scan::Type::exclusive, amrex::Scan::retSum);
 
          WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
-                                          "FindSuborbitParticles: wrong number of invalid particles found");
+                                          "SetupSuborbitParticles: wrong number of invalid particles found");
     }
 
 }
@@ -349,7 +378,7 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
  * \param[in] lev The refinement level
  * \param[in] gather_lev The refinement level at which to do the field gather
  * \param[in] dt The time step size
- * \param[in/out] num_unconverged_particles Number of unconverged particles that have already been flagged
+ * \param[in/out] num_unconverged_particles Number of unconverged particles
  * \param[in/out] unconverged_indices The list of indices of unconverged particles
  * \param[in/out] saved_weights The saved weights of the unconverged particles
  */
@@ -431,7 +460,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr() + offset;
     amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
     // The x/y/z_n are the positions and velocities saved at the start of the step
 #if !defined(WARPX_DIM_1D_Z)
@@ -602,38 +630,8 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     // gathered, their weights saved, and their weight set to zero (so they
     // don't contribute to the current density).
     num_unconverged_particles = *(unconverged_particles.copyToHost());
-
-    auto num_previous = unconverged_indices.size();
-    unconverged_indices.resize(num_previous + num_unconverged_particles);
-    saved_weights.resize(num_previous + num_unconverged_particles);
-
-    long * unconverged_i = unconverged_indices.data() + num_previous;
-    amrex::ParticleReal * saved_w = saved_weights.data() + num_previous;
-
-    if (nsuborbits) {
-        // This looks for the unconverged particles, which had been flagged as invalid
-        long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
-            [=] AMREX_GPU_DEVICE (long ip) -> long
-                {
-                    return nsuborbits[ip] > 1;
-                },
-            [=] AMREX_GPU_DEVICE (long ip, long x) // x is the exclusive sum at position ip
-                {
-                    if (nsuborbits[ip] > 1) {
-                        // This check of x should always be true but is here for memory safety
-                        if (x < num_unconverged_particles)  {
-                            // The index saved is relative to the full array
-                            unconverged_i[x] = ip + offset;
-                            saved_w[x] = w[ip];
-                            w[ip] = 0.0_prt;
-                        }
-                    }
-                },
-             amrex::Scan::Type::exclusive, amrex::Scan::retSum);
-
-         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_flagged == num_unconverged_particles,
-                                          "ImplicitPushXP: wrong number of invalid particles found");
-    }
+    SetupSuborbitParticles(pti, offset, np_to_push, num_unconverged_particles,
+                           unconverged_indices, saved_weights);
 
     if (num_unconverged_particles > 0) {
         ablastr::warn_manager::WMRecordWarning("ImplicitPushXP",

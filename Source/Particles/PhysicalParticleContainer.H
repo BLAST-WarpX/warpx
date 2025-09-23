@@ -128,6 +128,13 @@ public:
                          amrex::Gpu::DeviceVector<long> & unconverged_indices,
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
+    void SetupSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
