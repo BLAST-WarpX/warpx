@@ -516,11 +516,11 @@ WarpX::PrintMainPICparameters ()
       amrex::Print() << "                      | - macroscopic" << "\n";
     }
     if ( (m_em_solver_medium == MediumForEM::Macroscopic) &&
-       (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff)){
+       (m_macroscopic_solver_algo == MacroscopicSolverAlgo::LaxWendroff)){
       amrex::Print() << "                      |  - Lax-Wendroff algorithm\n";
     }
     else if ((m_em_solver_medium == MediumForEM::Macroscopic) &&
-            (WarpX::macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler)){
+            (m_macroscopic_solver_algo == MacroscopicSolverAlgo::BackwardEuler)){
       amrex::Print() << "                      |  - Backward Euler algorithm\n";
     }
     if(electrostatic_solver_id != ElectrostaticSolverAlgo::None){

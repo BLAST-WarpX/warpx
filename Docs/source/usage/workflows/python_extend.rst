@@ -3,23 +3,52 @@
 Extend a Simulation with Python
 ===============================
 
-When running WarpX directly :ref:`from Python <usage-picmi>` it is possible to interact with the simulation.
+.. tab-set::
 
-For instance, with the :py:meth:`~pywarpx.picmi.Simulation.step` method of the simulation class, one could run ``sim.step(nsteps=1)`` in a loop:
+   .. tab-item:: PICMI
 
-.. code-block:: python3
+      When running WarpX directly :ref:`from PICMI Python <usage-picmi>` it is possible to interact with the simulation.
 
-   # Preparation: set up the simulation
-   #   sim = picmi.Simulation(...)
-   #   ...
+      For instance, with the :py:meth:`~pywarpx.picmi.Simulation.step` method of the simulation class, one could run ``sim.step(nsteps=1)`` in a loop:
 
-   steps = 1000
-   for _ in range(steps):
-       sim.step(nsteps=1)
+      .. code-block:: python3
 
-       # do something custom with the sim object
+         # Preparation: set up the simulation
+         #   sim = picmi.Simulation(...)
+         #   ...
 
-As a more flexible alternative, one can install `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__, which will execute a given Python function at a
+         steps = 1000
+         for _ in range(steps):
+             sim.step(nsteps=1)
+
+             # do something custom with the sim object
+
+      As a more flexible alternative, one can install callback functions (see next).
+
+
+   .. tab-item:: Inputs File
+
+      When starting from an :ref:`inputs file <running-cpp-parameters>`, one can transition to WarpX Python by loading it:
+
+      .. code-block:: python3
+
+         from pywarpx import warpx
+
+         sim = warpx
+         sim.load_inputs_file("./inputs_test_3d_laser_acceleration")
+
+         # register callbacks ...
+
+         # advance simulation until the last time step
+         sim.evolve()
+
+      .. dropdown:: Full Example
+
+         .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
+            :language: python3
+            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
+
+Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.
 
 .. automodule:: pywarpx.callbacks
