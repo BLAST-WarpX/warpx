@@ -239,6 +239,9 @@ WarpX::Evolve (int numsteps)
         mypc->doQEDSchwinger();
 #endif
 
+        // perform particle injection
+        ExecutePythonCallback("particleinjection");
+
         // perform collisions and advance fields and particles by one time step
         OneStep(cur_time, dt[0], step, collisions, collisions_split_position_push);
 
@@ -403,9 +406,6 @@ void WarpX::OneStep (
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
 
-        // perform particle injection
-        ExecutePythonCallback("particleinjection");
-
         // advance fields and particles by one time step
         m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
@@ -431,9 +431,6 @@ void WarpX::OneStep (
                     mypc->doCollisions(a_step, a_cur_time, a_dt);
                     ExecutePythonCallback("aftercollisions");
 
-                    // perform particle injection
-                    ExecutePythonCallback("particleinjection");
-
                     // push particles (half position)
                     PushParticlesandDeposit(
                         a_cur_time,
@@ -449,9 +446,6 @@ void WarpX::OneStep (
                     mypc->doCollisions(a_step, a_cur_time, a_dt);
                     ExecutePythonCallback("aftercollisions");
 
-                    // perform particle injection
-                    ExecutePythonCallback("particleinjection");
-
                     // push particles (half position)
                     PushParticlesandDeposit(
                         a_cur_time,
@@ -463,9 +457,6 @@ void WarpX::OneStep (
             }
             // without collisions
             else {
-                // perform particle injection
-                ExecutePythonCallback("particleinjection");
-
                 // push particles (half position)
                 PushParticlesandDeposit(
                     a_cur_time,
@@ -481,9 +472,6 @@ void WarpX::OneStep (
             ExecutePythonCallback("beforecollisions");
             mypc->doCollisions(a_step, a_cur_time, a_dt);
             ExecutePythonCallback("aftercollisions");
-
-            // perform particle injection
-            ExecutePythonCallback("particleinjection");
 
             // without mesh refinement
             if (finest_level == 0) {
