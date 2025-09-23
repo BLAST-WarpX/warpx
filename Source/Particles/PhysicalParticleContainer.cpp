@@ -567,10 +567,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 } else if (push_type == PushType::Implicit) {
                     long const offset = 0;
                     if (implicit_options->evolve_suborbit_particles_only) {
-                        FindSuborbitParticles(pti,
-                                       offset, np_to_push,
-                                       num_unconverged_particles,
-                                       unconverged_indices, saved_weights);
+                        FindSuborbitParticles(pti, offset, np_to_push,
+                                              num_unconverged_particles,
+                                              unconverged_indices, saved_weights);
 
                     } else {
                         ImplicitPushXP(pti, exfab, eyfab, ezfab,
@@ -626,10 +625,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                lev, lev-1, dt, ScaleFields(false), subcycling_half);
                     } else if (push_type == PushType::Implicit) {
                         if (implicit_options->evolve_suborbit_particles_only) {
-                            FindSuborbitParticles(pti,
-                                           nfine_gather, np-nfine_gather,
-                                           num_unconverged_particles_c,
-                                           unconverged_indices, saved_weights);
+                            FindSuborbitParticles(pti, nfine_gather, np-nfine_gather,
+                                                  num_unconverged_particles_c,
+                                                  unconverged_indices, saved_weights);
 
                         } else {
                             ImplicitPushXP(pti, cexfab, ceyfab, cezfab,

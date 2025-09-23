@@ -249,7 +249,7 @@ namespace {
 }
 
 /*
- * \brief The routine finds particles that require suborbiting.
+ * \brief The routine finds particles that have previously been marked for suborbiting.
  *        The indices and the weights of such particles are saved.
  *
  * \param[in] pti                            The WarpXParIter holding the particles to push
