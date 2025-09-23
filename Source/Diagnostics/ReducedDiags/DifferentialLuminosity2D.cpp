@@ -219,11 +219,11 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             // Extract low-level (cell-level) data
             auto const n_cells = static_cast<int>(bins_1.numBins());
 
-	    IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
-	    indep_pairs.shuffle(indices_1, indices_2);
+        IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
+        indep_pairs.shuffle(indices_1, indices_2);
 
-	    int n_independent_pairs = indep_pairs.numIndependentPairs();
-	    const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
+        int n_independent_pairs = indep_pairs.numIndependentPairs();
+        const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
             amrex::ParallelFor( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
