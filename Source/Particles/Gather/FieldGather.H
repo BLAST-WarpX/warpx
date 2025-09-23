@@ -1353,7 +1353,6 @@ void doGatherShapeNEsirkepovStencilImplicit (
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
  * \param lo                        Index lower bounds of domain.
- * \param max_crossings             Maximum number of particle cell crossings allowed.
  * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
@@ -1386,7 +1385,6 @@ void doGatherPicnicShapeN (
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
-                     const int max_crossings,
                      const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
@@ -1499,22 +1497,9 @@ void doGatherPicnicShapeN (
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Abort if cell crossings are larger than permitted
-    if (cell_crossings_x > max_crossings) {
-        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-    if (cell_crossings_y > max_crossings) {
-        amrex::Abort("Error: cell_crossings_y = " + std::to_string(cell_crossings_y) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-    if (cell_crossings_z > max_crossings) {
-        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 7) ...
 
     // compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
@@ -1695,18 +1680,9 @@ void doGatherPicnicShapeN (
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Abort if cell crossings are larger than permitted
-    if (cell_crossings_x > max_crossings) {
-        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-    if (cell_crossings_z > max_crossings) {
-        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-
+    // need to assert that the number of cell crossings in each direction
+    // is within the range permitted by the number of guard cells
+    // e.g., if (num_segments > 5) ...
 
     // compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
@@ -1875,13 +1851,6 @@ void doGatherPicnicShapeN (
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Abort if cell crossings are larger than permitted
-    if (cell_crossings_z > max_crossings) {
-        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-
     // need to assert that the number of cell crossings in each direction
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
@@ -1966,16 +1935,6 @@ void doGatherPicnicShapeN (
     const auto i_new = static_cast<int>(x_new-shift);
     const int cell_crossings_x = std::abs(i_new-i_old);
     num_segments += cell_crossings_x;
-
-    // Abort if cell crossings are larger than permitted
-    if (cell_crossings_x > max_crossings) {
-        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
-                     " is greater than the maximum allowed = " +
-                     std::to_string(max_crossings));
-    }
-
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
 
     // need to assert that the number of cell crossings in each direction
     // is within the range permitted by the number of guard cells
@@ -2219,7 +2178,6 @@ void doGatherShapeNImplicit (
                      const amrex::XDim3 & xyzmin,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
-                     [[maybe_unused]]const int max_crossings,
                      const int nox,
                      const CurrentDepositionAlgo depos_type )
 {
@@ -2256,25 +2214,25 @@ void doGatherShapeNImplicit (
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Direct) {
