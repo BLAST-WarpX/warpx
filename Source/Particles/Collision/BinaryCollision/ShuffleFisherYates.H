@@ -57,6 +57,7 @@ struct IndependentPairHelper
      * @param[in] a_cell_offsets_2 the offset array storing the number of particles per cell for species 2
      *
      */
+    AMREX_NO_INLINE
     IndependentPairHelper (int a_n_cells,
                index_type const* AMREX_RESTRICT a_cell_offsets_1,
                index_type const* AMREX_RESTRICT a_cell_offsets_2)
@@ -68,9 +69,8 @@ struct IndependentPairHelper
     // Compute the number of independent pairs in each cell. This is equal to
     // the number of particles in whichever species has fewer
     index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = m_n_ind_pairs_in_each_cell.dataPtr();
-    amrex::ParallelFor( m_n_cells+1,
-        [=] AMREX_GPU_DEVICE (int i_cell) noexcept
-        {
+    amrex::ParallelFor( m_n_cells+1, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+    {
         if (i_cell < a_n_cells)
         {
         const auto n_part_in_cell_1 = a_cell_offsets_1[i_cell+1] - a_cell_offsets_1[i_cell];
