@@ -52,7 +52,7 @@ struct IndependentPairHelper
     /**
      * \brief Constructor
      *
-     * @param[in] n_cells the number of cells in this tile
+     * @param[in] a_n_cells the number of cells in this tile
      * @param[in] a_cell_offsets_1 the offset array storing the number of particles per cell for species 1
      * @param[in] a_cell_offsets_2 the offset array storing the number of particles per cell for species 2
      *
