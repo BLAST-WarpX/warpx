@@ -11,9 +11,8 @@
 #define WARPX_WarpXParticleContainer_H_
 
 #include "WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
@@ -238,8 +237,8 @@ public:
     virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
                          int lev,
                          const std::string& current_fp_string,
-                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
-                         bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit) = 0;
+                         amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                         ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
 
@@ -586,6 +585,15 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    void setDoNotGather (int flag) { do_not_gather = flag; }
+    void setDoNotDeposit (int flag) { do_not_deposit = flag; }
+
+    bool HasiAttrib (const std::string& name)
+    {
+        std::vector<std::string> const & int_names = GetIntSoANames();
+        auto const pos = std::find(int_names.begin(), int_names.end(), name);
+        return (pos != int_names.end());
+    }
 
     std::string const & getName() { return species_name; }
 

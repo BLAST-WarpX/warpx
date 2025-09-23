@@ -263,8 +263,10 @@ macro(find_amrex)
             set(COMPONENT_SIMD)
         endif()
 
-        set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
+        set(WarpX_amrex_dim ${WarpX_DIMS})
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(COMPONENT_DIMS)
         foreach(D IN LISTS WarpX_amrex_dim)

@@ -86,136 +86,133 @@ Overall simulation parameters
 
     * ``explicit``: Use an explicit solver, such as the standard FDTD or PSATD
 
-    * ``theta_implicit_em``: Use a fully implicit electromagnetic solver with a time-biasing parameter theta bound between 0.5 and 1.0. Exact energy conservation is achieved using theta = 0.5. Maximal damping of high-k modes is obtained using theta = 1.0. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed (PS) JFNK.
-      The algorithm itself is numerical stable for large time steps. That is, it does not require time steps that resolve the plasma period or the CFL condition for light waves. However, the practicality of using a large time step depends on the nonlinear solver. Note that the Picard solver is for demonstration only. It is inefficient and will most like not converge when
-      :math:`\omega_{pe} \Delta t` is close to or greater than one or when the CFL condition for light waves is violated. The PS-JFNK method must be used in order to use large time steps. However, the current implementation of PS-JFNK is still inefficient because the JFNK solver is not preconditioned and there is no use of the mass matrices to minimize the cost of a linear iteration. The time step is limited by how many cells a particle can cross in a time step (MPI-related) and by the need to resolve the relevant physics.
-      The Picard method is described in `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
-      The PS-JFNK method is described in `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__ . (The version implemented in WarpX is an updated version that includes the relativistic gamma factor for the particles.) Also see `Chen et al., An energy- and charge-conserving, implicit, electrostatic particle-in-cell algorithm. <https://doi.org/10.1016/j.jcp.2011.05.031>`__ .
-      Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
+    * ``theta_implicit_em``: Use a :math:`\theta`-implicit electromagnetic solver.
+
+      - **Time-biasing parameter:**
+        The fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance the system are computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`, where :math:`\theta\in[0.5,1.0]`.
+
+        - ``implicit_evolve.theta`` (`float`, default: 0.5)
+        - :math:`\theta = 0.5`: Exact energy conservation.
+        - :math:`\theta = 1.0`: Maximal damping of high-k modes.
+
+      - **Field gather and current depositions:**
+        Exact energy conservation requires matching gather and deposition.
+        The following depositions support this:
+
+        - ``algo.current_deposition = direct``
+        - ``algo.current_deposition = villasenor``
+        - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
+
+      - **Numerical stability:**
+
+        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
+        - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or satisfying the CFL condition for light waves).
+        - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
+
+      - **Nonlinear solvers:**
+        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are `picard` and `newton`.
+
+        - ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
+
+        - ``implicit_evolve.nonlinear_solver = picard``: Use a Picard iteration method. Requires small time steps; often non-convergent for large time steps.
+
+          - ``picard.verbose`` (`bool`, default: true)
+          - ``picard.require_convergence`` (`bool`, default: true)
+          - ``picard.maximum_iterations`` (`int`, default: 100)
+          - ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``picard.absolute_tolerance`` (`float`, default: 0.0)
+          - ``picard.diagnostic_file`` (`string`, default: None)
+          - ``picard.diagnostic_interval`` (`int`, default: 1)
+
+        - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
+
+          - ``newton.verbose`` (`bool`, default: true)
+          - ``newton.require_convergence`` (`bool`, default: true)
+          - ``newton.maximum_iterations`` (`int`, default: 100)
+          - ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
+          - ``newton.absolute_tolerance`` (`float`, default: 0.0)
+          - ``newton.diagnostic_file`` (`string`, default: None)
+          - ``newton.diagnostic_interval`` (`int`, default: 1)
+
+          - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
+
+          - ``gmres.verbose_int`` (`int`, default: 2)
+          - ``gmres.restart_length`` (`int`, default: 30)
+          - ``gmres.maximum_iterations`` (`int`, default: 1000)
+          - ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
+          - ``gmres.absolute_tolerance`` (`float`, default: 0.0)
+
+      - **PS-JFNK solver specific options:**
+        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
+
+        - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
+
+          - ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
+          - ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
+          - ``implicit_evolve.particle_suborbits`` (`bool`, default: false)
+          - ``implicit_evolve.print_unconverged_particle_details`` (`bool`, default: false)
+
+        - ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false).
+          When `true`, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
+
+          - ``implicit_evolve.skip_particle_picard_init`` (`bool`, default: false).
+            When `true` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
+            This can enhance the overall efficiency of the Newton solver.
+            Default is true if ``implicit_evolve.particle_suborbits = true``.
+
+        - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
+          When `true`, the plasma response is captured in the preconditioner.
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
+
+        - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
+
+          - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
+
+            .. math::
+
+               \nabla \times \left( \alpha\nabla\times\textbf{E} \right) + \boldsymbol{\beta}\cdot\textbf{E} = \textbf{b},
+
+            where :math:`\alpha=\theta^2\Delta t^2c^2` is a scalar and :math:`\boldsymbol{\beta}` is a diagonal matrix that scales the components of :math:`\textbf{E}`.
+
+              - Default: :math:`\boldsymbol\beta = \mathbb{I}`, giving implicit Maxwell equations, suitable for time steps that under-resolve light waves (:math:`c\Delta t > 1/\sqrt{\left(\sum_i1/\Delta x_i^2\right)}`).
+              - ``implicit_evolve.use_mass_matrices_pc = true``: :math:`\boldsymbol\beta` also includes plasma response via the diagonal mass matrices, enabling time steps that under-resolve the plasma period (:math:`\omega_{pe}\Delta t > 1`).
+
+            - ``pc_curl_curl_mlmg.verbose`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.bottom_verbose`` (`bool`, default: false)
+            - ``pc_curl_curl_mlmg.agglomeration`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.consolidation`` (`bool`, default: true)
+            - ``pc_curl_curl_mlmg.max_iter`` (`int`, default: 10)
+            - ``pc_curl_curl_mlmg.max_coarsening_level`` (`int`, default: 30)
+            - ``pc_curl_curl_mlmg.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_curl_curl_mlmg.absolute_tolerance`` (`float`, default: 1.0e-16)
+
+          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This preconditioner only captures the plasma response via the diagonal mass matrices.
+
+            - ``pc_jacobi.verbose`` (`bool`, default: true)
+            - ``pc_jacobi.max_iter`` (`int`, default: 10)
+            - ``pc_jacobi.relative_tolerance`` (`float`, default: 1.0e-4)
+            - ``pc_jacobi.absolute_tolerance`` (`float`, default: 1.0e-16)
+
+      - **References:** (WarpX includes relativistic extensions not discussed in references.)
+
+        - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
+        - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
+        - `Angus et al., An implicit particle code with exact energy and charge conservation for studies of dense plasmas in axisymmetric geometries <https://doi.org/10.1016/j.jcp.2024.113427>`__.
+
+    * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver.
+
+      - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method. Consequently, this method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.
+      - Particles are treated implicitly, and all of the comments for ``theta_implicit_em`` above apply here as well (except that :math:`\theta` is fixed to 0.5).
+      - The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
+
 
     * ``strang_implicit_spectral_em``: Use a fully implicit electromagnetic solver. All of the comments for ``theta_implicit_em``
-      above apply here as well (except that theta is fixed to 0.5 and that charge will not be conserved).
+      above apply here as well (except that :math:`\theta` is fixed to 0.5 and that charge will not be conserved).
       In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
       The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
-      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft == 1``. Otherwise,
+      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft = 1``. Otherwise,
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
-
-    * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver. Choices for the nonlinear solver include a Picard iteration scheme and particle-suppressed JFNK.
-      Note that this method has the CFL limitation :math:`\Delta t < c/\sqrt( \sum_i 1/\Delta x_i^2 )`. The Picard solver for this method can only be expected to work well when :math:`\omega_{pe} \Delta t` is less than one.
-      The method is described in `Chen et al., A semi-implicit, energy- and charge-conserving particle-in-cell algorithm for the relativistic Vlasov-Maxwell equations <https://doi.org/10.1016/j.jcp.2020.109228>`__.
-      Exact energy conservation requires that the interpolation stencil used for the field gather match that used for the current deposition. ``algo.current_deposition = direct`` must be used with ``interpolation.galerkin_scheme = 0``, and ``algo.current_deposition = Esirkepov`` must be used with ``interpolation.galerkin_scheme = 1``. If using ``algo.current_deposition = villasenor``, the corresponding field gather routine will automatically be selected and the ``interpolation.galerkin_scheme`` flag does not need to be specified. The Esirkepov and villasenor deposition schemes are charge-conserving.
-
-* ``implicit_evolve.theta`` (`float`, default: 0.5)
-    When `algo.evolve_scheme = theta_implicit_em`, the fields used on the RHS of the equations for the implicit advance
-    are computed as (1-theta)*E_{n} + theta*E_{n+1}. theta is bound between 0.5 and 1. The default value of theta = 0.5
-    is needed for exact energy conservation. For theta > 0.5, high-k modes will be damped and the method will not be
-    exactly energy conserving, but the solver may perform better.
-
-* ``implicit_evolve.nonlinear_solver`` (`string`, default: None)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em`, this sets the nonlinear solver used
-    to advance the field-particle system in time. Options are `picard` or `newton`.
-
-* ``implicit_evolve.max_particle_iterations`` (`integer`, default: 21)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
-    , this sets the maximum number of iterations for the method used to obtain a self-consistent update of the particles at
-    each iteration in the JFNK process.
-
-* ``implicit_evolve.particle_tolerance`` (`float`, default: 1.e-10)
-    When `algo.evolve_scheme` is either `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`
-    , this sets the relative tolerance for the iterative method used to obtain a self-consistent update of the particles at
-    each iteration in the JFNK process.
-
-* ``implicit_evolve.use_mass_matrices_jacobian`` (`bool`, default: false)
-    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton`, mass matrices are computed at each nonlinear JFNK iteration and are used during the linear iterations to compute the plasma current density, replacing direct particle calculations.
-
-* ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false)
-    When `algo.evolve_scheme` is `theta_implicit_em`, `strang_implicit_spectral_em`, or `semi_implicit_em` and `implicit_evolve.nonlinear_solver = newton` and a preconditioner is used, this flag determines whether the plasma response is captured in the preconditioner.
-
-* ``picard.verbose`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the verbosity of the Picard solver. If true, then information
-    on the nonlinear error are printed to screen at each nonlinear iteration.
-
-* ``picard.require_convergence`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets whether the Picard method is required to converge at each
-    time step. If it is required, an abort is raised if it does not converge and the code then exits. If not, then a warning
-    is issued and the calculation continues.
-
-* ``picard.maximum_iterations`` (`int`, default: 100)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the maximum iterations used by the Picard method. If
-    `picard.require_convergence = false`, the solution is considered converged if the iteration count reaches this value,
-    but a warning is issued. If `picard.require_convergence = true`, then an abort is raised if the iteration count reaches
-    this value.
-
-* ``picard.relative_tolerance`` (`float`, default: 1.0e-6)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the relative tolerance used by the Picard method for determining
-    convergence. The absolute error for the Picard method is the L2 norm of the difference of the solution vector between
-    two successive iterations. The relative error is the absolute error after iteration k > 1 divided by the absolute error
-    after the first iteration. The Picard method is considered converged when the relative error is below the relative tolerance.
-    This is the preferred means of determining convergence.
-
-* ``picard.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = picard`, this sets the absolute tolerance used by the Picard method for determining
-    convergence. The default value is 0.0, which means that the absolute tolerance is not used to determine converence. The
-    solution vector in the nonlinear solvers are in physical units rather than normalized ones. Thus, the absolute scale
-    of the problem can vary over many orders and magnitude depending on the problem. The relative tolerance is the preferred
-    means of determining convergence.
-
-* ``newton.verbose`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the verbosity of the Newton solver. If true, then information
-    on the nonlinear error are printed to screen at each nonlinear iteration.
-
-* ``newton.require_convergence`` (`bool`, default: 1)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets whether the Newton method is required to converge at each
-    time step. If it is required, an abort is raised if it does not converge and the code then exits. If not, then a warning
-    is issued and the calculation continues.
-
-* ``newton.maximum_iterations`` (`int`, default: 100)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the maximum iterations used by the Newton method. If
-    `newton.require_convergence = false`, the solution is considered converged if the iteration count reaches this value,
-    but a warning is issued. If `newton.require_convergence = true`, then an abort is raised if the iteration count reaches
-    this value.
-
-* ``newton.relative_tolerance`` (`float`, default: 1.0e-6)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the relative tolerance used by the Newton method for determining
-    convergence. The absolute error for the Newton method is the L2 norm of the residual vector. The relative error is the
-    absolute error divided by the L2 norm of the initial residual associated with the initial guess. The Newton method is
-    considered converged when the relative error is below the relative tolerance. This is the preferred means of determining
-    convergence.
-
-* ``newton.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the absolute tolerance used by the Newton method for determining
-    convergence. The default value is 0.0, which means that the absolute tolerance is not used to determine converence. The
-    residual vector in the nonlinear solvers are in physical units rather than normalized ones. Thus, the absolute scale
-    of the problem can vary over many orders and magnitude depending on the problem. The relative tolerance is the preferred
-    means of determining convergence.
-
-* ``gmres.verbose_int`` (`int`, default: 2)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the verbosity of the AMReX::GMRES linear solver. The default
-    value of 2 gives maximumal verbosity and information about the residual are printed to the screen at each GMRES iteration.
-
-* ``gmres.restart_length`` (`int`, default: 30)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the iteration number at which to do a restart in AMReX::GMRES.
-    This parameter is used to save memory on building the Krylov subspace basis vectors for linear systems that are ill-conditioned
-    and require many iterations to converge.
-
-* ``gmres.relative_tolerance`` (`float`, default: 1.0e-4)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the relative tolerance used to determine convergence of the
-    AMReX::GMRES linear solver used to compute the Newton step in the JNFK process. The absolute error is the L2 norm of the
-    residual vector. The relative error is the absolute error divided by the L2 norm of the initial residual (typically equal
-    to the norm of the nonlinear residual from the end of the previous Newton iteration). The linear solver is considered
-    converged when the relative error is below the relative tolerance. This is the preferred means of determining convergence.
-
-* ``gmres.absolute_tolerance`` (`float`, default: 0.0)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the absolute tolerance used to determine converence of the
-    GMRES linear solver used to compute the Newton step in the JNFK process. The default value is 0.0, which means that the
-    absolute tolerance is not used to determine converence. The residual vector in the nonlinear/linear solvers are in physical
-    units rather than normalized ones. Thus, the absolute scale of the problem can vary over many orders and magnitude depending
-    on the problem. The relative tolerance is the preferred means of determining convergence.
-
-* ``gmres.maximum_iterations`` (`int`, default: 1000)
-    When `implicit_evolve.nonlinear_solver = newton`, this sets the maximum iterations used by the GMRES linear solver. The
-    solution to the linear system is considered converged if the iteration count reaches this value.
 
 * ``warpx.do_electrostatic`` (`string`) optional (default `none`)
     Specifies the electrostatic mode. When turned on, instead of updating
@@ -1066,6 +1063,8 @@ Particle initialization
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant `double` scalars) then the species will use these, unless overwritten in the input file (see ``<species_name>.mass``, ``<species_name>.charge`` or ``<species_name>.species_type``).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
       For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-developers>`.
+      See `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
+      for an example of how to prepare the openPMD data file.
 
     * ``NFluxPerCell``: Continuously inject a flux of macroparticles from a surface. The emitting surface can be chosen to be either a plane
       defined by the user (using some of the parameters listed below), or the embedded boundary (see :ref:`Embedded Boundary Conditions <running-cpp-parameters-eb>`).
@@ -1157,6 +1156,13 @@ Particle initialization
       mathematical expression for the density of the species, e.g.
       ``electrons.density_function(x,y,z) = "n0+n0*x**2*1.e12"`` where ``n0`` is a
       user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
+
+    * ``read_from_file``: load the density profile from an openPMD file.
+      An additional parameter, indicating the path of an openPMD data file,
+      ``<species_name>.read_density_from_path`` must be specified. The openPMD
+      file must contain a field named ``density``. See
+      `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
+      for an example of how to prepare the openPMD data file.
 
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
@@ -1939,7 +1945,16 @@ are applied to the particles directly, at each timestep. As a results, these fie
         .. note::
 
             When using ``read_from_file``, the fields loaded from the file will be interpolated
-            to the resolution of the grid used for the simulation.
+            to the resolution of the grid used for the simulation. These fields are seen by the diagnostics.
+
+        The time dependency of the E- and B-field can be specified by the input parameter:
+
+        * ``particles.read_fields_E_dependency(t)``
+
+        * ``particles.read_fields_B_dependency(t)``
+
+        The time dependency scales the E- and B-field uniformly in space by the given function.
+
 
     * ``repeated_plasma_lens``: apply a series of plasma lenses.
       The properties of the lenses are defined in the lab frame by the input parameters:
@@ -2096,32 +2111,47 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
-    - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions
-      of electrons and ions.
+    - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
+      This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
+    - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions of electrons and ions.
       The absorbed energy and momentum is distributed among the electrons so that the quantities are exactly conserved.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
       equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
       (instead of following the correct distribution, see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
-      The implementation follows the same numerical algorithm as that of fusion reactions (see. `Higginson et al. (JCP 388, 439-453, 2019) <https://doi.org/10.1016/j.jcp.2019.03.020>`__).
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
+    - ``linear_compton`` for linear Compton scattering between a lepton (electron or positron, for now) and a photon, based on the Klein-Nishina cross-section
+      (see for example :cite:t:`param-LandauVol4`: equations 86.10 and 86.16 for the differential and total cross sections, respectively).
+      The probability of scattering is drawn from the total cross section, while the angular distribution of the scattered lepton and photon is drawn from the differential cross section.
+      The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
+      Note the difference between the linear Compton scattering module described here and
+      `the quantum synchrotron QED module <https://warpx.readthedocs.io/en/latest/usage/parameters.html#lookup-tables-and-other-settings-for-qed-modules>`__.
+      The former (commonly referred to simply as Compton scattering) is the collision between a single electron and a single photon,
+      the latter (also known as multi-photon/nonlinear Compton or quantum synchrotron radiation) is the scattering
+      of a single electron in a strong electromagnetic field.
 
 * ``<collision_name>.species`` (`strings`)
-    If using ``dsmc``, ``pairwisecoulomb`` or ``nuclearfusion``, this should be the name(s) of the species,
+    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, or ``bremsstrahlung``, this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
+    With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     In this case, only one species name should be given.
     if using ``inverse_bremsstrahlung``, this should be the photon species being absorbed and the electron
     species colliding with, in that order.
     If using ``linear_breit_wheeler`` these should be two photon species.
+    If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
+
 
 * ``<collision_name>.product_species`` (`strings`)
-    Only for ``dsmc``, ``linear_breit_wheeler``, and ``nuclearfusion``. The name(s) of the species in which to add
-    the new macroparticles created by the reaction.
+    Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
+    The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
     If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
+    If using ``bremsstrahlung``, the product species must be of type photon.
+    If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
 * ``<collision_name>.ndt`` (`int`) optional
     Execute collision every # time steps. The default value is 1.
@@ -2146,7 +2176,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     is specified, this Debye length is not used.
 
 * ``<collision_name>.event_multiplier`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler`` (LBW).
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     Increasing ``event_multiplier`` creates more macroparticles products,
     but with lower weight (in such a way that the corresponding
     total number of physical particle remains the same). This can improve
@@ -2158,7 +2188,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     The default value of ``event_multiplier`` is 1.
 
 * ``<collision_name>.probability_threshold`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     If the event multiplier is too high and results in a probability
     that approaches 1 (for a given collision between two macroparticles), then
     there is a risk of underestimating the total yield. In these cases,
@@ -2167,7 +2197,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     which WarpX reduces the event multiplier.
 
 * ``<collision_name>.probability_target_value`` (`float`) optional.
-    Only for ``nuclearfusion`` and ``linear_breit_wheeler``.
+    Only for ``nuclearfusion``, ``linear_breit_wheeler``, and ``linear_compton``.
     When the probability of fusion or linear Breit-Wheeler for a given collision exceeds
     ``probability_threshold``, WarpX reduces the event multiplier for
     that collisions such that the probability approches ``probability_target_value``.
@@ -2253,6 +2283,22 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``<collision_name>.ionization_target_species`` (`string`)
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
+
+* ``<collision_name>.Z`` (`integer`)
+    Only for ``bremsstrahlung``. The atomic number of the target ion species.
+    Currently, only the values 1, 2, 5, 6 are supported.
+
+* ``<collision_name>.multiplier`` (`float`)
+    Only for ``bremsstrahlung``. Multiplier for the collision probability.
+    Any resulting photons will have the electron weight divided the multiplier.
+    The default is 1. This must be greater than or equal to 1.
+
+* ``<collision_name>.create_photons`` (`integer`)
+    Only for ``bremsstrahlung``. Whether photons will be created, defaults to 1 (true).
+
+* ``<collision_name>.koT1_cut`` (`float`)
+    Only for ``bremsstrahlung``. Minimum energy of the photons created.
+    This is relative to the electron energy, defaulting to 1.e-4.
 
 * ``collisions.correct_energy_momentum`` (`bool`) optional (default 0)
     For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
@@ -2847,7 +2893,7 @@ WarpX has five types of diagnostics:
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
 
-* ``warpx.synchronize_velocity_for_diagnostics`` (``0`` or ``1``, optional, default ``0``)
+* ``warpx.synchronize_velocity_for_diagnostics`` (``0`` or ``1``, optional, default ``1``)
     Whether to synchronize the particle velocities with the particle positions in the diagnostics.
     In its normal operation, WarpX is using the leap frog algorithm to advance the particles, and leaves the positions and velocities of the particles unsynchronized at the end of each time step, with the velocities lagging behind a half step.
     When this option is turned on, whenever any diagnostics will be calculated, the velocities will be advanced a half step to
@@ -2921,6 +2967,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
      ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
      Default: ``f`` (full diagnostics)
+
+* ``<diag_name>.buffer_flush_limit_btd`` (`integer`; defaults to 5) optional, only read if ``<diag_name>.diag_type = BackTransformed``
+    This parameter is intended for ADIOS backend to group every N buffers (N is the value of this parameter) and then flush to disk.
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
     `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.

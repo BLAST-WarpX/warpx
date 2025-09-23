@@ -1,0 +1,134 @@
+##############################
+####### USER CONSTANTS #######
+##############################
+# electron bunch
+my_constants.Q_bunch = 2080.5031144200598 * 30000 * q_e
+my_constants.N_bunch = 500000 # Increase this number to reduce the tolerance in the test
+my_constants.gamma_bunch_mean = 30.205798028084185
+my_constants.gamma_bunch_rms = 0.58182474907848347
+my_constants.bunch_sigma_z = 1.e-6
+# laser (modeled as a cylinder with radius laser_radius and height laser_duration*clight)
+my_constants.laser_energy = 1. # Joule
+my_constants.laser_radius = 10.e-6 # meters
+my_constants.laser_duration = 0.2e-12 # seconds
+my_constants.photon_energy = q_e # 1 eV
+my_constants.N_photons = laser_energy / photon_energy # Number of photons in the laser pulse
+# time
+my_constants.T = laser_duration + Lz / clight
+my_constants.dens = N_photons / (pi * laser_radius**2 * laser_duration*clight)
+my_constants.sigma_kn_max = 6.65e-29 # Maximum value of Klein-Nishina cross-section
+my_constants.v_rel = 2 *clight
+my_constants.probability_target_value = 0.05
+my_constants.dt =  probability_target_value / (sigma_kn_max * dens * v_rel )
+my_constants.N_step = floor(T / dt)
+# space
+my_constants.Lz = 8 * bunch_sigma_z
+my_constants.zmin = -0.5*Lz
+my_constants.zmax =  0.5*Lz
+
+########################
+####### NUMERICS #######
+########################
+max_step = N_step
+geometry.dims = 3
+amr.n_cell = 8 8 8
+geometry.prob_lo = -20e-6 -20e-6  zmin
+geometry.prob_hi =  20e-6  20e-6  zmax
+amr.max_level = 0
+warpx.verbose = 1
+warpx.cfl = 1.0
+algo.particle_shape = 1
+algo.maxwell_solver= none
+warpx.const_dt = dt
+
+#########################
+####### PARTICLES #######
+#########################
+particles.species_names = photon1 electron1 photon2 electron2
+particles.photon_species = photon1 photon2
+
+# laser
+photon1.species_type = photon
+photon1.injection_style = NFluxPerCell
+photon1.flux_profile = parse_flux_function
+photon1.flux_function(x,y,z,t) = N_photons / ( pi*laser_radius**2 * laser_duration) * ((x**2 + y**2)<laser_radius**2)
+photon1.flux_normal_axis = z
+photon1.surface_flux_pos = zmin
+photon1.flux_direction = 1
+photon1.flux_tmin = 0
+photon1.flux_tmax = laser_duration
+photon1.num_particles_per_cell = 1
+photon1.momentum_distribution_type = constant
+photon1.ux = 0
+photon1.uy = 0
+photon1.uz = photon_energy / (m_e * clight**2)
+
+# bunch
+electron1.species_type = electron
+electron1.injection_style = gaussian_beam
+electron1.x_rms = 1e-6
+electron1.y_rms = 1e-6
+electron1.z_rms = bunch_sigma_z
+electron1.x_m = 0
+electron1.y_m = 0
+electron1.z_m = 0
+electron1.npart = N_bunch
+electron1.q_tot = -Q_bunch
+electron1.momentum_distribution_type = gaussian
+electron1.ux_m = 0
+electron1.uy_m = 0
+electron1.uz_m = -gamma_bunch_mean
+electron1.ux_th = 0
+electron1.uy_th = 0
+electron1.uz_th = gamma_bunch_rms
+electron1.do_not_push = 1
+
+# Compton-scattered electrons
+electron2.species_type = electron
+electron2.injection_style = none
+electron2.do_not_push = 1
+
+# Compton-scattered photons
+photon2.species_type = photon
+photon2.injection_style = none
+photon2.do_not_push = 1
+
+#########################
+####### COLLISION #######
+#########################
+collisions.collision_names = lc # linear Compton
+lc.species = photon1 electron1
+lc.product_species = photon2 electron2
+lc.type = linear_compton
+lc.event_multiplier = 1.
+lc.probability_threshold = 0.5
+lc.probability_target_value = probability_target_value
+
+###########################
+####### DIAGNOSTICS #######
+###########################
+diagnostics.diags_names = diag1 bound
+diag1.intervals = 40
+diag1.diag_type = Full
+diag1.fields_to_plot = rho
+diag1.write_species = 1
+diag1.format = openpmd
+diag1.dump_last_timestep = 1
+
+bound.intervals = - 1
+bound.diag_type = BoundaryScraping
+bound.format = openpmd
+bound.dump_last_timestep = 1
+photon1.save_particles_at_xlo = 1
+photon1.save_particles_at_ylo = 1
+photon1.save_particles_at_zlo = 1
+photon1.save_particles_at_xhi = 1
+photon1.save_particles_at_yhi = 1
+photon1.save_particles_at_zhi = 1
+
+#electron1.save_particles_at_xlo = 1
+#electron1.save_particles_at_ylo = 1
+#electron1.save_particles_at_zlo = 1
+#electron1.save_particles_at_xhi = 1
+#electron1.save_particles_at_yhi = 1
+#electron1.save_particles_at_zhi = 1

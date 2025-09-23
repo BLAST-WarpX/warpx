@@ -38,8 +38,6 @@
 #   endif
 #endif
 #include "AcceleratorLattice/AcceleratorLattice.H"
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
@@ -189,18 +187,10 @@ public:
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
     EvolveScheme evolve_scheme = EvolveScheme::Default;
-    //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static int max_particle_its_in_implicit_scheme;
-    //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static amrex::ParticleReal particle_tol_in_implicit_scheme;
     /** Records a number corresponding to the load balance cost update strategy
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
     static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
-    /** Integer that correspond to macroscopic Maxwell solver algorithm
-     *  (BackwardEuler - 0, Lax-Wendroff - 1)
-     */
-    static inline auto macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
     /** Boundary conditions applied to fields at the lower domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
@@ -470,16 +460,16 @@ public:
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, DtType dt_type, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, DtType dt_type, amrex::Real start_time);
-    void EvolveF (         amrex::Real dt, DtType dt_type);
-    void EvolveF (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveG (         amrex::Real dt, DtType dt_type);
-    void EvolveG (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveF (         amrex::Real dt, int const rho_comp);
+    void EvolveF (int lev, amrex::Real dt, int const rho_comp);
+    void EvolveG (         amrex::Real dt);
+    void EvolveG (int lev, amrex::Real dt);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
-    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
-    void EvolveG (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
+    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
+    void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
 
     void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
     void MacroscopicEvolveE (int lev, amrex::Real dt, amrex::Real start_time);
@@ -607,7 +597,7 @@ public:
                               PatchType patch_type);
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
-    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
+    void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -651,10 +641,10 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
+                                  ImplicitOptions const * implicit_options = nullptr);
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+                                  ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
@@ -1196,6 +1186,11 @@ private:
     //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
     MediumForEM m_em_solver_medium = MediumForEM::Default;
 
+    /** Integer that correspond to macroscopic Maxwell solver algorithm
+     *  (BackwardEuler - 0, Lax-Wendroff - 1)
+     */
+    MacroscopicSolverAlgo m_macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
+
     //
     // Fields: First array for level, second for direction
     //
@@ -1366,7 +1361,7 @@ private:
     amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
     amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
-    bool synchronize_velocity_for_diagnostics = false;
+    bool synchronize_velocity_for_diagnostics = true;
 
     bool use_single_read = true;
     bool use_single_write = true;

@@ -5,6 +5,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel

@@ -118,8 +118,6 @@ Vector<int> WarpX::boost_direction = {0,0,0};
 bool WarpX::compute_max_step_from_btd = false;
 Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
-int WarpX::max_particle_its_in_implicit_scheme = 21;
-ParticleReal WarpX::particle_tol_in_implicit_scheme = 1.e-10;
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
 bool WarpX::do_single_precision_comms = false;
@@ -1343,7 +1341,7 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      macroscopic_solver_algo, "-_");
+                                      m_macroscopic_solver_algo, "-_");
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
@@ -1447,6 +1445,7 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
+            // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
                 evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);

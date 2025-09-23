@@ -180,7 +180,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         const long np_to_push,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
-                                        DtType a_dt_type)
+                                        SubcyclingHalf subcycling_half)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -224,7 +224,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      a_dt_type);
+                                      subcycling_half);
 
     if (!done_injecting_lev) {
 
@@ -269,8 +269,8 @@ void
 RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                         int lev,
                                         const std::string& current_fp_string,
-                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                        bool /*deposit_mass_matrices*/, PushType push_type)
+                                        Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                        ImplicitOptions const * /*implicit_options*/)
 {
 
     // Update location of injection plane in the boosted frame
@@ -295,7 +295,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, false, push_type);
+                                       t, dt, subcycling_half, skip_deposition, nullptr);
 }
 
 void
