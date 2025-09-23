@@ -83,6 +83,8 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // get MultiParticleContainer class object
     const auto & mypc = warpx.GetPartContainer();
 
+    const auto & mymfr = warpx.GetMultiFabRegister();
+
     // judge if the diags should be done
     // costs is initialized only if we're doing load balance
     if (!m_intervals.contains(step+1) ||
@@ -116,11 +118,13 @@ void LoadBalanceCosts::ComputeDiags (int step)
 
     costs.resize(nLevels);
     mem_used.resize(nLevels);
+
     for (int lev = 0; lev < nLevels; ++lev)
     {
         costs[lev] = std::make_unique<LayoutData<Real>>(*WarpX::getCosts(lev));
         mem_used[lev] = std::make_unique<LayoutData<std::size_t>>(warpx.boxArray(lev), warpx.DistributionMap(lev));
         mypc.CapacityOfParticlesInGrid(*mem_used[lev], lev);
+        mymfr.CapacityOfFabs(*mem_used[lev], warpx.boxArray(lev), warpx.DistributionMap(lev));
     }
 
     if (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Heuristic)

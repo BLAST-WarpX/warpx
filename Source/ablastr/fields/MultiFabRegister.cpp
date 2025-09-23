@@ -357,6 +357,23 @@ namespace ablastr::fields
         return &mf;
     }
 
+    void
+    MultiFabRegister::CapacityOfFabs (
+        amrex::LayoutData<std::size_t>& mem,
+        amrex::BoxArray const & ba,
+        amrex::DistributionMapping const & dm
+    ) const
+    {
+        for (auto & element : m_mf_register ) {
+            const MultiFabOwner & mf_owner = element.second;
+            amrex::LayoutData<std::size_t> tmpmem(ba, dm);
+            mf_owner.m_mf.capacityOfFabs(tmpmem);
+            for (amrex::MFIter mfi(tmpmem); mfi.isValid(); ++mfi) {
+                mem[mfi.index()] += tmpmem[mfi];
+            }
+        }
+    }
+
     amrex::MultiFab const *
     MultiFabRegister::internal_get (
         std::string const & internal_name
