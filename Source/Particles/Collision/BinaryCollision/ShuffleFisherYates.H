@@ -67,6 +67,9 @@ struct IndependentPairHelper
         Initialize();
     }
 
+    /* \brief Compute the number of independent pairs in each cell. This is equal to
+     * the number of particles in whichever species has fewer
+    */
     void Initialize () {
         // Compute the number of independent pairs in each cell. This is equal to
         // the number of particles in whichever species has fewer
@@ -87,11 +90,10 @@ struct IndependentPairHelper
                     p_n_ind_pairs_in_each_cell[i_cell] = 0;
                 }
         });
-    }
 
-    // number of total independent collision pairs
-    m_n_independent_pairs = (int) amrex::Scan::ExclusiveSum(m_n_cells+1,
-        p_n_ind_pairs_in_each_cell, m_coll_offsets.data(), amrex::Scan::RetSum{true});
+        // number of total independent collision pairs
+        m_n_independent_pairs = (int) amrex::Scan::ExclusiveSum(m_n_cells+1,
+            p_n_ind_pairs_in_each_cell, m_coll_offsets.data(), amrex::Scan::RetSum{true});
     }
 
     /**
