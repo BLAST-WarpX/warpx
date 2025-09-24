@@ -1891,6 +1891,16 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    const amrex::ParmParse pp_collisions("collisions");
+    pp_collisions.query("split_position_push", m_collisions_split_position_push);
+    if (m_collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
+        ablastr::warn_manager::WMRecordWarning(
+            "Collisions",
+            "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
+            ablastr::warn_manager::WarnPriority::low
+        );
+    }
 }
 
 void

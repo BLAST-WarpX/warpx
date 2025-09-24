@@ -1049,9 +1049,7 @@ private:
     void OneStep (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
-        int a_step,
-        bool const collisions,
-        bool const collisions_split_position_push
+        int a_step
     );
 
     void OneStep_nosub (amrex::Real cur_time);
@@ -1612,6 +1610,12 @@ private:
     bool m_JRhom = false;
     int m_JRhom_subintervals;
 
+    /**
+     * \brief WarpX class attribute that controls whether collisions are placed
+     *        in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push.
+     */
+    bool m_collisions_split_position_push = false;
 };
 
 #endif

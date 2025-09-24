@@ -159,21 +159,6 @@ WarpX::Evolve (int numsteps)
 
     static Real evolve_time = 0;
 
-    // check if simulation has collisions
-    amrex::Vector<std::string> collision_names;
-    const amrex::ParmParse pp_collisions("collisions");
-    pp_collisions.queryarr("collision_names", collision_names);
-    bool collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
-    bool collisions_split_position_push = false;
-    pp_collisions.query("split_position_push", collisions_split_position_push);
-    if (collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
-        ablastr::warn_manager::WMRecordWarning(
-            "Collisions",
-            "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
-            ablastr::warn_manager::WarnPriority::low
-        );
-    }
-
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
@@ -243,7 +228,7 @@ WarpX::Evolve (int numsteps)
         ExecutePythonCallback("particleinjection");
 
         // perform collisions and advance fields and particles by one time step
-        OneStep(cur_time, dt[0], step, collisions, collisions_split_position_push);
+        OneStep(cur_time, dt[0], step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -392,9 +377,7 @@ WarpX::Evolve (int numsteps)
 void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
-    int a_step,
-    bool const collisions,
-    bool const collisions_split_position_push
+    int a_step
 )
 {
     WARPX_PROFILE("WarpX::OneStep()");
@@ -414,49 +397,36 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // with collisions
-            if (collisions) {
-                // with splitting of position push
-                if (collisions_split_position_push) {
-                    // push particles (half position and full momentum)
-                    PushParticlesandDeposit(
-                        a_cur_time,
-                        /*skip_current=*/true,
-                        PositionPushType::FirstHalf,
-                        MomentumPushType::Full
-                    );
+            // with collisions placed in the middle of the position push and after the momentum push
+            if (m_collisions_split_position_push) {
+                // push particles (half position and full momentum)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    PositionPushType::FirstHalf,
+                    MomentumPushType::Full
+                );
 
-                    // perform particle collisions
-                    ExecutePythonCallback("beforecollisions");
-                    mypc->doCollisions(a_step, a_cur_time, a_dt);
-                    ExecutePythonCallback("aftercollisions");
+                // perform particle collisions
+                ExecutePythonCallback("beforecollisions");
+                mypc->doCollisions(a_step, a_cur_time, a_dt);
+                ExecutePythonCallback("aftercollisions");
 
-                    // push particles (half position)
-                    PushParticlesandDeposit(
-                        a_cur_time,
-                        /*skip_current=*/true,
-                        PositionPushType::SecondHalf,
-                        MomentumPushType::None
-                    );
-                }
-                // without splitting of position push
-                else {
-                    // perform particle collisions
-                    ExecutePythonCallback("beforecollisions");
-                    mypc->doCollisions(a_step, a_cur_time, a_dt);
-                    ExecutePythonCallback("aftercollisions");
-
-                    // push particles (half position)
-                    PushParticlesandDeposit(
-                        a_cur_time,
-                        /*skip_current=*/true,
-                        PositionPushType::Full,
-                        MomentumPushType::Full
-                    );
-                }
+                // push particles (half position)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    PositionPushType::SecondHalf,
+                    MomentumPushType::None
+                );
             }
-            // without collisions
+            // with collisions placed before the position and momentum push, or without collisions
             else {
+                // perform particle collisions
+                ExecutePythonCallback("beforecollisions");
+                mypc->doCollisions(a_step, a_cur_time, a_dt);
+                ExecutePythonCallback("aftercollisions");
+
                 // push particles (half position)
                 PushParticlesandDeposit(
                     a_cur_time,
