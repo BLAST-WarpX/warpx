@@ -407,6 +407,9 @@ void WarpX::OneStep (
                     MomentumPushType::Full
                 );
 
+                // communicate particle data
+                mypc->Redistribute();
+
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
