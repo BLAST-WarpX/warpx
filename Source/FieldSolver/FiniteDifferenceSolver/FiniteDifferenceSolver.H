@@ -102,6 +102,7 @@ class FiniteDifferenceSolver
           * finite-difference algorithm and macroscopic sigma-method defined in
           * WarpXAlgorithmSelection.H
           *
+          * \param[in] macroscopic_solver_algo macroscopic Maxwell solver algorithm (BackwardEuler or Lax-Wendroff)
           * \param[out] Efield  vector of electric field MultiFabs updated at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
           * \param[in] Jfield   vector of current density MultiFabs at a given level
@@ -110,6 +111,7 @@ class FiniteDifferenceSolver
           * \param[in] macroscopic_properties contains user-defined properties of the medium.
           */
         void MacroscopicEvolveE (
+                      MacroscopicSolverAlgo macroscopic_solver_algo,
                       ablastr::fields::VectorField const& Efield,
                       ablastr::fields::VectorField const& Bfield,
                       ablastr::fields::VectorField const& Jfield,
