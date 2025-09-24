@@ -230,9 +230,14 @@ protected:
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
-     * \brief Save E and J at start of each Newton step
+     * \brief Add J from particles included in mass matrices at start of each Newton step
      */
-    void SaveEandJ ();
+    void CumulateJ ();
+
+    /**
+     * \brief Save E at start of each Newton step
+     */
+    void SaveE ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

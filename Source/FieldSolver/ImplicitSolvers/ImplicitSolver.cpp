@@ -97,16 +97,33 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
     return lbc;
 }
 
-void ImplicitSolver::SaveEandJ ()
+void ImplicitSolver::CumulateJ ()
 {
 
-    // Copy Efield_fp to E0 and add J0 to current_fp.
+    // Add J0, which contains J from particles included in the mass matrices (MM) to current_fp, which
+    // is either zero or contains J from suborbit particles that are not inclued in the MM.
     // Do this BEFORE call to SyncCurrentAndRho().
     //
     // J during the linear stage of JFNK is computed as J(E=E0+dE) = J_suborbit + J0 + MM*(E - E0),
-    // where MM are the mass matrices (i.e., dJ/dE), E0 is the electric field at the start of the Newton step,
-    // J0 is the current associated with particles that are included in the MM using E0, and J_suborbit is the
-    // current associated with particles that have suborbits.
+    // where MM are the mass matrices (i.e., dJ/dE), E0 is the electric field at the start of the Newton
+    // step (see SaveE function), J0 is the current associated with particles that are included in the MM
+    // using E0, and J_suborbit is the current associated with particles that have suborbits.
+
+    using warpx::fields::FieldType;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
+        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
+        amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
+        amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
+        amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
+    }
+
+}
+
+void ImplicitSolver::SaveE ()
+{
+
+    // Copy Efield_fp to E0.
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -115,13 +132,6 @@ void ImplicitSolver::SaveEandJ ()
         amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, E[0]->nComp(), E[0]->nGrowVect());
         amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, E[1]->nComp(), E[1]->nGrowVect());
         amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
-
-        // Add J0 (J from particles included in MM) to J (which can already include J from suborbit particles)
-        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
-        amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
-        amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
-        amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
     }
 
 }
@@ -670,7 +680,8 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
-            //
+        }
+        if (m_use_mass_matrices) {
             m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
@@ -741,7 +752,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
-        if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
+        CumulateJ();
+        if (m_use_mass_matrices_jacobian) { SaveE(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
            const amrex::Real theta_dt = m_theta*m_dt;
