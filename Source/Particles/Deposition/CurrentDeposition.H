@@ -1452,18 +1452,20 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
  * \tparam depos_order  deposition order
- * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
- * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param wq           Pointer to array of particle weights.
- * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
- * \param gaminv       One over gamma for particle at middle of step
- * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
- * \param dt                    Time step for particle level
- * \param dinv                  3D cell size inverse
- * \param xyzmin                Physical lower bounds of domain
- * \param lo                    Index lower bounds of domain
- * \param invvol                One over cell volume
- * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
+ * \param xp_old,yp_old,zp_old        Old particle positions (nominally at start of step)
+ * \param xp_new,yp_new,zp_new        New particle positions (nominally at end of step)
+ * \param wq                          Pointer to array of particle weights
+ * \param uxp_mid,uyp_mid,uzp_mid     Particle momentum at middle of step
+ * \param gaminv                      One over gamma for particle at middle of step
+ * \param Jx_arr,Jy_arr,Jz_arr        Array4 of current density, either full array or tile
+ * \param max_crossings               Maximum number of particle cell crossings allowed
+ * \param out_of_range_particles_ptr  DeviceScalar* to check for out-of-range particles
+ * \param dt                          Time step for particle level
+ * \param dinv                        3D cell size inverse
+ * \param xyzmin                      Physical lower bounds of domain
+ * \param lo                          Index lower bounds of domain
+ * \param invvol                      One over cell volume
+ * \param n_rz_azimuthal_modes        Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -1481,6 +1483,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                                        amrex::Array4<amrex::Real>const & Jx_arr,
                                        amrex::Array4<amrex::Real>const & Jy_arr,
                                        amrex::Array4<amrex::Real>const & Jz_arr,
+                                       int const max_crossings,
+                                       int* out_of_range_particles_ptr,
                                        amrex::Real const dt,
                                        amrex::XDim3 const & dinv,
                                        amrex::XDim3 const & xyzmin,
@@ -1599,9 +1603,31 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 7) ...
+    // Abort if cell crossings are larger than permitted
+    if (cell_crossings_x > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
+    if (cell_crossings_y > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_y = " + std::to_string(cell_crossings_y) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
+    if (cell_crossings_z > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
 
     // compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
@@ -1784,9 +1810,23 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 5) ...
+    // Abort if cell crossings are larger than permitted
+    if (cell_crossings_x > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
+    if (cell_crossings_z > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
 
     // compute total change in particle position and the initial cell
     // locations in each direction used to find the position at cell crossings.
@@ -1951,9 +1991,15 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
+    // Abort if cell crossings are larger than permitted
+    if (cell_crossings_z > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_z = " + std::to_string(cell_crossings_z) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
 
     // compute dzp and the initial cell location used to find the cell crossings.
     double const dzp = z_new - z_old;
@@ -2031,9 +2077,15 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     const int cell_crossings_x = std::abs(i_new-i_old);
     num_segments += cell_crossings_x;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
+    // Abort if cell crossings are larger than permitted
+    if (cell_crossings_x > max_crossings) {
+        amrex::Gpu::Atomic::AddNoRet(out_of_range_particles_ptr,1);
+#if !defined(AMREX_USE_GPU)
+        amrex::Abort("Error: cell_crossings_x = " + std::to_string(cell_crossings_x) +
+                     " is greater than the maximum allowed = " +
+                     std::to_string(max_crossings));
+#endif
+    }
 
     // compute dxp and the initial cell location used to find the cell crossings.
     double const dxp = x_new - x_old;
@@ -2122,6 +2174,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                        since q is a scalar. For non-ionizable species,
                        ion_lev is a null pointer.
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
+ * \param max_crossings         The maximum number of particle cell crossings allowed.
  * \param np_to_deposit         Number of particles for which current is deposited.
  * \param dt                    Time step for particle level
  * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
@@ -2141,6 +2194,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::Array4<amrex::Real>& Jx_arr,
                                            const amrex::Array4<amrex::Real>& Jy_arr,
                                            const amrex::Array4<amrex::Real>& Jz_arr,
+                                           const int max_crossings,
                                            const long np_to_deposit,
                                            const amrex::Real dt,
                                            const amrex::Real relative_time,
@@ -2157,6 +2211,9 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
     bool const do_ionization = ion_lev;
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_particles_ptr = out_of_range_particles.dataPtr();
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -2186,10 +2243,17 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
 
             VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp[ip], uyp[ip], uzp[ip], gaminv,
-                                                          Jx_arr, Jy_arr, Jz_arr,
+                                                          Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                          out_of_range_particles_ptr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
+
+    // Check for out of range particles
+    amrex::Gpu::streamSynchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "Out of range particles found in deposition.");
 }
 
 /**
@@ -2210,6 +2274,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                        since q is a scalar. For non-ionizable species,
                        ion_lev is a null pointer.
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
+ * \param max_crossings         The maximum number of particle cell crossings allowed.
  * \param np_to_deposit         Number of particles for which current is deposited.
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
@@ -2234,6 +2299,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Array4<amrex::Real>& Jx_arr,
                                            const amrex::Array4<amrex::Real>& Jy_arr,
                                            const amrex::Array4<amrex::Real>& Jz_arr,
+                                           const int max_crossings,
                                            const long np_to_deposit,
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
@@ -2249,6 +2315,10 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
     bool const do_ionization = ion_lev;
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    // Guards used here because out of range particles are found in the kernal when on CPU
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_particles_ptr = out_of_range_particles.dataPtr();
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
@@ -2287,10 +2357,18 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
-                                                          Jx_arr, Jy_arr, Jz_arr,
+                                                          Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                          out_of_range_particles_ptr,
                                                           dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
 
     });
+
+    // Check for out of range particles
+    amrex::Gpu::synchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "out of range particles found in deposition");
+
 }
 
 /**

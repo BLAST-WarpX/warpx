@@ -101,6 +101,7 @@ namespace {
         amrex::XDim3 const & dinv,
         amrex::XDim3 const & xyzmin,
         amrex::Dim3 const & lo,
+        int const & max_crossings,
         int const & n_rz_azimuthal_modes,
         int const & depos_order,
         CurrentDepositionAlgo const & depos_type,
@@ -163,8 +164,8 @@ namespace {
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order,
-                                       depos_type );
+                                       dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes,
+                                       depos_order, depos_type);
             }
 
             // Externally applied E and B-field in Cartesian co-ordinates
@@ -388,6 +389,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const amrex::ParticleReal m = this-> mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
+    const int max_crossings = WarpX::particle_max_grid_crossings;
     const auto do_crr = do_classical_radiation_reaction;
 #ifdef WARPX_QED
     const auto do_sync = m_do_qed_quantum_sync;
@@ -479,7 +481,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              Bxp, Byp, Bzp,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                             dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
+                             dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
                              getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
@@ -665,8 +667,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::Dim3 lo = lbound(box);
 
     const int depos_order = WarpX::nox;
-    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
     const int max_crossings = WarpX::particle_max_grid_crossings;
+    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
     amrex::Array4<const amrex::Real> const & ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const & ey_arr = eyfab->array();
@@ -779,6 +781,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
 
+    amrex::Gpu::DeviceScalar<int> out_of_range_particles(0);
+    int* out_of_range_particles_ptr = out_of_range_particles.dataPtr();
+
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
@@ -786,7 +791,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                        amrex::CompileTimeOptions<no_qed  ,has_qed>,
                                        amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
                        {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
-                       num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
+                       num_unconverged_particles, [=,count_particles_ptr=out_of_range_particles_ptr] AMREX_GPU_DEVICE (long i,
                                                                  auto exteb_control, auto qed_control, auto depos_order_control)
     {
 
@@ -864,7 +869,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  Bxp, Byp, Bzp,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                 dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
+                                 dinv, xyzmin, lo, max_crossings, n_rz_azimuthal_modes, depos_order, depos_type,
                                  getExternalEB, ion_lev, m, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
@@ -896,7 +901,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                     // The ignore_unused is needed so that the variables are not first-captured
                     // in a constexpr-if context.
-                    amrex::ignore_unused(full_mass_matrices, max_crossings);
+                    amrex::ignore_unused(full_mass_matrices);
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
@@ -1024,25 +1029,29 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     if constexpr (depos_order_control == order_one) {
                         VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
+                                                            Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_two) {
                         VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
+                                                            Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_three) {
                         VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
+                                                            Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_four) {
                         VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
+                                                            Jx_arr, Jy_arr, Jz_arr, max_crossings,
+                                                            count_particles_ptr,
                                                             dt_suborbit, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
                     }
                 }
@@ -1115,5 +1124,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     });
 
+    // Check for out of range particles
     amrex::Gpu::streamSynchronize();
+    const int num_out_of_range_particles = out_of_range_particles.dataValue();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(num_out_of_range_particles == 0,
+                                     "Out of range particles found in deposition.");
+
 }
