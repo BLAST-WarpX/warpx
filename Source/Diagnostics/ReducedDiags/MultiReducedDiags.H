@@ -12,6 +12,8 @@
 
 #include "ReducedDiags.H"
 
+#include "LoadBalancing/LoadBalancer.H"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,7 +37,7 @@ public:
     std::vector<std::unique_ptr<ReducedDiags>> m_multi_rd;
 
     /// constructor
-    MultiReducedDiags ();
+    MultiReducedDiags (std::shared_ptr<warpx::load_balancing::LoadBalancer> p_load_balancer);
 
     /** Loop over all ReducedDiags and call their InitData
      */

@@ -56,7 +56,7 @@ using namespace amrex;
 
 
 
-void
+/*void
 WarpX::LoadBalance ()
 {
     WARPX_PROFILE_REGION("LoadBalance");
@@ -156,7 +156,7 @@ WarpX::LoadBalance ()
         reduced_diags->LoadBalance();
     }
 #endif
-}
+}*/
 
 void
 WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const DistributionMapping& dm)
@@ -288,15 +288,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         // Re-initialize the lattice element finder with the new ba and dm.
         m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
-        if (costs[lev] != nullptr)
-        {
-            costs[lev] = std::make_unique<LayoutData<Real>>(ba, dm);
-            const auto iarr = costs[lev]->IndexArray();
-            for (const auto& i : iarr)
-            {
-                (*costs[lev])[i] = 0.0;
-                setLoadBalanceEfficiency(lev, -1);
-            }
+        if (m_load_balancer->is_active()){
+            m_load_balancer->clear_level(lev);
+            m_load_balancer->allocate_level(lev, ba, dm);
+            m_load_balancer->reset_costs(lev);
+            m_load_balancer->reset_efficiency(lev);
         }
 
         SetDistributionMap(lev, dm);

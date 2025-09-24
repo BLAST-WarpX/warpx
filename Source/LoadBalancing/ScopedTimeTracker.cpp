@@ -80,24 +80,14 @@ namespace warpx::load_balancing
         all_times.at(lev).reset();
     }
 
-    void ScopedTimeTracker::reset_values ()
-    {
-        /*for (auto& lev_data : ScopedTimeTracker::all_times){
-            const auto& idxs = lev_data.IndexArray();
-            for (const auto& idx : idxs){
-                lev_data[idx] = 0.0;
-            }
-        }*/
-    }
 
-    void ScopedTimeTracker::reset_values (const int lev)
+    void ScopedTimeTracker::reset_times (const int lev)
     {
-        /*auto& lev_data = ScopedTimeTracker::all_times[lev];
-        const auto& idxs = lev_data.IndexArray();
-        for (const auto& idx : idxs){
-            lev_data[idx] = 0.0;
-        }*/
-       amrex::ignore_unused(lev);
+        auto times = *all_times.at(lev);
+        const auto iarr = times.IndexArray();
+        for (const auto& i : iarr) {
+            times[i] = 0.0;
+        }
     }
 
     void ScopedTimeTracker::record_time ()

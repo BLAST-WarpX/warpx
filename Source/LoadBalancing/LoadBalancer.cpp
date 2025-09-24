@@ -7,6 +7,8 @@
 
 #include "LoadBalancer.H"
 
+#include "Utils/Parser/ParserUtils.H"
+
 #include <AMReX_ParmParse.H>
 
 #include <string>
@@ -16,7 +18,7 @@ namespace warpx::load_balancing
 {
     LoadBalancer::LoadBalancer(int particle_shape, ElectromagneticSolverAlgo em_solver_id)
     {
-        const auto pp_algo = amrex::ParmParse pp_algo{"algo"};
+        const auto pp_algo = amrex::ParmParse{"algo"};
 
         std::vector<std::string> load_balance_intervals_string_vec = {"0"};
         pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
@@ -35,11 +37,11 @@ namespace warpx::load_balancing
         }
 
         utils::parser::queryWithParser(pp_algo, "load_balance_efficiency_ratio_threshold",
-                        load_balance_efficiency_ratio_threshold);
+                        m_load_balance_efficiency_ratio_threshold);
 
-        pp_algo.query_enum_sloppy("load_balance_costs_update", m_load_balance_costs_update_algo, "-_");
+        pp_algo.query_enum_sloppy("load_balance_costs_update", m_costs_update_algo, "-_");
 
-        if (WarpX::load_balance_costs_update_algo==CostsUpdateAlgo::Heuristic) {
+        if (m_costs_update_algo==CostsUpdateAlgo::Heuristic) {
             m_heuristic_cost_tracker = HeuristicCostsTracker{particle_shape, em_solver_id};
         }
         else{
@@ -71,7 +73,7 @@ namespace warpx::load_balancing
         m_load_balance_efficiency.at(lev) = -1;
     }
 
-    bool LoadBalancer::is_active ()
+    bool LoadBalancer::is_active () const
     {
         return m_load_balance_intervals.isActivated();
     }
@@ -86,5 +88,41 @@ namespace warpx::load_balancing
             m_heuristic_cost_tracker.value().allocate_level(lev, ba, dm);
         }
         m_load_balance_efficiency[lev] = -1;
+    }
+
+    int LoadBalancer::get_nlevs() const
+    {
+        return m_load_balance_efficiency.size();
+    }
+
+    amrex::Real LoadBalancer::get_load_balance_efficiency(const int lev) const
+    {
+        return m_load_balance_efficiency.at(lev);
+    }
+
+    amrex::LayoutData<amrex::Real>*
+    LoadBalancer::get_costs (const int lev)
+    {
+        if (m_costs_update_algo == CostsUpdateAlgo::Timers){
+            return ScopedTimeTracker::all_times.at(lev).get();
+        }
+        else {
+            return m_heuristic_cost_tracker.value().get_costs(lev);
+        }
+    }
+
+    void LoadBalancer::reset_costs (const int lev)
+    {
+        if (m_costs_update_algo == CostsUpdateAlgo::Timers){
+            return ScopedTimeTracker::reset_times(lev);
+        }
+        else {
+            return m_heuristic_cost_tracker.value().reset_costs(lev);
+        }
+    }
+
+    void LoadBalancer::reset_efficiency(const int lev)
+    {
+        m_load_balance_efficiency.at(lev) = -1.0;
     }
 }

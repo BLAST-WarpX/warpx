@@ -46,8 +46,14 @@ namespace warpx::load_balancing
         void resize (int nlevs_max);
         void clear_level (int lev);
         void allocate_level (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
+        void reset_costs (int lev);
+        void reset_efficiency(int lev);
 
-        [[nodiscard]] bool is_active ();
+        [[nodiscard]] int get_nlevs () const;
+        [[nodiscard]] amrex::Real get_load_balance_efficiency (int lev) const;
+        [[nodiscard]] amrex::LayoutData<amrex::Real>* get_costs (int lev);
+
+        [[nodiscard]] bool is_active () const;
 
     private:
         /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
@@ -85,17 +91,15 @@ namespace warpx::load_balancing
 #endif //WARPX_LOAD_BALANCING_LOAD_BALANCER_H_
 
 /*
-amrex::LayoutData<amrex::Real>*
-WarpX::getCosts (int lev)
-{
-    if (m_instance)
-    {
-        return m_instance->costs[lev].get();
-    } else
-    {
-        return nullptr;
+
+
+    if (costs[lev]) {
+        const auto iarr = costs[lev]->IndexArray();
+        for (const auto& i : iarr) {
+            (*costs[lev])[i] = 0.0;
+            WarpX::setLoadBalanceEfficiency(lev, -1);
+        }
     }
-}
 
 void
 WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
@@ -108,19 +112,6 @@ WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
         return;
     }
 }
-
-amrex::Real
-WarpX::getLoadBalanceEfficiency (const int lev)
-{
-    if (m_instance)
-    {
-        return m_instance->load_balance_efficiency[lev];
-    } else
-    {
-        return -1;
-    }
-}
-
 
 void
 WarpX::ResetCosts ()

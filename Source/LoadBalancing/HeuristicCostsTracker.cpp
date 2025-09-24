@@ -7,6 +7,7 @@
 
 #include "HeuristicCostsTracker.H"
 
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
 #include "AMReX_ParmParse.H"
@@ -16,7 +17,7 @@ namespace warpx::load_balancing
     HeuristicCostsTracker::HeuristicCostsTracker (
         const int particle_shape, const ElectromagneticSolverAlgo em_solver_id)
     {
-        const auto pp_algo = amrex::ParmParse pp_algo{"algo"};
+        const auto pp_algo = amrex::ParmParse{"algo"};
 
         const bool has_custom_value_for_cells = utils::parser::queryWithParser(
             pp_algo, "costs_heuristic_cells_wt", m_costs_heuristic_cells_wt);
@@ -46,6 +47,7 @@ namespace warpx::load_balancing
 #else // CPU
             m_costs_heuristic_cells_wt     = costs_heuristic_cells_wt_cpu_default[particle_shape];
             m_costs_heuristic_particles_wt = costs_heuristic_particles_wt_cpu_default[particle_shape];
+            amrex::ignore_unused(em_solver_id);
 #endif // AMREX_USE_GPU
         }
     }
@@ -63,5 +65,19 @@ namespace warpx::load_balancing
     void HeuristicCostsTracker::allocate_level (const int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm)
     {
         m_costs.at(lev) = std::make_unique<amrex::LayoutData<amrex::Real>>(ba, dm);
+    }
+
+    amrex::LayoutData<amrex::Real>* HeuristicCostsTracker::get_costs (int lev)
+    {
+        return m_costs.at(lev).get();
+    }
+
+    void HeuristicCostsTracker::reset_costs (int lev)
+    {
+        auto costs = *m_costs.at(lev);
+        const auto iarr = costs.IndexArray();
+        for (const auto& i : iarr) {
+            costs[i] = 0.0;
+        }
     }
 }

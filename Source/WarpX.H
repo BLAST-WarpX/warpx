@@ -520,7 +520,7 @@ public:
 
     /** \brief perform load balance; compute and communicate new `amrex::DistributionMapping`
      */
-    void LoadBalance ();
+    // void LoadBalance ();
 
     /**
      * \brief Private function for spectral solver
@@ -1264,7 +1264,7 @@ private:
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
 
     // Load balancing
-    std::unique_ptr<warpx::load_balancing::LoadBalancer> m_load_balancer;
+    std::shared_ptr<warpx::load_balancing::LoadBalancer> m_load_balancer;
 
     // Determines timesteps for override sync
     utils::parser::IntervalsParser override_sync_intervals;

@@ -43,7 +43,7 @@
 using namespace amrex;
 
 // constructor
-MultiReducedDiags::MultiReducedDiags ()
+MultiReducedDiags::MultiReducedDiags (std::shared_ptr<warpx::load_balancing::LoadBalancer> p_load_balancer)
 {
     // read reduced diags names
     const ParmParse pp_warpx("warpx");
@@ -53,29 +53,30 @@ MultiReducedDiags::MultiReducedDiags ()
     if ( m_plot_rd == 0 ) { return; }
 
     using CS = const std::string& ;
+    using SPLB = std::shared_ptr<warpx::load_balancing::LoadBalancer> ;
     const auto reduced_diags_dictionary =
-        std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS)>>{
-            {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
-            {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
-            {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
-            {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
-            {"DifferentialLuminosity2D",[](CS s){return std::make_unique<DifferentialLuminosity2D>(s);}},
-            {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
-            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
-            {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
-            {"ParticleHistogram2D",   [](CS s){return std::make_unique<ParticleHistogram2D>(s);}},
-            {"ParticleMomentum",      [](CS s){return std::make_unique<ParticleMomentum>(s);}},
-            {"ParticleNumber",        [](CS s){return std::make_unique<ParticleNumber>(s);}},
-            {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
-            {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
-            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
-            {"FieldPoyntingFlux",     [](CS s){return std::make_unique<FieldPoyntingFlux>(s);}},
-            {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
-            {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
-            {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
-            {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
-            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
-            {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
+        std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS, SPLB)>>{
+            {"BeamRelevant",            [](CS s, SPLB){return std::make_unique<BeamRelevant>(s);}},
+            {"ChargeOnEB",              [](CS s, SPLB){return std::make_unique<ChargeOnEB>(s);}},
+            {"ColliderRelevant",        [](CS s, SPLB){return std::make_unique<ColliderRelevant>(s);}},
+            {"DifferentialLuminosity",  [](CS s, SPLB){return std::make_unique<DifferentialLuminosity>(s);}},
+            {"DifferentialLuminosity2D",[](CS s, SPLB){return std::make_unique<DifferentialLuminosity2D>(s);}},
+            {"ParticleEnergy",          [](CS s, SPLB){return std::make_unique<ParticleEnergy>(s);}},
+            {"ParticleExtrema",         [](CS s, SPLB){return std::make_unique<ParticleExtrema>(s);}},
+            {"ParticleHistogram",       [](CS s, SPLB){return std::make_unique<ParticleHistogram>(s);}},
+            {"ParticleHistogram2D",     [](CS s, SPLB){return std::make_unique<ParticleHistogram2D>(s);}},
+            {"ParticleMomentum",        [](CS s, SPLB){return std::make_unique<ParticleMomentum>(s);}},
+            {"ParticleNumber",          [](CS s, SPLB){return std::make_unique<ParticleNumber>(s);}},
+            {"FieldEnergy",             [](CS s, SPLB){return std::make_unique<FieldEnergy>(s);}},
+            {"FieldMaximum",            [](CS s, SPLB){return std::make_unique<FieldMaximum>(s);}},
+            {"FieldMomentum",           [](CS s, SPLB){return std::make_unique<FieldMomentum>(s);}},
+            {"FieldPoyntingFlux",       [](CS s, SPLB){return std::make_unique<FieldPoyntingFlux>(s);}},
+            {"FieldProbe",              [](CS s, SPLB){return std::make_unique<FieldProbe>(s);}},
+            {"FieldReduction",          [](CS s, SPLB){return std::make_unique<FieldReduction>(s);}},
+            {"LoadBalanceCosts",        [](CS s, SPLB splb){return std::make_unique<LoadBalanceCosts>(s, splb);}},
+            {"LoadBalanceEfficiency",   [](CS s, SPLB splb){return std::make_unique<LoadBalanceEfficiency>(s, splb);}},
+            {"RhoMaximum",              [](CS s, SPLB){return std::make_unique<RhoMaximum>(s);}},
+            {"Timestep",                [](CS s, SPLB){return std::make_unique<Timestep>(s);}}
     };
     // loop over all reduced diags and fill m_multi_rd with requested reduced diags
     std::transform(m_rd_names.begin(), m_rd_names.end(), std::back_inserter(m_multi_rd),
@@ -91,7 +92,7 @@ MultiReducedDiags::MultiReducedDiags ()
                 rd_type + " is not a valid type for reduced diagnostic " + rd_name
             );
 
-            return reduced_diags_dictionary.at(rd_type)(rd_name);
+            return reduced_diags_dictionary.at(rd_type)(rd_name, p_load_balancer);
         });
     // end loop over all reduced diags
 }

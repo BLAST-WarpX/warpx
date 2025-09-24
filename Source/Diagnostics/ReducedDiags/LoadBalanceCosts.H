@@ -10,8 +10,11 @@
 
 #include "ReducedDiags.H"
 
+#include "LoadBalancing/LoadBalancer.H"
+
 #include <AMReX_Vector.H>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,7 +57,9 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    LoadBalanceCosts(const std::string& rd_name);
+    LoadBalanceCosts(
+        const std::string& rd_name,
+        std::shared_ptr<warpx::load_balancing::LoadBalancer> p_load_balancer);
 
     /**
      * This function updates the costs, given the current distribution mapping,
@@ -72,6 +77,9 @@ public:
      * @param[in] step current time step
      */
     void WriteToFile(int step) const final;
+
+private:
+    std::shared_ptr<warpx::load_balancing::LoadBalancer> m_load_balancer;
 
 };
 

@@ -45,8 +45,7 @@ namespace warpx::load_balancing
         static void resize (int max_num_levels);
         static void allocate_level (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm);
         static void clear_level (int lev);
-        static void reset_values ();
-        static void reset_values (int lev);
+        static void reset_times (int lev);
 
         static bool do_tracking;
         static amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real>>> all_times;

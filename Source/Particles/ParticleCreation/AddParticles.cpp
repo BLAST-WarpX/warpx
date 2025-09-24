@@ -8,6 +8,7 @@
 
 #include "AddPlasmaUtilities.H"
 #include "DefaultInitialization.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Initialization/InjectorDensity.H"
 #include "Initialization/InjectorMomentum.H"
 #include "Initialization/InjectorPosition.H"
@@ -705,8 +706,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 
     defineAllParticleTiles();
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     amrex::Box fine_injection_box;
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
@@ -744,11 +743,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 #endif
     for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
     {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi);
 
         const amrex::Box& tile_box = mfi.tilebox();
         const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
@@ -1128,12 +1123,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
         });
 
         amrex::Gpu::synchronize();
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 
     // Remove particles that are inside the embedded boundaries
@@ -1180,8 +1169,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     }
 #endif
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(0);
-
     // Create temporary particle container to which particles will be added;
     // we will then call Redistribute on this new container and finally
     // add the new particles to the original container.
@@ -1223,16 +1210,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     info.SetDynamic(true);
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi = MakeMFIter(0, info); mfi.isValid(); ++mfi)
+    for (MFIter mfi = MakeMFIter(level_zero, info); mfi.isValid(); ++mfi)
     {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(level_zero, mfi);
 
         const amrex::Box& tile_box = mfi.tilebox();
-        const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+        const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, level_zero);
 
         // Find the cells of part_realbox that overlap with tile_realbox
         // If there is no overlap, just go to the next tile in the loop
@@ -1669,12 +1652,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         });
 
         amrex::Gpu::synchronize();
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 
     // Remove particles that are inside the embedded boundaries

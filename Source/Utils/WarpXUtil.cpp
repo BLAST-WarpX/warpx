@@ -376,6 +376,8 @@ void CheckGriddingForRZSpectral ()
 #endif
 }
 
+/*
+TODO TODO
 namespace WarpXUtilLoadBalance
 {
     bool doCosts (const amrex::LayoutData<amrex::Real>* cost, const amrex::BoxArray& ba,
@@ -387,3 +389,4 @@ namespace WarpXUtilLoadBalance
         return consistent;
     }
 }
+*/

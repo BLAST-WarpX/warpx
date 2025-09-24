@@ -6,6 +6,7 @@
  */
 #include "SpectralFieldDataRZ.H"
 
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Utils/WarpXUtil.H"
 #include "WarpX.H"
 
