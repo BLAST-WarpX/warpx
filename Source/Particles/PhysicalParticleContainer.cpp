@@ -654,10 +654,10 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                     // Deposit inside domains
                     if (implicit_options && implicit_options->deposit_mass_matrices) {
-                        // Note that J for particles included in MM are deposited to current_fp_save
-                        amrex::MultiFab * jx = fields.get(FieldType::current_fp_save, Direction{0}, lev);
-                        amrex::MultiFab * jy = fields.get(FieldType::current_fp_save, Direction{1}, lev);
-                        amrex::MultiFab * jz = fields.get(FieldType::current_fp_save, Direction{2}, lev);
+                        // Note that J for particles included in MM are deposited to current_fp_MM
+                        amrex::MultiFab * jx = fields.get(FieldType::current_fp_MM, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(FieldType::current_fp_MM, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(FieldType::current_fp_MM, Direction{2}, lev);
                         amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
                         amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
                         amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
