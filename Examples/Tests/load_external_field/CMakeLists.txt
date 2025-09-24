@@ -12,6 +12,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_load_external_field_grid_from_another_sim_step1  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_load_external_field_grid_from_another_sim_step1 # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_load_external_field_grid_from_another_sim_step2  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_load_external_field_grid_from_another_sim_step2  # inputs
+    "analysis_3d_from_another_sim.py"  # analysis
+    "analysis_default_regression.py --path diags/fields"  # checksum
+    test_3d_load_external_field_grid_from_another_sim_step1  # dependency
+)
+
+add_warpx_test(
     test_3d_load_external_field_particle_picmi  # name
     3  # dims
     1  # nprocs

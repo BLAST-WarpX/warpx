@@ -3,10 +3,9 @@ my_constants.sigmax = 516e-9
 my_constants.sigmay = 7.7e-9
 my_constants.Q = 3.2e-9
 
-max_step = 0
+max_step = 1
 amr.n_cell = 128 128 128
 amr.max_level = 0
-amr.max_grid_size = 128
 geometry.dims = 3
 geometry.prob_lo = -4*sigmax -4*sigmay -4*sigmaz
 geometry.prob_hi = +4*sigmax +4*sigmay +4*sigmaz
@@ -15,9 +14,10 @@ boundary.field_hi = open open open
 warpx.const_dt = 1e-14
 warpx.do_electrostatic = relativistic
 warpx.poisson_solver = fft
-algo.field_gathering = momentum-conserving
+warpx.grid_type = collocated
 algo.particle_shape = 1
 
+#warpx.use_filter = 0
 particles.species_names = electron
 
 electron.charge = -q_e
@@ -30,11 +30,17 @@ electron.momentum_distribution_type = "constant"
 electron.ux = 0.0
 electron.uy = 0.0
 electron.uz = 25000
-electron.initialize_self_fields = 1
+electron.initialize_self_fields = 0
+electron.do_not_deposit = 1
+electron.do_not_push = 1
 
-diagnostics.diags_names = diag1
+warpx.B_ext_grid_init_style = read_from_file
+warpx.E_ext_grid_init_style = read_from_file
+warpx.read_fields_from_path = "../test_3d_load_external_field_grid_from_another_sim_step1/diags/diag1/openpmd_000000.bp5"
 
-diag1.intervals = 1
-diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
-diag1.format = openpmd
+diagnostics.diags_names = fields
+fields.intervals = 1
+fields.diag_type = Full
+fields.fields_to_plot = Ex Ey Ez Bx By Bz
+fields.format = openpmd
+fields.write_species = 0

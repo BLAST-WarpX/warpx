@@ -161,6 +161,7 @@ public:
 private:
     std::shared_ptr<double> m_FC_data_cpu;
     amrex::Gpu::DeviceVector<double> m_FC_data_gpu;
+    amrex::Gpu::DeviceVector<double> m_FC_data_transposed;
     ExternalFieldView m_external_field_view;
 };
 
