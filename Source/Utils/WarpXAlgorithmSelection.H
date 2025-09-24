@@ -171,7 +171,7 @@ AMREX_ENUM(PushType,
            Implicit,  //!< Crank-Nicolson scheme (e.g., equations (15)-(18) in (Chen et al, JCP 407, 2020))
            Default = Explicit);
 
-/** \brief For advanced algorithms that split the position push in substeps */
+/** \brief For advanced collision algorithms that split the particle push in substeps */
 AMREX_ENUM(
     PositionPushType,
     None,
@@ -181,13 +181,11 @@ AMREX_ENUM(
     Default = Full
 );
 
-/** \brief For advanced algorithms that split the momentum push in substeps */
+/** \brief For advanced collision algorithms that split the particle push in substeps */
 AMREX_ENUM(
     MomentumPushType,
     None,
     Full,
-    FirstHalf,
-    SecondHalf,
     Default = Full
 );
 
