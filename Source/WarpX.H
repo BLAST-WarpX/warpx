@@ -1615,7 +1615,7 @@ private:
      *        in the middle of the position push and after the momentum push,
      *        or before both the position and momentum push.
      */
-    bool m_collisions_split_position_push = false;
+    bool m_collisions_split_position_push;
 };
 
 #endif

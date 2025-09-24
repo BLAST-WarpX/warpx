@@ -1892,6 +1892,14 @@ WarpX::ReadParameters ()
         }
     }
 
+    // set default value of m_collisions_split_position_push based on the evolve scheme,
+    // then possibly override it with the input parameter collisions.split_position_push
+    if (evolve_scheme == EvolveScheme::Explicit) {
+        m_collisions_split_position_push = true;
+    }
+    else {
+        m_collisions_split_position_push = false;
+    }
     const amrex::ParmParse pp_collisions("collisions");
     pp_collisions.query("split_position_push", m_collisions_split_position_push);
     if (m_collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
