@@ -37,9 +37,9 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_test_3d_laser_acceleration
+             .. literalinclude:: inputs_base_3d
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_base_3d``.
 
    .. tab-item:: RZ
 
@@ -58,9 +58,9 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-             .. literalinclude:: inputs_test_rz_laser_acceleration
+             .. literalinclude:: inputs_base_rz
                 :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration``.
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_base_rz``.
 
 Analyze
 -------

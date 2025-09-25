@@ -31,6 +31,11 @@ class WarpX(Bucket):
     A Python wrapper for the WarpX C++ class
     """
 
+    # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
+    # Simulation objects. In the future, LibWarpX objects may actually be owned
+    # by Simulation objects to permit multiple WarpX runs simultaneously.
+    extension = libwarpx
+
     def create_argv_list(self, **kw):
         argv = []
 
@@ -90,6 +95,64 @@ class WarpX(Bucket):
             bucket = Bucket(bucket_name)
             self._bucket_dict[bucket_name] = bucket
             return bucket
+
+    @staticmethod
+    def read_dims_from_file(filename, visited=None):
+        """Parse an AMReX input file (and its includes) and return the
+        geometry.dims value as a string or None if not found.
+        """
+        import os
+
+        if visited is None:
+            visited = set()
+        filename = os.path.abspath(filename)
+        if filename in visited:
+            return None
+        visited.add(filename)
+
+        # included files
+        file_pattern = re.compile(r'^\s*FILE\s*=\s*"?([^"\n\r]+)"?', re.I)
+        # geometry.dims can be 1/2/3/RZ/RCYLINDER/RSPHERE
+        dims_pattern = re.compile(
+            r'^\s*geometry\.dims\s*=\s*"?\s*(1|2|3|RZ|RCYLINDER|RSPHERE)\s*"?', re.I
+        )
+
+        dims_value = None
+        try:
+            with open(filename) as f:
+                for line in f:
+                    # Check for FILE = ... recursively
+                    m_file = file_pattern.search(line)
+                    if m_file:
+                        included_file = m_file.group(1).strip()
+                        val = WarpX.read_dims_from_file(included_file, visited)
+                        if val is not None:
+                            dims_value = val
+                        continue
+
+                    # Check for geometry.dims = ...
+                    m_dims = dims_pattern.search(line)
+                    if m_dims:
+                        dims_value = m_dims.group(1)
+
+        except (FileNotFoundError, OSError):
+            print(
+                f"Error: Could not open file '{filename}'. "
+                "Please check if it exists and is accessible."
+            )
+
+        return dims_value
+
+    def load_inputs_file(self, filename):
+        from .Geometry import geometry
+
+        geometry.dims = WarpX.read_dims_from_file(filename)
+        if geometry.dims is None:
+            raise RuntimeError(
+                f"Error: Could not find the geometry.dims in the input file '{filename}' or its included files."
+            )
+
+        libwarpx.initialize(sys.argv + [filename])
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces

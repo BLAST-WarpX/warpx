@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_UTIL_H
-#define TWO_PRODUCT_UTIL_H
+#ifndef LINEAR_BREIT_WHEELER_UTIL_H
+#define LINEAR_BREIT_WHEELER_UTIL_H
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -40,7 +40,7 @@ namespace {
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void TwoProductComputeProductMomenta (
+    void LinearBreitWheelerComputeProductMomenta (
                             const amrex::ParticleReal& u1x_in,
                             const amrex::ParticleReal& u1y_in,
                             const amrex::ParticleReal& u1z_in,
@@ -139,4 +139,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_UTIL_H
+#endif // LINEAR_BREIT_WHEELER_UTIL_H

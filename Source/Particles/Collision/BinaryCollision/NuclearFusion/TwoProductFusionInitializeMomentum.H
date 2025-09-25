@@ -8,7 +8,7 @@
 #ifndef WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
 #define WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductFusionUtil.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -67,7 +67,7 @@ namespace {
         amrex::ParticleReal ux1_out = 0.0_prt, uy1_out = 0.0_prt, uz1_out = 0.0_prt;
         amrex::ParticleReal ux2_out = 0.0_prt, uy2_out = 0.0_prt, uz2_out = 0.0_prt;
 
-        TwoProductFusionComputeProductMomenta(
+        TwoProductComputeProductMomenta(
             soa1_in.m_rdata[PIdx::ux][idx1_in],
             soa1_in.m_rdata[PIdx::uy][idx1_in],
             soa1_in.m_rdata[PIdx::uz][idx1_in], m1_in,
