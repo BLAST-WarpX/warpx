@@ -407,8 +407,8 @@ void WarpX::OneStep (
                     MomentumPushType::Full
                 );
 
-                // communicate particle data
-                mypc->Redistribute();
+                // FIXME communicate particle data
+                //mypc->Redistribute();
 
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
