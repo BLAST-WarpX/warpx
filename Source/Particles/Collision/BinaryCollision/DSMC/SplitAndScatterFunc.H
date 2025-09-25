@@ -313,7 +313,8 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][product2_index],
                     soa_products_data[3].m_rdata[PIdx::uy][product2_index],
                     soa_products_data[3].m_rdata[PIdx::uz][product2_index], m_product2,
-                    -reaction_energy, // TwoProductComputeProductMomenta expects the *released* energy here
+                    -reaction_energy,
+                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     false,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the incident particle, in the center-of-mass frame
