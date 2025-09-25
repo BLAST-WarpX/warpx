@@ -150,7 +150,7 @@ namespace {
             p1z_out = pz_star;
         }
 
-        // Compute momentum of beryllium in lab frame, using total momentum conservation
+        // Compute momentum of the second product in lab frame, using total momentum conservation
         const amrex::ParticleReal p2x_out = p1x_in + p2x_in - p1x_out;
         const amrex::ParticleReal p2y_out = p1y_in + p2y_in - p1y_out;
         const amrex::ParticleReal p2z_out = p1z_in + p2z_in - p1z_out;
