@@ -139,14 +139,24 @@ namespace {
             // Assume that the momentum of the products has the same direction
             // as that of the incident particle in the center of mass frame
 
-            // Convert momentum of first incident particle to lab frame, using equation (2)
-            // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
-            const amrex::ParticleReal vcDps = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
-            const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
-            const amrex::ParticleReal factor = factor0*vcDps - m1_in*g1_in*gc;
-            amrex::ParticleReal p1x_star_in = p1x_in + vcx * factor;
-            amrex::ParticleReal p1y_star_in = p1y_in + vcy * factor;
-            amrex::ParticleReal p1z_star_in = p1z_in + vcz * factor;
+            amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
+            if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
+            {
+                // Convert momentum of first incident particle to lab frame, using equation (2)
+                // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
+                const amrex::ParticleReal vcDps = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
+                const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
+                const amrex::ParticleReal factor = factor0*vcDps - m1_in*g1_in*gc;
+                p1x_star_in = p1x_in + vcx * factor;
+                p1y_star_in = p1y_in + vcy * factor;
+                p1z_star_in = p1z_in + vcz * factor;
+            }
+            else // If center of mass velocity is zero, we are already in the lab frame
+            {
+                p1x_star_in = p1x_in;
+                p1y_star_in = p1y_in;
+                p1z_star_in = p1z_in;
+            }
             amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
 
             // Momentum of the first product in the center of mass frame:
@@ -159,7 +169,6 @@ namespace {
 
         // Next step is to convert momenta to lab frame
         amrex::ParticleReal p1x_out, p1y_out, p1z_out;
-
         // Convert momentum of first product to lab frame, using equation (13)
         // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
