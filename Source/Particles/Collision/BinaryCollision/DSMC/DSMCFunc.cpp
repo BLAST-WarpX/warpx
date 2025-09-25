@@ -38,14 +38,15 @@ DSMCFunc::DSMCFunc (
         std::string cross_section_file;
         pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
 
-        // if the scattering process is excitation, ionization or forward get
-        // the energy associated with that process
+        // if the scattering process is excitation, ionization, forward or
+        // two-product reaction get the energy associated with that process
         // (note that this allows forward scattering to be used both with and
         // without a fixed energy loss)
         amrex::ParticleReal energy = 0._prt;
         if (scattering_process.find("excitation") != std::string::npos ||
             scattering_process.find("ionization") != std::string::npos ||
-            scattering_process.find("forward") != std::string::npos ) {
+            scattering_process.find("forward") != std::string::npos ||
+            scattering_process.find("two_product_reaction") != std::string::npos ) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
@@ -66,7 +67,7 @@ DSMCFunc::DSMCFunc (
             reaction_produces_new_species = true;
         }
 
-        if (process.type() == ScatteringProcessType::IONIZATION) {
+        if (scattering_process.find("excitation") != std::string::npos) {
             // Ensure that the first product species is always an electron (which is assumed
             // during the scattering operation).
             amrex::Vector<std::string> product_species_names;
@@ -79,7 +80,7 @@ DSMCFunc::DSMCFunc (
 
             // TODO: add a check that the ionization species has the same mass
             // (and a positive charge), compared to the target species
-        } else if (process.type() == ScatteringProcessType::TWOPRODUCT_REACTION) {
+        } else if (scattering_process.find("charge_exchange") != std::string::npos) {
             // Ensure that the order of the product species in the charge exchange process is correct.
             // One product must have gained an electron (charge difference ≈ -q_e),
             // and the other must have lost an electron (charge difference ≈ +q_e).

@@ -74,7 +74,7 @@ public:
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
         // The following is used to calculate the appropriate offsets for processes
-        // that do not produce macroparticles in new species (i.e., not ionization, not charge exchange).
+        // that do not produce macroparticles in new species (i.e., not ionization, not two-product reaction).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -102,7 +102,7 @@ public:
         }
 
         // The following is used to calculate the appropriate offsets for
-        // product producing processes (i.e., ionization and charge exchange).
+        // product producing processes (i.e., ionization and two-product reaction).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
