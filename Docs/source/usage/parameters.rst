@@ -1550,7 +1550,7 @@ Particle initialization
     The virtual photons can undergo collisions via the linear Breit-Wheeler or linear Compton processes.
     This is useful to model incoherent beam-beam effects in colliders (e.g. pair generation, radiative Bhabha scattering).
     This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
-    It requires WarpX to be compiled with QED=TRUE.
+    It requires WarpX to be compiled with ``WarpX_QED=ON`` (CMake) or ``QED=TRUE`` (GNU Make).
 
 .. _running-cpp-parameters-fluids:
 

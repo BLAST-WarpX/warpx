@@ -1,4 +1,4 @@
-/* Copyright 2021 Neil Zaim
+/* Copyright 2025 Arianna Formenti
  *
  * This file is part of WarpX.
  *

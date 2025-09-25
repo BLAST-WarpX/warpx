@@ -99,7 +99,6 @@ diagnostics.diags_names = diag1
 diag1.intervals = -1
 diag1.diag_type = Full
 diag1.write_species = 1
-diag1.dump_last_timestep = 1
 diag1.species = beam virtual_photons
 diag1.format = openpmd
 diag1.virtual_photons.variables = uz w x y z
