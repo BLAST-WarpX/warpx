@@ -38,7 +38,6 @@
 #   endif
 #endif
 #include "AcceleratorLattice/AcceleratorLattice.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
@@ -192,10 +191,6 @@ public:
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
     static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
-    /** Integer that correspond to macroscopic Maxwell solver algorithm
-     *  (BackwardEuler - 0, Lax-Wendroff - 1)
-     */
-    static inline auto macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
     /** Boundary conditions applied to fields at the lower domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
@@ -1190,6 +1185,11 @@ private:
 
     //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
     MediumForEM m_em_solver_medium = MediumForEM::Default;
+
+    /** Integer that correspond to macroscopic Maxwell solver algorithm
+     *  (BackwardEuler - 0, Lax-Wendroff - 1)
+     */
+    MacroscopicSolverAlgo m_macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
 
     //
     // Fields: First array for level, second for direction

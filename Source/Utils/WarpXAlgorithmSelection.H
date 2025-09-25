@@ -165,4 +165,10 @@ AMREX_ENUM(SubcyclingHalf,
            None,
            Default = None);
 
+/** \brief Particle push scheme */
+AMREX_ENUM(PushType,
+           Explicit,  //!< Standard leap-frog scheme
+           Implicit,  //!< Crank-Nicolson scheme (e.g., equations (15)-(18) in (Chen et al, JCP 407, 2020))
+           Default = Explicit);
+
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_
