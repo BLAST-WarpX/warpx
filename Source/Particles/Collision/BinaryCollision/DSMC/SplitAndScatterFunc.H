@@ -168,7 +168,7 @@ public:
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
 
-        // Grab the masses of ionization products
+        // Grab the masses of reaction products
         amrex::ParticleReal m_product1 = 0;
         amrex::ParticleReal m_product2 = 0;
         if (num_product_species > 2) {
