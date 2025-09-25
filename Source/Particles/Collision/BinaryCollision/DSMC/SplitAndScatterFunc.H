@@ -169,11 +169,11 @@ public:
         const auto ionization_energy = m_ionization_energy;
 
         // Grab the masses of ionization products
-        amrex::ParticleReal m_ioniz_product1 = 0;
-        amrex::ParticleReal m_ioniz_product2 = 0;
+        amrex::ParticleReal m_product1 = 0;
+        amrex::ParticleReal m_product2 = 0;
         if (num_product_species > 2) {
-            m_ioniz_product1 = pc_products[2]->getMass();
-            m_ioniz_product2 = pc_products[3]->getMass();
+            m_product1 = pc_products[2]->getMass();
+            m_product2 = pc_products[3]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -423,7 +423,7 @@ public:
 
                 // calculate the value of C
                 const amrex::ParticleReal C = std::sqrt(E_out / (
-                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
+                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_product1) + n_2*n_2 / (2.0_prt * m_product2)
                 ));
 
                 // Now that appropriate momenta are set for each outgoing species
@@ -450,13 +450,13 @@ public:
                 uy1 = C * n_0 / m1 * cos_theta * sin_phi;
                 uz1 = -C * n_0 / m1 * sin_theta;
 
-                ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
+                ux_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                uy_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                uz_p1 = C * n_1 / m_product1 * (cos_alpha * sin_theta);
 
-                ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
+                ux_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                uy_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                uz_p2 = C * n_2 / m_product2 * (cos_gamma * sin_theta);
 
                 // transform back to labframe
                 ux1 += uCOM_x;
