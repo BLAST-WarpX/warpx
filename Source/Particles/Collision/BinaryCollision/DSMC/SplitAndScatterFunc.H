@@ -299,14 +299,14 @@ public:
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
 
-                // Compute the momenta
+                // Update the momenta of the products
                 TwoProductComputeProductMomenta(
-                    soa_products_data[0].m_rdata[PIdx::ux][reactant1_index], // TODO: should this use soa_1
-                    soa_products_data[0].m_rdata[PIdx::uy][reactant1_index],
-                    soa_products_data[0].m_rdata[PIdx::uz][reactant1_index], m1,
-                    soa_products_data[1].m_rdata[PIdx::ux][reactant2_index], // TODO: should this use soa_2
-                    soa_products_data[1].m_rdata[PIdx::uy][reactant2_index],
-                    soa_products_data[1].m_rdata[PIdx::uz][reactant2_index], m2,
+                    soa_1.m_rdata[PIdx::ux][reactant1_index],
+                    soa_1.m_rdata[PIdx::uy][reactant1_index],
+                    soa_1.m_rdata[PIdx::uz][reactant1_index], m1,
+                    soa_2.m_rdata[PIdx::ux][reactant2_index],
+                    soa_2.m_rdata[PIdx::uy][reactant2_index],
+                    soa_2.m_rdata[PIdx::uz][reactant2_index], m2,
                     soa_products_data[2].m_rdata[PIdx::ux][product1_index],
                     soa_products_data[2].m_rdata[PIdx::uy][product1_index],
                     soa_products_data[2].m_rdata[PIdx::uz][product1_index], m_product1,
@@ -316,7 +316,7 @@ public:
                     0, // no energy released in the reaction (for now)
                     false,
                     // no angular scattering: the products' momenta have the same direction
-                    // as that of the incident particle, in the center of mass frame
+                    // as that of the incident particle, in the center-of-mass frame
                     engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
