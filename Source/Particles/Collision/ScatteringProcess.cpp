@@ -9,7 +9,6 @@
 #include "ScatteringProcess.H"
 
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
