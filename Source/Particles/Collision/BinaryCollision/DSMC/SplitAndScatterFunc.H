@@ -169,7 +169,7 @@ public:
         const int num_product_species = m_num_product_species;
         const auto reaction_energy = m_reaction_energy;
 
-        // Grab the masses of reaction products
+        // Grab the masses of the reaction products
         amrex::ParticleReal mass_product1 = 0;
         amrex::ParticleReal mass_product2 = 0;
         if (num_product_species > 2) {
@@ -309,10 +309,10 @@ public:
                     soa_2.m_rdata[PIdx::uz][reactant2_index], m2,
                     soa_products_data[2].m_rdata[PIdx::ux][product1_index],
                     soa_products_data[2].m_rdata[PIdx::uy][product1_index],
-                    soa_products_data[2].m_rdata[PIdx::uz][product1_index], m_product1,
+                    soa_products_data[2].m_rdata[PIdx::uz][product1_index], mass_product1,
                     soa_products_data[3].m_rdata[PIdx::ux][product2_index],
                     soa_products_data[3].m_rdata[PIdx::uy][product2_index],
-                    soa_products_data[3].m_rdata[PIdx::uz][product2_index], m_product2,
+                    soa_products_data[3].m_rdata[PIdx::uz][product2_index], mass_product2,
                     -reaction_energy,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     false,
