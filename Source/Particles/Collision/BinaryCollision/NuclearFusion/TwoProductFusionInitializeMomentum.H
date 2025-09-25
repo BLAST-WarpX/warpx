@@ -52,7 +52,7 @@ namespace {
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void TwoProductComputeProductMomenta (
+    void TwoProductFusionInitializeMomentum (
                             const SoaData_type& soa1_in, const SoaData_type& soa2_in,
                             SoaData_type& soa1_out, SoaData_type& soa2_out,
                             const index_type& idx1_in, const index_type& idx2_in,
