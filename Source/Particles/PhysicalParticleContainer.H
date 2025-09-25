@@ -153,6 +153,7 @@ public:
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  ablastr::fields::MultiFabRegister& fields,
                                   amrex::FArrayBox const * exfab,
                                   amrex::FArrayBox const * eyfab,
                                   amrex::FArrayBox const * ezfab,

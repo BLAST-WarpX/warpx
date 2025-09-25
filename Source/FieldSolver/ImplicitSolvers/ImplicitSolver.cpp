@@ -736,6 +736,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
     options.linear_stage_of_jfnk = a_from_jacobian;
+    options.use_mass_matrices_pc = m_use_mass_matrices_pc;
     options.evolve_suborbit_particles_only = false;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
@@ -784,7 +785,10 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Copy mass matrices elements used for the preconditioner
+    // Add select mass matrices elements to the preconditioner containers,
+    // which may alread include contributions from suborbit particles that
+    // are not included in the mass matrices.
+
     const int diag_comp_xx = (AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2])-1)/2;
     const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
     const int diag_comp_zz = (AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2])-1)/2;
@@ -793,9 +797,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
         amrex::MultiFab* MM_yy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
         amrex::MultiFab* MM_zz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
         ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
-        amrex::MultiFab::Copy(*MM_PC[0], *MM_xx, diag_comp_xx, 0, 1, MM_xx->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[1], *MM_yy, diag_comp_yy, 0, 1, MM_yy->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[2], *MM_zz, diag_comp_zz, 0, 1, MM_zz->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[0], *MM_xx, diag_comp_xx, 0, 1, MM_xx->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[1], *MM_yy, diag_comp_yy, 0, 1, MM_yy->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[2], *MM_zz, diag_comp_zz, 0, 1, MM_zz->nGrowVect());
     }
 
     // Do addOp Exchange on MassMatrices_PC
