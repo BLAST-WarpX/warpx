@@ -67,7 +67,7 @@ DSMCFunc::DSMCFunc (
             reaction_produces_new_species = true;
         }
 
-        if (scattering_process.find("excitation") != std::string::npos) {
+        if (scattering_process.find("ionization") != std::string::npos) {
             // Ensure that the first product species is always an electron (which is assumed
             // during the scattering operation).
             amrex::Vector<std::string> product_species_names;
