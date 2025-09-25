@@ -85,7 +85,7 @@ public:
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] > 0) &
                         (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -112,7 +112,7 @@ public:
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
-                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -181,7 +181,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
             {
                 const auto product1_index = products_np_data[0] + no_product_p_offsets[i];
                 // Make a copy of the particle from species 1
@@ -281,7 +281,7 @@ public:
             }
 
             // Next perform all product-producing collisions
-            else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
+            else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
             {
                 // create a copy of the first product species at the location of species 1
                 const auto reactant1_index = static_cast<int>(p_pair_indices_1[i]);
