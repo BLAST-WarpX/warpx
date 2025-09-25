@@ -171,7 +171,7 @@ class MatrixPC : public Preconditioner<T,Ops>
         int m_ndofs_g = 0;
         bool m_pc_diag_only = false;
         int m_pc_mat_nnz = 0;
-        int m_pc_mass_matrix_width = 0;
+        int m_pc_mass_matrix_width = 1;
         bool m_pc_mass_matrix_include_ij = false;
 
         std::string m_name = "noname";
@@ -180,6 +180,8 @@ class MatrixPC : public Preconditioner<T,Ops>
         amrex::Gpu::DeviceVector<int> m_num_nz;
         amrex::Gpu::DeviceVector<int> m_c_indices_g;
         amrex::Gpu::DeviceVector<amrex::Real> m_a_ij;
+
+        const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
 
         /**
          * \brief Read parameters
@@ -285,6 +287,18 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
     m_c_indices_g.resize(m_pc_mat_nnz*m_ndofs_l);
     m_a_ij.resize(m_pc_mat_nnz*m_ndofs_l);
 
+
+    m_bcoefs = m_ops->GetMassMatricesCoeff();
+    if (m_bcoefs == nullptr) {
+        if (m_pc_mass_matrix_width > 0) {
+            std::stringstream warning_message;
+            warning_message << "pc_mass_matrix_width set as nonzero but unable to get mass matrices from operator.\n";
+            warning_message << "setting m_pc_mass_matrix_width = 0.\n";
+            ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
+        }
+        m_pc_mass_matrix_width = 0;
+    }
+
     m_is_defined = true;
 }
 
@@ -346,6 +360,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
         const auto dxi = geom.InvCellSizeArray();
 
         for (int dir = 0; dir < 3; dir++) {
+
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 auto bx = mfi.tilebox();
@@ -383,6 +398,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() - trying to compile with unsupported dimensionality");
 #endif
 
+                // Add the Maxwell's piece
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     int icol = 0;
@@ -397,9 +413,9 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                         auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);;
                         amrex::Real val = 1.0;
                         MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
-                                                   &c_indices_g_ptr[ridx_l*nnz_max],
-                                                   &a_ij_ptr[ridx_l*nnz_max],
-                                                   icol );
+                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                    icol );
                         AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                     }
 
@@ -416,9 +432,9 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                             val += 2*alpha *(dxi[0]*dxi[0] + dxi[1]*dxi[1]);
                         }
                         MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                   &c_indices_g_ptr[ridx_l*nnz_max],
-                                                   &a_ij_ptr[ridx_l*nnz_max],
-                                                   icol );
+                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                    icol );
                         AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                     }
                     if ((dir == 0) || (dir == 2)) {
@@ -426,54 +442,54 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
                             amrex::Real val = alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                         {
                             auto cidx_g_rhs = (int) dof_tdir_arr(i,j,k,1);
                             amrex::Real val = -alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
                             amrex::Real val = -alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                         {
                             auto cidx_g_rhs = (int) (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
                             amrex::Real val = alpha * dxi[dir==0?0:1] * dxi[dir==0?1:0];
                             MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                       &c_indices_g_ptr[ridx_l*nnz_max],
-                                                       &a_ij_ptr[ridx_l*nnz_max],
-                                                       icol );
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
                             AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                         }
                     } else {
@@ -482,18 +498,18 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                                 auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
                                 amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
                                 MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                           &c_indices_g_ptr[ridx_l*nnz_max],
-                                                           &a_ij_ptr[ridx_l*nnz_max],
-                                                           icol );
+                                                            &c_indices_g_ptr[ridx_l*nnz_max],
+                                                            &a_ij_ptr[ridx_l*nnz_max],
+                                                            icol );
                                 AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                             }
                             {
                                 auto cidx_g_rhs = (int) (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
                                 amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
                                 MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                           &c_indices_g_ptr[ridx_l*nnz_max],
-                                                           &a_ij_ptr[ridx_l*nnz_max],
-                                                           icol );
+                                                            &c_indices_g_ptr[ridx_l*nnz_max],
+                                                            &a_ij_ptr[ridx_l*nnz_max],
+                                                            icol );
                                 AMREX_ALWAYS_ASSERT(icol <= nnz_max);
                             }
                         }
@@ -502,6 +518,36 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
 #endif
                     num_nz_ptr[ridx_l] = icol;
                 });
+
+                // Add the mass matrix piece
+                if (m_pc_mass_matrix_width > 0) {
+
+                    auto mm_width = m_pc_mass_matrix_width;
+                    auto mm_incl_ij = m_pc_mass_matrix_include_ij;
+                    auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);
+
+                    ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    {
+                        auto ridx_l = (int) dof_lhs_arr(i,j,k,0);
+                        AMREX_ALWAYS_ASSERT((ridx_l >= 0) && (ridx_l < ndofs_l));
+                        int icol = num_nz_ptr[ridx_l];
+
+                        {
+                            auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);;
+                            amrex::Real val = sigma_ii_arr(i,j,k,0) - 1.0;
+                            MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
+                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                        icol );
+                            AMREX_ALWAYS_ASSERT(icol <= nnz_max);
+                        }
+
+                        amrex::ignore_unused(mm_width); // will be used when adding off-diagonal elements
+                        amrex::ignore_unused(mm_incl_ij); // will be used when adding off-diagonal elements
+
+                        num_nz_ptr[ridx_l] = icol;
+                    });
+                }
             }
         }
     }

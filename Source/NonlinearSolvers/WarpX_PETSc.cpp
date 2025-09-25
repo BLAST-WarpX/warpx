@@ -104,6 +104,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     copyVec(a_F, context->m_F);
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
+    ((JacobianFunctionMF<VecType,TIType>*)context->m_linop)->updatePreCondMat(context->m_U);
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -705,7 +706,6 @@ void SNES_impl::solve(  VecType& a_U,
     m_time = a_time;
     m_iter = a_step;
     ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->curTimeStep(a_dt);
-    ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->updatePreCondMat(a_U);
 
     copyVec(this->m_x->obj, a_U);
     copyVec(this->m_b->obj, a_B);
