@@ -514,10 +514,6 @@ public:
 
     amrex::Real m_quantum_xi_c2;
 
-    /** Check and potentially compute load balancing
-     */
-    void CheckLoadBalance (int step);
-
     /** \brief perform load balance; compute and communicate new `amrex::DistributionMapping`
      */
     // void LoadBalance ();

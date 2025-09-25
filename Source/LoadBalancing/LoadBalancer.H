@@ -53,6 +53,10 @@ namespace warpx::load_balancing
         [[nodiscard]] amrex::Real get_load_balance_efficiency (int lev) const;
         [[nodiscard]] amrex::LayoutData<amrex::Real>* get_costs (int lev);
 
+        void check_and_do_load_balance (int step);
+
+        void rescale_costs (int step);
+
         [[nodiscard]] bool is_active () const;
 
     private:
@@ -114,50 +118,6 @@ WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
 }
 
 void
-WarpX::ResetCosts ()
-{
-    AMREX_ALWAYS_ASSERT(!costs.empty());
-    AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr)
-        {
-            // Reset costs
-            (*costs[lev])[i] = 0.0;
-        }
-    }
-}
-
-void
-WarpX::RescaleCosts (int step)
-{
-    // rescale is only used for timers
-    if (WarpX::load_balance_costs_update_algo != LoadBalanceCostsUpdateAlgo::Timers)
-    {
-        return;
-    }
-
-    AMREX_ALWAYS_ASSERT(costs.size() == finest_level + 1);
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        if (costs[lev])
-        {
-            // Perform running average of the costs
-            // (Giving more importance to most recent costs; only needed
-            // for timers update, heuristic load balance considers the
-            // instantaneous costs)
-            for (const auto& i : costs[lev]->IndexArray())
-            {
-                (*costs[lev])[i] *= (1._rt - 2._rt/load_balance_intervals.localPeriod(step+1));
-            }
-        }
-    }
-}
-
-void
 WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > >& a_costs)
 {
     using ablastr::fields::Direction;
@@ -194,22 +154,5 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
     {
         return load_balance_intervals;
     }
-
-void
-WarpX::CheckLoadBalance (int step)
-{
-    if (step > 0 && load_balance_intervals.contains(step+1))
-    {
-        LoadBalance();
-
-        // Reset the costs to 0
-        ResetCosts();
-    }
-    if (!costs.empty())
-    {
-        RescaleCosts(step);
-    }
-}
-
 
 */
