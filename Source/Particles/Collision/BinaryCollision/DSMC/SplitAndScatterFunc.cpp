@@ -40,8 +40,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                 m_num_products_host.push_back(1); // first product species
                 m_num_products_host.push_back(1); // second product species
 
-                // get the ionization energy
-                pp_collision_name.get("ionization_energy", m_ionization_energy);
+                // get the reaction energy
+                pp_collision_name.get("ionization_energy", m_reaction_energy);
             }
 
             // For charge exchange or two-product reaction:
@@ -52,6 +52,13 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                 m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
                 m_num_products_host.push_back(1); // first product species
                 m_num_products_host.push_back(1); // second product species
+
+                // get the reaction energy
+                if (std::find(scattering_processes.begin(), scattering_processes.end(), "two_product_reaction") != scattering_processes.end()) {
+                    pp_collision_name.get("two_product_reaction_energy", m_reaction_energy);
+                } else {
+                    m_reaction_energy = 0; // assume zero energy cost for charge exchange
+                }
             }
 
         } else {

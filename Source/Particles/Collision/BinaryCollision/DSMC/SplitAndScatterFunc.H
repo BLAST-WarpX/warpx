@@ -167,7 +167,7 @@ public:
 #endif
 
         const int num_product_species = m_num_product_species;
-        const auto ionization_energy = m_ionization_energy;
+        const auto reaction_energy = m_reaction_energy;
 
         // Grab the masses of the reaction products
         amrex::ParticleReal m_product1 = 0;
@@ -313,7 +313,7 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][product2_index],
                     soa_products_data[3].m_rdata[PIdx::uy][product2_index],
                     soa_products_data[3].m_rdata[PIdx::uz][product2_index], m_product2,
-                    0, // no energy released in the reaction (for now)
+                    -reaction_energy, // TwoProductComputeProductMomenta expects the *released* energy here
                     false,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the incident particle, in the center-of-mass frame
@@ -404,7 +404,7 @@ public:
                 const amrex::ParticleReal E_coll = E1 + E2;
 
                 // subtract the energy cost for ionization
-                const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
+                const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
 
                 // Momentum and energy division after the ionization event
                 // is done as follows:
@@ -531,7 +531,7 @@ private:
     // How many different type of species the collision produces
     int m_num_product_species;
     // If ionization collisions are included, what is the energy cost
-    amrex::ParticleReal m_ionization_energy = 0.0;
+    amrex::ParticleReal m_reaction_energy = 0.0;
     // Vectors of size m_num_product_species storing how many particles of a given species are
     // produced by a collision event.
     amrex::Gpu::HostVector<int> m_num_products_host;
