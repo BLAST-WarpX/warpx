@@ -1892,22 +1892,25 @@ WarpX::ReadParameters ()
         }
     }
 
-    // set default value of m_collisions_split_position_push based on the evolve scheme,
-    // then possibly override it with the input parameter collisions.split_position_push
-    if (evolve_scheme == EvolveScheme::Explicit) {
-        m_collisions_split_position_push = true;
-    }
-    else {
-        m_collisions_split_position_push = false;
-    }
+    // Set the default value of m_collisions_split_position_push, then possibly override
+    // it with the input parameter collisions.split_position_push.
+    m_collisions_split_position_push = false;
     const amrex::ParmParse pp_collisions("collisions");
-    pp_collisions.query("split_position_push", m_collisions_split_position_push);
-    if (m_collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
-        ablastr::warn_manager::WMRecordWarning(
-            "Collisions",
-            "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
-            ablastr::warn_manager::WarnPriority::low
-        );
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    if (collisions) {
+        if (evolve_scheme == EvolveScheme::Explicit) {
+            m_collisions_split_position_push = true;
+        }
+        pp_collisions.query("split_position_push", m_collisions_split_position_push);
+        if (m_collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Collisions",
+                "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
+                ablastr::warn_manager::WarnPriority::low
+            );
+        }
     }
 }
 

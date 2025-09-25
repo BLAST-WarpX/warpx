@@ -1613,7 +1613,8 @@ private:
     /**
      * \brief WarpX class attribute that controls whether collisions are placed
      *        in the middle of the position push and after the momentum push,
-     *        or before both the position and momentum push.
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
      */
     bool m_collisions_split_position_push;
 };
