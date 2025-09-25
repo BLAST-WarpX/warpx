@@ -308,5 +308,3 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
     // Reduced diagnostics
     // not needed yet
 }
-
-
