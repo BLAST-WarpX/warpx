@@ -9,6 +9,7 @@
 #ifndef WARPX_SPLIT_AND_SCATTER_FUNC_H_
 #define WARPX_SPLIT_AND_SCATTER_FUNC_H_
 
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
@@ -168,12 +169,12 @@ public:
         const int num_product_species = m_num_product_species;
         const auto ionization_energy = m_ionization_energy;
 
-        // Grab the masses of ionization products
-        amrex::ParticleReal m_ioniz_product1 = 0;
-        amrex::ParticleReal m_ioniz_product2 = 0;
+        // Grab the masses of the reaction products
+        amrex::ParticleReal m_product1 = 0;
+        amrex::ParticleReal m_product2 = 0;
         if (num_product_species > 2) {
-            m_ioniz_product1 = pc_products[2]->getMass();
-            m_ioniz_product2 = pc_products[3]->getMass();
+            m_product1 = pc_products[2]->getMass();
+            m_product2 = pc_products[3]->getMass();
         }
 
         // First perform all non-product producing collisions
@@ -226,6 +227,7 @@ public:
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
                 // rest masses
+                // TODO: this could be made relativistic by using TwoProductComputeProductMomenta
                 auto const uCOM_x = (m1 * ux1 + m2 * ux2) / (m1 + m2);
                 auto const uCOM_y = (m1 * uy1 + m2 * uy2) / (m1 + m2);
                 auto const uCOM_z = (m1 * uz1 + m2 * uz2) / (m1 + m2);
@@ -282,18 +284,40 @@ public:
             else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of species 1
+                const auto reactant1_index = static_cast<int>(p_pair_indices_1[i]);
                 const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
-                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                copy_species1[2](soa_products_data[2], soa_1, reactant1_index,
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
+                const auto reactant2_index = static_cast<int>(p_pair_indices_2[i]);
                 const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
-                copy_species2[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                copy_species2[3](soa_products_data[3], soa_2, reactant2_index,
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+
+                // Compute the momenta
+                TwoProductComputeProductMomenta(
+                    soa_products_data[0].m_rdata[PIdx::ux][reactant1_index],
+                    soa_products_data[0].m_rdata[PIdx::uy][reactant1_index],
+                    soa_products_data[0].m_rdata[PIdx::uz][reactant1_index], m1,
+                    soa_products_data[1].m_rdata[PIdx::ux][reactant2_index],
+                    soa_products_data[1].m_rdata[PIdx::uy][reactant2_index],
+                    soa_products_data[1].m_rdata[PIdx::uz][reactant2_index], m2,
+                    soa_products_data[2].m_rdata[PIdx::ux][product1_index],
+                    soa_products_data[2].m_rdata[PIdx::uy][product1_index],
+                    soa_products_data[2].m_rdata[PIdx::uz][product1_index], m_product1,
+                    soa_products_data[3].m_rdata[PIdx::ux][product2_index],
+                    soa_products_data[3].m_rdata[PIdx::uy][product2_index],
+                    soa_products_data[3].m_rdata[PIdx::uz][product2_index], m_product2,
+                    0, // no energy released in the reaction (for now)
+                    false,
+                    // no angular scattering: the products' momenta have the same direction
+                    // as that of the incident particle, in the center of mass frame
+                    engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
@@ -423,7 +447,7 @@ public:
 
                 // calculate the value of C
                 const amrex::ParticleReal C = std::sqrt(E_out / (
-                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_ioniz_product1) + n_2*n_2 / (2.0_prt * m_ioniz_product2)
+                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * m_product1) + n_2*n_2 / (2.0_prt * m_product2)
                 ));
 
                 // Now that appropriate momenta are set for each outgoing species
@@ -450,13 +474,13 @@ public:
                 uy1 = C * n_0 / m1 * cos_theta * sin_phi;
                 uz1 = -C * n_0 / m1 * sin_theta;
 
-                ux_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                uy_p1 = C * n_1 / m_ioniz_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                uz_p1 = C * n_1 / m_ioniz_product1 * (cos_alpha * sin_theta);
+                ux_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
+                uy_p1 = C * n_1 / m_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
+                uz_p1 = C * n_1 / m_product1 * (cos_alpha * sin_theta);
 
-                ux_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                uy_p2 = C * n_2 / m_ioniz_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                uz_p2 = C * n_2 / m_ioniz_product2 * (cos_gamma * sin_theta);
+                ux_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
+                uy_p2 = C * n_2 / m_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
+                uz_p2 = C * n_2 / m_product2 * (cos_gamma * sin_theta);
 
                 // transform back to labframe
                 ux1 += uCOM_x;
