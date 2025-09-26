@@ -51,7 +51,7 @@ class SpectralSolverRZ
          *  to spectral space, and store the corresponding result internally
          *  (in the spectral field specified by `field_index`) */
         void ForwardTransform (int lev, amrex::MultiFab const & field_mf, int field_index,
-                               int i_comp=0);
+                               int i_comp, bool do_costs);
 
         /* \brief Transform the two MultiFabs `field_mf1` and `field_mf2`
          *  to spectral space, and store the corresponding results internally
@@ -62,7 +62,7 @@ class SpectralSolverRZ
         /* \brief Transform spectral field specified by `field_index` back to
          * real space, and store it in the component `i_comp` of `field_mf` */
         void BackwardTransform (int lev, amrex::MultiFab& field_mf, int field_index,
-                                int i_comp=0);
+                                int i_comp, bool do_costs);
 
         /* \brief Transform spectral fields specified by `field_index1` and `field_index2`
          * back to real space, and store it in `field_mf1` and `field_mf2`*/

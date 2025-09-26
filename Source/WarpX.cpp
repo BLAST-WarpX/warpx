@@ -3059,7 +3059,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
-
+    constexpr auto do_costs_flag = true;
     auto pss = std::make_unique<SpectralSolver>(lev,
                                                 realspace_ba,
                                                 dm,
@@ -3079,7 +3079,8 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
                                                 time_dependency_J,
                                                 time_dependency_rho,
                                                 do_dive_cleaning,
-                                                do_divb_cleaning);
+                                                do_divb_cleaning,
+                                                do_costs_flag);
     spectral_solver[lev] = std::move(pss);
 }
 #   endif

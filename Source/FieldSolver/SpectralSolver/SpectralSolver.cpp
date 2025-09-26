@@ -41,7 +41,8 @@ SpectralSolver::SpectralSolver (
                 const TimeDependencyJ time_dependency_J,
                 const TimeDependencyRho time_dependency_rho,
                 const bool dive_cleaning,
-                const bool divb_cleaning)
+                const bool divb_cleaning,
+                const bool do_costs)
     : m_dt(dt)
 {
     // Initialize all structures using the same distribution mapping dm
@@ -111,17 +112,18 @@ SpectralSolver::SpectralSolver (
 
     // - Initialize arrays for fields in spectral space + FFT plans
     field_data = SpectralFieldData(lev, realspace_ba, k_space, dm,
-                                   m_spectral_index.n_fields, periodic_single_box);
+                                   m_spectral_index.n_fields, periodic_single_box, do_costs);
 }
 
 void
 SpectralSolver::ForwardTransform (const int lev,
                                   const amrex::MultiFab& mf,
                                   const int field_index,
-                                  const int i_comp)
+                                  const int i_comp,
+                                  const bool do_costs)
 {
     WARPX_PROFILE("SpectralSolver::ForwardTransform");
-    field_data.ForwardTransform(lev, mf, field_index, i_comp);
+    field_data.ForwardTransform(lev, mf, field_index, i_comp, do_costs);
 }
 
 void
@@ -129,10 +131,11 @@ SpectralSolver::BackwardTransform( const int lev,
                                    amrex::MultiFab& mf,
                                    const int field_index,
                                    const amrex::IntVect& fill_guards,
-                                   const int i_comp )
+                                   const int i_comp,
+                                   const bool do_costs)
 {
     WARPX_PROFILE("SpectralSolver::BackwardTransform");
-    field_data.BackwardTransform(lev, mf, field_index, fill_guards, i_comp);
+    field_data.BackwardTransform(lev, mf, field_index, fill_guards, i_comp, do_costs);
 }
 
 void

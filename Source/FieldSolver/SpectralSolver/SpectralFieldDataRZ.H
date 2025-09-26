@@ -39,7 +39,8 @@ class SpectralFieldDataRZ
                              const SpectralKSpaceRZ& k_space,
                              const amrex::DistributionMapping& dm,
                              int n_field_required,
-                             int n_modes);
+                             int n_modes,
+                             bool do_costs);
         SpectralFieldDataRZ () = default; // Default constructor
         ~SpectralFieldDataRZ ();
 
@@ -54,13 +55,13 @@ class SpectralFieldDataRZ
 
 
         void ForwardTransform (int lev, const amrex::MultiFab& mf, int field_index,
-                               int i_comp=0);
+                               int i_comp, bool do_costs);
         void ForwardTransform (int lev, const amrex::MultiFab& mf_r, int field_index_r,
-                               const amrex::MultiFab& mf_t, int field_index_t);
+                               const amrex::MultiFab& mf_t, int field_index_t, bool do_costs);
         void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
-                                int i_comp=0);
+                                int i_comp, bool do_costs);
         void BackwardTransform (int lev, amrex::MultiFab& mf_r, int field_index_r,
-                                amrex::MultiFab& mf_t, int field_index_t);
+                                amrex::MultiFab& mf_t, int field_index_t, bool do_costs);
 
         void FABZForwardTransform (amrex::MFIter const & mfi, amrex::Box const & realspace_bx,
                                    amrex::MultiFab const & tempHTransformedSplit,

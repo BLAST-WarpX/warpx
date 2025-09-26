@@ -149,7 +149,8 @@ class SpectralFieldData
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
                            int n_field_required,
-                           bool periodic_single_box);
+                           bool periodic_single_box,
+                           bool do_costs);
         SpectralFieldData() = default; // Default constructor
         ~SpectralFieldData();
 
@@ -161,10 +162,12 @@ class SpectralFieldData
 
         void ForwardTransform (int lev,
                                const amrex::MultiFab& mf, int field_index,
-                               int i_comp);
+                               int i_comp,
+                               bool do_costs);
 
         void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
-                                const amrex::IntVect& fill_guards, int i_comp);
+                                const amrex::IntVect& fill_guards, int i_comp,
+                                bool do_costs);
 
         // `fields` stores fields in spectral space, as multicomponent FabArray
         SpectralField fields;

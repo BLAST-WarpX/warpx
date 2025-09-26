@@ -92,7 +92,8 @@ class SpectralSolver
                         TimeDependencyJ time_dependency_J,
                         TimeDependencyRho time_dependency_rho,
                         bool dive_cleaning,
-                        bool divb_cleaning);
+                        bool divb_cleaning,
+                        bool do_costs);
 
         /**
          * \brief Transform the component i_comp of the MultiFab mf to Fourier space,
@@ -106,7 +107,8 @@ class SpectralSolver
         void ForwardTransform (int lev,
                                const amrex::MultiFab& mf,
                                int field_index,
-                               int i_comp = 0);
+                               int i_comp,
+                               bool do_costs);
 
         /**
          * \brief Transform spectral field specified by `field_index` back to
@@ -116,7 +118,8 @@ class SpectralSolver
                                 amrex::MultiFab& mf,
                                 int field_index,
                                 const amrex::IntVect& fill_guards,
-                                int i_comp=0 );
+                                int i_comp,
+                                bool do_costs);
 
         /**
          * \brief Update the fields in spectral space, over one timestep

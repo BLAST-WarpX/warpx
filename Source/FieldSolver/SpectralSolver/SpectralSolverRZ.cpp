@@ -82,9 +82,9 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
 void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf, int const field_index,
-                                    int const i_comp) {
+                                    int const i_comp, const bool do_costs) {
     WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
-    field_data.ForwardTransform(lev, field_mf, field_index, i_comp);
+    field_data.ForwardTransform(lev, field_mf, field_index, i_comp, do_costs);
 }
 
 /* \brief Transform the two MultiFabs `field_mf1` and `field_mf2`
@@ -93,11 +93,12 @@ SpectralSolverRZ::ForwardTransform (const int lev,
 void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf1, int const field_index1,
-                                    amrex::MultiFab const & field_mf2, int const field_index2) {
+                                    amrex::MultiFab const & field_mf2, int const field_index2,
+                                    const bool do_costs) {
     WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev,
                                 field_mf1, field_index1,
-                                field_mf2, field_index2);
+                                field_mf2, field_index2, do_costs);
 }
 
 /* \brief Transform spectral field specified by `field_index` back to
@@ -105,9 +106,9 @@ SpectralSolverRZ::ForwardTransform (const int lev,
 void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf, int const field_index,
-                                     int const i_comp) {
+                                     int const i_comp, const bool do_costs) {
     WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
-    field_data.BackwardTransform(lev, field_mf, field_index, i_comp);
+    field_data.BackwardTransform(lev, field_mf, field_index, i_comp, do_costs);
 }
 
 /* \brief Transform spectral fields specified by `field_index1` and `field_index2`
@@ -115,11 +116,13 @@ SpectralSolverRZ::BackwardTransform (const int lev,
 void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf1, int const field_index1,
-                                     amrex::MultiFab& field_mf2, int const field_index2) {
+                                     amrex::MultiFab& field_mf2, int const field_index2,
+                                     const bool do_costs) {
     WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev,
                                  field_mf1, field_index1,
-                                 field_mf2, field_index2);
+                                 field_mf2, field_index2,
+                                 do_costs);
 }
 
 /* \brief Update the fields in spectral space, over one timestep */

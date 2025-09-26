@@ -8,7 +8,6 @@
 #include "SpectralFieldData.H"
 
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXUtil.H"
 #include "WarpX.H"
 
 #include <AMReX_Array4.H>
@@ -134,11 +133,11 @@ SpectralFieldData::SpectralFieldData( const int lev,
                                       const SpectralKSpace& k_space,
                                       const amrex::DistributionMapping& dm,
                                       const int n_field_required,
-                                      const bool periodic_single_box):
+                                      const bool periodic_single_box,
+                                      const bool do_costs):
     m_periodic_single_box{periodic_single_box}
 {
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, realspace_ba, dm);
 
     const BoxArray& spectralspace_ba = k_space.spectralspace_ba;
 
@@ -224,10 +223,10 @@ SpectralFieldData::~SpectralFieldData()
 void
 SpectralFieldData::ForwardTransform (const int lev,
                                      const MultiFab& mf, const int field_index,
-                                     const int i_comp)
+                                     const int i_comp,
+                                     const bool do_costs)
 {
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
     const bool is_nodal_0 = mf.is_nodal(0);
@@ -324,10 +323,10 @@ SpectralFieldData::BackwardTransform (const int lev,
                                       MultiFab& mf,
                                       const int field_index,
                                       const amrex::IntVect& fill_guards,
-                                      const int i_comp)
+                                      const int i_comp,
+                                      const bool do_costs)
 {
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
     const bool is_nodal_0 = mf.is_nodal(0);
