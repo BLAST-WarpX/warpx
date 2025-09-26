@@ -67,7 +67,7 @@ class SpectralSolverRZ
         /* \brief Transform spectral fields specified by `field_index1` and `field_index2`
          * back to real space, and store it in `field_mf1` and `field_mf2`*/
         void BackwardTransform (int lev, amrex::MultiFab& field_mf1, int field_index1,
-                                amrex::MultiFab& field_mf2, int field_index2 bool do_costs);
+                                amrex::MultiFab& field_mf2, int field_index2, bool do_costs);
 
         /* \brief Update the fields in spectral space, over one timestep */
         void pushSpectralFields (bool doing_pml=false);
