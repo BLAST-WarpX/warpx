@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_TWO_PRODUCT_FUSION_UTIL_H
-#define WARPX_TWO_PRODUCT_FUSION_UTIL_H
+#ifndef WARPX_TWO_PRODUCT_UTIL_H
+#define WARPX_TWO_PRODUCT_UTIL_H
 
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -20,7 +20,7 @@
 
 namespace {
     /**
-     * \brief Given the momenta of two colliding macroparticles in a fusion reaction,
+     * \brief Given the momenta of two colliding macroparticles in a two-product reaction,
      * this function computes the momenta of the two product macroparticles.
      *
      * This is done by using the conservation of energy and momentum,
@@ -45,7 +45,7 @@ namespace {
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    void TwoProductFusionComputeProductMomenta (
+    void TwoProductComputeProductMomenta (
                             const amrex::ParticleReal& u1x_in,
                             const amrex::ParticleReal& u1y_in,
                             const amrex::ParticleReal& u1z_in,
@@ -62,7 +62,7 @@ namespace {
                             amrex::ParticleReal& u2y_out,
                             amrex::ParticleReal& u2z_out,
                             const amrex::ParticleReal& m2_out,
-                            const amrex::ParticleReal& E_fusion,
+                            const amrex::ParticleReal& E_reaction,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -95,17 +95,17 @@ namespace {
 
         // Total energy of incident macroparticles in the lab frame
         const amrex::ParticleReal E_lab = (m1_in * g1_in + m2_in * g2_in) * c_sq;
-        // Total energy squared of proton+boron in the center of mass frame, calculated using the
+        // Total energy squared of the reactants in the center of mass frame, calculated using the
         // Lorentz invariance of the four-momentum norm
         const amrex::ParticleReal E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
         // Total energy squared of the products in the center of mass frame
-        // In principle, the term - E_rest_in + E_rest_out + E_fusion is not needed and equal to
-        // zero (i.e. the energy liberated during fusion is equal to the mass difference). However,
+        // In principle, the term - E_rest_in + E_rest_out + E_reaction is not needed and equal to
+        // zero (i.e. the energy liberated during the reaction is equal to the mass difference). However,
         // due to possible inconsistencies in how the mass is defined in the code, it is
-        // probably more robust to subtract the rest masses and to add the fusion energy to the
+        // probably more robust to subtract the rest masses and to add the reaction energy to the
         // total kinetic energy.
         const amrex::ParticleReal E_star_f_sq = powi<2>(std::sqrt(E_star_sq)
-                                                         - E_rest_in + E_rest_out + E_fusion);
+                                                         - E_rest_in + E_rest_out + E_reaction);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -150,7 +150,7 @@ namespace {
             p1z_out = pz_star;
         }
 
-        // Compute momentum of beryllium in lab frame, using total momentum conservation
+        // Compute momentum of the second product in lab frame, using total momentum conservation
         const amrex::ParticleReal p2x_out = p1x_in + p2x_in - p1x_out;
         const amrex::ParticleReal p2y_out = p1y_in + p2y_in - p1y_out;
         const amrex::ParticleReal p2z_out = p1z_in + p2z_in - p1z_out;
@@ -165,4 +165,4 @@ namespace {
     }
 }
 
-#endif // WARPX_TWO_PRODUCT_FUSION_UTIL_H
+#endif // WARPX_TWO_PRODUCT_UTIL_H

@@ -641,11 +641,15 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 #endif
 
             if (plasma_injector.insideBounds(x, y, z)) {
-                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass;
-                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass;
+
+                // The normalized momentum is u = p / m = gamma beta c
+                // with m = m_e for photons, m the particle mass otherwise.
+                amrex::ParticleReal const mass_eff = (mass > 0.0_prt) ? mass : PhysConst::m_e;
+                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
+                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
                 if (ps["momentum"].contains("y")) {
-                    uy = ptr_uy.get()[i]*momentum_unit_y/mass;
+                    uy = ptr_uy.get()[i]*momentum_unit_y/mass_eff;
                 }
                 CheckAndAddParticle(x, y, z, ux, uy, uz, weight,
                                     particle_x,  particle_y,  particle_z,

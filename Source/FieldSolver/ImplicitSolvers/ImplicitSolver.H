@@ -54,6 +54,8 @@ public:
 
     void CreateParticleAttributes () const;
 
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -149,6 +151,23 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
+
+    /**
+     * \brief whether to skip the full Picard update of particls on the initial newton step
+     */
+    bool m_skip_particle_picard_init = false;
+
+    /**
      * \brief Whether to use mass matrices for the implicit solver
      */
     bool m_use_mass_matrices = false;
@@ -191,7 +210,7 @@ protected:
      */
     void InitializeMassMatrices ();
 
-    void PrintMassMatricesParameters () const;
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side

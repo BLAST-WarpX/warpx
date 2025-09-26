@@ -2,6 +2,12 @@ def parse_input_file(input_file):
     """
     Parse WarpX input file.
 
+    TODO: consolidate with "read_dims_from_file" function and add support for:
+    - more robust regex parsing (in read_dims_from_file)
+    - included files via FILE = ... (in read_dims_from_file)
+    - un-quote "" string values (in read_dims_from_file)
+    - multi-line string assignments (generally to-do)
+
     Parameters
     ----------
     input_file : string

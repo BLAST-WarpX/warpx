@@ -279,7 +279,7 @@ computePhi (
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d);
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, is_igf_2d);
             }
             continue;
         }

@@ -257,11 +257,16 @@ class ForceFreeSheetReconnection(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.total_steps,
-                data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez"],
+                data_list=["B", "E", "phi"],
                 # warpx_format='openpmd',
                 # warpx_openpmd_backend='h5',
             )
             simulation.add_diagnostic(field_diag)
+
+            # set the solver convergence criteria low since phi is only
+            # calculated for diagnostic output testing
+            simulation.self_fields_required_precision = 1e-3
+            simulation.self_fields_verbosity = 1
 
         # reduced diagnostics for reconnection rate calculation
         # create a 2 l_i box around the X-point on which to measure

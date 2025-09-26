@@ -19,7 +19,6 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 
-#include <AMReX_MultiFab.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
 #include <AMReX_FabArray.H>

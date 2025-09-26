@@ -27,6 +27,10 @@ void ImplicitSolver::CreateParticleAttributes () const
         pc->AddRealComp("ux_n", comm);
         pc->AddRealComp("uy_n", comm);
         pc->AddRealComp("uz_n", comm);
+
+        if (m_particle_suborbits) {
+            pc->AddIntComp("nsuborbits", comm);
+        }
     }
 }
 
@@ -430,10 +434,17 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_tolerance", m_particle_tolerance);
+        pp.query("particle_suborbits", m_particle_suborbits);
+        pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
             m_use_mass_matrices = true;
+        }
+        if (m_use_mass_matrices_jacobian) {
+            // Default m_skip_particle_picard_init to true if using suborbits
+            if (m_particle_suborbits) { m_skip_particle_picard_init = true; }
+            pp.query("skip_particle_picard_init", m_skip_particle_picard_init);
         }
 #if defined(WARPX_DIM_RCYLINDER)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -700,10 +711,18 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
-    options.nonlinear_iteration = a_nl_iter;
-    options.max_particle_iterations = m_max_particle_iterations;
-    options.particle_tolerance = m_particle_tolerance;
     options.linear_stage_of_jfnk = a_from_jacobian;
+
+    if (a_nl_iter == 0 && !a_from_jacobian &&
+        m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
+        // Only do a single Picard iteration for particles on the initial Newton step
+        options.max_particle_iterations = 1;
+        options.particle_tolerance = 0.0;
+    }
+    else {
+        options.max_particle_iterations = m_max_particle_iterations;
+        options.particle_tolerance = m_particle_tolerance;
+    }
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
@@ -782,18 +801,30 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
-void ImplicitSolver::PrintMassMatricesParameters () const
+void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
-    if (!m_use_mass_matrices) { return; }
-    amrex::Print() << "    for jacobian calc:  " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
-    amrex::Print() << "    for preconditioner: " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
-    amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
-    amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
-    amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
-    amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
-    amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
-    amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
-    amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
-    amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
-    amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+    amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
+    amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
+    amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
+    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
+    if (m_nlsolver_type==NonlinearSolverType::Newton) {
+        amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
+        if (m_use_mass_matrices) {
+            amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
+            if (m_use_mass_matrices_jacobian) {
+                amrex::Print() << "        skip particle picard init:  " << (m_skip_particle_picard_init ? "true":"false") << "\n";
+            }
+            amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
+            amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << "\n";
+            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << "\n";
+            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << "\n";
+            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << "\n";
+            amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << "\n";
+            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << "\n";
+            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << "\n";
+            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << "\n";
+            amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << "\n";
+        }
+    }
 }
