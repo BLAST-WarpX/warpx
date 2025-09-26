@@ -138,7 +138,8 @@ namespace ablastr::fields
     computePhiIGF (amrex::MultiFab const & rho,
                    amrex::MultiFab & phi,
                    std::array<amrex::Real, 3> const & cell_size,
-                   bool is_igf_2d_slices);
+                   bool is_igf_2d_slices,
+                   amrex::Array<amrex::Real, AMREX_SPACEDIM> beta);
 
 } // namespace ablastr::fields
 
