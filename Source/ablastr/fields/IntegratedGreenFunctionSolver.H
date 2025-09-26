@@ -35,8 +35,15 @@ namespace ablastr::fields
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real
-    IntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z)
+    IntegratedPotential3D (amrex::Real x0, amrex::Real y0, amrex::Real z0,
+        amrex::Real betax, amrex::Real betay, amrex::Real betaz, amrex::Real gamma)
     {
+        // Transform to new coordinates
+        amrex::Real const factor = gamma*gamma*(betax*x0 + betay*y0 + betaz*z0);
+        amrex::Real const x = x0 + factor*betax;
+        amrex::Real const y = y0 + factor*betay;
+        amrex::Real const z = z0 + factor*betaz;
+        // Compute integrated Green function in the new coordinates
         amrex::Real const r = std::sqrt( x*x + y*y + z*z );
         amrex::Real const G = - 0.5_rt * z*z * std::atan( x*y/(z*r) )
                               - 0.5_rt * y*y * std::atan( x*z/(y*r) )
@@ -80,17 +87,19 @@ namespace ablastr::fields
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real
-    SumOfIntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz)
+    SumOfIntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z,
+        amrex::Real dx, amrex::Real dy, amrex::Real dz,
+        amrex::Real betax, amrex::Real betay, amrex::Real betaz, amrex::Real gamma)
     {
         return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
-                  IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-                + IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-                + IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-                + IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
-                - IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
+                  IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz, betax, betay, betaz, gamma )
+                - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz, betax, betay, betaz, gamma )
+                - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz, betax, betay, betaz, gamma )
+                + IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz, betax, betay, betaz, gamma )
+                - IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz, betax, betay, betaz, gamma )
+                + IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz, betax, betay, betaz, gamma )
+                + IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz, betax, betay, betaz, gamma )
+                - IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz, betax, betay, betaz, gamma )
                 );
     }
 

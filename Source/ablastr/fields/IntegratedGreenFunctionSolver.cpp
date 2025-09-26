@@ -34,7 +34,8 @@ void
 computePhiIGF ( amrex::MultiFab const & rho,
                 amrex::MultiFab & phi,
                 std::array<amrex::Real, 3> const & cell_size,
-                bool const is_igf_2d_slices)
+                bool const is_igf_2d_slices,
+                amrex::Array<amrex::Real, AMREX_SPACEDIM> beta )
 {
     using namespace amrex::literals;
 
@@ -66,6 +67,10 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dx = cell_size[0];
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
+    amrex::Real const betax = beta[0];
+    amrex::Real const betay = beta[1];
+    amrex::Real const betaz = beta[2];
+    amrex::Real const gamma = 1._rt / std::sqrt(1._rt - betax*betax - betay*betay - betaz*betaz);
 
     if (!is_igf_2d_slices){
         // fully 3D solver
@@ -79,7 +84,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
             amrex::Real const y = j0*dy;
             amrex::Real const z = k0*dz;
 
-            return SumOfIntegratedPotential3D(x, y, z, dx, dy, dz);
+            return SumOfIntegratedPotential3D(x, y, z, dx, dy, dz, betax, betay, betaz, gamma);
         });
     }else{
         // 2D sliced solver
