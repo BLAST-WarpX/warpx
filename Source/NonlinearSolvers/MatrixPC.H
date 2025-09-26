@@ -171,7 +171,7 @@ class MatrixPC : public Preconditioner<T,Ops>
         int m_ndofs_g = 0;
         bool m_pc_diag_only = false;
         int m_pc_mat_nnz = 0;
-        int m_pc_mass_matrix_width = 1;
+        int m_pc_mass_matrix_width = 0;
         bool m_pc_mass_matrix_include_ij = false;
 
         std::string m_name = "noname";
@@ -290,13 +290,13 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
 
     m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs == nullptr) {
-        if (m_pc_mass_matrix_width > 0) {
+        if (m_pc_mass_matrix_width >= 0) {
             std::stringstream warning_message;
-            warning_message << "pc_mass_matrix_width set as nonzero but unable to get mass matrices from operator.\n";
-            warning_message << "setting m_pc_mass_matrix_width = 0.\n";
+            warning_message << "pc_mass_matrix_width is nonnegative but unable to get mass matrices from operator.\n";
+            warning_message << "setting m_pc_mass_matrix_width = -1 (no mass matrix in PC).\n";
             ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
         }
-        m_pc_mass_matrix_width = 0;
+        m_pc_mass_matrix_width = -1;
     }
 
     m_is_defined = true;
@@ -520,7 +520,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
                 });
 
                 // Add the mass matrix piece
-                if (m_pc_mass_matrix_width > 0) {
+                if (m_pc_mass_matrix_width >= 0) {
 
                     auto mm_width = m_pc_mass_matrix_width;
                     auto mm_incl_ij = m_pc_mass_matrix_include_ij;
