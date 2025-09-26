@@ -17,7 +17,6 @@ collision1.species = electrons protons
 collision2.species = electrons electrons
 collision3.species = protons protons
 collisions.collision_names = collision1 collision2 collision3
-collisions.split_position_push = 1
 
 # diagnostics
 diagnostics.diags_names = diag1

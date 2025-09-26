@@ -1892,24 +1892,40 @@ WarpX::ReadParameters ()
         }
     }
 
-    // Set the default value of m_collisions_split_position_push, then possibly override
-    // it with the input parameter collisions.split_position_push.
+    // Set the default value of m_collisions_split_position_push
     m_collisions_split_position_push = false;
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
     pp_collisions.queryarr("collision_names", collision_names);
     bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
     if (collisions) {
-        if (evolve_scheme == EvolveScheme::Explicit) {
+        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
             m_collisions_split_position_push = true;
         }
+
+        // Override m_collisions_split_position_push if the corresponding input
+        // parameter collisions.split_position_push is set in the input file
         pp_collisions.query("split_position_push", m_collisions_split_position_push);
-        if (m_collisions_split_position_push && evolve_scheme != EvolveScheme::Explicit) {
-            ablastr::warn_manager::WMRecordWarning(
-                "Collisions",
-                "Collisions with split position push implemented only for the explicit evolve scheme, ignoring collisions.split_position_push.",
-                ablastr::warn_manager::WarnPriority::low
-            );
+
+        // Warn the user if collisions with split position push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_position_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (EB::enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with embedded\
+                    boundaries, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
         }
     }
 }
