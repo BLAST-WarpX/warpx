@@ -42,6 +42,8 @@
  * multiplier
  * @param[in] probability_target_value if the probability threshold is exceeded, this is used
  * to determine by how much the event multiplier is reduced
+ * @param[in] minimum_scattering_angle minimum scattering angle (in radians) used to compute
+ * the Bhabha cross section
  * @param[in] engine the random engine.
  */
 template <typename index_type>
