@@ -69,7 +69,7 @@ namespace {
         const int compx, const int compy, const int compz, const bool do_costs)
     {
 #ifdef WARPX_DIM_RZ
-        solver.ForwardTransform(lev, *vector_field[0], compx, *vector_field[1], compy, do_costs);
+        solver.ForwardTransform(lev, *vector_field[0], compx, *vector_field[1], compy, 0, do_costs);
         solver.ForwardTransform(lev, *vector_field[2], compz, do_costs);
 #else
         solver.ForwardTransform(lev, *vector_field[0], compx, 0, do_costs);
@@ -92,7 +92,7 @@ namespace {
     {
 #ifdef WARPX_DIM_RZ
         amrex::ignore_unused(fill_guards);
-        solver.BackwardTransform(lev, *vector_field[0], compx, *vector_field[1], compy, do_costs);
+        solver.BackwardTransform(lev, *vector_field[0], compx, *vector_field[1], compy, 0, do_costs);
         solver.BackwardTransform(lev, *vector_field[2], compz, do_costs);
 #else
         solver.BackwardTransform(lev, *vector_field[0], compx, fill_guards, 0, do_costs);
