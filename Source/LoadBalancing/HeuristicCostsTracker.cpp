@@ -7,6 +7,7 @@
 
 #include "HeuristicCostsTracker.H"
 
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
@@ -78,6 +79,40 @@ namespace warpx::load_balancing
         const auto iarr = costs.IndexArray();
         for (const auto& i : iarr) {
             costs[i] = 0.0;
+        }
+    }
+
+    void HeuristicCostsTracker::compute_cost (
+        const int finest_level,
+        const ablastr::fields::ConstMultiLevelScalarField& Ex,
+        MultiParticleContainer& mpc)
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            finest_level == m_costs.size(),
+            "Mismatch of the refinement levels number between fields and costs for load balancing.");
+
+        for (int lev = 0; lev <= finest_level; ++lev)
+        {
+            const auto nSpecies = mpc.nSpecies();
+
+            // Species loop
+            for (int i_s = 0; i_s < nSpecies; ++i_s)
+            {
+                auto& myspc = mpc.GetParticleContainer(i_s);
+
+                // Particle loop
+                for (WarpXParIter pti(myspc, lev); pti.isValid(); ++pti)
+                {
+                    (*m_costs[lev])[pti.index()] += m_costs_heuristic_particles_wt*pti.numParticles();
+                }
+            }
+
+            // Cell loop
+            for (MFIter mfi(*Ex[lev], false); mfi.isValid(); ++mfi)
+            {
+                const Box& gbx = mfi.growntilebox();
+                (*m_costs[lev])[mfi.index()] += m_costs_heuristic_cells_wt*gbx.numPts();
+            }
         }
     }
 }

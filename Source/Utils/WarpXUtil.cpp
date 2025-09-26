@@ -376,17 +376,3 @@ void CheckGriddingForRZSpectral ()
 #endif
 }
 
-/*
-TODO TODO
-namespace WarpXUtilLoadBalance
-{
-    bool doCosts (const amrex::LayoutData<amrex::Real>* cost, const amrex::BoxArray& ba,
-                  const amrex::DistributionMapping& dm)
-    {
-        const bool consistent = cost && (dm == cost->DistributionMap()) &&
-            (ba.CellEqual(cost->boxArray())) &&
-            (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers);
-        return consistent;
-    }
-}
-*/

@@ -12,8 +12,11 @@
 
 #include "HeuristicCostsTracker.H"
 #include "ScopedTimeTracker.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
@@ -52,6 +55,11 @@ namespace warpx::load_balancing
         [[nodiscard]] int get_nlevs () const;
         [[nodiscard]] amrex::Real get_load_balance_efficiency (int lev) const;
         [[nodiscard]] amrex::LayoutData<amrex::Real>* get_costs (int lev);
+
+        void compute_cost (
+            int finest_level,
+            const ablastr::fields::ConstMultiLevelScalarField& Ex,
+            MultiParticleContainer& mpc);
 
         void check_and_do_load_balance (int step);
 
@@ -93,66 +101,3 @@ namespace warpx::load_balancing
 }
 
 #endif //WARPX_LOAD_BALANCING_LOAD_BALANCER_H_
-
-/*
-
-
-    if (costs[lev]) {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr) {
-            (*costs[lev])[i] = 0.0;
-            WarpX::setLoadBalanceEfficiency(lev, -1);
-        }
-    }
-
-void
-WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
-{
-    if (m_instance)
-    {
-        m_instance->load_balance_efficiency[lev] = efficiency;
-    } else
-    {
-        return;
-    }
-}
-
-void
-WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > >& a_costs)
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        const auto & mypc_ref = GetPartContainer();
-        const auto nSpecies = mypc_ref.nSpecies();
-
-        // Species loop
-        for (int i_s = 0; i_s < nSpecies; ++i_s)
-        {
-            auto & myspc = mypc_ref.GetParticleContainer(i_s);
-
-            // Particle loop
-            for (WarpXParIter pti(myspc, lev); pti.isValid(); ++pti)
-            {
-                (*a_costs[lev])[pti.index()] += costs_heuristic_particles_wt*pti.numParticles();
-            }
-        }
-
-        // Cell loop
-        MultiFab* Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
-        for (MFIter mfi(*Ex, false); mfi.isValid(); ++mfi)
-        {
-            const Box& gbx = mfi.growntilebox();
-            (*a_costs[lev])[mfi.index()] += costs_heuristic_cells_wt*gbx.numPts();
-        }
-    }
-}
-
-    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
-    {
-        return load_balance_intervals;
-    }
-
-*/

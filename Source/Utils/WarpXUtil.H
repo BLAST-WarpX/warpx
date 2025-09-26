@@ -107,21 +107,4 @@ bool WriteBinaryDataOnFile(const std::string& filename, const amrex::Vector<char
 
 }
 
-
-//
-// TODO TODO
-//namespace WarpXUtilLoadBalance
-//{
-//    /** \brief We only want to update the cost data if the grids we are working on
-//    *  are the main grids, i.e. not the PML grids. This function returns whether
-//     *   this is the case or not.
-//     * @param[in] cost pointer to the cost data
-//     * @param[in] ba the grids to check
-//     * @param[in] dm the dmap to check
-//     * @return consistent whether the grids are consistent or not.
-//     */
-//    bool doCosts (const amrex::LayoutData<amrex::Real>* cost, const amrex::BoxArray& ba,
-//                  const amrex::DistributionMapping& dm);
-//}
-
 #endif //WARPX_UTILS_H_

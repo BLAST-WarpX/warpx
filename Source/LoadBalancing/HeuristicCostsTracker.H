@@ -8,14 +8,21 @@
 #ifndef WARPX_LOAD_BALANCING_HEURISTIC_COSTS_TRACKER_H_
 #define WARPX_LOAD_BALANCING_HEURISTIC_COSTS_TRACKER_H_
 
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_Box.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_LayoutData.H>
+#include <AMReX_MFIter.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
 #include <array>
 #include <memory>
+
+using namespace amrex;
 
 namespace warpx::load_balancing
 {
@@ -50,6 +57,11 @@ namespace warpx::load_balancing
         void reset_costs (int lev);
 
         [[nodiscard]] amrex::LayoutData<amrex::Real>* get_costs (int lev);
+
+        void compute_cost (
+            int finest_level,
+            const ablastr::fields::ConstMultiLevelScalarField& Ex,
+            MultiParticleContainer& mpc);
 
     private:
         /** Weight factor for cells in `Heuristic` costs update.

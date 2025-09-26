@@ -8,11 +8,14 @@
 #include "LoadBalancer.H"
 
 #include "Utils/Parser/ParserUtils.H"
+#include "Utils/TextMsg.H"
 
 #include <AMReX_ParmParse.H>
 
 #include <string>
 #include <vector>
+
+using namespace amrex;
 
 namespace warpx::load_balancing
 {
@@ -133,9 +136,11 @@ namespace warpx::load_balancing
         }
 
         if (step > 0 && m_load_balance_intervals.contains(step+1)) {
-            LoadBalance();
+            // TODO
+            //LoadBalance();
 
-            for (int lev = 0; i < this->get_nlevs(); ++lev){
+            const int nlevs = this->get_nlevs();
+            for (int lev = 0; lev < nlevs; ++lev){
                 this->reset_costs(lev);
             }
         }
@@ -151,11 +156,28 @@ namespace warpx::load_balancing
         // (Giving more importance to most recent costs; only needed
         // for timers update, heuristic load balance considers the
         // instantaneous costs)
-        for (int lev = 0; lev < ScopedTimeTracker::all_times.size(); ++lev){
+        auto& all_times = ScopedTimeTracker::all_times;
+        const int nlevs = all_times.size();
+        for (int lev = 0; lev < nlevs; ++lev){
             for (const auto& i : all_times[lev]->IndexArray()){
                  (*all_times[lev])[i] *= (1._rt - 2._rt/m_load_balance_intervals.localPeriod(step+1));
             }
         }
 
     }
+
+    void LoadBalancer::compute_cost (
+        const int finest_level,
+        const ablastr::fields::ConstMultiLevelScalarField& Ex,
+        MultiParticleContainer& mpc)
+    {
+        if (m_costs_update_algo != CostsUpdateAlgo::Heuristic || !this->is_active()){
+            return;
+        }
+        m_heuristic_cost_tracker->compute_cost(finest_level, Ex, mpc);
+    }
 }
+
+
+
+
