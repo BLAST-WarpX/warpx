@@ -80,12 +80,6 @@ namespace {
         // Rest energy of products
         const amrex::ParticleReal E_rest_out = (m1_out + m2_out)*c_sq;
 
-        // Compute Lorentz factor gamma in the lab frame
-        const amrex::ParticleReal g1_in = std::sqrt( 1._prt
-            + (u1x_in*u1x_in + u1y_in*u1y_in + u1z_in*u1z_in)*inv_csq );
-        const amrex::ParticleReal g2_in = std::sqrt( 1._prt
-            + (u2x_in*u2x_in + u2y_in*u2y_in + u2z_in*u2z_in)*inv_csq );
-
         // Compute momenta
         const amrex::ParticleReal p1x_in = u1x_in * m1_in;
         const amrex::ParticleReal p1y_in = u1y_in * m1_in;
@@ -93,13 +87,20 @@ namespace {
         const amrex::ParticleReal p2x_in = u2x_in * m2_in;
         const amrex::ParticleReal p2y_in = u2y_in * m2_in;
         const amrex::ParticleReal p2z_in = u2z_in * m2_in;
+
+        // Compute 0th component of the 4-momentum of the incident particles
+        const amrex::ParticleReal p1t_in = std::sqrt(
+            m1_in*m1_in*c_sq + p1x_in*p1x_in + p1y_in*p1y_in + p1z_in*p1z_in);
+        const amrex::ParticleReal p2t_in = std::sqrt(
+            m2_in*m2_in*c_sq + p2x_in*p2x_in + p2y_in*p2y_in + p2z_in*p2z_in);
+
         // Square norm of the total (sum between the two particles) momenta in the lab frame
         const amrex::ParticleReal p_total_sq =  powi<2>(p1x_in+p2x_in) +
                                                 powi<2>(p1y_in+p2y_in) +
                                                 powi<2>(p1z_in+p2z_in);
 
         // Total energy of incident macroparticles in the lab frame
-        const amrex::ParticleReal E_lab = (m1_in * g1_in + m2_in * g2_in) * c_sq;
+        const amrex::ParticleReal E_lab = (p1t_in + p2t_in) * PhysConst::c;
         // Total energy squared of the reactants in the center of mass frame, calculated using the
         // Lorentz invariance of the four-momentum norm
         const amrex::ParticleReal E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
@@ -120,11 +121,11 @@ namespace {
         const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c_sq * ( powi<2>(E_ratio) - 1._prt )
                 + powi<2>(m1_out - m2_out)*c_sq*0.25_prt * powi<2>( E_ratio - 1._prt/E_ratio );
 
-        // Preliminary calculation: compute center of mass velocity vc
-        const amrex::ParticleReal mass_g = m1_in * g1_in + m2_in * g2_in;
-        const amrex::ParticleReal vcx    = (p1x_in+p2x_in) / mass_g;
-        const amrex::ParticleReal vcy    = (p1y_in+p2y_in) / mass_g;
-        const amrex::ParticleReal vcz    = (p1z_in+p2z_in) / mass_g;
+        // Preliminary calculation: compute center of mass velocity
+        const amrex::ParticleReal pt = p1t_in + p2t_in;
+        const amrex::ParticleReal vcx    = (p1x_in+p2x_in) * PhysConst::c / pt;
+        const amrex::ParticleReal vcy    = (p1y_in+p2y_in) * PhysConst::c / pt;
+        const amrex::ParticleReal vcz    = (p1z_in+p2z_in) * PhysConst::c / pt;
         const amrex::ParticleReal vc_sq   = vcx*vcx + vcy*vcy + vcz*vcz;
         const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
 
@@ -146,7 +147,7 @@ namespace {
                 // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
                 const amrex::ParticleReal vcDps = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
                 const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
-                const amrex::ParticleReal factor = factor0*vcDps - m1_in*g1_in*gc;
+                const amrex::ParticleReal factor = factor0*vcDps - p1t_in*gc/PhysConst::c;
                 p1x_star_in = p1x_in + vcx * factor;
                 p1y_star_in = p1y_in + vcy * factor;
                 p1z_star_in = p1z_in + vcz * factor;
