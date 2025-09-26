@@ -202,17 +202,19 @@ PML_RZ::PushPSATD (int lev, ablastr::fields::MultiFabRegister& fields, SpectralS
     amrex::MultiFab * pml_Br = fields.get(FieldType::pml_B_fp, Direction{0}, 0);
     amrex::MultiFab * pml_Bt = fields.get(FieldType::pml_B_fp, Direction{1}, 0);
 
+    constexpr bool dont_do_costs = false;
+
     // Perform forward Fourier transforms
-    spec_solver.ForwardTransform(lev, *pml_Er, Idx.Er_pml, *pml_Et, Idx.Et_pml);
-    spec_solver.ForwardTransform(lev, *pml_Br, Idx.Br_pml, *pml_Bt, Idx.Bt_pml);
+    spec_solver.ForwardTransform(lev, *pml_Er, Idx.Er_pml, *pml_Et, Idx.Et_pml, dont_do_costs);
+    spec_solver.ForwardTransform(lev, *pml_Br, Idx.Br_pml, *pml_Bt, Idx.Bt_pml, dont_do_costs);
 
     // Advance fields in spectral space
     bool const doing_pml = true;
     spec_solver.pushSpectralFields(doing_pml);
 
     // Perform backward Fourier transforms
-    spec_solver.BackwardTransform(lev, *pml_Er, Idx.Er_pml, *pml_Et, Idx.Et_pml);
-    spec_solver.BackwardTransform(lev, *pml_Br, Idx.Br_pml, *pml_Bt, Idx.Bt_pml);
+    spec_solver.BackwardTransform(lev, *pml_Er, Idx.Er_pml, *pml_Et, Idx.Et_pml, dont_do_costs);
+    spec_solver.BackwardTransform(lev, *pml_Br, Idx.Br_pml, *pml_Bt, Idx.Bt_pml, dont_do_costs);
 }
 
 #endif
