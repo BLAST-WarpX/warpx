@@ -8,11 +8,11 @@ my_constants.GeV   = q_e*1.e9
 
 # BEAMS
 my_constants.beam_energy = 187.5*GeV
-my_constants.beam_gamma  = beam_energy/mc2 
+my_constants.beam_gamma  = beam_energy/mc2
 my_constants.beam_npart  = 2.3e11
 my_constants.nmacropart  = 1e4
 my_constants.beam_charge = q_e * beam_npart
-my_constants.sigmax      = 38200*nano 
+my_constants.sigmax      = 38200*nano
 my_constants.sigmay      = 68.1*nano
 my_constants.sigmaz      = 2540.*micro
 my_constants.beam_uth    = 0.
@@ -21,8 +21,8 @@ my_constants.muy         = 0.
 my_constants.muz         = 4*sigmaz
 my_constants.emitx       = 535.7*micro
 my_constants.emity       = 1.064*micro
-my_constants.dux         = emitx / sigmax 
-my_constants.duy         = emity / sigmay 
+my_constants.dux         = emitx / sigmax
+my_constants.duy         = emity / sigmay
 
 # BOX
 my_constants.Lx = 32*sigmax
@@ -40,7 +40,7 @@ my_constants.T = 0.5*Lz/clight
 my_constants.dt = T / nz
 
 
-my_constants.nt = floor(T/dt) - 1 
+my_constants.nt = floor(T/dt) - 1
 my_constants.coll_time = abs(muz)/clight
 my_constants.coll_step = floor(nt*coll_time/T)
 
@@ -49,10 +49,10 @@ warpx.used_inputs_file = warpx_used_inputs.txt
 
 
 my_constants.sigma_bw_max = 1.7e-32 # m^2
-my_constants.probability_estimate =   beam_npart / nmacropart * sigma_bw_max * 2 * clight * dt  / (dx * dy * dz) 
+my_constants.probability_estimate =   beam_npart / nmacropart * sigma_bw_max * 2 * clight * dt  / (dx * dy * dz)
 
 my_constants.probability_target_value = 0.01
-my_constants.multiplier =  probability_target_value / probability_estimate 
+my_constants.multiplier =  probability_target_value / probability_estimate
 my_constants.probability_threshold = 0.1
 
 
@@ -71,8 +71,8 @@ geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
 #################################
 ######## BOUNDARY CONDITION #####
 #################################
-boundary.field_lo = open open open 
-boundary.field_hi = open open open 
+boundary.field_lo = open open open
+boundary.field_hi = open open open
 boundary.particle_lo = Absorbing Absorbing Absorbing
 boundary.particle_hi = Absorbing Absorbing Absorbing
 
@@ -80,10 +80,10 @@ boundary.particle_hi = Absorbing Absorbing Absorbing
 ############ NUMERICS ###########
 #################################
 warpx.do_electrostatic = relativistic
-warpx.const_dt = dt 
+warpx.const_dt = dt
 warpx.grid_type = collocated
 algo.particle_shape = 3
-algo.particle_pusher = vay 
+algo.particle_pusher = vay
 warpx.poisson_solver = fft
 
 #################################
@@ -95,7 +95,7 @@ beam1.species_type = electron
 beam1.injection_style = gaussian_beam
 beam1.x_rms = sigmax
 beam1.y_rms = sigmay
-beam1.z_rms = sigmaz 
+beam1.z_rms = sigmaz
 beam1.x_m = - mux
 beam1.y_m = - muy
 beam1.z_m = - muz
@@ -117,7 +117,7 @@ beam2.injection_style = gaussian_beam
 beam2.x_rms = sigmax
 beam2.y_rms = sigmay
 beam2.z_rms = sigmaz
-beam2.x_m = mux 
+beam2.x_m = mux
 beam2.y_m = muy
 beam2.z_m = muz
 beam2.npart = nmacropart
