@@ -174,10 +174,10 @@ namespace {
         // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
         {
-            const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_f_sq / (m1_out*m1_out*c_sq));
+            const amrex::ParticleReal p1t_out = std::sqrt(m1_out*m1_out*c_sq + p_star_f_sq);
             const amrex::ParticleReal vcDps = vcx*px_star_out + vcy*py_star_out + vcz*pz_star_out;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
-            const amrex::ParticleReal factor = factor0*vcDps + m1_out*g_star*gc;
+            const amrex::ParticleReal factor = factor0*vcDps + p1t_out*gc/PhysConst::c;
             p1x_out = px_star_out + vcx * factor;
             p1y_out = py_star_out + vcy * factor;
             p1z_out = pz_star_out + vcz * factor;
