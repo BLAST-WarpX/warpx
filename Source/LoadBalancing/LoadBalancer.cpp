@@ -177,7 +177,3 @@ namespace warpx::load_balancing
         m_heuristic_cost_tracker->compute_cost(finest_level, Ex, mpc);
     }
 }
-
-
-
-

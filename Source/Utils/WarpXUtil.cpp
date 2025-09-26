@@ -375,4 +375,3 @@ void CheckGriddingForRZSpectral ()
     pp_amr.addarr("max_grid_size_y", mg);
 #endif
 }
-
