@@ -138,11 +138,6 @@ void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, co
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
                                 lab_to_COM_factor * w_max * bhabha_cross_section * v_coll * dt / dV;
 
-    
-    //amrex::Print(0) << "probability_estimate=" << probability_estimate << std::endl;
-    amrex::Print(0) << "bhabha_cross_section=" << bhabha_cross_section << std::endl;
-    amrex::Print(0) << "lab_to_COM_factor=" << lab_to_COM_factor << std::endl;
-
     // Effective event multiplier
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
 

@@ -194,11 +194,7 @@ namespace {
             rel_error = std::abs(theta_guess_new-theta_guess_old)/std::abs(theta_guess_old);
             theta_guess_old = theta_guess_new;
             
-            // amrex::Print(0) << "f=" << f << std::endl;
-            // amrex::Print(0) << "sample_point=" << sample_point << std::endl;
-            // amrex::Print(0) << "THETA_CONV=" << theta_guess_old << std::endl;
         }
-        // amrex::Print(0) << "THETA=" << theta_guess_old << std::endl;
         cosXs = std::cos(theta_guess_old);
         sinXs = std::sin(theta_guess_old);
 
