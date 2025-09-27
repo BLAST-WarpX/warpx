@@ -380,6 +380,8 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const int do_symmetrize = plasma_injector.do_symmetrize;
     const int symmetrization_order = plasma_injector.symmetrization_order;
     const amrex::Real focal_distance = plasma_injector.focal_distance;
+    const amrex::Real rotation_angle = plasma_injector.rotation_angle;
+    const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
 
     // Declare temporary vectors on the CPU
     amrex::Gpu::HostVector<ParticleReal> particle_x;
@@ -494,7 +496,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
 #elif defined(WARPX_DIM_1D_Z)
                     z = z_m + (z-z_m)*std::cos(rotation_angle) + k_cross_z*std::sin(rotation_angle) + kz*k_dot_x*(1._rt - std::cos(rotation_angle));
 #endif
-                    if (do_rotation_momenta){
+                    if (plasma_injector.do_rotation_momenta){
 
                         // dot product
                         const Real k_dot_u = kx*u.x + ky*u.y + kz*u.z;
