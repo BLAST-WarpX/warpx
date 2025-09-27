@@ -125,7 +125,7 @@ private:
 // struct whose getDensity returns density from file.
 struct InjectorDensityFromFile
 {
-    InjectorDensityFromFile (std::string const& a_file_name, amrex::Geometry const& a_geom);
+    InjectorDensityFromFile (std::string const& a_file_name, amrex::Geometry const& a_geom, bool a_distributed);
 
     void clear ();
 
@@ -194,9 +194,9 @@ struct InjectorDensity
 
     // This constructor stores a InjectorDensityFromFile in union object.
     InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name,
-                     amrex::Geometry const& a_geom)
+                     amrex::Geometry const& a_geom, bool a_distributed)
         : type(Type::fromfile),
-          object(t,a_file_name,a_geom)
+          object(t,a_file_name,a_geom,a_distributed)
     { }
 
     // Explicitly prevent the compiler from generating copy constructors
@@ -268,8 +268,8 @@ private:
         Object (InjectorDensityPredefined*, std::string const& a_species_name)
             : predefined(a_species_name) {}
         Object (InjectorDensityFromFile*, std::string const& a_file_name,
-                amrex::Geometry const& a_geom)
-            : fromfile(a_file_name, a_geom) {}
+                amrex::Geometry const& a_geom, bool a_distributed)
+            : fromfile(a_file_name, a_geom, a_distributed) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
         InjectorDensityPredefined predefined;

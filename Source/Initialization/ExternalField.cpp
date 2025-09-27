@@ -199,13 +199,13 @@ ExternalFieldReader::ExternalFieldReader (
       m_name(std::move(F_name)),
       m_component(std::move(F_component)),
       m_problo(problo),
-      m_probdx(pdx)
-    // xxxxx: m_distributed(distributed)
+      m_probdx(pdx),
+      m_distributed(distributed)
 {
     amrex::RealBox rbox;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        rbox.setLo(idim, problo[idim] + pbox.smallEnd(idim)*pdx[idim]);
-        rbox.setHi(idim, problo[idim] + pbox.  bigEnd(idim)*pdx[idim]);
+        rbox.setLo(idim, m_problo[idim] + pbox.smallEnd(idim)*m_probdx[idim]);
+        rbox.setHi(idim, m_problo[idim] + pbox.  bigEnd(idim)*m_probdx[idim]);
     }
 
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)

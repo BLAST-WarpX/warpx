@@ -108,12 +108,12 @@ void InjectorDensityPredefined::clear ()
 }
 
 InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name,
-                                                  amrex::Geometry const& a_geom)
+                                                  amrex::Geometry const& a_geom,
+                                                  bool a_distributed)
 {
-    bool distributed = true; // xxxxxx make this a run time parameter
     m_external_field_reader = new ExternalFieldReader
         (a_file_name, "density", "", a_geom.ProbLoArray(), a_geom.CellSizeArray(),
-         amrex::convert(a_geom.Domain(),amrex::IntVect(1)), distributed);
+         amrex::convert(a_geom.Domain(),amrex::IntVect(1)), a_distributed);
 }
 
 void InjectorDensityFromFile::clear ()

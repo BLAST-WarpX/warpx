@@ -107,8 +107,10 @@ namespace SpeciesUtils {
                 density_parser->compile<3>()));
         } else if (rho_prof_s == "read_from_file") {
             std::string density_file;
+            bool distributed = false; // xxxxx should the default be true or false?
             utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom));
+            pp_species.query("read_density_distributed", distributed);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
