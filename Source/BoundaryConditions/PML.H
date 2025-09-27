@@ -19,7 +19,6 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 
-#include <AMReX_MultiFab.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
 #include <AMReX_FabArray.H>
@@ -146,7 +145,7 @@ public:
          ablastr::utils::enums::GridType grid_type,
          int do_moving_window, int pml_has_particles, int do_pml_in_domain,
          PSATDSolutionType psatd_solution_type,
-         JInTime J_in_time, RhoInTime rho_in_time,
+         TimeDependencyJ time_dependency_J, TimeDependencyRho time_dependency_rho,
          bool do_pml_dive_cleaning, bool do_pml_divb_cleaning,
          const amrex::IntVect& fill_guards_fields,
          const amrex::IntVect& fill_guards_current,

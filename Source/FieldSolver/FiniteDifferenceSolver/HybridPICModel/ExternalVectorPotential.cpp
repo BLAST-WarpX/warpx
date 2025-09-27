@@ -9,6 +9,7 @@
 
 #include "ExternalVectorPotential.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -26,6 +27,8 @@ void
 ExternalVectorPotential::ReadParameters ()
 {
     const ParmParse pp_ext_A("external_vector_potential");
+
+    pp_ext_A.query("do_diva_cleaning", m_do_clean_divA);
 
     pp_ext_A.queryarr("fields", m_field_names);
 
@@ -140,8 +143,6 @@ ExternalVectorPotential::InitData ()
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-    int A_time_dep_count = 0;
-
     for (int i = 0; i < m_nFields; ++i) {
 
         const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
@@ -200,15 +201,20 @@ ExternalVectorPotential::InitData ()
                     lev, PatchType::fine,
                     warpx.GetEBUpdateEFlag(),
                     false);
-
-                for (int idir = 0; idir < 3; ++idir) {
-                    warpx.m_fields.get(Aext_field, Direction{idir}, lev)->
-                        FillBoundary(warpx.Geom(lev).periodicity());
-                }
             }
+            // NOTE: Fill Boundary is not done here since non-periodic A fields can lead to periodic E/B fields
+            // This requires valid definitions of the vector potential in the ghost cells.
         }
 
         amrex::Gpu::streamSynchronize();
+
+        if (m_do_clean_divA) {
+            warpx::initialization::ProjectionDivCleaner dc(Aext_field, true);
+            dc.setSourceFromField();
+            dc.solve();
+            dc.correctField();
+            amrex::Print() << Utils::TextMsg::Info( "Finished Projection A-Field divergence cleaner.");
+        }
 
         CalculateExternalCurlA(m_field_names[i]);
 
@@ -216,17 +222,6 @@ ExternalVectorPotential::InitData ()
         m_A_external_time_parser[i] = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(m_A_ext_time_function[i],{"t",}));
         m_A_time_scale[i] = m_A_external_time_parser[i]->compile<1>();
-
-        const std::set<std::string> A_time_ext_symbols = m_A_external_time_parser[i]->symbols();
-        A_time_dep_count += static_cast<int>(A_time_ext_symbols.count("t"));
-    }
-
-    if (A_time_dep_count > 0) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC ExternalVectorPotential",
-            "Coulomb Gauge is Expected, please be sure to have a divergence free A. Divergence cleaning of A to be implemented soon.",
-            ablastr::warn_manager::WarnPriority::low
-        );
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));

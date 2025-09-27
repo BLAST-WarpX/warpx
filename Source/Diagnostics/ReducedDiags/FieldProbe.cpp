@@ -91,8 +91,10 @@ FieldProbe::FieldProbe (const std::string& rd_name)
         utils::parser::getWithParser(
             pp_rd_name, "y_probe", y_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(
             pp_rd_name, "z_probe", z_probe);
+#endif
     }
     else if (m_probe_geometry_str == "Line")
     {
@@ -105,13 +107,15 @@ FieldProbe::FieldProbe (const std::string& rd_name)
         utils::parser::queryWithParser(pp_rd_name, "y_probe", y_probe);
         utils::parser::queryWithParser(pp_rd_name, "y1_probe", y1_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(pp_rd_name, "z_probe", z_probe);
         utils::parser::getWithParser(pp_rd_name, "z1_probe", z1_probe);
+#endif
         utils::parser::getWithParser(pp_rd_name, "resolution", m_resolution);
     }
     else if (m_probe_geometry_str == "Plane")
     {
-#if defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM == 1)
         WARPX_ABORT_WITH_MESSAGE(
             "Plane probe should be used in a 2D or 3D simulation only");
 #endif
@@ -359,6 +363,8 @@ bool FieldProbe::ProbeInDomain () const
      */
 #if defined(WARPX_DIM_1D_Z)
     return z_probe >= prob_lo[0] && z_probe < prob_hi[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    return x_probe >= prob_lo[0] && x_probe < prob_hi[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     return x_probe >= prob_lo[0] && x_probe < prob_hi[0] &&
            z_probe >= prob_lo[1] && z_probe < prob_hi[1];
@@ -458,10 +464,12 @@ void FieldProbe::ComputeDiags (int step)
                     {
                         setPosition(ip, xp, yp+move_dist, zp);
                     }
+#if defined(WARPX_ZINDEX)
                     if (temp_warpx_moving_window == WARPX_ZINDEX)
                     {
                         setPosition(ip, xp, yp, zp+move_dist);
                     }
+#endif
                 });
             }
             if( ProbeInDomain() )

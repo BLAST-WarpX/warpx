@@ -66,6 +66,7 @@ photons.uy_th = 0.2
 photons.uz_th = 0.2
 
 # Diagnostics
+warpx.synchronize_velocity_for_diagnostics = 1
 diagnostics.diags_names = diag1 openpmd
 diag1.intervals = 200
 diag1.diag_type = Full

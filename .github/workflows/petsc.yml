@@ -1,0 +1,126 @@
+name: 🐧 PETSc
+
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-petsc
+  cancel-in-progress: true
+
+jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
+  test_petsc_gcc:
+    name: GCC
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    env:
+      CXXFLAGS: "-Werror"
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: |
+        .github/workflows/dependencies/gcc.sh
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev
+    - name: Build WarpX w/ PETSc
+      run: |
+        # export environment variables
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+        export warpx_dir=${PWD}
+        export PETSC_DIR=${warpx_dir}/petsc
+        export PETSC_ARCH=arch-opt
+        # clone and configure PETSc
+        cd ${warpx_dir}
+        git clone -b release https://gitlab.com/petsc/petsc.git petsc
+        cd ${PETSC_DIR}
+        ./configure --with-fortran-bindings=no --with-x=no --with-mpi=0 --with-debugging=1
+        make -j 4
+        # configure WarpX
+        cd ${warpx_dir}
+        cmake -S . -B build            \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_DIMS="1;2;RZ;3"      \
+          -DAMReX_PETSC=YES            \
+          -DPETSC_DIR=${PETSC_DIR}     \
+          -DPETSC_ARCH=${PETSC_ARCH}   \
+          -DWarpX_EB=OFF               \
+          -DWarpX_MPI=OFF              \
+          -DWarpX_QED=OFF
+        # build WarpX
+        cmake --build build -j 4
+        ccache -s
+        du -hs ~/.cache/ccache
+
+  test_petsc_mpich:
+    name: GCC + MPICH
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    env:
+      CXXFLAGS: "-Werror"
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: |
+        .github/workflows/dependencies/gcc12.sh
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends libblas-dev liblapack-dev mpich libmpich-dev
+    - name: Build WarpX w/ PETSc
+      run: |
+        # export environment variables
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+        export warpx_dir=${PWD}
+        export PETSC_DIR=${warpx_dir}/petsc
+        export PETSC_ARCH=arch-opt
+        # clone and configure PETSc
+        cd ${warpx_dir}
+        git clone -b release https://gitlab.com/petsc/petsc.git petsc
+        cd ${PETSC_DIR}
+        ./configure --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx --with-debugging=1
+        make -j 4
+        # configure WarpX
+        cd ${warpx_dir}
+        cmake -S . -B build            \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_DIMS="1;2;RZ;3"      \
+          -DAMReX_PETSC=YES            \
+          -DPETSC_DIR=${PETSC_DIR}     \
+          -DPETSC_ARCH=${PETSC_ARCH}   \
+          -DWarpX_EB=OFF               \
+          -DWarpX_MPI=ON               \
+          -DWarpX_QED=OFF
+        # build WarpX
+        cmake --build build -j 4
+        ccache -s
+        du -hs ~/.cache/ccache

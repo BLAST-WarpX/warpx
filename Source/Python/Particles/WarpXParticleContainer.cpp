@@ -117,6 +117,10 @@ void init_WarpXParticleContainer (py::module& m)
             &WarpXParticleContainer::sumParticleCharge,
             py::arg("local")
         )
+        .def("sum_particle_energy",
+            &WarpXParticleContainer::sumParticleEnergy,
+            py::arg("local")
+        )
         .def("deposit_charge",
             [](WarpXParticleContainer& pc,
             amrex::MultiFab* rho, const int lev)
@@ -139,6 +143,14 @@ void init_WarpXParticleContainer (py::module& m)
         )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_gather",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotGather(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_deposit",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotDeposit(flag); },
             py::arg("flag")
         )
     ;

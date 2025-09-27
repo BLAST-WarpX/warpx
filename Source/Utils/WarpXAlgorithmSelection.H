@@ -99,14 +99,16 @@ AMREX_ENUM(PSATDSolutionType,
            SecondOrder,
            Default = SecondOrder);
 
-AMREX_ENUM(JInTime,
+AMREX_ENUM(TimeDependencyJ,
            Constant,
            Linear,
+           Quadratic,
            Default = Constant);
 
-AMREX_ENUM(RhoInTime,
+AMREX_ENUM(TimeDependencyRho,
            Constant,
            Linear,
+           Quadratic,
            Default = Linear);
 
 /** Strategy to compute weights for use in load balance.
@@ -155,5 +157,18 @@ AMREX_ENUM(ReductionType,
            Minimum,
            Sum,
            Integral = Sum);
+
+/** \brief Subcycling half selector */
+AMREX_ENUM(SubcyclingHalf,
+           FirstHalf,
+           SecondHalf,
+           None,
+           Default = None);
+
+/** \brief Particle push scheme */
+AMREX_ENUM(PushType,
+           Explicit,  //!< Standard leap-frog scheme
+           Implicit,  //!< Crank-Nicolson scheme (e.g., equations (15)-(18) in (Chen et al, JCP 407, 2020))
+           Default = Explicit);
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_
