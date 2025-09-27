@@ -7,9 +7,9 @@
  */
 #include "SpectralFieldData.H"
 
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
-#include "WarpX.H"
 
 #include <AMReX_Array4.H>
 #include <AMReX_BLassert.H>
@@ -137,7 +137,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
                                       const bool periodic_single_box):
     m_periodic_single_box{periodic_single_box}
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, realspace_ba, dm);
 
     const BoxArray& spectralspace_ba = k_space.spectralspace_ba;
@@ -177,11 +176,8 @@ SpectralFieldData::SpectralFieldData( const int lev,
     // Loop over boxes and allocate the corresponding plan
     // for each box owned by the local MPI proc
     for ( MFIter mfi(spectralspace_ba, dm); mfi.isValid(); ++mfi ){
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi, do_costs);
 
         // Note: the size of the real-space box and spectral-space box
         // differ when using real-to-complex FFT. When initializing
@@ -197,13 +193,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
             fft_size, tmpRealField[mfi].dataPtr(),
             reinterpret_cast<ablastr::math::anyfft::Complex*>( tmpSpectralField[mfi].dataPtr()),
             ablastr::math::anyfft::direction::C2R, AMREX_SPACEDIM);
-
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -226,7 +215,6 @@ SpectralFieldData::ForwardTransform (const int lev,
                                      const MultiFab& mf, const int field_index,
                                      const int i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
@@ -242,11 +230,8 @@ SpectralFieldData::ForwardTransform (const int lev,
     // Note: we do NOT OpenMP parallelize here, since we use OpenMP threads for
     //       the FFTs on each box!
     for ( MFIter mfi(mf); mfi.isValid(); ++mfi ){
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi, do_costs);
 
         // Copy the real-space field `mf` to the temporary field `tmpRealField`
         // This ensures that all fields have the same number of points
@@ -306,13 +291,6 @@ SpectralFieldData::ForwardTransform (const int lev,
                 fields_arr(i,j,k,field_index) = spectral_field_value;
             });
         }
-
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -326,7 +304,6 @@ SpectralFieldData::BackwardTransform (const int lev,
                                       const amrex::IntVect& fill_guards,
                                       const int i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
@@ -341,11 +318,8 @@ SpectralFieldData::BackwardTransform (const int lev,
     // Note: we do NOT OpenMP parallelize here, since we use OpenMP threads for
     //       the iFFTs on each box!
     for ( MFIter mfi(mf); mfi.isValid(); ++mfi ){
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi, do_costs);
 
         // Copy the spectral-space field `tmpSpectralField` to the appropriate
         // field (specified by the input argument field_index)
@@ -429,13 +403,6 @@ SpectralFieldData::BackwardTransform (const int lev,
                 // Copy and normalize field
                 mf_arr(i,j,k,i_comp) = inv_N * tmp_arr(ii,jj,kk);
             });
-        }
-
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
 }

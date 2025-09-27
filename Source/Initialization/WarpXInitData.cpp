@@ -804,7 +804,7 @@ WarpX::InitData ()
     multi_diags = std::make_unique<MultiDiagnostics>();
 
     /** create object for reduced diagnostics */
-    reduced_diags = std::make_unique<MultiReducedDiags>();
+    reduced_diags = std::make_unique<MultiReducedDiags>(m_load_balancer);
 
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,
@@ -1328,13 +1328,8 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     // load external grid fields into E/Bfield_fp_external multifabs
     LoadExternalFields(lev);
 
-    if (costs[lev]) {
-        const auto iarr = costs[lev]->IndexArray();
-        for (const auto& i : iarr) {
-            (*costs[lev])[i] = 0.0;
-            WarpX::setLoadBalanceEfficiency(lev, -1);
-        }
-    }
+    m_load_balancer->reset_costs(lev);
+    m_load_balancer->reset_efficiency(lev);
 }
 
 template<typename T>

@@ -13,6 +13,7 @@
 #include "Fields.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/PlasmaInjector.H"
+#include "LoadBalancing/ScopedTimeTracker.H"
 #include "MultiParticleContainer.H"
 #include "Parallelization/WarpXSumGuardCells.H"
 #ifdef WARPX_QED
@@ -433,8 +434,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
     const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
 
@@ -465,11 +464,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                amrex::Gpu::synchronize();
-            }
-            auto wt = static_cast<amrex::Real>(amrex::second());
+
+            const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, pti);
 
             const Box& box = pti.validbox();
 
@@ -743,12 +739,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             }
 
             amrex::Gpu::synchronize();
-
-            if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-            {
-                wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add( &(*cost)[pti.index()], wt);
-            }
         }
     }
     // Split particles at the end of the timestep.

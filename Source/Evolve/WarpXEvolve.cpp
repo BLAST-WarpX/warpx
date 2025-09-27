@@ -188,7 +188,9 @@ WarpX::Evolve (int numsteps)
         }
         ExecutePythonCallback("beforestep");
 
-        CheckLoadBalance(step);
+        // Load balance
+        m_load_balancer->check_and_do_load_balance(step);
+        m_load_balancer->rescale_costs(step);
 
         // Update timestep for electrostatic solver if a constant dt is not provided
         // This first synchronizes the position and velocity before setting the new timestep

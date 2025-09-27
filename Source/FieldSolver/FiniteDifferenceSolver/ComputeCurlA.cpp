@@ -19,6 +19,8 @@
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 
+#include "LoadBalancing/ScopedTimeTracker.H"
+
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -81,9 +83,6 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
     int lev
 )
 {
-    // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // reset Bfield
     Bfield[0]->setVal(0);
     Bfield[1]->setVal(0);
@@ -94,11 +93,8 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Afield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        Real wt = static_cast<Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi);
 
         // Extract field data for this grid/tile
         Array4<const Real> const& Ar = Afield[0]->const_array(mfi);
@@ -206,13 +202,6 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                 }
             }
         );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -225,9 +214,6 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
     int lev
 )
 {
-    // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // reset Bfield
     Bfield[0]->setVal(0);
     Bfield[1]->setVal(0);
@@ -238,11 +224,8 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Afield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        Real wt = static_cast<Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi);
 
         // Extract field data for this grid/tile
         Array4<const Real> const& At = Afield[1]->const_array(mfi);
@@ -301,13 +284,6 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
                 Bphi(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
             }
         );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -323,9 +299,6 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 {
     using ablastr::fields::Direction;
 
-    // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
     // reset Bfield
     Bfield[0]->setVal(0);
     Bfield[1]->setVal(0);
@@ -336,10 +309,8 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for ( MFIter mfi(*Afield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        const auto scoped_time_tracker = warpx::load_balancing::get_scoped_time_tracker(lev, mfi);
 
         // Extract field data for this grid/tile
         Array4<Real> const &Bx = Bfield[0]->array(mfi);
@@ -407,13 +378,6 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
                 );
             }
         );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 #endif

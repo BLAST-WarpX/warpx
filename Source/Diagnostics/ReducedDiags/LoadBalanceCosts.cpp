@@ -69,8 +69,10 @@ namespace
 }
 
 // constructor
-LoadBalanceCosts::LoadBalanceCosts (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+LoadBalanceCosts::LoadBalanceCosts (
+    const std::string& rd_name,
+    std::shared_ptr<warpx::load_balancing::LoadBalancer> p_load_balancer)
+    : ReducedDiags{rd_name}, m_load_balancer{p_load_balancer}
 {
 }
 
@@ -83,14 +85,14 @@ void LoadBalanceCosts::ComputeDiags (int step)
     // judge if the diags should be done
     // costs is initialized only if we're doing load balance
     if (!m_intervals.contains(step+1) ||
-        !warpx.get_load_balance_intervals().isActivated() ) { return; }
+        !m_load_balancer->is_active() ) { return; }
 
     // get number of boxes over all levels
     auto nLevels = warpx.finestLevel() + 1;
     int nBoxes = 0;
     for (int lev = 0; lev < nLevels; ++lev)
     {
-        auto *const cost = WarpX::getCosts(lev);
+        auto *const cost = m_load_balancer->get_costs(lev);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             cost, "ERROR: costs are not initialized on level " + std::to_string(lev) + " !");
         nBoxes += cost->size();
@@ -113,13 +115,14 @@ void LoadBalanceCosts::ComputeDiags (int step)
     costs.resize(nLevels);
     for (int lev = 0; lev < nLevels; ++lev)
     {
-        costs[lev] = std::make_unique<LayoutData<Real>>(*WarpX::getCosts(lev));
+        costs[lev] = std::make_unique<LayoutData<Real>>(*m_load_balancer->get_costs(lev));
     }
 
-    if (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Heuristic)
-    {
-        warpx.ComputeCostsHeuristic(costs);
-    }
+    // TO MOVE ELSEWHERE
+    //if (WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Heuristic)
+    //{
+    //    warpx.ComputeCostsHeuristic(costs);
+    //}
 
     // keep track of correct index in array over all boxes on all levels
     // shift index for m_data
