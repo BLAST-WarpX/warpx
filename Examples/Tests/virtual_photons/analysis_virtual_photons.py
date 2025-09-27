@@ -59,25 +59,25 @@ dN_dy_warpx = H / db / np.sum(w_electrons)
 
 y = b
 # spectrum of virtual photons for one electron
-A = 0
-dN_dy_theory = alpha / pi / y * (-2 * log(y) + A)
+dN_dy_theory = alpha / pi / y * (-2 * log(y))
 # dN_dy[dN_dy < 0] = 0.0
 
 # number of virtual photons for one electron from theory
-N_theory = alpha / pi * (-A * log(ymin) + log(ymin) ** 2)
+N_theory = alpha / pi * log(ymin) ** 2
+
+number_rel_error = np.abs(N_warpx - N_theory) / N_theory
+spectrum_rel_error = np.abs(dN_dy_warpx - dN_dy_theory) / dN_dy_theory
 
 print("Number of virtual photons per electron:")
 print(f"From simulation : {N_warpx}")
 print(f"From theory     : {N_theory}")
-print(f"Relative error  : {np.abs(N_warpx - N_theory) / N_theory:.2%}")
+print(f"Relative error  : {number_rel_error:.2%}")
 
 print("Spectrum of virtual photons per electron:")
-print(
-    f"Max relative error: {(np.abs(dN_dy_warpx - dN_dy_theory) / dN_dy_theory).max()}"
-)
+print(f"Max relative error: {spectrum_rel_error.max()}")
 
-assert (np.abs(dN_dy_warpx - dN_dy_theory) < 0.04 * dN_dy_theory).all()
-assert np.abs(N_theory - N_warpx) < 0.02 * N_theory
+assert number_rel_error < 0.02
+assert (spectrum_rel_error < 0.04).all()
 
 ################
 ### POSITION ###
