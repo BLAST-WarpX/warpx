@@ -198,6 +198,8 @@ class MatrixPC : public Preconditioner<T,Ops>
 
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
 
+        int m_num_realloc = 0;
+
         /**
          * \brief Read parameters
          */
@@ -303,18 +305,21 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
         if (nnz_diff) {
 
-            std::stringstream warning_message;
-            warning_message << "Maximum number of nonzeros per row:\n";
-            warning_message << "Current value of m_pc_mat_nnz (" << m_pc_mat_nnz << ") too low.\n";
-            warning_message << "increasing by " << nnz_diff << " and reallocating.\n";
-            ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
-
             m_pc_mat_nnz += nnz_diff;
+            m_num_realloc++;
 
         } else {
             break;
         }
     }
+
+    if (m_num_realloc > 1) {
+        std::stringstream warning_message;
+        warning_message << "Number of times arrays were reallocated due to new nonzero elements "
+                        << "is greater than 1 (" << m_num_realloc <<"). This is unexpected.\n";
+        ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
+    }
+
 }
 
 template <class T, class Ops>
