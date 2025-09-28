@@ -97,7 +97,7 @@ struct ExternalFieldView
 
         if (i0 < table.begin || i0 >= table.end-1) // This covers empty Table.
         {
-            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0]);
+            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0]-1);
             return 0;
         } else {
             return static_cast<amrex::Real>(
@@ -110,8 +110,8 @@ struct ExternalFieldView
         if (i0 < table.begin[0] || i0 >= table.end[0]-1 ||
             i1 < table.begin[1] || i1 >= table.end[1]-1)
         {
-            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0] ||
-                                i1 < 0 || i1 >= global_size[1]);
+            AMREX_ALWAYS_ASSERT(i0 < 0 || i0 >= global_size[0]-1 ||
+                                i1 < 0 || i1 >= global_size[1]-1);
             return 0;
         } else {
             return static_cast<amrex::Real>(
