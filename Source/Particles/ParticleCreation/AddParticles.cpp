@@ -724,6 +724,23 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         plasma_injector.prepare(part_realbox);
     }
 
+#ifdef AMREX_USE_OMP
+    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
+    amrex::Vector<InjectorDensity*> inj_rho_omp;
+    auto const nthreads = amrex::OpenMP::get_max_threads();
+    if (! WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion()
+        && nthreads > 1 && plasma_injector.distributedInjectorDensity())
+    {
+        inj_rho_data = std::unique_ptr<void,amrex::DataDeleter>
+            (amrex::The_Cpu_Arena()->alloc(sizeof(InjectorDensity)*nthreads),
+             amrex::DataDeleter{amrex::The_Cpu_Arena()});
+        auto* p = reinterpret_cast<InjectorDensity*>(inj_rho_data.get());
+        for (int tid = 0; tid < nthreads; ++tid) {
+            inj_rho_omp.push_back(p++);
+        }
+    }
+#endif
+
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
@@ -752,7 +769,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     }
 #ifdef AMREX_USE_OMP
     info.SetDynamic(true);
-#pragma omp parallel if (not WarpX::serialize_initial_conditions)
+#pragma omp parallel if (not WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
     {
@@ -775,7 +792,25 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             continue; // Go to the next tile
         }
 
-        InjectorDensity* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        InjectorDensity* inj_rho;
+#ifdef AMREX_USE_OMP
+        if (plasma_injector.distributedInjectorDensity() &&
+            amrex::OpenMP::get_num_threads() > 1)
+        {
+            auto const tid = amrex::OpenMP::get_thread_num();
+#pragma omp critical(get_injector_denisty)
+            {
+                inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+                std::memcpy(inj_rho_omp[tid], inj_rho, sizeof(InjectorDensity)); // NOLINT
+            }
+            inj_rho = inj_rho_omp[tid];
+        } else
+#endif
+        {
+            // Note that this is GPU async safe because of the sync at the
+            // end of the loop.
+            inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        }
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
@@ -1682,7 +1717,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             }
         });
 
-        amrex::Gpu::synchronize();
+        amrex::Gpu::synchronize(); // If this is removed, we need to make sure inj_rho is async safe.
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {

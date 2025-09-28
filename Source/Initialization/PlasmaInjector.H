@@ -155,6 +155,8 @@ public:
 
     void prepare (amrex::RealBox const& pbox);
 
+    [[nodiscard]] bool distributedInjectorDensity () const { return inj_rho_distributed; }
+
 protected:
 
     bool mass_from_source = false;

@@ -1773,6 +1773,7 @@ WarpX::ReadExternalFieldFromFile (
         const amrex::Box tb = mfi.tilebox(nodal_flag, mf->nGrowVect());
         auto const& mffab = mf->array(mfi);
 
+        // This is thread safe because getView return by value.
         auto const& external_field_view = external_field_reader.getView(mfi.LocalIndex());
 
         // Start ParallelFor
