@@ -576,10 +576,12 @@ void ImplicitSolver::InitializeMassMatrices ()
         else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #ifndef WARPX_DIM_3D
             int max_crossings = ngJ[0] - shape + 1;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings>0,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings==m_WarpX->particle_max_grid_crossings,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings == m_WarpX->particle_max_grid_crossings,
                 "Guard cells for J are not consistent with particle_max_grid_crossings.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings <= 2,
+                "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings <= 2.");
 #endif
             // Comment on direction-dependent number of mass matrices components
             // set below for charge-conserving Villasenor deposition:
