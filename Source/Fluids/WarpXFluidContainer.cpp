@@ -177,7 +177,6 @@ void WarpXFluidContainer::InitData(
     init_box.surroundingNodes();
 
     // Create local copies of pointers for GPU kernels
-    InjectorDensity* inj_rho = d_inj_rho;
     InjectorMomentum* inj_mom = d_inj_mom;
 
     if (h_inj_rho->distributed()) {
@@ -208,10 +207,11 @@ void WarpXFluidContainer::InitData(
 
     // Loop through cells and initialize their value
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) firstprivate(inj_rho)
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi(*fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
+        InjectorDensity* inj_rho = d_inj_rho;
         if (h_inj_rho->distributed()) {
 #ifdef AMREX_USE_OMP
             if (amrex::OpenMP::get_num_threads() > 1) {
