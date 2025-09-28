@@ -301,9 +301,15 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     }
 
     const auto offset = F.gridGlobalOffset();
-    AMREX_D_TERM(m_offset[0] = Real(offset.at(0));,
-                 m_offset[1] = Real(offset.at(1));,
-                 m_offset[2] = Real(offset.at(2)));
+    if (xyz_order) {
+        AMREX_D_TERM(m_offset[0] = Real(offset.at(0));,
+                     m_offset[1] = Real(offset.at(1));,
+                     m_offset[2] = Real(offset.at(2)));
+    } else {
+        AMREX_D_TERM(m_offset[0] = Real(offset.at(AMREX_SPACEDIM-1));,
+                     m_offset[1] = Real(offset.at(AMREX_SPACEDIM-2));,
+                     m_offset[2] = Real(offset.at(AMREX_SPACEDIM-3)));
+    }
 
     // Load the first component if m_component is empty
     auto FC = m_component.empty() ? F.begin()->second : F[m_component];
