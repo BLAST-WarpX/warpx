@@ -454,17 +454,39 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
                                    amrex::DistributionMapping const& dmap,
                                    amrex::IntVect const& ngrow)
 {
-    // xxxxx todo
-
-    // make sure it is not out of bound We should save m_size in the view,
-    // then we can find out if it's out of the total data bound, it will be
-    // a runtime error if the data point is outside the table's bound but
-    // inside the total size bound.
+    using namespace amrex;
 
     AMREX_ALWAYS_ASSERT(m_moving_window == false);
 
     if (m_distributed) {
-        amrex::Abort("xxxxx prepare(BoxArray,DistributionMapping,IntVect) TODO");
+        BoxList bl;
+        bl.reserve(grids.size());
+        for (int ibox = 0; ibox < int(grids.size()); ++ibox) {
+            Box b = grids[ibox];
+            b.surroundingNodes().grow(ngrow);
+            IntVect lo, hi;
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                auto plo = m_problo[idim] + b.smallEnd(idim)*m_probdx[idim];
+                auto phi = m_problo[idim] + b.  bigEnd(idim)*m_probdx[idim];
+                auto ilo = int(std::floor( (plo-m_offset[idim])/m_dx[idim] ));
+                auto ihi = int(std::floor( (phi-m_offset[idim])/m_dx[idim] ))+1; // +1 for interpolation
+                --ilo; // in case there are roundoff errors
+                ++ihi;
+                lo[idim] = std::max(ilo, 0);
+                hi[idim] = std::min(ihi, m_size[idim]-1);
+            }
+            Box box(lo, hi);
+            if (box.isEmpty()) {
+                box = Box(IntVect(0),IntVect(0));
+            }
+            bl.push_back(box);
+        }
+        BoxArray ba(std::move(bl));
+        FabArray<BaseFab<double>> tmpmf(ba,dmap,1,0);
+        tmpmf.ParallelCopy(m_mf);
+        m_mf = std::move(tmpmf);
+        m_fab.clear();
+        m_FC_data_cpu.reset();
     }
 }
 
