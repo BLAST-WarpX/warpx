@@ -691,7 +691,7 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
 #ifdef AMREX_USE_GPU
         if (! inj_rho_distributed) {
             amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-            Gpu::streamSynchronize();
+            amrex::Gpu::streamSynchronize();
         }
 #endif
         inj_rho_prepared = true;
@@ -704,7 +704,7 @@ void PlasmaInjector::prepare (amrex::RealBox const& pbox)
         h_inj_rho->prepare(pbox);
 #ifdef AMREX_USE_GPU
         amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-        Gpu::streamSynchronize();
+        amrex::Gpu::streamSynchronize();
 #endif
         inj_rho_distributed = false;
         inj_rho_prepared = true;

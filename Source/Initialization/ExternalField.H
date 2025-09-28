@@ -84,9 +84,9 @@ struct ExternalFieldView
 #endif
 
         // Get index of the external field array
-        AMREX_D_TERM(int const i0 = std::floor( (pos[0]-offset[0])/dx[0] );,
-                     int const i1 = std::floor( (pos[1]-offset[1])/dx[1] );,
-                     int const i2 = std::floor( (pos[2]-offset[2])/dx[2] ));
+        AMREX_D_TERM(int const i0 = int(std::floor( (pos[0]-offset[0])/dx[0] ));,
+                     int const i1 = int(std::floor( (pos[1]-offset[1])/dx[1] ));,
+                     int const i2 = int(std::floor( (pos[2]-offset[2])/dx[2] )));
 
         // Get coordinates of external grid point
         AMREX_D_TERM(amrex::Real const xx0 = offset[0] + i0 * dx[0];,
