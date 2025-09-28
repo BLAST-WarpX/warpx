@@ -226,6 +226,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     auto F = iseries.meshes[m_name];
 
     bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
+    amrex::ignore_unused(c_order);
 
     auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
     auto fileGeom = F.getAttribute("geometry").get<std::string>();
@@ -242,7 +243,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
         WARPX_ABORT_WITH_MESSAGE("3D expects axisLabels {x, y, z} or {z, y, x}");
     }
 #elif defined(WARPX_DIM_XZ)
-    WARPX_ABORT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
     if (axisLabels.at(0) == "x" && axisLabels.at(1) == "z") {
         xyz_order = true;
     } else if (axisLabels.at(1) == "x" && axisLabels.at(0) == "z") {
@@ -251,7 +252,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
         WARPX_ABORT_WITH_MESSAGE("XZ expects axisLabels {x, z} or {z, x}");
     }
 #elif defined(WARPX_DIM_RZ)
-    WARPX_ABORT_WITH_MESSAGE(fileGeom == "thetaMode", "RZ can only read from files with 'thetaMode'  geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "thetaMode", "RZ can only read from files with 'thetaMode'  geometry");
     if (axisLabels.at(0) == "r" && axisLabels.at(1) == "z") {
         xyz_order = true;
     } else if (axisLabels.at(1) == "r" && axisLabels.at(0) == "z") {
@@ -260,8 +261,8 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
         WARPX_ABORT_WITH_MESSAGE("RZ expects axisLabels {r, z} or {z, r}");
     }
 #elif defined(WARPX_DIM_1D_Z)
-    WARPX_ABORT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
-    WARPX_ABORT_WITH_MESSAGE(axisLabels.at(0) == "z", "1D3V expects axisLabel {z}");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "z", "1D3V expects axisLabel {z}");
 #endif
 
     const auto d = F.gridSpacing<long double>();
