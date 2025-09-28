@@ -199,7 +199,7 @@ private:
     bool m_moving_window = false;
     amrex::RealVect m_dx;     // Field data's dx
     amrex::RealVect m_offset; // Field data's physical location at (0,0,0)
-    amrex::IntVect m_size;    // Field data's size (i.e., number of elemens)
+    amrex::IntVect m_size;    // Field data's size (i.e., number of elements)
     amrex::RealBox m_domain;  // Field data's total physical domain
     amrex::RealBox m_cache_domain; // Current cache's domain
     std::shared_ptr<double> m_FC_data_cpu;
