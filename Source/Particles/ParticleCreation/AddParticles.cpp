@@ -717,9 +717,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
-    amrex::Print() << "xxxxx part_realbox = " << part_realbox
-                   << ", geom = " << geom << std::endl;
-
     if (initial_injectcion) {
         plasma_injector.prepare(this->ParticleBoxArray(lev),
                                 this->ParticleDistributionMap(lev), IntVect(0));

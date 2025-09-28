@@ -313,12 +313,6 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     }
 #endif
 
-#if (AMREX_SPACEDIM == 3)
-    amrex::Print() << "xxxxx m_dx = " << m_dx << ", m_offset = " << m_offset
-                   << ", extent = " << extent[0] << " " << extent[1]
-                   << " " << extent[2] << std::endl;
-#endif
-
     // Determine the full extent of the data we need
     IntVect lo, hi;
     if (m_distributed) {
@@ -437,9 +431,6 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #endif
     }
 
-    amrex::Print() << "xxxxx External file data lo & hi: "
-                   << lo << " " << hi << std::endl;
-
     if (m_distributed) {
         m_mf.define(grids, dmap, 1, 0, MFInfo{}.SetAlloc(false));
         if (has_load) {
@@ -522,10 +513,8 @@ void ExternalFieldReader::prepare (amrex::RealBox const& pbox)
 
 ExternalFieldView ExternalFieldReader::getView (int li) const
 {
-    amrex::Abort("xxxxx getView todo");
-
-    if (m_distributed) {
-        return ExternalFieldView{}; // xxxxx
+    if (m_distributed && !m_moving_window) {
+        return make_view(m_mf.atLocalIdx(li));
     } else {
         return make_view(m_fab);
     }
