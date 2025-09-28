@@ -44,7 +44,7 @@ namespace
     {
         using namespace amrex;
         Table3D<T const, Order::C> ctab(pi, {0,0,0}, {nx, ny, nz});
-        Table3D<T      ,Order::F> ftab(po, {0,0,0}, {nx, ny, nz});
+        Table3D<T      , Order::F> ftab(po, {0,0,0}, {nx, ny, nz});
         BoxND<3> box(IntVectND<3>(0), IntVectND<3>(nx-1,ny-1,nz-1));
         ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
@@ -390,7 +390,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     openPMD::Offset chunk_offset(extent.size(),0);
     openPMD::Extent chunk_extent(extent.size(),1);
 #if defined(WARPX_DIM_RZ)
-    if (xyz_order) {
+    if (xyz_order) { // xxxxx Ask Axel if this is correct.
         chunk_offset[1] = lo[0];
         chunk_offset[2] = lo[1];
         chunk_extent[1] = hi[0]-lo[0]+1;
@@ -424,9 +424,8 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     }
     series.flush();
 
-    Box box(lo,hi);
-
     if (has_load) {
+        Box box(lo,hi);
 #ifdef AMREX_USE_GPU
         m_fab.resize(box, 1);
         Gpu::htod_memcpy_async(m_fab.dataPtr(), m_FC_data_cpu.get(), m_fab.nBytes());
