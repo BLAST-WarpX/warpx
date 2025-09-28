@@ -801,7 +801,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #pragma omp critical(get_injector_denisty)
             {
                 inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
-                std::memcpy(inj_rho_omp[tid], inj_rho, sizeof(InjectorDensity)); // NOLINT
+                std::memcpy((void*)inj_rho_omp[tid], (void const*)inj_rho, sizeof(InjectorDensity));
             }
             inj_rho = inj_rho_omp[tid];
         } else

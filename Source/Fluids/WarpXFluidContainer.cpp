@@ -219,7 +219,7 @@ void WarpXFluidContainer::InitData(
 #pragma omp critical(inj_rho)
                 {
                     h_inj_rho->prepare(mfi.LocalIndex());
-                    std::memcpy(inj_rho_omp[tid], h_inj_rho.get(), sizeof(InjectorDensity)); // NOLINT
+                    std::memcpy((void*)inj_rho_omp[tid], (void const*)h_inj_rho.get(), sizeof(InjectorDensity));
                 }
                 inj_rho = inj_rho_omp[tid];
             } else
