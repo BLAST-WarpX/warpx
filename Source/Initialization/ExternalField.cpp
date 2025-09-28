@@ -24,6 +24,34 @@
 
 namespace
 {
+    // xxxxx A faster version of this will be moved to amrex.
+    template <typename T>
+    void TransposeCtoF (T const* pi, T* po, int nx, int ny)
+    {
+        using namespace amrex;
+        Table2D<T const, Order::C> ctab(pi, {0,0}, {nx, ny});
+        Table2D<T      , Order::F> ftab(po, {0,0}, {nx, ny});
+        BoxND<2> box(IntVectND<2>(0), IntVectND<2>(nx-1,ny-1));
+        ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j)
+        {
+            ftab(i,j) = ctab(i,j);
+        });
+        Gpu::streamSynchronize();
+    }
+
+    template <typename T>
+    void TransposeCtoF (T const* pi, T* po, int nx, int ny, int nz)
+    {
+        using namespace amrex;
+        Table3D<T const, Order::C> ctab(pi, {0,0,0}, {nx, ny, nz});
+        Table3D<T      ,Order::F> ftab(po, {0,0,0}, {nx, ny, nz});
+        BoxND<3> box(IntVectND<3>(0), IntVectND<3>(nx-1,ny-1,nz-1));
+        ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            ftab(i,j,k) = ctab(i,j,k);
+        });
+        Gpu::streamSynchronize();
+    }
 
     enum class EMFieldType{E, B};
 
@@ -208,17 +236,13 @@ ExternalFieldReader::ExternalFieldReader (
         rbox.setHi(idim, m_problo[idim] + pbox.  bigEnd(idim)*m_probdx[idim]);
     }
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     load_data(rbox);
-#else
-    amrex::ignore_unused(rbox);
-    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER and RSPHERE");
-#endif
+
 }
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     using namespace amrex;
 
     auto series = openPMD::Series(m_file, openPMD::Access::READ_ONLY);
@@ -409,27 +433,8 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #if (AMREX_SPACEDIM > 1)
         if ((xyz_order && c_order) || (!xyz_order && !c_order)) {
             BaseFab<double> tmp(box, 1);
-            // xxxxx TODO Add transpose to amrex
-#if (AMREX_SPACEDIM == 2)
-            Table2D<double,Order::C> ctab(m_fab.dataPtr(), {lo[0],lo[1]},
-                                          {hi[0]+1,hi[1]+1});
-            Table2D<double,Order::F> ftab(tmp.dataPtr(), {lo[0],lo[1]},
-                                          {hi[0]+1,hi[1]+1});
-            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int)
-            {
-                ftab(i,j) = ctab(i,j);
-            });
-#else
-            Table3D<double,Order::C> ctab(m_fab.dataPtr(), {lo[0],lo[1],lo[2]},
-                                          {hi[0]+1,hi[1]+1,hi[2]+1});
-            Table3D<double,Order::F> ftab(tmp.dataPtr(), {lo[0],lo[1],lo[2]},
-                                          {hi[0]+1,hi[1]+1,hi[2]+1});
-            ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ftab(i,j,k) = ctab(i,j,k);
-            });
-#endif
-            Gpu::streamSynchronize();
+            TransposeCtoF(m_fab.dataPtr(), tmp.dataPtr(),
+                          AMREX_D_DECL(box.length(0),box.length(1),box.length(2)));
             std::swap(m_fab,tmp);
             m_FC_data_cpu.reset();
         }
@@ -443,8 +448,12 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
                         BaseFab<double>(m_fab,amrex::make_alias,0,1));
         }
     }
-}
+
+#else
+    amrex::ignore_unused(pbox);
+    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER and RSPHERE");
 #endif
+}
 
 void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
                                    amrex::DistributionMapping const& dmap,
