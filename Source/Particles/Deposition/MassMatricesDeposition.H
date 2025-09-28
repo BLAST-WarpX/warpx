@@ -1011,9 +1011,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double x0_old = x_old;
     double z0_old = z_old;
 
-    constexpr int num_segments_max = 1 + 2*AMREX_SPACEDIM;
+    constexpr int num_segments_max = 1 + 4*AMREX_SPACEDIM;
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE( num_segments <= num_segments_max,
-        "Error: num_segments must be less than or equal to 1 + 2*AMREX_SPACEDIM.");
+        "Error: num_segments must be less than or equal to 1 + 4*AMREX_SPACEDIM.");
 
     // Save the start index and interpolation weights for each segment
     int i0_cell[num_segments_max];
@@ -1405,9 +1405,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double z0_new;
     double z0_old = z_old;
 
-    constexpr int num_segments_max = 1 + 2*AMREX_SPACEDIM;
+    constexpr int num_segments_max = 1 + 4*AMREX_SPACEDIM;
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE( num_segments <= num_segments_max,
-        "Error: num_segments must be less than or equal to 1 + 2*AMREX_SPACEDIM.");
+        "Error: num_segments must be less than or equal to 1 + 4*AMREX_SPACEDIM.");
 
     // Save the start index and interpolation weights for each segment
     int k0_cell[num_segments_max];
