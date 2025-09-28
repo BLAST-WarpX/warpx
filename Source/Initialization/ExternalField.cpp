@@ -296,8 +296,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
         m_size[1] = extent[2];
     } else {
         m_size[0] = extent[2];
-        m_size[1] = extent[1];
-        WARPX_ABORT_WITH_MESSAGE("What do we expect for WarpX RZ data? Check with Axel");
+        m_size[1] = extent[1]; // xxxxx Ask Axel if this is correct.
     }
 #else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == AMREX_SPACEDIM,
@@ -312,6 +311,11 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
                      m_size[2] = int(extent.at(AMREX_SPACEDIM-3)));
     }
 #endif
+
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        m_domain.setLo(idim, m_offset[idim]);
+        m_domain.setHi(idim, m_offset[idim]+(m_size[idim]-1)*m_dx[idim]);
+    }
 
     // Determine the full extent of the data we need
     IntVect lo, hi;
@@ -338,7 +342,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     BoxArray grids;
     DistributionMapping dmap;
     bool has_load = true;
-    if (m_distributed) {
+    if (m_distributed && !m_moving_window) {
         grids = amrex::decompose(Box(lo,hi), ParallelDescriptor::NProcs());
         Vector<int> pmap(grids.size());
         std::iota(pmap.begin(), pmap.end(), 0);
@@ -431,7 +435,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #endif
     }
 
-    if (m_distributed) {
+    if (! grids.empty()) {
         m_mf.define(grids, dmap, 1, 0, MFInfo{}.SetAlloc(false));
         if (has_load) {
             m_mf.setFab(ParallelDescriptor::MyProc(),
@@ -481,34 +485,40 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
     }
 }
 
+void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox)
+{
+    m_cache_domain = pbox;
+    // xxxx Ask Remi. How general do we need to be about moving window
+    // direction? For now, I am assuming it's moving along the positive
+    // direction of the last dimension.
+    int dir = AMREX_SPACEDIM-1;
+    amrex::Real factor = 10.0;
+    amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
+    m_cache_domain.setHi(dir, newhi);
+    // Grow the box a little bit so that m_cache_domain.contains(pbox) is true.
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        m_cache_domain.setLo(idim, m_cache_domain.lo(idim) - m_dx[idim]);
+        m_cache_domain.setHi(idim, m_cache_domain.hi(idim) + m_dx[idim]);
+    }
+}
+
 void ExternalFieldReader::prepare (amrex::RealBox const& pbox)
 {
-    if (! m_distributed) {
-        m_moving_window = true;
-        return;
-    }
-
-    amrex::Abort("xxxxx prepare(RealBox) todo");
-
-    // If it's not distributed, we will not need to do anything.
-    // The constructor's load_data should try to load everything!
+    if (! m_distributed) { return; }
 
     if (!m_moving_window) {
-        // clear the data?
+        m_moving_window = true;
+        m_mf.clear();
+        make_cache_box(pbox);
+        load_data(m_cache_domain);
+    } else {
+        if (! m_cache_domain.contains(pbox)) {
+            make_cache_box(pbox);
+            if (m_cache_domain.intersects(m_domain)) {
+                load_data(m_cache_domain);
+            }
+        }
     }
-
-// We should be able to convert form RealBox pbox to required Box.
-// If it has no overlap with m_box, there is nothing we can load.
-// If it has ovelap, then we will see if it's already cached.
-    // If not cached, we will load. Note that if this is the first time (i.e., m_moving_window = false), we will always try to load.
-
-//    m_moving_window = true;
-//    load_data(pbox)?
-    // xxxxx todo
-
-    // Should we worry about moving window direction???
-
-    m_moving_window = true;
 }
 
 ExternalFieldView ExternalFieldReader::getView (int li) const

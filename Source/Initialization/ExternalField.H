@@ -188,17 +188,20 @@ private:
 
     void load_data (amrex::RealBox const& pbox);
     [[nodiscard]] ExternalFieldView make_view (amrex::BaseFab<double> const& fab) const;
+    void make_cache_box (amrex::RealBox const& pbox);
 
     std::string m_file;
     std::string m_name;
     std::string m_component;
-    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo;
-    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx;
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo; // WarpX's initial prob lo
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx; // WarpX's cell size
     bool m_distributed = false;
     bool m_moving_window = false;
-    amrex::RealVect m_dx;
-    amrex::RealVect m_offset;
-    amrex::IntVect m_size;
+    amrex::RealVect m_dx;     // Field data's dx
+    amrex::RealVect m_offset; // Field data's physical location at (0,0,0)
+    amrex::IntVect m_size;    // Field data's size (i.e., number of elemens)
+    amrex::RealBox m_domain;  // Field data's total physical domain
+    amrex::RealBox m_cache_domain; // Current cache's domain
     std::shared_ptr<double> m_FC_data_cpu;
     amrex::BaseFab<double> m_fab;
     amrex::FabArray<amrex::BaseFab<double>> m_mf;
