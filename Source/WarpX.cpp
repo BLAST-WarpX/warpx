@@ -319,6 +319,8 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    m_instance = this;
+
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
