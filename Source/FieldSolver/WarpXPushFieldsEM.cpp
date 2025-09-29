@@ -616,11 +616,11 @@ void WarpX::PSATDForwardTransformRho (
     {
         for (int lev = 0; lev <= finest_level; ++lev)
         {
-            spectral_solver_fp[lev]->ApplyFilter(lev, dcomp);
+            spectral_solver_fp[lev]->ApplyFilter(lev, dcomp, true);
 
             if (spectral_solver_cp[lev])
             {
-                spectral_solver_cp[lev]->ApplyFilter(lev, dcomp);
+                spectral_solver_cp[lev]->ApplyFilter(lev, dcomp, true);
             }
         }
     }

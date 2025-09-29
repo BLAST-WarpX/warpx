@@ -29,7 +29,8 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
                                           SpectralKSpaceRZ const & k_space,
                                           amrex::DistributionMapping const & dm,
                                           int const n_field_required,
-                                          int const n_modes)
+                                          int const n_modes,
+                                          bool do_costs)
     : n_rz_azimuthal_modes(n_modes),
       m_ncomps(2 * n_modes - 1),
       m_n_fields(n_field_required)

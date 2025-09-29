@@ -68,7 +68,7 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
             auto & solver = warpx.get_spectral_solver_fp(m_lev);
             const SpectralFieldIndex& Idx = solver.m_spectral_index;
             solver.ForwardTransform(m_lev, *rho, Idx.rho_new, 0, true);
-            solver.ApplyFilter(m_lev, Idx.rho_new);
+            solver.ApplyFilter(m_lev, Idx.rho_new, true);
             solver.BackwardTransform(m_lev, *rho, Idx.rho_new, 0, true);
         }
     }

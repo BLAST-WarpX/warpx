@@ -45,7 +45,8 @@ class SpectralSolverRZ
                           TimeDependencyJ time_dependency_J,
                           TimeDependencyRho time_dependency_rho,
                           bool dive_cleaning,
-                          bool divb_cleaning);
+                          bool divb_cleaning,
+                          bool do_costs);
 
         /* \brief Transform the component `i_comp` of MultiFab `field_mf`
          *  to spectral space, and store the corresponding result internally
@@ -80,16 +81,17 @@ class SpectralSolverRZ
         }
 
         /* \brief Apply K space filtering for a scalar */
-        void ApplyFilter (const int lev, int const field_index)
+        void ApplyFilter (const int lev, int const field_index, const bool do_costs)
         {
-            field_data.ApplyFilter(lev, field_index);
+            field_data.ApplyFilter(lev, field_index, do_costs);
         }
 
         /* \brief Apply K space filtering for a vector */
         void ApplyFilter (const int lev, int const field_index1,
-                          int const field_index2, int const field_index3)
+                          int const field_index2, int const field_index3,
+                          const bool do_costs)
         {
-            field_data.ApplyFilter(lev, field_index1, field_index2, field_index3);
+            field_data.ApplyFilter(lev, field_index1, field_index2, field_index3, do_costs);
         }
 
         /**

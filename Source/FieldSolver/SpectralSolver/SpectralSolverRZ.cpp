@@ -39,7 +39,8 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     const TimeDependencyJ time_dependency_J,
                                     const TimeDependencyRho time_dependency_rho,
                                     const bool dive_cleaning,
-                                    const bool divb_cleaning)
+                                    const bool divb_cleaning,
+                                    const bool do_costs)
     : m_dt(dt), k_space(realspace_ba, dm, dx)
 {
     // Initialize all structures using the same distribution mapping dm
@@ -73,7 +74,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
     // - Initialize arrays for fields in spectral space + FFT plans
     field_data = SpectralFieldDataRZ(lev, realspace_ba, k_space, dm,
                                      m_spectral_index.n_fields,
-                                     n_rz_azimuthal_modes);
+                                     n_rz_azimuthal_modes, do_costs);
 }
 
 /* \brief Transform the component `i_comp` of MultiFab `field_mf`
@@ -149,7 +150,7 @@ SpectralSolverRZ::ComputeSpectralDivE (const int lev,
                                        amrex::MultiFab& divE
 )
 {
-    algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE);
+    algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE, true);
 }
 
 /**

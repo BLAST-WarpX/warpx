@@ -135,9 +135,10 @@ class SpectralFieldDataRZ
         void InitFilter (amrex::IntVect const & filter_npass_each_dir, bool compensation,
                          SpectralKSpaceRZ const & k_space);
 
-        void ApplyFilter (int lev, int field_index);
+        void ApplyFilter (int lev, int field_index, bool do_costs);
         void ApplyFilter (int lev, int field_index1,
-                          int field_index2, int field_index3);
+                          int field_index2, int field_index3,
+                          bool do_costs);
 
         // Returns an array that holds the kr for all of the modes
         HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {

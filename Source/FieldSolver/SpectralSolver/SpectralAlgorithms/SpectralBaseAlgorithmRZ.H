@@ -68,7 +68,7 @@ class SpectralBaseAlgorithmRZ
         void ComputeSpectralDivE ( int lev,
                                    SpectralFieldDataRZ& field_data,
                                    ablastr::fields::VectorField const & Efield,
-                                   amrex::MultiFab& divE );
+                                   amrex::MultiFab& divE, bool do_costs);
 
         /**
          * \brief Virtual function for Vay current deposition in Fourier space
