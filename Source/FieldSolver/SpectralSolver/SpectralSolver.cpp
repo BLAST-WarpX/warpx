@@ -24,7 +24,6 @@
 #if WARPX_USE_FFT
 
 SpectralSolver::SpectralSolver (
-                const int lev,
                 const amrex::BoxArray& realspace_ba,
                 const amrex::DistributionMapping& dm,
                 const int norder_x,
@@ -110,7 +109,7 @@ SpectralSolver::SpectralSolver (
     }
 
     // - Initialize arrays for fields in spectral space + FFT plans
-    field_data = SpectralFieldData(lev, realspace_ba, k_space, dm,
+    field_data = SpectralFieldData(realspace_ba, k_space, dm,
                                    m_spectral_index.n_fields, periodic_single_box);
 }
 

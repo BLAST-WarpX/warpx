@@ -3060,8 +3060,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,

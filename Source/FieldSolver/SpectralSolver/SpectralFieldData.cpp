@@ -129,8 +129,7 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 }
 
 /* \brief Initialize fields in spectral space, and FFT plans */
-SpectralFieldData::SpectralFieldData( const int lev,
-                                      const amrex::BoxArray& realspace_ba,
+SpectralFieldData::SpectralFieldData( const amrex::BoxArray& realspace_ba,
                                       const SpectralKSpace& k_space,
                                       const amrex::DistributionMapping& dm,
                                       const int n_field_required,
