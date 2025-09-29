@@ -39,8 +39,7 @@ class SpectralFieldDataRZ
                              const SpectralKSpaceRZ& k_space,
                              const amrex::DistributionMapping& dm,
                              int n_field_required,
-                             int n_modes,
-                             bool do_costs);
+                             int n_modes);
         SpectralFieldDataRZ () = default; // Default constructor
         ~SpectralFieldDataRZ ();
 

@@ -45,8 +45,7 @@ class SpectralSolverRZ
                           TimeDependencyJ time_dependency_J,
                           TimeDependencyRho time_dependency_rho,
                           bool dive_cleaning,
-                          bool divb_cleaning,
-                          bool do_costs);
+                          bool divb_cleaning);
 
         /* \brief Transform the component `i_comp` of MultiFab `field_mf`
          *  to spectral space, and store the corresponding result internally
