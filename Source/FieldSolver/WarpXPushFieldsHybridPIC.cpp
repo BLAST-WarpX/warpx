@@ -7,7 +7,6 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Evolve/WarpXDtType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
@@ -107,7 +106,7 @@ void WarpX::HybridPICEvolveFields ()
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::FirstHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -141,7 +140,7 @@ void WarpX::HybridPICEvolveFields ()
             rho_fp_temp,
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
-            DtType::SecondHalf, guard_cells.ng_FieldSolver,
+            SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -360,13 +359,21 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {
             // Get the external fields
+            // Currently t_new is what t_old will be when entering the solver since
+            // after initialization the t_old is set to t_new, then t_new is incremented by dt
             m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
-                gett_old(0),
+                gett_new(0),
                 0.5_rt*dt[0]);
 
             // If using split fields, add the external field at t=0
             for (int lev = 0; lev <= finest_level; ++lev) {
                 for (int idim = 0; idim < 3; ++idim) {
+                    // Check to make sure field only contains numeric values
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev)->is_finite(),
+                        "Non-finite value detected in external B-field at t=0."
+                    );
+
                     MultiFab::Add(
                         *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
                         *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),

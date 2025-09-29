@@ -89,6 +89,9 @@ class Species(picmistandard.PICMI_Species):
     warpx_do_not_gather: bool, default=False
         Whether or not to gather the fields from grids for this species
 
+    warpx_radial_numpercell_power: float, default=0.
+        With cylindrical geometry, specifies the radial power of the number of particles per cell
+
     warpx_random_theta: bool, default=True
         Whether or not to add random angle to the particles in theta
         when in RZ mode.
@@ -264,6 +267,7 @@ class Species(picmistandard.PICMI_Species):
         self.do_not_deposit = kw.pop("warpx_do_not_deposit", None)
         self.do_not_push = kw.pop("warpx_do_not_push", None)
         self.do_not_gather = kw.pop("warpx_do_not_gather", None)
+        self.radial_numpercell_power = kw.pop("warpx_radial_numpercell_power", None)
         self.random_theta = kw.pop("warpx_random_theta", None)
 
         # For particle reflection
@@ -363,6 +367,7 @@ class Species(picmistandard.PICMI_Species):
             do_not_deposit=self.do_not_deposit,
             do_not_push=self.do_not_push,
             do_not_gather=self.do_not_gather,
+            radial_numpercell_power=self.radial_numpercell_power,
             random_theta=self.random_theta,
             do_resampling=self.do_resampling,
             resampling_algorithm=self.resampling_algorithm,
@@ -1850,7 +1855,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     n0: float
         Reference plasma density in m^-3.
 
-    gamma: float, default=3/2
+    gamma: float, default=5/3
         Exponent in calculation of electron pressure.
 
     n_floor: float, optional
@@ -2385,17 +2390,64 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
+    """
+    Load external E/B fields from file (openPMD/plotfile) and optionally
+    apply a time-dependent scalar multiplier parsed on the C++ side.
+
+    Parameters
+    ----------
+    read_fields_from_path : str
+        Path to diagnostics containing the external field data to load.
+
+    load_E : bool, default=True
+        If True, load the external E field from file.
+
+    load_B : bool, default=True
+        If True, load the external B field from file.
+
+    warpx_E_time_function : str, optional
+        AMReX parser expression in variable `t` (seconds) that scales the
+        file-loaded E field uniformly in space and per level, e.g.
+        ``"cos(2*pi*2e6*t)"``. If not provided, defaults to ``"1.0"`` in C++.
+
+    warpx_B_time_function : str, optional
+        AMReX parser expression in variable `t` (seconds) that scales the
+        file-loaded B field uniformly in space and per level, e.g.
+        ``"cos(2*pi*2e6*t + pi/2)"``. If not provided, defaults to ``"1.0"`` in C++.
+
+    warpx_do_initial_div_cleaning : bool, optional
+        Run the projection-based B-field divergence cleaner after loading.
+
+    warpx_projection_div_cleaner_atol : float, optional
+        Absolute tolerance for the divergence cleaner solve.
+
+    warpx_projection_div_cleaner_rtol : float, optional
+        Relative tolerance for the divergence cleaner solve.
+    """
+
     def __init__(self, **kw):
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
         self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
         self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
 
+        self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
+        self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
+
         super().__init__(**kw)
 
     def applied_field_initialize_inputs(self):
+        # file path for external fields
         pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+
+        # enable file-loading styles
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
+            # pass time dependence via parser
+            if self.warpx_E_time_function:
+                pywarpx.particles.__setattr__(
+                    "read_fields_E_dependency(t)", self.warpx_E_time_function
+                )
+
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
@@ -2405,6 +2457,11 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "rtol", self.div_cleaner_rtol
             )
+            # pass time dependence via parser
+            if self.warpx_B_time_function:
+                pywarpx.particles.__setattr__(
+                    "read_fields_B_dependency(t)", self.warpx_B_time_function
+                )
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
@@ -3117,6 +3174,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
 
+        self.self_fields_required_precision = kw.pop(
+            "warpx_self_fields_required_precision", None
+        )
+        self.self_fields_absolute_tolerance = kw.pop(
+            "warpx_self_fields_absolute_tolerance", None
+        )
+        self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
+        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -3212,6 +3278,15 @@ class Simulation(picmistandard.PICMI_Simulation):
             else:
                 interpolation_order = particle_shape
             pywarpx.algo.particle_shape = interpolation_order
+
+        pywarpx.warpx.self_fields_required_precision = (
+            self.self_fields_required_precision
+        )
+        pywarpx.warpx.self_fields_absolute_tolerance = (
+            self.self_fields_absolute_tolerance
+        )
+        pywarpx.warpx.self_fields_max_iters = self.self_fields_max_iters
+        pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
 
         self.solver.solver_initialize_inputs()
 
@@ -3417,6 +3492,9 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         Species for which to calculate particle_fields_to_plot functions. Fields will
         be calculated separately for each specified species. If not passed, default is
         all of the available particle species.
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3433,6 +3511,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
         self.particle_fields_to_plot = kw.pop("warpx_particle_fields_to_plot", [])
         self.particle_fields_species = kw.pop("warpx_particle_fields_species", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -3445,6 +3524,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         self.diagnostic.dump_rz_modes = self.dump_rz_modes
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
         if self.number_of_cells is not None:
@@ -3565,7 +3645,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         particle_fields_to_plot_names.sort()
         self.diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
         self.diagnostic.particle_fields_species = self.particle_fields_species
-
         self.diagnostic.plot_raw_fields = self.plot_raw_fields
         self.diagnostic.plot_raw_fields_guards = self.plot_raw_fields_guards
         self.diagnostic.plot_finepatch = self.plot_finepatch
@@ -3708,6 +3787,9 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
 
     warpx_plot_filter_function: string, optional
         Analytic expression to down select the particles to in the diagnostic
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3720,6 +3802,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         self.uniform_stride = kw.pop("warpx_uniform_stride", None)
         self.plot_filter_function = kw.pop("warpx_plot_filter_function", None)
         self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
         self.user_defined_kw = {}
         if self.plot_filter_function is not None:
@@ -3744,6 +3827,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.dump_last_timestep = self.dump_last_timestep
         self.diagnostic.intervals = self.period
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
         self.diagnostic.set_or_replace_attr("write_species", True)
         if "fields_to_plot" not in self.diagnostic.argvattrs:
             self.diagnostic.fields_to_plot = "none"
@@ -3908,6 +3992,9 @@ class LabFrameFieldDiagnostic(
 
     warpx_upper_bound: vector of floats, optional
         Passed to <diagnostic name>.upper_bound
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -3922,6 +4009,7 @@ class LabFrameFieldDiagnostic(
         self.buffer_size = kw.pop("warpx_buffer_size", None)
         self.lower_bound = kw.pop("warpx_lower_bound", None)
         self.upper_bound = kw.pop("warpx_upper_bound", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -3933,6 +4021,7 @@ class LabFrameFieldDiagnostic(
         self.diagnostic.file_min_digits = self.file_min_digits
         self.diagnostic.diag_lo = self.lower_bound
         self.diagnostic.diag_hi = self.upper_bound
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.diagnostic.do_back_transformed_fields = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots
@@ -4019,6 +4108,9 @@ class LabFrameParticleDiagnostic(
 
     warpx_buffer_size: integer, optional
         Passed to <diagnostic name>.buffer_size
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def init(self, kw):
@@ -4029,6 +4121,7 @@ class LabFrameParticleDiagnostic(
         self.intervals = kw.pop("warpx_intervals", None)
         self.file_min_digits = kw.pop("warpx_file_min_digits", None)
         self.buffer_size = kw.pop("warpx_buffer_size", None)
+        self.verbose = kw.pop("warpx_verbose", None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -4038,6 +4131,7 @@ class LabFrameParticleDiagnostic(
         self.diagnostic.openpmd_backend = self.openpmd_backend
         self.diagnostic.openpmd_encoding = self.openpmd_encoding
         self.diagnostic.file_min_digits = self.file_min_digits
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.diagnostic.do_back_transformed_particles = True
         self.diagnostic.dt_snapshots_lab = self.dt_snapshots

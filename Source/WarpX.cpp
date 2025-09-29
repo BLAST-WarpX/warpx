@@ -11,6 +11,7 @@
  */
 #include "WarpX.H"
 
+#include "BoundaryConditions/FieldBoundaries.H"
 #include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
@@ -37,6 +38,7 @@
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
 #include "Initialization/WarpXInit.H"
+#include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -116,8 +118,6 @@ Vector<int> WarpX::boost_direction = {0,0,0};
 bool WarpX::compute_max_step_from_btd = false;
 Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
-int WarpX::max_particle_its_in_implicit_scheme = 21;
-ParticleReal WarpX::particle_tol_in_implicit_scheme = 1.e-10;
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
 bool WarpX::do_single_precision_comms = false;
@@ -278,7 +278,15 @@ void WarpX::MakeWarpX ()
         moving_window_dir, moving_window_v);
 
     ConvertLabParamsToBoost();
-    ReadBCParams();
+
+    std::tie(field_boundary_lo, field_boundary_hi) =
+        warpx::boundary_conditions::parse_field_boundaries();
+
+    const auto is_field_boundary_periodic =
+        warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
+
+    std::tie(particle_boundary_lo, particle_boundary_hi) =
+        warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
     CheckGriddingForRZSpectral();
 
@@ -558,6 +566,23 @@ WarpX::ReadParameters ()
         }
 #endif
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})
+        ),
+        "PEC boundary not implemented for PSATD, yet!");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
+        (
+            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
+            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})
+        ),
+        "PMC boundary not implemented for PSATD, yet!");
+
+
         pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
     }
 
@@ -724,6 +749,18 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "The FFT Poisson solver only works in 3D.");
 #endif
+
+        const bool is_any_boundary_open =
+            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
+            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
+
+        if(is_any_boundary_open){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction,
+                "Field open boundary conditions are only implemented for the FFT-based Poisson solver");
+        }
+
+
 #ifndef WARPX_USE_FFT
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
@@ -1304,7 +1341,7 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      macroscopic_solver_algo, "-_");
+                                      m_macroscopic_solver_algo, "-_");
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
@@ -1408,6 +1445,7 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
+            // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
                 evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);

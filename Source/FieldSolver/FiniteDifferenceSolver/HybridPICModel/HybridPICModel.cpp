@@ -470,14 +470,14 @@ void HybridPICModel::BfieldEvolveRK (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt, DtType dt_type,
+    amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         BfieldEvolveRK(
-            Bfield, Efield, Jfield, rhofield, eb_update_E, dt, lev, dt_type,
+            Bfield, Efield, Jfield, rhofield, eb_update_E, dt, lev, subcycling_half,
             ng, nodal_sync
         );
     }
@@ -489,7 +489,7 @@ void HybridPICModel::BfieldEvolveRK (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt, int lev, DtType dt_type,
+    amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     // Make copies of the B-field multifabs at t = n and create multifabs for
@@ -516,7 +516,7 @@ void HybridPICModel::BfieldEvolveRK (
     // Step 1:
     FieldPush(
         Bfield, Efield, Jfield, rhofield, eb_update_E,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -532,7 +532,7 @@ void HybridPICModel::BfieldEvolveRK (
     // Step 2:
     FieldPush(
         Bfield, Efield, Jfield, rhofield, eb_update_E,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -552,7 +552,7 @@ void HybridPICModel::BfieldEvolveRK (
     // Step 3:
     FieldPush(
         Bfield, Efield, Jfield, rhofield, eb_update_E,
-        dt, dt_type, ng, nodal_sync
+        dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -568,7 +568,7 @@ void HybridPICModel::BfieldEvolveRK (
     // Step 4:
     FieldPush(
         Bfield, Efield, Jfield, rhofield, eb_update_E,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -603,7 +603,7 @@ void HybridPICModel::FieldPush (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt, DtType dt_type,
+    amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
@@ -617,6 +617,6 @@ void HybridPICModel::FieldPush (
     warpx.FillBoundaryE(ng, nodal_sync);
 
     // Push forward the B-field using Faraday's law
-    warpx.EvolveB(dt, dt_type, t_old);
+    warpx.EvolveB(dt, subcycling_half, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
 }

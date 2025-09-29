@@ -8,7 +8,7 @@
 #ifndef WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 #define WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductFusionUtil.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
@@ -95,7 +95,7 @@ namespace {
         // produced in the fusion reaction
         amrex::ParticleReal ux_alpha1 = 0.0, uy_alpha1 = 0.0, uz_alpha1 = 0.0;
         amrex::ParticleReal ux_Be = 0.0, uy_Be = 0.0, uz_Be = 0.0;
-        TwoProductFusionComputeProductMomenta (
+        TwoProductComputeProductMomenta (
             soa_1.m_rdata[PIdx::ux][idx_1],
             soa_1.m_rdata[PIdx::uy][idx_1],
             soa_1.m_rdata[PIdx::uz][idx_1], m1,

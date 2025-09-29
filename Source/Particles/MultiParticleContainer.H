@@ -12,9 +12,8 @@
 #define WARPX_ParticleContainer_H_
 
 #include "MultiParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/Collision/CollisionHandler.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
@@ -111,10 +110,9 @@ public:
         std::string const& current_fp_string,
         amrex::Real t,
         amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
+        SubcyclingHalf subcycling_half=SubcyclingHalf::None,
         bool skip_deposition=false,
-        bool deposit_mass_matrices=false,
-        PushType push_type=PushType::Explicit
+        ImplicitOptions const * implicit_options = nullptr
     );
 
     /**
@@ -359,6 +357,14 @@ public:
     std::unique_ptr<amrex::Parser> m_Ex_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ey_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ez_particle_parser;
+    // Parser for time dependency of B_external from file on the particle
+    std::unique_ptr<amrex::Parser> m_B_particle_from_file_parser;
+    // Parser for time dependency of B_external from file on the particle
+    std::unique_ptr<amrex::Parser> m_E_particle_from_file_parser;
+
+    amrex::ParserExecutor<1> m_Efield_time_partparser;
+    amrex::ParserExecutor<1> m_Bfield_time_partparser;
+
 
     amrex::ParticleReal m_repeated_plasma_lens_period;
     amrex::Vector<amrex::ParticleReal> h_repeated_plasma_lens_starts;

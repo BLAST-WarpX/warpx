@@ -19,6 +19,7 @@ The script ``update_dependencies.py`` from `Tools/Release/update_dependencies.py
        --pyamrex   Update pyAMReX only
        --picsar    Update PICSAR only
        --warpx     Update WarpX only
+       --release   New release
 
 Create a new WarpX release
 --------------------------
@@ -34,6 +35,7 @@ In order to create a GitHub release, you need to:
     The script above can be used to update the core dependencies of WarpX and the WarpX version.
 
     For a WarpX release, ideally a *git tag* of AMReX & PICSAR shall be used instead of an unnamed commit.
+    This can be done by running the script above with the command line option ``--release``.
 
     Then open a PR, wait for tests to pass and then merge.
 

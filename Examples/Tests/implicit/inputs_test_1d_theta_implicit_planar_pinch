@@ -19,19 +19,19 @@ my_constants.u0 = sqrt(PB0/rho0)    # implosion speed [m/s]
 my_constants.t0 = R0/u0             # implosion time [m/s]
 
 ###   simulation parameters
-my_constants.tsim = 220.e-9  # sim time = 1.35*t0 [s]
+my_constants.tsim = 220.e-9       # sim time = 1.35*t0 [s]
 my_constants.rise_time = t0/20.0  # current rise time [s]
 my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
-my_constants.Nppc = 1028      # particles per cell
+my_constants.Nppc = 100           # particles per cell
 
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = tsim
 max_step = 20
-amr.n_cell =  216
+amr.n_cell =  224
+amr.max_grid_size = 8
 amr.max_level = 0
-warpx.numprocs = 2
 geometry.dims = 1
 geometry.prob_lo = 0.0
 geometry.prob_hi = 1.54e-2
@@ -52,20 +52,25 @@ insulator.Bx_z_hi(x,y,t) = min(t/rise_time,1)*B0
 #################################
 warpx.serialize_initial_conditions = 1
 warpx.verbose = 1
+warpx.limit_verbose_step = false
 warpx.const_dt = dt
 warpx.use_filter = 0
+
+amrex.fpe_trap_invalid = 1
+amrex.fpe_trap_overflow = 1
+amrex.fpe_trap_zero = 1
 
 algo.maxwell_solver = Yee
 algo.evolve_scheme = "theta_implicit_em"
 
 implicit_evolve.theta = 0.5
 implicit_evolve.max_particle_iterations = 21
-implicit_evolve.particle_tolerance = 1.0e-10
+implicit_evolve.particle_tolerance = 1.0e-12
 
 implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
 newton.max_iterations = 100
-newton.relative_tolerance = 1.0e-8
+newton.relative_tolerance = 1.0e-10
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
@@ -76,16 +81,16 @@ gmres.max_iterations = 1000
 gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
-implicit_evolve.use_mass_matrices_jacobian = false
+implicit_evolve.use_mass_matrices_jacobian = true
+implicit_evolve.skip_particle_picard_init = true
 implicit_evolve.use_mass_matrices_pc = true
 jacobian.pc_type = "pc_curl_curl_mlmg"
 pc_curl_curl_mlmg.verbose = true
-pc_curl_curl_mlmg.max_iter = 10
+pc_curl_curl_mlmg.max_iter = 1
 pc_curl_curl_mlmg.relative_tolerance = 1e-4
 
-algo.particle_pusher = "boris"
-
 particles.max_grid_crossings = 2
+algo.particle_pusher = "higuera"
 algo.particle_shape = 2
 algo.current_deposition = "villasenor"
 

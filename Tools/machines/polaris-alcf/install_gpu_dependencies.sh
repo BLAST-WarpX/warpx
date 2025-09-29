@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2024 The WarpX Community
+# Copyright 2024-2025 The WarpX Community
 #
 # This file is part of WarpX.
 #
@@ -113,9 +113,8 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies such as picmistandard
 python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
-python3 -m pip install cupy-cuda11x  # CUDA 11.8 compatible wheel
-# optional: for libEnsemble
-python3 -m pip install -r $HOME/src/warpx/Tools/LibEnsemble/requirements.txt
-# optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-python3 -m pip install --upgrade torch  # CUDA 11.8 compatible wheel
-python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt
+python3 -m pip install cupy-cuda12x  # CUDA 12.6 compatible wheel
+# optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
+python3 -m pip install --upgrade torch  # CUDA 12.6 compatible wheel
+python3 -m pip install --upgrade optimas[all]
+python3 -m pip install --upgrade lasy

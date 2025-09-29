@@ -62,8 +62,11 @@ Diagnostics::BaseReadParameters ()
     std::string dims;
     pp_geometry.get("dims", dims);
 
+    // use warpx.verbose as global diagnostic verbosity level
     const amrex::ParmParse pp_warpx("warpx");
     pp_warpx.query("verbose", m_verbose);
+    // now overwrite verbosity value if it is specified for this diagnostic instance
+    pp_diag_name.query("verbose", m_verbose);
 
     // Query list of grid fields to write to output
     const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
@@ -80,12 +83,17 @@ Diagnostics::BaseReadParameters ()
     }
 
     // Sanity check if user requests to plot phi
-    if (utils::algorithms::is_in(m_varnames_fields, "phi")){
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+    if (utils::algorithms::is_in(m_varnames_fields, "phi") && !(
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential,
-            "plot phi only works if do_electrostatic = labframe, do_electrostatic = labframe-electromagnetostatic or do_electrostatic = labframe-effective-potential");
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential
+        )
+    ){
+        ablastr::warn_manager::WMRecordWarning(
+            "Diagnostics",
+            "Electrostatic potential diagnostic is requested but an EM solver is used. A Poisson solve will be added to diagnostic output steps.",
+            ablastr::warn_manager::WarnPriority::low
+        );
     }
 
     // Sanity check if user requests to plot A
@@ -360,7 +368,7 @@ Diagnostics::InitDataBeforeRestart ()
 }
 
 void
-Diagnostics::InitDataAfterRestart ()
+Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 {
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
         // loop over all levels
@@ -387,7 +395,7 @@ Diagnostics::InitDataAfterRestart ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
     if (write_species == 0) {
@@ -429,7 +437,7 @@ Diagnostics::InitDataAfterRestart ()
 
 
 void
-Diagnostics::InitData ()
+Diagnostics::InitData (const MultiParticleContainer& mpc)
 {
     auto& warpx = WarpX::GetInstance();
 
@@ -466,7 +474,7 @@ Diagnostics::InitData ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
 
