@@ -226,7 +226,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
-            // This uses the Takizuka and Abe pairing algorithm 
+            // This uses the Takizuka and Abe pairing algorithm
             // (https://doi.org/10.1016/0021-9991(77)90099-7)
             // to estimate the number of collisions in each cell.
             // Instead of evaluating the number of collisions for every `NI1*NI2`
