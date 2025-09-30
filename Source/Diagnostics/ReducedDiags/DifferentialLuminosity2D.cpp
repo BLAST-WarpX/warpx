@@ -226,6 +226,13 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
+            // This uses the Takizuka and Abe pairing algorithm 
+            // (https://doi.org/10.1016/0021-9991(77)90099-7)
+            // to estimate the number of collisions in each cell.
+            // Instead of evaluating the number of collisions for every `NI1*NI2`
+            // pair of macroparticles, it samples max(NI1,NI2) pairs
+            // and scales the resulting number by multiplying by min(NI1,NI2).
+            // The parallelization strategy follows: https://dl.acm.org/doi/10.1145/3732775.3733578
             amrex::ParallelFor( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
             {
                 // to avoid type mismatch errors
@@ -314,6 +321,8 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                     // we also use beta=v/c instead of v
                     Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
 
+                    // Scale the number of collisions by multiplying by `min_N`
+                    // to reflect the fact that we only sampled `max_N` pairs instead of `NI1*NI2`
                     Real const d2L_dE1_dE2 = PhysConst::c * std::sqrt( radicand ) * min_N * w1[j_1] * w2[j_2] / (dV * bin_size_1 * bin_size_2) * dt; // m^-2 eV^-2
 
                     amrex::Real &data = d_table(bin_1, bin_2);
