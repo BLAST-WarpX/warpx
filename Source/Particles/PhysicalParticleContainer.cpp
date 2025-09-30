@@ -1410,7 +1410,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                   m, q, pusher_algo, do_crr,
                                   dt);
 #endif
-        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
+        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
         setPosition(ip, xp, yp, zp);
 
 #ifdef WARPX_QED

@@ -2320,7 +2320,7 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
                 [=] AMREX_GPU_DEVICE (long i) {
                                     ParticleReal x, y, z;
                                     GetPosition(i, x, y, z);
-                                    UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt);
+                                    UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
                                     SetPosition(i, x, y, z);
                 }
             );

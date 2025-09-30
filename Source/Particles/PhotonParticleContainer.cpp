@@ -15,7 +15,7 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/Pusher/CopyParticleAttribs.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/Pusher/UpdatePositionPhoton.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
@@ -224,8 +224,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #else
             amrex::ignore_unused(qed_control);
 #endif
-
-            UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
+            UpdatePosition( x, y, z, ux[i], uy[i], uz[i], dt, mass );
             SetPosition(i, x, y, z);
         }
     );

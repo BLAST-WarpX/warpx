@@ -22,29 +22,54 @@
  *    x^{n+1} - x^{n} = dt*u^{n+1/2}/gamma^{n+1/2}
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void UpdatePosition([[maybe_unused]] amrex::ParticleReal& x,
-                    [[maybe_unused]] amrex::ParticleReal& y,
-                    [[maybe_unused]] amrex::ParticleReal& z,
-                    const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
-                    const amrex::Real dt )
+void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
+                     [[maybe_unused]] amrex::ParticleReal& y,
+                     [[maybe_unused]] amrex::ParticleReal& z,
+                     const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
+                     const amrex::Real dt,
+                     amrex::ParticleReal const mass)
 {
     using namespace amrex::literals;
 
-    constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+    amrex::ParticleReal constexpr c2 = PhysConst::c * PhysConst::c;
+    amrex::ParticleReal const u2 = ux*ux + uy*uy + uz*uz;
 
-    // Compute inverse Lorentz factor
-    const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
-    // Update positions over one time step
+    // massive particles
+    if (mass > 0.0_rt) {
+        const amrex::ParticleReal gamma = std::sqrt(1._prt + u2/c2);
+        const amrex::ParticleReal inv_gamma = 1._prt/gamma;
+
+        // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
-    x += ux * inv_gamma * dt;
+        x += ux * inv_gamma * dt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Radial pushes particles in 3D
-    y += uy * inv_gamma * dt;
+        // Particles pushed in 3D even in 1D cylindrical, 1D spherical geometry, and 2D cylindrical geometry
+        y += uy * inv_gamma * dt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-    z += uz * inv_gamma * dt;
+        z += uz * inv_gamma * dt;
 #endif
+    }
+    // massless particles (photons)
+    else {
+        const amrex::ParticleReal u_mag = std::sqrt(u2);
+        if (u_mag > 0._prt) {
+            const amrex::ParticleReal inv_u_mag = 1._prt/u_mag;
+
+            // Update positions over one time step
+#if !defined(WARPX_DIM_1D_Z)
+            x += ux * inv_u_mag * PhysConst::c * dt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Particles pushed in 3D even in 1D cylindrical, 1D spherical geometry, and 2D cylindrical geometry
+            y += uy * inv_u_mag * PhysConst::c * dt;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+            z += uz * inv_u_mag * PhysConst::c * dt;
+#endif
+        }
+    }
 }
 
 /** \brief Compute the inverse Lorentz factor for the position update in
