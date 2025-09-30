@@ -264,7 +264,7 @@ SpectralFieldData::ForwardTransform (const int lev,
             AMREX_ALWAYS_ASSERT( realspace_bx.contains(tmpRealField[mfi].box()) );
             const Array4<const Real> mf_arr = mf[mfi].array();
             const Array4<Real> tmp_arr = tmpRealField[mfi].array();
-            ParallelFor( tmpRealField[mfi].box(),
+            ParallelForOMP( tmpRealField[mfi].box(),
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 tmp_arr(i,j,k) = mf_arr(i,j,k,i_comp);
             });
@@ -291,7 +291,7 @@ SpectralFieldData::ForwardTransform (const int lev,
             // Loop over indices within one box
             const Box spectralspace_bx = tmpSpectralField[mfi].box();
 
-            ParallelFor( spectralspace_bx,
+            ParallelForOMP( spectralspace_bx,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 Complex spectral_field_value = tmp_arr(i,j,k);
                 // Apply proper shift in each dimension
@@ -364,7 +364,7 @@ SpectralFieldData::BackwardTransform (const int lev,
             // Loop over indices within one box
             const Box spectralspace_bx = tmpSpectralField[mfi].box();
 
-            ParallelFor( spectralspace_bx,
+            ParallelForOMP( spectralspace_bx,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 Complex spectral_field_value = field_arr(i,j,k,field_index);
                 // Apply proper shift in each dimension
@@ -417,7 +417,7 @@ SpectralFieldData::BackwardTransform (const int lev,
             }
 
             // Loop over cells within full box, including ghost cells
-            ParallelFor(mf_box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+            ParallelForOMP(mf_box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
                 // Assume periodicity and set the last outer guard cell equal to the first one:
                 // this is necessary in order to get the correct value along a nodal direction,

@@ -9,8 +9,6 @@
 #include <AMReX.H>
 #include <AMReX_REAL.H>
 
-#include <algorithm>
-
 using namespace amrex;
 
 MultiDiagnostics::MultiDiagnostics ()

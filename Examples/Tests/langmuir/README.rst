@@ -31,11 +31,12 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_test_3d_langmuir_multi``
+            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``.
+            Check out ``Examples/Tests/langmuir/inputs_test_3d_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_test_3d_langmuir_multi
+            .. literalinclude:: inputs_base_3d
                :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_3d_langmuir_multi``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_3d``.
 
    .. tab-item:: 2D
 
@@ -51,11 +52,12 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_test_2d_langmuir_multi``
+            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_base_2d``
+            Check out ``Examples/Tests/langmuir/inputs_test_2d_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_test_2d_langmuir_multi
+            .. literalinclude:: inputs_base_2d
                :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_2d_langmuir_multi``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_2d``.
 
 
    .. tab-item:: RZ
@@ -72,11 +74,12 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.rz inputs_test_rz_langmuir_multi``
+            This example can be run as WarpX **executable** using an input file: ``warpx.rz inputs_base_rz``
+            Check out ``Examples/Tests/langmuir/inputs_test_rz_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_test_rz_langmuir_multi
+            .. literalinclude:: inputs_base_rz
                :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_rz_langmuir_multi``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_rz``.
 
 
    .. tab-item:: 1D

@@ -9,13 +9,13 @@
 
 #include "Diagnostics.H"
 #include "Diagnostics/ComputeDiagFunctors/ComputeDiagFunctor.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/Parser/IntervalsParser.H"
 
 #include <AMReX_Box.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
-#include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
 #include <AMReX_Vector.H>

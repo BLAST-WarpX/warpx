@@ -420,7 +420,7 @@ void
 PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                    int lev,
                                    const std::string& current_fp_string,
-                                   Real /*t*/, Real dt, DtType a_dt_type, bool skip_deposition,
+                                   Real /*t*/, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                    ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
@@ -563,7 +563,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     PushPX(pti, exfab, eyfab, ezfab,
                            bxfab, byfab, bzfab,
                            Ex.nGrowVect(), e_is_nodal,
-                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), a_dt_type);
+                           0, np_to_push, lev, gather_lev, dt, ScaleFields(false), subcycling_half);
                 } else if (push_type == PushType::Implicit) {
                     long const offset = 0;
                     ImplicitPushXP(pti, exfab, eyfab, ezfab,
@@ -615,7 +615,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                cbxfab, cbyfab, cbzfab,
                                cEx.nGrowVect(), e_is_nodal,
                                nfine_gather, np-nfine_gather,
-                               lev, lev-1, dt, ScaleFields(false), a_dt_type);
+                               lev, lev-1, dt, ScaleFields(false), subcycling_half);
                     } else if (push_type == PushType::Implicit) {
                         ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
                                        cbxfab, cbyfab, cbzfab,
@@ -758,7 +758,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     // are not consistent, and the call to Redistribute (inside
     // SplitParticles) may result in split particles to deposit twice on the
     // coarse level.
-    if (do_splitting && (a_dt_type == DtType::SecondHalf || a_dt_type == DtType::Full) ){
+    if (do_splitting && (subcycling_half == SubcyclingHalf::SecondHalf || subcycling_half == SubcyclingHalf::None) ){
         SplitParticles(lev);
     }
 }
@@ -1209,7 +1209,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                    const long np_to_push,
                                    int lev, int gather_lev,
                                    amrex::Real dt, ScaleFields scaleFields,
-                                   DtType a_dt_type)
+                                   SubcyclingHalf subcycling_half)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -1273,7 +1273,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    const int do_copy = (m_do_back_transformed_particles && (subcycling_half!=SubcyclingHalf::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
