@@ -9,34 +9,38 @@
 
 #include "Fields.H"
 #include "Particles/ParticleIO.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
-#include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include "ablastr/fields/MultiFabRegister.H"
 #include <ablastr/utils/text/StreamUtils.H>
 
+#include <AMReX_Array.H>
+#include <AMReX_Array4.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Config.H>
-#include <AMReX_Extension.H>
+#include <AMReX_FArrayBox.H>
+#include <AMReX_FabArray.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
-#include <AMReX_PODVector.H>
+#include <AMReX_IndexType.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParIter.H>
 #include <AMReX_ParticleIO.H>
+#include <AMReX_Print.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
 #include <algorithm>
-#include <array>
-#include <istream>
 #include <memory>
 #include <string>
 #include <sstream>
