@@ -462,9 +462,11 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
 
     const char* conv_reason;
     KSPGetConvergedReasonString(m_ksp->obj, &conv_reason);
-    amrex::Print() << "GMRES (PETSc KSP): exited due to \""
-                   << conv_reason << "\" "
-                   << "(abs. norm=" << m_norm << ").\n";
+    if (m_verbose > 0) {
+        amrex::Print() << "GMRES (PETSc KSP): exited due to \""
+                       << conv_reason << "\" "
+                       << "(abs. norm=" << m_norm << ").\n";
+    }
 }
 
 void KSP_impl::setVerbose(int a_v)
@@ -721,9 +723,11 @@ void SNES_impl::solve(  VecType& a_U,
 
     const char* conv_reason;
     SNESGetConvergedReasonString(m_snes->obj, &conv_reason);
-    amrex::Print() << "Newton (PETSc SNES): exited due to \""
-                   << conv_reason << "\" "
-                   << "(abs. norm=" << m_norm << ").\n";
+    if (m_verbose) {
+        amrex::Print() << "Newton (PETSc SNES): exited due to \""
+                       << conv_reason << "\" "
+                       << "(abs. norm = " << m_norm << ").\n";
+    }
 
     m_total_iters += m_niters;
     m_total_linsol_iters += m_niters_l;
