@@ -382,7 +382,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
 
             // Loop over the particles and update their momentum
             const amrex::ParticleReal q = this->charge;
-            const amrex::ParticleReal m = this-> mass;
+            const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;
             const auto do_crr = do_classical_radiation_reaction;
@@ -427,19 +427,19 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 if (do_crr) {
                     UpdateMomentumBorisWithRadiationReaction(uxpp[ip], uypp[ip], uzpp[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, m, dt);
+                                                             Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     UpdateMomentumBoris( uxpp[ip], uypp[ip], uzpp[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, m, dt);
+                                         Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     UpdateMomentumVay( uxpp[ip], uypp[ip], uzpp[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, m, dt);
+                                       Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( uxpp[ip], uypp[ip], uzpp[ip],
                                                Exp, Eyp, Ezp, Bxp,
-                                               Byp, Bzp, qp, m, dt);
+                                               Byp, Bzp, qp, mass, dt);
                 } else {
                     amrex::Abort("Unknown particle pusher");
                 }

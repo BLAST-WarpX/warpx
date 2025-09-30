@@ -644,7 +644,7 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 
                 // The normalized momentum is u = p / m = gamma beta c
                 // with m = m_e for photons, m the particle mass otherwise.
-                amrex::ParticleReal const mass_eff = (mass > 0.0_prt) ? mass : PhysConst::m_e;
+                amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
                 amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
                 amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
@@ -1367,6 +1367,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
 #endif
+
+        // local copy for device lambda capture
+        amrex::ParticleReal const mass = m_mass;
 
         // Loop over all new particles and inject them (creates too many
         // particles, in particular does not consider xmin, xmax etc.).

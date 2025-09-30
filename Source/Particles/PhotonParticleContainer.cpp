@@ -179,6 +179,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const int qed_runtime_flag = no_qed;
 #endif
 
+    // local copy for device lambda capture
+    amrex::ParticleReal const mass = m_mass;
+
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
                        {exteb_runtime_flag, qed_runtime_flag},

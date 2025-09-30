@@ -106,7 +106,7 @@ namespace {
         CurrentDepositionAlgo const & depos_type,
         GetExternalEBField const & getExternalEB,
         int const * const ion_lev,
-        amrex::ParticleReal const & m,
+        amrex::ParticleReal const & mass,
         amrex::ParticleReal const & q,
         ParticlePusherAlgo const & pusher_algo,
         bool const & do_crr
@@ -183,7 +183,7 @@ namespace {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
-                                          m, q, pusher_algo, do_crr,
+                                          mass, q, pusher_algo, do_crr,
                                           t_chi_max,
                                           dt);
             } else {
@@ -191,7 +191,7 @@ namespace {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                               ion_lev ? ion_lev[ip] : 1,
-                                              m, q, pusher_algo, do_crr,
+                                              mass, q, pusher_algo, do_crr,
                                               t_chi_max,
                                               dt);
                 }
@@ -200,7 +200,7 @@ namespace {
             doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
-                                      m, q, pusher_algo, do_crr,
+                                      mass, q, pusher_algo, do_crr,
                                       dt);
 #endif
 
@@ -385,7 +385,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     // Loop over the particles and update their momentum
     const amrex::ParticleReal q = this->charge;
-    const amrex::ParticleReal m = this-> mass;
+    const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
@@ -480,7 +480,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                             getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -745,7 +745,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     // Loop over the particles and update their momentum
     const amrex::ParticleReal q = this->charge;
-    const amrex::ParticleReal m = this-> mass;
+    const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
@@ -865,7 +865,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, ion_lev, m, q, pusher_algo, do_crr
+                                 getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
@@ -887,7 +887,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ParticleReal fpxx, fpxy, fpxz;
                     amrex::ParticleReal fpyx, fpyy, fpyz;
                     amrex::ParticleReal fpzx, fpzy, fpzz;
-                    setMassMatricesKernels(q, m, dt_suborbit, rhop,
+                    setMassMatricesKernels(q, mass, dt_suborbit, rhop,
                                            ux[ip], uy[ip], uz[ip],
                                            Bxp, Byp, Bzp,
                                            fpxx, fpxy, fpxz,
