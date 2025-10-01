@@ -97,30 +97,46 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
     return lbc;
 }
 
-void ImplicitSolver::SaveEandJ ()
+void ImplicitSolver::CumulateJ ()
 {
 
-    // Copy Efield_fp and current_fp to Efield_fp_save and current_fp_save
-    // Do this BEFORE call to SyncCurrentAndRho()
+    // Add J0, which contains J from particles included in the mass matrices (MM) to current_fp, which
+    // is either zero or contains J from suborbit particles that are not inclued in the MM.
+    // Do this BEFORE call to SyncCurrentAndRho().
+    //
+    // J during the linear stage of JFNK is computed as J(E=E0+dE) = J_suborbit + J0 + MM*(E - E0),
+    // where MM are the mass matrices (i.e., dJ/dE), E0 is the electric field at the start of the Newton
+    // step (see SaveE function), J0 is the current associated with particles that are included in the MM
+    // using E0, and J_suborbit is the current associated with particles that have suborbits.
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
-        amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, E[0]->nComp(), E[0]->nGrowVect());
-        amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, E[1]->nComp(), E[1]->nGrowVect());
-        amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
-
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
-        amrex::MultiFab::Copy(*J0[0], *J[0], 0, 0, J[0]->nComp(), J[0]->nGrowVect());
-        amrex::MultiFab::Copy(*J0[1], *J[1], 0, 0, J[1]->nComp(), J[1]->nGrowVect());
-        amrex::MultiFab::Copy(*J0[2], *J[2], 0, 0, J[2]->nComp(), J[2]->nGrowVect());
+        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_MM, lev);
+        amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
+        amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
+        amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
     }
 
 }
 
-void ImplicitSolver::ComputeJfromMassMatrices ()
+void ImplicitSolver::SaveE ()
+{
+
+    // Copy Efield_fp to E0.
+
+    using warpx::fields::FieldType;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
+        amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, E[0]->nComp(), E[0]->nGrowVect());
+        amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, E[1]->nComp(), E[1]->nGrowVect());
+        amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
+    }
+
+}
+
+void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
     using namespace amrex::literals;
@@ -132,7 +148,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
 
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_save, lev);
+        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_MM, lev);
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
@@ -142,6 +158,13 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
         const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
         const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
         const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
+
+        if (a_J_from_MM_only) {
+            // Initialize comps of J to zero before adding J from MM
+            J[0]->setVal(0.0);
+            J[1]->setVal(0.0);
+            J[2]->setVal(0.0);
+        }
 
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
@@ -283,7 +306,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jx(i,j,k,n) = Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
+                Jx(i,j,k,n) += Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
             });
             amrex::ParallelFor(
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -346,7 +369,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jy(i,j,k,n) = Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
+                Jy(i,j,k,n) += Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
             });
             amrex::ParallelFor(
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -409,7 +432,7 @@ void ImplicitSolver::ComputeJfromMassMatrices ()
                     }
                 }
 
-                Jz(i,j,k,n) = Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
+                Jz(i,j,k,n) += Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
             });
         }
 
@@ -553,10 +576,12 @@ void ImplicitSolver::InitializeMassMatrices ()
         else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #ifndef WARPX_DIM_3D
             int max_crossings = ngJ[0] - shape + 1;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings>0,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( max_crossings==m_WarpX->particle_max_grid_crossings,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings == m_WarpX->particle_max_grid_crossings,
                 "Guard cells for J are not consistent with particle_max_grid_crossings.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings <= 2,
+                "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings <= 2.");
 #endif
             // Comment on direction-dependent number of mass matrices components
             // set below for charge-conserving Villasenor deposition:
@@ -657,10 +682,11 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
-            //
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
+        }
+        if (m_use_mass_matrices) {
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
+            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
         }
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{0}, lev, ba_Jx, dm, Nc_tot_xx, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{1}, lev, ba_Jx, dm, Nc_tot_xy, ngJ, 0.0_rt);
@@ -712,6 +738,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // Set the implict solver options for particles and setting the current density
     ImplicitOptions options;
     options.linear_stage_of_jfnk = a_from_jacobian;
+    options.use_mass_matrices_pc = m_use_mass_matrices_pc;
+    options.evolve_suborbit_particles_only = false;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
         m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
@@ -727,7 +755,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
-        if (m_use_mass_matrices_jacobian) { SaveEandJ(); }
+        CumulateJ();
+        if (m_use_mass_matrices_jacobian) { SaveE(); }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
            const amrex::Real theta_dt = m_theta*m_dt;
@@ -735,9 +764,15 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         }
     }
     else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
-        ComputeJfromMassMatrices();
+        if (m_particle_suborbits) {
+            options.deposit_mass_matrices = false;
+            options.evolve_suborbit_particles_only = true;
+            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        }
+        const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
+        ComputeJfromMassMatrices( J_from_MM_only );
     }
-    else {  // Conventional particle-suppressed JFNK
+    else { // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
     }
@@ -752,7 +787,10 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Copy mass matrices elements used for the preconditioner
+    // Add select mass matrices elements to the preconditioner containers,
+    // which may alread include contributions from suborbit particles that
+    // are not included in the mass matrices.
+
     const int diag_comp_xx = (AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2])-1)/2;
     const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
     const int diag_comp_zz = (AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2])-1)/2;
@@ -761,9 +799,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
         amrex::MultiFab* MM_yy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
         amrex::MultiFab* MM_zz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
         ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
-        amrex::MultiFab::Copy(*MM_PC[0], *MM_xx, diag_comp_xx, 0, 1, MM_xx->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[1], *MM_yy, diag_comp_yy, 0, 1, MM_yy->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[2], *MM_zz, diag_comp_zz, 0, 1, MM_zz->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[0], *MM_xx, diag_comp_xx, 0, 1, MM_xx->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[1], *MM_yy, diag_comp_yy, 0, 1, MM_yy->nGrowVect());
+        amrex::MultiFab::Add(*MM_PC[2], *MM_zz, diag_comp_zz, 0, 1, MM_zz->nGrowVect());
     }
 
     // Do addOp Exchange on MassMatrices_PC

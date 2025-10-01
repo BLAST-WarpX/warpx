@@ -566,12 +566,19 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                            0, np_to_push, lev, gather_lev, dt, ScaleFields(false), subcycling_half);
                 } else if (push_type == PushType::Implicit) {
                     long const offset = 0;
-                    ImplicitPushXP(pti, exfab, eyfab, ezfab,
-                                   bxfab, byfab, bzfab,
-                                   implicit_options,
-                                   Ex.nGrowVect(),
-                                   offset, np_to_push, lev, gather_lev, dt,
-                                   num_unconverged_particles, unconverged_indices, saved_weights);
+                    if (implicit_options->evolve_suborbit_particles_only) {
+                        FindSuborbitParticles(pti, offset, np_to_push,
+                                              num_unconverged_particles,
+                                              unconverged_indices, saved_weights);
+
+                    } else {
+                        ImplicitPushXP(pti, exfab, eyfab, ezfab,
+                                       bxfab, byfab, bzfab,
+                                       implicit_options,
+                                       Ex.nGrowVect(),
+                                       offset, np_to_push, lev, gather_lev, dt,
+                                       num_unconverged_particles, unconverged_indices, saved_weights);
+                    }
                 }
 
                 if (np_gather < np)
@@ -617,20 +624,27 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                nfine_gather, np-nfine_gather,
                                lev, lev-1, dt, ScaleFields(false), subcycling_half);
                     } else if (push_type == PushType::Implicit) {
-                        ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
-                                       cbxfab, cbyfab, cbzfab,
-                                       implicit_options,
-                                       cEx.nGrowVect(),
-                                       nfine_gather, np-nfine_gather,
-                                       lev, lev-1, dt,
-                                       num_unconverged_particles_c, unconverged_indices, saved_weights);
+                        if (implicit_options->evolve_suborbit_particles_only) {
+                            FindSuborbitParticles(pti, nfine_gather, np-nfine_gather,
+                                                  num_unconverged_particles_c,
+                                                  unconverged_indices, saved_weights);
+
+                        } else {
+                            ImplicitPushXP(pti, cexfab, ceyfab, cezfab,
+                                           cbxfab, cbyfab, cbzfab,
+                                           implicit_options,
+                                           cEx.nGrowVect(),
+                                           nfine_gather, np-nfine_gather,
+                                           lev, lev-1, dt,
+                                           num_unconverged_particles_c, unconverged_indices, saved_weights);
+                        }
                     }
                 }
 
                 WARPX_PROFILE_VAR_STOP(blp_fg);
 
                 // Current Deposition
-                if (!skip_deposition)
+                if (!skip_deposition && !(implicit_options && implicit_options->evolve_suborbit_particles_only))
                 {
                     // Deposit at t_{n+1/2} with explicit push
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);
@@ -639,10 +653,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     // Deposit inside domains
-                    amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
-                    amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
-                    amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                     if (implicit_options && implicit_options->deposit_mass_matrices) {
+                        // Note that J for particles included in MM are deposited to current_fp_MM
+                        amrex::MultiFab * jx = fields.get(FieldType::current_fp_MM, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(FieldType::current_fp_MM, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(FieldType::current_fp_MM, Direction{2}, lev);
                         amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
                         amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
                         amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
@@ -657,6 +672,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
                     }
                     else {
+                        amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
@@ -679,7 +697,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         long const offset = 0;
-                        ImplicitPushXPSubOrbits(pti, fields, exfab, eyfab, ezfab,
+                        ImplicitPushXPSubOrbits(pti, fields,
+                                                exfab, eyfab, ezfab,
                                                 bxfab, byfab, bzfab,
                                                 implicit_options,
                                                 Ex.nGrowVect(),
@@ -709,7 +728,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
 
                         long const offset = num_unconverged_particles;
-                        ImplicitPushXPSubOrbits(pti, fields, cexfab, ceyfab, cezfab,
+                        ImplicitPushXPSubOrbits(pti, fields,
+                                                cexfab, ceyfab, cezfab,
                                                 cbxfab, cbyfab, cbzfab,
                                                 implicit_options,
                                                 cEx.nGrowVect(),
