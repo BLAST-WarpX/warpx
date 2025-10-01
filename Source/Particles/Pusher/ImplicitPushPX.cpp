@@ -332,7 +332,7 @@ PhysicalParticleContainer::SetupSuborbitParticles (WarpXParIter & pti,
     amrex::ParticleReal * saved_w = saved_weights.data() + num_previous;
 
     if (nsuborbits) {
-        // This looks for the unconverged particles, which had been flagged as invalid
+        // This looks for the particles that require suborbits to converge.
         long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
             [=] AMREX_GPU_DEVICE (long ip) -> long
                 {
