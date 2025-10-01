@@ -2084,7 +2084,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
 std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumParticleWeightAndEnergy (bool local) const {
 
     // Get mass (used only for particles other than photons, see below)
-    const amrex::Real m = this->m_mass;
+    const amrex::Real mass = this->m_mass;
 
     using PType = typename WarpXParticleContainer::SuperParticleType;
 
@@ -2123,7 +2123,7 @@ std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumP
                 const amrex::ParticleReal uy = p.rdata(PIdx::uy);
                 const amrex::ParticleReal uz = p.rdata(PIdx::uz);
 
-                return {w*Algorithms::KineticEnergy(ux,uy,uz,m), w};
+                return {w*Algorithms::KineticEnergy(ux,uy,uz,mass), w};
             },
             reduce_ops);
 
