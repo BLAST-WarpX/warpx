@@ -36,8 +36,8 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
 
     // massive particles
     if (mass > 0.0_rt) {
-        const amrex::ParticleReal gamma = std::sqrt(1._prt + u2/c2);
-        const amrex::ParticleReal inv_gamma = 1._prt/gamma;
+        amrex::ParticleReal const gamma = std::sqrt(1._prt + u2/c2);
+        amrex::ParticleReal const inv_gamma = 1._prt/gamma;
 
         // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
@@ -53,20 +53,20 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
     }
     // massless particles (photons)
     else {
-        const amrex::ParticleReal u_mag = std::sqrt(u2);
-        if (u_mag > 0._prt) {
-            const amrex::ParticleReal inv_u_mag = 1._prt/u_mag;
+        const amrex::ParticleReal u_norm = std::sqrt(u2);
+        if (u_norm > 0._prt) {
+            amrex::ParticleReal const inv_u_norm = 1._prt/u_norm;
 
             // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
-            x += ux * inv_u_mag * PhysConst::c * dt;
+            x += ux * inv_u_norm * PhysConst::c * dt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Particles pushed in 3D even in 1D cylindrical, 1D spherical geometry, and 2D cylindrical geometry
-            y += uy * inv_u_mag * PhysConst::c * dt;
+            y += uy * inv_u_norm * PhysConst::c * dt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-            z += uz * inv_u_mag * PhysConst::c * dt;
+            z += uz * inv_u_norm * PhysConst::c * dt;
 #endif
         }
     }

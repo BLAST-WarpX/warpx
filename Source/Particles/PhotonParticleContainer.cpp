@@ -227,7 +227,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #else
             amrex::ignore_unused(qed_control);
 #endif
-            UpdatePosition( x, y, z, ux[i], uy[i], uz[i], dt, mass );
+            UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
             SetPosition(i, x, y, z);
         }
     );
