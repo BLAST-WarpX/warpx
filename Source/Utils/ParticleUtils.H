@@ -346,47 +346,55 @@ namespace ParticleUtils {
             const amrex::ParticleReal pztot = wpmp1*uz1 + wpmp2*uz2;
             const amrex::ParticleReal Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
             const amrex::ParticleReal Erel = Ecm - wpmp1*c2 - wpmp2*c2;
-            if (Erel <= 0.0) { continue; }
 
-            // Set the amount of energy change for this pair based on the
-            // relative energy in the center of momentum.
-            // If deltaE > 0, no more that Erel can be removed from this pair.
-            // If deltaE < 0, limit the energy added by Erel at first, but
-            // after the first loop, add whatever is left (using the adjusted fmult_fact).
-            amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction*fmult_fact)*Erel;
-            if (std::abs(deltaEpair) >= std::abs(deltaE)) {
-                deltaEpair = deltaE;
-                deltaE = 0.0_prt;
-                deltaE_is_zero = true;
-            } else {
-                deltaE -= deltaEpair;
+            // Erel should never be negative. If it is, it is due to round off, so skip the pair of particles.
+            if (Erel > 0.0) {
+
+                // Set the amount of energy change for this pair based on the
+                // relative energy in the center of momentum.
+                // If deltaE > 0, no more that Erel can be removed from this pair.
+                // If deltaE < 0, limit the energy added by Erel at first, but
+                // after the first loop, add whatever is left (using the adjusted fmult_fact).
+                amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction*fmult_fact)*Erel;
+                if (std::abs(deltaEpair) >= std::abs(deltaE)) {
+                    // If the energy available is greater than what remains, then apply all of the remainder
+                    // to this pair and then exit the loop.
+                    deltaEpair = deltaE;
+                    deltaE_is_zero = true;
+                }
+
+                const amrex::ParticleReal A = Etot - deltaEpair;
+                const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
+                const amrex::ParticleReal p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
+                const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
+
+                // Compute coefficients for quadratic equation for alpha.
+                const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
+                const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+                const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
+
+                const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
+
+                // These checks should always be true, but can sometimes fail due to round off errors.
+                if (root >= 0.0 && a != 0.0) {
+                    const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+
+                    // Update particle velocities.
+                    const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
+                    const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
+                    uxp[ indices[i1] ] += ratio1*ux;
+                    uyp[ indices[i1] ] += ratio1*uy;
+                    uzp[ indices[i1] ] += ratio1*uz;
+                    uxp[ indices[i2] ] -= ratio2*ux;
+                    uyp[ indices[i2] ] -= ratio2*uy;
+                    uzp[ indices[i2] ] -= ratio2*uz;
+
+                    Erel_cumm += Erel - deltaEpair;
+
+                    // Only update deltaE if the particle has been updated.
+                    deltaE -= deltaEpair;
+                }
             }
-
-            const amrex::ParticleReal A = Etot - deltaEpair;
-            const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-            const amrex::ParticleReal p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
-            const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
-
-            // Compute coefficients for quadratic equation for alpha.
-            const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
-            const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-            const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
-
-            const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-            if (root < 0.0 || a == 0.0) { continue; }
-            const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
-
-            // Update particle velocities.
-            const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
-            const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
-            uxp[ indices[i1] ] += ratio1*ux;
-            uyp[ indices[i1] ] += ratio1*uy;
-            uzp[ indices[i1] ] += ratio1*uz;
-            uxp[ indices[i2] ] -= ratio2*ux;
-            uyp[ indices[i2] ] -= ratio2*uy;
-            uzp[ indices[i2] ] -= ratio2*uz;
-
-            Erel_cumm += Erel - deltaEpair;
 
             if (i1 < cell_stop - 2) {
                 // If not done with the loop, increment to the next pair of particles
