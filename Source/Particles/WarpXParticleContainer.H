@@ -525,10 +525,9 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    //amrex::Real getCharge () {return charge;}
     amrex::ParticleReal getCharge () const {return charge;}
-    //amrex::Real getMass () {return mass;}
-    amrex::ParticleReal getMass () const {return mass;}
+
+    amrex::ParticleReal getMass () const {return m_mass;}
 
     int DoFieldIonization() const { return do_field_ionization; }
 
@@ -602,7 +601,7 @@ protected:
     std::string species_name;
 
     amrex::ParticleReal charge;
-    amrex::ParticleReal mass;
+    amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
     // Controls boundaries for particles exiting the domain

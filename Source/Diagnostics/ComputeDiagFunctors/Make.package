@@ -1,6 +1,7 @@
 CEXE_sources += CellCenterFunctor.cpp
 CEXE_sources += PartPerCellFunctor.cpp
 CEXE_sources += PartPerGridFunctor.cpp
+CEXE_sources += ProcessNumberFunctor.cpp
 CEXE_sources += DivBFunctor.cpp
 CEXE_sources += DivEFunctor.cpp
 CEXE_sources += EBCoveredFunctor.cpp
