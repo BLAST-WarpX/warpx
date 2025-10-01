@@ -20,8 +20,8 @@ import sys
 import numpy as np
 from scipy import constants
 
-# this will be the name of the plot file
-last_fn = sys.argv[1]
+# this will be the name of the test
+test_name = os.path.split(os.getcwd())[1]
 
 particle_energy = np.loadtxt(
     os.path.join("diags", "reducedfiles", "particle_energy.txt"), skiprows=1
@@ -65,60 +65,62 @@ dP_total = np.abs(total_momentum[-1] - total_momentum[0]) / total_momentum[0]
 print(f"change in total momentum = {dP_total}")
 assert dP_total < momentum_tolerance
 
-print()
 
-dt = 1.0e-2 * 1.0e-15
-Z = 5
-n_i = 5.47e31
-n_e = 5.47e30
-L = 1.0e-6  # 1 micron
-T1 = 1.0e6  # 1 MeV
-N_e = n_e * L  # number of electrons
-m_e_eV = constants.m_e * constants.c**2 / constants.e
-gamma = T1 / m_e_eV + 1.0
-gamma_beta = np.sqrt(gamma**2 - 1.0)
-beta = gamma_beta / gamma
+if test_name.find("inverse_Bremsstrahlung") < 0:
+    # Check the photon production only when not including inverse Bremsstrahlung
+    print()
 
-phirad = 6.761  # from Seltzer and Berger for 1 MeV electron and Boron
+    dt = 1.0e-2 * 1.0e-15
+    Z = 5
+    n_i = 5.47e31
+    n_e = 5.47e30
+    L = 1.0e-6  # 1 micron
+    T1 = 1.0e6  # 1 MeV
+    N_e = n_e * L  # number of electrons
+    m_e_eV = constants.m_e * constants.c**2 / constants.e
+    gamma = T1 / m_e_eV + 1.0
+    gamma_beta = np.sqrt(gamma**2 - 1.0)
+    beta = gamma_beta / gamma
 
+    phirad = 6.761  # from Seltzer and Berger for 1 MeV electron and Boron
 
-dEdx_simulation = (
-    (particle_energy[0, 3] - particle_energy[1:, 3])
-    / particle_energy[1:, 0]
-    / (beta * constants.c * dt)
-    / constants.e
-    / N_e
-)
+    dEdx_simulation = (
+        (particle_energy[0, 3] - particle_energy[1:, 3])
+        / particle_energy[1:, 0]
+        / (beta * constants.c * dt)
+        / constants.e
+        / N_e
+    )
 
-Boron_weight = 20065.0 * constants.m_e
-r_e = (
-    1.0
-    / (4.0 * constants.pi * constants.epsilon_0)
-    * (constants.e**2 / (constants.m_e * constants.c**2))
-)
-dEdx = n_i * constants.alpha * r_e**2 * Z**2 * (T1 + m_e_eV) * phirad
+    Boron_weight = 20065.0 * constants.m_e
+    r_e = (
+        1.0
+        / (4.0 * constants.pi * constants.epsilon_0)
+        * (constants.e**2 / (constants.m_e * constants.c**2))
+    )
+    dEdx = n_i * constants.alpha * r_e**2 * Z**2 * (T1 + m_e_eV) * phirad
 
-dEdx_difference = np.abs(dEdx_simulation[-1] / dEdx - 1.0)
-dEdx_tolerance = 0.03
+    dEdx_difference = np.abs(dEdx_simulation[-1] / dEdx - 1.0)
+    dEdx_tolerance = 0.03
 
-print(f"dE/dx analytic  = {dEdx}")
-print(f"dE/dx simulated = {dEdx_simulation[-1]}")
-print(f"dE/dx simulated/analytic = {dEdx_simulation[-1] / dEdx}")
-print(f"dE/dx tolerance = {dEdx_tolerance}")
-print(f"dE/dx difference = {dEdx_difference}")
-assert dEdx_difference < dEdx_tolerance
+    print(f"dE/dx analytic  = {dEdx}")
+    print(f"dE/dx simulated = {dEdx_simulation[-1]}")
+    print(f"dE/dx simulated/analytic = {dEdx_simulation[-1] / dEdx}")
+    print(f"dE/dx tolerance = {dEdx_tolerance}")
+    print(f"dE/dx difference = {dEdx_difference}")
+    assert dEdx_difference < dEdx_tolerance
 
-sigma_total = 1.818e-28  # Calculated from table with k cutoff=1.e-4
-N_photon = n_e * n_i * L * beta * constants.c * sigma_total * dt
-new_photons_tolerance = 0.02
-new_photons_difference = np.abs(
-    particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0
-)
-print(f"New photons per step simulated = {particle_number[-1, -1]}")
-print(f"New photons per step analytic  = {particle_energy[-1, 0] * N_photon}")
-print(
-    f"New photons per step simulated/analytic = {particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon)}"
-)
-print(f"New photons per step toleraance = {new_photons_tolerance}")
-print(f"New photons per step difference = {new_photons_difference}")
-assert new_photons_difference < new_photons_tolerance
+    sigma_total = 1.818e-28  # Calculated from table with k cutoff=1.e-4
+    N_photon = n_e * n_i * L * beta * constants.c * sigma_total * dt
+    new_photons_tolerance = 0.02
+    new_photons_difference = np.abs(
+        particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon) - 1.0
+    )
+    print(f"New photons per step simulated = {particle_number[-1, -1]}")
+    print(f"New photons per step analytic  = {particle_energy[-1, 0] * N_photon}")
+    print(
+        f"New photons per step simulated/analytic = {particle_number[-1, -1] / (particle_energy[-1, 0] * N_photon)}"
+    )
+    print(f"New photons per step toleraance = {new_photons_tolerance}")
+    print(f"New photons per step difference = {new_photons_difference}")
+    assert new_photons_difference < new_photons_tolerance
