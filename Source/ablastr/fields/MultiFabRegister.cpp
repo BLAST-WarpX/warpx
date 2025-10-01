@@ -366,6 +366,9 @@ namespace ablastr::fields
     {
         for (auto & element : m_mf_register ) {
             const MultiFabOwner & mf_owner = element.second;
+            if (mf_owner.is_alias()) {
+                continue;
+            }
             amrex::LayoutData<std::size_t> tmpmem(ba, dm);
             mf_owner.m_mf.capacityOfFabs(tmpmem);
             for (amrex::MFIter mfi(tmpmem); mfi.isValid(); ++mfi) {
