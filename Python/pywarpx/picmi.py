@@ -2072,6 +2072,16 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         If the effective potential Poisson solver is used, this sets the value
         of C_EP (the method is marginally stable at C_EP = 1)
 
+    warpx_effective_potential_time_filter_param: float, default=0.1
+        Time filtering parameter used to filter sigma in the effective
+        potential scheme. sigma is updated using:
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n
+                  + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+
+    warpx_effective_potential_density_floor: float, default=0
+        If given, this value will be used as the minimum density during the
+        local calculation of sigma.
+
     warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
