@@ -15,7 +15,6 @@
 # photons are created with the correct distribution.
 #
 import os
-import sys
 
 import numpy as np
 from scipy import constants
