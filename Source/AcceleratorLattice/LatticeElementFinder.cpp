@@ -8,8 +8,8 @@
 #include "LatticeElementFinder.H"
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
+#include "Particles/WarpXParticleContainer.H"
 
-#include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 
 using namespace amrex::literals;

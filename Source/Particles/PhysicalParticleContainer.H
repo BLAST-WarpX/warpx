@@ -121,6 +121,20 @@ public:
                          amrex::Real dt, ScaleFields scaleFields,
                          SubcyclingHalf subcycling_half=SubcyclingHalf::None);
 
+    void FindSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void SetupSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
@@ -138,7 +152,8 @@ public:
                          amrex::Gpu::DeviceVector<long> & unconverged_indices,
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
-    void ImplicitPushXPSubOrbits (WarpXParIter& pti, ablastr::fields::MultiFabRegister& fields,
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  ablastr::fields::MultiFabRegister& fields,
                                   amrex::FArrayBox const * exfab,
                                   amrex::FArrayBox const * eyfab,
                                   amrex::FArrayBox const * ezfab,
