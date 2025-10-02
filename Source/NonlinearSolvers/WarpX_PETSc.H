@@ -24,6 +24,11 @@ class WarpXSolverVec;
 class ImplicitSolver;
 // end of forward declarations
 
+/* \brief Implementations of linear and nonlinear solvers using PETSc
+ *
+ * This namespace contains the implementations of linear and nonlinear solvers using
+ * PETSc that are needed by the implicit time integrators.
+ */
 namespace warpx_petsc {
 
 // forward declarations
@@ -37,6 +42,13 @@ using TIType = ImplicitSolver;
 using LinOpType = LinearFunction<WarpXSolverVec,ImplicitSolver>;
 using VecType = WarpXSolverVec;
 
+/**
+ * \brief Base class for PETSc linear and nonlinear solvers
+ *
+ * This contains all the variables and functions that are common to the
+ * WarpX classes that use PETSc's KSP and SNES to solve linear and nonlinear
+ * systems, respectively.
+ */
 class PETScSolver_impl
 {
     public:
@@ -90,6 +102,18 @@ class PETScSolver_impl
         PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
 };
 
+/**
+ * \brief Linear solver using PETSc KSP
+ *
+ * This class uses PETSc's KSP to solve a linear system (with and without a
+ * preconditioner):
+ *     Ax = b
+ * where the x and b are of type WarpXSolverVec, and the operator A is of the
+ * type LinearFunction<WarpXSolverVec,ImplicitSolver>.
+ *
+ * This class is used in the implicit solvers through it's wrapper PETScKSP
+ * (PETScKSP_Wrapper.H).
+ */
 class KSP_impl : public PETScSolver_impl
 {
     public:
@@ -158,6 +182,17 @@ class KSP_impl : public PETScSolver_impl
         KSPObj* m_ksp = nullptr;
 };
 
+/**
+ * \brief Nonlinear solver using PETSc SNES
+ *
+ * This class uses PETSc's SNES to solve a nonlinear system:
+ *     G(x) = b
+ * where the x and b are of type WarpXSolverVec, and the nonlinear function G()
+ * is provided by the ImplicitSolver class.
+ *
+ * This class is used in the implicit solvers through it's wrapper PETScSNES
+ * (PETScSNES_Wrapper.H).
+ */
 class SNES_impl : public PETScSolver_impl
 {
     public:

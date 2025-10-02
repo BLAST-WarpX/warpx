@@ -25,6 +25,9 @@
  *    solver for more details. This class is templated on a vector class Vec,
  *    and an operator class Ops.
  *
+ *    PETScSNES is just a wrapper; the actual implementation is in SNES_impl in
+ *    Warpx_PETSc.H/cpp. This is to avoid including PETSc's header files here
+ *    and consequent conflicts between PETSc and WarpX variables.
  */
 
 template <class Vec, class Ops>
