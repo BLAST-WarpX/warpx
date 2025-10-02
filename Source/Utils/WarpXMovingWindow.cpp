@@ -472,7 +472,7 @@ WarpX::MoveWindow (const int step, bool move_j)
                 ::shiftMF(*pml_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
             }
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-            const bool PMLRZ_flag = getPMLRZ();
+            const bool PMLRZ_flag = pml_rz[0].get();
             if (pml_rz[lev] && dim < 2) {
                 amrex::MultiFab* pml_rz_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
                 amrex::MultiFab* pml_rz_E = m_fields.get(FieldType::pml_E_fp, Direction{dim}, lev);
