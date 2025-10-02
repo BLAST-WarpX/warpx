@@ -106,7 +106,7 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
-    void ComputeJfromMassMatrices ();
+    void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
 protected:
 
@@ -163,7 +163,7 @@ protected:
     bool m_print_unconverged_particle_details = false;
 
     /**
-     * \brief whether to skip the full Picard update of particls on the initial newton step
+     * \brief whether to skip the full Picard update of particles on the initial newton step
      */
     bool m_skip_particle_picard_init = false;
 
@@ -230,9 +230,14 @@ protected:
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
-     * \brief Save E and J at start of each Newton step
+     * \brief Add J from particles included in mass matrices at start of each Newton step
      */
-    void SaveEandJ ();
+    void CumulateJ ();
+
+    /**
+     * \brief Save E at start of each Newton step
+     */
+    void SaveE ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

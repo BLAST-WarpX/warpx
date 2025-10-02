@@ -53,6 +53,10 @@ DSMCFunc::DSMCFunc (
 
         ScatteringProcess process(scattering_process, cross_section_file, energy);
 
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::EXCITATION,
+                                        "Excitation collisions are not yet supported in DSMC");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::FORWARD,
+                                        "Forward scattering collisions are not yet supported in DSMC");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 

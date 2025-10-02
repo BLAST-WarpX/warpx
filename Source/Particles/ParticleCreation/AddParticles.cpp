@@ -695,7 +695,7 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 
                 // The normalized momentum is u = p / m = gamma beta c
                 // with m = m_e for photons, m the particle mass otherwise.
-                amrex::ParticleReal const mass_eff = (mass > 0.0_prt) ? mass : PhysConst::m_e;
+                amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
                 amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
                 amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
@@ -1455,7 +1455,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Determine the position of the particle within the cell
                 XDim3 pos;
-                XDim3 r;
+                auto r = XDim3{0.0_rt,0.0_rt,0.0_rt};
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
                     auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
