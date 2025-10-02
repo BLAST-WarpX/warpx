@@ -343,7 +343,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
-        "MatrixPC::Update() called on undefined object" );
+        "MatrixPC::Assemble() called on undefined object" );
 
     // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
@@ -405,15 +405,15 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 #if defined(WARPX_DIM_RCYLINDER)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RCYLINDER");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RSPHERE");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RSPHERE");
 #elif defined(WARPX_DIM_RZ)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RZ");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
 #elif defined(WARPX_DIM_XZ)
                 int tdir = -1;
                 if  (dir == 0) { tdir = 2; }
@@ -423,7 +423,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 #elif defined(WARPX_DIM_3D)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_3D");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_3D");
 #endif
 
                 // Add the Maxwell's piece
