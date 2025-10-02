@@ -451,12 +451,6 @@ public:
      */
     void ShiftGalileanBoundary ();
 
-    /**
-     * \brief Update injection position for continuous injection of
-     *        particles and lasers (loops over species and lasers).
-     */
-    void UpdateInjectionPosition (amrex::Real dt);
-
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
