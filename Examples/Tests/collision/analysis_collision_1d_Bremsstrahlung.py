@@ -91,7 +91,6 @@ if test_name.find("inverse_Bremsstrahlung") < 0:
         / N_e
     )
 
-    Boron_weight = 20065.0 * constants.m_e
     r_e = (
         1.0
         / (4.0 * constants.pi * constants.epsilon_0)
