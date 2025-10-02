@@ -32,8 +32,8 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
 
     // massive particles
     if (mass > 0.0_rt) {
-        constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-        const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
+        amrex::ParticleReal constexpr inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+        amrex::ParticleReal const inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
 
         // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
@@ -49,22 +49,20 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
     }
     // massless particles (photons)
     else {
-        amrex::ParticleReal const u_norm = std::sqrt(ux*ux + uy*uy + uz*uz);
-        if (u_norm > 0._prt) {
-            amrex::ParticleReal const inv_u_norm = 1._prt/u_norm;
+        amrex::ParticleReal const unorm = std::sqrt(ux*ux + uy*uy + uz*uz);
+        amrex::ParticleReal const c_over_unorm = (unorm == 0._prt) ? 0._prt: PhysConst::c/unorm;
 
-            // Update positions over one time step
+        // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
-            x += ux * inv_u_norm * PhysConst::c * dt;
+        x += ux * c_over_unorm * dt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
-            y += uy * inv_u_norm * PhysConst::c * dt;
+        // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
+        y += uy * c_over_unorm * dt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-            z += uz * inv_u_norm * PhysConst::c * dt;
+        z += uz * c_over_unorm * dt;
 #endif
-        }
     }
 }
 
