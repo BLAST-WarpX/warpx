@@ -30,13 +30,10 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
 {
     using namespace amrex::literals;
 
-    amrex::ParticleReal constexpr c2 = PhysConst::c * PhysConst::c;
-    amrex::ParticleReal const u2 = ux*ux + uy*uy + uz*uz;
-
     // massive particles
     if (mass > 0.0_rt) {
-        amrex::ParticleReal const gamma = std::sqrt(1._prt + u2/c2);
-        amrex::ParticleReal const inv_gamma = 1._prt/gamma;
+        constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+        const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
 
         // Update positions over one time step
 #if !defined(WARPX_DIM_1D_Z)
@@ -52,7 +49,7 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
     }
     // massless particles (photons)
     else {
-        const amrex::ParticleReal u_norm = std::sqrt(u2);
+        amrex::ParticleReal const u_norm = std::sqrt(ux*ux + uy*uy + uz*uz);
         if (u_norm > 0._prt) {
             amrex::ParticleReal const inv_u_norm = 1._prt/u_norm;
 
