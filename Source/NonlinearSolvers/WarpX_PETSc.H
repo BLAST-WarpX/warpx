@@ -242,6 +242,27 @@ class SNES_impl : public PETScSolver_impl
         //! Print parameters
         void printParams () const;
 
+        AMREX_FORCE_INLINE
+        auto numIters() const { return m_niters; }
+
+        AMREX_FORCE_INLINE
+        auto numTotalIters() const { return m_total_iters; }
+
+        AMREX_FORCE_INLINE
+        auto normAbs() const { return -1.0; /* absolute norm is not tracked */}
+
+        AMREX_FORCE_INLINE
+        auto normRel() const { return m_norm; }
+
+        AMREX_FORCE_INLINE
+        auto numLinIters() const { return m_niters_l; }
+
+        AMREX_FORCE_INLINE
+        auto numTotalLinIters() const { return m_total_linsol_iters; }
+
+        AMREX_FORCE_INLINE
+        auto normLinResidual() const { return m_norm_lin; }
+
         //! Using SNES FD?
         bool m_fd_jac_comput = false;
 
@@ -273,6 +294,8 @@ class SNES_impl : public PETScSolver_impl
         mutable int m_status = -1;
         //! residual norm (relative) for recentmost solve
         mutable amrex::Real m_norm = DBL_MAX;
+        //! residual norm (relative) for recentmost linear solve
+        mutable amrex::Real m_norm_lin = DBL_MAX;
 
         //! Simulation time
         mutable amrex::Real m_time = 0.0;

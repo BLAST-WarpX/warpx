@@ -718,6 +718,10 @@ void SNES_impl::solve(  VecType& a_U,
     SNESGetIterationNumber(m_snes->obj, &m_niters);
     SNESGetLinearSolveIterations(m_snes->obj, &m_niters_l);
 
+    KSP ksp;
+    SNESGetKSP(m_snes->obj, &ksp);
+    KSPGetResidualNorm(ksp, &m_norm_lin);
+
     SNESConvergedReason reason;
     SNESGetConvergedReason( m_snes->obj, &reason );
     m_status = (int) reason;

@@ -62,6 +62,31 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
                      int a_step)  const override
         {
             m_solver->solve(a_U, a_b, a_time, a_dt, a_step);
+
+            if (    !this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()
+                &&  ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
+                std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
+                diagnostic_file << std::setprecision(14);
+                diagnostic_file << a_step+1;
+                diagnostic_file << " ";
+                diagnostic_file << a_time + a_dt;
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->numIters();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->numTotalIters();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->normAbs();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->normRel();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->numLinIters();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->numTotalLinIters();
+                diagnostic_file << " ";
+                diagnostic_file << m_solver->normLinResidual();
+                diagnostic_file << "\n";
+                diagnostic_file.close();
+            }
         }
 
         AMREX_FORCE_INLINE
