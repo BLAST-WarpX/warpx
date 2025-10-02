@@ -104,7 +104,9 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     copyVec(a_F, context->m_F);
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
-    ((JacobianFunctionMF<VecType,TIType>*)context->m_linop)->updatePreCondMat(context->m_U);
+    if (!context->m_fd_jac_comput) {
+        ((JacobianFunctionMF<VecType,TIType>*)context->m_linop)->updatePreCondMat(context->m_U);
+    }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 

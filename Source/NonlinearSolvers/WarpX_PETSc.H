@@ -207,6 +207,9 @@ class SNES_impl : public PETScSolver_impl
         //! Print parameters
         void printParams () const;
 
+        //! Using SNES FD?
+        bool m_fd_jac_comput = false;
+
     private:
 
         //! absolute tolerance
@@ -251,9 +254,6 @@ class SNES_impl : public PETScSolver_impl
 
         //! Solver object
         SNESObj* m_snes = nullptr;
-
-        //! Using SNES FD?
-        bool m_fd_jac_comput = false;
 };
 
 }
