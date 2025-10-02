@@ -400,7 +400,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     }
     KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
     KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
-    if (m_verbose > 0) {
+    if (m_verbose > 1) {
         KSPMonitorSet( m_ksp->obj, printKSPResidual, NULL, NULL );
     }
     KSPSetFromOptions(m_ksp->obj);
