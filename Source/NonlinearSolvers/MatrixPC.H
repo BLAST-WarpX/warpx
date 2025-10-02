@@ -402,11 +402,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
                 auto dof_lhs_arr = dofs_lhs_mfarrvec[lev][dir]->const_array(mfi);
 
-#if defined(WARPX_DIM_1D_Z)
-                amrex::ignore_unused(dof_arr);
-                amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_1D_Z");
-#elif defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_RCYLINDER");
@@ -428,8 +424,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() not yet implemented for WARPX_DIM_3D");
-#else
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Update() - trying to compile with unsupported dimensionality");
 #endif
 
                 // Add the Maxwell's piece
@@ -454,6 +448,35 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     }
 
 #if defined(WARPX_DIM_1D_Z)
+                    if (dir != 2) {
+                        {
+                            auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
+                            amrex::Real val = 2*alpha * dxi[0]*dxi[0];
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                        {
+                            auto cidx_g_rhs = (int) dof_arr(i-1,j,k,1);
+                            amrex::Real val = -alpha * dxi[0]*dxi[0];
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                        {
+                            auto cidx_g_rhs = (int) dof_arr(i+1,j,k,1);
+                            amrex::Real val = -alpha * dxi[0]*dxi[0];
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                    }
 #elif defined(WARPX_DIM_XZ)
                     {
                         auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
