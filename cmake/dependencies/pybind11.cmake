@@ -53,10 +53,13 @@ set(WarpX_pybind11_repo "https://github.com/pybind/pybind11.git"
     CACHE STRING
     "Repository URI to pull and build pybind11 from if(WarpX_pybind11_internal)")
 
-# Parse AMReX version and commit information
+# Parse pybind11 version and commit information
 file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
 string(JSON pybind11_version GET "${dependencies_data}" version_pybind11)
 string(JSON pybind11_commit GET "${dependencies_data}" commit_pybind11)
+
+# Strip "v" prefix from version for find_package
+string(REGEX REPLACE "^v" "" pybind11_version "${pybind11_version}")
 
 set(WarpX_pybind11_branch ${pybind11_commit}
     CACHE STRING
