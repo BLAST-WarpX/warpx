@@ -16,10 +16,9 @@
 
 
 
-/** \brief Push the particle's positions over one timestep,
- *    given the value of its momenta `ux`, `uy`, `uz`.
- *    This uses the standard leapfrog algorithm
- *    x^{n+1} - x^{n} = dt*u^{n+1/2}/gamma^{n+1/2}
+/** \brief Push the particle position over one time step,
+ *         given the value of its momenta `ux`, `uy`, `uz`,
+ *         using the standard leapfrog algorithm x(t+dt) = x(t) + v(t+dt/2)*dt.
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
@@ -44,7 +43,7 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
         x += ux * inv_gamma * dt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // Particles pushed in 3D even in 1D cylindrical, 1D spherical geometry, and 2D cylindrical geometry
+        // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
         y += uy * inv_gamma * dt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
@@ -62,7 +61,7 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
             x += ux * inv_u_norm * PhysConst::c * dt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Particles pushed in 3D even in 1D cylindrical, 1D spherical geometry, and 2D cylindrical geometry
+            // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
             y += uy * inv_u_norm * PhysConst::c * dt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
