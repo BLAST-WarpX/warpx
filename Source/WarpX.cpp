@@ -88,6 +88,7 @@
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_TagBox.H>
+#include <AMReX_VisMF.H>
 
 #include <algorithm>
 #include <cmath>
