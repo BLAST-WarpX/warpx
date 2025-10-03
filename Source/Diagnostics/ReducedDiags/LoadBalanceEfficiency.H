@@ -22,9 +22,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    LoadBalanceEfficiency(const std::string& rd_name);
+    LoadBalanceEfficiency(WarpX* warpx, const std::string& rd_name);
 
     /**
      * This function gets the current load balance efficiency

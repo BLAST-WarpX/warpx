@@ -17,7 +17,8 @@
 #include <algorithm>
 
 
-AcceleratorLattice::AcceleratorLattice ()
+AcceleratorLattice::AcceleratorLattice (WarpX* warpx)
+    : m_warpx(warpx)
 {
 
 #if defined(WARPX_ZINDEX)
@@ -90,7 +91,7 @@ AcceleratorLattice::InitElementFinder (
         m_element_finder = std::make_unique<amrex::LayoutData<LatticeElementFinder>>(ba, dm);
         for (amrex::MFIter mfi(*m_element_finder); mfi.isValid(); ++mfi)
         {
-            (*m_element_finder)[mfi].InitElementFinder(lev, gamma_boost, time, mfi, *this);
+            (*m_element_finder)[mfi].InitElementFinder(m_warpx, lev, gamma_boost, time, mfi, *this);
         }
     }
 }

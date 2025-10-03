@@ -10,7 +10,8 @@
 
 #include <AMReX_ParmParse.H>
 
-CollisionBase::CollisionBase (const std::string& collision_name)
+CollisionBase::CollisionBase (WarpX* warpx, const std::string& collision_name)
+    : m_warpx(warpx)
 {
 
     // read collision species

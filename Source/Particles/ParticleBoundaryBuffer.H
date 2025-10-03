@@ -16,6 +16,7 @@
 
 #include <vector>
 
+class WarpX;
 
 /**
  *  This stores particles that have left / been absorbed by domain and embedded boundaries.
@@ -23,7 +24,7 @@
 class WARPX_EXPORT ParticleBoundaryBuffer
 {
 public:
-    ParticleBoundaryBuffer ();
+    explicit ParticleBoundaryBuffer (WarpX* warpx);
 
     ~ParticleBoundaryBuffer() = default;
 
@@ -71,6 +72,8 @@ public:
     std::string boundaryName (int const ibuffer) {return m_boundary_names[ibuffer];}
 
 private:
+    WarpX* m_warpx;
+
     // over boundary, then number of species
     std::vector<std::vector<PinnedMemoryParticleContainer> > m_particle_containers;
 

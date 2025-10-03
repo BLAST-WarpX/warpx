@@ -13,8 +13,8 @@
 
 using namespace amrex::literals;
 
-PartPerCellFunctor::PartPerCellFunctor(const amrex::MultiFab* mf_src, const int lev, amrex::IntVect crse_ratio, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
+PartPerCellFunctor::PartPerCellFunctor(WarpX* warpx, const amrex::MultiFab* mf_src, const int lev, amrex::IntVect crse_ratio, const int ncomp)
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_lev(lev)
 {
     // mf_src will not be used, let's make sure it's null.
     AMREX_ALWAYS_ASSERT(mf_src == nullptr);
@@ -25,7 +25,7 @@ PartPerCellFunctor::PartPerCellFunctor(const amrex::MultiFab* mf_src, const int 
 void
 PartPerCellFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     // Guard cell is set to 1 for generality. However, for a cell-centered
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering
     // the operations performend in the CoarsenAndInterpolate function.

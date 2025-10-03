@@ -56,7 +56,7 @@ public:
                         amrex::Real time,
                         bool isBTD = false) const;
 
-    FlushFormatPlotfile () = default;
+    explicit FlushFormatPlotfile (WarpX* warpx) : FlushFormat(warpx) {}
     ~FlushFormatPlotfile() override = default;
 
     FlushFormatPlotfile ( FlushFormatPlotfile const &)             = default;

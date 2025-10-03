@@ -31,7 +31,7 @@ class FlushFormatCatalyst : public FlushFormatInSitu
 {
 public:
     // Initialize
-    FlushFormatCatalyst();
+    FlushFormatCatalyst(WarpX* warpx);
 
     /** Send particle, mesh, and field information through the catalyst pipeline */
     void WriteToFile (

@@ -42,6 +42,7 @@
  * \param[in] create2 callable that defines what will be done for the create step for dst2.
  * \param[in] transform callable that defines the transformation to apply on dst1 and dst2.
  * \param[in] geom_lev_zero the geometry object associated to level zero
+ * \param[in] t new time
  *
  * \return num_added the number of particles that were written to dst1 and dst2.
  */
@@ -53,7 +54,8 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                     const FAB *src_FAB, const Index* mask,
                                     const Index dst1_index, const Index dst2_index,
                                     CreateFunc1&& create1, CreateFunc2&& create2,
-                                    TransFunc&& transform, const amrex::Geometry& geom_lev_zero) noexcept
+                                    TransFunc&& transform, const amrex::Geometry& geom_lev_zero,
+                                    amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -155,7 +157,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                        pc1.get_quantum_sync_engine_ptr(),
 #endif
                                        pc1.getIonizationInitialLevel(),
-                                       old_np1, new_np1);
+                                       old_np1, new_np1, t);
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
                                        0, 0,
                                        pc2.getUserRealAttribs(), pc2.getUserIntAttribs(),
@@ -169,7 +171,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
                                        pc2.get_quantum_sync_engine_ptr(),
 #endif
                                        pc2.getIonizationInitialLevel(),
-                                       old_np2, new_np2);
+                                       old_np2, new_np2, t);
 
     Gpu::synchronize();
     return num_added;
@@ -207,6 +209,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
  * \param[in] create2 callable that defines what will be done for the create step for dst2.
  * \param[in] transform callable that defines the transformation to apply on dst1 and dst2.
  * \param[in] geom_lev_zero the geometry object associated to level zero
+ * \param[in] t new time
  *
  * \return num_added the number of particles that were written to dst1 and dst2.
  */
@@ -217,7 +220,8 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                 const FABs& src_FABs, const Index dst1_index,
                                 const Index dst2_index, FilterFunc&& filter,
                                 CreateFunc1&& create1, CreateFunc2&& create2,
-                                TransFunc && transform, const amrex::Geometry& geom_lev_zero) noexcept
+                                TransFunc && transform, const amrex::Geometry& geom_lev_zero,
+                                amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -250,7 +254,7 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                         std::forward<CreateFunc1>(create1),
                                         std::forward<CreateFunc2>(create2),
                                         std::forward<TransFunc>(transform),
-                                        geom_lev_zero);
+                                        geom_lev_zero, t);
 }
 
 #endif // WARPX_FILTER_CREATE_TRANSFORM_FROM_FAB_H_

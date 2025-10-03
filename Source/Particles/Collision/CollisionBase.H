@@ -14,11 +14,13 @@
 
 #include <string>
 
+class WarpX;
+
 class CollisionBase
 {
 public:
 
-    CollisionBase (const std::string& collision_name);
+    CollisionBase (WarpX* warpx, const std::string& collision_name);
 
     virtual void doCollisions (amrex::Real /*cur_time*/, amrex::Real /*dt*/, MultiParticleContainer* /*mypc*/ ){}
 
@@ -34,6 +36,8 @@ public:
     [[nodiscard]] bool use_global_debye_length() const {return m_use_global_debye_length;}
 
 protected:
+
+    WarpX* m_warpx;
 
     amrex::Vector<std::string> m_species_names;
     int m_ndt;

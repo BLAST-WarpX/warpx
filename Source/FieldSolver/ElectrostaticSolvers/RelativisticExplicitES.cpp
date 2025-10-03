@@ -17,7 +17,7 @@
 using namespace amrex;
 
 void RelativisticExplicitES::InitData () {
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     bool prepare_field_solve = (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::Relativistic);
     // check if any of the particle containers have initialize_self_fields = True
     for (auto const& species : warpx.GetPartContainer()) {
@@ -76,7 +76,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
                                      "Error: RZ electrostatic only implemented for a single mode");
 #endif
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // Allocate fields for charge and potential
     Vector<std::unique_ptr<MultiFab>> rho(num_levels);
@@ -142,7 +142,7 @@ void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVector
 {
     WARPX_PROFILE("RelativisticExplicitES::AddBoundaryField");
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // Allocate fields for charge and potential
     Vector<std::unique_ptr<MultiFab>> rho(num_levels);

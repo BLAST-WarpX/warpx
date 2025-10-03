@@ -16,6 +16,7 @@ class DivBFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] arr_mf_src source multifabs (3 elements for x y z).
      * \param[in] lev level of multifab.
      * \param[in] crse_ratio for interpolating field values from simulation MultiFabs
@@ -25,6 +26,7 @@ public:
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
     DivBFunctor (
+        WarpX* warpx,
         ablastr::fields::VectorField const & arr_mf_src,
         int lev,
         amrex::IntVect crse_ratio,

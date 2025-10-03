@@ -35,7 +35,7 @@ void init_BoundaryBufferParIter (py::module& m)
 void init_ParticleBoundaryBuffer (py::module& m)
 {
     py::class_<ParticleBoundaryBuffer>(m, "ParticleBoundaryBuffer")
-        .def(py::init<>())
+// no need to expose ctor        .def(py::init<WarpX*>(), py::arg("warpx"))
         .def("clear_particles",
             [](ParticleBoundaryBuffer& pbb) { pbb.clearParticles(); }
         )

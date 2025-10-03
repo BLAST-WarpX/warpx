@@ -32,14 +32,11 @@
 
 using namespace amrex;
 
-ParticleMomentum::ParticleMomentum (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+ParticleMomentum::ParticleMomentum (WarpX* warpx, const std::string& rd_name)
+    : ReducedDiags{warpx,rd_name}
 {
-    // Get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
-
     // Get MultiParticleContainer class object
-    const auto & mypc = warpx.GetPartContainer();
+    const auto & mypc = warpx->GetPartContainer();
 
     // Get number of species
     const int nSpecies = mypc.nSpecies();
@@ -119,7 +116,7 @@ void ParticleMomentum::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // Get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
 
     // Get number of species
     const int nSpecies = mypc.nSpecies();

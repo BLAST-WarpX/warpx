@@ -349,10 +349,8 @@ void
 WarpX::CalculateExternalCurlA() {
     WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
 
-    auto & warpx = WarpX::GetInstance();
-
     // Get reference to External Field Object
-    auto* ext_vector = warpx.m_hybrid_pic_model->m_external_vector_potential.get();
+    auto* ext_vector = this->m_hybrid_pic_model->m_external_vector_potential.get();
     ext_vector->CalculateExternalCurlA();
 
 }

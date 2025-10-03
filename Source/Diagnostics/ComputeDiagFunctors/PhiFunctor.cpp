@@ -17,17 +17,17 @@
 
 using warpx::fields::FieldType;
 
-PhiFunctor::PhiFunctor (const int lev,
+PhiFunctor::PhiFunctor (WarpX* warpx, const int lev,
     const amrex::IntVect crse_ratio,
     bool convertRZmodes2cartesian, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio),
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio),
     m_lev(lev), m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 { }
 
 void
 PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     // check if phi_fp exists in the multifab registry
     if (warpx.m_fields.has(FieldType::phi_fp, m_lev)) {

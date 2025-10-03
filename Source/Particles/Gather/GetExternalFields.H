@@ -15,6 +15,7 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
+class WarpX;
 
 /** \brief Functor class that assigns external
  *         field values (E and B) to particles.
@@ -25,7 +26,9 @@ struct GetExternalEBField
 
     GetExternalEBField () = default;
 
-    GetExternalEBField (const WarpXParIter& a_pti, long a_offset = 0) noexcept;
+    GetExternalEBField (WarpX* warxp, const WarpXParIter& a_pti, long a_offset = 0) noexcept;
+
+    WarpX* m_warpx = nullptr;
 
     ExternalFieldInitType m_Etype;
     ExternalFieldInitType m_Btype;

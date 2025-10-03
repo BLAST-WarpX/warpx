@@ -21,9 +21,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    BeamRelevant(const std::string& rd_name);
+    BeamRelevant(WarpX* warpx, const std::string& rd_name);
 
     /// name of beam species
     std::string m_beam_name;

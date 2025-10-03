@@ -20,25 +20,24 @@
 using namespace amrex::literals;
 using namespace warpx::particles::deposition;
 
-VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name ) :
-    m_species_name(species_name)
+VarianceAccumulationBuffer::VarianceAccumulationBuffer (WarpX* warpx, ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name ) :
+    m_warpx(warpx), m_species_name(species_name)
 {
     using ablastr::fields::Direction;
-    auto & warpx = WarpX::GetInstance();
 
     const int ncomps = 1;
 
-    m_nsamples.resize(warpx.finestLevel() + 1);
+    m_nsamples.resize(warpx->finestLevel() + 1);
 
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+    for (int lev = 0; lev <= warpx->finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
             amrex::BoxArray const& ba = T_vf[lev][Direction{idir}]->boxArray();
             amrex::DistributionMapping const& dm = T_vf[lev][Direction{idir}]->DistributionMap();
             amrex::IntVect const& ng = T_vf[lev][Direction{idir}]->nGrowVect();
 
-            warpx.m_fields.alloc_init("variance_buffer_w_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
-            warpx.m_fields.alloc_init("variance_buffer_w2_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
-            warpx.m_fields.alloc_init("variance_buffer_vbar_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+            warpx->m_fields.alloc_init("variance_buffer_w_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+            warpx->m_fields.alloc_init("variance_buffer_w2_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
+            warpx->m_fields.alloc_init("variance_buffer_vbar_" + m_species_name, Direction{idir}, lev, ba, dm, ncomps, ng, 0.0_rt);
 
             m_nsamples[lev][idir] = std::make_unique<amrex::iMultiFab>(ba, dm, ncomps, ng);
             m_nsamples[lev][idir]->setVal(0);
@@ -50,7 +49,7 @@ void
 VarianceAccumulationBuffer::reset ()
 {
     using ablastr::fields::Direction;
-    auto &warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         for (int idir = 0; idir < 3; ++idir) {
@@ -65,7 +64,7 @@ VarianceAccumulationBuffer::reset ()
 amrex::MultiFab*
 VarianceAccumulationBuffer::get(std::string arr, ablastr::fields::Direction dir, int lev)
 {
-    auto &warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     return warpx.m_fields.get("variance_buffer_" + arr + "_" + m_species_name, dir, lev);
 }
 
@@ -82,7 +81,7 @@ VarianceAccumulationBuffer::ConvertVarianceToTemperatureAndFilter (
     bool apply_filter)
 {
     using ablastr::fields::Direction;
-    auto &warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         auto const& periodicity = warpx.Geom(lev).periodicity();

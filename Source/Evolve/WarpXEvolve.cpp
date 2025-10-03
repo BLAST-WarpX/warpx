@@ -1338,34 +1338,34 @@ WarpX::applyMirrors (Real time)
         for(int lev=0; lev<=finest_level; lev++)
         {
             // Mirror must contain at least m_mirror_z_npoints[i_mirror] cells
-            const amrex::Real dz = WarpX::CellSize(lev)[2];
+            const amrex::Real dz = this->CellSize(lev)[2];
             const amrex::Real z_max = std::max(z_max_tmp, z_min+m_mirror_z_npoints[i_mirror]*dz);
 
             // Set each field on the fine patch to zero between z_min and z_max
-            NullifyMF(m_fields, "Efield_fp", Direction{0}, lev, z_min, z_max);
-            NullifyMF(m_fields, "Efield_fp", Direction{1}, lev, z_min, z_max);
-            NullifyMF(m_fields, "Efield_fp", Direction{2}, lev, z_min, z_max);
-            NullifyMF(m_fields, "Bfield_fp", Direction{0}, lev, z_min, z_max);
-            NullifyMF(m_fields, "Bfield_fp", Direction{1}, lev, z_min, z_max);
-            NullifyMF(m_fields, "Bfield_fp", Direction{2}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Efield_fp", Direction{0}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Efield_fp", Direction{1}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Efield_fp", Direction{2}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Bfield_fp", Direction{0}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Bfield_fp", Direction{1}, lev, z_min, z_max);
+            NullifyMF(this, m_fields, "Bfield_fp", Direction{2}, lev, z_min, z_max);
 
             // If div(E)/div(B) cleaning are used, set F/G field to zero
-            NullifyMF(m_fields, "F_fp", lev, z_min, z_max);
-            NullifyMF(m_fields, "G_fp", lev, z_min, z_max);
+            NullifyMF(this, m_fields, "F_fp", lev, z_min, z_max);
+            NullifyMF(this, m_fields, "G_fp", lev, z_min, z_max);
 
             if (lev>0)
             {
                 // Set each field on the coarse patch to zero between z_min and z_max
-                NullifyMF(m_fields, "Efield_cp", Direction{0}, lev, z_min, z_max);
-                NullifyMF(m_fields, "Efield_cp", Direction{1}, lev, z_min, z_max);
-                NullifyMF(m_fields, "Efield_cp", Direction{2}, lev, z_min, z_max);
-                NullifyMF(m_fields, "Bfield_cp", Direction{0}, lev, z_min, z_max);
-                NullifyMF(m_fields, "Bfield_cp", Direction{1}, lev, z_min, z_max);
-                NullifyMF(m_fields, "Bfield_cp", Direction{2}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Efield_cp", Direction{0}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Efield_cp", Direction{1}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Efield_cp", Direction{2}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Bfield_cp", Direction{0}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Bfield_cp", Direction{1}, lev, z_min, z_max);
+                NullifyMF(this, m_fields, "Bfield_cp", Direction{2}, lev, z_min, z_max);
 
                 // If div(E)/div(B) cleaning are used, set F/G field to zero
-                NullifyMF(m_fields, "F_cp", lev, z_min, z_max);
-                NullifyMF(m_fields, "G_cp", lev, z_min, z_max);
+                NullifyMF(this, m_fields, "F_cp", lev, z_min, z_max);
+                NullifyMF(this, m_fields, "G_cp", lev, z_min, z_max);
             }
         }
     }

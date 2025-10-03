@@ -54,8 +54,8 @@ using namespace amrex;
 
 
 // constructor
-ParticleHistogram2D::ParticleHistogram2D (const std::string& rd_name)
-        : ReducedDiags{rd_name}
+ParticleHistogram2D::ParticleHistogram2D (WarpX* warpx, const std::string& rd_name)
+        : ReducedDiags{warpx,rd_name}
 {
     ParmParse pp_rd_name(rd_name);
 
@@ -92,7 +92,7 @@ ParticleHistogram2D::ParticleHistogram2D (const std::string& rd_name)
             utils::parser::makeParser(function_string_ord,{"t","x","y","z","ux","uy","uz","w"}));
 
     // get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
     // get species names (std::vector<std::string>)
     auto const species_names = mypc.GetSpeciesNames();
     // select species
@@ -154,7 +154,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
     auto d_table = d_data_2D.table();
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get time at level 0
     auto const t = warpx.gett_new(0);
@@ -308,7 +308,7 @@ void ParticleHistogram2D::WriteToFile (int step) const
     // UNIT DIMENSION IS NOT SET ON THE VALUES
 
     // Get time at level 0
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     auto const time = warpx.gett_new(0);
     i.setTime(time);
 

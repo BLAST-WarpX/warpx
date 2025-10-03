@@ -14,6 +14,9 @@
 
 class FlushFormatCheckpoint final : public FlushFormatPlotfile
 {
+public:
+    explicit FlushFormatCheckpoint (WarpX* warpx) : FlushFormatPlotfile(warpx) {}
+
     /** Flush fields and particles to plotfile */
     void WriteToFile (
         const amrex::Vector<std::string>& varnames,

@@ -28,9 +28,9 @@ class NCIGodfreyFilter : public Filter
 {
 public:
 
-    NCIGodfreyFilter () = default;
+    explicit NCIGodfreyFilter (WarpX* warpx) : Filter(warpx) {}
 
-    NCIGodfreyFilter(godfrey_coeff_set coeff_set, amrex::Real cdtodz,
+    NCIGodfreyFilter(WarpX* warpx, godfrey_coeff_set coeff_set, amrex::Real cdtodz,
                      bool nodal_gather);
 
     void ComputeStencils();

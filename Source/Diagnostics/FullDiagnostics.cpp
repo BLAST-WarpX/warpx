@@ -52,8 +52,8 @@
 using namespace amrex::literals;
 using warpx::fields::FieldType;
 
-FullDiagnostics::FullDiagnostics (int i, const std::string& name, DiagTypes diag_type):
-    Diagnostics{i, name, diag_type},
+FullDiagnostics::FullDiagnostics (WarpX* warpx, int i, const std::string& name, DiagTypes diag_type):
+    Diagnostics{warpx, i, name, diag_type},
     m_solver_deposits_current{
         (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::None) ||
         (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)}
@@ -65,7 +65,7 @@ FullDiagnostics::FullDiagnostics (int i, const std::string& name, DiagTypes diag
 void
 FullDiagnostics::DerivedInitData() {
     if (m_diag_type == DiagTypes::TimeAveraged) {
-        auto & warpx = WarpX::GetInstance();
+        auto const& warpx = *m_warpx;
         if (m_time_average_mode == TimeAverageType::Dynamic) {
 
             // already checked in ReadParameters that only one of the parameters is set
@@ -244,7 +244,7 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
 {
     // This function should be moved to Diagnostics when plotfiles/openpmd format
     // is supported for BackTransformed Diagnostics, in BTDiagnostics class.
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     // Get the time step on coarsest level.
     const int step = warpx.getistep(0);
@@ -370,7 +370,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     using ablastr::fields::Direction;
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     // Make sure all multifabs have the same number of components
     for (int dim=0; dim<3; dim++){
@@ -421,26 +421,26 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     for (int comp=0; comp<m_varname_fields_size; comp++){
         for (int idir=0; idir < 3; idir++) {
             if        ( m_varnames_fields[comp] == "E"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Efield_aux,
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::Efield_aux,
                                                             Direction{idir}, lev), lev, m_crse_ratio, false, ncomp);
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("E"+field_names[idir]), ncomp);
                 }
             } else if ( m_varnames_fields[comp] == "B"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Bfield_aux,
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::Bfield_aux,
                                                             Direction{idir}, lev), lev, m_crse_ratio, false, ncomp);
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("B"+field_names[idir]), ncomp);
                 }
             } else if ( m_varnames_fields[comp] == "j"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<JFunctor>(idir, lev, m_crse_ratio,
+                m_all_field_functors[lev][comp] = std::make_unique<JFunctor>(m_warpx, idir, lev, m_crse_ratio,
                                                             false, deposit_current, ncomp);
                 deposit_current = false;
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("j"+field_names[idir]), ncomp);
                 }
             } else if ( m_varnames_fields[comp] == "j"+field_names[idir]+"_displacement" ){
-                m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(idir, lev, m_crse_ratio,
+                m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(m_warpx, idir, lev, m_crse_ratio,
                                                             false, ncomp);
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("j"+field_names[idir]+"_displacement"), ncomp);
@@ -450,7 +450,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 std::string T_arr_str = std::string(m_varnames_fields[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
-                    warpx.m_fields.get(T_arr_str, Direction{idir}, lev),
+                    m_warpx, warpx.m_fields.get(T_arr_str, Direction{idir}, lev),
                     lev, m_crse_ratio);
 
                 if (update_varnames) {
@@ -463,14 +463,14 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 
         if ( m_varnames_fields[comp] == "rho" ){
             // Initialize rho functor to dump total rho
-            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, -1,
+            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(m_warpx, lev, m_crse_ratio, true, -1,
                                                         false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("rho"), ncomp);
             }
         } else if ( m_varnames_fields[comp].rfind("rho_", 0) == 0 ){
             // Initialize rho functor to dump rho per species
-            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, m_rho_per_species_index[i],
+            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(m_warpx, lev, m_crse_ratio, true, m_rho_per_species_index[i],
                                                         false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("rho_") + m_all_species_names[m_rho_per_species_index[i]], ncomp);
@@ -478,59 +478,59 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             i++;
         } else if ( m_varnames_fields[comp].rfind("T_", 0) == 0 ){
             // Initialize temperature functor to dump temperature per species
-            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
+            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(m_warpx, lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("T_") + m_all_species_names[m_T_per_species_index[i_T_species]], ncomp);
             }
             i_T_species++;
         } else if ( m_varnames_fields[comp] == "F" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio,
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio,
                                                         false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("F"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "G" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>( warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio,
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio,
                                                         false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("G"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "phi" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(lev, m_crse_ratio, false, ncomp);
+            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(m_warpx, lev, m_crse_ratio, false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("phi"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "part_per_cell" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PartPerCellFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PartPerCellFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
             if (update_varnames) {
                 m_varnames.push_back(std::string("part_per_cell"));
             }
         } else if ( m_varnames_fields[comp] == "part_per_grid" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PartPerGridFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PartPerGridFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
             if (update_varnames) {
                 m_varnames.push_back(std::string("part_per_grid"));
             }
         } else if ( m_varnames_fields[comp] == "proc_num"){
-            m_all_field_functors[lev][comp] = std::make_unique<ProcessNumberFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<ProcessNumberFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
             if (update_varnames) {
                 m_varnames.push_back(std::string("proc_num"));
             }
         } else if ( m_varnames_fields[comp] == "divB" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(
-                warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev),
+                m_warpx, warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev),
                 lev, m_crse_ratio, false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divB"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(
-                warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev),
+                m_warpx, warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev),
                 lev, m_crse_ratio, false, ncomp);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divE"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "eb_covered" ){
-            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(m_warpx, lev, m_crse_ratio);
             if (update_varnames) {
                 // Use 1 instead of ncomp here because eb_covered is only computed/stored for mode m=0
                 AddRZModesToOutputNames(std::string("eb_covered"), 1);
@@ -546,7 +546,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // The names of the diagnostics are output in the `[varname]_[species]` format.
     for (int pcomp=0; pcomp<int(m_pfield_varnames.size()); pcomp++) {
         for (int ispec=0; ispec<int(m_pfield_species.size()); ispec++) {
-            m_all_field_functors[lev][nvar + pcomp * nspec + ispec] = std::make_unique<ParticleReductionFunctor>(nullptr,
+            m_all_field_functors[lev][nvar + pcomp * nspec + ispec] = std::make_unique<ParticleReductionFunctor>(m_warpx, nullptr,
                     lev, m_crse_ratio, m_pfield_strings[pcomp], m_pfield_species_index[ispec], m_pfield_do_average[pcomp],
                     m_pfield_dofilter[pcomp], m_pfield_filter_strings[pcomp]);
             if (update_varnames) {
@@ -577,7 +577,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
     if (!m_dump_rz_modes) { return; }
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     // Make sure all multifabs have the same number of components
     for (int dim=0; dim<3; dim++){
@@ -618,7 +618,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     // E
     for (int dim=0; dim<3; dim++){
         // 3 components, r theta z
-        m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(
+        m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(m_warpx,
                 warpx.m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), lev,
                     m_crse_ratio, false, ncomp_multimodefab));
         AddRZModesToOutputNames(std::string("E") + coord[dim], ncomp_multimodefab);
@@ -626,7 +626,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     // B
     for (int dim=0; dim<3; dim++){
         // 3 components, r theta z
-        m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(
+        m_all_field_functors[lev].push_back(std::make_unique<CellCenterFunctor>(m_warpx,
                 warpx.m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), lev,
                     m_crse_ratio, false, ncomp_multimodefab));
         AddRZModesToOutputNames(std::string("B") + coord[dim], ncomp_multimodefab);
@@ -634,21 +634,21 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     // j
     for (int dim=0; dim<3; dim++){
         // 3 components, r theta z
-        m_all_field_functors[lev].push_back(std::make_unique<JFunctor>(
+        m_all_field_functors[lev].push_back(std::make_unique<JFunctor>(m_warpx,
             dim, lev, m_crse_ratio, false, deposit_current, ncomp_multimodefab));
         deposit_current = false;
         AddRZModesToOutputNames(std::string("J") + coord[dim], ncomp_multimodefab);
     }
     // divE
     if (divE_requested) {
-        m_all_field_functors[lev].push_back(std::make_unique<DivEFunctor>(
+        m_all_field_functors[lev].push_back(std::make_unique<DivEFunctor>(m_warpx,
             warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev),
             lev, m_crse_ratio, false, ncomp_multimodefab));
         AddRZModesToOutputNames(std::string("divE"), ncomp_multimodefab);
     }
     // rho
     if (rho_requested) {
-        m_all_field_functors[lev].push_back(std::make_unique<RhoFunctor>(
+        m_all_field_functors[lev].push_back(std::make_unique<RhoFunctor>(m_warpx,
             lev, m_crse_ratio, true, -1, false, ncomp_multimodefab));
         AddRZModesToOutputNames(std::string("rho"), ncomp_multimodefab);
     }
@@ -684,7 +684,7 @@ FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
 void
 FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
     amrex::ignore_unused(restart);
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     amrex::RealBox diag_dom;
     bool use_warpxba = true;
     const amrex::IntVect blockingFactor = warpx.blockingFactor( lev );
@@ -807,7 +807,7 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
     } else if (lev > 0) {
         // Take the geom object of previous level and refine it.
         m_geom_output[i_buffer][lev] = amrex::refine( m_geom_output[i_buffer][lev-1],
-                                                      WarpX::RefRatio(lev-1) );
+                                                      m_warpx->refRatio(lev-1) );
     }
 }
 
@@ -823,7 +823,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     }
 #endif
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     // Clear any pre-existing vector to release stored data.
     m_all_field_functors[lev].clear();
@@ -857,21 +857,21 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     for (int comp=0; comp<nvar; comp++){
         for (int idir=0; idir < 3; idir++) {
             if        ( m_varnames[comp] == "E"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Efield_aux, Direction{idir}, lev), lev, m_crse_ratio);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::Efield_aux, Direction{idir}, lev), lev, m_crse_ratio);
             } else if ( m_varnames[comp] == "B"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Bfield_aux, Direction{idir}, lev), lev, m_crse_ratio);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::Bfield_aux, Direction{idir}, lev), lev, m_crse_ratio);
             } else if ( m_varnames[comp] == "j"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<JFunctor>(idir, lev, m_crse_ratio, true, deposit_current);
+                m_all_field_functors[lev][comp] = std::make_unique<JFunctor>(m_warpx, idir, lev, m_crse_ratio, true, deposit_current);
                 deposit_current = false;
             } else if ( m_varnames[comp] == "j"+field_names[idir]+"_displacement" ) {
-                    m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(idir, lev, m_crse_ratio, true);
+                    m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(m_warpx, idir, lev, m_crse_ratio, true);
             } else if ( m_varnames[comp] == "A"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::vector_potential_fp_nodal, Direction{idir}, lev), lev, m_crse_ratio);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::vector_potential_fp_nodal, Direction{idir}, lev), lev, m_crse_ratio);
             } else if ( m_varnames[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
                 // Remove component to get string to lookup in field register.
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
@@ -879,33 +879,33 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
 
         if ( m_varnames[comp] == "rho" ){
             // Initialize rho functor to dump total rho
-            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true);
+            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(m_warpx, lev, m_crse_ratio, true);
         } else if ( m_varnames[comp].rfind("rho_", 0) == 0 ){
             // Initialize rho functor to dump rho per species
-            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, m_rho_per_species_index[i]);
+            m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(m_warpx, lev, m_crse_ratio, true, m_rho_per_species_index[i]);
             i++;
         } else if ( m_varnames[comp].rfind("T_", 0) == 0 ){
             // Initialize temperature functor to dump temperature per species
-            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
+            m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(m_warpx, lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
             i_T_species++;
         } else if ( m_varnames[comp] == "F" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "G" ){
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(m_warpx, warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "phi" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PhiFunctor>(m_warpx, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "part_per_cell" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PartPerCellFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PartPerCellFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "part_per_grid" ){
-            m_all_field_functors[lev][comp] = std::make_unique<PartPerGridFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<PartPerGridFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "proc_num" ){
-            m_all_field_functors[lev][comp] = std::make_unique<ProcessNumberFunctor>(nullptr, lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<ProcessNumberFunctor>(m_warpx, nullptr, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "divB" ){
-            m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(m_warpx, warpx.m_fields.get_alldirs(FieldType::Bfield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "divE" ){
-            m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(m_warpx, warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "eb_covered" ){
-            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(m_warpx, lev, m_crse_ratio);
         } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error on component " + m_varnames[comp] + ": "
@@ -915,7 +915,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     // Add functors for average particle data for each species
     for (int pcomp=0; pcomp<int(m_pfield_varnames.size()); pcomp++) {
         for (int ispec=0; ispec<int(m_pfield_species.size()); ispec++) {
-            m_all_field_functors[lev][nvar + pcomp * nspec + ispec] = std::make_unique<ParticleReductionFunctor>(nullptr,
+            m_all_field_functors[lev][nvar + pcomp * nspec + ispec] = std::make_unique<ParticleReductionFunctor>(m_warpx, nullptr,
                     lev, m_crse_ratio, m_pfield_strings[pcomp], m_pfield_species_index[ispec], m_pfield_do_average[pcomp],
                     m_pfield_dofilter[pcomp], m_pfield_filter_strings[pcomp]);
         }
@@ -929,7 +929,7 @@ FullDiagnostics::PrepareFieldDataForOutput ()
 {
     // First, make sure all guard cells are properly filled
     // Probably overkill/unnecessary, but safe and shouldn't happen often !!
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     warpx.FillBoundaryE(warpx.getngEB());
     warpx.FillBoundaryB(warpx.getngEB());
     warpx.UpdateAuxilaryData();
@@ -951,7 +951,7 @@ FullDiagnostics::PrepareFieldDataForOutput ()
 void
 FullDiagnostics::MovingWindowAndGalileanDomainShift (int step)
 {
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     // Get current finest level available
     const int finest_level = warpx.finestLevel();

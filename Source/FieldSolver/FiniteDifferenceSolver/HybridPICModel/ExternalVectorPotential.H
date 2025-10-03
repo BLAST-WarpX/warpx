@@ -30,6 +30,8 @@
 
 #include <optional>
 
+class WarpX;
+
 /**
  * \brief This class contains the parameters needed to evaluate a
  * time varying external vector potential, leading to external E/B
@@ -43,6 +45,8 @@
 class ExternalVectorPotential
 {
 protected:
+    WarpX* m_warpx;
+
     int m_nFields;
 
     std::vector<std::string> m_field_names;
@@ -65,8 +69,7 @@ protected:
 
 public:
 
-    // Default Constructor
-    ExternalVectorPotential ();
+    explicit ExternalVectorPotential (WarpX* warpx);
 
     void ReadParameters ();
 

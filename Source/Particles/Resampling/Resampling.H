@@ -17,6 +17,8 @@
 #include <memory>
 #include <string>
 
+class WarpX;
+
 /**
  * \brief An empty base class from which specific resampling algorithms are derived.
  */
@@ -63,9 +65,10 @@ public:
      * \brief Constructor of the Resampling class. Reads the chosen resampling algorithm from the
      * input file.
      *
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] species_name the name of the resampled species
      */
-    Resampling (const std::string& species_name);
+    Resampling (WarpX* warpx, const std::string& species_name);
 
     /**
      * \brief A method that returns true if resampling should be done for the considered species
@@ -89,6 +92,7 @@ public:
         int lev, WarpXParticleContainer* pc) const;
 
 private:
+    WarpX* m_warpx = nullptr;
     ResamplingTrigger m_resampling_trigger;
     std::unique_ptr<ResamplingAlgorithm> m_resampling_algorithm;
 };

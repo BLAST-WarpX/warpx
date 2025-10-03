@@ -30,6 +30,8 @@
 #include <array>
 #include <memory>
 
+class WarpX;
+
 /**
  * \brief Top-level class for the electromagnetic finite-difference solver
  *
@@ -45,11 +47,13 @@ class FiniteDifferenceSolver
          *
          * This function initializes the stencil coefficients for the chosen finite-difference algorithm
          *
+         * \param warpx pointer to a WarpX object
          * \param fdtd_algo Identifies the chosen algorithm, as defined in WarpXAlgorithmSelection.H
          * \param cell_size Cell size along each dimension, for the chosen refinement level
          * \param grid_type Whether the solver is applied to a collocated or staggered grid
          */
         FiniteDifferenceSolver (
+            WarpX* warpx,
             ElectromagneticSolverAlgo fdtd_algo,
             std::array<amrex::Real,3> cell_size,
             ablastr::utils::enums::GridType grid_type );
@@ -198,6 +202,7 @@ class FiniteDifferenceSolver
 
     private:
 
+        WarpX* m_warpx = nullptr;
         ElectromagneticSolverAlgo m_fdtd_algo;
         ablastr::utils::enums::GridType m_grid_type;
 

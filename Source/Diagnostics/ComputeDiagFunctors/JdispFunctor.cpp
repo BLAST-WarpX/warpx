@@ -21,9 +21,9 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
-JdispFunctor::JdispFunctor (int dir, int lev,
+JdispFunctor::JdispFunctor (WarpX* warpx, int dir, int lev,
         amrex::IntVect crse_ratio, bool convertRZmodes2cartesian, int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_dir(dir), m_lev(lev),
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_dir(dir), m_lev(lev),
     m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 { }
 
@@ -32,7 +32,7 @@ JdispFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buff
 {
     using ablastr::fields::Direction;
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     auto* hybrid_pic_model = warpx.get_pointer_HybridPICModel();
 
     /** pointer to total simulation current (J) multifab */

@@ -30,6 +30,8 @@
 #include <algorithm>
 #include <limits>
 
+class WarpX;
+
 /** @file
  *
  * This file contains the implementation of the elementary process
@@ -94,6 +96,7 @@ public:
     * Also a QuantumSynchrotronGetOpticalDepth has to be passed, since the
     * optical depth has to be re-initialized after each photon emission.
     *
+    * @param[in] warpx pointer to a WarpX object
     * @param[in] opt_depth_functor functor to re-initialize the optical depth of the source particles
     * @param[in] opt_depth_runtime_comp index of the optical depth component of the source species
     * @param[in] emission_functor functor to generate photons and update momentum of the source particles
@@ -111,6 +114,7 @@ public:
     * @param[in] a_offset offset to apply to the particle indices
     */
     PhotonEmissionTransformFunc (
+        WarpX* warpx,
         QuantumSynchrotronGetOpticalDepth opt_depth_functor,
         int opt_depth_runtime_comp,
         QuantumSynchrotronPhotonEmission emission_functor,

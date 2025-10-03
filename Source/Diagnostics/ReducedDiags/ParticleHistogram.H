@@ -26,9 +26,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    ParticleHistogram(const std::string& rd_name);
+    ParticleHistogram(WarpX* warpx, const std::string& rd_name);
 
     /// normalization type
     int m_norm;

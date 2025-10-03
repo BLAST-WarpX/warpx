@@ -12,13 +12,14 @@ class TemperatureFunctor final : public ComputeDiagFunctor
 {
 public:
     /** \brief Constructor
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] lev level of multifab
      * \param[in] crse_ratio for interpolating field values from simulation MultiFabs
                   to the output diagnostic MultiFab mf_dst
      * \param[in] ispec index of the species over which to calculate the temperature
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab
      */
-    TemperatureFunctor(int lev, amrex::IntVect crse_ratio, int ispec, int ncomp=1);
+    TemperatureFunctor(WarpX* warpx, int lev, amrex::IntVect crse_ratio, int ispec, int ncomp=1);
 
     /** \brief Compute the temperature in each grid cell.
      *

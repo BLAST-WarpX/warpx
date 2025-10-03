@@ -14,7 +14,8 @@
 
 #include <vector>
 
-ResamplingTrigger::ResamplingTrigger (const std::string& species_name)
+ResamplingTrigger::ResamplingTrigger (WarpX* warpx, const std::string& species_name)
+    : m_warpx(warpx)
 {
     const amrex::ParmParse pp_species_name(species_name);
 
@@ -37,10 +38,9 @@ bool ResamplingTrigger::triggered (const int timestep, const amrex::Real global_
 
 void ResamplingTrigger::initialize_global_numcells () const
 {
-    auto & warpx = WarpX::GetInstance();
-    for (int lev = 0; lev <= warpx.maxLevel(); lev++)
+    for (int lev = 0; lev <= m_warpx->maxLevel(); lev++)
     {
-        m_global_numcells +=  warpx.boxArray(lev).numPts();
+        m_global_numcells +=  m_warpx->boxArray(lev).numPts();
     }
     m_initialized = true;
 }

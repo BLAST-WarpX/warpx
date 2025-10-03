@@ -28,9 +28,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    ParticleHistogram2D(const std::string& rd_name);
+    ParticleHistogram2D(WarpX* warpx, const std::string& rd_name);
 
     /// File type
     std::string m_openpmd_backend {"default"};

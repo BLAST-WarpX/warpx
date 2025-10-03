@@ -16,8 +16,8 @@
 
 #include <string>
 
-BackgroundStopping::BackgroundStopping (std::string const& collision_name)
-    : CollisionBase(collision_name)
+BackgroundStopping::BackgroundStopping (WarpX* warpx, std::string const& collision_name)
+    : CollisionBase(warpx, collision_name)
 {
     using namespace amrex::literals;
 
@@ -104,7 +104,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     auto const flvl = species.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
-        auto *cost = WarpX::getCosts(lev);
+        auto *cost = m_warpx->getCosts(lev);
 
         // loop over particles box by box
 #ifdef _OPENMP

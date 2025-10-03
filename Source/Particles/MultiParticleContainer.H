@@ -50,6 +50,8 @@
 #include <string>
 #include <vector>
 
+class WarpX;
+
 /**
  * The class MultiParticleContainer holds multiple instances of the polymorphic
  * class WarpXParticleContainer, stored in its member variable "allcontainers".
@@ -326,6 +328,10 @@ public:
     }
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
+
+    [[nodiscard]] WarpX& GetWarpX () const { return *m_warpx; }
+
+    WarpX* m_warpx = nullptr;
 
     std::string m_B_ext_particle_s = "none";
     std::string m_E_ext_particle_s = "none";

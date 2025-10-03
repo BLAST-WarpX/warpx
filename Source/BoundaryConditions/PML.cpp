@@ -548,7 +548,7 @@ MultiSigmaBox::ComputePMLFactorsE (const Real* dx, Real dt)
     }
 }
 
-PML::PML (const int lev, const BoxArray& grid_ba,
+PML::PML (WarpX* warpx, const int lev, const BoxArray& grid_ba,
           const DistributionMapping& grid_dm, const bool do_similar_dm_pml,
           const Geometry* geom, const Geometry* cgeom,
           int ncell, int delta, amrex::IntVect ref_ratio,
@@ -571,6 +571,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
       m_geom(geom),
       m_cgeom(cgeom)
 {
+    amrex::ignore_unused(warpx);
+
 #ifndef AMREX_USE_EB
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!eb_enabled, "PML: eb_enabled is true but was not compiled in.");
 #endif
@@ -744,7 +746,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
 
             ablastr::fields::VectorField t_pml_edge_lengths = fields.get_alldirs(FieldType::pml_edge_lengths, lev);
             warpx::embedded_boundary::ComputeEdgeLengths(t_pml_edge_lengths, eb_fact);
-            warpx::embedded_boundary::ScaleEdges(t_pml_edge_lengths, WarpX::CellSize(lev));
+            warpx::embedded_boundary::ScaleEdges(t_pml_edge_lengths, warpx->CellSize(lev));
 
         }
     }
@@ -789,10 +791,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         const RealVect dx{AMREX_D_DECL(geom->CellSize(0), geom->CellSize(1), geom->CellSize(2))};
         // Get the cell-centered box, with guard cells
         BoxArray realspace_ba = ba; // Copy box
-        amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
+        amrex::Vector<amrex::Real> const& v_galilean = warpx->m_v_galilean;
         amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
         realspace_ba.enclosedCells().grow(nge); // cell-centered + guard cells
-        spectral_solver_fp = std::make_unique<SpectralSolver>(lev, realspace_ba, dm,
+        spectral_solver_fp = std::make_unique<SpectralSolver>(warpx, lev, realspace_ba, dm,
             nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
             v_comoving_zero, dx, dt, in_pml, periodic_single_box, update_with_rho,
             fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
@@ -901,10 +903,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             const RealVect cdx{AMREX_D_DECL(cgeom->CellSize(0), cgeom->CellSize(1), cgeom->CellSize(2))};
             // Get the cell-centered box, with guard cells
             BoxArray realspace_cba = cba; // Copy box
-            amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
+            amrex::Vector<amrex::Real> const& v_galilean = warpx->m_v_galilean;
             amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
             realspace_cba.enclosedCells().grow(nge); // cell-centered + guard cells
-            spectral_solver_cp = std::make_unique<SpectralSolver>(lev, realspace_cba, cdm,
+            spectral_solver_cp = std::make_unique<SpectralSolver>(warpx, lev, realspace_cba, cdm,
                 nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
                 v_comoving_zero, cdx, dt, in_pml, periodic_single_box, update_with_rho,
                 fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);

@@ -27,14 +27,11 @@
 using namespace amrex::literals;
 
 // constructor
-ParticleNumber::ParticleNumber (const std::string& rd_name)
-: ReducedDiags{rd_name}
+ParticleNumber::ParticleNumber (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
-    // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
-
     // get MultiParticleContainer class object
-    const auto & mypc = warpx.GetPartContainer();
+    const auto & mypc = warpx->GetPartContainer();
 
     // get number of species (int)
     const auto nSpecies = mypc.nSpecies();
@@ -90,7 +87,7 @@ void ParticleNumber::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
 
     // get number of species (int)
     const auto nSpecies = mypc.nSpecies();

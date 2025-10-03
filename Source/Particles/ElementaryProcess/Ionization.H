@@ -27,6 +27,8 @@
 
 #include <cmath>
 
+class WarpX;
+
 struct IonizationFilterFunc
 {
     const amrex::Real* AMREX_RESTRICT m_ionization_energies;
@@ -71,7 +73,8 @@ struct IonizationFilterFunc
 
     amrex::Dim3 m_lo;
 
-    IonizationFilterFunc (const WarpXParIter& a_pti, int lev, amrex::IntVect ngEB,
+    IonizationFilterFunc (WarpX* warpx, const WarpXParIter& a_pti,
+                          int lev, amrex::IntVect ngEB,
                           amrex::FArrayBox const& exfab,
                           amrex::FArrayBox const& eyfab,
                           amrex::FArrayBox const& ezfab,

@@ -18,6 +18,7 @@
 #include <AMReX_Gpu.H>
 #include <AMReX_REAL.H>
 
+class WarpX;
 
 enum struct ConvertDirection{WarpX_to_SI, SI_to_WarpX};
 
@@ -84,12 +85,13 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
 /** Gathers phi (electrostatic potential) from a MultiFab to the macroparticles.
  * Adds a runtime component of the particle container to store it.
  *
+ * @param warpx pointer to a WarpX object
  * @param tmp the particle container on which to store the gathered field
  * @param electrostatic_solver_id the type of electrostatic solver used
  * @param is_full_diagnostic whether this diagnostic is a full diagnostic
  */
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpX* warpx, PinnedMemoryParticleContainer& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
 
 #endif /* WARPX_PARTICLEIO_H_ */

@@ -30,9 +30,11 @@
 
 /* This function initializes the stencil coefficients for the chosen finite-difference algorithm */
 FiniteDifferenceSolver::FiniteDifferenceSolver (
+    WarpX* warpx,
     ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
     ablastr::utils::enums::GridType grid_type):
+    m_warpx(warpx),
     // Register the type of finite-difference algorithm
     m_fdtd_algo{fdtd_algo},
     m_grid_type{grid_type}
@@ -46,7 +48,7 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     m_dr = cell_size[0];
     m_nmodes = WarpX::n_rz_azimuthal_modes;
-    m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
+    m_rmin = m_warpx->Geom(0).ProbLo(0);
     if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
         CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
@@ -66,7 +68,7 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
     }
 #elif defined(WARPX_DIM_RSPHERE)
     m_dr = cell_size[0];
-    m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
+    m_rmin = m_warpx->Geom(0).ProbLo(0);
     if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
         SphericalYeeAlgorithm::InitializeStencilCoefficients(cell_size, m_h_stencil_coefs_r);

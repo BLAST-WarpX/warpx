@@ -20,8 +20,8 @@
 
 #include <memory>
 
-PartPerGridFunctor::PartPerGridFunctor(const amrex::MultiFab * const mf_src, const int lev, const amrex::IntVect crse_ratio, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
+PartPerGridFunctor::PartPerGridFunctor(WarpX* warpx, const amrex::MultiFab * const mf_src, const int lev, const amrex::IntVect crse_ratio, const int ncomp)
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_lev(lev)
 {
     // mf_src will not be used, let's make sure it's null.
     AMREX_ALWAYS_ASSERT(mf_src == nullptr);
@@ -32,7 +32,7 @@ PartPerGridFunctor::PartPerGridFunctor(const amrex::MultiFab * const mf_src, con
 void
 PartPerGridFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const amrex::Vector<amrex::Long>& npart_in_grid = warpx.GetPartContainer().NumberOfParticlesInGrid(m_lev);
     // Guard cell is set to 1 for generality. However, for a cell-centered
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering

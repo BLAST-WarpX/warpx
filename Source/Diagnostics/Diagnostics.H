@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+class WarpX;
+
 /** All types of diagnostics. */
 enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
 /**
@@ -34,11 +36,12 @@ class Diagnostics
 public:
     /** Constructor
      *
+     * @param warpx pointer to a WarpX object
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
      * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
-    Diagnostics (int i, std::string name, DiagTypes diag_type);
+    Diagnostics (WarpX* warpx, int i, std::string name, DiagTypes diag_type);
 
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~Diagnostics ();
@@ -47,6 +50,8 @@ public:
     Diagnostics& operator= (Diagnostics const & )  = delete;
     Diagnostics(Diagnostics&& )                    = default;
     Diagnostics& operator=(Diagnostics&& )         = default;
+
+    WarpX* m_warpx = nullptr;
 
     /** Stores the diag type */
     DiagTypes m_diag_type;

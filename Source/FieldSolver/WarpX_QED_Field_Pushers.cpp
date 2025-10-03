@@ -74,7 +74,7 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
     using warpx::fields::FieldType;
 
     const int patch_level = (patch_type == PatchType::fine) ? lev : lev-1;
-    const std::array<Real,3>& dx_vec= WarpX::CellSize(patch_level);
+    const std::array<Real,3>& dx_vec= this->CellSize(patch_level);
     const Real dx = dx_vec[0];
     const Real dy = dx_vec[1];
     const Real dz = dx_vec[2];
@@ -107,7 +107,7 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         Jz = m_fields.get(FieldType::current_cp, Direction{2}, lev);
     }
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = this->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP

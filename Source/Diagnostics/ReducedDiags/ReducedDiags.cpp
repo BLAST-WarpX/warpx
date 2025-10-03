@@ -23,8 +23,8 @@
 using namespace amrex;
 
 // constructor
-ReducedDiags::ReducedDiags (const std::string& rd_name):
-m_rd_name{rd_name}
+ReducedDiags::ReducedDiags (WarpX* warpx, const std::string& rd_name):
+    m_warpx(warpx), m_rd_name{rd_name}
 {
     BackwardCompatibility();
 
@@ -140,7 +140,7 @@ void ReducedDiags::WriteToFile (int step) const
     ofs << std::fixed << std::setprecision(m_precision) << std::scientific;
 
     // write time
-    ofs << WarpX::GetInstance().gett_new(0);
+    ofs << m_warpx->gett_new(0);
 
     // loop over data size and write
     for (const auto& item : m_data) { ofs << m_sep << item; }

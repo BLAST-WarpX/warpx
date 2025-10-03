@@ -84,15 +84,10 @@ class WARPX_EXPORT WarpX
     : public amrex::AmrCore
 {
 public:
-    static WarpX& GetInstance ();
 
-    static void ResetInstance ();
+    static WarpX& GetInstance_detail (); //! NOT for the users
 
-    /**
-     * \brief
-     * This method has to be called at the end of the simulation. It deletes the WarpX instance.
-     */
-    static void Finalize();
+    static void Finalize_detail (); //! NOT for the users
 
     /** Destructor */
     ~WarpX () override;
@@ -390,14 +385,14 @@ public:
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
-    static amrex::LayoutData<amrex::Real>* getCosts (int lev);
+    amrex::LayoutData<amrex::Real>* getCosts (int lev);
 
     void setLoadBalanceEfficiency (int lev, amrex::Real efficiency);
 
     amrex::Real getLoadBalanceEfficiency (int lev);
 
     static amrex::IntVect filter_npass_each_dir;
-    BilinearFilter bilinear_filter;
+    std::unique_ptr<BilinearFilter> bilinear_filter;
     amrex::Vector< std::unique_ptr<NCIGodfreyFilter> > nci_godfrey_filter_exeybz;
     amrex::Vector< std::unique_ptr<NCIGodfreyFilter> > nci_godfrey_filter_bxbyez;
 
@@ -707,9 +702,9 @@ public:
     [[nodiscard]] amrex::Real stopTime () const {return stop_time;}
     void updateStopTime (const amrex::Real new_stop_time) {stop_time = new_stop_time;}
 
-    static std::array<amrex::Real,3> CellSize (int lev);
-    static amrex::XDim3 InvCellSize (int lev);
-    static amrex::RealBox getRealBox(const amrex::Box& bx, int lev);
+    [[nodiscard]] std::array<amrex::Real,3> CellSize (int lev) const;
+    [[nodiscard]] amrex::XDim3 InvCellSize (int lev) const;
+    [[nodiscard]] amrex::RealBox getRealBox(const amrex::Box& bx, int lev) const;
 
     /**
      * \brief Return the lower corner of the box in real units.
@@ -719,7 +714,7 @@ public:
      *                         (when v_galilean is not zero)
      * \return An array of the position coordinates
      */
-    static amrex::XDim3 LowerCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
+    [[nodiscard]] amrex::XDim3 LowerCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta) const;
     /**
      * \brief Return the upper corner of the box in real units.
      * \param bx The box
@@ -728,12 +723,10 @@ public:
      *                         (when v_galilean is not zero)
      * \return An array of the position coordinates
      */
-    static amrex::XDim3 UpperCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta);
+    [[nodiscard]] amrex::XDim3 UpperCorner (const amrex::Box& bx, int lev, amrex::Real time_shift_delta) const;
 
-    static amrex::IntVect RefRatio (int lev);
-
-    static const amrex::iMultiFab* CurrentBufferMasks (int lev);
-    static const amrex::iMultiFab* GatherBufferMasks (int lev);
+    const amrex::iMultiFab* CurrentBufferMasks (int lev);
+    const amrex::iMultiFab* GatherBufferMasks (int lev);
 
     static inline auto electrostatic_solver_id = ElectrostaticSolverAlgo::Default;
     static inline auto poisson_solver_id = PoissonSolverAlgo::Default;
@@ -756,13 +749,13 @@ public:
     static bool fft_do_time_averaging;
 
     // these should be private, but can't due to Cuda limitations
-    static void ComputeDivB (amrex::MultiFab& divB, int dcomp,
-                             ablastr::fields::VectorField const & B,
-                             const std::array<amrex::Real,3>& dx);
+    void ComputeDivB (amrex::MultiFab& divB, int dcomp,
+                      ablastr::fields::VectorField const & B,
+                      const std::array<amrex::Real,3>& dx);
 
-    static void ComputeDivB (amrex::MultiFab& divB, int dcomp,
-                             ablastr::fields::VectorField const & B,
-                             const std::array<amrex::Real,3>& dx, amrex::IntVect ngrow);
+    void ComputeDivB (amrex::MultiFab& divB, int dcomp,
+                      ablastr::fields::VectorField const & B,
+                      const std::array<amrex::Real,3>& dx, amrex::IntVect ngrow);
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
@@ -996,22 +989,10 @@ protected:
 
 private:
 
-    /**
-     * \brief
-     *  WarpX constructor. This method should not be called directly, but rather through
-     * the static member function MakeWarpX(). MakeWarpX() is called by GetInstance ()
-     * if an instance of the WarpX class does not currently exist.
-     */
+    /** Default constructor */
     WarpX ();
 
-    /**
-     * \brief
-     * This method creates a new instance of the WarpX class.
-     */
-    static void MakeWarpX ();
-
-    // Singleton is used when the code is run from python
-    static WarpX* m_instance;
+    static WarpX* MakeWarpX_detail (bool make);
 
     //! Complete the asynchronous broadcast of signal flags, and initiate a checkpoint if requested
     void HandleSignals ();

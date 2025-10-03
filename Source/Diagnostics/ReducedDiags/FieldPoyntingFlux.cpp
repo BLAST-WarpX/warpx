@@ -40,8 +40,8 @@
 
 using namespace amrex::literals;
 
-FieldPoyntingFlux::FieldPoyntingFlux (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+FieldPoyntingFlux::FieldPoyntingFlux (WarpX* warpx, const std::string& rd_name)
+    : ReducedDiags{warpx,rd_name}
 {
     // Resize data array
     // lo and hi is 2
@@ -125,7 +125,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
     int const lev = 0;
 
     // Get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // RZ coordinate only working with one mode
 #if defined(WARPX_DIM_RZ)
@@ -224,7 +224,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Lower corner of box physical domain
-            amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            amrex::XDim3 const xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
             amrex::Dim3 const lo = amrex::lbound(box);
             amrex::Real const dr = warpx.Geom(lev).CellSize(lev);
             amrex::Real const rmin = xyzmin.x;

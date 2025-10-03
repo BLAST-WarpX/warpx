@@ -8,20 +8,21 @@
 #include <AMReX_MultiFab.H>
 
 DivBFunctor::DivBFunctor (
+    WarpX* warpx,
     ablastr::fields::VectorField const & arr_mf_src,
     const int lev,
     const amrex::IntVect crse_ratio,
     bool convertRZmodes2cartesian,
     const int ncomp
 )
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
       m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 {}
 
 void
 DivBFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     // Guard cell is set to 1 for generality. However, for a cell-centered
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering
     // the operations performend in the CoarsenAndInterpolate function.
@@ -29,7 +30,7 @@ DivBFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
     // A cell-centered divB multifab spanning the entire domain is generated
     // and divB is computed on the cell-center, with ng=1.
     amrex::MultiFab divB( warpx.boxArray(m_lev), warpx.DistributionMap(m_lev), WarpX::ncomps, ng );
-    WarpX::ComputeDivB(divB, 0, m_arr_mf_src, WarpX::CellSize(m_lev) );
+    m_warpx->ComputeDivB(divB, 0, m_arr_mf_src, m_warpx->CellSize(m_lev) );
     // // Coarsen and Interpolate from divB to coarsened/reduced_domain mf_dst
     // ablastr::coarsen::sample::Coarsen( mf_dst, divB, dcomp, 0, nComp(), 0, m_crse_ratio);
 #ifdef WARPX_DIM_RZ

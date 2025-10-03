@@ -605,7 +605,7 @@ for (const auto & particle_diag : particle_diags) {
 
     // Gather the electrostatic potential (phi) on the macroparticles
     if ( particle_diag.m_plot_phi ) {
-        storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
+        storePhiOnParticles( pc->m_warpx, tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data

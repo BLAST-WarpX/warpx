@@ -39,9 +39,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    FieldProbe (const std::string& rd_name);
+    FieldProbe (WarpX* warpx, const std::string& rd_name);
 
     /**
      * This function assins test/data particles to constructed environemnt

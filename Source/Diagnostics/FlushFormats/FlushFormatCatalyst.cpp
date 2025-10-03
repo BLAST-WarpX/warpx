@@ -73,7 +73,9 @@ void EmptyParticleData (
 
 using namespace amrex;
 
-FlushFormatCatalyst::FlushFormatCatalyst() {
+FlushFormatCatalyst::FlushFormatCatalyst(WarpX* warpx)
+    : FlushFormatInSitu(warpx)
+{
     ParmParse const pp_catalyst("catalyst");
     std::string scriptPaths;
     std::string implementation {"paraview"};
@@ -137,7 +139,7 @@ FlushFormatCatalyst::WriteToFile (
     amrex::Print() << Utils::TextMsg::Info("Running Catalyst pipeline scripts...");
 
     WARPX_PROFILE("FlushFormatCatalyst::WriteToFile()");
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !isBTD,

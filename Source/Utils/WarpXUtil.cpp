@@ -201,6 +201,7 @@ void ConvertLabParamsToBoost()
 }
 
 void NullifyMFinstance (
+    WarpX* warpx,
     amrex::MultiFab *mf,
     int lev,
     amrex::Real zmin,
@@ -214,9 +215,9 @@ void NullifyMFinstance (
     for(amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi){
         const amrex::Box& bx = mfi.tilebox();
         // Get box lower and upper physical z bound, and dz
-        const amrex::Real zmin_box = WarpX::LowerCorner(bx, lev, 0._rt).z;
-        const amrex::Real zmax_box = WarpX::UpperCorner(bx, lev, 0._rt).z;
-        const amrex::Real dz  = WarpX::CellSize(lev)[2];
+        const amrex::Real zmin_box = warpx->LowerCorner(bx, lev, 0._rt).z;
+        const amrex::Real zmax_box = warpx->UpperCorner(bx, lev, 0._rt).z;
+        const amrex::Real dz  = warpx->CellSize(lev)[2];
         // Get box lower index in the z direction
 #if defined(WARPX_DIM_3D)
         const int lo_ind = bx.loVect()[2];
@@ -248,6 +249,7 @@ void NullifyMFinstance (
 }
 
 void NullifyMF (
+    WarpX* warpx,
     ablastr::fields::MultiFabRegister& multifab_map,
     std::string const& mf_name,
     int lev,
@@ -260,10 +262,11 @@ void NullifyMF (
 
     auto * mf = multifab_map.get(mf_name, lev);
 
-    NullifyMFinstance ( mf, lev, zmin, zmax);
+    NullifyMFinstance ( warpx, mf, lev, zmin, zmax);
 }
 
 void NullifyMF (
+    WarpX* warpx,
     ablastr::fields::MultiFabRegister& multifab_map,
     std::string const& mf_name,
     ablastr::fields::Direction dir,
@@ -277,7 +280,7 @@ void NullifyMF (
 
     auto * mf = multifab_map.get(mf_name, dir, lev);
 
-    NullifyMFinstance ( mf, lev, zmin, zmax);
+    NullifyMFinstance ( warpx, mf, lev, zmin, zmax);
 }
 
 namespace WarpXUtilIO{

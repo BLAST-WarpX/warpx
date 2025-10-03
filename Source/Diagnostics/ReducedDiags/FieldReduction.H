@@ -48,9 +48,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    FieldReduction(const std::string& rd_name);
+    FieldReduction(WarpX* warpx, const std::string& rd_name);
 
     /**
      * This function is called at every time step, and if necessary calls the templated function
@@ -92,7 +93,7 @@ public:
         using warpx::fields::FieldType;
 
         // get a reference to WarpX instance
-        auto & warpx = WarpX::GetInstance();
+        auto & warpx = *m_warpx;
 
         constexpr int lev = 0; // This reduced diag currently does not work with mesh refinement
 

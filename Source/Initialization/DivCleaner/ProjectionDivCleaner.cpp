@@ -33,18 +33,16 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential) :
-    m_field_name(a_field_name), m_vector_potential(a_vector_potential)
+ProjectionDivCleaner::ProjectionDivCleaner(WarpX* warpx, std::string const& a_field_name, bool a_vector_potential) :
+    m_warpx(warpx), m_field_name(a_field_name), m_vector_potential(a_vector_potential)
 {
     using ablastr::fields::Direction;
     ReadParameters();
 
-    auto& warpx = WarpX::GetInstance();
-
-    m_grid_type = warpx.grid_type;
+    m_grid_type = warpx->grid_type;
 
     // Only div clean level 0
-    if (warpx.finestLevel() > 0) {
+    if (warpx->finestLevel() > 0) {
         ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
             "Multiple AMR levels detected, only first level has been cleaned.",
             ablastr::warn_manager::WarnPriority::low);
@@ -54,7 +52,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
     m_source.resize(m_levels);
 
     const int ncomps = WarpX::ncomps;
-    auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
+    auto const& ng = warpx->m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
 
     IntVect nodal_flag{};
     if (m_grid_type == GridType::Collocated || m_vector_potential) {
@@ -67,8 +65,8 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
     for (int lev = 0; lev < m_levels; ++lev)
     {
         // Default BoxArray and DistributionMap for initializing the output MultiFab, m_mf_output.
-        const amrex::BoxArray& ba = warpx.boxArray(lev);
-        const amrex::DistributionMapping& dmap = warpx.DistributionMap(lev);
+        const amrex::BoxArray& ba = warpx->boxArray(lev);
+        const amrex::DistributionMapping& dmap = warpx->DistributionMap(lev);
 
         m_solution[lev].reset();
         m_source[lev].reset();
@@ -84,7 +82,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
         m_source[lev]->setVal(0.0, ng);
     }
 
-    auto cell_size = WarpX::CellSize(0);
+    auto cell_size = m_warpx->CellSize(0);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,
         m_h_stencil_coefs_x, m_h_stencil_coefs_z );
@@ -146,7 +144,7 @@ void
 ProjectionDivCleaner::solve ()
 {
     // Get WarpX object
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     const auto& ba = warpx.boxArray();
     const auto& dmap = warpx.DistributionMap();
@@ -221,7 +219,7 @@ ProjectionDivCleaner::setSourceFromField ()
     using ablastr::fields::Direction;
 
     // Get WarpX object
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const auto& geom = warpx.Geom();
 
     // This function will compute -divB and store it in the source multifab
@@ -253,11 +251,11 @@ ProjectionDivCleaner::setSourceFromField ()
 
         amrex::Gpu::streamSynchronize();
 
-        WarpX::ComputeDivB(
+        m_warpx->ComputeDivB(
             *m_source[ilev],
             0,
             {Bx, By, Bz},
-            WarpX::CellSize(0)
+            m_warpx->CellSize(0)
             );
 
         m_source[ilev]->mult(-1._rt);
@@ -306,7 +304,7 @@ ProjectionDivCleaner::correctField ()
     using ablastr::fields::Direction;
 
     // Get WarpX object
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const auto& geom = warpx.Geom();
 
     // This function computes the gradient of the solution and subtracts out divB component from B
@@ -416,7 +414,7 @@ WarpX::ProjectionCleanDivB() {
                 ablastr::warn_manager::WarnPriority::low);
         }
 
-        warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
+        warpx::initialization::ProjectionDivCleaner dc(this, "Bfield_fp_external");
 
 
         dc.setSourceFromField();

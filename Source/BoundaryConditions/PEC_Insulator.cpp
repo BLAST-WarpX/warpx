@@ -175,7 +175,8 @@ PEC_Insulator::ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
     return specified;
 }
 
-PEC_Insulator::PEC_Insulator ()
+PEC_Insulator::PEC_Insulator (WarpX* warpx)
+    : m_warpx(warpx)
 {
 
     amrex::ParmParse const pp_insulator("insulator");
@@ -385,7 +386,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     int const nComp_y = field[1]->nComp();
     int const nComp_z = field[2]->nComp();
 
-    std::array<amrex::Real,3> const & dx = WarpX::CellSize(lev);
+    std::array<amrex::Real,3> const & dx = m_warpx->CellSize(lev);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -409,9 +410,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
         amrex::Box const & tez = (split_pml_field) ? mfi.tilebox(field[2]->ixType().toIntVect())
                                                    : mfi.tilebox(field[2]->ixType().toIntVect(), ng_fieldgather);
 
-        const amrex::XDim3 xyzmin_x = WarpX::LowerCorner(tex, lev, 0._rt);
-        const amrex::XDim3 xyzmin_y = WarpX::LowerCorner(tey, lev, 0._rt);
-        const amrex::XDim3 xyzmin_z = WarpX::LowerCorner(tez, lev, 0._rt);
+        const amrex::XDim3 xyzmin_x = m_warpx->LowerCorner(tex, lev, 0._rt);
+        const amrex::XDim3 xyzmin_y = m_warpx->LowerCorner(tey, lev, 0._rt);
+        const amrex::XDim3 xyzmin_z = m_warpx->LowerCorner(tez, lev, 0._rt);
         amrex::IntVect const lo_x = tex.smallEnd();
         amrex::IntVect const lo_y = tey.smallEnd();
         amrex::IntVect const lo_z = tez.smallEnd();

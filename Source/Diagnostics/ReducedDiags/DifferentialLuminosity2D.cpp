@@ -66,8 +66,8 @@ namespace io = openPMD;
 #endif
 
 
-DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
-: ReducedDiags{rd_name}
+DifferentialLuminosity2D::DifferentialLuminosity2D (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // RZ coordinate is not supported
 #if (defined WARPX_DIM_RZ)
@@ -157,7 +157,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
     auto d_table = m_d_data_2D.table();
 
     // get a reference to WarpX instance
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const Real dt = warpx.getdt(0);
     // get cell volume
     Geometry const & geom = warpx.Geom(0);
@@ -413,7 +413,7 @@ void DifferentialLuminosity2D::WriteToFile (int step) const
     data.resetDataset(dataset);
 
     // Get time at level 0
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     auto const time = warpx.gett_new(0);
     i.setTime(time);
 

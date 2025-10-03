@@ -384,9 +384,10 @@ public:
     /**
      * \brief Constructor
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] rd_name reduced diags names
      */
-    FieldPoyntingFlux (const std::string& rd_name);
+    FieldPoyntingFlux (WarpX* warpx, const std::string& rd_name);
 
     /**
      * \brief Call the routine to compute the Poynting flux if needed

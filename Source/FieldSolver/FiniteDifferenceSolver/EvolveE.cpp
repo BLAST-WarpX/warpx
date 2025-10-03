@@ -116,7 +116,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     Real constexpr c2 = PhysConst::c * PhysConst::c;
 
     // Loop through the grids, and over the tiles within each grid
@@ -245,7 +245,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -467,7 +467,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP

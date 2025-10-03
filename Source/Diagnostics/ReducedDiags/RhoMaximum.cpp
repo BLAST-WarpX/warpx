@@ -29,8 +29,8 @@
 using namespace amrex::literals;
 
 // constructor
-RhoMaximum::RhoMaximum (const std::string& rd_name)
-: ReducedDiags{rd_name}
+RhoMaximum::RhoMaximum (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // RZ coordinate is not working
 #if (defined WARPX_DIM_RZ)
@@ -51,11 +51,11 @@ RhoMaximum::RhoMaximum (const std::string& rd_name)
     // Initialize functors for the total charge density
     for (int lev = 0; lev < nLevel; ++lev)
     {
-        m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio));
+        m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(warpx, lev, crse_ratio));
     }
 
     // get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
 
     // get number of species (int)
     const auto nSpecies = mypc.nSpecies();
@@ -76,7 +76,7 @@ RhoMaximum::RhoMaximum (const std::string& rd_name)
             for (int lev = 0; lev < nLevel; ++lev)
             {
                 // Initialize functors for the charge density of each charged species
-                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(lev, crse_ratio, false, i));
+                m_rho_functors[lev].push_back(std::make_unique<RhoFunctor>(warpx, lev, crse_ratio, false, i));
             }
         }
     }
@@ -128,7 +128,7 @@ void RhoMaximum::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get number of levels
     const auto nLevel = warpx.finestLevel() + 1;

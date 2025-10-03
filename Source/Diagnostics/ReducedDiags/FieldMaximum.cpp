@@ -43,8 +43,8 @@ using namespace amrex;
 using warpx::fields::FieldType;
 
 // constructor
-FieldMaximum::FieldMaximum (const std::string& rd_name)
-: ReducedDiags{rd_name}
+FieldMaximum::FieldMaximum (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // Non-Cartesian coordinates not working
 #if (defined WARPX_DIM_RZ)
@@ -116,7 +116,7 @@ void FieldMaximum::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get number of level
     const auto nLevel = warpx.finestLevel() + 1;

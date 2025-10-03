@@ -18,7 +18,7 @@
 using namespace amrex;
 
 void EffectivePotentialES::InitData() {
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
 }
 
@@ -50,7 +50,7 @@ void EffectivePotentialES::ComputeSpaceChargeField (
 
     // Apply filter, perform MPI exchange, interpolate across levels
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
 
 #ifndef WARPX_DIM_RZ
@@ -122,7 +122,7 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     amrex::GpuArray<int, 3> const nodal = {1, 0, 0};
 #endif
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     auto& mypc = warpx.GetPartContainer();
 
     // The effective potential dielectric function is given by
@@ -188,7 +188,7 @@ void EffectivePotentialES::computePhi (
         sorted_phi.emplace_back(phi[lev]);
     }
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     std::optional<EBCalcEfromPhiPerLevel> post_phi_calculation;
 #ifdef AMREX_USE_EB

@@ -28,6 +28,8 @@
 #include <string>
 #include <vector>
 
+class WarpX;
+
 void ReadBoostedFrameParameters(amrex::Real& gamma_boost, amrex::Real& beta_boost,
                                 amrex::Vector<int>& boost_direction);
 
@@ -50,12 +52,14 @@ void CheckGriddingForRZSpectral ();
 
 /** Function that sets the value of MultiFab MF to zero.
  *
+ * \param[in] warpx pointer to a WarpX object
  * \param[in] mf Pointer to the MultiFab
  * \param[in] lev The mesh refinement level
  * \param[in] zmin The minimum z of the range to be nullified
  * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMFinstance (
+    WarpX* warpx,
     amrex::MultiFab *mf,
     int lev,
     amrex::Real zmin,
@@ -64,6 +68,7 @@ void NullifyMFinstance (
 
 /** Function that sets the value of MultiFab MF to zero.
  *
+ * \param[in] warpx pointer to a WarpX object
  * \param[in] multifab_map Multifab registry
  * \param[in] mf_name Name of Multifab to modify
  * \param[in] lev The mesh refinement level
@@ -71,6 +76,7 @@ void NullifyMFinstance (
  * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMF (
+    WarpX* warpx,
     ablastr::fields::MultiFabRegister& multifab_map,
     std::string const& mf_name,
     int lev,
@@ -80,6 +86,7 @@ void NullifyMF (
 
 /** Function that sets the value of MultiFab MF to zero.
  *
+ * \param[in] warpx pointer to a WarpX object
  * \param[in] multifab_map Multifab registry
  * \param[in] mf_name Name of Multifab to modify
  * \param[in] dir Direction, for Multifabs that are components of vectors
@@ -88,6 +95,7 @@ void NullifyMF (
  * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMF (
+    WarpX* warpx,
     ablastr::fields::MultiFabRegister& multifab_map,
     std::string const& mf_name,
     ablastr::fields::Direction dir,

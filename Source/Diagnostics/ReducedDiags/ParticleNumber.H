@@ -22,9 +22,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    ParticleNumber(const std::string& rd_name);
+    ParticleNumber(WarpX* warpx, const std::string& rd_name);
 
     /**
      * This function computes the total number of macroparticles and physical particles of each

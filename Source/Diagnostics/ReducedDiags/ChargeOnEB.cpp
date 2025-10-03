@@ -32,8 +32,8 @@ using namespace amrex;
 
 
 // constructor
-ChargeOnEB::ChargeOnEB (const std::string& rd_name)
-: ReducedDiags{rd_name}
+ChargeOnEB::ChargeOnEB (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // Only 3D is working for now
 #if !(defined WARPX_DIM_3D)
@@ -99,7 +99,7 @@ void ChargeOnEB::ComputeDiags (const int step)
     using ablastr::fields::Direction;
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // Only compute the integral on level 0
     int const lev = 0;

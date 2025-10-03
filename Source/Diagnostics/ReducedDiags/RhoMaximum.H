@@ -26,9 +26,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    RhoMaximum(const std::string& rd_name);
+    RhoMaximum(WarpX* warpx, const std::string& rd_name);
 
     /**
      * This function computes the maximum and minimum values of rho (summed over all species) and

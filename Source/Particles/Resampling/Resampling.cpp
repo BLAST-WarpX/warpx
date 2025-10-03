@@ -13,7 +13,8 @@
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 
-Resampling::Resampling (const std::string& species_name)
+Resampling::Resampling (WarpX* warpx, const std::string& species_name)
+    : m_warpx(warpx)
 {
     const amrex::ParmParse pp_species_name(species_name);
     std::string resampling_algorithm_string = "leveling_thinning"; // default resampling algorithm
@@ -30,7 +31,7 @@ Resampling::Resampling (const std::string& species_name)
     else
     { WARPX_ABORT_WITH_MESSAGE("Unknown resampling algorithm."); }
 
-    m_resampling_trigger = ResamplingTrigger(species_name);
+    m_resampling_trigger = ResamplingTrigger(m_warpx, species_name);
 }
 
 bool Resampling::triggered (const int timestep, const amrex::Real global_numparts) const

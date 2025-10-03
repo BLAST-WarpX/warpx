@@ -85,12 +85,13 @@ public:
     /**
      * \brief Constructor of the BinaryCollision class.
      *
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] collision_name the name of the collision
      * @param[in] mypc Container of species involved
      *
      */
-    BinaryCollision (std::string collision_name, MultiParticleContainer const * const mypc)
-        : CollisionBase(collision_name)
+    BinaryCollision (WarpX* warpx, std::string collision_name, MultiParticleContainer const * const mypc)
+        : CollisionBase(warpx, collision_name)
     {
         using namespace amrex::literals;
         if(m_species_names.size() != 2) {
@@ -226,7 +227,7 @@ public:
         // Loop over refinement levels
         for (int lev = 0; lev <= species1.finestLevel(); ++lev){
 
-        amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+        amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
         // Loop over all grids/tiles at this level
 #ifdef AMREX_USE_OMP
@@ -309,13 +310,13 @@ public:
         bool const use_global_debye_length = m_use_global_debye_length;
         amrex::Real * global_debye_length_data = nullptr;
         if (use_global_debye_length) {
-            WarpX & warpx = WarpX::GetInstance();
+            WarpX & warpx = species_1.GetWarpX();
             amrex::MultiFab & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
             amrex::FArrayBox & global_debye_length_fab = global_debye_length[mfi];
             global_debye_length_data = global_debye_length_fab.dataPtr();
         }
 
-        amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
+        amrex::Geometry const& geom_lev = species_1.GetWarpX().Geom(lev);
         amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
 #if defined(WARPX_DIM_RZ)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box

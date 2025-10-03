@@ -18,7 +18,8 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
-ElectrostaticSolver::ElectrostaticSolver (int nlevs_max) : num_levels{nlevs_max}
+ElectrostaticSolver::ElectrostaticSolver (WarpX* warpx, int nlevs_max)
+    : m_warpx(warpx), num_levels{nlevs_max}
 {
     // Create an instance of the boundary handler to properly set boundary
     // conditions
@@ -74,7 +75,7 @@ ElectrostaticSolver::setPhiBC (
 
     auto dirichlet_flag = m_poisson_boundary_handler->dirichlet_flag;
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // loop over all mesh refinement levels and set the boundary values
     for (int lev=0; lev < num_levels; lev++) {
@@ -142,7 +143,7 @@ ElectrostaticSolver::computePhi (
         sorted_phi.emplace_back(phi[lev]);
     }
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     std::optional<EBCalcEfromPhiPerLevel> post_phi_calculation;
 #ifdef AMREX_USE_EB
@@ -229,7 +230,7 @@ ElectrostaticSolver::computeE (
     ablastr::fields::MultiLevelScalarField const& phi,
     std::array<amrex::Real, 3> beta ) const
 {
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     for (int lev = 0; lev < num_levels; lev++) {
 
         const Real* dx = warpx.Geom(lev).CellSize();
@@ -396,7 +397,7 @@ void ElectrostaticSolver::computeB (
     // return early if beta is 0 since there will be no B-field
     if ((beta[0] == 0._rt) && (beta[1] == 0._rt) && (beta[2] == 0._rt)) { return; }
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     for (int lev = 0; lev < num_levels; lev++) {
 
         const Real* dx = warpx.Geom(lev).CellSize();

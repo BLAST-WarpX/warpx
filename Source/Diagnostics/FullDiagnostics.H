@@ -12,7 +12,7 @@
 class FullDiagnostics final : public Diagnostics
 {
 public:
-    FullDiagnostics (int i, const std::string& name, DiagTypes diag_type);
+    FullDiagnostics (WarpX* warpx, int i, const std::string& name, DiagTypes diag_type);
     /** Type of time averaging for diagnostics (fields only)
      * None corresponds to instantaneous diags
      * Static corresponds to a fixed starting step for averaging,

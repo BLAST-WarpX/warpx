@@ -21,11 +21,10 @@
 using namespace amrex::literals;
 
 // constructor
-Timestep::Timestep (const std::string& rd_name)
-:ReducedDiags{rd_name}
+Timestep::Timestep (WarpX* warpx, const std::string& rd_name)
+:ReducedDiags{warpx,rd_name}
 {
-    const auto& warpx = WarpX::GetInstance();
-    const auto max_level = warpx.maxLevel();
+    const auto max_level = warpx->maxLevel();
 
     // data size should be equal to the number of refinement levels
     m_data.resize(max_level + 1, 0.0_rt);
@@ -61,7 +60,7 @@ void Timestep::ComputeDiags (int step) {
     // Check if diagnostic should be done
     if (!m_intervals.contains(step+1)) { return; }
 
-    const auto& warpx = WarpX::GetInstance();
+    const auto& warpx = *m_warpx;
     const auto max_level = warpx.maxLevel();
     const auto dt = warpx.getdt();
 

@@ -20,8 +20,8 @@
 using namespace amrex;
 
 // constructor
-LoadBalanceEfficiency::LoadBalanceEfficiency (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+LoadBalanceEfficiency::LoadBalanceEfficiency (WarpX* warpx, const std::string& rd_name)
+    : ReducedDiags{warpx,rd_name}
 {
     // read number of levels
     int nLevel = 0;
@@ -65,7 +65,7 @@ void LoadBalanceEfficiency::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get number of level
     const auto nLevel = warpx.finestLevel() + 1;

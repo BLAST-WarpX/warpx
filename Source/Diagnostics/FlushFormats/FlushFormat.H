@@ -6,6 +6,8 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "Particles/MultiParticleContainer.H"
 
+class WarpX;
+
 class FlushFormat
 {
 public:
@@ -26,13 +28,15 @@ public:
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
         bool isLastBTDFlush = false) const = 0;
 
-    FlushFormat () = default;
+    explicit FlushFormat (WarpX* warpx) : m_warpx(warpx) {}
     virtual ~FlushFormat() = default;
 
     FlushFormat ( FlushFormat const &)             = default;
     FlushFormat& operator= ( FlushFormat const & ) = default;
     FlushFormat ( FlushFormat&& )                  = default;
     FlushFormat& operator= ( FlushFormat&& )       = default;
+
+    WarpX* m_warpx = nullptr;
 };
 
 #endif // WARPX_FLUSHFORMAT_H_

@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+class WarpX;
+
 /**
  *  Base class for reduced diagnostics. Each type of reduced diagnostics is
  *  implemented in a derived class, and must override the (pure virtual)
@@ -23,6 +25,8 @@
 class ReducedDiags
 {
 public:
+
+    WarpX* m_warpx = nullptr;
 
     /// output path (default)
     std::string m_path = "./diags/reducedfiles/";
@@ -50,9 +54,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (const std::string& rd_name);
+    ReducedDiags (WarpX* warpx, const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism

@@ -41,11 +41,15 @@
 #include "Fields.H"
 #include "Utils/Parser/ParserUtils.H"
 
+class WarpX;
+
 namespace warpx::initialization {
 
 class ProjectionDivCleaner
 {
 protected:
+    WarpX* m_warpx;
+
     int m_levels = 1; // Hard coded to 1 for now, will only clean first level
 
     int m_ref_ratio = 1;
@@ -114,7 +118,7 @@ public:
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
 
     // Default Constructor
-    ProjectionDivCleaner (std::string const& a_field_name, bool a_vector_potential=false);
+    ProjectionDivCleaner (WarpX* warpx, std::string const& a_field_name, bool a_vector_potential=false);
 
     void ReadParameters ();
 

@@ -22,8 +22,8 @@
 #include <regex>
 
 // constructor
-FieldReduction::FieldReduction (const std::string& rd_name)
-: ReducedDiags{rd_name}
+FieldReduction::FieldReduction (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     using namespace amrex::literals;
 

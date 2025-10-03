@@ -77,7 +77,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
         "EvolveRhoCartesianECT: Embedded Boundaries are only implemented in 3D and XZ");
 #endif
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
