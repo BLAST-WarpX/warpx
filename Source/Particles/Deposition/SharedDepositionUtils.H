@@ -80,7 +80,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
                        const amrex::Real q,
                        const int n_rz_azimuthal_modes,
                        const unsigned int ip,
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
                        const int zdir,
 #endif
                        const int NODE, const int CELL, const int dir)
@@ -207,7 +207,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
     int const k_j = ((j_type[1] == NODE) ? k_node : k_cell);
 #endif
 
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
     // z direction
     // Keep these double to avoid bug in single precision
     const double zmid = ((zp - xyzmin.z) + relative_time*vz)*dinv.z;

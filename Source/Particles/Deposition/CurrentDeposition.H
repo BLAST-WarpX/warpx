@@ -510,7 +510,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::IntVect const jy_type = jy_fab.box().type();
     amrex::IntVect const jz_type = jz_fab.box().type();
 
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
     constexpr int zdir = WARPX_ZINDEX;
 #endif
 
@@ -598,7 +598,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_buff, jx_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
                                           ip,
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
                                           zdir,
 #endif
                                           NODE, CELL, 0);
@@ -617,7 +617,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jy_buff, jy_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
                                           ip,
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
                                           zdir,
 #endif
                                           NODE, CELL, 1);
@@ -636,7 +636,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jz_buff, jz_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
                                           ip,
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_ZINDEX)
                                           zdir,
 #endif
                                           NODE, CELL, 2);
