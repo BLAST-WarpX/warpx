@@ -498,7 +498,8 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 {
     using namespace amrex::literals;
 
-#if defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
     using namespace amrex;
 
     auto permutation = a_bins.permutationPtr();
@@ -510,10 +511,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::IntVect const jy_type = jy_fab.box().type();
     amrex::IntVect const jz_type = jz_fab.box().type();
 
-#if defined(WARPX_ZINDEX)
     constexpr int zdir = WARPX_ZINDEX;
-#endif
-
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
@@ -597,11 +595,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const unsigned int ip = permutation[ip_orig];
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_buff, jx_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
-                                          ip,
-#if defined(WARPX_ZINDEX)
-                                          zdir,
-#endif
-                                          NODE, CELL, 0);
+                                          ip, zdir, NODE, CELL, 0);
         }
 
         __syncthreads();
@@ -616,11 +610,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const unsigned int ip = permutation[ip_orig];
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jy_buff, jy_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
-                                          ip,
-#if defined(WARPX_ZINDEX)
-                                          zdir,
-#endif
-                                          NODE, CELL, 1);
+                                          ip, zdir, NODE, CELL, 1);
         }
 
         __syncthreads();
@@ -635,11 +625,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const unsigned int ip = permutation[ip_orig];
             depositComponent<depos_order>(GetPosition, wp, uxp, uyp, uzp, ion_lev, jz_buff, jz_type,
                                           relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
-                                          ip,
-#if defined(WARPX_ZINDEX)
-                                          zdir,
-#endif
-                                          NODE, CELL, 2);
+                                          ip, zdir, NODE, CELL, 2);
         }
 
         __syncthreads();

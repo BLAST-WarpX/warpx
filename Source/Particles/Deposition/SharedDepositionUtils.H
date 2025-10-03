@@ -62,7 +62,8 @@ void addLocalToGlobal (const amrex::Box& bx,
 }
 #endif
 
-#if defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
@@ -80,10 +81,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
                        const amrex::Real q,
                        const int n_rz_azimuthal_modes,
                        const unsigned int ip,
-#if defined(WARPX_ZINDEX)
-                       const int zdir,
-#endif
-                       const int NODE, const int CELL, const int dir)
+                       const int zdir, const int NODE, const int CELL, const int dir)
 {
     using namespace amrex::literals;
 
@@ -207,7 +205,6 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
     int const k_j = ((j_type[1] == NODE) ? k_node : k_cell);
 #endif
 
-#if defined(WARPX_ZINDEX)
     // z direction
     // Keep these double to avoid bug in single precision
     const double zmid = ((zp - xyzmin.z) + relative_time*vz)*dinv.z;
@@ -227,7 +224,6 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
         sz_j[iz] = ((j_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
     }
     int const l_j = ((j_type[zdir] == NODE) ? l_node : l_cell);
-#endif
 
     // Deposit current into j_buff
 #if defined(WARPX_DIM_1D_Z)
