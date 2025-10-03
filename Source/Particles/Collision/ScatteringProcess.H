@@ -9,10 +9,13 @@
 #ifndef WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 #define WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 
-#include <AMReX_Math.H>
-#include <AMReX_Vector.H>
-#include <AMReX_RandomEngine.H>
 #include <AMReX_GpuContainers.H>
+#include <AMReX_Math.H>
+#include <AMReX_REAL.H>
+#include <AMReX_RandomEngine.H>
+#include <AMReX_Vector.H>
+
+#include <string>
 
 enum class ScatteringProcessType {
     INVALID,
