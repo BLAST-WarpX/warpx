@@ -8,6 +8,7 @@
 #include "DifferentialLuminosity.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
+#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/SpeciesPhysicalProperties.H"
@@ -159,17 +160,12 @@ void DifferentialLuminosity::ComputeDiags (int step)
 
     amrex::Real* const AMREX_RESTRICT dptr_data = d_data.dataPtr();
 
-    // Enable tiling
-    amrex::MFItInfo info;
-    if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
-
     int const nlevs = std::max(0, species_1.finestLevel()+1); // species_1 ?
-    for (int lev = 0; lev < nlevs; ++lev) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-
-        for (amrex::MFIter mfi = species_1.MakeMFIter(lev, info); mfi.isValid(); ++mfi){
+    for (int lev = 0; lev < nlevs; ++lev) {
+        for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
@@ -177,7 +173,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
             ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_1 );
             ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_2 );
 
-            // Species
+            // Species 1
             const auto soa_1 = ptile_1.getParticleTileData();
             index_type* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
@@ -189,6 +185,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
             bool const species1_is_photon = species_1.AmIA<PhysicalSpecies::photon>();
 
+            // Species 2
             const auto soa_2 = ptile_2.getParticleTileData();
             index_type* AMREX_RESTRICT indices_2 = bins_2.permutationPtr();
             index_type const* AMREX_RESTRICT cell_offsets_2 = bins_2.offsetsPtr();
@@ -202,83 +199,120 @@ void DifferentialLuminosity::ComputeDiags (int step)
             // Extract low-level data
             auto const n_cells = static_cast<int>(bins_1.numBins());
 
-            // Loop over cells
-            amrex::ParallelFor( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+            IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
+            indep_pairs.shuffle(indices_1, indices_2);
+
+            int n_independent_pairs = indep_pairs.numIndependentPairs();
+            const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
+
+            // Loop over independent pairs
+            // This uses the Takizuka and Abe pairing algorithm
+            // (https://doi.org/10.1016/0021-9991(77)90099-7)
+            // to estimate the number of collisions in each cell.
+            // Instead of evaluating the number of collisions for every `NI1*NI2`
+            // pair of macroparticles, it samples max(NI1,NI2) pairs
+            // and scales the resulting number by multiplying by min(NI1,NI2).
+            // The parallelization strategy follows: https://dl.acm.org/doi/10.1145/3732775.3733578
+            amrex::ParallelFor( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
             {
+                // to avoid type mismatch errors
+                auto ui_coll = (index_type)i_coll;
+
+                // Use a bisection algorithm to find the index of the cell in which this pair is located
+                const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
+
                 // The particles from species1 that are in the cell `i_cell` are
                 // given by the `indices_1[cell_start_1:cell_stop_1]`
                 index_type const cell_start_1 = cell_offsets_1[i_cell];
                 index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
                 // Same for species 2
                 index_type const cell_start_2 = cell_offsets_2[i_cell];
                 index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
-                for(index_type i_1=cell_start_1; i_1<cell_stop_1; ++i_1){
-                    for(index_type i_2=cell_start_2; i_2<cell_stop_2; ++i_2){
+                const index_type NI1 = cell_stop_1 - cell_start_1;
+                const index_type NI2 = cell_stop_2 - cell_start_2;
+                const index_type max_N = amrex::max(NI1,NI2);
+                const index_type min_N = amrex::min(NI1,NI2);
 
-                        index_type const j_1 = indices_1[i_1];
-                        index_type const j_2 = indices_2[i_2];
+                // collision number of the cell
+                const index_type coll_idx = ui_coll - p_coll_offsets[i_cell];
+                index_type i_1 = cell_start_1 + coll_idx;
+                index_type i_2 = cell_start_2 + coll_idx;
 
-                        Real p1t=0, p1x=0, p1y=0, p1z=0; // components of 4-momentum of particle 1
-                        Real const u1_sq =  u1x[j_1]*u1x[j_1] + u1y[j_1]*u1y[j_1] + u1z[j_1]*u1z[j_1];
-                        if (species1_is_photon) {
-                            // photon case (momentum is normalized by m_e in WarpX)
-                            p1t = PhysConst::m_e*std::sqrt( u1_sq );
-                            p1x = PhysConst::m_e*u1x[j_1];
-                            p1y = PhysConst::m_e*u1y[j_1];
-                            p1z = PhysConst::m_e*u1z[j_1];
-                        } else {
-                            p1t = m1*std::sqrt( c_sq + u1_sq );
-                            p1x = m1*u1x[j_1];
-                            p1y = m1*u1y[j_1];
-                            p1z = m1*u1z[j_1];
-                        }
+                // we will start from collision number = coll_idx and then add
+                // stride (smaller set size) until we do all collisions (larger set size)
+                for (index_type k = coll_idx; k < max_N; k += min_N)
+                {
+                    index_type const j_1 = indices_1[i_1];
+                    index_type const j_2 = indices_2[i_2];
 
-                        Real p2t=0, p2x=0, p2y=0, p2z=0; // components of 4-momentum of particle 2
-                        Real const u2_sq =  u2x[j_2]*u2x[j_2] + u2y[j_2]*u2y[j_2] + u2z[j_2]*u2z[j_2];
-                        if (species2_is_photon) {
-                            // photon case (momentum is normalized by m_e in WarpX)
-                            p2t = PhysConst::m_e*std::sqrt(u2_sq);
-                            p2x = PhysConst::m_e*u2x[j_2];
-                            p2y = PhysConst::m_e*u2y[j_2];
-                            p2z = PhysConst::m_e*u2z[j_2];
-                        } else {
-                            p2t = m2*std::sqrt( c_sq + u2_sq );
-                            p2x = m2*u2x[j_2];
-                            p2y = m2*u2y[j_2];
-                            p2z = m2*u2z[j_2];
-                        }
+                    Real p1t=0, p1x=0, p1y=0, p1z=0; // components of 4-momentum of particle 1
+                    Real const u1_sq =  u1x[j_1]*u1x[j_1] + u1y[j_1]*u1y[j_1] + u1z[j_1]*u1z[j_1];
+                    if (species1_is_photon) {
+                        // photon case (momentum is normalized by m_e in WarpX)
+                        p1t = PhysConst::m_e*std::sqrt( u1_sq );
+                        p1x = PhysConst::m_e*u1x[j_1];
+                        p1y = PhysConst::m_e*u1y[j_1];
+                        p1z = PhysConst::m_e*u1z[j_1];
+                    } else {
+                        p1t = m1*std::sqrt( c_sq + u1_sq );
+                        p1x = m1*u1x[j_1];
+                        p1y = m1*u1y[j_1];
+                        p1z = m1*u1z[j_1];
+                    }
 
-                        // center of mass energy in eV
-                        Real const E_com = c_over_qe * std::sqrt(m1*m1*c_sq + m2*m2*c_sq + 2*(p1t*p2t - p1x*p2x - p1y*p2y - p1z*p2z));
+                    Real p2t=0, p2x=0, p2y=0, p2z=0; // components of 4-momentum of particle 2
+                    Real const u2_sq =  u2x[j_2]*u2x[j_2] + u2y[j_2]*u2y[j_2] + u2z[j_2]*u2z[j_2];
+                    if (species2_is_photon) {
+                        // photon case (momentum is normalized by m_e in WarpX)
+                        p2t = PhysConst::m_e*std::sqrt(u2_sq);
+                        p2x = PhysConst::m_e*u2x[j_2];
+                        p2y = PhysConst::m_e*u2y[j_2];
+                        p2z = PhysConst::m_e*u2z[j_2];
+                    } else {
+                        p2t = m2*std::sqrt( c_sq + u2_sq );
+                        p2x = m2*u2x[j_2];
+                        p2y = m2*u2y[j_2];
+                        p2z = m2*u2z[j_2];
+                    }
 
-                        // determine particle bin
-                        int const bin = int(Math::floor((E_com-bin_min)/bin_size));
+                    // center of mass energy in eV
+                    Real const E_com = c_over_qe * std::sqrt(m1*m1*c_sq + m2*m2*c_sq + 2*(p1t*p2t - p1x*p2x - p1y*p2y - p1z*p2z));
 
-                        if ( bin<0 || bin>=num_bins ) { continue; } // discard if out-of-range
+                    // determine particle bin
+                    int const bin = int(Math::floor((E_com-bin_min)/bin_size));
 
-                        Real const inv_p1t = 1.0_rt/p1t;
-                        Real const inv_p2t = 1.0_rt/p2t;
+                    if ( bin<0 || bin>=num_bins ) { continue; } // discard if out-of-range
 
-                        Real const beta1_sq = (p1x*p1x + p1y*p1y + p1z*p1z) * inv_p1t*inv_p1t;
-                        Real const beta2_sq = (p2x*p2x + p2y*p2y + p2z*p2z) * inv_p2t*inv_p2t;
-                        Real const beta1_dot_beta2 = (p1x*p2x + p1y*p2y + p1z*p2z) * inv_p1t*inv_p2t;
+                    Real const inv_p1t = 1.0_rt/p1t;
+                    Real const inv_p2t = 1.0_rt/p2t;
 
-                        // Here we use the fact that:
-                        // (v1 - v2)^2 = v1^2 + v2^2 - 2 v1.v2
-                        // and (v1 x v2)^2 = v1^2 v2^2 - (v1.v2)^2
-                        // we also use beta=v/c instead of v
+                    Real const beta1_sq = (p1x*p1x + p1y*p1y + p1z*p1z) * inv_p1t*inv_p1t;
+                    Real const beta2_sq = (p2x*p2x + p2y*p2y + p2z*p2z) * inv_p2t*inv_p2t;
+                    Real const beta1_dot_beta2 = (p1x*p2x + p1y*p2y + p1z*p2z) * inv_p1t*inv_p2t;
 
-                        Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
+                    // Here we use the fact that:
+                    // (v1 - v2)^2 = v1^2 + v2^2 - 2 v1.v2
+                    // and (v1 x v2)^2 = v1^2 v2^2 - (v1.v2)^2
+                    // we also use beta=v/c instead of v
 
-                        Real const dL_dEcom = PhysConst::c * std::sqrt( radicand ) * w1[j_1] * w2[j_2] / dV / bin_size * dt; // m^-2 eV^-1
+                    Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
 
-                        amrex::HostDevice::Atomic::Add(&dptr_data[bin], dL_dEcom);
+                    // Scale the number of collisions by multiplying by `min_N`
+                    // to reflect the fact that we only sampled `max_N` pairs instead of `NI1*NI2`
+                    Real const dL_dEcom = PhysConst::c * std::sqrt( radicand ) * min_N * w1[j_1] * w2[j_2] / dV / bin_size * dt; // m^-2 eV^-1
 
-                    } // particles species 2
-                } // particles species 1
-            }); // cells
+                    amrex::HostDevice::Atomic::Add(&dptr_data[bin], dL_dEcom);
+
+                    if (max_N == NI1) {
+                        i_1 += min_N;
+                    }
+                    if (max_N == NI2) {
+                        i_2 += min_N;
+                    }
+                } // k
+            }); // independent pairs
         } // boxes
     } // levels
 

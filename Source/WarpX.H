@@ -66,7 +66,6 @@
 #include <AMReX_RealBox.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_Vector.H>
-#include <AMReX_VisMF.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -388,10 +387,6 @@ public:
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-    const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
-#endif
-
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
@@ -450,12 +445,6 @@ public:
      * In doding so, only positions attributes are changed while fields remain unchanged.
      */
     void ShiftGalileanBoundary ();
-
-    /**
-     * \brief Update injection position for continuous injection of
-     *        particles and lasers (loops over species and lasers).
-     */
-    void UpdateInjectionPosition (amrex::Real dt);
 
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
@@ -1357,9 +1346,6 @@ private:
 
     /** When `true`, write the diagnostics after restart at the time of the restart. */
     bool write_diagnostics_on_restart = false;
-
-    amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-    amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
     bool synchronize_velocity_for_diagnostics = true;
 

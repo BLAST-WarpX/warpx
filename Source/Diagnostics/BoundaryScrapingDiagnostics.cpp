@@ -7,15 +7,17 @@
 
 #include "BoundaryScrapingDiagnostics.H"
 #include "EmbeddedBoundary/Enabled.H"
-#include "ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <AMReX.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_REAL.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Vector.H>
 
 #include <set>
 #include <string>

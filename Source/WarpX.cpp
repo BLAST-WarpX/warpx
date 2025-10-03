@@ -88,6 +88,7 @@
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_TagBox.H>
+#include <AMReX_VisMF.H>
 
 #include <algorithm>
 #include <cmath>
@@ -1020,13 +1021,6 @@ WarpX::ReadParameters ()
 
         {
             // Parameters below control all plotfile diagnostics
-            bool plotfile_min_max = true;
-            pp_warpx.query("plotfile_min_max", plotfile_min_max);
-            if (plotfile_min_max) {
-                plotfile_headerversion = amrex::VisMF::Header::Version_v1;
-            } else {
-                plotfile_headerversion = amrex::VisMF::Header::NoFabHeader_v1;
-            }
             pp_warpx.query("usesingleread", use_single_read);
             pp_warpx.query("usesinglewrite", use_single_write);
             ParmParse pp_vismf("vismf");
