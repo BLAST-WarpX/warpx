@@ -133,7 +133,7 @@ class MatrixPC : public Preconditioner<T,Ops>
                                  amrex::Gpu::DeviceVector<int>& a_num_nz,
                                  amrex::Gpu::DeviceVector<int>& a_c_indices_g,
                                  amrex::Gpu::DeviceVector<RT>& a_a_ij,
-                                 int& a_n, int& a_ncols_max )
+                                 int& a_n, int& a_ncols_max ) override
         {
             a_n = m_ndofs_l;
             a_ncols_max = m_pc_mat_nnz;
