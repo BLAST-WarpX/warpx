@@ -270,22 +270,6 @@ void PETScSolver_impl::assemblePCMatrix()
         }
     }
 
-//    const auto r_indices_g_ptr = r_indices_g.data();
-//    const auto n_nz_cols_ptr = n_nz_cols.data();
-//    const auto c_indices_g_ptr = c_indices_g.data();
-//    const auto a_ij_ptr = a_ij.data();
-//
-//    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (int i)
-//    {
-//        MatSetValues( m_P->obj,
-//                      1,
-//                      &r_indices_g_ptr[i],
-//                      n_nz_cols_ptr[i],
-//                      &c_indices_g_ptr[i*ncols_max],
-//                      &a_ij_ptr[i*ncols_max],
-//                      INSERT_VALUES );
-//    });
-
     MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
 }
