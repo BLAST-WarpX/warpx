@@ -494,6 +494,7 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     pp_newton.query("max_iterations",      m_maxits);
 
     const amrex::ParmParse pp_gmres("gmres");
+    pp_gmres.query("verbose_int",         m_verbose_l);
     pp_gmres.query("absolute_tolerance",  m_atol_l);
     pp_gmres.query("relative_tolerance",  m_rtol_l);
     pp_gmres.query("max_iterations",      m_maxits_l);
@@ -598,6 +599,8 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     setMaxIters(m_maxits, m_maxits_l);
     if (m_verbose) {
         SNESMonitorSet(m_snes->obj, printSNESResidual, NULL,NULL );
+    }
+    if (m_verbose_l > 1) {
         SNESGetKSP(m_snes->obj, &ksp);
         KSPMonitorSet( ksp, printKSPResidual, NULL, NULL );
     }

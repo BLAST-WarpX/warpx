@@ -278,6 +278,8 @@ class SNES_impl : public PETScSolver_impl
         int m_maxits= 100;
         //! verbosity
         bool m_verbose = true;
+        //! verbosity for linear solver
+        int m_verbose_l = 2;
 
         //! absolute tolerance
         amrex::Real m_atol_l = 0.;

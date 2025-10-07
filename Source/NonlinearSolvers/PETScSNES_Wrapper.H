@@ -50,6 +50,12 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
         void Define ( const Vec& a_U, Ops* a_op ) override
         {
             m_solver = std::make_unique<warpx_petsc::SNES_impl>(a_U, a_op);
+
+            const amrex::ParmParse pp_newton("newton");
+            pp_newton.query("verbose",             this->m_verbose);
+            pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
+            pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
+
             this->m_is_defined = m_solver->isDefined();
             this->m_usePC = m_solver->usePC();
         }
