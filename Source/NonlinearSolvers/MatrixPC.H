@@ -22,6 +22,10 @@
 
 namespace MatrixPCUtils
 {
+    template <typename T>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    T sign(const T a_x) { return (a_x < 0 ? T(-1) : T(1)); }
+
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool insertOrAdd( const int a_cidx, /*!< Column index (global) */
                       const amrex::Real a_val, /*!< Value to insert/add */
@@ -398,32 +402,31 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 auto bx = mfi.tilebox();
-
-                auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
                 auto dof_lhs_arr = dofs_lhs_mfarrvec[lev][dir]->const_array(mfi);
 
 #if defined(WARPX_DIM_RCYLINDER)
-                amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
-                amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RSPHERE");
 #elif defined(WARPX_DIM_RZ)
-                amrex::ignore_unused(dof_arr);
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
 #elif defined(WARPX_DIM_XZ)
+                auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
                 int tdir = -1;
                 if  (dir == 0) { tdir = 2; }
                 else if (dir == 2) { tdir = 0; }
                 else { tdir = 1; }
                 auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
 #elif defined(WARPX_DIM_3D)
-                amrex::ignore_unused(dof_arr);
-                amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_3D");
+                int tdir1 = (dir + 1) % 3;
+                int tdir2 = (dir + 2) % 3;
+                GpuArray<Array4<const Real>, AMREX_SPACEDIM>
+                    const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
+                                                      dofs_mfarrvec[lev][tdir1]->const_array(mfi),
+                                                      dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
 #endif
 
                 // Add the Maxwell's piece
@@ -575,6 +578,44 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         }
                     }
 #else
+                    amrex::IntVect dvec(AMREX_D_DECL(dir,tdir1,tdir2));
+                    amrex::IntVect ic(AMREX_D_DECL(i,j,k));
+                    {
+                        auto cidx_g_rhs = (int) dof_arrays[0](ic,1);
+                        amrex::Real val = 2 * alpha * (dxi[dvec[1]]*dxi[dvec[1]] + dxi[dvec[2]]*dxi[dvec[2]]);
+                        auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                &a_ij_ptr[ridx_l*nnz_max],
+                                                                nnz_max, icol );
+                        if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                    }
+                    for (int ctr = -1; ctr <= 1; ctr += 2) {
+                        for (int tdir = 1; tdir <= 2; tdir++) {
+                            auto iv = ic; iv[dvec[tdir]] += ctr;
+                            auto cidx_g_rhs = (int) dof_arrays[0](iv,1);
+                            amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]];
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                    }
+                    for (int ctr_dir = -1; ctr_dir <= 0; ctr_dir++) {
+                        for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
+                            for (int tdir = 1; tdir <= 2; tdir++) {
+                                auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
+                                auto sign = MatrixPCUtils::sign<int>(ctr_dir) * MatrixPCUtils::sign<int>(ctr_tdir);
+                                auto cidx_g_rhs = (int) dof_arrays[tdir](iv,1);
+                                amrex::Real val = amrex::Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]];
+                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
+                                if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                            }
+                        }
+                    }
 #endif
                     num_nz_ptr[ridx_l] = icol;
                 });
