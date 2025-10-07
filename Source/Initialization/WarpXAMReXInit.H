@@ -21,7 +21,6 @@ namespace warpx::initialization
      * @param[in] argc number of arguments from main()
      * @param[in] argv argument strings from main()
      * @param[in] build_parm_parse build the input file parser (AMReX' default: true)
-     * @param[in] mpi_comm the MPI communicator to use (AMReX' default: MPI_COMM_WORLD)
      * @returns pointer to an AMReX* object, forwarded from amrex::Initialize
      */
     amrex::AMReX*

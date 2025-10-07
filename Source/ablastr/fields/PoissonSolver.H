@@ -52,6 +52,7 @@
 #   include <AMReX_EBFabFactory.H>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -65,7 +66,6 @@ namespace ablastr::fields {
  * \param[in] rho The charge density a given species
  * \param[in] finest_level The most refined mesh refinement level
  * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[out] max_norm_rho The maximum L-infinity norm of `rho` across all levels
  */
 inline amrex::Real getMaxNormRho (
     ablastr::fields::ConstMultiLevelScalarField const& rho,
@@ -250,9 +250,16 @@ computePhi (
             {{ beta[2] }};  // beta_x and beta_z
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             {{ beta[0], beta[2] }};  // beta_x and beta_z
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            {{ beta[0] }};  // beta_x
 #else
             {{ beta[0], beta[1], beta[2] }};
 #endif
+
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE (
+        std::all_of(beta_solver.begin(), beta_solver.end(),
+            [](const auto b){return (b<1.0_rt);}),
+        "Components of beta_solver must be < 1.");
 
     // determine if rho is zero everywhere
     const amrex::Real max_norm_b = getMaxNormRho(
@@ -272,7 +279,7 @@ computePhi (
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d);
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, is_igf_2d);
             }
             continue;
         }
@@ -397,7 +404,7 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setAlwaysUseBNorm((max_norm_b > 0));
+        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {

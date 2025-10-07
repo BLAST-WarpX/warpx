@@ -10,8 +10,6 @@
 #ifndef WARPX_PhysicalParticleContainer_H_
 #define WARPX_PhysicalParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
@@ -23,6 +21,10 @@
 #include "Particles/Gather/ScaleFields.H"
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
@@ -64,6 +66,8 @@ public:
     PhysicalParticleContainer(PhysicalParticleContainer&& )                    = default;
     PhysicalParticleContainer& operator=(PhysicalParticleContainer&& )         = default;
 
+    virtual void AllocData () override;
+
     void InitData () override;
 
     void ReadHeader (std::istream& is) override;
@@ -78,17 +82,17 @@ public:
     PlasmaInjector* GetPlasmaInjector (int i) override;
 
     /**
-     * \brief Evolve is the central function PhysicalParticleContainer that
+     * \brief Evolve is the central function in PhysicalParticleContainer that
      * advances plasma particles for a time dt (typically one timestep).
      *
-     * \param fields the WarpX field register
-     * \param lev level on which particles are living
-     * \param current_fp_string current coarse or fine patch identifier in fields
-     * \param t current physical time
-     * \param dt time step by which particles are advanced
-     * \param a_dt_type type of time step (used for sub-cycling)
-     * \param skip_deposition Skip the charge and current deposition.
-     * \param push_type Type of particle push, explicit or implicit. Defaults to explicit
+     * \param fields The WarpX field register
+     * \param lev Level on which particles are living
+     * \param current_fp_string Current (coarse or fine patch) identifier in fields
+     * \param t Current physical time
+     * \param dt Time Step by which particles are advanced
+     * \param subcycling_half Type of time step (used for sub-cycling)
+     * \param skip_deposition Skip the charge and current deposition
+     * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
      * field gather, particle push and current deposition for all particles
@@ -99,9 +103,9 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
-                 PushType push_type=PushType::Explicit) override;
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -115,7 +119,21 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None);
+
+    void FindSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void SetupSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -124,12 +142,36 @@ public:
                          amrex::FArrayBox const * bxfab,
                          amrex::FArrayBox const * byfab,
                          amrex::FArrayBox const * bzfab,
-                         amrex::IntVect ngEB, int /*e_is_nodal*/,
+                         ImplicitOptions const * implicit_options,
+                         amrex::IntVect const & ngEB,
                          long offset,
                          long np_to_push,
                          int lev, int gather_lev,
-                         amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         amrex::Real dt,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  ablastr::fields::MultiFabRegister& fields,
+                                  amrex::FArrayBox const * exfab,
+                                  amrex::FArrayBox const * eyfab,
+                                  amrex::FArrayBox const * ezfab,
+                                  amrex::FArrayBox const * bxfab,
+                                  amrex::FArrayBox const * byfab,
+                                  amrex::FArrayBox const * bzfab,
+                                  ImplicitOptions const * implicit_options,
+                                  amrex::IntVect ngEB,
+                                  amrex::MultiFab * const jx,
+                                  amrex::MultiFab * const jy,
+                                  amrex::MultiFab * const jz,
+                                  long offset,
+                                  int lev, int gather_lev,
+                                  amrex::Real dt,
+                                  bool skip_deposition,
+                                  long num_unconverged_particles,
+                                  amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -172,7 +214,7 @@ public:
      * number of particles per cell (in the cells of `part_realbox`).
      * The new particles are only created inside the intersection of `part_realbox`
      * with the local grid for the current proc.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] lev the index of the refinement level
      * @param[in] part_realbox the box in which new particles should be created
      * (this box should correspond to an integer number of cells in each direction,
@@ -183,7 +225,7 @@ public:
     /**
      * Create new macroparticles for this species, with a fixed
      * number of particles per cell in a plane.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] dt time step size, used to partially advance the particles
     */
     void AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt);
@@ -195,7 +237,7 @@ public:
     void AddGaussianBeam (PlasmaInjector const& plasma_injector);
 
     /** Load a particle beam from an external file
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] q_tot total charge of the particle species to be initialized
      * @param[in] z_shift optional shift to the z position of particles (useful for boosted frame runs)
      */
@@ -226,7 +268,6 @@ public:
      * These are NOT initialized by this function.
      * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
      * These are NOT initialized by this function.
-     * @param[in] engine the random engine, used in initialization of QED optical depths
      */
     void DefaultInitializeRuntimeAttributes (
         typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
@@ -360,6 +401,24 @@ public:
         return GetVecOfPtrs(m_user_real_attrib_parser);
     }
 
+    // By default this returns false; overridden here to return runtime value
+    virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
+
+    virtual void AccumulateVelocitiesAndComputeTemperature (
+        ablastr::fields::MultiLevelVectorField const & T_vf,
+        amrex::Real relative_time) override;
+
+    virtual void DepositTemperature (
+        WarpXParIter& pti,
+        RealVector const & wp, RealVector const & uxp,
+        RealVector const & uyp, RealVector const & uzp,
+        amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
+        long const offset, long const np_to_deposit,
+        int const thread_num, const int lev, int const depos_lev,
+        amrex::Real const relative_time, PushType push_type,
+        const warpx::particles::deposition::TemperatureDepositionType type,
+        const warpx::particles::deposition::TemperatureDepositionPass pass) override;
+
 protected:
 
     /*
@@ -399,6 +458,11 @@ protected:
 
     // A flag to enable saving of the previous timestep positions
     bool m_save_previous_position = false;
+
+    // Flag controlling whether or not variance and then temperatures are computed per species
+    bool m_do_temperature_deposition = false;
+
+    std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
 #ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons

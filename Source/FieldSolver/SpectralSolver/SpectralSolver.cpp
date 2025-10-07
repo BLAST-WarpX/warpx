@@ -8,9 +8,9 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "SpectralAlgorithms/PsatdAlgorithmComoving.H"
 #include "SpectralAlgorithms/PsatdAlgorithmPml.H"
-#include "SpectralAlgorithms/PsatdAlgorithmFirstOrder.H"
-#include "SpectralAlgorithms/PsatdAlgorithmJConstantInTime.H"
-#include "SpectralAlgorithms/PsatdAlgorithmJLinearInTime.H"
+#include "SpectralAlgorithms/PsatdAlgorithmGalilean.H"
+#include "SpectralAlgorithms/PsatdAlgorithmJRhomFirstOrder.H"
+#include "SpectralAlgorithms/PsatdAlgorithmJRhomSecondOrder.H"
 #include "SpectralKSpace.H"
 #include "SpectralSolver.H"
 #include "Utils/TextMsg.H"
@@ -38,8 +38,8 @@ SpectralSolver::SpectralSolver (
                 const bool update_with_rho,
                 const bool fft_do_time_averaging,
                 const PSATDSolutionType psatd_solution_type,
-                const JInTime J_in_time,
-                const RhoInTime rho_in_time,
+                const TimeDependencyJ time_dependency_J,
+                const TimeDependencyRho time_dependency_rho,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
     : m_dt(dt)
@@ -52,7 +52,7 @@ SpectralSolver::SpectralSolver (
     const SpectralKSpace k_space= SpectralKSpace(realspace_ba, dm, dx);
 
     m_spectral_index = SpectralFieldIndex(
-        update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time,
+        update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho,
         dive_cleaning, divb_cleaning, pml);
 
     // - Select the algorithm depending on the input parameters
@@ -76,7 +76,7 @@ SpectralSolver::SpectralSolver (
         // Galilean PSATD algorithm (only J constant in time)
         else if (v_galilean[0] != 0. || v_galilean[1] != 0. || v_galilean[2] != 0.)
         {
-            algorithm = std::make_unique<PsatdAlgorithmJConstantInTime>(
+            algorithm = std::make_unique<PsatdAlgorithmGalilean>(
                 k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
                 v_galilean, dt, update_with_rho, fft_do_time_averaging,
                 dive_cleaning, divb_cleaning);
@@ -93,25 +93,19 @@ SpectralSolver::SpectralSolver (
 
             const bool div_cleaning = (dive_cleaning && divb_cleaning);
 
-            algorithm = std::make_unique<PsatdAlgorithmFirstOrder>(
+            // First-order PSATD equations with variable time dependency of J and rho
+            // (valid also for standard PSATD, where J is constant and rho is linear)
+            algorithm = std::make_unique<PsatdAlgorithmJRhomFirstOrder>(
                 k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
-                dt, div_cleaning, J_in_time, rho_in_time);
+                dt, div_cleaning, time_dependency_J, time_dependency_rho);
         }
         else if (psatd_solution_type == PSATDSolutionType::SecondOrder)
         {
-            if (J_in_time == JInTime::Constant)
-            {
-                algorithm = std::make_unique<PsatdAlgorithmJConstantInTime>(
-                    k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
-                    v_galilean, dt, update_with_rho, fft_do_time_averaging,
-                    dive_cleaning, divb_cleaning);
-            }
-            else if (J_in_time == JInTime::Linear)
-            {
-                algorithm = std::make_unique<PsatdAlgorithmJLinearInTime>(
-                    k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
-                    dt, fft_do_time_averaging, dive_cleaning, divb_cleaning);
-            }
+            // Second-order PSATD equations with variable time dependency of J and rho
+            // (valid also for standard PSATD, where J is constant and rho is linear)
+            algorithm = std::make_unique<PsatdAlgorithmJRhomSecondOrder>(
+              k_space, dm, m_spectral_index, norder_x, norder_y, norder_z, grid_type,
+              dt, update_with_rho, fft_do_time_averaging, dive_cleaning, divb_cleaning, time_dependency_J, time_dependency_rho);
         }
     }
 
@@ -148,6 +142,43 @@ SpectralSolver::pushSpectralFields(){
     // on the sub-class of `SpectralBaseAlgorithm` that was
     // initialized in the constructor of `SpectralSolver`
     algorithm->pushSpectralFields( field_data );
+}
+
+void SpectralSolver::ComputeSpectralDivE (
+        const int lev,
+        ablastr::fields::VectorField const & Efield,
+        amrex::MultiFab& divE)
+{
+    algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE );
+}
+
+void SpectralSolver::CurrentCorrection ()
+{
+    algorithm->CurrentCorrection(field_data);
+}
+
+void SpectralSolver::VayDeposition ()
+{
+    algorithm->VayDeposition(field_data);
+}
+
+void SpectralSolver::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    // The last two arguments represent the number of components and
+    // the number of ghost cells to perform this operation
+    Copy(field_data.fields, field_data.fields, src_comp, dest_comp, 1, 0);
+}
+
+void SpectralSolver::ZeroOutDataComp (const int icomp)
+{
+    // The last argument represents the number of components to perform this operation
+    field_data.fields.setVal(0., icomp, 1);
+}
+
+void SpectralSolver::ScaleDataComp (const int icomp, const amrex::Real scale_factor)
+{
+    // The last argument represents the number of components to perform this operation
+    field_data.fields.mult(scale_factor, icomp, 1);
 }
 
 #endif // WARPX_USE_FFT

@@ -15,8 +15,43 @@ void init_MultiFabRegister (py::module & m)
 {
     using namespace ablastr::fields;
 
-    py::class_<ablastr::fields::Direction>(m, "Direction")
-        .def(py::init<int>());
+    py::class_<ablastr::fields::Direction> pyDirection(m, "Direction");
+    pyDirection
+        .def(py::init<int>())
+        .def(py::init<std::string>())
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        .def_property_readonly_static("r", [](py::object /* self */) {
+            return ablastr::fields::Direction::r;
+        })
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        .def_property_readonly_static("theta", [](py::object /* self */) {
+            return ablastr::fields::Direction::theta;
+        })
+#endif
+
+#if defined(WARPX_DIM_RSPHERE)
+        .def_property_readonly_static("phi", [](py::object /* self */) {
+            return ablastr::fields::Direction::phi;
+        })
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+        .def_property_readonly_static("x", [](py::object /* self */) {
+            return ablastr::fields::Direction::x;
+        })
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+        .def_property_readonly_static("y", [](py::object /* self */) {
+            return ablastr::fields::Direction::y;
+        })
+#endif
+#if !defined(WARPX_DIM_RSPHERE)
+        .def_property_readonly_static("z", [](py::object /* self */) {
+            return ablastr::fields::Direction::z;
+        })
+#endif
+    ;
+    py::implicitly_convertible<std::string, ablastr::fields::Direction>();
 
     py::class_<ablastr::fields::MultiFabRegister>(m, "MultiFabRegister")
 
@@ -32,6 +67,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level"),
              py::arg("ba"),
@@ -56,6 +92,7 @@ void init_MultiFabRegister (py::module & m)
                  bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level"),
@@ -75,6 +112,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("level"),
@@ -89,6 +127,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  std::optional<const amrex::Real>
              >(&MultiFabRegister::alias_init<std::string, std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("dir"),
@@ -121,6 +160,7 @@ void init_MultiFabRegister (py::module & m)
                  std::string,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("level")
         )
@@ -131,15 +171,16 @@ void init_MultiFabRegister (py::module & m)
                  ablastr::fields::Direction,
                  int
              >(&MultiFabRegister::get<std::string>),
+             py::return_value_policy::reference_internal,
              py::arg("name"),
              py::arg("dir"),
              py::arg("level")
         )
 
-        //.def("list",
-        //     &MultiFabRegister::list
-        //     // "..."
-        //)
+        .def("list",
+             &MultiFabRegister::list,
+             "List the internal names of all registered fields"
+        )
 
         .def("erase",
              py::overload_cast<

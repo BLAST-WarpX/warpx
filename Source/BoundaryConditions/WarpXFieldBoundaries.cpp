@@ -3,7 +3,6 @@
 #include "BoundaryConditions/PML.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
-#include "Evolve/WarpXDtType.H"
 #include "WarpX_PEC.H"
 
 #include <AMReX.H>
@@ -165,7 +164,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
         }
     }
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     if (patch_type == PatchType::fine) {
         ApplyFieldBoundaryOnAxis(m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
                                  m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
@@ -178,7 +177,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
 #endif
 }
 
-void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, DtType a_dt_type, amrex::Real time)
+void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real time)
 {
     using ablastr::fields::Direction;
 
@@ -238,7 +237,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, DtType a_d
     // This is because the formula used for Silver-Mueller assumes that
     // E and B are staggered in time, which is only true after the first half-push
     if (lev == 0) {
-        if (a_dt_type == DtType::FirstHalf) {
+        if (subcycling_half == SubcyclingHalf::FirstHalf) {
             if(::isAnyBoundary<FieldBoundaryType::Absorbing_SilverMueller>(field_boundary_lo, field_boundary_hi)){
                 auto Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
                 auto Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);
@@ -250,7 +249,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, DtType a_d
         }
     }
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     if (patch_type == PatchType::fine) {
         ApplyFieldBoundaryOnAxis(m_fields.get(FieldType::Bfield_fp,Direction{0},lev),
                                  m_fields.get(FieldType::Bfield_fp,Direction{1},lev),
@@ -282,6 +281,7 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
                                  amrex::MultiFab* Jy, amrex::MultiFab* Jz,
                                  PatchType patch_type)
 {
+    BL_PROFILE("WarpX::ApplyJfieldBoundary()");
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
@@ -294,8 +294,8 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
     }
 }
 
-#ifdef WARPX_DIM_RZ
-// Applies the boundary conditions that are specific to the axis when in RZ.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+// Applies the boundary conditions that are specific to the axis when in cylindrical or spherical
 void
 WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex::MultiFab* Ez, int lev) const
 {
@@ -338,9 +338,11 @@ WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex
         tbr.setRange(0, -ngE[0], ngE[0]);
         tbt.setRange(0, -ngE[0], ngE[0]);
         tbz.setRange(0, -ngE[0], ngE[0]);
+#ifdef WARPX_DIM_RZ
         tbr.grow(1, ngE[1]);
         tbt.grow(1, ngE[1]);
         tbz.grow(1, ngE[1]);
+#endif
 
         const int nmodes = n_rz_azimuthal_modes;
 
@@ -365,12 +367,18 @@ WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex
         },
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
+#if defined(WARPX_DIM_RSPHERE)
+            // Ephi is anti-symmetric
+            Ez_arr(i,j,0,0) = -Ez_arr(-i-ishift_z,j,0,0);
+
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             Ez_arr(i,j,0,0) = Ez_arr(-i-ishift_z,j,0,0);
 
             for (int imode=1 ; imode < nmodes ; imode++) {
                 Ez_arr(i,j,0,2*imode-1) = -std::pow(-1._rt, imode+1._rt)*Ez_arr(-i-ishift_z,j,0,2*imode-1);
                 Ez_arr(i,j,0,2*imode) = -std::pow(-1._rt, imode+1._rt)*Ez_arr(-i-ishift_z,j,0,2*imode);
             }
+#endif
 
         });
     }

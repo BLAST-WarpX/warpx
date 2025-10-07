@@ -8,8 +8,6 @@
  */
 #include "LaserParticleContainer.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
 #include "Particles/LaserParticleContainer.H"
@@ -86,7 +84,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
       m_laser_name{name}
 {
     charge = 1.0;
-    mass = std::numeric_limits<Real>::max();
+    m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
 
@@ -251,14 +249,14 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
             (m_nvec[0]-windir[0])*(m_nvec[0]-windir[0]) +
             (m_nvec[1]-windir[1])*(m_nvec[1]-windir[1]) +
             (m_nvec[2]-windir[2])*(m_nvec[2]-windir[2]) < 1.e-12,
-            "do_continous_injection for laser particle only works" +
+            "do_continous_injection for laser particle only works"
             " if moving window direction and laser propagation direction are the same");
         if ( WarpX::gamma_boost>1 ){
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (WarpX::boost_direction[0]-0)*(WarpX::boost_direction[0]-0) +
                 (WarpX::boost_direction[1]-0)*(WarpX::boost_direction[1]-0) +
                 (WarpX::boost_direction[2]-1)*(WarpX::boost_direction[2]-1) < 1.e-12,
-                "do_continous_injection for laser particle only works if " +
+                "do_continous_injection for laser particle only works if "
                 "warpx.boost_direction = z. TODO: all directions.");
         }
     }
@@ -349,6 +347,8 @@ LaserParticleContainer::UpdateAntennaPosition (const amrex::Real dt)
         m_updated_position[2] -= WarpX::beta_boost *
             WarpX::boost_direction[2] * PhysConst::c * dt;
         amrex::ignore_unused(dir);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(dir, dt);
 #endif
     }
 }
@@ -560,7 +560,8 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition, PushType push_type)
+                                Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
+                                ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -569,6 +570,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
+
+    const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
     Real t_lab = t;
     if (WarpX::gamma_boost > 1) {
@@ -621,20 +624,20 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             amplitude_E.resize(np);
 
             // Determine whether particles will deposit on the fine or coarse level
-            long np_current = np;
+            long np_to_deposit = np;
             if (lev > 0 && m_deposit_on_main_grid && has_buffer) {
-                np_current = 0;
+                np_to_deposit = 0;
             }
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
-                              np_current, thread_num, lev, lev);
+                              np_to_deposit, thread_num, lev, lev);
                 if (has_buffer) {
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                    DepositCharge(pti, wp, ion_lev, crho, 0, np_current,
-                                  np-np_current, thread_num, lev, lev-1);
+                    DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
+                                  np-np_to_deposit, thread_num, lev, lev-1);
                 }
             }
 
@@ -672,7 +675,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                 amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                 DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
-                               0, np_current, thread_num,
+                               0, np_to_deposit, thread_num,
                                lev, lev, dt, relative_time, push_type);
 
                 if (has_buffer)
@@ -682,7 +685,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                     amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                     DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
-                                   np_current, np-np_current, thread_num,
+                                   np_to_deposit, np-np_to_deposit, thread_num,
                                    lev, lev-1, dt, relative_time, push_type);
                 }
             }
@@ -692,11 +695,11 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 1, 0,
-                              np_current, thread_num, lev, lev);
+                              np_to_deposit, thread_num, lev, lev);
                 if (has_buffer) {
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
-                    DepositCharge(pti, wp, ion_lev, crho, 1, np_current,
-                                  np-np_current, thread_num, lev, lev-1);
+                    DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
+                                  np-np_to_deposit, thread_num, lev, lev-1);
                 }
             }
 
@@ -830,7 +833,7 @@ LaserParticleContainer::calculate_laser_plane_coordinates (const WarpXParIter& p
                 tmp_u_X_0 * (x - tmp_position_0) +
                 tmp_u_X_2 * (z - tmp_position_2);
             pplane_Yp[i] = 0.;
-#elif defined(WARPX_DIM_1D_Z)
+#elif AMREX_SPACEDIM == 1
             pplane_Xp[i] = 0.;
             pplane_Yp[i] = 0.;
 #endif
@@ -870,7 +873,7 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
     // When using the implicit solver, this function is called multiple times per timestep
     // (within the linear and nonlinear solver). Thus, the position of the particles needs to be reset
     // to the initial position (at the beginning of the timestep), before updating the particle position
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
     ParticleReal* x_n = nullptr;
     if (push_type == PushType::Implicit) {
         x_n = pti.GetAttribs("x_n").dataPtr();

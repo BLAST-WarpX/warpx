@@ -60,6 +60,9 @@ protected:
     std::vector<bool> m_read_A_from_file;
     std::vector<std::string> m_external_file_path;
 
+    // Clean div A
+    bool m_do_clean_divA = true;
+
 public:
 
     // Default Constructor

@@ -140,13 +140,13 @@ class Checksum:
             # Load time series
             ts = OpenPMDTimeSeries(self.output_file)
             data = {}
-            # Compute number of MR levels
-            # TODO This calculation of nlevels assumes that the last element
-            #      of level_fields is by default on the highest MR level.
-            level_fields = [field for field in ts.avail_fields if "lvl" in field]
-            nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
             # Compute checksum for field quantities
             if do_fields:
+                # Compute number of MR levels
+                # TODO This calculation of nlevels assumes that the last element
+                #      of level_fields is by default on the highest MR level.
+                level_fields = [field for field in ts.avail_fields if "lvl" in field]
+                nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
                 for lev in range(nlevels + 1):
                     # Create list of fields specific to level lev
                     grid_fields = []

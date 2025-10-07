@@ -136,18 +136,36 @@ WarpX::UpdateAuxilaryData ()
     // When loading particle fields from file: add the external fields:
     for (int lev = 0; lev <= finest_level; ++lev) {
         if (mypc->m_E_ext_particle_s == "read_from_file") {
+
+            // Scale the field read from file (E_ext) by a scalar time dependency and add it to Efield_aux
+
+            const amrex::ParticleReal time_factor = mypc->m_Efield_time_partparser(t_new[lev]);
+
             ablastr::fields::VectorField Efield_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
             const auto& E_ext_lev = m_fields.get_alldirs(FieldType::E_external_particle_field, lev);
-            amrex::MultiFab::Add(*Efield_aux[0], *E_ext_lev[0], 0, 0, E_ext_lev[0]->nComp(), guard_cells.ng_FieldGather);
-            amrex::MultiFab::Add(*Efield_aux[1], *E_ext_lev[1], 0, 0, E_ext_lev[1]->nComp(), guard_cells.ng_FieldGather);
-            amrex::MultiFab::Add(*Efield_aux[2], *E_ext_lev[2], 0, 0, E_ext_lev[2]->nComp(), guard_cells.ng_FieldGather);
+
+            amrex::Saxpy(*Efield_aux[0], time_factor, *E_ext_lev[0], 0, 0, E_ext_lev[0]->nComp(),
+                 guard_cells.ng_FieldGather);
+            amrex::Saxpy(*Efield_aux[1], time_factor, *E_ext_lev[1], 0, 0, E_ext_lev[1]->nComp(),
+                 guard_cells.ng_FieldGather);
+            amrex::Saxpy(*Efield_aux[2], time_factor, *E_ext_lev[2], 0, 0, E_ext_lev[2]->nComp(),
+                 guard_cells.ng_FieldGather);
         }
         if (mypc->m_B_ext_particle_s == "read_from_file") {
+
+            // Scale the field read from file (B_ext) by a scalar time dependency and add it to Bfield_aux
+
+            const amrex::ParticleReal time_factor = mypc->m_Bfield_time_partparser(t_new[lev]);
+
             ablastr::fields::VectorField Bfield_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
             const auto& B_ext_lev = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
-            amrex::MultiFab::Add(*Bfield_aux[0], *B_ext_lev[0], 0, 0, B_ext_lev[0]->nComp(), guard_cells.ng_FieldGather);
-            amrex::MultiFab::Add(*Bfield_aux[1], *B_ext_lev[1], 0, 0, B_ext_lev[1]->nComp(), guard_cells.ng_FieldGather);
-            amrex::MultiFab::Add(*Bfield_aux[2], *B_ext_lev[2], 0, 0, B_ext_lev[2]->nComp(), guard_cells.ng_FieldGather);
+
+            amrex::Saxpy(*Bfield_aux[0], time_factor, *B_ext_lev[0], 0, 0, B_ext_lev[0]->nComp(),
+                 guard_cells.ng_FieldGather);
+            amrex::Saxpy(*Bfield_aux[1], time_factor, *B_ext_lev[1], 0, 0, B_ext_lev[1]->nComp(),
+                 guard_cells.ng_FieldGather);
+            amrex::Saxpy(*Bfield_aux[2], time_factor, *B_ext_lev[2], 0, 0, B_ext_lev[2]->nComp(),
+                 guard_cells.ng_FieldGather);
         }
     }
 
@@ -760,7 +778,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryE(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -773,7 +791,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryE, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -825,7 +843,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
         if (pml_rz[lev])
         {
-            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, nodal_sync);
+            pml_rz[lev]->FillBoundaryB(m_fields, patch_type, do_single_precision_comms, nodal_sync);
         }
 #endif
     }
@@ -838,7 +856,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
             "Error: in FillBoundaryB, requested more guard cells than allocated");
 
         const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, WarpX::do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
     }
 }
 
@@ -1268,6 +1286,23 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 }
 
 void
+WarpX::SyncMassMatricesPC ()
+{
+    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
+
+    ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
+
+    for (int idim = 0; idim < 3; ++idim)
+    {
+        for (int lev = finest_level; lev >= 0; --lev)
+        {
+            auto const& period = Geom(lev).periodicity();
+            SumBoundaryJ(Sigma_fp, lev, idim, period);
+        }
+    }
+}
+
+void
 WarpX::SyncRho () {
     bool const skip_lev0_coarse_patch = true;
     const ablastr::fields::MultiLevelScalarField rho_fp = m_fields.has(FieldType::rho_fp, 0) ?
@@ -1429,6 +1464,8 @@ void WarpX::SumBoundaryJ (
     {
 #if   defined(WARPX_DIM_1D_Z)
         ng_depos_J[0] += m_current_centering_noz / 2;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        ng_depos_J[0] += m_current_centering_nox / 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         ng_depos_J[0] += m_current_centering_nox / 2;
         ng_depos_J[1] += m_current_centering_noz / 2;

@@ -127,6 +127,10 @@ WarpX::LoadBalance ()
         ParallelDescriptor::Bcast(&doLoadBalance, 1,
                                   ParallelDescriptor::IOProcessorNumber());
 
+        amrex::Print() << Utils::TextMsg::Info("current LB efficiency = " + std::to_string(currentEfficiency)
+                          + " proposed LB efficiency = " + std::to_string(proposedEfficiency)
+                          + " LoadBalance is set to : " + std::to_string(doLoadBalance) );
+
         if (doLoadBalance)
         {
             Vector<int> pmap;

@@ -70,11 +70,11 @@ public:
 
         const amrex::ParmParse pp_collision_name(collision_name);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_multiplier", m_fusion_multiplier);
+            pp_collision_name, "event_multiplier", m_fusion_multiplier);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_threshold", m_probability_threshold);
+            pp_collision_name, "probability_threshold", m_probability_threshold);
         utils::parser::queryWithParser(
-            pp_collision_name, "fusion_probability_target_value",
+            pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
@@ -139,6 +139,7 @@ public:
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -239,6 +240,7 @@ public:
         NuclearFusionType m_fusion_type;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies;
     };
 
