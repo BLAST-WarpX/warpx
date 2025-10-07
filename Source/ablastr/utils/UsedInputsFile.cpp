@@ -11,7 +11,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
-#include <ostream>
+#include <fstream>
 #include <string>
 
 
