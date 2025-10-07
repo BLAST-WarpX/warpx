@@ -136,6 +136,25 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
     }
 }
 
+void SpectralSolverRZ::InitFilter (
+    amrex::IntVect const & filter_npass_each_dir,
+    bool const compensation)
+{
+    field_data.InitFilter(filter_npass_each_dir, compensation, k_space);
+}
+
+void SpectralSolverRZ::ApplyFilter (const int lev, int const field_index)
+{
+    field_data.ApplyFilter(lev, field_index);
+}
+
+void SpectralSolverRZ::ApplyFilter (
+    const int lev, int const field_index1,
+    int const field_index2, int const field_index3)
+{
+    field_data.ApplyFilter(lev, field_index1, field_index2, field_index3);
+}
+
 /**
   * \brief Public interface to call the member function ComputeSpectralDivE
   * of the base class SpectralBaseAlgorithmRZ from objects of class SpectralSolverRZ
@@ -165,4 +184,23 @@ void
 SpectralSolverRZ::VayDeposition ()
 {
     algorithm->VayDeposition(field_data);
+}
+
+
+void
+SpectralSolverRZ::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    field_data.CopySpectralDataComp(src_comp, dest_comp);
+}
+
+void
+SpectralSolverRZ::ZeroOutDataComp (const int icomp)
+{
+    field_data.ZeroOutDataComp(icomp);
+}
+
+void
+SpectralSolverRZ::ScaleDataComp (const int icomp, const amrex::Real scale_factor)
+{
+    field_data.ScaleDataComp(icomp, scale_factor);
 }

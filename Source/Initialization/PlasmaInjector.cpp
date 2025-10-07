@@ -242,6 +242,14 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
     const bool focusing_is_specified = pp_species.contains("focal_distance");
+    utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
+    utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
+
+    if(do_rotation){
+        utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
+        utils::parser::getArrWithParser(pp_species, source_name, "gaussian_beam_rotation_axis", rotation_axis, 0, 3);
+    }
+
     if(focusing_is_specified){
         do_focusing = true;
         utils::parser::queryWithParser(pp_species, source_name, "focal_distance", focal_distance);
@@ -270,6 +278,11 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( z_rms > 0._rt,
         "Error: Gaussian beam z_rms must be strictly greater than 0 with RCYLINDER "
         "(it is used when computing the particles' weights from the total beam charge)");
+#endif
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !do_rotation && !do_rotation_momenta,
+        "Error: Gaussian beam cannot be rotated in 1D, RCYLINDER, RSPHERE, and RZ geometries.");
 #endif
 }
 
