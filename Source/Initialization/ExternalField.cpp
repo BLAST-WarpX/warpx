@@ -13,6 +13,8 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_BaseFabUtility.H>
+
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include <openPMD/openPMD.hpp>
 #endif
@@ -24,35 +26,6 @@
 
 namespace
 {
-    // xxxxx A faster version of this will be moved to amrex.
-    template <typename T>
-    void TransposeCtoF (T const* pi, T* po, int nx, int ny)
-    {
-        using namespace amrex;
-        Table2D<T const, Order::C> ctab(pi, {0,0}, {nx, ny});
-        Table2D<T      , Order::F> ftab(po, {0,0}, {nx, ny});
-        BoxND<2> box(IntVectND<2>(0), IntVectND<2>(nx-1,ny-1));
-        ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j)
-        {
-            ftab(i,j) = ctab(i,j);
-        });
-        Gpu::streamSynchronize();
-    }
-
-    template <typename T>
-    void TransposeCtoF (T const* pi, T* po, int nx, int ny, int nz)
-    {
-        using namespace amrex;
-        Table3D<T const, Order::C> ctab(pi, {0,0,0}, {nx, ny, nz});
-        Table3D<T      , Order::F> ftab(po, {0,0,0}, {nx, ny, nz});
-        BoxND<3> box(IntVectND<3>(0), IntVectND<3>(nx-1,ny-1,nz-1));
-        ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            ftab(i,j,k) = ctab(i,j,k);
-        });
-        Gpu::streamSynchronize();
-    }
-
     enum class EMFieldType{E, B};
 
     template <EMFieldType T>
@@ -438,8 +411,10 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #if (AMREX_SPACEDIM > 1)
         if ((xyz_order && c_order) || (!xyz_order && !c_order)) {
             BaseFab<double> tmp(box, 1);
-            TransposeCtoF(m_fab.dataPtr(), tmp.dataPtr(),
-                          AMREX_D_DECL(box.length(0),box.length(1),box.length(2)));
+            amrex::transposeCtoF(m_fab.dataPtr(), tmp.dataPtr(),
+                                 AMREX_D_DECL(box.length(0),
+                                              box.length(1),
+                                              box.length(2)));
             std::swap(m_fab,tmp);
             m_FC_data_cpu.reset();
         }
