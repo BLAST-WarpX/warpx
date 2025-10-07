@@ -127,7 +127,6 @@ namespace {
         const amrex::ParticleReal vcz    = (p1z_in+p2z_in) / mass_g;
         const amrex::ParticleReal vc_sq   = vcx*vcx + vcy*vcy + vcz*vcz;
         const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
-        const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
 
         // Compute momentum of first product in the center of mass frame
         amrex::ParticleReal px_star_out, py_star_out, pz_star_out;
@@ -146,6 +145,7 @@ namespace {
                 // Convert momentum of first incident particle to lab frame, using equation (2)
                 // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
                 const amrex::ParticleReal vcDps = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
+                const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
                 const amrex::ParticleReal factor = factor0*vcDps - m1_in*g1_in*gc;
                 p1x_star_in = p1x_in + vcx * factor;
                 p1y_star_in = p1y_in + vcy * factor;
@@ -175,6 +175,7 @@ namespace {
         {
             const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_f_sq / (m1_out*m1_out*c_sq));
             const amrex::ParticleReal vcDps = vcx*px_star_out + vcy*py_star_out + vcz*pz_star_out;
+            const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
             const amrex::ParticleReal factor = factor0*vcDps + m1_out*g_star*gc;
             p1x_out = px_star_out + vcx * factor;
             p1y_out = py_star_out + vcy * factor;
