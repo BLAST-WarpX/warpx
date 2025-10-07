@@ -144,4 +144,41 @@ SpectralSolver::pushSpectralFields(){
     algorithm->pushSpectralFields( field_data );
 }
 
+void SpectralSolver::ComputeSpectralDivE (
+        const int lev,
+        ablastr::fields::VectorField const & Efield,
+        amrex::MultiFab& divE)
+{
+    algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE );
+}
+
+void SpectralSolver::CurrentCorrection ()
+{
+    algorithm->CurrentCorrection(field_data);
+}
+
+void SpectralSolver::VayDeposition ()
+{
+    algorithm->VayDeposition(field_data);
+}
+
+void SpectralSolver::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    // The last two arguments represent the number of components and
+    // the number of ghost cells to perform this operation
+    Copy(field_data.fields, field_data.fields, src_comp, dest_comp, 1, 0);
+}
+
+void SpectralSolver::ZeroOutDataComp (const int icomp)
+{
+    // The last argument represents the number of components to perform this operation
+    field_data.fields.setVal(0., icomp, 1);
+}
+
+void SpectralSolver::ScaleDataComp (const int icomp, const amrex::Real scale_factor)
+{
+    // The last argument represents the number of components to perform this operation
+    field_data.fields.mult(scale_factor, icomp, 1);
+}
+
 #endif // WARPX_USE_FFT
