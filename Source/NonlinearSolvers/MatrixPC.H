@@ -273,10 +273,13 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
     m_ndofs_l = a_U.nDOF_local();
     m_ndofs_g = a_U.nDOF_global();
 
-    m_r_indices_g.resize(m_ndofs_l);
-    m_num_nz.resize(m_ndofs_l);
-    m_c_indices_g.resize(m_pc_mat_nnz*m_ndofs_l);
-    m_a_ij.resize(m_pc_mat_nnz*m_ndofs_l);
+    auto n_rows = size_t(m_ndofs_l);
+    auto n_cols = size_t(m_pc_mat_nnz) * size_t(m_ndofs_l);
+
+    m_r_indices_g.resize(n_rows);
+    m_num_nz.resize(n_rows);
+    m_c_indices_g.resize(n_cols);
+    m_a_ij.resize(n_cols);
 
 
     m_bcoefs = m_ops->GetMassMatricesCoeff();
@@ -371,10 +374,13 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
     m_c_indices_g.clear();
     m_a_ij.clear();
 
-    m_r_indices_g.resize(m_ndofs_l);
-    m_num_nz.resize(m_ndofs_l);
-    m_c_indices_g.resize(m_pc_mat_nnz*m_ndofs_l);
-    m_a_ij.resize(m_pc_mat_nnz*m_ndofs_l);
+    auto n_rows = size_t(m_ndofs_l);
+    auto n_cols = size_t(m_pc_mat_nnz) * size_t(m_ndofs_l);
+
+    m_r_indices_g.resize(n_rows);
+    m_num_nz.resize(n_rows);
+    m_c_indices_g.resize(n_cols);
+    m_a_ij.resize(n_cols);
 
     auto r_indices_g_ptr = m_r_indices_g.data();
     auto num_nz_ptr = m_num_nz.data();
