@@ -404,7 +404,9 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 auto bx = mfi.tilebox();
                 auto dof_lhs_arr = dofs_lhs_mfarrvec[lev][dir]->const_array(mfi);
 
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_1D_Z)
+                auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
+#elif defined(WARPX_DIM_RCYLINDER)
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
@@ -427,6 +429,9 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
                                                       dofs_mfarrvec[lev][tdir1]->const_array(mfi),
                                                       dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
+#else
+                amrex::ignore_unused(dxi);
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble encountered unknown dimensionality");
 #endif
 
                 // Add the Maxwell's piece
@@ -577,7 +582,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                         }
                     }
-#else
+#elif defined(WARPX_DIM_3D)
                     amrex::IntVect dvec(AMREX_D_DECL(dir,tdir1,tdir2));
                     amrex::IntVect ic(AMREX_D_DECL(i,j,k));
                     {
