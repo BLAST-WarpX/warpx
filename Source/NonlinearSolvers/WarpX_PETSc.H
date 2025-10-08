@@ -100,6 +100,11 @@ class PETScSolver_impl
 
         //! Preconditioner type
         PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
+
+    protected:
+
+        //! Set PETSc options from WarpX input file
+        void setOptions();
 };
 
 /**

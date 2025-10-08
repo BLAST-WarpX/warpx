@@ -207,7 +207,89 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Apply Jacovian operator
+// Set PETSc options from WarpX input file
+void PETScSolver_impl::setOptions()
+{
+    BL_PROFILE("PETScSolver_impl::setOptions()");
+
+    PetscBool pc_specified;
+    PetscOptionsHasName( NULL, NULL, "-pc_type", &pc_specified );
+
+    if ((!pc_specified) && (m_pc_type == PreconditionerType::pc_petsc)) {
+
+        auto parsestr = amrex::getEnumNameString(PreconditionerType::pc_petsc);
+        const amrex::ParmParse pp_pc(parsestr.c_str());
+
+        std::string pctype = "asm"; // default
+        {
+            std::string key = "type";
+            std::string val = pctype;
+            pp_pc.query(key.c_str(), val);
+            PetscOptionsSetValue( NULL, "-pc_type", val.c_str());
+            pctype = val;
+        }
+
+        if (pctype == "asm") {
+
+            {
+                std::string key = "asm_overlap";
+                int val = 0;
+                pp_pc.query(key.c_str(), val);
+                char valstr[10]; sprintf(valstr, "%d", val);
+                PetscOptionsSetValue( NULL, "-pc_asm_overlap", valstr);
+            }
+
+            std::string subpctype = "ilu"; // default
+            {
+                std::string key = "sub_type";
+                std::string val = subpctype;
+                pp_pc.query(key.c_str(), val);
+                PetscOptionsSetValue( NULL, "-sub_pc_type", val.c_str());
+                subpctype = val;
+            }
+
+            if (subpctype == "ilu") {
+                std::string key = "ilu_factor_levels";
+                int val = 2;
+                pp_pc.query(key.c_str(), val);
+                char valstr[10]; sprintf(valstr, "%d", val);
+                PetscOptionsSetValue( NULL, "-sub_pc_factor_levels", valstr);
+            }
+
+        } else if (pctype == "hypre") {
+
+            std::string hyprepctype = "euclid"; // default
+            {
+                std::string key = "hypre_type";
+                std::string val = hyprepctype;
+                pp_pc.query(key.c_str(), val);
+                PetscOptionsSetValue( NULL, "-pc_hypre_type", val.c_str());
+                hyprepctype = val;
+            }
+
+            if (hyprepctype == "euclid") {
+                std::string key = "euclid_factor_levels";
+                int val = 2;
+                pp_pc.query(key.c_str(), val);
+                char valstr[10]; sprintf(valstr, "%d", val);
+                PetscOptionsSetValue( NULL, "-pc_hypre_euclid_level", valstr);
+            }
+
+        } else {
+
+            // some sanity checks
+#ifdef AMREX_USE_GPU
+            if (pctype == "lu") {
+                WARPX_ABORT_WITH_MESSAGE("PETScSolver_impl::setOptions() - PC type LU not available on GPUs");
+            }
+#endif
+        }
+
+    }
+
+}
+
+// Apply Jacobian operator
 void PETScSolver_impl::applyOp(VecType& a_F, const VecType& a_U) const
 {
     BL_PROFILE("PETScSolver_impl::applyOp()");
@@ -344,6 +426,8 @@ void KSP_impl::createObjects(const VecType& a_vec)
     KSPGetPC(m_ksp->obj, &pc);
     KSPSetPCSide(m_ksp->obj, PC_RIGHT);
     this->m_pc_type = this->m_linop->pcType();
+    // set PETSc options from WarpX inputs
+    setOptions();
     if (this->m_pc_type != PreconditionerType::pc_petsc) {
         // use native implementation (or no PC, if
         // native PC is turned off)
@@ -541,6 +625,8 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     PC pc;
     KSPGetPC(ksp, &pc);
     KSPSetPCSide(ksp, PC_RIGHT);
+    // set PETSc options from WarpX inputs
+    setOptions();
     if (this->m_pc_type != PreconditionerType::pc_petsc) {
         // use native implementation (or no PC, if
         // native PC is turned off)
