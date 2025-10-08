@@ -260,6 +260,7 @@ void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi))
     {
         PEC::ApplyReflectiveBoundarytoRhofield(rho,
@@ -277,6 +278,7 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi))
     {
         PEC::ApplyReflectiveBoundarytoJfield(Jx, Jy, Jz,
