@@ -62,7 +62,8 @@ void addLocalToGlobal (const amrex::Box& bx,
 }
 #endif
 
-#if defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
