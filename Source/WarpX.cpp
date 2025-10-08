@@ -320,7 +320,8 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
-    m_instance = this;
+    m_instance = this; // This guarantees that GetInstance() can be
+                       // indirectly used in WarpX constructor.
 
     warpx::initialization::initialize_warning_manager();
 
