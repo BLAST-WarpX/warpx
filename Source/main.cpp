@@ -31,7 +31,7 @@ main (int argc, char* argv[]) {
 
             warpx->InitData();
             warpx->Evolve();
-            const auto is_warpx_verbose = warpx.Verbose();
+            const auto is_warpx_verbose = warpx->Verbose();
             WarpX::Finalize_detail();
 
             timer.record_stop_time();
