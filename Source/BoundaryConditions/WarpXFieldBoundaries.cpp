@@ -127,9 +127,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
     if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
         if (patch_type == PatchType::fine) {
             pec_insulator_boundary->ApplyPEC_InsulatortoEfield(
-                    {m_fields.get(FieldType::Efield_fp,Direction{0},lev),
-                     m_fields.get(FieldType::Efield_fp,Direction{1},lev),
-                     m_fields.get(FieldType::Efield_fp,Direction{2},lev)},
+                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     field_boundary_lo, field_boundary_hi,
                     get_ng_fieldgather(), Geom(lev),
                     lev, patch_type, ref_ratio, time);
@@ -145,9 +143,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
             }
         } else {
             pec_insulator_boundary->ApplyPEC_InsulatortoEfield(
-                {m_fields.get(FieldType::Efield_cp,Direction{0},lev),
-                 m_fields.get(FieldType::Efield_cp,Direction{1},lev),
-                 m_fields.get(FieldType::Efield_cp,Direction{2},lev)},
+                m_fields.get_alldirs(FieldType::Efield_cp, lev),
                 field_boundary_lo, field_boundary_hi,
                 get_ng_fieldgather(), Geom(lev),
                 lev, patch_type, ref_ratio, time);
@@ -216,17 +212,13 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
     if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
         if (patch_type == PatchType::fine) {
             pec_insulator_boundary->ApplyPEC_InsulatortoBfield(
-                {m_fields.get(FieldType::Bfield_fp,Direction{0},lev),
-                 m_fields.get(FieldType::Bfield_fp,Direction{1},lev),
-                 m_fields.get(FieldType::Bfield_fp,Direction{2},lev)},
+                m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                 field_boundary_lo, field_boundary_hi,
                 get_ng_fieldgather(), Geom(lev),
                 lev, patch_type, ref_ratio, time);
         } else {
             pec_insulator_boundary->ApplyPEC_InsulatortoBfield(
-                {m_fields.get(FieldType::Bfield_cp,Direction{0},lev),
-                 m_fields.get(FieldType::Bfield_cp,Direction{1},lev),
-                 m_fields.get(FieldType::Bfield_cp,Direction{2},lev)},
+                m_fields.get_alldirs(FieldType::Bfield_cp, lev),
                 field_boundary_lo, field_boundary_hi,
                 get_ng_fieldgather(), Geom(lev),
                 lev, patch_type, ref_ratio, time);

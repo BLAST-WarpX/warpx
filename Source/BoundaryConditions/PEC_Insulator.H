@@ -172,6 +172,5 @@ private:
     std::unique_ptr<amrex::Parser> m_Ex_z_lo, m_Ey_z_lo;
     std::unique_ptr<amrex::Parser> m_Ex_z_hi, m_Ey_z_hi;
 
-
 };
 #endif // PEC_INSULATOR_H_

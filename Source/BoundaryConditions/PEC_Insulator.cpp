@@ -62,13 +62,14 @@ namespace
                                   amrex::GpuArray<FieldBoundaryType, 3> const fbndry_hi)
     {
         using namespace amrex::literals;
+        amrex::IntVect ijk_mirror = ijk_vec;
+        amrex::IntVect ijk_boundary = ijk_vec;
         amrex::IntVect ijk_next = ijk_vec;
         amrex::IntVect ijk_nextp1 = ijk_vec;
-        amrex::IntVect ijk_mirror = ijk_vec;
-        bool OnBoundary = false;
-        bool GuardCell = false;
-        bool isInsulatorBoundary = false;
-        amrex::Real sign = +1._rt;
+        bool on_cell_boundary = false;
+        bool on_nodal_boundary = false;
+        bool guard_cell = false;
+        bool is_insulator_boundary = false;
         bool is_normal_to_boundary = false;
         amrex::Real field_value = 0._rt;
         bool set_field = false;
@@ -76,15 +77,15 @@ namespace
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
-                bool const isPEC_InsulatorBoundary = ( (iside == -1)
+                bool const is_PEC_insulator_boundary = ( (iside == -1)
                     ? fbndry_lo[idim] == FieldBoundaryType::PECInsulator
                     : fbndry_hi[idim] == FieldBoundaryType::PECInsulator );
-                if (isPEC_InsulatorBoundary) {
-                    isInsulatorBoundary = ( (iside == -1)
+                if (is_PEC_insulator_boundary) {
+
+                    is_insulator_boundary = ( (iside == -1)
                         ? is_insulator_lo[idim] == 1
                         : is_insulator_hi[idim] == 1 );
-                }
-                if (isPEC_InsulatorBoundary) {
+
                     // Calculates the number of grid points ijk_vec is beyond the
                     // domain boundary i.e. a value of +1 means the current cell is
                     // outside of the simulation domain by 1 cell. Note that the high
@@ -107,55 +108,95 @@ namespace
                     is_normal_to_boundary = (icomp == idim);
 #endif
 
-                    if (ig == 0) {
-                        // Check if field is on the boundary
-                        if (is_nodal[idim] == 1) {
-                            OnBoundary = true;
-                        }
-                    } else if (ig > 0) {
-                        GuardCell = true;
+                    // For B fields, the parallel fields are cell centered, so are on the boundary
+                    // when ig == 1, the first cell beyond the boundary.
+                    on_cell_boundary = (ig == 1);
 
-                        // Location of the next cells inward
-                        ijk_next[idim] = ijk_vec[idim] - ig*iside;
-                        ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
+                    on_nodal_boundary = (ig == 0);
+
+                    if (is_insulator_boundary) {
+                        field_value = ( (iside == -1) ? field_lo[idim] : field_hi[idim] );
+                        set_field = ( (iside == -1) ? set_field_lo[idim]==1 : set_field_hi[idim]==1 );
+                    }
+
+                    if (ig > 0) {
+                        guard_cell = true;
 
                         // Mirror location inside the domain by "ig" number of cells
                         ijk_mirror[idim] = ( (iside == -1)
                                         ? (dom_lo[idim] + ig - (1 - is_nodal[idim]))
                                         : (dom_hi[idim] - ig + 1));
 
-                        // Check for components with even symmetry.
-                        // True for E_like and tangential, and B_like and normal
-                        if (E_like ^ is_normal_to_boundary) { sign *= -1._rt; }
+                        ijk_boundary[idim] = ( (iside == -1) ? dom_lo[idim] : dom_hi[idim] + is_nodal[idim]);
 
-                        field_value = ( (iside == -1) ? field_lo[idim] : field_hi[idim] );
-                        set_field = ( (iside == -1) ? set_field_lo[idim]==1 : set_field_hi[idim]==1 );
+                        // Location of the next cells inward
+                        ijk_next[idim] = ijk_vec[idim] - ig*iside;
+                        ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
+
                     }
                 } // is pec_insulator boundary
             } // loop over iside
         } // loop over dimensions
 
-        if (isInsulatorBoundary) {
+        if (E_like) {
             if (is_normal_to_boundary) {
-                // The value on the boundary is left unmodified
-                // The values in the guard cells are extrapolated
-                if (GuardCell) {
-                    field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
+                if (guard_cell) {
+                    // E-normal is cell-centered so is mirrored for both PEC and insulator
+                    field(ijk_vec, n) = field(ijk_mirror, n);
                 }
-            } else if ((OnBoundary || GuardCell) && set_field) {
-                field(ijk_vec, n) = field_value;
-            } else if (GuardCell) {
-                field(ijk_vec, n) = 2._rt*field(ijk_next, n) - field(ijk_nextp1, n);
+            } else {
+                if (on_nodal_boundary) {
+                    if (is_insulator_boundary) {
+                        if (set_field) {
+                            // E-parallel on the boundary is only modified if field is being set,
+                            // otherwise it is evolved
+                            field(ijk_vec, n) = field_value;
+                        }
+                    } else {
+                        // E-parallel is set to zero on the boundary for PEC
+                        field(ijk_vec, n) = 0._rt;
+                    }
+                } else if (guard_cell) {
+                    if (is_insulator_boundary) {
+                        amrex::Real const field_boundary = (set_field ? field_value : field(ijk_boundary, n));
+                        field(ijk_vec, n) = 2._rt*field_boundary - field(ijk_mirror, n);
+                    } else {
+                        // For PEC, field_boundary = 0
+                        field(ijk_vec, n) = -field(ijk_mirror, n);
+                    }
+                }
             }
         } else {
-            if (OnBoundary && (E_like ^ is_normal_to_boundary)) {
-                // If ijk_vec is on a boundary, set to zero if
-                // E_like and tangential or B_like and normal
-                field(ijk_vec,n) = 0._rt;
-            } else if (GuardCell) {
-                // Fnormal and Ftangential is set opposite and equal to the value
-                // in the mirror location, respectively.
-                field(ijk_vec,n) = sign * field(ijk_mirror,n);
+            // B-field
+            if (is_normal_to_boundary) {
+                if (on_nodal_boundary) {
+                    // For insulator, B-normal is evolved so is unmodified here
+                    if (!is_insulator_boundary) {
+                        // With PEC, B-normal is zeroed out.
+                        field(ijk_vec, n) = 0._rt;
+                    }
+                } else if (guard_cell) {
+                    // B-normal is nodal
+                    if (is_insulator_boundary) {
+                        // Extrapolate from evolved value on the boundary
+                        field(ijk_vec, n) = 2._rt*field(ijk_boundary, n) - field(ijk_mirror, n);
+                    } else {
+                        // Extrapolate from zero on the boundary
+                        field(ijk_vec, n) = -field(ijk_mirror, n);
+                    }
+                }
+            } else {
+                if (on_cell_boundary && is_insulator_boundary && set_field) {
+                    // B-parallel in the boundary cell is only modified if field is being set,
+                    // otherwise it is mirrored.
+                    field(ijk_vec, n) = field_value;
+                } else if (guard_cell) {
+                    if (is_insulator_boundary && set_field) {
+                        field(ijk_vec, n) = 2._rt*field(ijk_next, n) + field(ijk_nextp1, n);
+                    } else {
+                        field(ijk_vec, n) = field(ijk_mirror, n);
+                    }
+                }
             }
         }
     }
