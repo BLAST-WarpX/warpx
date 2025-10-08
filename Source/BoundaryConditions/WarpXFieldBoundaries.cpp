@@ -132,7 +132,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
                     get_ng_fieldgather(), Geom(lev),
                     lev, patch_type, ref_ratio, time);
             if (::isAnyBoundary<FieldBoundaryType::PML>(field_boundary_lo, field_boundary_hi)) {
-                // apply pec on split E-fields in PML region
+                // apply on split E-fields in PML region
                 const bool split_pml_field = true;
                 pec_insulator_boundary->ApplyPEC_InsulatortoEfield(
                     m_fields.get_alldirs(FieldType::pml_E_fp, lev),
@@ -148,7 +148,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
                 get_ng_fieldgather(), Geom(lev),
                 lev, patch_type, ref_ratio, time);
             if (::isAnyBoundary<FieldBoundaryType::PML>(field_boundary_lo, field_boundary_hi)) {
-                // apply pec on split E-fields in PML region
+                // apply on split E-fields in PML region
                 const bool split_pml_field = true;
                 pec_insulator_boundary->ApplyPEC_InsulatortoEfield(
                     m_fields.get_alldirs(FieldType::pml_E_cp, lev),
