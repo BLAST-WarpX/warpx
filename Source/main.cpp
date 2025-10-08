@@ -37,7 +37,7 @@ main (int argc, char* argv[]) {
             timer.record_stop_time();
             if (is_warpx_verbose) {
                 amrex::Print() << "Total Time                     : "
-                           << timer.get_global_duration() << '\n';
+                               << timer.get_global_duration() << '\n';
             }
         }
 
