@@ -89,6 +89,11 @@ public:
 
     static void Finalize_detail (); //! NOT for the users
 
+    static void Initialize ();
+
+    /** Default constructor */
+    WarpX ();
+
     /** Destructor */
     ~WarpX () override;
 
@@ -988,9 +993,6 @@ protected:
     void ClearLevel (int lev) final;
 
 private:
-
-    /** Default constructor */
-    WarpX ();
 
     static WarpX* MakeWarpX_detail (bool make);
 

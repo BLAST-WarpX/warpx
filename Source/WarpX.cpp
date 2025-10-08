@@ -268,30 +268,34 @@ namespace
     }
 }
 
+void WarpX::Initialize ()
+{
+    warpx::initialization::check_dims();
+
+    ReadMovingWindowParameters(
+        do_moving_window, start_moving_window_step, end_moving_window_step,
+        moving_window_dir, moving_window_v);
+
+    ConvertLabParamsToBoost();
+
+    std::tie(field_boundary_lo, field_boundary_hi) =
+        warpx::boundary_conditions::parse_field_boundaries();
+
+    const auto is_field_boundary_periodic =
+        warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
+
+    std::tie(particle_boundary_lo, particle_boundary_hi) =
+        warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
+
+    CheckGriddingForRZSpectral();
+}
+
 WarpX* WarpX::MakeWarpX_detail (bool make)
 {
     static bool first_call = true;
     if (first_call) {
         first_call = false;
-
-        warpx::initialization::check_dims();
-
-        ReadMovingWindowParameters(
-            do_moving_window, start_moving_window_step, end_moving_window_step,
-            moving_window_dir, moving_window_v);
-
-        ConvertLabParamsToBoost();
-
-        std::tie(field_boundary_lo, field_boundary_hi) =
-            warpx::boundary_conditions::parse_field_boundaries();
-
-        const auto is_field_boundary_periodic =
-            warpx::boundary_conditions::get_periodicity_array(field_boundary_lo, field_boundary_hi);
-
-        std::tie(particle_boundary_lo, particle_boundary_hi) =
-            warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
-
-        CheckGriddingForRZSpectral();
+        WarpX::Initialize();
     }
 
     // We use a raw pointer here because of how Python binding is set up.

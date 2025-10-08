@@ -21,19 +21,24 @@ main (int argc, char* argv[]) {
     {
         WARPX_PROFILE_VAR("main()", pmain);
 
-        auto timer = ablastr::utils::timer::Timer{};
-        timer.record_start_time();
+        {
+            auto timer = ablastr::utils::timer::Timer{};
+            timer.record_start_time();
 
-        auto& warpx = WarpX::GetInstance_detail();
-        warpx.InitData();
-        warpx.Evolve();
-        const auto is_warpx_verbose = warpx.Verbose();
-        WarpX::Finalize_detail();
+            WarpX::Initialize();
 
-        timer.record_stop_time();
-        if (is_warpx_verbose) {
-            amrex::Print() << "Total Time                     : "
+            auto warpx = std::make_unique<WarpX>();
+
+            warpx->InitData();
+            warpx->Evolve();
+            const auto is_warpx_verbose = warpx.Verbose();
+            WarpX::Finalize_detail();
+
+            timer.record_stop_time();
+            if (is_warpx_verbose) {
+                amrex::Print() << "Total Time                     : "
                            << timer.get_global_duration() << '\n';
+            }
         }
 
         WARPX_PROFILE_VAR_STOP(pmain);
