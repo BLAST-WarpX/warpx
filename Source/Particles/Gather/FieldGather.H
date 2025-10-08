@@ -481,8 +481,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     const amrex::Real z = (zp-xyzmin.z)*dinv.z;
     amrex::Real sz_node[depos_order + 1];
     amrex::Real sz_cell[depos_order + 1];
-    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
-    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
+    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation];
+    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation];
     int l_node = 0;
     int l_cell = 0;
     int l_node_v = 0;
