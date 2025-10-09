@@ -7,6 +7,8 @@
  */
 #include "MultiFabRegister.H"
 
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_MakeType.H>
 
 #include <array>

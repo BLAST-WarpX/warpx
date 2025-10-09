@@ -272,6 +272,11 @@ Nuclear Fusion and Plasma Confinement
 Plasma Thrusters and Spacecraft Physics
 ***************************************
 
+#. Zhou Z., Luo X., Zhao Y., Yu D.
+   **Impact of azimuthal magnetic field inhomogeneity on Hall thruster high-frequency azimuthal instability via 2D radial–azimuthal PIC simulations**.
+   Plasma Sources Sci. Technol. **34**, 105006, 2025.
+   `DOI:10.1088/1361-6595/ae0af5 <https://doi.org/10.1088/1361-6595/ae0af5>`__
+
 #. Xie L., Zhou Z., Luo X., Zhao Y.
    **The influence of adding Monte Carlo collisions on convergence in 3D PIC simulations of Hall thruster azimuthal instability**.
    Phys. Scr. **100**, 075616, 2025.

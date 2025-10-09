@@ -52,27 +52,15 @@ amrex::Real minmod (amrex::Real a, amrex::Real b)
         return 0.0_rt;
     }
 }
-// Min of 3 inputs
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real min3 (amrex::Real a, amrex::Real b, amrex::Real c)
-{
-    return std::min(a, std::min(b, c) );
-}
-// Max of 3 inputs
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real max3 (amrex::Real a, amrex::Real b, amrex::Real c)
-{
-    return std::max(a, std::max(b, c) );
-}
 // mindmod
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real minmod3 (amrex::Real a, amrex::Real b , amrex::Real c)
 {
     using namespace amrex::literals;
     if (a > 0.0_rt && b > 0.0_rt && c > 0.0_rt) {
-        return min3(a,b,c);
+        return std::min({a,b,c});
     } else if (a < 0.0_rt && b < 0.0_rt && c < 0.0_rt) {
-        return max3(a,b,c);
+        return std::max({a,b,c});
     } else {
         return 0.0;
     }
@@ -170,7 +158,7 @@ amrex::Real ave_stage2 (amrex::Real dQ, amrex::Real a, amrex::Real b, amrex::Rea
     using namespace amrex::literals;
     // sigma = sqrt(3) -1
     constexpr auto sigma = 0.732050807568877_rt;
-    const amrex::Real dq_min = 2.0_rt*std::min( b - min3(a,b,c), max3(a,b,c) - b);
+    const amrex::Real dq_min = 2.0_rt*std::min( b - std::min({a,b,c}), std::max({a,b,c}) - b);
     return ( std::abs(dQ)/dQ ) * std::min( std::abs(dQ) , sigma*std::abs(dq_min) );
 }
 // Returns the offset indices for the "plus" grid
