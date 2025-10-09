@@ -459,6 +459,11 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         auto dst_index = ptile_buffer.numParticles();
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
+                          auto np_to_add = amrex::get<0>(reduce_data.value());
+                          amrex::Long np_cap = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                          if (dst_index + np_to_add > np_cap) {
+                              ptile_buffer.resize(2*(dst_index + np_to_add));
+                          }
                           ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
                         }
                         {
@@ -563,6 +568,11 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     auto dst_index = ptile_buffer.numParticles();
                     {
                         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
+                        auto np_to_add = amrex::get<0>(reduce_data.value());
+                        amrex::Long np_cap = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                        if (dst_index + np_to_add > np_cap) {
+                            ptile_buffer.resize(2*(dst_index + np_to_add));
+                        }
                         ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
                     }
                     auto &warpx = WarpX::GetInstance();
