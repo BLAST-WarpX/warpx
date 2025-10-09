@@ -362,6 +362,8 @@ namespace
      * \param[in] mirrorfac         mirror cell indices given by mirrorfac - ijk_vec
      * \param[in] is_reflective     whether the given boundary is reflective
      * \param[in] psign             sign for reflecting the field value across the boundary
+     * \param[in] sum_on_boundary   whether the guards are summed on the boundary (for J|| and PECInsulator)
+     * \param[in] nguards           number of guard cells to sum over
      * \param[in] idim              boundary direction
      * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
@@ -373,9 +375,11 @@ namespace
                         const amrex::GpuArray<int,2> & mirrorfac,
                         const amrex::GpuArray<int,2> & is_reflective,
                         const amrex::GpuArray<amrex::Real,2> & psign,
+                        const amrex::GpuArray<int,2> & sum_on_boundary,
+                        int const nguards,
                         [[maybe_unused]]int const idim,
                         [[maybe_unused]]int const is_nodal_r,
-                              amrex::Box const& fabbox)
+                        amrex::Box const& fabbox)
     {
 
         for (int iside = 0; iside < 2; ++iside) {
@@ -403,7 +407,19 @@ namespace
                 }
 #endif
                 // Reflected J/rho deposited to guard cell to mirror valid cell
-                field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
+                // The J-parallel in PECInsulator boundaries is handled differently.
+                if (ijk_vec != ijk_mirror || !sum_on_boundary[iside] || psign[iside] > 0._rt) {
+                    field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
+                } else {
+                    // For J-parallel in PECInsulator boundaries, sum the values in the guard
+                    // cells and add it to the J in the boundary (noting that J-parallel is nodal).
+                    int const isign = (iside == 0 ? -1 : +1);
+                    amrex::IntVect ijk_guard = ijk_vec;
+                    for (int ig = 0 ; ig < nguards ; ig++) {
+                        ijk_guard[idim] += isign;
+                        field(ijk_vec,n) += field(ijk_guard,n);
+                    }
+                }
             }
         }
     }
@@ -458,10 +474,8 @@ namespace
             ijk_mirror[idim] = mirrorfac[iside] - ijk_vec[idim];
 
             // Update the cell if the mirror guard cell exists
-            if (ijk_vec == ijk_mirror && psign[iside] == -1) {
-                field(ijk_mirror,n) = 0.0;
-            }
-            else if ( (ijk_vec != ijk_mirror) && (fabbox.contains(ijk_mirror)) ) {
+            // This assumes that the nodal boundary cells are not included in the box.
+            if (fabbox.contains(ijk_mirror)) {
                 amrex::Real inv_rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 if (idim == 0 && iside == 1) {
@@ -736,6 +750,7 @@ PEC::ApplyReflectiveBoundarytoRhofield (
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<GpuArray<Real,2>,AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> mirrorfac;
+    amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> sum_on_boundary;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
         // Check if boundary is reflective on lo side
@@ -767,6 +782,10 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         // Set the mirror index offset on lo and hi sides
         mirrorfac[idim][0] = 2*domain_lo[idim] - (1 - rho_nodal[idim]);
         mirrorfac[idim][1] = 2*domain_hi[idim] - (1 - rho_nodal[idim]);
+
+        // Whether the J-parallel in the guard cells is summed on the boundary
+        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator);
+        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator);
 
     }
 
@@ -814,8 +833,8 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 ::ReflectJorRho( n, iv, rho_array, mirrorfac[idim],
-                                 is_reflective[idim], psign[idim], idim,
-                                 rho_nodal[0], rho_fabbox );
+                                 is_reflective[idim], psign[idim], sum_on_boundary[idim], Ng[idim],
+                                 idim, rho_nodal[0], rho_fabbox );
             });
 
         }
@@ -833,8 +852,15 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             // Get Rho box and grow to include guard cells in transverse dirs
             amrex::Box rho_box = amrex::convert(mfi.validbox(),rho_nodal);
             for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                if (jdim==idim) { continue; }
-                rho_box.grow(jdim,Ng[jdim]);
+                if (jdim == idim) {
+                    if (rho_nodal[jdim]) {
+                        // The nodal boundary values were fully handled in ReflectJorRho
+                        // so exclude them from the loop here.
+                        rho_box.grow(jdim, -1);
+                    }
+                } else {
+                    rho_box.grow(jdim, Ng[jdim]);
+                }
             }
 
             auto const& rho_array = rho->array(mfi);
@@ -901,6 +927,7 @@ PEC::ApplyReflectiveBoundarytoJfield (
     amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> is_reflective;
     amrex::GpuArray<GpuArray<GpuArray<Real,2>,3>,AMREX_SPACEDIM> psign;
     amrex::GpuArray<GpuArray<GpuArray<int,2>,3>,AMREX_SPACEDIM> mirrorfac;
+    amrex::GpuArray<GpuArray<int,2>,AMREX_SPACEDIM> sum_on_boundary;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
         // Check if boundary is reflective on lo side
@@ -956,6 +983,10 @@ PEC::ApplyReflectiveBoundarytoJfield (
         mirrorfac[idim][2][0] = 2*domain_lo[idim] - (1 - Jz_nodal[idim]);
         mirrorfac[idim][2][1] = 2*domain_hi[idim] - (1 - Jz_nodal[idim]);
 
+        // Whether the J-parallel in the guard cells is summed on the boundary
+        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator);
+        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator);
+
     }
 
 #ifdef AMREX_USE_OMP
@@ -1010,24 +1041,24 @@ PEC::ApplyReflectiveBoundarytoJfield (
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 ::ReflectJorRho( n, iv, Jx_array, mirrorfac[idim][0],
-                                 is_reflective[idim], psign[idim][0], idim,
-                                 Jx_nodal[0], Jx_fabbox );
+                                 is_reflective[idim], psign[idim][0], sum_on_boundary[idim], Ng[idim],
+                                 idim, Jx_nodal[0], Jx_fabbox );
             },
             Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 ::ReflectJorRho( n, iv, Jy_array, mirrorfac[idim][1],
-                                 is_reflective[idim], psign[idim][1], idim,
-                                 Jy_nodal[0], Jy_fabbox );
+                                 is_reflective[idim], psign[idim][1], sum_on_boundary[idim], Ng[idim],
+                                 idim, Jy_nodal[0], Jy_fabbox );
             },
             Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 ::ReflectJorRho( n, iv, Jz_array, mirrorfac[idim][2],
-                                 is_reflective[idim], psign[idim][2], idim,
-                                 Jz_nodal[0], Jz_fabbox );
+                                 is_reflective[idim], psign[idim][2], sum_on_boundary[idim], Ng[idim],
+                                 idim, Jz_nodal[0], Jz_fabbox );
             });
 
         }
@@ -1047,10 +1078,17 @@ PEC::ApplyReflectiveBoundarytoJfield (
             amrex::Box Jy_box = amrex::convert(mfi.validbox(),Jy_nodal);
             amrex::Box Jz_box = amrex::convert(mfi.validbox(),Jz_nodal);
             for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                if (jdim==idim) { continue; }
-                Jx_box.grow(jdim,Ng[jdim]);
-                Jy_box.grow(jdim,Ng[jdim]);
-                Jz_box.grow(jdim,Ng[jdim]);
+                if (jdim == idim) {
+                    // The nodal boundary values were fully handled in ReflectJorRho
+                    // so exclude them from the loop here.
+                    if (Jx_nodal[idim]) { Jx_box.grow(jdim, -1); }
+                    if (Jy_nodal[idim]) { Jy_box.grow(jdim, -1); }
+                    if (Jz_nodal[idim]) { Jz_box.grow(jdim, -1); }
+                } else {
+                    Jx_box.grow(jdim, Ng[jdim]);
+                    Jy_box.grow(jdim, Ng[jdim]);
+                    Jz_box.grow(jdim, Ng[jdim]);
+                }
             }
 
             auto const& Jx_array = Jx->array(mfi);
