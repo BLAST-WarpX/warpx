@@ -17,7 +17,7 @@
     "particle_position_z": 5119.315988293887,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 9.753592070820214e-28,
+    "particle_momentum_z": 0.0,
     "particle_weight": 1.999999598832474e+20
   },
   "H2plus": {
@@ -26,7 +26,7 @@
     "particle_position_z": 1021.6452858525089,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
+    "particle_momentum_z": 9.753592070820214e-28,
     "particle_weight": 40116752655537.766
   },
   "Hplus": {
