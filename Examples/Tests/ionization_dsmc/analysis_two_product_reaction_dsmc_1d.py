@@ -42,7 +42,7 @@ E_com_after = (
 
 # Compute celocity of H in COM frame
 vH_com = np.sqrt(
-    (E_com_after * eV_to_J) / (m_H * (1 + m_H / m_H2))
+    1 / 2 * (E_com_after * eV_to_J) / (m_H * (1 + m_H / m_H2))
 )  # [m/s] Note: in the COM frame, the total momentum is zero
 
 # Lab-frame velocities
