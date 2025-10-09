@@ -60,6 +60,7 @@ eb.type = elastic_bhabha_moller
 eb.event_multiplier = 1.
 eb.probability_threshold = 0.5
 eb.probability_target_value = 0.02
+eb.minimum_scattering_angle = 0.01 # in rad
 
 # Full diagnostics
 diagnostics.diags_names = diag1

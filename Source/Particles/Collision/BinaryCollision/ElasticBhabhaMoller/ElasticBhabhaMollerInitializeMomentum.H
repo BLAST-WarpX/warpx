@@ -82,6 +82,7 @@ namespace {
      * @param[in] idx2_in index of second colliding macroparticle (lepton)
      * @param[in] idx1_out_start index of first product macroparticle (photon)
      * @param[in] idx2_out_start index of second product macroparticle (lepton)
+     * @param[in] minimum_scattering_angle minimum scattering angle (in radians)
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -90,6 +91,7 @@ namespace {
                             SoaData_type& soa1_out, SoaData_type& soa2_out,
                             const index_type& idx1_in, const index_type& idx2_in,
                             const index_type& idx1_out_start, const index_type& idx2_out_start,
+                            amrex::ParticleReal const minimum_scattering_angle,
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;
@@ -158,11 +160,12 @@ namespace {
 
         // Compute s12
         amrex::ParticleReal s12 = 0;
+        // Define minimum theta in radians
+        amrex::ParticleReal const theta_min = minimum_scattering_angle; //This must be set from the configuration. Also check ElasticBhabhaMollerCollisionFunc.H
+            
         if (p1sm > std::numeric_limits<amrex::ParticleReal>::min()) {
 
-            // Define minimum theta in radians
-            amrex::ParticleReal const theta_min = 0.01_prt; //~0.5 degrees. This must be set from the configuration. Also check ElasticBhabhaMollerCollisionFunc.H
-            s12 = (16*MathConst::pi*MathConst::pi* PhysConst::r_e* PhysConst::r_e)*(p1sm / m1 / PhysConst::c)*(p1sm / m1 / PhysConst::c)* TreeLevelElasticBhabhaCrossSectionAngularPart(theta_min);
+            s12 = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_min);
 
         }
 
@@ -177,16 +180,23 @@ namespace {
         // Newton-Raphson method between 0 and s12.
         amrex::ParticleReal const sample_point = r * s12;
         // Iteratively find angle which corresponds to the sample point.
-        amrex::ParticleReal theta_guess = 0.5_prt * MathConst::pi;
-        while (true) {
-            amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess) - sample_point;
-            amrex::ParticleReal const df = TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess);
+        amrex::ParticleReal theta_guess_old = theta_min;
+        amrex::ParticleReal theta_guess_new = theta_min;
+        amrex::ParticleReal const tol = 1e-6_prt;
+        amrex::ParticleReal rel_error = 1._prt;
+        while (rel_error > tol) {
+            amrex::ParticleReal const f = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_guess_old) - sample_point;
+            //Beware of the sign. TreeLevelElasticBhabhaCrossSectionAngularPart is integrated from 2Pi to theta_min.
+            amrex::ParticleReal const df = -TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess_old);
             //For theta_min = 0.05, sample_point must range from 0 to 31.5
-            if (std::abs(f) < 1e-6_prt) break;
-            theta_guess -= f / df;
+            theta_guess_new = theta_guess_old - f/df;
+            
+            rel_error = std::abs(theta_guess_new-theta_guess_old)/std::abs(theta_guess_old);
+            theta_guess_old = theta_guess_new;
+            
         }
-        cosXs = std::cos(theta_guess);
-        sinXs = std::sin(theta_guess);
+        cosXs = std::cos(theta_guess_old);
+        sinXs = std::sin(theta_guess_old);
 
         // Get random azimuthal angle
         amrex::ParticleReal const phis = amrex::Random(engine) * 2.0_prt * MathConst::pi;
@@ -211,15 +221,9 @@ namespace {
             p1fsz = (-p1sp           ) * sinXs*cosphis +
                     ( 0.0_prt        ) * sinXs*sinphis +
                     ( p1sz           ) * cosXs;
-            // Note a negative sign is different from
-            // Eq. (12) in Perez's paper,
-            // but they are the same due to the random nature of phis.
         }
         else
         {
-            // If the previous p1sp is almost zero
-            // x->y  y->z  z->x
-            // This set is equivalent to the one in Nanbu's paper
             p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
             p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
                     ( p1sz*p1sm/p1sp ) * sinXs*sinphis +

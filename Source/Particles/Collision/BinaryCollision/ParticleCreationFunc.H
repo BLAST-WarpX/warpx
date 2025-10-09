@@ -244,11 +244,17 @@ public:
                         engine);
                 }
                 else if(t_collision_type == CollisionType::ElasticBhabhaMoller){
+                    //amrex::ParmParse pp_collision_name(collision_name);
+                    amrex::ParticleReal minimum_scattering_angle = 0.001_prt; // in rad
+                    // utils::parser::queryWithParser(
+                    //     pp_collision_name, "minimum_scattering_angle",
+                    //      minimum_scattering_angle);
                     ElasticBhabhaMollerInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        minimum_scattering_angle,
                         engine);
                 }
             }

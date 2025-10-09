@@ -42,6 +42,8 @@
  * multiplier
  * @param[in] probability_target_value if the probability threshold is exceeded, this is used
  * to determine by how much the event multiplier is reduced
+ * @param[in] minimum_scattering_angle minimum scattering angle (in radians) used to compute
+ * the Bhabha cross section
  * @param[in] engine the random engine.
  */
 template <typename index_type>
@@ -57,8 +59,10 @@ void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, co
                                        const int& multiplier_ratio,
                                        const amrex::ParticleReal& probability_threshold,
                                        const amrex::ParticleReal& probability_target_value,
+                                       const amrex::ParticleReal& minimum_scattering_angle,
                                        const amrex::RandomEngine& engine)
 {
+
     using namespace amrex::literals;
     constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
     constexpr amrex::ParticleReal inv_c_sq = inv_c * inv_c;
@@ -98,13 +102,10 @@ void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, co
     amrex::ParticleReal const vcx    = (p1x+p2x) / mass_g;
     amrex::ParticleReal const vcy    = (p1y+p2y) / mass_g;
     amrex::ParticleReal const vcz    = (p1z+p2z) / mass_g;
-    amrex::ParticleReal const vcms   = vcx*vcx + vcy*vcy + vcz*vcz;
-    amrex::ParticleReal const gc     = 1._prt / std::sqrt( 1._prt - vcms*inv_c_sq );
-    // Factor that converts collision rate from rest frame to lab frame: ration of energies in rest frame and lab frame
-    // (See L. D. Landau and E. M. Lifshitz. The classical theory of fields, Eq. 12.5, 12.6)
-    const amrex::ParticleReal lab_to_rest_frame_factor = gc;
-    // sqrt( | v1 - v2 |^2  - | v1 x v2 |^2/c^2 ) evaluated in the rest frame
-    const amrex::ParticleReal v_rel =  PhysConst::c;
+    amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
+    BinaryCollisionUtils::get_collision_parameters(
+        m1*u1x, m1*u1y, m1*u1z, m2*u2x, m2*u2y, m2*u2z, m1, m2,
+        E_coll, v_coll, lab_to_COM_factor);
 
     // Compute vc dot v1 and v2
     amrex::ParticleReal const vcDv1 = (vcx*u1x + vcy*u1y + vcz*u1z) / g1;
@@ -114,13 +115,13 @@ void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, co
     // Rewrite by multiplying and dividing first term by (gc+1) to
     // avoid loss of precision when gc is close to 1
     amrex::ParticleReal const lorentz_transform_factor =
-            ( gc*gc*vcDv1*inv_c2/(1._prt + gc) - gc )*m1*g1;
+            ( lab_to_COM_factor*lab_to_COM_factor*vcDv1*inv_c2/(1._prt + lab_to_COM_factor) - lab_to_COM_factor )*m1*g1;
     amrex::ParticleReal const p1sx = p1x + vcx*lorentz_transform_factor;
     amrex::ParticleReal const p1sy = p1y + vcy*lorentz_transform_factor;
     amrex::ParticleReal const p1sz = p1z + vcz*lorentz_transform_factor;
     amrex::ParticleReal const p1sm = std::sqrt( p1sx*p1sx + p1sy*p1sy + p1sz*p1sz );
 
-    amrex::ParticleReal const theta_min = 0.01_prt; //~0.5 degrees. This must be set from the configuration. Also check ElasticBhabhaMollerInitializeMomentum.H
+    amrex::ParticleReal const theta_min = minimum_scattering_angle;
     // Elastic Bhabha Tree level cross section.
     amrex::ParticleReal numerator = (
         111._prt * std::cos(theta_min) +
@@ -131,18 +132,18 @@ void SingleElasticBhabhaMollerCollisionEvent (const amrex::ParticleReal& u1x, co
         10._prt
     );
     amrex::ParticleReal denominator = 1536._prt * MathConst::pi;
-    const amrex::ParticleReal bhabha_cross_section = (16*MathConst::pi*MathConst::pi* PhysConst::r_e* PhysConst::r_e)*(p1sm / m1 / PhysConst::c)*(p1sm / m1 / PhysConst::c)* (numerator / denominator);
+    const amrex::ParticleReal bhabha_cross_section = (16*MathConst::pi*MathConst::pi* PhysConst::r_e* PhysConst::r_e)/(p1sm / m1 / PhysConst::c*p1sm / m1 / PhysConst::c)* (numerator / denominator);
     // First estimate of probability for scattering
-    // (Convert from rest frame to lab frame, using lab_to_rest_frame_factor)
+    // (Convert from rest frame to lab frame, using lab_to_COM_factor)
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
-                                lab_to_rest_frame_factor * w_max * bhabha_cross_section * v_rel * dt / dV;
+                                lab_to_COM_factor * w_max * bhabha_cross_section * v_coll * dt / dV;
 
     // Effective event multiplier
     amrex::ParticleReal event_multiplier_eff = event_multiplier;
 
     // If the scattering probability is too high and the event multiplier greater than one,
-    // we risk to systematically underestimate the electron-positron yield. In this case,
-    // we reduce the event multiplier to reduce the pair-production probability
+    // we risk to systematically underestimate the cross section. In this case,
+    // we reduce the event multiplier to reduce the event probability
     if (probability_estimate > probability_threshold)
     {
         // We aim for a scattering probability of probability_target_value but take into account
