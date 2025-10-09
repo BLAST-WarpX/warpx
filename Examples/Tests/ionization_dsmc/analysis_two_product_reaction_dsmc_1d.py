@@ -40,7 +40,7 @@ E_com_after = (
     E_com_before + Q
 )  # [eV] Total kinetic energy in the center-of-mass frame (after the reaction)
 
-# Compute celocity of H in COM frame
+# Compute velocity of H in COM frame
 vH_com = np.sqrt(
     2 * (E_com_after * eV_to_J) / (m_H * (1 + m_H / m_H2))
 )  # [m/s] Note: in the COM frame, the total momentum is zero
@@ -52,6 +52,6 @@ vH2_lab = v_com - vH_com / 2
 theory_uz["H"] = vH_lab / clight
 theory_uz["H2plus"] = vH2_lab / clight
 
-# Compare the fluxes
+# Compare the velocities
 assert np.allclose(sim_uz["H2plus"], theory_uz["H2plus"], atol=1e-8)
 assert np.allclose(sim_uz["H"], theory_uz["H"], atol=1e-8)
