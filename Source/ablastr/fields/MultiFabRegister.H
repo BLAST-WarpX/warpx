@@ -8,8 +8,7 @@
 #ifndef ABLASTR_FIELDS_MF_REGISTER_H
 #define ABLASTR_FIELDS_MF_REGISTER_H
 
-#include <AMReX_BoxArray.H>
-#include <AMReX_DistributionMapping.H>
+#include <AMReX_BaseFwd.H>
 #include <AMReX_Enum.H>
 #include <AMReX_Extension.H>
 #include <AMReX_IntVect.H>
@@ -24,6 +23,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 

@@ -38,7 +38,6 @@
 
 #include <AMReX_BaseFwd.H>
 
-#include <array>
 #include <memory>
 
 using namespace amrex;

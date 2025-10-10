@@ -15,7 +15,7 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/Pusher/CopyParticleAttribs.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/Pusher/UpdatePositionPhoton.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
@@ -179,6 +179,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const int qed_runtime_flag = no_qed;
 #endif
 
+    // local copy for device lambda capture
+    amrex::ParticleReal const mass = m_mass;
+
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
                        {exteb_runtime_flag, qed_runtime_flag},
@@ -224,8 +227,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #else
             amrex::ignore_unused(qed_control);
 #endif
-
-            UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
+            UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
             SetPosition(i, x, y, z);
         }
     );

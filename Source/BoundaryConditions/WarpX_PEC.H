@@ -10,7 +10,6 @@
 #include <AMReX_BaseFwd.H>
 
 #include <array>
-#include <memory>
 
 namespace PEC {
     /**
