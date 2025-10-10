@@ -13,6 +13,7 @@ needs to be relaxed to one order of magnitude higher.
 import argparse
 import sys
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import constants
 
@@ -58,6 +59,40 @@ def analyze(args: argparse.Namespace) -> None:
     )
     field_energy_error = (field_energy - field_energy[0]) / normalization_factor
 
+    # plot the results before raising exceptions
+    fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
+    ax[0].plot(
+        field_energy_data[:, 1] * plasma_frequency,
+        total_energy_error,
+        label="Total energy error",
+    )
+    ax[0].set_xlabel(r"$\omega_p t$")
+    ax[0].set_ylabel(r"$\Delta U_{tot} / U_{tot}(t=0)$")
+    ax[0].set_yscale("symlog", linthresh=1e-6)
+    ax[0].grid()
+    ax[0].legend()
+    ax[1].plot(
+        field_energy_data[:, 1] * plasma_frequency,
+        field_energy_error,
+        label="Field energy error",
+    )
+    ax[1].hlines(
+        y=equipartition_value,
+        xmin=field_energy_data[0, 1] * plasma_frequency,
+        xmax=field_energy_data[-1, 1] * plasma_frequency,
+        colors="C1",
+        linestyles="dashed",
+        label="Equipartition value",
+    )
+    ax[1].set_xlabel(r"$\omega_p t$")
+    ax[1].set_ylabel(r"$\Delta U_{field} / (3 n T_e (10 c / \omega_p)^2)$")
+    ax[1].set_yscale("symlog", linthresh=1e-6)
+    ax[1].grid()
+    ax[1].legend()
+    plt.tight_layout()
+    plt.savefig("energy_conservation.png", dpi=300)
+    plt.close()
+
     print(f"Total energy error: \n{total_energy_error}")
     print(f"Field energy error: \n{field_energy_error}")
     print(f"Equipartition value: {equipartition_value}")
@@ -72,11 +107,13 @@ def analyze(args: argparse.Namespace) -> None:
 
     # compare the final value of the field energy variation to the reference equipartition value
     relative_tolerance = 1e-1
+    # average over the last 100 time steps to reduce noise
+    field_energy_error_avg = np.mean(field_energy_error[-100:])
     if not np.isclose(
-        field_energy_error[-1], equipartition_value, rtol=relative_tolerance
+        field_energy_error_avg, equipartition_value, rtol=relative_tolerance
     ):
         raise ValueError(
-            f"Final field energy error {field_energy_error[-1]} is not close to the reference equipartition value {equipartition_value}"
+            f"Averaged field energy error {field_energy_error_avg} is not close to the reference equipartition value {equipartition_value}"
         )
 
 
