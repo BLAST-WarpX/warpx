@@ -81,12 +81,14 @@ namespace {
         const amrex::ParticleReal E_rest_out = (m1_out + m2_out)*c_sq;
 
         // Compute momenta
-        const amrex::ParticleReal p1x_in = u1x_in * m1_in;
-        const amrex::ParticleReal p1y_in = u1y_in * m1_in;
-        const amrex::ParticleReal p1z_in = u1z_in * m1_in;
-        const amrex::ParticleReal p2x_in = u2x_in * m2_in;
-        const amrex::ParticleReal p2y_in = u2y_in * m2_in;
-        const amrex::ParticleReal p2z_in = u2z_in * m2_in;
+        // Note: for massless particles, the momentum is normalized to the electron mass
+        constexpr amrex::ParticleReal me = PhysConst::m_e;
+        const amrex::ParticleReal p1x_in = (m1_in == 0) ? me*u1x_in : m1_in*u1x_in;
+        const amrex::ParticleReal p1y_in = (m1_in == 0) ? me*u1y_in : m1_in*u1y_in;
+        const amrex::ParticleReal p1z_in = (m1_in == 0) ? me*u1z_in : m1_in*u1z_in;
+        const amrex::ParticleReal p2x_in = (m2_in == 0) ? me*u2x_in : m2_in*u2x_in;
+        const amrex::ParticleReal p2y_in = (m2_in == 0) ? me*u2y_in : m2_in*u2y_in;
+        const amrex::ParticleReal p2z_in = (m2_in == 0) ? me*u2z_in : m2_in*u2z_in;
 
         // Compute 0th component of the 4-momentum of the incident particles
         const amrex::ParticleReal p1t_in = std::sqrt(
@@ -195,12 +197,13 @@ namespace {
         const amrex::ParticleReal p2z_out = p1z_in + p2z_in - p1z_out;
 
         // Compute the momentum of the product macroparticles
-        u1x_out = p1x_out/m1_out;
-        u1y_out = p1y_out/m1_out;
-        u1z_out = p1z_out/m1_out;
-        u2x_out = p2x_out/m2_out;
-        u2y_out = p2y_out/m2_out;
-        u2z_out = p2z_out/m2_out;
+        // Note: for massless particles, the momentum is normalized to the electron mass
+        u1x_out = (m1_out == 0) ? p1x_out/me : p1x_out/m1_out;
+        u1y_out = (m1_out == 0) ? p1y_out/me : p1y_out/m1_out;
+        u1z_out = (m1_out == 0) ? p1z_out/me : p1z_out/m1_out;
+        u2x_out = (m2_out == 0) ? p2x_out/me : p2x_out/m2_out;
+        u2y_out = (m2_out == 0) ? p2y_out/me : p2y_out/m2_out;
+        u2z_out = (m2_out == 0) ? p2z_out/me : p2z_out/m2_out;
     }
 }
 
