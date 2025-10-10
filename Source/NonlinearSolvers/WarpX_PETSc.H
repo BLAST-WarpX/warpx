@@ -32,10 +32,10 @@ class ImplicitSolver;
 namespace warpx_petsc {
 
 // forward declarations
-class SNESObj;
-class KSPObj;
-class MatObj;
-class VecObj;
+struct SNESObj;
+struct KSPObj;
+struct MatObj;
+struct VecObj;
 // end of forward declarations
 
 using TIType = ImplicitSolver;
