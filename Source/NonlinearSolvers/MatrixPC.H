@@ -465,7 +465,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     if (dir != 2) {
                         {
                             auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
-                            amrex::Real val = 2*alpha * dxi[0]*dxi[0];
+                            amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0];
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
@@ -496,11 +496,11 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         auto cidx_g_rhs = (int) dof_arr(i,j,k,1);
                         amrex::Real val = 0.0;
                         if (dir == 0) {
-                            val += 2*alpha * dxi[1]*dxi[1];
+                            val += 2.0_rt*alpha * dxi[1]*dxi[1];
                         } else if (dir == 2) {
-                            val += 2*alpha * dxi[0]*dxi[0];
+                            val += 2.0_rt*alpha * dxi[0]*dxi[0];
                         } else {
-                            val += 2*alpha *(dxi[0]*dxi[0] + dxi[1]*dxi[1]);
+                            val += 2.0_rt*alpha *(dxi[0]*dxi[0] + dxi[1]*dxi[1]);
                         }
                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
@@ -593,7 +593,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     amrex::IntVect ic(AMREX_D_DECL(i,j,k));
                     {
                         auto cidx_g_rhs = (int) dof_arrays[0](ic,1);
-                        amrex::Real val = 2 * alpha * (dxi[dvec[1]]*dxi[dvec[1]] + dxi[dvec[2]]*dxi[dvec[2]]);
+                        amrex::Real val = 2.0_rt * alpha * (dxi[dvec[1]]*dxi[dvec[1]] + dxi[dvec[2]]*dxi[dvec[2]]);
                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                 &a_ij_ptr[ridx_l*nnz_max],
