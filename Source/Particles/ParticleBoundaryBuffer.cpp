@@ -460,11 +460,10 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
                           auto np_to_add = amrex::get<0>(reduce_data.value());
-                          amrex::Long np_cap = ptile_buffer.capacity() / species_buffer.superParticleSize();
-                          if (dst_index + np_to_add > np_cap) {
-                              ptile_buffer.resize(2*(dst_index + np_to_add));
-                          }
-                          ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
+                          auto new_np = dst_index + np_to_add;
+                          amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                          if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
+                          ptile_buffer.resize(new_np);
                         }
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
@@ -569,11 +568,10 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     {
                         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
                         auto np_to_add = amrex::get<0>(reduce_data.value());
-                        amrex::Long np_cap = ptile_buffer.capacity() / species_buffer.superParticleSize();
-                        if (dst_index + np_to_add > np_cap) {
-                            ptile_buffer.resize(2*(dst_index + np_to_add));
-                        }
-                        ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
+                        auto new_np = dst_index + np_to_add;
+                        amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                        if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
+                        ptile_buffer.resize(new_np);
                     }
                     auto &warpx = WarpX::GetInstance();
                     const auto dt = warpx.getdt(pti.GetLevel());
