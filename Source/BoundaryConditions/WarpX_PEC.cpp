@@ -417,7 +417,7 @@ namespace
                     amrex::IntVect ijk_guard = ijk_vec;
                     for (int ig = 0 ; ig < nguards ; ig++) {
                         ijk_guard[idim] += isign;
-                        field(ijk_vec,n) += field(ijk_guard,n);
+                        field(ijk_vec,n) += 2._rt*field(ijk_guard,n);
                     }
                 }
             }
