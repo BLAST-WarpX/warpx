@@ -42,4 +42,4 @@ ref_density = np.array([1.27936406e+14, 2.23582812e+14, 2.55397239e+14, 2.556656
 
 density_data = np.load("ion_density_case_1.npy")
 print(repr(density_data))
-assert np.allclose(density_data, ref_density, rtol=1e-2)
+assert np.allclose(density_data, ref_density)
