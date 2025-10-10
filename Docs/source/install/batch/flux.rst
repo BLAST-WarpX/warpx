@@ -16,8 +16,8 @@ Job Control
 
 * details for my jobs:
 
-  * ``flux jobs -a`` all jobs under my user name
-  * ``flux job info 12345 jobspec`` all details for job with <job id> ``12345``
+  * ``flux jobs`` all jobs under my user name
+  * ``flux job info abc123 jobspec`` all details for job with <job id> ``abc123``
   * ``flux job info 12345 eventlog`` history of events for job with <job id> ``12345``
 
 
