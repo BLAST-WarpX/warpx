@@ -265,6 +265,7 @@ class Checksum:
 
         # Dictionaries have same values?
         checksums_differ = False
+        max_rel_err = 0.0
         for key1 in ref_benchmark.data.keys():
             for key2 in ref_benchmark.data[key1].keys():
                 passed = np.isclose(
@@ -294,6 +295,8 @@ class Checksum:
                     if np.abs(x) != 0.0:
                         rel_err = abs_err / np.abs(x)
                         print("Relative error: {:.2e}".format(rel_err))
+                        max_rel_err = max(max_rel_err, rel_err)
+        print("\nMaximum relative error: {:.2e}".format(max_rel_err))
         if checksums_differ:
             print(f"\nNew checksums file {self.test_name}.json:")
             print(json.dumps(self.data, indent=2))

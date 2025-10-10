@@ -9,8 +9,6 @@
 breathe
 docutils>=0.17.1
 
-openpmd-viewer  # for checksumAPI
-
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
 picmistandard==0.33.0
