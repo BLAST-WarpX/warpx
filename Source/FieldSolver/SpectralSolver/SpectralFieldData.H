@@ -146,7 +146,7 @@ class SpectralFieldData
 {
 
     public:
-        SpectralFieldData( WarpX* warpx, int lev,
+        SpectralFieldData( WarpX* warpx,
                            const amrex::BoxArray& realspace_ba,
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,

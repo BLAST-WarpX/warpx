@@ -47,7 +47,6 @@ class SpectralSolver
          * the fields in spectral space.
          *
          * \param[in] warpx pointer to a WarpX object
-         * \param[in] lev mesh refinement level
          * \param[in] realspace_ba BoxArray in real space
          * \param[in] dm DistributionMapping for the given BoxArray
          * \param[in] norder_x spectral order along x
@@ -76,7 +75,7 @@ class SpectralSolver
          * \param[in] divb_cleaning whether to use div(B) cleaning to account for errors in
          *                          div(B) = 0 law (new field G in the update equations)
          */
-        SpectralSolver (WarpX* warpx, int lev,
+        SpectralSolver (WarpX* warpx,
                         const amrex::BoxArray& realspace_ba,
                         const amrex::DistributionMapping& dm,
                         int norder_x,
