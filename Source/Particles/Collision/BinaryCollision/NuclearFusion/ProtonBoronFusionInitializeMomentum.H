@@ -105,7 +105,7 @@ namespace {
             ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
             E_fusion,
-            true, // isotropic scattering
+            /*isotropic scattering=*/true,
             engine);
 
         // Compute momentum of beryllium in lab frame
