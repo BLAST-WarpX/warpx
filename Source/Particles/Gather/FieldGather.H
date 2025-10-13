@@ -403,8 +403,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // sx_[eb][xyz] shape factor along x for the centering of each current
     // There are only two possible centerings, node or cell centered, so at most only two shape factor
     // arrays will be needed.
-    amrex::Real sx_node[depos_order + 1];
-    amrex::Real sx_cell[depos_order + 1];
+    amrex::Real sx_node[depos_order + 1] = {0._rt};
+    amrex::Real sx_cell[depos_order + 1] = {0._rt};
     amrex::Real sx_node_galerkin[depos_order + 1 - galerkin_interpolation] = {0._rt};
     amrex::Real sx_cell_galerkin[depos_order + 1 - galerkin_interpolation] = {0._rt};
 
@@ -441,10 +441,10 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #if defined(WARPX_DIM_3D)
     // y direction
     const amrex::Real y = (yp-xyzmin.y)*dinv.y;
-    amrex::Real sy_node[depos_order + 1];
-    amrex::Real sy_cell[depos_order + 1];
-    amrex::Real sy_node_v[depos_order + 1 - galerkin_interpolation];
-    amrex::Real sy_cell_v[depos_order + 1 - galerkin_interpolation];
+    amrex::Real sy_node[depos_order + 1] = {0._rt};
+    amrex::Real sy_cell[depos_order + 1] = {0._rt};
+    amrex::Real sy_node_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
+    amrex::Real sy_cell_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
     int k_node = 0;
     int k_cell = 0;
     int k_node_v = 0;
@@ -479,10 +479,10 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // z direction
     const amrex::Real z = (zp-xyzmin.z)*dinv.z;
-    amrex::Real sz_node[depos_order + 1];
-    amrex::Real sz_cell[depos_order + 1];
-    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation];
-    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation];
+    amrex::Real sz_node[depos_order + 1] = {0._rt};
+    amrex::Real sz_cell[depos_order + 1] = {0._rt};
+    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
+    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
     int l_node = 0;
     int l_cell = 0;
     int l_node_v = 0;

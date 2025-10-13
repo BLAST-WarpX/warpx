@@ -792,7 +792,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
         amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
         realspace_ba.enclosedCells().grow(nge); // cell-centered + guard cells
-        spectral_solver_fp = std::make_unique<SpectralSolver>(lev, realspace_ba, dm,
+        spectral_solver_fp = std::make_unique<SpectralSolver>(realspace_ba, dm,
             nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
             v_comoving_zero, dx, dt, in_pml, periodic_single_box, update_with_rho,
             fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
@@ -904,7 +904,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
             amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
             realspace_cba.enclosedCells().grow(nge); // cell-centered + guard cells
-            spectral_solver_cp = std::make_unique<SpectralSolver>(lev, realspace_cba, cdm,
+            spectral_solver_cp = std::make_unique<SpectralSolver>(realspace_cba, cdm,
                 nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
                 v_comoving_zero, cdx, dt, in_pml, periodic_single_box, update_with_rho,
                 fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);

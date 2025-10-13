@@ -129,17 +129,13 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 }
 
 /* \brief Initialize fields in spectral space, and FFT plans */
-SpectralFieldData::SpectralFieldData( const int lev,
-                                      const amrex::BoxArray& realspace_ba,
+SpectralFieldData::SpectralFieldData( const amrex::BoxArray& realspace_ba,
                                       const SpectralKSpace& k_space,
                                       const amrex::DistributionMapping& dm,
                                       const int n_field_required,
                                       const bool periodic_single_box):
     m_periodic_single_box{periodic_single_box}
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, realspace_ba, dm);
-
     const BoxArray& spectralspace_ba = k_space.spectralspace_ba;
 
     // Allocate the arrays that contain the fields in spectral space
@@ -177,12 +173,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
     // Loop over boxes and allocate the corresponding plan
     // for each box owned by the local MPI proc
     for ( MFIter mfi(spectralspace_ba, dm); mfi.isValid(); ++mfi ){
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
-
         // Note: the size of the real-space box and spectral-space box
         // differ when using real-to-complex FFT. When initializing
         // the FFT plan, the valid dimensions are those of the real-space box.
@@ -197,13 +187,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
             fft_size, tmpRealField[mfi].dataPtr(),
             reinterpret_cast<ablastr::math::anyfft::Complex*>( tmpSpectralField[mfi].dataPtr()),
             ablastr::math::anyfft::direction::C2R, AMREX_SPACEDIM);
-
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 

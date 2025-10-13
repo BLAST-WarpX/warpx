@@ -320,6 +320,9 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    m_instance = this; // This guarantees that GetInstance() can be
+                       // indirectly used in WarpX constructor.
+
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
@@ -3058,8 +3061,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,
