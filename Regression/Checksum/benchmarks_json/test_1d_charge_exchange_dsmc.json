@@ -1,41 +1,41 @@
 {
+  "lev=0": {
+    "rho": 0.0008854820671196606
+  },
   "H": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 5.95036013049123e-17,
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 2531.217131747524,
-    "particle_weight": 12089592041266.457
-  },
-  "H2": {
+    "particle_position_z": 2530.9912404665756,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
+    "particle_momentum_z": 5.951881767143957e-17,
+    "particle_weight": 12092683613198.762
+  },
+  "H2": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
     "particle_position_z": 5119.315988293887,
-    "particle_weight": 1.999999598801558e+20
-  },
-  "H2plus": {
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
+    "particle_weight": 1.9999995987757947e+20
+  },
+  "H2plus": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 1270.0446609477433,
-    "particle_weight": 40119844227470.06
-  },
-  "Hplus": {
+    "particle_position_z": 1269.2422182808616,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 5.4195625447980895e-18,
+    "particle_momentum_z": 0.0,
+    "particle_weight": 40122420537413.65
+  },
+  "Hplus": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 29.019975970057178,
-    "particle_weight": 1101114869888.1821
-  },
-  "lev=0": {
-    "rho": 0.0008856952407255376
+    "particle_position_z": 29.390768217584238,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 5.406882239358692e-18,
+    "particle_weight": 1098538559944.5972
   }
 }
