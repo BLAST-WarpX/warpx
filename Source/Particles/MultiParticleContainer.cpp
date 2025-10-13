@@ -203,6 +203,43 @@ MultiParticleContainer::ReadParameters ()
 
         }
 
+        // if the input string for B_ext_particle_s is
+        // "read_from_file" then the mathematical expression
+        // for the time dependency read_fields_B_dependency(t)
+        // can be provided in the input file. If not provided, it defaults to '1.0'
+        if (m_B_ext_particle_s == "read_from_file") {
+            // store the mathematical expression as string
+            std::string str_B_ext_time_function = "1.0";
+            utils::parser::Query_parserString(
+                pp_particles, "read_fields_B_dependency(t)",
+                str_B_ext_time_function);
+
+            // Parser for B_external on the particle
+            m_B_particle_from_file_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_B_ext_time_function,{"t"}));
+
+            m_Bfield_time_partparser = m_B_particle_from_file_parser->compile<1>();
+        }
+
+        // if the input string for E_ext_particle_s is
+        // "read_from_file" then the mathematical expression
+        // for the time dependency read_fields_E_dependency(t)
+        // can be provided in the input file. If not provided, it defaults to '1.0'
+        if (m_E_ext_particle_s == "read_from_file") {
+            // store the mathematical expression as string
+            std::string str_E_ext_time_function = "1.0";
+            utils::parser::Query_parserString(
+                pp_particles, "read_fields_E_dependency(t)",
+                str_E_ext_time_function);
+
+            // Parser for B_external on the particle
+            m_E_particle_from_file_parser = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(str_E_ext_time_function,{"t"}));
+
+            m_Efield_time_partparser = m_E_particle_from_file_parser->compile<1>();
+
+        }
+
         // if the input string for E_ext_particle_s or B_ext_particle_s is
         // "repeated_plasma_lens" then the plasma lens properties
         // must be provided in the input file.
@@ -454,7 +491,7 @@ void
 MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
-                                Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                 ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
@@ -469,6 +506,9 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
         if (implicit_options && implicit_options->deposit_mass_matrices) {
+            fields.get(FieldType::current_fp_MM, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{2}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
@@ -478,10 +518,15 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
+            if (implicit_options->use_mass_matrices_pc) {
+                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
+            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, implicit_options);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, implicit_options);
     }
 }
 

@@ -48,16 +48,7 @@ void SemiImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "----------- SEMI IMPLICIT EM SOLVER PARAMETERS ------------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
-    amrex::Print() << "max particle iterations:    " << m_max_particle_iterations << "\n";
-    amrex::Print() << "particle tolerance:         " << m_particle_tolerance << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Picard) {
-        amrex::Print() << "Nonlinear solver type:      Picard\n";
-    }
-    else if (m_nlsolver_type==NonlinearSolverType::Newton) {
-        amrex::Print() << "Nonlinear solver type:      Newton\n";
-        amrex::Print() << "use mass matrices:          " << (m_use_mass_matrices ? "true":"false") << "\n";
-        PrintMassMatricesParameters();
-    }
+    PrintBaseImplicitSolverParameters();
     m_nlsolver->PrintParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -83,7 +74,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     m_Eold.Copy( FieldType::Efield_fp );
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
-    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::FirstHalf, start_time);
+    m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::FirstHalf, start_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
@@ -107,7 +98,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
 
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
-    m_WarpX->EvolveB(0.5_rt*m_dt, DtType::SecondHalf, half_time);
+    m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::SecondHalf, half_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
 }

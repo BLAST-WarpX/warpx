@@ -34,7 +34,6 @@ void
 computePhiIGF ( amrex::MultiFab const & rho,
                 amrex::MultiFab & phi,
                 std::array<amrex::Real, 3> const & cell_size,
-                amrex::BoxArray const & ba,
                 bool const is_igf_2d_slices)
 {
     using namespace amrex::literals;
@@ -42,8 +41,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     BL_PROFILE("ablastr::fields::computePhiIGF");
 
     // Define box that encompasses the full domain
-    amrex::Box domain = ba.minimalBox();
-    domain.surroundingNodes(); // get nodal points, since `phi` and `rho` are nodal
+    amrex::Box domain = rho.boxArray().minimalBox();
     domain.grow( phi.nGrowVect() ); // include guard cells
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
