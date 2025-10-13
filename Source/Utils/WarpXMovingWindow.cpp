@@ -253,94 +253,104 @@ namespace
 
     }
 
-}
-
-void
-WarpX::UpdateInjectionPosition (const amrex::Real a_dt)
-{
-    const int dir = moving_window_dir;
-
-    // Loop over species (particles and lasers)
-    const int n_containers = mypc->nContainers();
-    for (int i=0; i<n_containers; i++)
+    /**
+     * \brief Update injection position for continuous injection of
+     *        particles and lasers (loops over species and lasers).
+     */
+    void
+    UpdateInjectionPosition (
+        MultiParticleContainer& mpc,
+        const amrex::Real gamma_boost,
+        const amrex::Real beta_boost,
+        const amrex::Vector<int>& boost_direction,
+        const int moving_window_dir,
+        const amrex::Real a_dt)
     {
-        WarpXParticleContainer& pc = mypc->GetParticleContainer(i);
+        const int dir = moving_window_dir;
 
-        // Continuously inject plasma in new cells (by default only on level 0)
-        if (pc.doContinuousInjection())
+        // Loop over species (particles and lasers)
+        const int n_containers = mpc.nContainers();
+        for (int i=0; i<n_containers; i++)
         {
-            // Get bulk momentum and velocity of plasma
-            // 1D: dir=0 is z
-            // 2D: dir=0 is x, dir=1 is z
-            // 3D: dir=0 is x, dir=1 is y, dir=2 is z
-            amrex::Vector<amrex::Real> current_injection_position = {0._rt, 0._rt, 0._rt};
-#if defined(WARPX_DIM_1D_Z)
-            current_injection_position[2] = pc.m_current_injection_position;
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            current_injection_position[0] = pc.m_current_injection_position;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            current_injection_position[dir*2] = pc.m_current_injection_position;
-#else // 3D
-            current_injection_position[dir] = pc.m_current_injection_position;
-#endif
+            WarpXParticleContainer& pc = mpc.GetParticleContainer(i);
 
-            // This only uses the base plasma injector
-            PlasmaInjector* plasma_injector = pc.GetPlasmaInjector(0);
-
-            amrex::Real v_shift = 0._rt;
-            if (plasma_injector != nullptr)
+            // Continuously inject plasma in new cells (by default only on level 0)
+            if (pc.doContinuousInjection())
             {
-                const amrex::XDim3 u_bulk = plasma_injector->getInjectorMomentumHost()->getBulkMomentum(
-                    current_injection_position[0],
-                    current_injection_position[1],
-                    current_injection_position[2]);
-#if defined(WARPX_DIM_1D_Z)
-                amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.z};
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x};
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x, u_bulk.z};
-#else // 3D
-                amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x, u_bulk.y, u_bulk.z};
-#endif
-                v_shift = PhysConst::c * u_bulk_vec[dir] / std::sqrt(1._rt + u_bulk_vec[dir]*u_bulk_vec[dir]);
-            }
+                // Get bulk momentum and velocity of plasma
+                // 1D: dir=0 is z
+                // 2D: dir=0 is x, dir=1 is z
+                // 3D: dir=0 is x, dir=1 is y, dir=2 is z
+                amrex::Vector<amrex::Real> current_injection_position = {0._rt, 0._rt, 0._rt};
+    #if defined(WARPX_DIM_1D_Z)
+                current_injection_position[2] = pc.m_current_injection_position;
+    #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                current_injection_position[0] = pc.m_current_injection_position;
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                current_injection_position[dir*2] = pc.m_current_injection_position;
+    #else // 3D
+                current_injection_position[dir] = pc.m_current_injection_position;
+    #endif
 
-            // In boosted-frame simulations, the plasma has moved since the last
-            // call to this function, and injection position needs to be updated.
-            // Note that the bulk velocity v, obtained from getBulkMomentum, is
-            // transformed to the boosted frame velocity v' via the formula
-            // v' = (v-c*beta)/(1-v*beta/c)
-            if (WarpX::gamma_boost > 1._rt)
-            {
-                v_shift = (v_shift - PhysConst::c*WarpX::beta_boost)
-                          / (1._rt - v_shift*WarpX::beta_boost/PhysConst::c);
-#if defined(WARPX_DIM_3D)
-                v_shift *= WarpX::boost_direction[dir];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                // In 2D, dir=0 corresponds to x and dir=1 corresponds to z.
-                // This needs to be converted to access boost_direction,
-                // which has always 3 components.
-                v_shift *= WarpX::boost_direction[2*dir];
-#elif defined(WARPX_DIM_1D_Z)
-                // In 1D, dir=0 corresponds to z.
-                // This needs to be converted to access boost_direction,
-                // which has always 3 components.
-                v_shift *= WarpX::boost_direction[2];
-                amrex::ignore_unused(dir);
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                // In 1D radial, dir=0 corresponds to x.
-                // This needs to be converted to access boost_direction,
-                // which has always 3 components.
-                v_shift *= WarpX::boost_direction[0];
-                amrex::ignore_unused(dir);
-#endif
-            }
+                // This only uses the base plasma injector
+                PlasmaInjector* plasma_injector = pc.GetPlasmaInjector(0);
 
-            // Update current injection position
-            pc.m_current_injection_position += v_shift * a_dt;
+                amrex::Real v_shift = 0._rt;
+                if (plasma_injector != nullptr)
+                {
+                    const amrex::XDim3 u_bulk = plasma_injector->getInjectorMomentumHost()->getBulkMomentum(
+                        current_injection_position[0],
+                        current_injection_position[1],
+                        current_injection_position[2]);
+    #if defined(WARPX_DIM_1D_Z)
+                    amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.z};
+    #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x};
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x, u_bulk.z};
+    #else // 3D
+                    amrex::Vector<amrex::Real> u_bulk_vec = {u_bulk.x, u_bulk.y, u_bulk.z};
+    #endif
+                    v_shift = PhysConst::c * u_bulk_vec[dir] / std::sqrt(1._rt + u_bulk_vec[dir]*u_bulk_vec[dir]);
+                }
+
+                // In boosted-frame simulations, the plasma has moved since the last
+                // call to this function, and injection position needs to be updated.
+                // Note that the bulk velocity v, obtained from getBulkMomentum, is
+                // transformed to the boosted frame velocity v' via the formula
+                // v' = (v-c*beta)/(1-v*beta/c)
+                if (gamma_boost > 1._rt)
+                {
+                    v_shift = (v_shift - PhysConst::c*beta_boost)
+                            / (1._rt - v_shift*beta_boost/PhysConst::c);
+    #if defined(WARPX_DIM_3D)
+                    v_shift *= boost_direction[dir];
+    #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    // In 2D, dir=0 corresponds to x and dir=1 corresponds to z.
+                    // This needs to be converted to access boost_direction,
+                    // which has always 3 components.
+                    v_shift *= boost_direction[2*dir];
+    #elif defined(WARPX_DIM_1D_Z)
+                    // In 1D, dir=0 corresponds to z.
+                    // This needs to be converted to access boost_direction,
+                    // which has always 3 components.
+                    v_shift *= boost_direction[2];
+                    amrex::ignore_unused(dir);
+    #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    // In 1D radial, dir=0 corresponds to x.
+                    // This needs to be converted to access boost_direction,
+                    // which has always 3 components.
+                    v_shift *= boost_direction[0];
+                    amrex::ignore_unused(dir);
+    #endif
+                }
+
+                // Update current injection position
+                pc.m_current_injection_position += v_shift * a_dt;
+            }
         }
     }
+
 }
 
 int
@@ -367,7 +377,8 @@ WarpX::MoveWindow (const int step, bool move_j)
     const int dir = moving_window_dir;
 
     // Update current injection position for all containers
-    UpdateInjectionPosition(dt[0]);
+    ::UpdateInjectionPosition(*mypc, gamma_boost, beta_boost, boost_direction, moving_window_dir, dt[0]);
+
     // Update antenna position for all lasers
     // TODO Make this specific to lasers only
     mypc->UpdateAntennaPosition(dt[0]);

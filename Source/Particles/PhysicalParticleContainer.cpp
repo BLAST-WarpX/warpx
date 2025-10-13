@@ -1320,7 +1320,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         amrex::ignore_unused(x_old, y_old, z_old);
     }
 
-    // Loop over the particles and update their momentum
+    // local copies for device lambda capture
     const amrex::ParticleReal q = this->charge;
     const amrex::ParticleReal mass = this->m_mass;
 
@@ -1352,6 +1352,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     int qed_runtime_flag = no_qed;
 #endif
 
+    // Loop over the particles and update their momentum.
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
@@ -1429,7 +1430,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                   mass, q, pusher_algo, do_crr,
                                   dt);
 #endif
-        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt);
+        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
         setPosition(ip, xp, yp, zp);
 
 #ifdef WARPX_QED

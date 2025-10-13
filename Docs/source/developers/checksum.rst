@@ -3,63 +3,15 @@
 Checksums on Tests
 ==================
 
-When running an automated test, we often compare the data of final time step of the test with expected values to catch accidental changes.
+When running an automated test, we often compare the data from the final time step of the test with expected values to catch accidental changes.
 Instead of relying on reference files that we would have to store in their full size, we calculate an aggregate checksum.
 
-For this purpose, the checksum Python module computes one aggregated number per field (e.g., the sum of the absolute values of the array elements) and compares it to a reference value (benchmark).
+For this purpose, the checksum Python module computes one aggregate number per field (e.g., the sum of the absolute values of the array elements) and compares it to a reference value (benchmark).
 This should be sensitive enough to make the test fail if your PR causes a significant difference, print meaningful error messages, and give you a chance to fix a bug or reset the benchmark if needed.
 
 The checksum module is located in ``Regression/Checksum/``, and the benchmarks are stored as human-readable `JSON <https://www.json.org/json-en.html>`__ files in ``Regression/Checksum/benchmarks_json/``, with one file per benchmark (for example, the test ``test_2d_langmuir_multi`` has a corresponding benchmark ``Regression/Checksum/benchmarks_json/test_2d_langmuir_multi.json``).
 
 For more details on the implementation, please refer to the Python implementation in ``Regression/Checksum/``.
-
-From a user point of view, you should only need to use ``checksumAPI.py``, which contains Python functions that can be imported and used from an analysis Python script or can also be executed directly as a Python script.
-
-How to compare checksums in your analysis script
-------------------------------------------------
-
-This relies on the function ``evaluate_checksum``:
-
-.. autofunction:: checksumAPI.evaluate_checksum
-
-This can also be included as part of an existing analysis script.
-
-How to evaluate checksums from the command line
------------------------------------------------
-
-You can execute ``checksumAPI.py`` as a Python script for that, and pass the plotfile that you want to evaluate, as well as the test name (so the script knows which benchmark to compare it to).
-
-.. code-block:: bash
-
-   ./checksumAPI.py --evaluate --output-file <path/to/plotfile> --output-format <'openpmd' or 'plotfile'> --test-name <test name>
-
-See additional options
-
-* ``--skip-fields`` if you don't want the fields to be compared (in that case, the benchmark must not have fields)
-* ``--skip-particles`` same thing for particles
-* ``--rtol`` relative tolerance for the comparison
-* ``--atol`` absolute tolerance for the comparison (a sum of both is used by ``numpy.isclose()``)
-
-How to create or reset checksums with local benchmark values
-------------------------------------------------------------
-
-This is using ``checksumAPI.py`` as a Python script.
-
-.. code-block:: bash
-
-   ./checksumAPI.py --reset-benchmark --output-file <path/to/plotfile> --output-format <'openpmd' or 'plotfile'> --test-name <test name>
-
-See additional options
-
-* ``--skip-fields`` if you don't want the benchmark to have fields
-* ``--skip-particles`` same thing for particles
-
-Since this will automatically change the JSON file stored on the repo, make a separate commit just for this file, and if possible commit it under the ``Tools`` name:
-
-.. code-block:: bash
-
-   git add <test name>.json
-   git commit -m "reset benchmark for <test name> because ..." --author="Tools <warpx@lbl.gov>"
 
 How to reset checksums for a list of tests with local benchmark values
 ----------------------------------------------------------------------

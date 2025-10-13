@@ -348,7 +348,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
                            << std::scientific << std::setprecision(5) << norm_rel << " (rel.)" << "\n";
         }
 
-        if (norm_abs < m_rtol) {
+        if (norm_abs < m_atol) {
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied absolute tolerance " << m_atol << "\n";
