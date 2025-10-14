@@ -776,6 +776,7 @@ MultiParticleContainer::SortParticlesByBin (
 {
     for (auto& pc : allcontainers) {
         if (sort_particles_for_deposition) {
+            if (pc->do_not_deposit) { continue; }
             pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
