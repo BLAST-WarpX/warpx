@@ -33,6 +33,7 @@
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SpeciesPhysicalProperties.H"
+#include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -345,18 +346,27 @@ MultiParticleContainer::ReadParameters ()
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            if (!photon_species.empty()) {
-                for (auto const& name : photon_species) {
-                    auto it = std::find(species_names.begin(), species_names.end(), name);
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        it != species_names.end(),
-                        "species '" + name
-                        + "' in particles.photon_species must be part of particles.species_names");
-                    const auto i = static_cast<int>(std::distance(species_names.begin(), it));
-                    species_types[i] = PCTypes::Photon;
+            int spec_index = 0;
+            for (auto const& name : species_names) {
+                bool species_type_is_photon = false;
+                const ParmParse pp_species(name);
+                if (auto tt = std::string {}; pp_species.query("species_type", tt)){
+                    const auto physical_species =
+                        species::from_string( physical_species_s );
+                    species_type_is_photon =
+                        (physical_species.value() == PhysicalSpecies::photon);
                 }
-            }
 
+                //deprecated
+                const bool name_is_in_photon_species =
+                    utils::algorithms::is_in(photon_species, name);
+
+                if (name_is_in_photon_species || species_type_is_photon  ){
+                    species_types[spec_index] = PCTypes::Photon;
+                }
+
+                spec_index++;
+            }
         }
         pp_particles.query("use_fdtd_nci_corr", WarpX::use_fdtd_nci_corr);
 #ifdef WARPX_DIM_RZ

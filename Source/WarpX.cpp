@@ -2112,6 +2112,13 @@ WarpX::BackwardCompatibility ()
             ablastr::warn_manager::WarnPriority::low);
     }
 
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future."
+            "It is recommended to set the particle type to 'photon', instead.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
     std::vector<std::string> backward_sp_names;
     pp_particles.queryarr("species_names", backward_sp_names);
     for(const std::string& speciesiter : backward_sp_names){

@@ -65,7 +65,7 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
         pp_species_name.query("do_qed_quantum_sync", test_quantum_sync);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         test_quantum_sync == 0,
-        "ERROR: do_qed_quantum_sync can be 1 for species NOT listed in particles.photon_species only!");
+        "ERROR: do_qed_quantum_sync can't be enabled for photon particles!");
         //_________________________________________________________
 #endif
 
