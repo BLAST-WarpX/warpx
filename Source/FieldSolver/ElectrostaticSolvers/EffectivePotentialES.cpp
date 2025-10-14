@@ -33,7 +33,7 @@ void EffectivePotentialES::InitData() {
 
 void EffectivePotentialES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
-    MultiParticleContainer& mpc,
+    [[maybe_unused]] MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
     int max_level)
 {
@@ -86,24 +86,6 @@ void EffectivePotentialES::computePhi (
 void EffectivePotentialES::ComputeSigma (
     ablastr::fields::MultiLevelScalarField const& rho_fp )
 {
-
-//     mpc.DepositCharge(rho_fp, 0.0_rt);
-//     if (mfl) {
-//         const int lev = 0;
-//         mfl->DepositCharge(fields, *rho_fp[lev], lev);
-//     }
-
-//     // Apply filter, perform MPI exchange, interpolate across levels
-//     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
-//     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
-
-// #ifndef WARPX_DIM_RZ
-//     for (int lev = 0; lev < num_levels; lev++) {
-//         // Reflect density over PEC boundaries, if needed.
-//         warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
-//     }
-// #endif
-
     // Reset the rho array
     for (const auto& rho_lev : rho_fp)
     {
@@ -173,20 +155,11 @@ void EffectivePotentialES::ComputeSigma (
         // within the `GetChargeDensity` function.
         auto rho = pc->GetChargeDensity(lev, true);
 
-// #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-//         warpx.ApplyInverseVolumeScalingToChargeDensity(*rho, lev);
-// #endif
-
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
 
         // Add rho for this species to the total charge density MF
         amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, rho_fp[lev]->nGrowVect());
-
-// #ifndef WARPX_DIM_RZ
-//         // Reflect density over PEC boundaries, if needed.
-//         warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
-// #endif
 
         // get multiplication factor for this species
         auto const q = std::abs(pc->getCharge());
