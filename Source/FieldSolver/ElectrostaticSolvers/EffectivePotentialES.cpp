@@ -51,26 +51,15 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
-    mpc.DepositCharge(rho_fp, 0.0_rt);
-    if (mfl) {
-        const int lev = 0;
-        mfl->DepositCharge(fields, *rho_fp[lev], lev);
-    }
-
-    // Apply filter, perform MPI exchange, interpolate across levels
-    const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
     auto & warpx = WarpX::GetInstance();
-    warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
-
-#ifndef WARPX_DIM_RZ
-    for (int lev = 0; lev < num_levels; lev++) {
-        // Reflect density over PEC boundaries, if needed.
-        warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
-    }
-#endif
 
     // set the boundary potentials appropriately
     setPhiBC(phi_fp, warpx.gett_new(0));
+
+    // Calculate the mass enhancement factor - see  Appendix A of
+    // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
+    // Also accumulate the total charge density.
+    ComputeSigma(rho_fp);
 
     // perform phi calculation
     computePhi(rho_fp, phi_fp, Efield_fp);
@@ -88,18 +77,39 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& phi,
     ablastr::fields::MultiLevelVectorField const& efield )
 {
-    // Calculate the mass enhancement factor - see  Appendix A of
-    // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
-    ComputeSigma();
-
     // Use the AMREX MLMG solver
     computePhi(rho, phi, efield, m_sigma, self_fields_required_precision,
                 self_fields_absolute_tolerance, self_fields_max_iters,
                 self_fields_verbosity);
 }
 
-void EffectivePotentialES::ComputeSigma ()
+void EffectivePotentialES::ComputeSigma (
+    ablastr::fields::MultiLevelScalarField const& rho_fp )
 {
+
+//     mpc.DepositCharge(rho_fp, 0.0_rt);
+//     if (mfl) {
+//         const int lev = 0;
+//         mfl->DepositCharge(fields, *rho_fp[lev], lev);
+//     }
+
+//     // Apply filter, perform MPI exchange, interpolate across levels
+//     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
+//     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
+
+// #ifndef WARPX_DIM_RZ
+//     for (int lev = 0; lev < num_levels; lev++) {
+//         // Reflect density over PEC boundaries, if needed.
+//         warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
+//     }
+// #endif
+
+    // Reset the rho array
+    for (const auto& rho_lev : rho_fp)
+    {
+        rho_lev->setVal(0.0_rt);
+    }
+
     // Get the user set value for C_SI (defaults to 4)
     amrex::Real C_SI = 4.0;
     const ParmParse pp_warpx("warpx");
@@ -154,13 +164,29 @@ void EffectivePotentialES::ComputeSigma ()
 
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
+        if (pc->do_not_deposit) { continue; }
+
         // grab the charge density for this species
         // Note: local deposition is done since the guard cells values are added
-        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below
+        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below.
+        // The rho boundary condition and inverse volume scaling for RZ is done
+        // within the `GetChargeDensity` function.
         auto rho = pc->GetChargeDensity(lev, true);
+
+// #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+//         warpx.ApplyInverseVolumeScalingToChargeDensity(*rho, lev);
+// #endif
 
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
+
+        // Add rho for this species to the total charge density MF
+        amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, rho_fp[lev]->nGrowVect());
+
+// #ifndef WARPX_DIM_RZ
+//         // Reflect density over PEC boundaries, if needed.
+//         warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
+// #endif
 
         // get multiplication factor for this species
         auto const q = std::abs(pc->getCharge());

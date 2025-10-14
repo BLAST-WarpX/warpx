@@ -35,7 +35,9 @@ public:
         MultiFluidContainer* mfl,
         int max_level) override;
 
-    void ComputeSigma ();
+    void ComputeSigma (
+        ablastr::fields::MultiLevelScalarField const& rho_fp
+    );
 
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
