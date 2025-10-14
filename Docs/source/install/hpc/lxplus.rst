@@ -23,8 +23,6 @@ Through LXPLUS we have access to CPU and GPU nodes (the latter equipped with NVI
 
 Installation
 ------------
-Only very little software is pre-installed on LXPLUS so we show how to install from scratch all the dependencies using `Spack <https://spack.io>`__.
-
 For size reasons it is not advisable to install WarpX in the ``$HOME`` directory, while it should be installed in the "work directory". For this purpose we set an environment variable with the path to the "work directory"
 
 .. code-block:: bash
@@ -40,14 +38,12 @@ We clone WarpX in ``$WORK``:
 
 Installation profile file
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-The easiest way to install the dependencies is to use the pre-prepared ``warpx.profile`` as follows:
+For convenience, all variables, cloning WarpX, and loading the LCG view required for the dependencies are available in the profile file ``warpx.profile`` as follows:
 
 .. code-block:: bash
 
     cp $WORK/warpx/Tools/machines/lxplus-cern/lxplus_warpx.profile.example $WORK/lxplus_warpx.profile
     source $WORK/lxplus_warpx.profile
-
-When doing this one can directly skip to the :ref:`Building WarpX <building-lxplus-warpx>` section.
 
 To have the environment activated at every login it is then possible to add the following lines to the ``.bashrc``
 
@@ -56,82 +52,30 @@ To have the environment activated at every login it is then possible to add the 
     export WORK=/afs/cern.ch/work/${USER:0:1}/$USER/
     source $WORK/lxplus_warpx.profile
 
-GCC
-^^^
-The pre-installed GNU compiler is outdated so we need a more recent compiler. Here we use the gcc 11.2.0 from the LCG project, but other options are possible.
-
-We activate it by doing
-
-.. code-block:: bash
-
-    source /cvmfs/sft.cern.ch/lcg/releases/gcc/11.2.0-ad950/x86_64-centos7/setup.sh
-
-In order to avoid using different compilers this line could be added directly into the ``$HOME/.bashrc`` file.
-
-Spack
-^^^^^
-We download and activate Spack in ``$WORK``:
-
-.. code-block:: bash
-
-    cd $WORK
-    git clone -c feature.manyFiles=true https://github.com/spack/spack.git
-    source spack/share/spack/setup-env.sh
-
-Now we add our gcc 11.2.0 compiler to spack:
-
-.. code-block:: bash
-
-    spack compiler find /cvmfs/sft.cern.ch/lcg/releases/gcc/11.2.0-ad950/x86_64-centos7/bin
-
-Installing the Dependencies
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To install the dependencies we create a virtual environment, which we call ``warpx-lxplus``:
-
-.. code-block:: bash
-
-    spack env create warpx-lxplus $WORK/WarpX/Tools/machines/lxplus-cern/spack.yaml
-    spack env activate warpx-lxplus
-    spack install
-
-If the GPU support or the Python bindings are not needed, it's possible to skip the installation by respectively setting
-the following environment variables export ``SPACK_STACK_USE_PYTHON=0`` and ``export SPACK_STACK_USE_CUDA = 0`` before
-running the previous commands.
-
-After the installation is done once, all we need to do in future sessions is just ``activate`` the environment again:
-
-.. code-block:: bash
-
-    spack env activate warpx-lxplus
-
-The environment ``warpx-lxplus`` (or ``-cuda`` or ``-cuda-py``) must be reactivated everytime that we log in so it could
-be a good idea to add the following lines to the ``.bashrc``:
-
-.. code-block:: bash
-
-    source $WORK/spack/share/spack/setup-env.sh
-    spack env activate -d warpx-lxplus
-    cd $HOME
-
-.. _building-lxplus-warpx:
-
 Building WarpX
 ^^^^^^^^^^^^^^
 
-We prepare and load the Spack software environment as above.
-Then we build WarpX:
+All dependencies are available via the LCG software stack. We choose the CUDA software stack to be able to compile both with and without CUDA without changing the stack. As both a serial and a parallel HDF5 installation are available, one has to make sure that WarpX picks up the parallel one both at build and at run time. Therefore, we load the software stack and export the path to the parallel HDF5:
 
 .. code-block:: bash
 
-    cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3"
+    source /cvmfs/sft.cern.ch/lcg/views/LCG_108_cuda/x86_64-el9-gcc13-opt/setup.sh
+    export H5_MPI=/cvmfs/sft.cern.ch/lcg/releases/hdf5_mpi/1.14.6-967d3/x86_64-el9-gcc13-opt
+
+
+
+Then we build WarpX, enforcing a static library build of HDF5 to prevent serial HDF5 installations in the path to cause run time mix-ups:
+
+.. code-block:: bash
+
+    cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DHDF5_ROOT="$H5_MPI" -DHDF5_USE_STATIC_LIBRARIES=ON
     cmake --build build -j 6
 
 Or if we need to compile with CUDA:
 
 .. code-block:: bash
 
-    cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_DIMS="1;2;RZ;3"
+    cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_DIMS="1;2;RZ;3" -DHDF5_ROOT="$H5_MPI" -DHDF5_USE_STATIC_LIBRARIES=ON
     cmake --build build -j 6
 
 **That's it!**
