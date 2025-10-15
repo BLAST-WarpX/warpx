@@ -2115,7 +2115,8 @@ WarpX::BackwardCompatibility ()
     if (pp_particles.contains("photon_species")){
         ablastr::warn_manager::WMRecordWarning("Species",
             "particles.photon_species is deprecated and may be removed in the future."
-            "It is recommended to set the particle type to 'photon', instead.",
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
             ablastr::warn_manager::WarnPriority::low);
     }
 
