@@ -20,6 +20,64 @@
 
 namespace
 {
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::XDim3 ConvertIndexToCoordinate(amrex::IntVect const & iv,
+                                          amrex::XDim3 const & xyzmin,
+                                          std::array<amrex::Real,3> const & dx,
+                                          amrex::IntVect const & lo,
+                                          amrex::IntVect const & nodal)
+    {
+        using namespace amrex::literals;
+        amrex::XDim3 result = {0._rt, 0._rt, 0._rt};
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
+        amrex::Real const shiftx = (nodal[0] ? 0._rt : 0.5_rt);
+        result.x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
+#endif
+        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
+        result.y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
+#ifndef WARPX_DIM_1D_Z
+#if defined(WARPX_ZINDEX)
+        amrex::Real const shiftz = (nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
+        result.z = xyzmin.z + (iv[WARPX_ZINDEX] - lo[WARPX_ZINDEX] + shiftz)*dx[2];
+#endif
+#endif
+
+        return result;
+    }
+
+    struct XDimTransverse { amrex::Real t1; amrex::Real t2; };
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    XDimTransverse GetTransverseCoordinates(int idim,
+                                            amrex::XDim3 const & coords)
+    {
+        // Transverse coordinates
+        amrex::Real t1 = 0.;
+        amrex::Real t2 = 0.;
+
+#ifndef WARPX_DIM_1D_Z
+        if (idim == 0) {
+            t1 = coords.y;
+            t2 = coords.z;
+        }
+#endif
+#if defined(WARPX_DIM_3D)
+        if (idim == 1) {
+            t1 = coords.x;
+            t2 = coords.z;
+        }
+#endif
+#if defined(WARPX_ZINDEX)
+        if (idim == WARPX_ZINDEX) {
+            t1 = coords.x;
+            t2 = coords.y;
+        }
+#endif
+        return XDimTransverse {t1, t2};
+    }
+
     /**
      * \brief At the specified grid location, apply either the PEC or insulator boundary condition if
      *        the cell is on the boundary or in the guard cells.
@@ -36,8 +94,7 @@ namespace
      * \param[in] E_like       whether the field behaves like E field or B field
      * \param[in] is_nodal     staggering of the field data being updated.
      * \param[in] is_insulator_boundary Specifies whether the boundary is an insulator
-     * \param[in] field_lo     the values of the field for the lower insulator boundary cell
-     * \param[in] field_hi     the values of the field for the upper insulator boundary cell
+     * \param[in] field_value  the value of the field for the insulator boundary cell
      * \param[in] set_field    whether to set the field on the lower boundary
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -52,8 +109,7 @@ namespace
                                   bool const E_like,
                                   amrex::IntVect const & is_nodal,
                                   const bool is_insulator_boundary,
-                                  amrex::RealVect const & field_lo,
-                                  amrex::RealVect const & field_hi,
+                                  amrex::Real const field_value,
                                   bool const set_field)
     {
         using namespace amrex::literals;
@@ -86,9 +142,9 @@ namespace
         // when ig == 1, the first cell beyond the boundary.
         bool const on_cell_boundary = (ig == 1);
 
+        // For E fields, the parallel fields are node centered, so are on the boundary
+        // when ig == 0.
         bool const on_nodal_boundary = (ig == 0);
-
-        amrex::Real const field_value = (iside == -1 ? field_lo[idim] : field_hi[idim] );
 
         amrex::IntVect ijk_mirror = ijk_vec;
         amrex::IntVect ijk_boundary = ijk_vec;
@@ -351,36 +407,53 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::IntVect const domain_lo = domain_box.smallEnd();
     amrex::IntVect const domain_hi = domain_box.bigEnd();
 
-#ifndef WARPX_DIM_1D_Z
-    amrex::ParserExecutor<2> const area_parsers_x_lo = m_insulator_area_lo[0]->compile<2>();
-    amrex::ParserExecutor<2> const area_parsers_x_hi = m_insulator_area_hi[0]->compile<2>();
-#endif
-#if defined(WARPX_DIM_3D)
-    amrex::ParserExecutor<2> const area_parsers_y_lo = m_insulator_area_lo[1]->compile<2>();
-    amrex::ParserExecutor<2> const area_parsers_y_hi = m_insulator_area_hi[1]->compile<2>();
-#endif
-#if defined(WARPX_ZINDEX)
-    amrex::ParserExecutor<2> const area_parsers_z_lo = m_insulator_area_lo[WARPX_ZINDEX]->compile<2>();
-    amrex::ParserExecutor<2> const area_parsers_z_hi = m_insulator_area_hi[WARPX_ZINDEX]->compile<2>();
-#endif
+    std::vector<bool> set_fields_x_lo = {false, false, false};
+    std::vector<bool> set_fields_y_lo = {false, false, false};
+    std::vector<bool> set_fields_z_lo = {false, false, false};
 
+    std::vector<bool> set_fields_x_hi = {false, false, false};
+    std::vector<bool> set_fields_y_hi = {false, false, false};
+    std::vector<bool> set_fields_z_hi = {false, false, false};
+
+    std::vector<amrex::ParserExecutor<2>> area_parsers_lo;
+    std::vector<amrex::ParserExecutor<2>> area_parsers_hi;
+    std::vector<amrex::ParserExecutor<3>> Fx_parsers_lo(3), Fy_parsers_lo(3), Fz_parsers_lo(3);
+    std::vector<amrex::ParserExecutor<3>> Fx_parsers_hi(3), Fy_parsers_hi(3), Fz_parsers_hi(3);
 #ifndef WARPX_DIM_1D_Z
-    amrex::ParserExecutor<3> const Fy_x_lo_parser = a_Fy_x_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fz_x_lo_parser = a_Fz_x_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fy_x_hi_parser = a_Fy_x_hi->compile<3>();
-    amrex::ParserExecutor<3> const Fz_x_hi_parser = a_Fz_x_hi->compile<3>();
+    set_fields_y_lo[0] = set_F_x_lo;
+    set_fields_z_lo[0] = set_F_x_lo;
+    set_fields_y_hi[0] = set_F_x_hi;
+    set_fields_z_hi[0] = set_F_x_hi;
+    area_parsers_lo.push_back(m_insulator_area_lo[0]->compile<2>());
+    area_parsers_hi.push_back(m_insulator_area_hi[0]->compile<2>());
+    Fy_parsers_lo[0] = a_Fy_x_lo->compile<3>();
+    Fz_parsers_lo[0] = a_Fz_x_lo->compile<3>();
+    Fy_parsers_hi[0] = a_Fy_x_hi->compile<3>();
+    Fz_parsers_hi[0] = a_Fz_x_hi->compile<3>();
 #endif
 #if defined(WARPX_DIM_3D)
-    amrex::ParserExecutor<3> const Fx_y_lo_parser = a_Fx_y_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fz_y_lo_parser = a_Fz_y_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fx_y_hi_parser = a_Fx_y_hi->compile<3>();
-    amrex::ParserExecutor<3> const Fz_y_hi_parser = a_Fz_y_hi->compile<3>();
+    set_fields_x_lo[1] = set_F_y_lo;
+    set_fields_z_lo[1] = set_F_y_lo;
+    set_fields_x_hi[1] = set_F_y_hi;
+    set_fields_z_hi[1] = set_F_y_hi;
+    area_parsers_lo.push_back(m_insulator_area_lo[1]->compile<2>());
+    area_parsers_hi.push_back(m_insulator_area_hi[1]->compile<2>());
+    Fx_parsers_lo[1] = a_Fx_y_lo->compile<3>();
+    Fz_parsers_lo[1] = a_Fz_y_lo->compile<3>();
+    Fx_parsers_hi[1] = a_Fx_y_hi->compile<3>();
+    Fz_parsers_hi[1] = a_Fz_y_hi->compile<3>();
 #endif
 #if defined(WARPX_ZINDEX)
-    amrex::ParserExecutor<3> const Fx_z_lo_parser = a_Fx_z_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fy_z_lo_parser = a_Fy_z_lo->compile<3>();
-    amrex::ParserExecutor<3> const Fx_z_hi_parser = a_Fx_z_hi->compile<3>();
-    amrex::ParserExecutor<3> const Fy_z_hi_parser = a_Fy_z_hi->compile<3>();
+    set_fields_x_lo[WARPX_ZINDEX] = set_F_z_lo;
+    set_fields_y_lo[WARPX_ZINDEX] = set_F_z_lo;
+    set_fields_x_hi[WARPX_ZINDEX] = set_F_z_hi;
+    set_fields_y_hi[WARPX_ZINDEX] = set_F_z_hi;
+    area_parsers_lo.push_back(m_insulator_area_lo[WARPX_ZINDEX]->compile<2>());
+    area_parsers_hi.push_back(m_insulator_area_hi[WARPX_ZINDEX]->compile<2>());
+    Fx_parsers_lo[WARPX_ZINDEX] = a_Fx_z_lo->compile<3>();
+    Fy_parsers_lo[WARPX_ZINDEX] = a_Fy_z_lo->compile<3>();
+    Fx_parsers_hi[WARPX_ZINDEX] = a_Fx_z_hi->compile<3>();
+    Fy_parsers_hi[WARPX_ZINDEX] = a_Fy_z_hi->compile<3>();
 #endif
 
     amrex::IntVect const Fx_nodal = field[0]->ixType().toIntVect();
@@ -472,30 +545,14 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                     tez_guard.setSmall(idim, node_box.bigEnd(idim));
                 }
 
-                bool set_fieldx = false;
-                bool set_fieldy = false;
-                bool set_fieldz = false;
-#ifndef WARPX_DIM_1D_Z
-                if (idim == 0) {
-                    set_fieldx = false;
-                    set_fieldy = (iside == -1 ? set_F_x_lo : set_F_x_hi);
-                    set_fieldz = (iside == -1 ? set_F_x_lo : set_F_x_hi);
-                }
-#endif
-#if defined(WARPX_DIM_3D)
-                if (idim == 1) {
-                    set_fieldx = (iside == -1 ? set_F_y_lo : set_F_y_hi);
-                    set_fieldy = false;
-                    set_fieldz = (iside == -1 ? set_F_y_lo : set_F_y_hi);
-                }
-#endif
-#if defined(WARPX_ZINDEX)
-                if (idim == WARPX_ZINDEX) {
-                    set_fieldx = (iside == -1 ? set_F_z_lo : set_F_z_hi);
-                    set_fieldy = (iside == -1 ? set_F_z_lo : set_F_z_hi);
-                    set_fieldz = false;
-                }
-#endif
+                bool const set_fieldx = ( (iside == -1) ? set_fields_x_lo[idim] : set_fields_x_hi[idim]);
+                bool const set_fieldy = ( (iside == -1) ? set_fields_y_lo[idim] : set_fields_y_hi[idim]);
+                bool const set_fieldz = ( (iside == -1) ? set_fields_z_lo[idim] : set_fields_z_hi[idim]);
+
+                amrex::ParserExecutor<2> & area_parser = ( (iside == -1) ? area_parsers_lo[idim] : area_parsers_hi[idim]);
+                amrex::ParserExecutor<3> & Fx_parser = ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]);
+                amrex::ParserExecutor<3> & Fy_parser = ( (iside == -1) ? Fy_parsers_lo[idim] : Fy_parsers_hi[idim]);
+                amrex::ParserExecutor<3> & Fz_parser = ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]);
 
                 // loop over cells and update fields
                 amrex::ParallelFor(
@@ -503,156 +560,50 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
                         amrex::ignore_unused(j, k);
 
-                        // This chunk of code can be put into a subroutine to reduce duplication
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
-#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                        amrex::Real const shiftx = (Fx_nodal[0] ? 0._rt : 0.5_rt);
-                        amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
-#endif
-                        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fx_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
-                        amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
-#ifndef WARPX_DIM_1D_Z
-#if defined(WARPX_ZINDEX)
-                        amrex::Real const shiftz = (Fx_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
-                        amrex::Real const z = xyzmin.z + (iv[WARPX_ZINDEX] - lo[WARPX_ZINDEX] + shiftz)*dx[2];
-#else
-                        amrex::Real const z = 0._rt;
-#endif
-#endif
 
-                        // the "is_insulator" check can be moved out of the kernel
-                        amrex::IntVect is_insulator_lo;
-                        amrex::IntVect is_insulator_hi;
-                        amrex::RealVect F_lo, F_hi;
-#ifndef WARPX_DIM_1D_Z
-                        is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
-                        is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
-                        F_lo[0] = 0._rt;  // Will be unused
-                        F_hi[0] = 0._rt;  // Will be unused
-#endif
-#if defined(WARPX_DIM_3D)
-                        is_insulator_lo[1] = (area_parsers_y_lo(x, z) > 0._rt);
-                        is_insulator_hi[1] = (area_parsers_y_hi(x, z) > 0._rt);
-                        F_lo[1] = (set_F_y_lo ? Fx_y_lo_parser(x, z, time) : 0._rt);
-                        F_hi[1] = (set_F_y_hi ? Fx_y_hi_parser(x, z, time) : 0._rt);
-#endif
-#if defined(WARPX_ZINDEX)
-                        is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
-                        is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
-                        F_lo[WARPX_ZINDEX] = (set_F_z_lo ? Fx_z_lo_parser(x, y, time) : 0._rt);
-                        F_hi[WARPX_ZINDEX] = (set_F_z_hi ? Fx_z_hi_parser(x, y, time) : 0._rt);
-#endif
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fx_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
 
-                        bool const is_insulator_boundary = ( (iside == -1)
-                                              ? is_insulator_lo[idim] == 1
-                                              : is_insulator_hi[idim] == 1 );
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+                        amrex::Real const field_value = (set_fieldx ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
                         int const icomp = 0;
                         ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fx, E_like, Fx_nodal, is_insulator_boundary,
-                                                  F_lo, F_hi, set_fieldx);
+                                                  Fx, E_like, Fx_nodal, is_insulator,
+                                                  field_value, set_fieldx);
                     },
                     tey_guard, nComp_y,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
                         amrex::ignore_unused(j, k);
 
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
-#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                        amrex::Real const shiftx = (Fy_nodal[0] ? 0._rt : 0.5_rt);
-                        amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
-#endif
-                        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fy_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
-                        amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
-#ifndef WARPX_DIM_1D_Z
-#if defined(WARPX_ZINDEX)
-                        amrex::Real const shiftz = (Fy_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
-                        amrex::Real const z = xyzmin.z + (iv[WARPX_ZINDEX] - lo[WARPX_ZINDEX] + shiftz)*dx[2];
-#else
-                        amrex::Real const z = 0._rt;
-#endif
-#endif
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fy_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
 
-                        amrex::IntVect is_insulator_lo;
-                        amrex::IntVect is_insulator_hi;
-                        amrex::RealVect F_lo, F_hi;
-#ifndef WARPX_DIM_1D_Z
-                        is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
-                        is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
-                        F_lo[0] = (set_F_x_lo ? Fy_x_lo_parser(y, z, time) : 0._rt);
-                        F_hi[0] = (set_F_x_hi ? Fy_x_hi_parser(y, z, time) : 0._rt);
-#endif
-#if defined(WARPX_DIM_3D)
-                        is_insulator_lo[1] = (area_parsers_y_lo(x, z) > 0._rt);
-                        is_insulator_hi[1] = (area_parsers_y_hi(x, z) > 0._rt);
-                        F_lo[1] = 0._rt;  // Will be unused
-                        F_hi[1] = 0._rt;  // Will be unused
-#endif
-#if defined(WARPX_ZINDEX)
-                        is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
-                        is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
-                        F_lo[WARPX_ZINDEX] = (set_F_z_lo ? Fy_z_lo_parser(x, y, time) : 0._rt);
-                        F_hi[WARPX_ZINDEX] = (set_F_z_hi ? Fy_z_hi_parser(x, y, time) : 0._rt);
-#endif
-
-                        bool const is_insulator_boundary = ( (iside == -1)
-                                              ? is_insulator_lo[idim] == 1
-                                              : is_insulator_hi[idim] == 1 );
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+                        amrex::Real const field_value = (set_fieldy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
                         int const icomp = 1;
                         ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fy, E_like, Fy_nodal, is_insulator_boundary,
-                                                  F_lo, F_hi, set_fieldy);
+                                                  Fy, E_like, Fy_nodal, is_insulator,
+                                                  field_value, set_fieldy);
                     },
                     tez_guard, nComp_z,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
                         amrex::ignore_unused(j, k);
 
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
-#if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-                        amrex::Real const shiftx = (Fz_nodal[0] ? 0._rt : 0.5_rt);
-                        amrex::Real const x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
-#endif
-                        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (Fz_nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
-                        amrex::Real const y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
-#ifndef WARPX_DIM_1D_Z
-#if defined(WARPX_ZINDEX)
-                        amrex::Real const shiftz = (Fz_nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
-                        amrex::Real const z = xyzmin.z + (iv[WARPX_ZINDEX] - lo[WARPX_ZINDEX] + shiftz)*dx[2];
-#else
-                        amrex::Real const z = 0._rt;
-#endif
-#endif
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fz_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
 
-                        amrex::IntVect is_insulator_lo;
-                        amrex::IntVect is_insulator_hi;
-                        amrex::RealVect F_lo, F_hi;
-#ifndef WARPX_DIM_1D_Z
-                        is_insulator_lo[0] = (area_parsers_x_lo(y, z) > 0._rt);
-                        is_insulator_hi[0] = (area_parsers_x_hi(y, z) > 0._rt);
-                        F_lo[0] = (set_F_x_lo ? Fz_x_lo_parser(y, z, time) : 0._rt);
-                        F_hi[0] = (set_F_x_hi ? Fz_x_hi_parser(y, z, time) : 0._rt);
-#endif
-#if defined(WARPX_DIM_3D)
-                        is_insulator_lo[1] = (area_parsers_y_lo(x, z) > 0._rt);
-                        is_insulator_hi[1] = (area_parsers_y_hi(x, z) > 0._rt);
-                        F_lo[1] = (set_F_y_lo ? Fz_y_lo_parser(x, z, time) : 0._rt);
-                        F_hi[1] = (set_F_y_hi ? Fz_y_hi_parser(x, z, time) : 0._rt);
-#endif
-#if defined(WARPX_ZINDEX)
-                        is_insulator_lo[WARPX_ZINDEX] = (area_parsers_z_lo(x, y) > 0._rt);
-                        is_insulator_hi[WARPX_ZINDEX] = (area_parsers_z_hi(x, y) > 0._rt);
-                        F_lo[WARPX_ZINDEX] = 0._rt;  // Will be unused
-                        F_hi[WARPX_ZINDEX] = 0._rt;  // Will be unused
-#endif
-
-                        bool const is_insulator_boundary = ( (iside == -1)
-                                              ? is_insulator_lo[idim] == 1
-                                              : is_insulator_hi[idim] == 1 );
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+                        amrex::Real const field_value = (set_fieldz ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
                         int const icomp = 2;
                         ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fz, E_like, Fz_nodal, is_insulator_boundary,
-                                                  F_lo, F_hi, set_fieldz);
+                                                  Fz, E_like, Fz_nodal, is_insulator,
+                                                  field_value, set_fieldz);
                     }
                 );
             }
