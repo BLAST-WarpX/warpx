@@ -903,10 +903,6 @@ Particle initialization
     The name of each species. This is then used in the rest of the input deck ;
     in this documentation we use `<species_name>` as a placeholder.
 
-* ``particles.photon_species`` (`strings`, separated by spaces)
-    List of species that are photon species, if any.
-    **This is required when compiling with QED=TRUE.**
-
 * ``particles.use_fdtd_nci_corr`` (`0` or `1`) optional (default `0`)
     Whether to activate the FDTD Numerical Cherenkov Instability corrector.
     Not currently available in the RZ, RCYLINDER, and RSPHERE configuration.
