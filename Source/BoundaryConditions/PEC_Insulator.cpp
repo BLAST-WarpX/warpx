@@ -21,6 +21,15 @@
 namespace
 {
 
+    // \brief Converts the grid indices to spatial coordinates
+    //
+    // \param[in] iv      vector of indices
+    // \param[in] xyzmin  vector of grid mins
+    // \param[in] dx      vector of grid sizes
+    // \param[in] lo      vector of grid index mins
+    // \param[in] nodal   vector of nodel flags to each dimension
+    // \return the coordinates
+
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::XDim3 ConvertIndexToCoordinate(amrex::IntVect const & iv,
                                           amrex::XDim3 const & xyzmin,
@@ -47,11 +56,16 @@ namespace
         return result;
     }
 
+    // Convenient structure to the hold the two transverse coordinates
     struct XDimTransverse { amrex::Real t1; amrex::Real t2; };
 
+    // \brief Returns the two coordinates transverse from the specified dimension
+    //
+    // \param[im] idim    the dimension number
+    // \param[in] coords  the coordinate of each dimension
+    // \return the transverse coordinates
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    XDimTransverse GetTransverseCoordinates(int idim,
-                                            amrex::XDim3 const & coords)
+    XDimTransverse GetTransverseCoordinates(int idim, amrex::XDim3 const & coords)
     {
         // Transverse coordinates
         amrex::Real t1 = 0.;
@@ -231,17 +245,17 @@ namespace
     }
 }
 
-
 bool
 PEC_Insulator::ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                          std::unique_ptr<amrex::Parser> & parser,
+                                          std::vector<std::unique_ptr<amrex::Parser>> & parsers,
                                           std::string const & input_name,
                                           std::string const & coord1,
                                           std::string const & coord2)
 {
     std::string str = "0";
     bool const specified = utils::parser::Query_parserString(pp_insulator, input_name, str);
-    parser = std::make_unique<amrex::Parser>(utils::parser::makeParser(str, {coord1, coord2, "t"}));
+    parsers.push_back(
+        std::make_unique<amrex::Parser>(utils::parser::makeParser(str, {coord1, coord2, "t"})));
     return specified;
 }
 
@@ -260,15 +274,15 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_x_hi, {"y", "z"})));
 
-    m_set_B_x_lo |= ReadTangentialFieldParser(pp_insulator, m_By_x_lo, "By_x_lo(y,z,t)", "y", "z");
-    m_set_B_x_lo |= ReadTangentialFieldParser(pp_insulator, m_Bz_x_lo, "Bz_x_lo(y,z,t)", "y", "z");
-    m_set_B_x_hi |= ReadTangentialFieldParser(pp_insulator, m_By_x_hi, "By_x_hi(y,z,t)", "y", "z");
-    m_set_B_x_hi |= ReadTangentialFieldParser(pp_insulator, m_Bz_x_hi, "Bz_x_hi(y,z,t)", "y", "z");
+    m_set_B_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "By_x_lo(y,z,t)", "y", "z");
+    m_set_B_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_x_lo(y,z,t)", "y", "z");
+    m_set_B_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "By_x_hi(y,z,t)", "y", "z");
+    m_set_B_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_x_hi(y,z,t)", "y", "z");
 
-    m_set_E_x_lo |= ReadTangentialFieldParser(pp_insulator, m_Ey_x_lo, "Ey_x_lo(y,z,t)", "y", "z");
-    m_set_E_x_lo |= ReadTangentialFieldParser(pp_insulator, m_Ez_x_lo, "Ez_x_lo(y,z,t)", "y", "z");
-    m_set_E_x_hi |= ReadTangentialFieldParser(pp_insulator, m_Ey_x_hi, "Ey_x_hi(y,z,t)", "y", "z");
-    m_set_E_x_hi |= ReadTangentialFieldParser(pp_insulator, m_Ez_x_hi, "Ez_x_hi(y,z,t)", "y", "z");
+    m_set_E_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ey_x_lo(y,z,t)", "y", "z");
+    m_set_E_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_x_lo(y,z,t)", "y", "z");
+    m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ey_x_hi(y,z,t)", "y", "z");
+    m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_x_hi(y,z,t)", "y", "z");
 #endif
 #if defined(WARPX_DIM_3D)
     std::string str_area_y_lo = "0";
@@ -280,17 +294,18 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_y_hi, {"x", "z"})));
 
-    m_set_B_y_lo |= ReadTangentialFieldParser(pp_insulator, m_Bx_y_lo, "Bx_y_lo(x,z,t)", "x", "z");
-    m_set_B_y_lo |= ReadTangentialFieldParser(pp_insulator, m_Bz_y_lo, "Bz_y_lo(x,z,t)", "x", "z");
-    m_set_B_y_hi |= ReadTangentialFieldParser(pp_insulator, m_Bx_y_hi, "Bx_y_hi(x,z,t)", "x", "z");
-    m_set_B_y_hi |= ReadTangentialFieldParser(pp_insulator, m_Bz_y_hi, "Bz_y_hi(x,z,t)", "x", "z");
+    m_set_B_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_y_lo(x,z,t)", "x", "z");
+    m_set_B_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_y_lo(x,z,t)", "x", "z");
+    m_set_B_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_y_hi(x,z,t)", "x", "z");
+    m_set_B_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_y_hi(x,z,t)", "x", "z");
 
-    m_set_E_y_lo |= ReadTangentialFieldParser(pp_insulator, m_Ex_y_lo, "Ex_y_lo(x,z,t)", "x", "z");
-    m_set_E_y_lo |= ReadTangentialFieldParser(pp_insulator, m_Ez_y_lo, "Ez_y_lo(x,z,t)", "x", "z");
-    m_set_E_y_hi |= ReadTangentialFieldParser(pp_insulator, m_Ex_y_hi, "Ex_y_hi(x,z,t)", "x", "z");
-    m_set_E_y_hi |= ReadTangentialFieldParser(pp_insulator, m_Ez_y_hi, "Ez_y_hi(x,z,t)", "x", "z");
+    m_set_E_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_y_lo(x,z,t)", "x", "z");
+    m_set_E_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_y_lo(x,z,t)", "x", "z");
+    m_set_E_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_y_hi(x,z,t)", "x", "z");
+    m_set_E_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_y_hi(x,z,t)", "x", "z");
 #endif
 
+#if defined(WARPX_ZINDEX)
     std::string str_area_z_lo = "0";
     std::string str_area_z_hi = "0";
     utils::parser::Query_parserString( pp_insulator, "area_z_lo(x,y)", str_area_z_lo);
@@ -300,15 +315,16 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_z_hi, {"x", "y"})));
 
-    m_set_B_z_lo |= ReadTangentialFieldParser(pp_insulator, m_Bx_z_lo, "Bx_z_lo(x,y,t)", "x", "y");
-    m_set_B_z_lo |= ReadTangentialFieldParser(pp_insulator, m_By_z_lo, "By_z_lo(x,y,t)", "x", "y");
-    m_set_B_z_hi |= ReadTangentialFieldParser(pp_insulator, m_Bx_z_hi, "Bx_z_hi(x,y,t)", "x", "y");
-    m_set_B_z_hi |= ReadTangentialFieldParser(pp_insulator, m_By_z_hi, "By_z_hi(x,y,t)", "x", "y");
+    m_set_B_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_z_lo(x,y,t)", "x", "y");
+    m_set_B_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "By_z_lo(x,y,t)", "x", "y");
+    m_set_B_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_z_hi(x,y,t)", "x", "y");
+    m_set_B_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "By_z_hi(x,y,t)", "x", "y");
 
-    m_set_E_z_lo |= ReadTangentialFieldParser(pp_insulator, m_Ex_z_lo, "Ex_z_lo(x,y,t)", "x", "y");
-    m_set_E_z_lo |= ReadTangentialFieldParser(pp_insulator, m_Ey_z_lo, "Ey_z_lo(x,y,t)", "x", "y");
-    m_set_E_z_hi |= ReadTangentialFieldParser(pp_insulator, m_Ex_z_hi, "Ex_z_hi(x,y,t)", "x", "y");
-    m_set_E_z_hi |= ReadTangentialFieldParser(pp_insulator, m_Ey_z_hi, "Ey_z_hi(x,y,t)", "x", "y");
+    m_set_E_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_z_lo(x,y,t)", "x", "y");
+    m_set_E_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ey_z_lo(x,y,t)", "x", "y");
+    m_set_E_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_z_hi(x,y,t)", "x", "y");
+    m_set_E_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ey_z_hi(x,y,t)", "x", "y");
+#endif
 
 }
 
@@ -325,20 +341,8 @@ PEC_Insulator::ApplyPEC_InsulatortoEfield (
     bool const E_like = true;
     ApplyPEC_InsulatortoField(Efield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like
-#ifndef WARPX_DIM_1D_Z
-                              , m_set_E_x_lo, m_set_E_x_hi,
-                              m_Ey_x_lo, m_Ez_x_lo, m_Ey_x_hi, m_Ez_x_hi
-#endif
-#if defined(WARPX_DIM_3D)
-                              , m_set_E_y_lo, m_set_E_y_hi,
-                              m_Ex_y_lo, m_Ez_y_lo, m_Ex_y_hi, m_Ez_y_hi
-#endif
-#if defined(WARPX_ZINDEX)
-                              , m_set_E_z_lo, m_set_E_z_hi,
-                              m_Ex_z_lo, m_Ey_z_lo, m_Ex_z_hi, m_Ey_z_hi
-#endif
-                              );
+                              E_like, m_set_E_lo, m_set_E_hi,
+                              m_parsers_E1_lo, m_parsers_E2_lo, m_parsers_E1_hi, m_parsers_E2_hi);
 }
 
 
@@ -355,20 +359,8 @@ PEC_Insulator::ApplyPEC_InsulatortoBfield (
     bool const split_pml_field = false;
     ApplyPEC_InsulatortoField(Bfield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like
-#ifndef WARPX_DIM_1D_Z
-                              , m_set_B_x_lo, m_set_B_x_hi,
-                              m_By_x_lo, m_Bz_x_lo, m_By_x_hi, m_Bz_x_hi
-#endif
-#if defined(WARPX_DIM_3D)
-                              , m_set_B_y_lo, m_set_B_y_hi,
-                              m_Bx_y_lo, m_Bz_y_lo, m_Bx_y_hi, m_Bz_y_hi
-#endif
-#if defined(WARPX_ZINDEX)
-                              , m_set_B_z_lo, m_set_B_z_hi,
-                              m_Bx_z_lo, m_By_z_lo, m_Bx_z_hi, m_By_z_hi
-#endif
-                              );
+                              E_like, m_set_B_lo, m_set_B_hi,
+                              m_parsers_B1_lo, m_parsers_B2_lo, m_parsers_B1_hi, m_parsers_B2_hi);
 }
 
 
@@ -377,27 +369,20 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     std::array<amrex::MultiFab*, 3> field,
     amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
     amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
-    amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
-    int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
+    amrex::IntVect const & ng_fieldgather,
+    amrex::Geometry const & geom,
+    int lev,
+    PatchType patch_type,
+    amrex::Vector<amrex::IntVect> const & ref_ratios,
     amrex::Real time,
     bool split_pml_field,
-    bool E_like
-#ifndef WARPX_DIM_1D_Z
-    , bool set_F_x_lo, bool set_F_x_hi,
-    std::unique_ptr<amrex::Parser> const & a_Fy_x_lo, std::unique_ptr<amrex::Parser> const & a_Fz_x_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fy_x_hi, std::unique_ptr<amrex::Parser> const & a_Fz_x_hi
-#endif
-#if defined(WARPX_DIM_3D)
-    , bool set_F_y_lo, bool set_F_y_hi,
-    std::unique_ptr<amrex::Parser> const & a_Fx_y_lo, std::unique_ptr<amrex::Parser> const & a_Fz_y_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fx_y_hi, std::unique_ptr<amrex::Parser> const & a_Fz_y_hi
-#endif
-#if defined(WARPX_ZINDEX)
-    , bool set_F_z_lo, bool set_F_z_hi,
-    std::unique_ptr<amrex::Parser> const & a_Fx_z_lo, std::unique_ptr<amrex::Parser> const & a_Fy_z_lo,
-    std::unique_ptr<amrex::Parser> const & a_Fx_z_hi, std::unique_ptr<amrex::Parser> const & a_Fy_z_hi
-#endif
-    )
+    bool E_like,
+    std::vector<int> & set_field_lo,
+    std::vector<int> & set_field_hi,
+    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
+    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_lo,
+    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_hi,
+    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_hi)
 {
     using namespace amrex::literals;
     amrex::Box domain_box = geom.Domain();
@@ -407,58 +392,60 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::IntVect const domain_lo = domain_box.smallEnd();
     amrex::IntVect const domain_hi = domain_box.bigEnd();
 
-    std::vector<bool> set_fields_x_lo = {false, false, false};
-    std::vector<bool> set_fields_y_lo = {false, false, false};
-    std::vector<bool> set_fields_z_lo = {false, false, false};
+    std::vector<int> set_fields_x_lo(AMREX_SPACEDIM, false);
+    std::vector<int> set_fields_y_lo(AMREX_SPACEDIM, false);
+    std::vector<int> set_fields_z_lo(AMREX_SPACEDIM, false);
 
-    std::vector<bool> set_fields_x_hi = {false, false, false};
-    std::vector<bool> set_fields_y_hi = {false, false, false};
-    std::vector<bool> set_fields_z_hi = {false, false, false};
+    std::vector<int> set_fields_x_hi(AMREX_SPACEDIM, false);
+    std::vector<int> set_fields_y_hi(AMREX_SPACEDIM, false);
+    std::vector<int> set_fields_z_hi(AMREX_SPACEDIM, false);
 
     std::vector<amrex::ParserExecutor<2>> area_parsers_lo;
     std::vector<amrex::ParserExecutor<2>> area_parsers_hi;
-    std::vector<amrex::ParserExecutor<3>> Fx_parsers_lo(3), Fy_parsers_lo(3), Fz_parsers_lo(3);
-    std::vector<amrex::ParserExecutor<3>> Fx_parsers_hi(3), Fy_parsers_hi(3), Fz_parsers_hi(3);
+    std::vector<amrex::ParserExecutor<3>> Fx_parsers_lo, Fy_parsers_lo, Fz_parsers_lo;
+    std::vector<amrex::ParserExecutor<3>> Fx_parsers_hi, Fy_parsers_hi, Fz_parsers_hi;
+
 #ifndef WARPX_DIM_1D_Z
-    set_fields_y_lo[0] = set_F_x_lo;
-    set_fields_z_lo[0] = set_F_x_lo;
-    set_fields_y_hi[0] = set_F_x_hi;
-    set_fields_z_hi[0] = set_F_x_hi;
+    set_fields_y_lo[0] = set_field_lo[0];
+    set_fields_z_lo[0] = set_field_lo[0];
+    set_fields_y_hi[0] = set_field_hi[0];
+    set_fields_z_hi[0] = set_field_hi[0];
     area_parsers_lo.push_back(m_insulator_area_lo[0]->compile<2>());
     area_parsers_hi.push_back(m_insulator_area_hi[0]->compile<2>());
-    Fy_parsers_lo[0] = a_Fy_x_lo->compile<3>();
-    Fz_parsers_lo[0] = a_Fz_x_lo->compile<3>();
-    Fy_parsers_hi[0] = a_Fy_x_hi->compile<3>();
-    Fz_parsers_hi[0] = a_Fz_x_hi->compile<3>();
+    Fy_parsers_lo.push_back(parser_field1_lo[0]->compile<3>());
+    Fz_parsers_lo.push_back(parser_field2_lo[0]->compile<3>());
+    Fy_parsers_hi.push_back(parser_field1_hi[0]->compile<3>());
+    Fz_parsers_hi.push_back(parser_field2_hi[0]->compile<3>());
 #endif
 #if defined(WARPX_DIM_3D)
-    set_fields_x_lo[1] = set_F_y_lo;
-    set_fields_z_lo[1] = set_F_y_lo;
-    set_fields_x_hi[1] = set_F_y_hi;
-    set_fields_z_hi[1] = set_F_y_hi;
+    set_fields_x_lo[1] = set_field_lo[1];
+    set_fields_z_lo[1] = set_field_lo[1];
+    set_fields_x_hi[1] = set_field_hi[1];
+    set_fields_z_hi[1] = set_field_hi[1];
     area_parsers_lo.push_back(m_insulator_area_lo[1]->compile<2>());
     area_parsers_hi.push_back(m_insulator_area_hi[1]->compile<2>());
-    Fx_parsers_lo[1] = a_Fx_y_lo->compile<3>();
-    Fz_parsers_lo[1] = a_Fz_y_lo->compile<3>();
-    Fx_parsers_hi[1] = a_Fx_y_hi->compile<3>();
-    Fz_parsers_hi[1] = a_Fz_y_hi->compile<3>();
+    Fx_parsers_lo.push_back(parser_field1_lo[1]->compile<3>());
+    Fz_parsers_lo.push_back(parser_field2_lo[1]->compile<3>());
+    Fx_parsers_hi.push_back(parser_field1_hi[1]->compile<3>());
+    Fz_parsers_hi.push_back(parser_field2_hi[1]->compile<3>());
 #endif
 #if defined(WARPX_ZINDEX)
-    set_fields_x_lo[WARPX_ZINDEX] = set_F_z_lo;
-    set_fields_y_lo[WARPX_ZINDEX] = set_F_z_lo;
-    set_fields_x_hi[WARPX_ZINDEX] = set_F_z_hi;
-    set_fields_y_hi[WARPX_ZINDEX] = set_F_z_hi;
+    set_fields_x_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
+    set_fields_y_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
+    set_fields_x_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
+    set_fields_y_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
     area_parsers_lo.push_back(m_insulator_area_lo[WARPX_ZINDEX]->compile<2>());
     area_parsers_hi.push_back(m_insulator_area_hi[WARPX_ZINDEX]->compile<2>());
-    Fx_parsers_lo[WARPX_ZINDEX] = a_Fx_z_lo->compile<3>();
-    Fy_parsers_lo[WARPX_ZINDEX] = a_Fy_z_lo->compile<3>();
-    Fx_parsers_hi[WARPX_ZINDEX] = a_Fx_z_hi->compile<3>();
-    Fy_parsers_hi[WARPX_ZINDEX] = a_Fy_z_hi->compile<3>();
+    Fx_parsers_lo.push_back(parser_field1_lo[WARPX_ZINDEX]->compile<3>());
+    Fy_parsers_lo.push_back(parser_field2_lo[WARPX_ZINDEX]->compile<3>());
+    Fx_parsers_hi.push_back(parser_field1_hi[WARPX_ZINDEX]->compile<3>());
+    Fy_parsers_hi.push_back(parser_field2_hi[WARPX_ZINDEX]->compile<3>());
 #endif
 
     amrex::IntVect const Fx_nodal = field[0]->ixType().toIntVect();
     amrex::IntVect const Fy_nodal = field[1]->ixType().toIntVect();
     amrex::IntVect const Fz_nodal = field[2]->ixType().toIntVect();
+
     // For each field multifab, apply boundary condition to ncomponents
     // If not split field, the boundary condition is applied to the regular field used in Maxwell's eq.
     // If split_pml_field is true, then boundary condition is applied to all the split field components.
@@ -583,6 +570,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_fieldy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        amrex::Print() << "By " << iv << " " << E_like << " " << idim << " " << iside << " " << set_fieldy << " " << field_value << "\n";
 
                         int const icomp = 1;
                         ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
