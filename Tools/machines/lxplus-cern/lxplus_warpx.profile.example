@@ -10,8 +10,8 @@ fi
 # load the LCG software stack that has all the dependencies
 source /cvmfs/sft.cern.ch/lcg/views/LCG_108_cuda/x86_64-el9-gcc13-opt/setup.sh
 
-# set variable for the parallel HDF5 to avoid picking the serial one at build-time
-H5_MPI=/cvmfs/sft.cern.ch/lcg/releases/hdf5_mpi/1.14.6-967d3/x86_64-el9-gcc13-opt
+# source environment that ensures that the parallel HDF5 is picked before the serial one
+source /cvmfs/sft.cern.ch/lcg/releases/LCG_108_cuda/hdf5_mpi/1.14.6/x86_64-el9-gcc13-opt/hdf5_mpi-env.sh
 
 export AMREX_CUDA_ARCH="7.0;7.5"
 

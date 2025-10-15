@@ -55,27 +55,26 @@ To have the environment activated at every login it is then possible to add the 
 Building WarpX
 ^^^^^^^^^^^^^^
 
-All dependencies are available via the LCG software stack. We choose the CUDA software stack to be able to compile both with and without CUDA without changing the stack. As both a serial and a parallel HDF5 installation are available, one has to make sure that WarpX picks up the parallel one both at build and at run time. Therefore, we load the software stack and export the path to the parallel HDF5:
+All dependencies are available via the LCG software stack. We choose the CUDA software stack to be able to compile both with and without CUDA without changing the stack. As both a serial and a parallel HDF5 installation are available, one has to make sure that WarpX picks up the parallel one both at build and at run time. Therefore, we load the software stack and source an environment script that ensures that ``hdf5_mpi`` appears before the serial version:
 
 .. code-block:: bash
 
     source /cvmfs/sft.cern.ch/lcg/views/LCG_108_cuda/x86_64-el9-gcc13-opt/setup.sh
-    export H5_MPI=/cvmfs/sft.cern.ch/lcg/releases/hdf5_mpi/1.14.6-967d3/x86_64-el9-gcc13-opt
+    source /cvmfs/sft.cern.ch/lcg/releases/LCG_108_cuda/hdf5_mpi/1.14.6/x86_64-el9-gcc13-opt/hdf5_mpi-env.sh
 
 
-
-Then we build WarpX, enforcing a static library build of HDF5 to prevent serial HDF5 installations in the path to cause run time mix-ups:
+Then we build WarpX:
 
 .. code-block:: bash
 
-    cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DHDF5_ROOT="$H5_MPI" -DHDF5_USE_STATIC_LIBRARIES=ON
+    cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3"
     cmake --build build -j 6
 
 Or if we need to compile with CUDA:
 
 .. code-block:: bash
 
-    cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_DIMS="1;2;RZ;3" -DHDF5_ROOT="$H5_MPI" -DHDF5_USE_STATIC_LIBRARIES=ON
+    cmake -S . -B build -DWarpX_COMPUTE=CUDA -DWarpX_DIMS="1;2;RZ;3"
     cmake --build build -j 6
 
 **That's it!**
