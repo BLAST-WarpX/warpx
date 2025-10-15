@@ -2426,6 +2426,9 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     """
 
     def __init__(self, **kw):
+        self.B_external_fields = kw.pop("B_external_fields", None)
+        self.E_external_fields = kw.pop("E_external_fields", None)
+
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
         self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
         self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
@@ -2433,35 +2436,115 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
+        # Collect user constants for mangle_expression (but keep kw intact!)
+        # Exclude base-class params so they don't end up in my_constants.
+        base_keys = {"read_fields_from_path", "load_E", "load_B"}
+        self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
+
+        # appease the base class requirement
+        if "read_fields_from_path" not in kw:
+            if self.B_external_fields or self.E_external_fields:
+                kw["read_fields_from_path"] = ""  # placeholder for multi-field mode
+            else:
+                raise ValueError(
+                    "LoadAppliedField requires 'read_fields_from_path' in legacy mode "
+                    "(no B_external_fields/E_external_fields provided)."
+                )
+
         super().__init__(**kw)
 
+        # hard-disable unwanted loaders set by the base ctor
+        if not self.load_E:
+            pywarpx.particles.E_ext_particle_init_style = "none"
+        if not self.load_B:
+            pywarpx.particles.B_ext_particle_init_style = "none"
+
+    def _apply_multi_particle_fields(
+        self, which: str, fields_dict: dict, mangle_dict: dict
+    ):
+        """
+        which: 'B' or 'E'
+        fields_dict: { name: {'read_fields_from_path': str,
+                              'read_fields_B_dependency(t)' or
+                              'read_fields_E_dependency(t)': str (optional)} }
+        """
+        assert which in ("B", "E")
+        if which == "B":
+            pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+            list_key = "B_ext_particle_fields"
+            dep_key = "read_fields_B_dependency(t)"
+        else:
+            pywarpx.particles.E_ext_particle_init_style = "read_from_file"
+            list_key = "E_ext_particle_fields"
+            dep_key = "read_fields_E_dependency(t)"
+
+        names = list(fields_dict.keys())
+        # list of field names (PICMI will serialize this to the WarpX string list)
+        pywarpx.particles.__setattr__(list_key, names)
+
+        for fname, fdict in fields_dict.items():
+            path = fdict.get("read_fields_from_path", None)
+            if not path:
+                raise ValueError(
+                    f"[PICMI] particles.{fname}.read_fields_from_path must be provided"
+                )
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_from_path", path)
+
+            # time dependence (default "1.0"), then *mangle* with my_constants
+            dep_expr_raw = fdict.get(dep_key, "1.0")
+            dep_expr = pywarpx.my_constants.mangle_expression(dep_expr_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.{dep_key}", dep_expr)
+
     def applied_field_initialize_inputs(self):
-        # file path for external fields
-        pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+        # Add the user defined keywords to my_constants
+        # The keywords are mangled if there is a conflicting variable already
+        # defined in my_constants with the same name but different value.
+        mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        # In legacy mode only (no multi-map dicts) we keep the top-level path
+        if not self.B_external_fields and not self.E_external_fields:
+            if hasattr(self, "read_fields_from_path") and self.read_fields_from_path:
+                pywarpx.particles.read_fields_from_path = self.read_fields_from_path
 
         # enable file-loading styles
         if self.load_E:
-            pywarpx.particles.E_ext_particle_init_style = "read_from_file"
-            # pass time dependence via parser
-            if self.warpx_E_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_E_dependency(t)", self.warpx_E_time_function
+            if self.E_external_fields:
+                self._apply_multi_particle_fields(
+                    "E", self.E_external_fields, mangle_dict
                 )
+            else:
+                pywarpx.particles.E_ext_particle_init_style = "read_from_file"
+                if self.warpx_E_time_function:
+                    dep = pywarpx.my_constants.mangle_expression(
+                        self.warpx_E_time_function, mangle_dict
+                    )
+                    pywarpx.particles.__setattr__("read_fields_E_dependency(t)", dep)
+        else:
+            # >>> ensure E is not implicitly enabled by the base class
+            pywarpx.particles.E_ext_particle_init_style = "none"
 
         if self.load_B:
-            pywarpx.particles.B_ext_particle_init_style = "read_from_file"
-            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "atol", self.div_cleaner_atol
-            )
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
-            )
-            # pass time dependence via parser
-            if self.warpx_B_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_B_dependency(t)", self.warpx_B_time_function
+            if self.B_external_fields:
+                self._apply_multi_particle_fields(
+                    "B", self.B_external_fields, mangle_dict
                 )
+            else:
+                pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+                pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "atol", self.div_cleaner_atol
+                )
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+                )
+                if self.warpx_B_time_function:
+                    dep = pywarpx.my_constants.mangle_expression(
+                        self.warpx_B_time_function, mangle_dict
+                    )
+                    pywarpx.particles.__setattr__("read_fields_B_dependency(t)", dep)
+        else:
+            # >>> ensure B is not implicitly enabled by the base class
+            pywarpx.particles.B_ext_particle_init_style = "none"
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
