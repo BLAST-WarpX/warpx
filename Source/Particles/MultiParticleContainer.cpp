@@ -347,7 +347,8 @@ MultiParticleContainer::ReadParameters ()
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            for (int spec_index = 0; spec_index < species_names.size(); ++spec_index){
+            const int spec_size = species_names.size();
+            for (int spec_index = 0; spec_index < spec_size; ++spec_index){
 
                 const auto name = species_names[spec_index];
 
