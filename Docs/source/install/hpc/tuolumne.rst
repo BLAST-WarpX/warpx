@@ -269,20 +269,32 @@ MI300A APUs (128GB)
 
 The batch script below can be used to run a WarpX simulation on 1 node with 4 APUs on the supercomputer Tuolumne at LLNL.
 Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<input file>`` could be ``plasma_mirror_inputs``.
-WarpX runs with one MPI rank per GPU.
+WarpX runs with one MPI rank per GPU and uses 21 (of 24) CPU cores (3 are reserved for the system).
 
-Note that we append these non-default runtime options:
+.. tab-set::
 
-* ``amrex.use_gpu_aware_mpi=1``: make use of fast APU to APU MPI communications
+   .. tab-item:: GPU
 
-.. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux``.
+      .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux
+         :language: bash
+         :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux``.
 
-To run a simulation, copy the lines above to a file ``tuolumne_mi300a.flux`` and run
+      To run a simulation, copy the lines above to a file ``tuolumne_mi300a.flux`` and run
 
-.. code-block:: bash
+      .. code-block:: bash
 
-   flux batch tuolumne_mi300a.flux
+         flux batch tuolumne_mi300a.flux
+
+   .. tab-item:: CPU
+
+      .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_cpu.flux
+         :language: bash
+         :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_cpu.flux``.
+
+      To run a simulation, copy the lines above to a file ``tuolumne_cpu.flux`` and run
+
+      .. code-block:: bash
+
+         flux batch tuolumne_cpu.flux
 
 to submit the job.
