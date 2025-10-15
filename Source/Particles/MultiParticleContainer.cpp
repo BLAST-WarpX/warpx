@@ -343,16 +343,19 @@ MultiParticleContainer::ReadParameters ()
                     species_types[i] = PCTypes::RigidInjected;
                 }
             }
+
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            int spec_index = 0;
-            for (auto const& name : species_names) {
+            for (int spec_index = 0; spec_index < species_names.size(); ++spec_index){
+
+                const auto name = species_names[spec_index];
+
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
-                if (auto tt = std::string {}; pp_species.query("species_type", tt)){
+                if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
                     const auto physical_species =
-                        species::from_string( physical_species_s );
+                        species::from_string(type_string);
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }
@@ -364,8 +367,6 @@ MultiParticleContainer::ReadParameters ()
                 if (name_is_in_photon_species || species_type_is_photon  ){
                     species_types[spec_index] = PCTypes::Photon;
                 }
-
-                spec_index++;
             }
         }
         pp_particles.query("use_fdtd_nci_corr", WarpX::use_fdtd_nci_corr);
