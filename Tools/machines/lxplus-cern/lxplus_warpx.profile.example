@@ -7,29 +7,11 @@ then
     git clone https://github.com/BLAST-WarpX/warpx.git $WORK/warpx
 fi
 
-# activate the compiler
-source /cvmfs/sft.cern.ch/lcg/releases/gcc/11.2.0-ad950/x86_64-centos7/setup.sh
+# load the LCG software stack that has all the dependencies
+source /cvmfs/sft.cern.ch/lcg/views/LCG_108_cuda/x86_64-el9-gcc13-opt/setup.sh
 
-# download and activate spack
-if [ ! -d "$WORK/spack" ]
-then
-    git clone -c feature.manyFiles=true https://github.com/spack/spack.git $WORK/spack
-    source $WORK/spack/share/spack/setup-env.sh
-
-    # add the compiler to spack
-    spack compiler find /cvmfs/sft.cern.ch/lcg/releases/gcc/11.2.0-ad950/x86_64-centos7/bin
-
-    # create and activate the spack environment
-    export SPACK_STACK_USE_PYTHON=1
-    export SPACK_STACK_USE_CUDA=1
-    spack env create warpx-lxplus-cuda-py $WORK/warpx/Tools/machines/lxplus-cern/spack.yaml
-    spack env activate warpx-lxplus-cuda-py
-    spack install
-else
-    # activate the spack environment
-    source $WORK/spack/share/spack/setup-env.sh
-    spack env activate warpx-lxplus-cuda-py
-fi
+# set variable for the parallel HDF5 to avoid picking the serial one at build-time
+H5_MPI=/cvmfs/sft.cern.ch/lcg/releases/hdf5_mpi/1.14.6-967d3/x86_64-el9-gcc13-opt
 
 export AMREX_CUDA_ARCH="7.0;7.5"
 
