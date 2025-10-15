@@ -169,6 +169,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", charge);
     const bool mass_is_specified = utils::parser::queryWithParser(pp_species_name, "mass", m_mass);
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE (
+        (!mass_is_specified) ||
+        (m_mass > 0.0),
+        species_name + ".mass' must be > 0. Use " + species_name + ".species_type " +
+        "in order to initialize massless particles.");
+
     if (charge_is_specified && species_is_specified) {
         ablastr::warn_manager::WMRecordWarning("Species",
             "Both '" + species_name +  ".charge' and " +
