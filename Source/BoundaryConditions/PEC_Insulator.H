@@ -103,12 +103,18 @@ public:
                                amrex::Real time,
                                bool split_pml_field,
                                bool E_like,
-                               std::vector<int> & set_field_lo,
-                               std::vector<int> & set_field_hi,
-                               std::vector<std::unique_ptr<amrex::Parser>> const & parsers_field1_lo,
-                               std::vector<std::unique_ptr<amrex::Parser>> const & parsers_field2_lo,
-                               std::vector<std::unique_ptr<amrex::Parser>> const & parsers_field1_hi,
-                               std::vector<std::unique_ptr<amrex::Parser>> const & parsers_field2_hi);
+                               std::vector<int> const & set_fields_x_lo,
+                               std::vector<int> const & set_fields_y_lo,
+                               std::vector<int> const & set_fields_z_lo,
+                               std::vector<int> const & set_fields_x_hi,
+                               std::vector<int> const & set_fields_y_hi,
+                               std::vector<int> const & set_fields_z_hi,
+                               std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
+                               std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
+                               std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
+                               std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
+                               std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
+                               std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
 
 private:
 
