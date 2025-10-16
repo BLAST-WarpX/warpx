@@ -83,13 +83,19 @@ public:
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
      * \param[in]     time                current time of the simulation
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
-     * \param[in]     E_like whether the field is E like or B like
-     * \param[in]     set_field_lo whether the tangential field at the low boundary was specified
-     * \param[in]     set_field_hi whether the tangential field at the high boundary was specified
-     * \param[in]     parsers_field1_lo the parser for the first tangential field at the low boundary
-     * \param[in]     parsers_field2_lo the parser for the second tangential field at the low boundary
-     * \param[in]     parsers_field1_hi the parser for the first tangential field at the high boundary
-     * \param[in]     parsers_field2_hi the parser for the second tangential field at the high boundary
+     * \param[in]     E_like              whether the field is E like or B like
+     * \param[in]     set_fields_x_lo     the flags for the field along x at the lower boundary
+     * \param[in]     set_fields_y_lo     the flags for the field along y at the lower boundary
+     * \param[in]     set_fields_z_lo     the flags for the field along z at the lower boundary
+     * \param[in]     set_fields_x_hi     the flags for the field along x at the upper boundary
+     * \param[in]     set_fields_y_hi     the flags for the field along y at the upper boundary
+     * \param[in]     set_fields_z_hi     the flags for the field along z at the upper boundary
+     * \param[in]     Fx_parsers_lo       the parsers for the field along x at the lower boundary
+     * \param[in]     Fy_parsers_lo       the parsers for the field along y at the lower boundary
+     * \param[in]     Fz_parsers_lo       the parsers for the field along z at the lower boundary
+     * \param[in]     Fx_parsers_hi       the parsers for the field along x at the upper boundary
+     * \param[in]     Fy_parsers_hi       the parsers for the field along y at the upper boundary
+     * \param[in]     Fz_parsers_hi       the parsers for the field along z at the upper boundary
      */
     void
     ApplyPEC_InsulatortoField (std::array<amrex::MultiFab*, 3> field,

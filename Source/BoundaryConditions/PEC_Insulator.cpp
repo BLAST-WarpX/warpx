@@ -244,26 +244,28 @@ namespace
         }
     }
 
-    // \brief Sets up the parsers, taking the input data and arranging it as needed
-    //        for the loops, and compiling the parser expressions.
-    //
-    // \param[in] set_field_lo, set_field_hi  flags whether the insulator expressions were specified
-    // \param[in] parser_field1_lo  the parser for the first transverse field at the low boundary
-    // \param[in] parser_field2_lo  the parser for the second transverse field at the low boundary
-    // \param[in] parser_field1_hi  the parser for the first transverse field at the high boundary
-    // \param[in] parser_field2_hi  the parser for the second transverse field at the high boundary
-    // \param[out] set_fields_x_lo  the flags for the field along x at the lower boundary
-    // \param[out] set_fields_y_lo  the flags for the field along y at the lower boundary
-    // \param[out] set_fields_z_lo  the flags for the field along z at the lower boundary
-    // \param[out] set_fields_x_hi  the flags for the field along x at the upper boundary
-    // \param[out] set_fields_y_hi  the flags for the field along y at the upper boundary
-    // \param[out] set_fields_z_hi  the flags for the field along z at the upper boundary
-    // \param[out] Fx_parsers_lo    the parsers for the field along x at the lower boundary
-    // \param[out] Fy_parsers_lo    the parsers for the field along y at the lower boundary
-    // \param[out] Fz_parsers_lo    the parsers for the field along z at the lower boundary
-    // \param[out] Fx_parsers_hi    the parsers for the field along x at the upper boundary
-    // \param[out] Fy_parsers_hi    the parsers for the field along y at the upper boundary
-    // \param[out] Fz_parsers_hi    the parsers for the field along z at the upper boundary
+    /* \brief Sets up the parsers, taking the input data and arranging it as needed
+     *        for the loops, and compiling the parser expressions.
+     *
+     * \param[in] set_field_lo      flags whether the insulator expressions were specified
+     * \param[in] set_field_hi      flags whether the insulator expressions were specified
+     * \param[in] parser_field1_lo  the parser for the first transverse field at the low boundary
+     * \param[in] parser_field2_lo  the parser for the second transverse field at the low boundary
+     * \param[in] parser_field1_hi  the parser for the first transverse field at the high boundary
+     * \param[in] parser_field2_hi  the parser for the second transverse field at the high boundary
+     * \param[out] set_fields_x_lo  the flags for the field along x at the lower boundary
+     * \param[out] set_fields_y_lo  the flags for the field along y at the lower boundary
+     * \param[out] set_fields_z_lo  the flags for the field along z at the lower boundary
+     * \param[out] set_fields_x_hi  the flags for the field along x at the upper boundary
+     * \param[out] set_fields_y_hi  the flags for the field along y at the upper boundary
+     * \param[out] set_fields_z_hi  the flags for the field along z at the upper boundary
+     * \param[out] Fx_parsers_lo    the parsers for the field along x at the lower boundary
+     * \param[out] Fy_parsers_lo    the parsers for the field along y at the lower boundary
+     * \param[out] Fz_parsers_lo    the parsers for the field along z at the lower boundary
+     * \param[out] Fx_parsers_hi    the parsers for the field along x at the upper boundary
+     * \param[out] Fy_parsers_hi    the parsers for the field along y at the upper boundary
+     * \param[out] Fz_parsers_hi    the parsers for the field along z at the upper boundary
+    */
     void SetupFieldParsers(std::vector<int> const & set_field_lo,
                            std::vector<int> const & set_field_hi,
                            std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
