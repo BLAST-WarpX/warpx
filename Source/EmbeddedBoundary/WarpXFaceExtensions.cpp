@@ -205,6 +205,7 @@ namespace
 #endif
     }
 
+#ifdef AMREX_USE_EB
     /**
     * \brief Initialize the memory for the FaceInfoBoxes
     */
@@ -229,6 +230,8 @@ namespace
             }
         }
     }
+#endif
+
 }
 
 /**
