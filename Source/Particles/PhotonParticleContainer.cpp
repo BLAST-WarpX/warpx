@@ -216,7 +216,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             }
 
 #ifdef WARPX_QED
-            // FIXME Use momentum_push_type here?
             [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
             [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
             [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
