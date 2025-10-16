@@ -633,7 +633,6 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_fieldy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
-                        amrex::Print() << "By " << iv << " " << E_like << " " << idim << " " << iside << " " << set_fieldy << " " << field_value << "\n";
 
                         int const icomp = 1;
                         ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
