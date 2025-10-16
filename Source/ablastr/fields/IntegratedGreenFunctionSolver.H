@@ -39,7 +39,7 @@ namespace ablastr::fields
         amrex::Real betax, amrex::Real betay, amrex::Real betaz, amrex::Real gamma)
     {
         // Transform to new coordinates
-        amrex::Real const factor = gamma*gamma*(betax*x0 + betay*y0 + betaz*z0);
+        amrex::Real const factor = gamma*gamma*(betax*x0 + betay*y0 + betaz*z0)/(gamma+1);
         amrex::Real const x = x0 + factor*betax;
         amrex::Real const y = y0 + factor*betay;
         amrex::Real const z = z0 + factor*betaz;
