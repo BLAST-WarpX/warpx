@@ -910,10 +910,6 @@ public:
     */
     void ComputeFaceExtensions();
     /**
-    * \brief Initialize the memory for the FaceInfoBoxes
-    */
-    void InitBorrowing();
-    /**
     * \brief Shrink the vectors in the FaceInfoBoxes
     */
     void ShrinkBorrowing();
