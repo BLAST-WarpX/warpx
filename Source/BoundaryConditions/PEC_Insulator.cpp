@@ -276,12 +276,12 @@ namespace
                            std::vector<int> & set_fields_x_hi,
                            std::vector<int> & set_fields_y_hi,
                            std::vector<int> & set_fields_z_hi,
-                           std::vector<amrex::ParserExecutor<3>> & Fx_parsers_lo,
-                           std::vector<amrex::ParserExecutor<3>> & Fy_parsers_lo,
-                           std::vector<amrex::ParserExecutor<3>> & Fz_parsers_lo,
-                           std::vector<amrex::ParserExecutor<3>> & Fx_parsers_hi,
-                           std::vector<amrex::ParserExecutor<3>> & Fy_parsers_hi,
-                           std::vector<amrex::ParserExecutor<3>> & Fz_parsers_hi)
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fx_parsers_lo,
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fy_parsers_lo,
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fz_parsers_lo,
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fx_parsers_hi,
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fy_parsers_hi,
+                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fz_parsers_hi)
     {
         set_fields_x_lo.resize(AMREX_SPACEDIM, false);
         set_fields_y_lo.resize(AMREX_SPACEDIM, false);
