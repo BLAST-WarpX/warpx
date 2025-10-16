@@ -243,6 +243,85 @@ namespace
             }
         }
     }
+
+    // \brief Sets up the parsers, taking the input data and arranging it as needed
+    //        for the loops, and compiling the parser expressions.
+    //
+    // \param[in] set_field_lo, set_field_hi  flags whether the insulator expressions were specified
+    // \param[in] parser_field1_lo  the parser for the first transverse field at the low boundary
+    // \param[in] parser_field2_lo  the parser for the second transverse field at the low boundary
+    // \param[in] parser_field1_hi  the parser for the first transverse field at the high boundary
+    // \param[in] parser_field2_hi  the parser for the second transverse field at the high boundary
+    // \param[out] set_fields_x_lo  the flags for the field along x at the lower boundary
+    // \param[out] set_fields_y_lo  the flags for the field along y at the lower boundary
+    // \param[out] set_fields_z_lo  the flags for the field along z at the lower boundary
+    // \param[out] set_fields_x_hi  the flags for the field along x at the upper boundary
+    // \param[out] set_fields_y_hi  the flags for the field along y at the upper boundary
+    // \param[out] set_fields_z_hi  the flags for the field along z at the upper boundary
+    // \param[out] Fx_parsers_lo    the parsers for the field along x at the lower boundary
+    // \param[out] Fy_parsers_lo    the parsers for the field along y at the lower boundary
+    // \param[out] Fz_parsers_lo    the parsers for the field along z at the lower boundary
+    // \param[out] Fx_parsers_hi    the parsers for the field along x at the upper boundary
+    // \param[out] Fy_parsers_hi    the parsers for the field along y at the upper boundary
+    // \param[out] Fz_parsers_hi    the parsers for the field along z at the upper boundary
+    void SetupFieldParsers(std::vector<int> const & set_field_lo,
+                           std::vector<int> const & set_field_hi,
+                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
+                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_lo,
+                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_hi,
+                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_hi,
+                           std::vector<int> & set_fields_x_lo,
+                           std::vector<int> & set_fields_y_lo,
+                           std::vector<int> & set_fields_z_lo,
+                           std::vector<int> & set_fields_x_hi,
+                           std::vector<int> & set_fields_y_hi,
+                           std::vector<int> & set_fields_z_hi,
+                           std::vector<amrex::ParserExecutor<3>> & Fx_parsers_lo,
+                           std::vector<amrex::ParserExecutor<3>> & Fy_parsers_lo,
+                           std::vector<amrex::ParserExecutor<3>> & Fz_parsers_lo,
+                           std::vector<amrex::ParserExecutor<3>> & Fx_parsers_hi,
+                           std::vector<amrex::ParserExecutor<3>> & Fy_parsers_hi,
+                           std::vector<amrex::ParserExecutor<3>> & Fz_parsers_hi)
+    {
+        set_fields_x_lo.resize(AMREX_SPACEDIM, false);
+        set_fields_y_lo.resize(AMREX_SPACEDIM, false);
+        set_fields_z_lo.resize(AMREX_SPACEDIM, false);
+        set_fields_x_hi.resize(AMREX_SPACEDIM, false);
+        set_fields_y_hi.resize(AMREX_SPACEDIM, false);
+        set_fields_z_hi.resize(AMREX_SPACEDIM, false);
+
+#ifndef WARPX_DIM_1D_Z
+        set_fields_y_lo[0] = set_field_lo[0];
+        set_fields_z_lo[0] = set_field_lo[0];
+        set_fields_y_hi[0] = set_field_hi[0];
+        set_fields_z_hi[0] = set_field_hi[0];
+        Fy_parsers_lo.push_back(parser_field1_lo[0]->compile<3>());
+        Fz_parsers_lo.push_back(parser_field2_lo[0]->compile<3>());
+        Fy_parsers_hi.push_back(parser_field1_hi[0]->compile<3>());
+        Fz_parsers_hi.push_back(parser_field2_hi[0]->compile<3>());
+#endif
+#if defined(WARPX_DIM_3D)
+        set_fields_x_lo[1] = set_field_lo[1];
+        set_fields_z_lo[1] = set_field_lo[1];
+        set_fields_x_hi[1] = set_field_hi[1];
+        set_fields_z_hi[1] = set_field_hi[1];
+        Fx_parsers_lo.push_back(parser_field1_lo[1]->compile<3>());
+        Fz_parsers_lo.push_back(parser_field2_lo[1]->compile<3>());
+        Fx_parsers_hi.push_back(parser_field1_hi[1]->compile<3>());
+        Fz_parsers_hi.push_back(parser_field2_hi[1]->compile<3>());
+#endif
+#if defined(WARPX_ZINDEX)
+        set_fields_x_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
+        set_fields_y_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
+        set_fields_x_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
+        set_fields_y_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
+        Fx_parsers_lo.push_back(parser_field1_lo[WARPX_ZINDEX]->compile<3>());
+        Fy_parsers_lo.push_back(parser_field2_lo[WARPX_ZINDEX]->compile<3>());
+        Fx_parsers_hi.push_back(parser_field1_hi[WARPX_ZINDEX]->compile<3>());
+        Fy_parsers_hi.push_back(parser_field2_hi[WARPX_ZINDEX]->compile<3>());
+#endif
+    }
+
 }
 
 bool
@@ -284,6 +363,7 @@ PEC_Insulator::PEC_Insulator ()
     m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ey_x_hi(y,z,t)", "y", "z");
     m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_x_hi(y,z,t)", "y", "z");
 #endif
+
 #if defined(WARPX_DIM_3D)
     std::string str_area_y_lo = "0";
     std::string str_area_y_hi = "0";
@@ -326,6 +406,26 @@ PEC_Insulator::PEC_Insulator ()
     m_set_E_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ey_z_hi(x,y,t)", "x", "y");
 #endif
 
+    for(const auto & area_parser : m_insulator_area_lo) {
+        m_area_parsers_lo.push_back(area_parser->compile<2>());
+    }
+    for(const auto & area_parser : m_insulator_area_hi) {
+        m_area_parsers_hi.push_back(area_parser->compile<2>());
+    }
+
+    ::SetupFieldParsers(m_set_B_lo, m_set_B_hi,
+                        m_parsers_B1_lo, m_parsers_B2_lo, m_parsers_B1_hi, m_parsers_B2_hi,
+                        m_set_Bfields_x_lo, m_set_Bfields_y_lo, m_set_Bfields_z_lo,
+                        m_set_Bfields_x_hi, m_set_Bfields_y_hi, m_set_Bfields_z_hi,
+                        m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo,
+                        m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi);
+
+    ::SetupFieldParsers(m_set_E_lo, m_set_E_hi,
+                        m_parsers_E1_lo, m_parsers_E2_lo, m_parsers_E1_hi, m_parsers_E2_hi,
+                        m_set_Efields_x_lo, m_set_Efields_y_lo, m_set_Efields_z_lo,
+                        m_set_Efields_x_hi, m_set_Efields_y_hi, m_set_Efields_z_hi,
+                        m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo,
+                        m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi);
 }
 
 void
@@ -341,10 +441,12 @@ PEC_Insulator::ApplyPEC_InsulatortoEfield (
     bool const E_like = true;
     ApplyPEC_InsulatortoField(Efield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like, m_set_E_lo, m_set_E_hi,
-                              m_parsers_E1_lo, m_parsers_E2_lo, m_parsers_E1_hi, m_parsers_E2_hi);
+                              E_like,
+                              m_set_Efields_x_lo, m_set_Efields_y_lo, m_set_Efields_z_lo,
+                              m_set_Efields_x_hi, m_set_Efields_y_hi, m_set_Efields_z_hi,
+                              m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo,
+                              m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi);
 }
-
 
 void
 PEC_Insulator::ApplyPEC_InsulatortoBfield (
@@ -359,8 +461,11 @@ PEC_Insulator::ApplyPEC_InsulatortoBfield (
     bool const split_pml_field = false;
     ApplyPEC_InsulatortoField(Bfield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like, m_set_B_lo, m_set_B_hi,
-                              m_parsers_B1_lo, m_parsers_B2_lo, m_parsers_B1_hi, m_parsers_B2_hi);
+                              E_like,
+                              m_set_Bfields_x_lo, m_set_Bfields_y_lo, m_set_Bfields_z_lo,
+                              m_set_Bfields_x_hi, m_set_Bfields_y_hi, m_set_Bfields_z_hi,
+                              m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo,
+                              m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi);
 }
 
 
@@ -377,12 +482,18 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::Real time,
     bool split_pml_field,
     bool E_like,
-    std::vector<int> & set_field_lo,
-    std::vector<int> & set_field_hi,
-    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
-    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_lo,
-    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_hi,
-    std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_hi)
+    std::vector<int> const & set_fields_x_lo,
+    std::vector<int> const & set_fields_y_lo,
+    std::vector<int> const & set_fields_z_lo,
+    std::vector<int> const & set_fields_x_hi,
+    std::vector<int> const & set_fields_y_hi,
+    std::vector<int> const & set_fields_z_hi,
+    std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
+    std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
+    std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
+    std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
+    std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
+    std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi)
 {
     using namespace amrex::literals;
     amrex::Box domain_box = geom.Domain();
@@ -391,56 +502,6 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     }
     amrex::IntVect const domain_lo = domain_box.smallEnd();
     amrex::IntVect const domain_hi = domain_box.bigEnd();
-
-    std::vector<int> set_fields_x_lo(AMREX_SPACEDIM, false);
-    std::vector<int> set_fields_y_lo(AMREX_SPACEDIM, false);
-    std::vector<int> set_fields_z_lo(AMREX_SPACEDIM, false);
-
-    std::vector<int> set_fields_x_hi(AMREX_SPACEDIM, false);
-    std::vector<int> set_fields_y_hi(AMREX_SPACEDIM, false);
-    std::vector<int> set_fields_z_hi(AMREX_SPACEDIM, false);
-
-    std::vector<amrex::ParserExecutor<2>> area_parsers_lo;
-    std::vector<amrex::ParserExecutor<2>> area_parsers_hi;
-    std::vector<amrex::ParserExecutor<3>> Fx_parsers_lo, Fy_parsers_lo, Fz_parsers_lo;
-    std::vector<amrex::ParserExecutor<3>> Fx_parsers_hi, Fy_parsers_hi, Fz_parsers_hi;
-
-#ifndef WARPX_DIM_1D_Z
-    set_fields_y_lo[0] = set_field_lo[0];
-    set_fields_z_lo[0] = set_field_lo[0];
-    set_fields_y_hi[0] = set_field_hi[0];
-    set_fields_z_hi[0] = set_field_hi[0];
-    area_parsers_lo.push_back(m_insulator_area_lo[0]->compile<2>());
-    area_parsers_hi.push_back(m_insulator_area_hi[0]->compile<2>());
-    Fy_parsers_lo.push_back(parser_field1_lo[0]->compile<3>());
-    Fz_parsers_lo.push_back(parser_field2_lo[0]->compile<3>());
-    Fy_parsers_hi.push_back(parser_field1_hi[0]->compile<3>());
-    Fz_parsers_hi.push_back(parser_field2_hi[0]->compile<3>());
-#endif
-#if defined(WARPX_DIM_3D)
-    set_fields_x_lo[1] = set_field_lo[1];
-    set_fields_z_lo[1] = set_field_lo[1];
-    set_fields_x_hi[1] = set_field_hi[1];
-    set_fields_z_hi[1] = set_field_hi[1];
-    area_parsers_lo.push_back(m_insulator_area_lo[1]->compile<2>());
-    area_parsers_hi.push_back(m_insulator_area_hi[1]->compile<2>());
-    Fx_parsers_lo.push_back(parser_field1_lo[1]->compile<3>());
-    Fz_parsers_lo.push_back(parser_field2_lo[1]->compile<3>());
-    Fx_parsers_hi.push_back(parser_field1_hi[1]->compile<3>());
-    Fz_parsers_hi.push_back(parser_field2_hi[1]->compile<3>());
-#endif
-#if defined(WARPX_ZINDEX)
-    set_fields_x_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
-    set_fields_y_lo[WARPX_ZINDEX] = set_field_lo[WARPX_ZINDEX];
-    set_fields_x_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
-    set_fields_y_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
-    area_parsers_lo.push_back(m_insulator_area_lo[WARPX_ZINDEX]->compile<2>());
-    area_parsers_hi.push_back(m_insulator_area_hi[WARPX_ZINDEX]->compile<2>());
-    Fx_parsers_lo.push_back(parser_field1_lo[WARPX_ZINDEX]->compile<3>());
-    Fy_parsers_lo.push_back(parser_field2_lo[WARPX_ZINDEX]->compile<3>());
-    Fx_parsers_hi.push_back(parser_field1_hi[WARPX_ZINDEX]->compile<3>());
-    Fy_parsers_hi.push_back(parser_field2_hi[WARPX_ZINDEX]->compile<3>());
-#endif
 
     amrex::IntVect const Fx_nodal = field[0]->ixType().toIntVect();
     amrex::IntVect const Fy_nodal = field[1]->ixType().toIntVect();
@@ -473,7 +534,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
         amrex::Box const & valid_box = mfi.validbox();
         amrex::Box const node_box = amrex::convert(valid_box, amrex::IntVect::TheNodeVector());
 
-        // The lower end of the box is the same for nodal and cell centered
+        // The lower end of the box is the same for nodal and cell centered,
+        // so the same lower end can be used for the three fields even though
+        // they will have different centerings.
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(valid_box, lev, 0._rt);
         amrex::IntVect const lo = valid_box.smallEnd();
 
@@ -536,10 +599,10 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 bool const set_fieldy = ( (iside == -1) ? set_fields_y_lo[idim] : set_fields_y_hi[idim]);
                 bool const set_fieldz = ( (iside == -1) ? set_fields_z_lo[idim] : set_fields_z_hi[idim]);
 
-                amrex::ParserExecutor<2> & area_parser = ( (iside == -1) ? area_parsers_lo[idim] : area_parsers_hi[idim]);
-                amrex::ParserExecutor<3> & Fx_parser = ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]);
-                amrex::ParserExecutor<3> & Fy_parser = ( (iside == -1) ? Fy_parsers_lo[idim] : Fy_parsers_hi[idim]);
-                amrex::ParserExecutor<3> & Fz_parser = ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]);
+                amrex::ParserExecutor<2> const & area_parser = ( (iside == -1) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim]);
+                amrex::ParserExecutor<3> const & Fx_parser = ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]);
+                amrex::ParserExecutor<3> const & Fy_parser = ( (iside == -1) ? Fy_parsers_lo[idim] : Fy_parsers_hi[idim]);
+                amrex::ParserExecutor<3> const & Fz_parser = ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]);
 
                 // loop over cells and update fields
                 amrex::ParallelFor(

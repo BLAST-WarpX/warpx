@@ -130,6 +130,9 @@ private:
     std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
     std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;
 
+    std::vector<amrex::ParserExecutor<2>> m_area_parsers_lo;
+    std::vector<amrex::ParserExecutor<2>> m_area_parsers_hi;
+
     std::vector<int> m_set_B_lo = {0, 0, 0};
     std::vector<int> m_set_B_hi = {0, 0, 0};
 
@@ -145,6 +148,28 @@ private:
     std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_lo;
     std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_hi;
     std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_hi;
+
+    std::vector<int> m_set_Bfields_x_lo;
+    std::vector<int> m_set_Bfields_y_lo;
+    std::vector<int> m_set_Bfields_z_lo;
+
+    std::vector<int> m_set_Bfields_x_hi;
+    std::vector<int> m_set_Bfields_y_hi;
+    std::vector<int> m_set_Bfields_z_hi;
+
+    std::vector<amrex::ParserExecutor<3>> m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo;
+    std::vector<amrex::ParserExecutor<3>> m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi;
+
+    std::vector<int> m_set_Efields_x_lo;
+    std::vector<int> m_set_Efields_y_lo;
+    std::vector<int> m_set_Efields_z_lo;
+
+    std::vector<int> m_set_Efields_x_hi;
+    std::vector<int> m_set_Efields_y_hi;
+    std::vector<int> m_set_Efields_z_hi;
+
+    std::vector<amrex::ParserExecutor<3>> m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo;
+    std::vector<amrex::ParserExecutor<3>> m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi;
 
 };
 #endif // PEC_INSULATOR_H_
