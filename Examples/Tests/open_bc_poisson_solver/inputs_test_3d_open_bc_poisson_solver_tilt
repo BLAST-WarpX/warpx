@@ -1,0 +1,58 @@
+my_constants.sigmaz = 300e-6
+my_constants.sigmax = 100e-6
+my_constants.sigmay = 100e-6
+my_constants.Q = 3.2e-9
+my_constants.theta = 0.25*pi
+
+max_step = 1
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.max_grid_size = 512
+geometry.dims = 3
+my_constants.xmax = 6*sigmax * cos(theta) + 3 * sigmaz * sin(theta)
+my_constants.zmax = 6*sigmaz * cos(theta) + 3 * sigmax * sin(theta)
+
+geometry.prob_lo = -xmax -6*sigmay -zmax
+geometry.prob_hi = +xmax +6*sigmay +zmax
+boundary.field_lo = open open open
+boundary.field_hi = open open open
+warpx.const_dt = 1e-14
+warpx.do_electrostatic = relativistic
+warpx.poisson_solver = fft
+algo.field_gathering = momentum-conserving
+algo.particle_shape = 3
+
+particles.species_names = electron
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = gaussian_beam
+electron.q_tot = -Q
+electron.npart = 1e7
+electron.x_m = 0.
+electron.y_m = 0.
+electron.z_m = 0.
+electron.x_rms = sigmax
+electron.y_rms = sigmay
+electron.z_rms = sigmaz
+electron.do_gaussian_beam_rotation = 1
+electron.do_gaussian_beam_rotation_momenta = 1
+electron.gaussian_beam_rotation_angle = theta
+electron.gaussian_beam_rotation_axis = 0 1 0
+electron.momentum_distribution_type = "constant"
+electron.ux = 0.0
+electron.uy = 0.0
+electron.uz = 25000
+electron.initialize_self_fields = 1
+
+diagnostics.diags_names = diag1 diag2
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.format = plotfile
+
+diag2.intervals = 1
+diag2.diag_type = Full
+diag2.fields_to_plot = Ex Ey Ez rho
+diag2.format = openpmd
