@@ -17,7 +17,7 @@ If you are new to this system, **please see the following resources**:
 * `Tuolumne overview <https://hpc.llnl.gov/hardware/compute-platforms/tuolumne>`__
 * `LLNL user account <https://lc.llnl.gov/lorenz/mylc/mylc.cgi>`__ (login required)
 * `Tuolumne user guide <https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems>`__
-* Batch system: `Flux with Slurm Wrappers <https://lc.llnl.gov/confluence/display/ELCAPEA/Running+Jobs>`__
+* Batch system: `Flux <https://lc.llnl.gov/confluence/display/ELCAPEA/Running+Jobs>`__
 * `Jupyter service <https://lc.llnl.gov/jupyter>`__ (`documentation <https://lc.llnl.gov/confluence/display/LC/JupyterHub+and+Jupyter+Notebook>`__, login required)
 * `Production directories <https://lc.llnl.gov/confluence/display/ELCAPEA/File+Systems>`__ (login required):
 
@@ -195,14 +195,14 @@ Note that we append these non-default runtime options:
 
 * ``amrex.use_gpu_aware_mpi=1``: make use of fast APU to APU MPI communications
 
-.. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.sbatch
+.. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.sbatch``.
+   :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux``.
 
-To run a simulation, copy the lines above to a file ``tuolumne_mi300a.sbatch`` and run
+To run a simulation, copy the lines above to a file ``tuolumne_mi300a.flux`` and run
 
 .. code-block:: bash
 
-   sbatch tuolumne_mi300a.sbatch
+   flux batch tuolumne_mi300a.flux
 
 to submit the job.

@@ -754,7 +754,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
         options.deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::Full, MomentumPushType::Full, &options);
         CumulateJ();
         if (m_use_mass_matrices_jacobian) { SaveE(); }
         if (m_use_mass_matrices_pc) {
@@ -767,14 +767,14 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         if (m_particle_suborbits) {
             options.deposit_mass_matrices = false;
             options.evolve_suborbit_particles_only = true;
-            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::Full, MomentumPushType::Full, &options);
         }
         const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
         ComputeJfromMassMatrices( J_from_MM_only );
     }
     else { // Conventional particle-suppressed JFNK
         options.deposit_mass_matrices = false;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::Full, MomentumPushType::Full, &options);
     }
 
     // Apply BCs to J and communicate

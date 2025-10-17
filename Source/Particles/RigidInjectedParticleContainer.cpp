@@ -180,7 +180,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         const long np_to_push,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
-                                        SubcyclingHalf subcycling_half)
+                                        SubcyclingHalf subcycling_half,
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -224,7 +226,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      subcycling_half);
+                                      subcycling_half,
+                                      position_push_type,
+                                      momentum_push_type);
 
     if (!done_injecting_lev) {
 
@@ -238,6 +242,10 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
         constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
+        amrex::Real position_dt = dt;
+        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
+            position_dt *= 0.5_rt;
+        }
         amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
             amrex::ParticleReal xp, yp, zp;
             GetPosition(i, xp, yp, zp);
@@ -246,17 +254,17 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                 yp = y_save[i];
                 zp = z_save[i];
                 if (rigid == RigidAdvanceMode::vzbar) {
-                    zp += dt * vz_ave_boosted;
+                    zp += position_dt * vz_ave_boosted;
                 } else {
                     const amrex::ParticleReal gi =
                         1._prt /
                         std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
                                             uz[i] * uz[i]) *
                                                inv_csq);
-                    zp += dt * uz[i] * gi;
+                    zp += position_dt * uz[i] * gi;
                     if (rigid == RigidAdvanceMode::v) {
-                        xp += dt * ux[i] * gi;
-                        yp += dt * uy[i] * gi;
+                        xp += position_dt * ux[i] * gi;
+                        yp += position_dt * uy[i] * gi;
                     }
                 }
                 SetPosition(i, xp, yp, zp);
@@ -270,6 +278,8 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
                                         int lev,
                                         const std::string& current_fp_string,
                                         Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type,
                                         ImplicitOptions const * /*implicit_options*/)
 {
 
@@ -292,10 +302,13 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (fields,
-                                       lev,
-                                       current_fp_string,
-                                       t, dt, subcycling_half, skip_deposition, nullptr);
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, subcycling_half, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      nullptr);
 }
 
 void

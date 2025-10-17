@@ -224,6 +224,9 @@ WarpX::Evolve (int numsteps)
         mypc->doQEDSchwinger();
 #endif
 
+        // perform particle injection
+        ExecutePythonCallback("particleinjection");
+
         // perform collisions and advance fields and particles by one time step
         OneStep(cur_time, dt[0], step);
 
@@ -379,16 +382,13 @@ void WarpX::OneStep (
 {
     WARPX_PROFILE("WarpX::OneStep()");
 
-    // perform particle collisions
-    ExecutePythonCallback("beforecollisions");
-    mypc->doCollisions(a_step, a_cur_time, a_dt);
-    ExecutePythonCallback("aftercollisions");
-
-    // perform particle injection
-    ExecutePythonCallback("particleinjection");
-
     // implicit solver
     if (m_implicit_solver) {
+        // perform particle collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+
         // advance fields and particles by one time step
         m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
@@ -397,15 +397,55 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // gather fields, push particles, skip deposition
-            bool const skip_deposition = true;
-            PushParticlesandDeposit(
-                a_cur_time,
-                skip_deposition
-            );
+            // with collisions placed in the middle of the position push and after the momentum push
+            if (m_collisions_split_position_push) {
+                // push particles (half position and full momentum)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    PositionPushType::FirstHalf,
+                    MomentumPushType::Full
+                );
+
+                // communicate particle data
+                mypc->Redistribute();
+
+                // perform particle collisions
+                ExecutePythonCallback("beforecollisions");
+                mypc->doCollisions(a_step, a_cur_time, a_dt);
+                ExecutePythonCallback("aftercollisions");
+
+                // push particles (half position)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    PositionPushType::SecondHalf,
+                    MomentumPushType::None
+                );
+            }
+            // with collisions placed before the position and momentum push, or without collisions
+            else {
+                // perform particle collisions
+                ExecutePythonCallback("beforecollisions");
+                mypc->doCollisions(a_step, a_cur_time, a_dt);
+                ExecutePythonCallback("aftercollisions");
+
+                // push particles (half position)
+                PushParticlesandDeposit(
+                    a_cur_time,
+                    /*skip_current=*/true,
+                    PositionPushType::Full,
+                    MomentumPushType::Full
+                );
+            }
         }
         // electromagnetic solver
         else {
+            // perform particle collisions
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(a_step, a_cur_time, a_dt);
+            ExecutePythonCallback("aftercollisions");
+
             // without mesh refinement
             if (finest_level == 0) {
                 // standard PIC loop
@@ -1211,6 +1251,8 @@ void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     bool skip_current,
+    PositionPushType position_push_type,
+    MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
 )
 {
@@ -1222,6 +1264,8 @@ WarpX::PushParticlesandDeposit (
             cur_time,
             SubcyclingHalf::None,
             skip_current,
+            position_push_type,
+            momentum_push_type,
             implicit_options
         );
     }
@@ -1233,6 +1277,8 @@ WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
     SubcyclingHalf subcycling_half,
     bool skip_current,
+    PositionPushType position_push_type,
+    MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
 )
 {
@@ -1262,6 +1308,8 @@ WarpX::PushParticlesandDeposit (
         dt[lev],
         subcycling_half,
         skip_current,
+        position_push_type,
+        momentum_push_type,
         implicit_options
     );
 

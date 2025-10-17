@@ -631,8 +631,13 @@ public:
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
+
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
@@ -907,14 +912,6 @@ public:
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
     void ComputeFaceExtensions();
-    /**
-    * \brief Initialize the memory for the FaceInfoBoxes
-    */
-    void InitBorrowing();
-    /**
-    * \brief Shrink the vectors in the FaceInfoBoxes
-    */
-    void ShrinkBorrowing();
     /**
     * \brief Do the one-way extension
     */
@@ -1574,6 +1571,13 @@ private:
     bool m_JRhom = false;
     int m_JRhom_subintervals;
 
+    /**
+     * \brief WarpX class attribute that controls whether collisions are placed
+     *        in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_position_push;
 };
 
 #endif

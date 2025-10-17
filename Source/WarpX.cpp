@@ -1893,6 +1893,43 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    // Set the default value of m_collisions_split_position_push
+    m_collisions_split_position_push = false;
+    const amrex::ParmParse pp_collisions("collisions");
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    if (collisions) {
+        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+            m_collisions_split_position_push = true;
+        }
+
+        // Override m_collisions_split_position_push if the corresponding input
+        // parameter collisions.split_position_push is set in the input file
+        pp_collisions.query("split_position_push", m_collisions_split_position_push);
+
+        // Warn the user if collisions with split position push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_position_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (EB::enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with embedded\
+                    boundaries, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+        }
+    }
 }
 
 void
@@ -2110,6 +2147,14 @@ WarpX::BackwardCompatibility ()
     if (pp_particles.query("nspecies", nspecies)){
         ablastr::warn_manager::WMRecordWarning("Species",
             "particles.nspecies is ignored. Just use particles.species_names please.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future. "
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
             ablastr::warn_manager::WarnPriority::low);
     }
 
