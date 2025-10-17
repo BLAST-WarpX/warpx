@@ -20,7 +20,7 @@
 using namespace amrex;
 
 void
-backward_compatibility ()
+warpx::initialization::backward_compatibility ()
 {
     // Auxiliary variables
     int backward_int;
