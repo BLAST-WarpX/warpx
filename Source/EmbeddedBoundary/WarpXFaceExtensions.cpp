@@ -216,7 +216,7 @@ namespace
         for (int idim = 0; idim < 3; ++idim){
             for (amrex::MFIter mfi(*Bfield[idim]); mfi.isValid(); ++mfi){
                 amrex::Box const &box = mfi.validbox();
-                auto &borrowing_dir = (*borrowing[idim])[mfi];
+                auto& borrowing_dir = (*borrowing[idim])[mfi];
                 borrowing_dir.inds_pointer.resize(box);
                 borrowing_dir.size.resize(box);
                 borrowing_dir.size.setVal<amrex::RunOn::Device>(0);
@@ -230,6 +230,26 @@ namespace
             }
         }
     }
+
+    /**
+    * \brief Shrink the vectors in the FaceInfoBoxes
+    */
+    void shrink_borrowing(
+        std::array< std::unique_ptr<amrex::LayoutData<FaceInfoBox> >, 3 > & borrowing,
+        ablastr::fields::VectorField Bfield)
+    {
+        using ablastr::fields::Direction;
+
+        for(int idim = 0; idim < AMREX_SPACEDIM; idim++) {
+            for (amrex::MFIter mfi(*Bfield[idim]); mfi.isValid(); ++mfi){
+                auto& borrowing_dir = (*borrowing[idim])[mfi];
+                borrowing_dir.inds.resize(borrowing_dir.vecs_size);
+                borrowing_dir.neigh_faces.resize(borrowing_dir.vecs_size);
+                borrowing_dir.area.resize(borrowing_dir.vecs_size);
+            }
+        }
+    }
+
 #endif
 
 }
@@ -369,7 +389,7 @@ WarpX::ComputeFaceExtensions ()
     );
 
     ComputeEightWaysExtensions();
-    ShrinkBorrowing();
+    ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
@@ -817,19 +837,4 @@ WarpX::ComputeEightWaysExtensions ()
     }
 #endif
 #endif
-}
-
-void
-WarpX::ShrinkBorrowing ()
-{
-    using ablastr::fields::Direction;
-
-    for(int idim = 0; idim < AMREX_SPACEDIM; idim++) {
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-            auto &borrowing = (*m_borrowing[maxLevel()][idim])[mfi];
-            borrowing.inds.resize(borrowing.vecs_size);
-            borrowing.neigh_faces.resize(borrowing.vecs_size);
-            borrowing.area.resize(borrowing.vecs_size);
-        }
-    }
 }
