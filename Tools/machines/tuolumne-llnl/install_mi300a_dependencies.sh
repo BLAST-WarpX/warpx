@@ -53,6 +53,7 @@ cmake \
     --fresh                        \
     -S ${SRC_DIR}/c-blosc2         \
     -B ${build_dir}/c-blosc2-build \
+    -DBUILD_SHARED_LIBS=OFF        \
     -DBUILD_TESTS=OFF              \
     -DBUILD_BENCHMARKS=OFF         \
     -DBUILD_EXAMPLES=OFF           \
@@ -87,6 +88,7 @@ cmake \
     -DADIOS2_USE_Fortran=OFF     \
     -DADIOS2_USE_Python=OFF      \
     -DADIOS2_USE_ZeroMQ=OFF      \
+    -DBUILD_SHARED_LIBS=OFF      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake \
     --build ${build_dir}/adios2-build \
@@ -110,6 +112,7 @@ cmake \
     -B ${build_dir}/blaspp-tuolumne-mi300a-build \
     -Duse_openmp=OFF                          \
     -Dgpu_backend=hip                         \
+    -DBUILD_SHARED_LIBS=OFF                   \
     -DCMAKE_CXX_STANDARD=17                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
@@ -135,6 +138,7 @@ cmake \
     -DCMAKE_CXX_STANDARD=17                     \
     -Dgpu_backend=hip                           \
     -Dbuild_tests=OFF                           \
+    -DBUILD_SHARED_LIBS=OFF                     \
     -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake \
