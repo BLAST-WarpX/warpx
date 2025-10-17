@@ -109,18 +109,18 @@ public:
                                amrex::Real time,
                                bool split_pml_field,
                                bool E_like,
-                               std::vector<int> const & set_fields_x_lo,
-                               std::vector<int> const & set_fields_y_lo,
-                               std::vector<int> const & set_fields_z_lo,
-                               std::vector<int> const & set_fields_x_hi,
-                               std::vector<int> const & set_fields_y_hi,
-                               std::vector<int> const & set_fields_z_hi,
-                               std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
-                               std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
-                               std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
-                               std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
-                               std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
-                               std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
+                               amrex::Vector<int> const & set_fields_x_lo,
+                               amrex::Vector<int> const & set_fields_y_lo,
+                               amrex::Vector<int> const & set_fields_z_lo,
+                               amrex::Vector<int> const & set_fields_x_hi,
+                               amrex::Vector<int> const & set_fields_y_hi,
+                               amrex::Vector<int> const & set_fields_z_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
 
 private:
 
@@ -134,54 +134,54 @@ private:
      * \return wether the parameter was specified
      */
     bool ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                    std::vector<std::unique_ptr<amrex::Parser>> & parsers,
+                                    amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
                                     std::string const & input_name,
                                     std::string const & coord1,
                                     std::string const & coord2);
 
-    std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;
 
-    std::vector<amrex::ParserExecutor<2>> m_area_parsers_lo;
-    std::vector<amrex::ParserExecutor<2>> m_area_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<2>> m_area_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<2>> m_area_parsers_hi;
 
-    std::vector<int> m_set_B_lo = {0, 0, 0};
-    std::vector<int> m_set_B_hi = {0, 0, 0};
+    amrex::Vector<int> m_set_B_lo = {0, 0, 0};
+    amrex::Vector<int> m_set_B_hi = {0, 0, 0};
 
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_hi;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_hi;
 
-    std::vector<int> m_set_E_lo = {0, 0, 0};
-    std::vector<int> m_set_E_hi = {0, 0, 0};
+    amrex::Vector<int> m_set_E_lo = {0, 0, 0};
+    amrex::Vector<int> m_set_E_hi = {0, 0, 0};
 
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_hi;
-    std::vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_hi;
 
-    std::vector<int> m_set_Bfields_x_lo;
-    std::vector<int> m_set_Bfields_y_lo;
-    std::vector<int> m_set_Bfields_z_lo;
+    amrex::Vector<int> m_set_Bfields_x_lo;
+    amrex::Vector<int> m_set_Bfields_y_lo;
+    amrex::Vector<int> m_set_Bfields_z_lo;
 
-    std::vector<int> m_set_Bfields_x_hi;
-    std::vector<int> m_set_Bfields_y_hi;
-    std::vector<int> m_set_Bfields_z_hi;
+    amrex::Vector<int> m_set_Bfields_x_hi;
+    amrex::Vector<int> m_set_Bfields_y_hi;
+    amrex::Vector<int> m_set_Bfields_z_hi;
 
-    std::vector<amrex::ParserExecutor<3>> m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo;
-    std::vector<amrex::ParserExecutor<3>> m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi;
 
-    std::vector<int> m_set_Efields_x_lo;
-    std::vector<int> m_set_Efields_y_lo;
-    std::vector<int> m_set_Efields_z_lo;
+    amrex::Vector<int> m_set_Efields_x_lo;
+    amrex::Vector<int> m_set_Efields_y_lo;
+    amrex::Vector<int> m_set_Efields_z_lo;
 
-    std::vector<int> m_set_Efields_x_hi;
-    std::vector<int> m_set_Efields_y_hi;
-    std::vector<int> m_set_Efields_z_hi;
+    amrex::Vector<int> m_set_Efields_x_hi;
+    amrex::Vector<int> m_set_Efields_y_hi;
+    amrex::Vector<int> m_set_Efields_z_hi;
 
-    std::vector<amrex::ParserExecutor<3>> m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo;
-    std::vector<amrex::ParserExecutor<3>> m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi;
 
 };
 #endif // PEC_INSULATOR_H_

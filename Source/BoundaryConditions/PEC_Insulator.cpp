@@ -266,24 +266,24 @@ namespace
      * \param[out] Fy_parsers_hi    the parsers for the field along y at the upper boundary
      * \param[out] Fz_parsers_hi    the parsers for the field along z at the upper boundary
     */
-    void SetupFieldParsers(std::vector<int> const & set_field_lo,
-                           std::vector<int> const & set_field_hi,
-                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
-                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_lo,
-                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field1_hi,
-                           std::vector<std::unique_ptr<amrex::Parser>> const & parser_field2_hi,
-                           std::vector<int> & set_fields_x_lo,
-                           std::vector<int> & set_fields_y_lo,
-                           std::vector<int> & set_fields_z_lo,
-                           std::vector<int> & set_fields_x_hi,
-                           std::vector<int> & set_fields_y_hi,
-                           std::vector<int> & set_fields_z_hi,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fx_parsers_lo,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fy_parsers_lo,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fz_parsers_lo,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fx_parsers_hi,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fy_parsers_hi,
-                           [[maybe_unused]]std::vector<amrex::ParserExecutor<3>> & Fz_parsers_hi)
+    void SetupFieldParsers(amrex::Vector<int> const & set_field_lo,
+                           amrex::Vector<int> const & set_field_hi,
+                           amrex::Vector<std::unique_ptr<amrex::Parser>> const & parser_field1_lo,
+                           amrex::Vector<std::unique_ptr<amrex::Parser>> const & parser_field2_lo,
+                           amrex::Vector<std::unique_ptr<amrex::Parser>> const & parser_field1_hi,
+                           amrex::Vector<std::unique_ptr<amrex::Parser>> const & parser_field2_hi,
+                           amrex::Vector<int> & set_fields_x_lo,
+                           amrex::Vector<int> & set_fields_y_lo,
+                           amrex::Vector<int> & set_fields_z_lo,
+                           amrex::Vector<int> & set_fields_x_hi,
+                           amrex::Vector<int> & set_fields_y_hi,
+                           amrex::Vector<int> & set_fields_z_hi,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fx_parsers_lo,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fy_parsers_lo,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fz_parsers_lo,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fx_parsers_hi,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fy_parsers_hi,
+                           [[maybe_unused]]amrex::Vector<amrex::ParserExecutor<3>> & Fz_parsers_hi)
     {
         set_fields_x_lo.resize(AMREX_SPACEDIM, false);
         set_fields_y_lo.resize(AMREX_SPACEDIM, false);
@@ -328,7 +328,7 @@ namespace
 
 bool
 PEC_Insulator::ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                          std::vector<std::unique_ptr<amrex::Parser>> & parsers,
+                                          amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
                                           std::string const & input_name,
                                           std::string const & coord1,
                                           std::string const & coord2)
@@ -484,18 +484,18 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::Real time,
     bool split_pml_field,
     bool E_like,
-    std::vector<int> const & set_fields_x_lo,
-    std::vector<int> const & set_fields_y_lo,
-    std::vector<int> const & set_fields_z_lo,
-    std::vector<int> const & set_fields_x_hi,
-    std::vector<int> const & set_fields_y_hi,
-    std::vector<int> const & set_fields_z_hi,
-    std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
-    std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
-    std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
-    std::vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
-    std::vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
-    std::vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi)
+    amrex::Vector<int> const & set_fields_x_lo,
+    amrex::Vector<int> const & set_fields_y_lo,
+    amrex::Vector<int> const & set_fields_z_lo,
+    amrex::Vector<int> const & set_fields_x_hi,
+    amrex::Vector<int> const & set_fields_y_hi,
+    amrex::Vector<int> const & set_fields_z_hi,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
+    amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi)
 {
     using namespace amrex::literals;
     amrex::Box domain_box = geom.Domain();
