@@ -602,9 +602,16 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                 bool const set_fieldz = ( (iside == -1) ? set_fields_z_lo[idim] : set_fields_z_hi[idim]);
 
                 amrex::ParserExecutor<2> const & area_parser = ( (iside == -1) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim]);
-                amrex::ParserExecutor<3> const & Fx_parser = ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]);
+
+                // A special check is needed for Fx and Fz since in 1D cases no parsers will be defined for one
+                // or the other. Instead, create a dummy ParserExecutor.
+                amrex::ParserExecutor<3> const & Fx_parser = ( Fx_parsers_lo.size() > 0 ?
+                                                             ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]) :
+                                                             amrex::ParserExecutor<3>() );
                 amrex::ParserExecutor<3> const & Fy_parser = ( (iside == -1) ? Fy_parsers_lo[idim] : Fy_parsers_hi[idim]);
-                amrex::ParserExecutor<3> const & Fz_parser = ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]);
+                amrex::ParserExecutor<3> const & Fz_parser = ( Fz_parsers_lo.size() > 0 ?
+                                                             ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]) :
+                                                             amrex::ParserExecutor<3>() );
 
                 // loop over cells and update fields
                 amrex::ParallelFor(
