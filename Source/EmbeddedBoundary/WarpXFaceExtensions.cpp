@@ -205,6 +205,53 @@ namespace
 #endif
     }
 
+#ifdef AMREX_USE_EB
+    /**
+    * \brief Initialize the memory for the FaceInfoBoxes
+    */
+    void init_borrowing(
+        std::array< std::unique_ptr<amrex::LayoutData<FaceInfoBox> >, 3 > & borrowing,
+        ablastr::fields::VectorField Bfield)
+    {
+        for (int idim = 0; idim < 3; ++idim){
+            for (amrex::MFIter mfi(*Bfield[idim]); mfi.isValid(); ++mfi){
+                amrex::Box const &box = mfi.validbox();
+                auto& borrowing_dir = (*borrowing[idim])[mfi];
+                borrowing_dir.inds_pointer.resize(box);
+                borrowing_dir.size.resize(box);
+                borrowing_dir.size.setVal<amrex::RunOn::Device>(0);
+                const amrex::Long ncells = box.numPts();
+                // inds, neigh_faces and area are extended to their largest possible size here, but they are
+                // resized to a much smaller size later on, based on the actual number of neighboring
+                // intruded faces for each unstable face.
+                borrowing_dir.inds.resize(8*ncells);
+                borrowing_dir.neigh_faces.resize(8*ncells);
+                borrowing_dir.area.resize(8*ncells);
+            }
+        }
+    }
+
+    /**
+    * \brief Shrink the vectors in the FaceInfoBoxes
+    */
+    void shrink_borrowing(
+        std::array< std::unique_ptr<amrex::LayoutData<FaceInfoBox> >, 3 > & borrowing,
+        ablastr::fields::VectorField Bfield)
+    {
+        using ablastr::fields::Direction;
+
+        for(int idim = 0; idim < AMREX_SPACEDIM; idim++) {
+            for (amrex::MFIter mfi(*Bfield[idim]); mfi.isValid(); ++mfi){
+                auto& borrowing_dir = (*borrowing[idim])[mfi];
+                borrowing_dir.inds.resize(borrowing_dir.vecs_size);
+                borrowing_dir.neigh_faces.resize(borrowing_dir.vecs_size);
+                borrowing_dir.area.resize(borrowing_dir.vecs_size);
+            }
+        }
+    }
+
+#endif
+
 }
 
 /**
@@ -326,7 +373,8 @@ WarpX::ComputeFaceExtensions ()
             ablastr::warn_manager::WarnPriority::low
     );
 
-    InitBorrowing();
+    const auto Bfield = m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel());
+    ::init_borrowing(m_borrowing[maxLevel()], Bfield);
     ComputeOneWayExtensions();
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
@@ -341,7 +389,7 @@ WarpX::ComputeFaceExtensions ()
     );
 
     ComputeEightWaysExtensions();
-    ShrinkBorrowing();
+    ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
@@ -393,53 +441,6 @@ WarpX::ComputeFaceExtensions ()
         );
     }
 #endif
-}
-
-
-void
-WarpX::InitBorrowing() {
-    using ablastr::fields::Direction;
-    int idim = 0;
-    for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-        amrex::Box const &box = mfi.validbox();
-        auto &borrowing_x = (*m_borrowing[maxLevel()][idim])[mfi];
-        borrowing_x.inds_pointer.resize(box);
-        borrowing_x.size.resize(box);
-        borrowing_x.size.setVal<amrex::RunOn::Device>(0);
-        const amrex::Long ncells = box.numPts();
-        // inds, neigh_faces and area are extended to their largest possible size here, but they are
-        // resized to a much smaller size later on, based on the actual number of neighboring
-        // intruded faces for each unstable face.
-        borrowing_x.inds.resize(8*ncells);
-        borrowing_x.neigh_faces.resize(8*ncells);
-        borrowing_x.area.resize(8*ncells);
-    }
-
-    idim = 1;
-    for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-        amrex::Box const &box = mfi.validbox();
-        auto &borrowing_y = (*m_borrowing[maxLevel()][idim])[mfi];
-        borrowing_y.inds_pointer.resize(box);
-        borrowing_y.size.resize(box);
-        borrowing_y.size.setVal<amrex::RunOn::Device>(0);
-        const amrex::Long ncells = box.numPts();
-        borrowing_y.inds.resize(8*ncells);
-        borrowing_y.neigh_faces.resize(8*ncells);
-        borrowing_y.area.resize(8*ncells);
-    }
-
-    idim = 2;
-    for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-        amrex::Box const &box = mfi.validbox();
-        auto &borrowing_z = (*m_borrowing[maxLevel()][idim])[mfi];
-        borrowing_z.inds_pointer.resize(box);
-        borrowing_z.size.resize(box);
-        borrowing_z.size.setVal<amrex::RunOn::Device>(0);
-        const amrex::Long ncells = box.numPts();
-        borrowing_z.inds.resize(8*ncells);
-        borrowing_z.neigh_faces.resize(8*ncells);
-        borrowing_z.area.resize(8*ncells);
-    }
 }
 
 
@@ -836,19 +837,4 @@ WarpX::ComputeEightWaysExtensions ()
     }
 #endif
 #endif
-}
-
-void
-WarpX::ShrinkBorrowing ()
-{
-    using ablastr::fields::Direction;
-
-    for(int idim = 0; idim < AMREX_SPACEDIM; idim++) {
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
-            auto &borrowing = (*m_borrowing[maxLevel()][idim])[mfi];
-            borrowing.inds.resize(borrowing.vecs_size);
-            borrowing.neigh_faces.resize(borrowing.vecs_size);
-            borrowing.area.resize(borrowing.vecs_size);
-        }
-    }
 }
