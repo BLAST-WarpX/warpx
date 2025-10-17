@@ -395,10 +395,10 @@ namespace
                 // Note that this includes the cells on the boundary
                 amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::Real rvalid = ijk_vec[idim] + rshift;
                 if (idim == 0 && iside == 1) {
                     // Account for different dV at different radii
                     amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
-                    const amrex::Real rvalid = ijk_vec[idim] + rshift;
                     const amrex::Real rmirror = ijk_mirror[idim] + rshift;
                     rscale = rmirror/rvalid;
 #if defined(WARPX_DIM_RSPHERE)
@@ -406,19 +406,27 @@ namespace
 #endif
                 }
 #endif
-                // Reflected J/rho deposited to guard cell to mirror valid cell
-                // The J-parallel in PECInsulator boundaries is handled differently.
-                if (ijk_vec != ijk_mirror || !sum_on_boundary[iside] || psign[iside] > 0._rt) {
-                    field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
-                } else {
+                if (ijk_vec == ijk_mirror && sum_on_boundary[iside] && psign[iside] < 0._rt) {
                     // For J-parallel in PECInsulator boundaries, sum the values in the guard
-                    // cells and add it to the J in the boundary (noting that J-parallel is nodal).
+                    // cells and add it to the J on the boundary.
+                    // (Note that J-parallel is nodal which has psign < 0.)
                     int const isign = (iside == 0 ? -1 : +1);
                     amrex::IntVect ijk_guard = ijk_vec;
                     for (int ig = 0 ; ig < nguards ; ig++) {
                         ijk_guard[idim] += isign;
-                        field(ijk_vec,n) += 2._rt*field(ijk_guard,n);
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        if (idim == 0 && iside == 1) {
+                            rscale = (rvalid + ig + 1)/rvalid;
+#if defined(WARPX_DIM_RSPHERE)
+                            rscale *= rmirror/rvalid;
+#endif
+                        }
+#endif
+                        field(ijk_vec,n) += 2._rt*rscale*field(ijk_guard,n);
                     }
+                } else {
+                    // J/rho deposited to guard cell is added to the valid mirror cell
+                    field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
                 }
             }
         }
