@@ -92,6 +92,8 @@ public:
      * \param dt Time Step by which particles are advanced
      * \param subcycling_half Type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition
+     * \param position_push_type Type of time advance for particle position (full, first half, second half, none)
+     * \param momentum_push_type Type of time advance for particle momentum (full, first half, second half, none)
      * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
@@ -105,8 +107,13 @@ public:
                  amrex::Real dt,
                  SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
+    /**
+     * \brief Gather fields and push particles in one fused kernel.
+     */
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
@@ -119,7 +126,9 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         SubcyclingHalf subcycling_half=SubcyclingHalf::None);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
 
     void FindSuborbitParticles (WarpXParIter& pti,
                          long offset,
