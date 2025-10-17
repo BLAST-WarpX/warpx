@@ -43,7 +43,18 @@ def analyze(args: argparse.Namespace) -> None:
         [int(nppc) for nppc in num_particles_per_cell_list]
     )
     num_particles_per_cell = np.prod(num_particles_per_cell_array)
-    equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+    electrostatic = (
+        True
+        if (
+            "warpx.do_electrostatic" in input_dict
+            and input_dict["warpx.do_electrostatic"] != "none"
+        )
+        else False
+    )
+    if electrostatic:
+        equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+    else:
+        equipartition_value = 5 / (6 * num_particles_per_cell + 5)
 
     # normalize the field energy variation
     electron_temperature = float(input_dict["my_constants.Te"][0])
