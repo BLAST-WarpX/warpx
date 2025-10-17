@@ -1855,7 +1855,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     n0: float
         Reference plasma density in m^-3.
 
-    gamma: float, default=3/2
+    gamma: float, default=5/3
         Exponent in calculation of electron pressure.
 
     n_floor: float, optional
@@ -2390,17 +2390,64 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
+    """
+    Load external E/B fields from file (openPMD/plotfile) and optionally
+    apply a time-dependent scalar multiplier parsed on the C++ side.
+
+    Parameters
+    ----------
+    read_fields_from_path : str
+        Path to diagnostics containing the external field data to load.
+
+    load_E : bool, default=True
+        If True, load the external E field from file.
+
+    load_B : bool, default=True
+        If True, load the external B field from file.
+
+    warpx_E_time_function : str, optional
+        AMReX parser expression in variable `t` (seconds) that scales the
+        file-loaded E field uniformly in space and per level, e.g.
+        ``"cos(2*pi*2e6*t)"``. If not provided, defaults to ``"1.0"`` in C++.
+
+    warpx_B_time_function : str, optional
+        AMReX parser expression in variable `t` (seconds) that scales the
+        file-loaded B field uniformly in space and per level, e.g.
+        ``"cos(2*pi*2e6*t + pi/2)"``. If not provided, defaults to ``"1.0"`` in C++.
+
+    warpx_do_initial_div_cleaning : bool, optional
+        Run the projection-based B-field divergence cleaner after loading.
+
+    warpx_projection_div_cleaner_atol : float, optional
+        Absolute tolerance for the divergence cleaner solve.
+
+    warpx_projection_div_cleaner_rtol : float, optional
+        Relative tolerance for the divergence cleaner solve.
+    """
+
     def __init__(self, **kw):
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
         self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
         self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
 
+        self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
+        self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
+
         super().__init__(**kw)
 
     def applied_field_initialize_inputs(self):
+        # file path for external fields
         pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+
+        # enable file-loading styles
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
+            # pass time dependence via parser
+            if self.warpx_E_time_function:
+                pywarpx.particles.__setattr__(
+                    "read_fields_E_dependency(t)", self.warpx_E_time_function
+                )
+
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
@@ -2410,6 +2457,11 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "rtol", self.div_cleaner_rtol
             )
+            # pass time dependence via parser
+            if self.warpx_B_time_function:
+                pywarpx.particles.__setattr__(
+                    "read_fields_B_dependency(t)", self.warpx_B_time_function
+                )
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
@@ -3122,6 +3174,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
 
+        self.self_fields_required_precision = kw.pop(
+            "warpx_self_fields_required_precision", None
+        )
+        self.self_fields_absolute_tolerance = kw.pop(
+            "warpx_self_fields_absolute_tolerance", None
+        )
+        self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
+        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
+
         self.inputs_initialized = False
         self.warpx_initialized = False
 
@@ -3217,6 +3278,15 @@ class Simulation(picmistandard.PICMI_Simulation):
             else:
                 interpolation_order = particle_shape
             pywarpx.algo.particle_shape = interpolation_order
+
+        pywarpx.warpx.self_fields_required_precision = (
+            self.self_fields_required_precision
+        )
+        pywarpx.warpx.self_fields_absolute_tolerance = (
+            self.self_fields_absolute_tolerance
+        )
+        pywarpx.warpx.self_fields_max_iters = self.self_fields_max_iters
+        pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
 
         self.solver.solver_initialize_inputs()
 

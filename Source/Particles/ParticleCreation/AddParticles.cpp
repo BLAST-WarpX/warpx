@@ -389,6 +389,8 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const int do_symmetrize = plasma_injector.do_symmetrize;
     const int symmetrization_order = plasma_injector.symmetrization_order;
     const amrex::Real focal_distance = plasma_injector.focal_distance;
+    const amrex::Real rotation_angle = plasma_injector.rotation_angle;
+    const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
 
     // Declare temporary vectors on the CPU
     amrex::Gpu::HostVector<ParticleReal> particle_x;
@@ -471,6 +473,56 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 x = x - (v_x - v_dot_n*n_x) * t;
 #endif
             }
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+            if (plasma_injector.do_rotation){
+
+                    // normalize the rotation axis
+                    const Real k_norm = std::sqrt(rotation_axis[0]*rotation_axis[0] + rotation_axis[1]*rotation_axis[1] + rotation_axis[2]*rotation_axis[2]);
+                    const Real kx = rotation_axis[0]/k_norm;
+                    const Real ky = rotation_axis[1]/k_norm;
+                    const Real kz = rotation_axis[2]/k_norm;
+
+                    // compute rotated vector:
+                    // v_rot = v * cos + (k x v) sin + k (k * v) (1 - cos)
+
+                    // dot product
+                    const Real k_dot_x = kx*(x-x_m) + ky*(y-y_m) + kz*(z-z_m);
+
+                    // cross product
+                    const Real k_cross_x = ky*(z-z_m) - kz*(y-y_m);
+                    const Real k_cross_y = kz*(x-x_m) - kx*(z-z_m);
+                    const Real k_cross_z = kx*(y-y_m) - ky*(x-x_m);
+
+                    // rotate positions around the centroid
+#if defined(WARPX_DIM_3D)
+                    x = x_m + (x-x_m)*std::cos(rotation_angle) + k_cross_x*std::sin(rotation_angle) + kx*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    y = y_m + (y-y_m)*std::cos(rotation_angle) + k_cross_y*std::sin(rotation_angle) + ky*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    z = z_m + (z-z_m)*std::cos(rotation_angle) + k_cross_z*std::sin(rotation_angle) + kz*k_dot_x*(1._rt - std::cos(rotation_angle));
+#elif defined(WARPX_DIM_XZ)
+                    x = x_m + (x-x_m)*std::cos(rotation_angle) + k_cross_x*std::sin(rotation_angle) + kx*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    z = z_m + (z-z_m)*std::cos(rotation_angle) + k_cross_z*std::sin(rotation_angle) + kz*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    ignore_unused(k_cross_y);
+#endif
+                    if (plasma_injector.do_rotation_momenta){
+
+                        // dot product
+                        const Real k_dot_u = kx*u.x + ky*u.y + kz*u.z;
+
+                        // cross product
+                        const Real k_cross_u_x = ky*u.z - kz*u.y;
+                        const Real k_cross_u_y = kz*u.x - kx*u.z;
+                        const Real k_cross_u_z = kx*u.y - ky*u.x;
+
+                        // rotate momenta
+                        u.x = u.x * std::cos(rotation_angle) + k_cross_u_x * std::sin(rotation_angle) + kx * k_dot_u * (1._rt - std::cos(rotation_angle));
+                        u.y = u.y * std::cos(rotation_angle) + k_cross_u_y * std::sin(rotation_angle) + ky * k_dot_u * (1._rt - std::cos(rotation_angle));
+                        u.z = u.z * std::cos(rotation_angle) + k_cross_u_z * std::sin(rotation_angle) + kz * k_dot_u * (1._rt - std::cos(rotation_angle));
+                    }
+                }
+#else
+                ignore_unused(rotation_angle, rotation_axis);
+#endif
+
                 u.x *= PhysConst::c;
                 u.y *= PhysConst::c;
                 u.z *= PhysConst::c;
@@ -826,11 +878,15 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 #endif
 
             if (plasma_injector.insideBounds(x, y, z)) {
-                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass;
-                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass;
+
+                // The normalized momentum is u = p / m = gamma beta c
+                // with m = m_e for photons, m the particle mass otherwise.
+                amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
+                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
+                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
                 if (ps["momentum"].contains("y")) {
-                    uy = ptr_uy.get()[i]*momentum_unit_y/mass;
+                    uy = ptr_uy.get()[i]*momentum_unit_y/mass_eff;
                 }
                 CheckAndAddParticle(x, y, z, ux, uy, uz, weight,
                                     particle_x,  particle_y,  particle_z,
@@ -1549,6 +1605,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
 #endif
 
+        // local copy for device lambda capture
+        amrex::ParticleReal const mass = m_mass;
+
         // Loop over all new particles and inject them (creates too many
         // particles, in particular does not consider xmin, xmax etc.).
         // The invalid ones are given negative ID and are deleted during the
@@ -1585,7 +1644,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Determine the position of the particle within the cell
                 XDim3 pos;
-                XDim3 r;
+                auto r = XDim3{0.0_rt,0.0_rt,0.0_rt};
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
                     auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
@@ -1823,7 +1882,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Update particle position by a random `t_fract`
                 // so as to produce a continuous-looking flow of particles
                 const amrex::Real t_fract = amrex::Random(engine)*dt;
-                UpdatePosition(ppos.x, ppos.y, ppos.z, pu.x, pu.y, pu.z, t_fract);
+                UpdatePosition(ppos.x, ppos.y, ppos.z, pu.x, pu.y, pu.z, t_fract, mass);
 
 #if defined(WARPX_DIM_3D)
                 pa[PIdx::x][ip] = ppos.x;

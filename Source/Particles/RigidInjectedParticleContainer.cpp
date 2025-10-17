@@ -180,7 +180,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         const long np_to_push,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
-                                        DtType a_dt_type)
+                                        SubcyclingHalf subcycling_half)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -224,7 +224,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      a_dt_type);
+                                      subcycling_half);
 
     if (!done_injecting_lev) {
 
@@ -269,7 +269,7 @@ void
 RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                         int lev,
                                         const std::string& current_fp_string,
-                                        Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                        Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                         ImplicitOptions const * /*implicit_options*/)
 {
 
@@ -295,7 +295,7 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     PhysicalParticleContainer::Evolve (fields,
                                        lev,
                                        current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, nullptr);
+                                       t, dt, subcycling_half, skip_deposition, nullptr);
 }
 
 void
@@ -382,7 +382,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
 
             // Loop over the particles and update their momentum
             const amrex::ParticleReal q = this->charge;
-            const amrex::ParticleReal m = this-> mass;
+            const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;
             const auto do_crr = do_classical_radiation_reaction;
@@ -427,19 +427,19 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 if (do_crr) {
                     UpdateMomentumBorisWithRadiationReaction(uxpp[ip], uypp[ip], uzpp[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, m, dt);
+                                                             Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     UpdateMomentumBoris( uxpp[ip], uypp[ip], uzpp[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, m, dt);
+                                         Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     UpdateMomentumVay( uxpp[ip], uypp[ip], uzpp[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, m, dt);
+                                       Byp, Bzp, qp, mass, dt);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( uxpp[ip], uypp[ip], uzpp[ip],
                                                Exp, Eyp, Ezp, Bxp,
-                                               Byp, Bzp, qp, m, dt);
+                                               Byp, Bzp, qp, mass, dt);
                 } else {
                     amrex::Abort("Unknown particle pusher");
                 }

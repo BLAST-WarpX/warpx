@@ -3,7 +3,6 @@
 #include "BoundaryConditions/PML.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
-#include "Evolve/WarpXDtType.H"
 #include "WarpX_PEC.H"
 
 #include <AMReX.H>
@@ -178,7 +177,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
 #endif
 }
 
-void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, DtType a_dt_type, amrex::Real time)
+void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real time)
 {
     using ablastr::fields::Direction;
 
@@ -238,7 +237,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, DtType a_d
     // This is because the formula used for Silver-Mueller assumes that
     // E and B are staggered in time, which is only true after the first half-push
     if (lev == 0) {
-        if (a_dt_type == DtType::FirstHalf) {
+        if (subcycling_half == SubcyclingHalf::FirstHalf) {
             if(::isAnyBoundary<FieldBoundaryType::Absorbing_SilverMueller>(field_boundary_lo, field_boundary_hi)){
                 auto Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
                 auto Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);

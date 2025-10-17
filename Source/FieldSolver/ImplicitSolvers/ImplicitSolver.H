@@ -54,6 +54,8 @@ public:
 
     void CreateParticleAttributes () const;
 
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -104,7 +106,7 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
-    void ComputeJfromMassMatrices ();
+    void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
 protected:
 
@@ -149,6 +151,23 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
+
+    /**
+     * \brief whether to skip the full Picard update of particles on the initial newton step
+     */
+    bool m_skip_particle_picard_init = false;
+
+    /**
      * \brief Whether to use mass matrices for the implicit solver
      */
     bool m_use_mass_matrices = false;
@@ -191,7 +210,7 @@ protected:
      */
     void InitializeMassMatrices ();
 
-    void PrintMassMatricesParameters () const;
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
@@ -211,9 +230,14 @@ protected:
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
-     * \brief Save E and J at start of each Newton step
+     * \brief Add J from particles included in mass matrices at start of each Newton step
      */
-    void SaveEandJ ();
+    void CumulateJ ();
+
+    /**
+     * \brief Save E at start of each Newton step
+     */
+    void SaveE ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

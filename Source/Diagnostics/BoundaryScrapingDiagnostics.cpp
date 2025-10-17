@@ -7,15 +7,17 @@
 
 #include "BoundaryScrapingDiagnostics.H"
 #include "EmbeddedBoundary/Enabled.H"
-#include "ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <AMReX.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_REAL.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Vector.H>
 
 #include <set>
 #include <string>
@@ -84,10 +86,9 @@ BoundaryScrapingDiagnostics::InitializeBufferData (int /*i_buffer*/, int /*lev*/
 }
 
 void
-BoundaryScrapingDiagnostics::InitializeParticleBuffer ()
+BoundaryScrapingDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
     auto & warpx = WarpX::GetInstance();
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
 
     // If the user does not specify any species, dump all species
     if (m_output_species_names.empty()) {

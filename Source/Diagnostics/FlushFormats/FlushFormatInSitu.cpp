@@ -1,6 +1,5 @@
 #include "FlushFormatInSitu.H"
 
-#include "WarpX.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXProfilerWrapper.H"
 

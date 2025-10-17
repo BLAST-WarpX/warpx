@@ -8,6 +8,7 @@
 #define WARPX_PARTICLES_COLLISION_BINARYCOLLISION_H_
 
 #include "Particles/Algorithms/KineticEnergy.H"
+#include "Particles/Collision/BinaryCollision/Bremsstrahlung/BremsstrahlungFunc.H"
 #include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/NuclearFusionFunc.H"
@@ -436,6 +437,10 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> pair_reaction_weight(n_total_pairs);
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight =
                                                                pair_reaction_weight.dataPtr();
+            // Extra data needed when products are created
+            int const n_product_data = (binary_collision_functor.m_need_product_data ? n_total_pairs : 0);
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> product_data(n_product_data);
+            amrex::ParticleReal* AMREX_RESTRICT p_product_data = product_data.dataPtr();
             /*
               End of calculations only required when creating product particles
             */
@@ -668,7 +673,7 @@ public:
 
                     // Call the function in order to perform collisions
                     // If there are product species, mask, p_pair_indices_1/2, and
-                    // p_pair_reaction_weight are filled here
+                    // p_pair_reaction_weight and p_product_data are filled here
                     binary_collision_functor(
                         cell_start_1, cell_half_1,
                         cell_half_1, cell_stop_1,
@@ -677,7 +682,7 @@ public:
                         n1, n1, T1, T1, global_lamdb,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
-                        p_pair_reaction_weight, engine);
+                        p_pair_reaction_weight, p_product_data, engine);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_loopOverCollisions);
@@ -691,7 +696,7 @@ public:
                                                     products_mass, p_mask, products_np,
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
-                                                    p_pair_reaction_weight);
+                                                    p_pair_reaction_weight, p_product_data);
 
             for (int i = 0; i < n_product_species; i++)
             {
@@ -883,7 +888,7 @@ public:
             WARPX_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
             // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
-            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
+            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
             amrex::Gpu::DeviceVector<index_type> pair_indices_1(n_total_pairs);
@@ -896,6 +901,10 @@ public:
             amrex::Gpu::DeviceVector<amrex::ParticleReal> pair_reaction_weight(n_total_pairs);
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight =
                                                                pair_reaction_weight.dataPtr();
+            // Extra data needed when products are created
+            int const n_product_data = (binary_collision_functor.m_need_product_data ? n_total_pairs : 0);
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> product_data(n_product_data);
+            amrex::ParticleReal* AMREX_RESTRICT p_product_data = product_data.dataPtr();
             /*
               End of calculations only required when creating product particles
             */
@@ -1246,7 +1255,7 @@ public:
 
                     // Call the function in order to perform collisions
                     // If there are product species, p_mask, p_pair_indices_1/2, and
-                    // p_pair_reaction_weight are filled here
+                    // p_pair_reaction_weight and p_product_data are filled here
                     binary_collision_functor(
                         cell_start_1, cell_stop_1, cell_start_2, cell_stop_2,
                         indices_1, indices_2,
@@ -1254,7 +1263,7 @@ public:
                         n1, n2, T1, T2, global_lamdb,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
-                        p_pair_reaction_weight, engine);
+                        p_pair_reaction_weight, p_product_data, engine);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_loopOverCollisions);
@@ -1269,7 +1278,7 @@ public:
                                                     products_mass, p_mask, products_np,
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
-                                                    p_pair_reaction_weight);
+                                                    p_pair_reaction_weight, p_product_data);
 
             for (int i = 0; i < n_product_species; i++)
             {
