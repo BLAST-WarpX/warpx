@@ -300,7 +300,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
         m_size[1] = extent[2];
     } else {
         m_size[0] = extent[2];
-        m_size[1] = extent[1]; // xxxxx Ask Axel if this is correct.
+        m_size[1] = extent[1];
     }
 #else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == AMREX_SPACEDIM,
@@ -363,7 +363,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     openPMD::Offset chunk_offset(extent.size(),0);
     openPMD::Extent chunk_extent(extent.size(),1);
 #if defined(WARPX_DIM_RZ)
-    if (xyz_order) { // xxxxx Ask Axel if this is correct.
+    if (xyz_order) {
         chunk_offset[1] = lo[0];
         chunk_offset[2] = lo[1];
         chunk_extent[1] = hi[0]-lo[0]+1;

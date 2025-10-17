@@ -129,12 +129,21 @@ struct InjectorDensityFromFile
 
     void clear ();
 
+    // This function needs to be called before intializing the density
+    // profile, if the openPMD data are distributed. When the openPMD data
+    // are loaded in the constructor of this class, we do not know the
+    // paricle containers' BoxArray and DistributionMapping yet.
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
                   amrex::IntVect const& ngrow);
 
+    // This function needs to be called before we do continuous injection of
+    // particles to inform the injector to load the data we need.
     void prepare (amrex::RealBox const& pbox);
 
+    // For distributed data, this function prepares the injector for loading
+    // data in this Box. Here `li` is the local index for the Box in a
+    // particle container.
     void prepare (int li);
 
     [[nodiscard]] bool distributed () const;
