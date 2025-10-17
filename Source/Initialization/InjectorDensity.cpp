@@ -44,17 +44,19 @@ void InjectorDensity::clear ()
 
 void InjectorDensity::prepare (amrex::BoxArray const& grids,
                                amrex::DistributionMapping const& dmap,
-                               amrex::IntVect const& ngrow)
+                               amrex::IntVect const& ngrow,
+                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (type == Type::fromfile) {
-        object.fromfile.prepare(grids,dmap,ngrow);
+        object.fromfile.prepare(grids,dmap,ngrow,get_zlab);
     }
 }
 
-void InjectorDensity::prepare (amrex::RealBox const& pbox)
+void InjectorDensity::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (type == Type::fromfile) {
-        object.fromfile.prepare(pbox);
+        object.fromfile.prepare(pbox, moving_dir, moving_sign, get_zlab);
     }
 }
 
@@ -62,6 +64,15 @@ void InjectorDensity::prepare (int li)
 {
     if (type == Type::fromfile) {
         object.fromfile.prepare(li);
+    }
+}
+
+bool InjectorDensity::needPreparation () const
+{
+    if (type == Type::fromfile) {
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -124,18 +135,20 @@ void InjectorDensityFromFile::clear ()
 
 void InjectorDensityFromFile::prepare (amrex::BoxArray const& grids,
                                        amrex::DistributionMapping const& dmap,
-                                       amrex::IntVect const& ngrow)
+                                       amrex::IntVect const& ngrow,
+                                       std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (m_external_field_reader) {
-        m_external_field_reader->prepare(grids,dmap,ngrow);
+        m_external_field_reader->prepare(grids,dmap,ngrow,get_zlab);
         m_external_field_view = m_external_field_reader->getView();
     }
 }
 
-void InjectorDensityFromFile::prepare (amrex::RealBox const& pbox)
+void InjectorDensityFromFile::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                                       std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (m_external_field_reader) {
-        m_external_field_reader->prepare(pbox);
+        m_external_field_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
         m_external_field_view = m_external_field_reader->getView();
     }
 }

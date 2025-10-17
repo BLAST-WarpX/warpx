@@ -195,23 +195,15 @@ ExternalFieldReader::ExternalFieldReader (
     std::string F_name, std::string F_component,
     amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& problo,
     amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& pdx,
-    amrex::Box const& pbox, bool distributed)
+    amrex::Box const& dombox, bool distributed)
     : m_file(std::move(read_fields_from_path)),
       m_name(std::move(F_name)),
       m_component(std::move(F_component)),
       m_problo(problo),
       m_probdx(pdx),
+      m_dombox(dombox),
       m_distributed(distributed)
-{
-    amrex::RealBox rbox;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        rbox.setLo(idim, m_problo[idim] + pbox.smallEnd(idim)*m_probdx[idim]);
-        rbox.setHi(idim, m_problo[idim] + pbox.  bigEnd(idim)*m_probdx[idim]);
-    }
-
-    load_data(rbox);
-
-}
+{}
 
 void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 {
@@ -442,11 +434,25 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 
 void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
                                    amrex::DistributionMapping const& dmap,
-                                   amrex::IntVect const& ngrow)
+                                   amrex::IntVect const& ngrow,
+                                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     using namespace amrex;
 
     AMREX_ALWAYS_ASSERT(m_moving_window == false);
+
+    amrex::RealBox rbox;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        rbox.setLo(idim, m_problo[idim] + m_dombox.smallEnd(idim)*m_probdx[idim]);
+        rbox.setHi(idim, m_problo[idim] + m_dombox.  bigEnd(idim)*m_probdx[idim]);
+    }
+    if (get_zlab) {
+        auto zlo = get_zlab(rbox.lo(AMREX_SPACEDIM-1));
+        auto zhi = get_zlab(rbox.hi(AMREX_SPACEDIM-1));
+        rbox.setLo(AMREX_SPACEDIM-1, zlo);
+        rbox.setHi(AMREX_SPACEDIM-1, zhi);
+    }
+    load_data(rbox);
 
     if (m_distributed) {
         BoxList bl;
@@ -458,6 +464,10 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
             for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
                 auto plo = m_problo[idim] + b.smallEnd(idim)*m_probdx[idim];
                 auto phi = m_problo[idim] + b.  bigEnd(idim)*m_probdx[idim];
+                if (get_zlab) {
+                    plo = get_zlab(plo);
+                    phi = get_zlab(phi);
+                }
                 auto ilo = int(std::floor( (plo-m_offset[idim])/m_dx[idim] ));
                 auto ihi = int(std::floor( (phi-m_offset[idim])/m_dx[idim] ))+1; // +1 for interpolation
                 --ilo; // in case there are roundoff errors
@@ -480,16 +490,18 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
     }
 }
 
-void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox)
+void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign)
 {
     m_cache_domain = pbox;
-    // xxxx Ask Remi. How general do we need to be about moving window
-    // direction? For now, I am assuming it's moving along the positive
-    // direction of the last dimension.
-    int dir = AMREX_SPACEDIM-1;
+    int dir = std::abs(moving_dir);
     amrex::Real factor = 10.0;
-    amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
-    m_cache_domain.setHi(dir, newhi);
+    if (moving_sign > 0) {
+        amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
+        m_cache_domain.setHi(dir, newhi);
+    } else {
+        amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
+        m_cache_domain.setLo(dir, newlo);
+    }
     // Grow the box a little bit so that m_cache_domain.contains(pbox) is true.
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         m_cache_domain.setLo(idim, m_cache_domain.lo(idim) - m_dx[idim]);
@@ -497,18 +509,27 @@ void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox)
     }
 }
 
-void ExternalFieldReader::prepare (amrex::RealBox const& pbox)
+void ExternalFieldReader::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (! m_distributed) { return; }
+
+    auto pboxz = pbox;
+    if (get_zlab) {
+        auto zlo = get_zlab(pbox.lo(AMREX_SPACEDIM-1));
+        auto zhi = get_zlab(pbox.hi(AMREX_SPACEDIM-1));
+        pboxz.setLo(AMREX_SPACEDIM-1, zlo);
+        pboxz.setHi(AMREX_SPACEDIM-1, zhi);
+    }
 
     if (!m_moving_window) {
         m_moving_window = true;
         m_mf.clear();
-        make_cache_box(pbox);
+        make_cache_box(pboxz, moving_dir, moving_sign);
         load_data(m_cache_domain);
     } else {
-        if (! m_cache_domain.contains(pbox)) {
-            make_cache_box(pbox);
+        if (! m_cache_domain.contains(pboxz)) {
+            make_cache_box(pboxz, moving_dir, moving_sign);
             if (m_cache_domain.intersects(m_domain)) {
                 load_data(m_cache_domain);
             }

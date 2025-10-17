@@ -23,6 +23,7 @@
 #include <AMReX_REAL.H>
 
 #include <cmath>
+#include <functional>
 #include <string>
 
 // struct whose getDensity returns constant density.
@@ -135,11 +136,13 @@ struct InjectorDensityFromFile
     // paricle containers' BoxArray and DistributionMapping yet.
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow);
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
     // This function needs to be called before we do continuous injection of
     // particles to inform the injector to load the data we need.
-    void prepare (amrex::RealBox const& pbox);
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
     // For distributed data, this function prepares the injector for loading
     // data in this Box. Here `li` is the local index for the Box in a
@@ -222,11 +225,15 @@ struct InjectorDensity
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow);
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
-    void prepare (amrex::RealBox const& pbox);
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
     void prepare (int li);
+
+    [[nodiscard]] bool needPreparation () const;
 
     [[nodiscard]] bool distributed () const;
 

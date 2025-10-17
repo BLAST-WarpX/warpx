@@ -769,32 +769,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
-    if (initial_injection) {
-        // Initial particle injection
-        plasma_injector.prepare(this->ParticleBoxArray(lev),
-                                this->ParticleDistributionMap(lev), IntVect(0));
-    } else {
-        // Continuous particle injection due to moving window
-        plasma_injector.prepare(part_realbox);
-    }
-
-#ifdef AMREX_USE_OMP
-    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
-    amrex::Vector<InjectorDensity*> inj_rho_omp;
-    auto const nthreads = amrex::OpenMP::get_max_threads();
-    if (! WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion()
-        && nthreads > 1 && plasma_injector.distributedInjectorDensity())
-    {
-        inj_rho_data = std::unique_ptr<void,amrex::DataDeleter>
-            (amrex::The_Cpu_Arena()->alloc(sizeof(InjectorDensity)*nthreads),
-             amrex::DataDeleter{amrex::The_Cpu_Arena()});
-        auto* p = reinterpret_cast<InjectorDensity*>(inj_rho_data.get());
-        for (int tid = 0; tid < nthreads; ++tid) {
-            inj_rho_omp.push_back(p++);
-        }
-    }
-#endif
-
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
@@ -816,6 +790,41 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                                      m_user_real_attribs.size(),
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
+
+    auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+    {
+        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, inj_mom,
+                                        gamma_boost, beta_boost, t);
+    };
+
+    if (initial_injection) {
+        // Initial particle injection
+        plasma_injector.prepare(this->ParticleBoxArray(lev),
+                                this->ParticleDistributionMap(lev), IntVect(0),
+                                get_zlab);
+    } else {
+        // Continuous particle injection due to moving window
+        int moving_dir = WarpX::moving_window_dir;
+        int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
+        plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
+    }
+
+#ifdef AMREX_USE_OMP
+    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
+    amrex::Vector<InjectorDensity*> inj_rho_omp;
+    auto const nthreads = amrex::OpenMP::get_max_threads();
+    if (! WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion()
+        && nthreads > 1 && plasma_injector.distributedInjectorDensity())
+    {
+        inj_rho_data = std::unique_ptr<void,amrex::DataDeleter>
+            (amrex::The_Cpu_Arena()->alloc(sizeof(InjectorDensity)*nthreads),
+             amrex::DataDeleter{amrex::The_Cpu_Arena()});
+        auto* p = reinterpret_cast<InjectorDensity*>(inj_rho_data.get());
+        for (int tid = 0; tid < nthreads; ++tid) {
+            inj_rho_omp.push_back(p++);
+        }
+    }
+#endif
 
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {

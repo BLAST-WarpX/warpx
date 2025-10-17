@@ -696,10 +696,11 @@ PlasmaInjector::getInjectorMomentumHost () const
 
 void PlasmaInjector::prepare (amrex::BoxArray const& grids,
                               amrex::DistributionMapping const& dmap,
-                              amrex::IntVect const& ngrow)
+                              amrex::IntVect const& ngrow,
+                              std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (h_inj_rho) {
-        h_inj_rho->prepare(grids, dmap, ngrow);
+        h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
         inj_rho_distributed = h_inj_rho->distributed();
 #ifdef AMREX_USE_GPU
         if (! inj_rho_distributed) {
@@ -711,11 +712,14 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
     }
 }
 
-void PlasmaInjector::prepare (amrex::RealBox const& pbox)
+void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                              std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
     if (h_inj_rho) {
-        h_inj_rho->prepare(pbox);
+        h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
 #ifdef AMREX_USE_GPU
+        // In principle, we don't need to do the memcpy every time. But the
+        // logic can get complicated.
         amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
         amrex::Gpu::streamSynchronize();
 #endif

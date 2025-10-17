@@ -40,7 +40,9 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
             (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        if (! h_inj_rho->needPreparation()) {
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        }
 #else
         d_inj_rho = h_inj_rho.get();
 #endif
@@ -176,18 +178,25 @@ void WarpXFluidContainer::InitData(
     // Convert initialization box to nodal box
     init_box.surroundingNodes();
 
-    // Create local copies of pointers for GPU kernels
-    InjectorMomentum* inj_mom = d_inj_mom;
-
-    if (h_inj_rho->distributed()) {
-        auto const& mf = *fields.get(name_mf_N, lev);
-        h_inj_rho->prepare(mf.boxArray(), mf.DistributionMap(), IntVect(0));
-    }
-
     // Extract grid geometry properties
     const auto dx = geom_lev.CellSizeArray();
     const auto problo = geom_lev.ProbLoArray();
     const amrex::Real clight = PhysConst::c;
+
+    // Create local copies of pointers for GPU kernels
+    InjectorMomentum* inj_mom = d_inj_mom;
+
+    if (h_inj_rho && h_inj_rho->needPreparation()) {
+        auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+        {
+            return gamma_boost*(z + beta_boost*clight*cur_time);
+        };
+        auto const& mf = *fields.get(name_mf_N, lev);
+        h_inj_rho->prepare(mf.boxArray(), mf.DistributionMap(), IntVect(0), get_zlab);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+#endif
+    }
 
 #ifdef AMREX_USE_OMP
     std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;

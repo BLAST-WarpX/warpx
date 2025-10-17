@@ -155,9 +155,11 @@ public:
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow);
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
-    void prepare (amrex::RealBox const& pbox);
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
     [[nodiscard]] bool distributedInjectorDensity () const { return inj_rho_distributed; }
 

@@ -22,6 +22,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -170,7 +171,7 @@ public:
                          std::string F_name, std::string F_component,
                          amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& problo,
                          amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& pdx,
-                         amrex::Box const& pbox, bool distributed);
+                         amrex::Box const& dombox, bool distributed);
 
     [[nodiscard]] ExternalFieldView getView (int li) const;
 
@@ -178,9 +179,11 @@ public:
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow);
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
 
-    void prepare (amrex::RealBox const& pbox);
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
 
     [[nodiscard]] bool distributed () const { return m_distributed; }
 
@@ -188,13 +191,14 @@ private:
 
     void load_data (amrex::RealBox const& pbox);
     [[nodiscard]] ExternalFieldView make_view (amrex::BaseFab<double> const& fab) const;
-    void make_cache_box (amrex::RealBox const& pbox);
+    void make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign);
 
     std::string m_file;
     std::string m_name;
     std::string m_component;
     amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo; // WarpX's initial prob lo
     amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx; // WarpX's cell size
+    amrex::Box m_dombox;                                  // WarpX's initial domain
     bool m_distributed = false;
     bool m_moving_window = false;
     amrex::RealVect m_dx;     // Field data's dx
