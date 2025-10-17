@@ -1081,10 +1081,6 @@ private:
 
     void ReadParameters ();
 
-    /** This function queries deprecated input parameters and abort
-     *  the run if one of them is specified. */
-    void BackwardCompatibility ();
-
     void InitFromScratch ();
 
     void AllocLevelData (int lev, const amrex::BoxArray& ba,
