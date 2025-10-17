@@ -51,7 +51,6 @@ algo.particle_shape = 1
 ############ PLASMA #############
 #################################
 particles.species_names = electrons ions photons
-particles.photon_species = photons
 
 electrons.species_type = electron
 electrons.do_not_deposit = 1
