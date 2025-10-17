@@ -27,7 +27,6 @@ algo.particle_shape = 1
 ############ PLASMA #############
 #################################
 particles.species_names = photon1 electron1 photon2 electron2
-particles.photon_species = photon1 photon2
 
 photon1.species_type = photon
 photon1.injection_style = "SingleParticle"

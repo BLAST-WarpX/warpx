@@ -230,14 +230,14 @@ public:
     virtual PlasmaInjector* GetPlasmaInjector (const int /*i*/) { return nullptr; }
 
     /**
-     * Evolve is the central WarpXParticleContainer function that advances
-     * particles for a time dt (typically one timestep). It is a pure virtual
-     * function for flexibility.
+     * \brief Pure virtual function to advance particles (typically by one time step).
      */
     virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
                          int lev,
                          const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
