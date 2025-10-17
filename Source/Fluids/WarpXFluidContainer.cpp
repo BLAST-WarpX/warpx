@@ -297,6 +297,8 @@ void WarpXFluidContainer::InitData(
         );
 
         if (h_inj_rho->distributed()) {
+            // h_inj_rho is shared by multiple GPU streams. We need to sync
+            // to avoid race conditions in h_inj_rho->prepare(int).
             Gpu::streamSynchronize();
         }
     }

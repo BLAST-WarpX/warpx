@@ -744,12 +744,12 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
     // If no part_realbox is provided, initialize particles in the whole domain
     const Geometry& geom = Geom(lev);
-    bool initial_injectcion;
+    bool initial_injection;
     if (!part_realbox.ok()) {
         part_realbox = geom.ProbDomain();
-        initial_injectcion = true;
+        initial_injection = true;
     } else {
-        initial_injectcion = false;
+        initial_injection = false;
     }
 
     const int num_ppc = plasma_injector.num_particles_per_cell;
@@ -769,10 +769,12 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
-    if (initial_injectcion) {
+    if (initial_injection) {
+        // Initial particle injection
         plasma_injector.prepare(this->ParticleBoxArray(lev),
                                 this->ParticleDistributionMap(lev), IntVect(0));
     } else {
+        // Continuous particle injection due to moving window
         plasma_injector.prepare(part_realbox);
     }
 

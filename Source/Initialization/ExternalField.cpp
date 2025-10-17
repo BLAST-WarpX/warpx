@@ -347,6 +347,11 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     DistributionMapping dmap;
     bool has_load = true;
     if (m_distributed && !m_moving_window) {
+        // At this point, the data is distributed in an arbitrary way.  For
+        // moving window, the data is loaded in a different way. We
+        // duplicate the data needed for initializing the newly added
+        // region, because the amount of data is relatively small and
+        // because the duplicated approach is much simpler.
         grids = amrex::decompose(Box(lo,hi), ParallelDescriptor::NProcs());
         Vector<int> pmap(grids.size());
         std::iota(pmap.begin(), pmap.end(), 0);
