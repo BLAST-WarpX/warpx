@@ -96,7 +96,17 @@ add_warpx_test(
     2  # dims
     1  # nprocs
     inputs_test_2d_collisions_split_position_push_electrostatic  # inputs
-    "analysis_test_2d_collisions_split_position_push_electrostatic.py --path diags/reducedfiles/"  # analysis
+    "analysis_test_2d_collisions_split_position_push.py --path diags/reducedfiles/"  # analysis
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_collisions_split_position_push_electromagnetic  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_collisions_split_position_push_electromagnetic  # inputs
+    "analysis_test_2d_collisions_split_position_push.py --path diags/reducedfiles/"  # analysis
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
