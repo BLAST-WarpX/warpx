@@ -171,6 +171,43 @@ cmake \
     --parallel ${build_procs}
 rm -rf ${build_dir}/lapackpp-tuolumne-mi300a-build
 
+# PETSC
+if [ -d ${SRC_DIR}/petsc ]
+then
+  cd ${SRC_DIR}/petsc
+  git fetch --prune
+  git checkout v3.24.0
+  cd -
+else
+  git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git ${SRC_DIR}/petsc
+fi
+cd petsc
+./configure               \
+    COPTFLAGS="-g -O3"    \
+    FOPTFLAGS="-g -O3"    \
+    CXXOPTFLAGS="-g -O2"  \
+    HIPOPTFLAGS="-g -O3"  \
+    LDFLAGS+="${LDFLAGS}" \
+    --prefix=${SW_DIR}/petsc-3.24.0  \
+    --with-batch                     \
+    --with-cmake=1                   \
+    --with-cuda=0                    \
+    --with-hip=1                     \
+    --with-hip-dir=${ROCM_PATH}      \
+    --with-fortran-bindings=0        \
+    --with-fftw=0                    \
+    --download-kokkos                \
+    --download-kokkos-kernels        \
+    --with-make-np=${build_procs}    \
+    --with-mpi-dir=${MPICH_DIR}      \
+    --with-clean=1                   \
+    --with-debugging=0               \
+    --with-x=0                       \
+    --with-zlib=1
+make all
+make install
+cd -
+
 # Python ######################################################################
 #
 # sometimes, the Tuolumne PIP Index is down

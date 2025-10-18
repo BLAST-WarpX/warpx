@@ -171,6 +171,42 @@ cmake \
     --parallel ${build_procs}
 rm -rf ${build_dir}/lapackpp-tuolumne-cpu-build
 
+# PETSC
+if [ -d ${SRC_DIR}/petsc ]
+then
+  cd ${SRC_DIR}/petsc
+  git fetch --prune
+  git checkout v3.24.0
+  cd -
+else
+  git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git ${SRC_DIR}/petsc
+fi
+cd petsc
+./configure    \
+    CC=${CC}   \
+    CXX=${CXX} \
+    FC=${FC}   \
+    COPTFLAGS="-g -O3"   \
+    FOPTFLAGS="-g -O3"   \
+    CXXOPTFLAGS="-g -O2" \
+    --prefix=${SW_DIR}/petsc-3.24.0  \
+    --with-batch                     \
+    --with-cmake=1                   \
+    --with-cuda=0                    \
+    --with-hip=0                     \
+    --with-fortran-bindings=0        \
+    --with-fftw=1                    \
+    --with-fftw-dir=${FFTW_ROOT}     \
+    --with-make-np=${build_procs}    \
+    ---with-openmp-kernels=1         \
+    --with-clean=1                   \
+    --with-debugging=0               \
+    --with-x=0                       \
+    --with-zlib=1
+make all
+make install
+cd -
+
 # Python ######################################################################
 #
 # sometimes, the Tuolumne PIP Index is down
