@@ -395,10 +395,10 @@ namespace
                 // Note that this includes the cells on the boundary
                 amrex::Real rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                 const amrex::Real rvalid = ijk_vec[idim] + rshift;
                 if (idim == 0 && iside == 1) {
                     // Account for different dV at different radii
-                    amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                     const amrex::Real rmirror = ijk_mirror[idim] + rshift;
                     rscale = rmirror/rvalid;
 #if defined(WARPX_DIM_RSPHERE)
