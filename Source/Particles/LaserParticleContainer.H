@@ -69,6 +69,8 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) final;
 
     void PushP (int lev, amrex::Real dt,
