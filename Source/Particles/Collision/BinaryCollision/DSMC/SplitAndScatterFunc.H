@@ -9,6 +9,7 @@
 #ifndef WARPX_SPLIT_AND_SCATTER_FUNC_H_
 #define WARPX_SPLIT_AND_SCATTER_FUNC_H_
 
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
@@ -73,7 +74,7 @@ public:
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
         // The following is used to calculate the appropriate offsets for processes
-        // that do not produce macroparticles in new species (i.e., not ionization, not charge exchange).
+        // that do not produce macroparticles in new species (i.e., not ionization, not two-product reaction).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -84,7 +85,7 @@ public:
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] > 0) &
                         (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -101,7 +102,7 @@ public:
         }
 
         // The following is used to calculate the appropriate offsets for
-        // product producing processes (i.e., ionization and charge exchange).
+        // product producing processes (i.e., ionization and two-product reaction).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -111,7 +112,7 @@ public:
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
-                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -166,9 +167,9 @@ public:
 #endif
 
         const int num_product_species = m_num_product_species;
-        const auto ionization_energy = m_ionization_energy;
+        const auto reaction_energy = m_reaction_energy;
 
-        // Grab the masses of reaction products
+        // Grab the masses of the reaction products
         amrex::ParticleReal mass_product1 = 0;
         amrex::ParticleReal mass_product2 = 0;
         if (num_product_species > 2) {
@@ -180,7 +181,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
             {
                 const auto product1_index = products_np_data[0] + no_product_p_offsets[i];
                 // Make a copy of the particle from species 1
@@ -226,6 +227,7 @@ public:
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
                 // rest masses
+                // TODO: this could be made relativistic by using TwoProductComputeProductMomenta
                 auto const uCOM_x = (m1 * ux1 + m2 * ux2) / (m1 + m2);
                 auto const uCOM_y = (m1 * uy1 + m2 * uy2) / (m1 + m2);
                 auto const uCOM_z = (m1 * uz1 + m2 * uz2) / (m1 + m2);
@@ -279,21 +281,45 @@ public:
             }
 
             // Next perform all product-producing collisions
-            else if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))
+            else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
             {
                 // create a copy of the first product species at the location of species 1
+                const auto reactant1_index = static_cast<int>(p_pair_indices_1[i]);
                 const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
-                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                copy_species1[2](soa_products_data[2], soa_1, reactant1_index,
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][product1_index] = p_pair_reaction_weight[i];
 
                 // create a copy of the other product species at the location of species 2
+                const auto reactant2_index = static_cast<int>(p_pair_indices_2[i]);
                 const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
-                copy_species2[3](soa_products_data[3], soa_2, static_cast<int>(p_pair_indices_2[i]),
+                copy_species2[3](soa_products_data[3], soa_2, reactant2_index,
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][product2_index] = p_pair_reaction_weight[i];
+
+                // Update the momenta of the products
+                TwoProductComputeProductMomenta(
+                    soa_1.m_rdata[PIdx::ux][reactant1_index],
+                    soa_1.m_rdata[PIdx::uy][reactant1_index],
+                    soa_1.m_rdata[PIdx::uz][reactant1_index], m1,
+                    soa_2.m_rdata[PIdx::ux][reactant2_index],
+                    soa_2.m_rdata[PIdx::uy][reactant2_index],
+                    soa_2.m_rdata[PIdx::uz][reactant2_index], m2,
+                    soa_products_data[2].m_rdata[PIdx::ux][product1_index],
+                    soa_products_data[2].m_rdata[PIdx::uy][product1_index],
+                    soa_products_data[2].m_rdata[PIdx::uz][product1_index], mass_product1,
+                    soa_products_data[3].m_rdata[PIdx::ux][product2_index],
+                    soa_products_data[3].m_rdata[PIdx::uy][product2_index],
+                    soa_products_data[3].m_rdata[PIdx::uz][product2_index], mass_product2,
+                    -reaction_energy*PhysConst::q_e,
+                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
+                    // We also convert from eV to Joules
+                    false,
+                    // no angular scattering: the products' momenta have the same direction
+                    // as that of the incident particle, in the center-of-mass frame
+                    engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
@@ -380,7 +406,7 @@ public:
                 const amrex::ParticleReal E_coll = E1 + E2;
 
                 // subtract the energy cost for ionization
-                const amrex::ParticleReal E_out = (E_coll - ionization_energy) * PhysConst::q_e;
+                const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
 
                 // Momentum and energy division after the ionization event
                 // is done as follows:
@@ -507,7 +533,7 @@ private:
     // How many different type of species the collision produces
     int m_num_product_species;
     // If ionization collisions are included, what is the energy cost
-    amrex::ParticleReal m_ionization_energy = 0.0;
+    amrex::ParticleReal m_reaction_energy = 0.0;
     // Vectors of size m_num_product_species storing how many particles of a given species are
     // produced by a collision event.
     amrex::Gpu::HostVector<int> m_num_products_host;
