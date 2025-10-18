@@ -26,6 +26,11 @@
 EXE="./warpx.2d"
 INPUTS="./inputs_hist_10.input"
 
+# clean shutdown close to walltime (or checkpoint)
+# https://warpx.readthedocs.io/en/latest/usage/parameters.html#signal-handling
+FLUX_WT_SIG="--signal=SIGUSR1@120s"
+WARPX_WT="warpx.break_signals=USR1"
+
 # enviroment setup
 if [[ -z "${MY_PROFILE}" ]]; then
     echo "WARNING: FORGOT TO"
@@ -49,7 +54,7 @@ export OMP_NUM_THREADS=21
 
 # start MPI parallel processes
 NNODES=$(flux resource list -s up -no {nnodes})
-flux run --exclusive --nodes=${NNODES} \
-  --tasks-per-node=4 \
-  ${EXE} ${INPUTS} \
+flux run ${FLUX_WT_SIG} --exclusive --nodes=${NNODES} \
+  --tasks-per-node=4           \
+  ${EXE} ${INPUTS} ${WARPX_WT} \
   > output.txt

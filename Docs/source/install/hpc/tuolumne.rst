@@ -271,6 +271,9 @@ The batch script below can be used to run a WarpX simulation on 1 node with 4 AP
 Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<input file>`` could be ``plasma_mirror_inputs``.
 WarpX runs with one MPI rank per GPU and uses 21 (of 24) CPU cores (3 are reserved for the system).
 
+The batch script below also :ref:`sends WarpX a signal <running-cpp-parameters-signal>` when the simulations gets close to the walltime of the job, to shut down cleanly.
+Adjust the ``FLUX_WT_SIG`` and ``WARPX_WT`` to modify or disable this behavior as needed.
+
 .. tab-set::
 
    .. tab-item:: GPU
