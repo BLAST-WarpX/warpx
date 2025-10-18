@@ -69,6 +69,30 @@ cmake \
     --parallel ${build_procs}
 rm -rf ${build_dir}/c-blosc2-build
 
+# HDF5
+if [ -d ${SRC_DIR}/hdf5 ]
+then
+  cd ${SRC_DIR}/hdf5
+  git fetch --prune
+  git checkout hdf5-1_14_1-2
+  cd -
+else
+  git clone -b hdf5-1_14_1-2 https://github.com/HDFGroup/hdf5.git ${SRC_DIR}/hdf5
+fi
+cmake \
+    --fresh                      \
+    -S ${SRC_DIR}/hdf5           \
+    -B ${build_dir}/hdf5-build   \
+    -DBUILD_SHARED_LIBS=OFF        \
+    -DBUILD_TESTING=OFF          \
+    -DHDF5_ENABLE_PARALLEL=ON    \
+    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/hdf5-1.14.1.2
+cmake \
+    --build ${build_dir}/hdf5-build \
+    --target install                \
+    --parallel ${build_procs}
+rm -rf ${build_dir}/hdf5-build
+
 # ADIOS2
 if [ -d ${SRC_DIR}/adios2 ]
 then
