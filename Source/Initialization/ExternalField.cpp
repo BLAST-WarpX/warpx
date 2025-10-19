@@ -464,7 +464,7 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
             for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
                 auto plo = m_problo[idim] + b.smallEnd(idim)*m_probdx[idim];
                 auto phi = m_problo[idim] + b.  bigEnd(idim)*m_probdx[idim];
-                if (get_zlab) {
+                if (get_zlab && (idim == AMREX_SPACEDIM-1)) {
                     plo = get_zlab(plo);
                     phi = get_zlab(phi);
                 }
