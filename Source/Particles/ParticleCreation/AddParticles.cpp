@@ -771,6 +771,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
+    InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
     const amrex::Real t = WarpX::GetInstance().gett_new(lev);
@@ -793,7 +794,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
     auto get_zlab = [=] (amrex::Real z) -> amrex::Real
     {
-        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, inj_mom,
+        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
                                         gamma_boost, beta_boost, t);
     };
 
