@@ -198,47 +198,15 @@ void WarpXFluidContainer::InitData(
 #endif
     }
 
-#ifdef AMREX_USE_OMP
-    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
-    amrex::Vector<InjectorDensity*> inj_rho_omp;
-    auto const nthreads = amrex::OpenMP::get_max_threads();
-    if (amrex::Gpu::notInLaunchRegion() && nthreads > 1 && h_inj_rho->distributed())
-    {
-        inj_rho_data = std::unique_ptr<void,amrex::DataDeleter>
-            (amrex::The_Cpu_Arena()->alloc(sizeof(InjectorDensity)*nthreads),
-             amrex::DataDeleter{amrex::The_Cpu_Arena()});
-        auto* p = reinterpret_cast<InjectorDensity*>(inj_rho_data.get());
-        for (int tid = 0; tid < nthreads; ++tid) {
-            inj_rho_omp.push_back(p++);
-        }
-    }
-#endif
-
     // Loop through cells and initialize their value
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+#pragma omp parallel
 #endif
     for (MFIter mfi(*fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         InjectorDensity* inj_rho = d_inj_rho;
         if (h_inj_rho->distributed()) {
-#ifdef AMREX_USE_OMP
-            if (amrex::OpenMP::get_num_threads() > 1) {
-                auto const tid = amrex::OpenMP::get_thread_num();
-#pragma omp critical(inj_rho)
-                {
-                    h_inj_rho->prepare(mfi.LocalIndex());
-                    std::memcpy((void*)inj_rho_omp[tid], (void const*)h_inj_rho.get(), sizeof(InjectorDensity));
-                }
-                inj_rho = inj_rho_omp[tid];
-            } else
-#endif
-            {
-                h_inj_rho->prepare(mfi.LocalIndex());
-#ifdef AMREX_USE_GPU
-                amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-#endif
-            }
+            h_inj_rho->prepare(mfi.LocalIndex(), &inj_rho);
         }
 
         amrex::Box const tile_box  = mfi.tilebox(fields.get(name_mf_N, lev)->ixType().toIntVect());

@@ -15,12 +15,14 @@
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_BoxArray.H>
+#include <AMReX_DataAllocator.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Math.H>
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Vector.H>
 
 #include <cmath>
 #include <functional>
@@ -231,7 +233,7 @@ struct InjectorDensity
     void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                   std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
-    void prepare (int li);
+    void prepare (int li, InjectorDensity** inj_rho);
 
     [[nodiscard]] bool needPreparation () const;
 
@@ -292,6 +294,10 @@ private:
         InjectorDensityFromFile   fromfile;
     };
     Object object;
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
+    amrex::Vector<InjectorDensity*> inj_rho_omp;
+#endif
 };
 
 // In order for InjectorDensity to be trivially copyable, its destructor

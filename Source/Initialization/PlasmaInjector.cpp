@@ -663,17 +663,15 @@ PlasmaInjector::getInjectorFluxPosition () const
 InjectorDensity*
 PlasmaInjector::getInjectorDensity (int li) const
 {
+    auto* inj_rho = d_inj_rho;
     if (inj_rho_prepared) {
         if (inj_rho_distributed) {
-            h_inj_rho->prepare(li);
-#ifdef AMREX_USE_GPU
-            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-#endif
+            h_inj_rho->prepare(li, &inj_rho);
         }
     } else {
         WARPX_ABORT_WITH_MESSAGE("Plasma Density Injector is not prepared");
     }
-    return d_inj_rho;
+    return inj_rho;
 }
 
 InjectorFlux*

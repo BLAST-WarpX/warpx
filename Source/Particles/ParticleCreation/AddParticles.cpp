@@ -809,28 +809,11 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
     }
 
-#ifdef AMREX_USE_OMP
-    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
-    amrex::Vector<InjectorDensity*> inj_rho_omp;
-    auto const nthreads = amrex::OpenMP::get_max_threads();
-    if (! WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion()
-        && nthreads > 1 && plasma_injector.distributedInjectorDensity())
-    {
-        inj_rho_data = std::unique_ptr<void,amrex::DataDeleter>
-            (amrex::The_Cpu_Arena()->alloc(sizeof(InjectorDensity)*nthreads),
-             amrex::DataDeleter{amrex::The_Cpu_Arena()});
-        auto* p = reinterpret_cast<InjectorDensity*>(inj_rho_data.get());
-        for (int tid = 0; tid < nthreads; ++tid) {
-            inj_rho_omp.push_back(p++);
-        }
-    }
-#endif
-
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
         info.EnableTiling(tile_size);
     }
-#ifdef AMREX_USE_OMP
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
     info.SetDynamic(true);
 #pragma omp parallel if (not WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion())
 #endif
@@ -855,25 +838,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             continue; // Go to the next tile
         }
 
-        InjectorDensity* inj_rho;
-#ifdef AMREX_USE_OMP
-        if (plasma_injector.distributedInjectorDensity() &&
-            amrex::OpenMP::get_num_threads() > 1)
-        {
-            auto const tid = amrex::OpenMP::get_thread_num();
-#pragma omp critical(get_injector_denisty)
-            {
-                inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
-                std::memcpy((void*)inj_rho_omp[tid], (void const*)inj_rho, sizeof(InjectorDensity));
-            }
-            inj_rho = inj_rho_omp[tid];
-        } else
-#endif
-        {
-            // Note that this is GPU async safe because of the sync at the
-            // end of the loop.
-            inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
-        }
+        auto* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
