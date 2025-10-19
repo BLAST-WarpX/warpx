@@ -1179,7 +1179,7 @@ Particle initialization
       are distributed among MPI processes. If particles are continuously
       injected during the simulation and
       ``<species_name>.read_density_distributed`` is true, chunks of the
-      openPMD data are loaded and cached ad needed.
+      openPMD data are loaded and cached as needed.
 
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
