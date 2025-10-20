@@ -7,8 +7,6 @@
 
 #include <AMReX_Enum.H>
 
-#include <AMReX_Enum.H>
-
 /**
   * \brief struct to select the nonlinear solver for implicit schemes
   */
