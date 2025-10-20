@@ -56,7 +56,7 @@ public:
     //! Defines with a reference to Ops. It's the user's responsibility to
     //! keep the Ops object alive for GMRES to be functional. This function
     //! must be called before solve() can be called.
-    void define (Ops& a_linop)
+    void define (Ops& a_linop) override
     {
         m_solver = std::make_unique<warpx_petsc::KSP_impl>(a_linop);
     }
@@ -74,7 +74,7 @@ public:
                 Vec const& a_rhs,
                 RT a_tol_rel,
                 RT a_tol_abs,
-                int a_its=-1)
+                int a_its=-1) override
     {
         if (!m_solver->isDefined()) {
             m_solver->createObjects(a_sol);
@@ -84,22 +84,22 @@ public:
     }
 
     //! Sets verbosity.
-    void setVerbose (int v) { m_solver->setVerbose(v); }
+    void setVerbose (int v) override { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
-    void setRestartLength (int rl) { amrex::ignore_unused(rl); }
+    void setRestartLength (int rl) override { amrex::ignore_unused(rl); }
 
     //! Sets the max number of iterations
-    void setMaxIters (int niters) { m_solver->setMaxIters(niters); }
+    void setMaxIters (int niters) override { m_solver->setMaxIters(niters); }
 
     //! Gets the number of iterations.
-    [[nodiscard]] int getNumIters () const { return m_solver->getNumIters(); }
+    [[nodiscard]] int getNumIters () const override { return m_solver->getNumIters(); }
 
     //! Gets the solver status.
-    [[nodiscard]] int getStatus () const { return m_solver->getStatus(); }
+    [[nodiscard]] int getStatus () const override { return m_solver->getStatus(); }
 
     //! Gets the 2-norm of the residual.
-    [[nodiscard]] RT getResidualNorm () const { return m_solver->getResidualNorm(); }
+    [[nodiscard]] RT getResidualNorm () const override { return m_solver->getResidualNorm(); }
 
 private:
 
