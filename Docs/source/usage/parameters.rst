@@ -946,7 +946,7 @@ Particle initialization
     The mass of one `physical` particle of this species.
     If ``species_type`` is specified, the mass will be set to the physical value and ``mass`` is optional.
     ``mass`` must be strictly positive. For massless species (i.e., photons for now), set ``<species_name>.species_type``
-    to the appropriate types.
+    to the appropriate type.
 
 * ``<species_name>.xmin,ymin,zmin`` and ``<species_name>.xmax,ymax,zmax`` (`float`) optional (default unlimited)
     When ``<species_name>.xmin`` and ``<species_name>.xmax`` are set, they delimit the region within which particles are injected.
