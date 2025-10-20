@@ -46,7 +46,6 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
         PETScSNES(PETScSNES&&) noexcept = delete;
         PETScSNES& operator=(PETScSNES&&) noexcept = delete;
 
-        AMREX_FORCE_INLINE
         void Define ( const Vec& a_U, Ops* a_op ) override
         {
             m_solver = std::make_unique<warpx_petsc::SNES_impl>(a_U, a_op);
@@ -60,7 +59,6 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
             this->m_usePC = m_solver->usePC();
         }
 
-        AMREX_FORCE_INLINE
         void Solve ( Vec& a_U,
                      const Vec& a_b,
                      RT a_time,
@@ -95,19 +93,16 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
             }
         }
 
-        AMREX_FORCE_INLINE
         void PrintParams () const override
         {
             m_solver->printParams();
         }
 
-        AMREX_FORCE_INLINE
         void GetSolverParams (RT& a_rtol, RT& a_atol, int& a_maxits) override
         {
             m_solver->getSolverParams(a_rtol, a_atol, a_maxits);
         }
 
-        AMREX_FORCE_INLINE
         void Verbose (bool a_verbose) override
         {
             m_solver->setVerbose(a_verbose);
