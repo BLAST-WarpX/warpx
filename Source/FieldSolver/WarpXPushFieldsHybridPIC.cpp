@@ -9,6 +9,7 @@
  */
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -21,6 +22,7 @@
 
 
 using namespace amrex;
+using namespace warpx;
 
 void WarpX::HybridPICEvolveFields ()
 {
@@ -107,7 +109,7 @@ void WarpX::HybridPICEvolveFields ()
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
             SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
-            WarpX::sync_nodal_points
+            parallelization::sync_nodal_points_flag()
         );
     }
 
@@ -141,7 +143,7 @@ void WarpX::HybridPICEvolveFields ()
             m_eb_update_E,
             0.5_rt/sub_steps*dt[0],
             SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
-            WarpX::sync_nodal_points
+            parallelization::sync_nodal_points_flag()
         );
     }
 
@@ -182,7 +184,7 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
-    FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+    FillBoundaryE(guard_cells.ng_FieldSolver, parallelization::sync_nodal_points_flag());
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
@@ -263,11 +265,12 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to
     // a nodal grid
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
     for (int lev = 0; lev <= finest_level; ++lev) {
         ablastr::utils::communication::FillBoundary(
             *m_fields.get(FieldType::rho_fp, lev),
             m_fields.get(FieldType::rho_fp, lev)->nGrowVect(),
-            WarpX::do_single_precision_comms,
+            do_single_precision_comms,
             Geom(lev).periodicity(),
             true
         );
@@ -275,7 +278,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
             ablastr::utils::communication::FillBoundary(
                 *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                 m_fields.get(FieldType::current_fp, Direction{idim}, lev)->nGrowVect(),
-                WarpX::do_single_precision_comms,
+                do_single_precision_comms,
                 Geom(lev).periodicity(),
                 true
             );

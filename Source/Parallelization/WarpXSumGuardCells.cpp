@@ -8,11 +8,12 @@
 
 #include "WarpXSumGuardCells.H"
 
+#include "Parallelization/Parallelization.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
-#include "WarpX.H"
-
 #include <ablastr/utils/Communication.H>
+
+using namespace warpx;
 
 void
 WarpXSumGuardCells(amrex::MultiFab& mf, const amrex::Periodicity& period,
@@ -20,7 +21,8 @@ WarpXSumGuardCells(amrex::MultiFab& mf, const amrex::Periodicity& period,
                    const int icomp, const int ncomp)
 {
     amrex::IntVect const n_updated_guards = mf.nGrowVect();
-    ablastr::utils::communication::SumBoundary(mf, icomp, ncomp, src_ngrow, n_updated_guards, WarpX::do_single_precision_comms, period);
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+    ablastr::utils::communication::SumBoundary(mf, icomp, ncomp, src_ngrow, n_updated_guards, do_single_precision_comms, period);
 }
 
 

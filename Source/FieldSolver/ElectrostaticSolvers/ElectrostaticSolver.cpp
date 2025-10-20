@@ -10,12 +10,14 @@
 #include "ElectrostaticSolver.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "Parallelization/Parallelization.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/PoissonSolver.H>
 
 
 using namespace amrex;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 ElectrostaticSolver::ElectrostaticSolver (int nlevs_max) : num_levels{nlevs_max}
@@ -198,6 +200,7 @@ ElectrostaticSolver::computePhi (
     bool const is_solver_igf_on_lev0 =
         WarpX::poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction;
 
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
     ablastr::fields::computePhi(
         sorted_rho,
         sorted_phi,
@@ -213,7 +216,7 @@ ElectrostaticSolver::computePhi (
         is_solver_igf_on_lev0,
         is_igf_2d,
         EB::enabled(),
-        WarpX::do_single_precision_comms,
+        do_single_precision_comms,
         warpx.refRatio(),
         post_phi_calculation,
         *m_poisson_boundary_handler,

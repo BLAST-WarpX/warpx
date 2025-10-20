@@ -15,11 +15,13 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer.H"
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
 using namespace amrex;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 HybridPICModel::HybridPICModel ()
@@ -402,7 +404,7 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
-        WarpX::do_single_precision_comms,
+        parallelization::comms_in_single_precision_flag(),
         warpx.Geom(lev).periodicity(),
         true);
 }

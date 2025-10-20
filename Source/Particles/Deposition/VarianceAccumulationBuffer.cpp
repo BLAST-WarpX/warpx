@@ -9,6 +9,7 @@
 
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 #include "Particles/Deposition/TemperatureDeposition.H"
+#include "Parallelization/Parallelization.H"
 #include "Parallelization/WarpXSumGuardCells.H"
 #include "Fields.H"
 
@@ -18,6 +19,7 @@
 #include <AMReX_REAL.H>
 
 using namespace amrex::literals;
+using namespace warpx;
 using namespace warpx::particles::deposition;
 
 VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name ) :
@@ -84,6 +86,8 @@ VarianceAccumulationBuffer::ConvertVarianceToTemperatureAndFilter (
     using ablastr::fields::Direction;
     auto &warpx = WarpX::GetInstance();
 
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         auto const& periodicity = warpx.Geom(lev).periodicity();
 
@@ -96,7 +100,7 @@ VarianceAccumulationBuffer::ConvertVarianceToTemperatureAndFilter (
             // Synchronize Ghost cells after normalization.
             ablastr::utils::communication::FillBoundary(
                 *var_vf[lev][Direction{idir}],
-                WarpX::do_single_precision_comms,
+                do_single_precision_comms,
                 periodicity,
                 true);
 
@@ -111,7 +115,7 @@ VarianceAccumulationBuffer::ConvertVarianceToTemperatureAndFilter (
                 // Re-synchronize MF after filtering
                 ablastr::utils::communication::FillBoundary(
                     *var_vf[lev][Direction{idir}],
-                    WarpX::do_single_precision_comms,
+                    do_single_precision_comms,
                     periodicity,
                     true);
             }

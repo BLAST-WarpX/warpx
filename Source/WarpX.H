@@ -230,9 +230,6 @@ public:
     //! (default is false for standard PSATD and true for Galilean PSATD)
     bool update_with_rho = false;
 
-    //! perform field communications in single precision
-    static bool do_single_precision_comms;
-
     //! used shared memory algorithm for charge deposition
     static bool do_shared_mem_charge_deposition;
 
@@ -320,7 +317,6 @@ public:
     //! If true, the code will compute max_step from the back transformed diagnostics
     static bool compute_max_step_from_btd;
 
-    static bool do_dynamic_scheduling;
     static bool refine_plasma;
 
     static utils::parser::IntervalsParser sort_intervals;
@@ -1359,9 +1355,6 @@ private:
 
     bool m_is_synchronized = true;
 
-    // Synchronization of nodal points
-    static constexpr bool sync_nodal_points = true;
-
     guardCellManager guard_cells;
 
     // Slice Parameters
@@ -1374,8 +1367,6 @@ private:
     int nox_fft = 16;
     int noy_fft = 16;
     int noz_fft = 16;
-
-
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
 #if defined(AMREX_USE_CUDA)

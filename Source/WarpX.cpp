@@ -121,7 +121,6 @@ Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
-bool WarpX::do_single_precision_comms = false;
 
 bool WarpX::do_shared_mem_charge_deposition = false;
 bool WarpX::do_shared_mem_current_deposition = false;
@@ -162,8 +161,6 @@ bool WarpX::refine_plasma     = false;
 
 utils::parser::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
-
-bool WarpX::do_dynamic_scheduling = true;
 
 IntVect WarpX::filter_npass_each_dir(1);
 
@@ -868,16 +865,6 @@ WarpX::ReadParameters ()
                 pp_warpx, "mirror_z_npoints", m_mirror_z_npoints, 0, m_num_mirrors);
         }
 
-        pp_warpx.query("do_single_precision_comms", do_single_precision_comms);
-#ifdef AMREX_USE_FLOAT
-        if (do_single_precision_comms) {
-            do_single_precision_comms = false;
-            ablastr::warn_manager::WMRecordWarning(
-                "comms",
-                "Overwrote warpx.do_single_precision_comms to be 0, since WarpX was built in single precision.",
-                ablastr::warn_manager::WarnPriority::low);
-        }
-#endif
         pp_warpx.query("do_shared_mem_charge_deposition", do_shared_mem_charge_deposition);
         pp_warpx.query("do_shared_mem_current_deposition", do_shared_mem_current_deposition);
 #if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) || \
@@ -1068,8 +1055,6 @@ WarpX::ReadParameters ()
                     utils::parser::makeParser(ref_patch_function,{"x","y","z"}));
             }
         }
-
-        pp_warpx.query("do_dynamic_scheduling", do_dynamic_scheduling);
 
         // Integer that corresponds to the type of grid used in the simulation
         // (collocated, staggered, hybrid)

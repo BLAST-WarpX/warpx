@@ -12,6 +12,7 @@
 #include "MultiParticleContainer.H"
 
 #include "Fields.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
@@ -81,6 +82,7 @@
 #include <vector>
 
 using namespace amrex;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 namespace
@@ -696,9 +698,10 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
         const Geometry& gm = allcontainers[0]->Geom(lev);
         // Possible performance optimization:
         // pass less than `rho->nGrowVect()` in the fifth input variable `dst_ng`
+        const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
         ablastr::utils::communication::SumBoundary(
             *rho, 0, rho->nComp(), rho->nGrowVect(), rho->nGrowVect(),
-            WarpX::do_single_precision_comms, gm.periodicity());
+            do_single_precision_comms, gm.periodicity());
     }
 
     return rho;

@@ -13,6 +13,7 @@
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Initialization/ExternalField.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fields.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -56,6 +57,7 @@
 #include <string>
 
 using namespace amrex;
+using namespace warpx;
 
 namespace
 {
@@ -362,6 +364,8 @@ WarpX::MoveWindow (const int step, bool move_j)
     using warpx::fields::FieldType;
 
     bool const skip_lev0_coarse_patch = true;
+
+    const bool do_single_precision_comms = parallelization::comms_in_single_precision_flag();
 
     if (step == start_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Starting moving window");

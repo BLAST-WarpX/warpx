@@ -12,6 +12,7 @@
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldDataRZ.H"
 #endif
+#include "Parallelization/Parallelization.H"
 #include "Utils/WarpXConst.H"
 
 #include <ablastr/utils/Communication.H>
@@ -33,6 +34,7 @@
 #include <memory>
 
 using namespace amrex::literals;
+using namespace warpx;
 using warpx::fields::FieldType;
 using ablastr::fields::Direction;
 
@@ -132,7 +134,7 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
 
 void
 PML_RZ::FillBoundaryE (ablastr::fields::MultiFabRegister& fields, PatchType patch_type,
-    const bool do_single_precision_comms, const std::optional<bool> nodal_sync)
+    const std::optional<bool> nodal_sync)
 {
     using ablastr::fields::Direction;
 
@@ -143,13 +145,16 @@ PML_RZ::FillBoundaryE (ablastr::fields::MultiFabRegister& fields, PatchType patc
     {
         amrex::Periodicity const& period = m_geom->periodicity();
         const amrex::Vector<amrex::MultiFab*> mf = {pml_Er, pml_Et};
-        ablastr::utils::communication::FillBoundary(mf, do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(
+            mf,
+            parallelization::comms_in_single_precision_flag(),
+            period, nodal_sync);
     }
 }
 
 void
 PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patch_type,
-    const bool do_single_precision_comms, const std::optional<bool> nodal_sync)
+    const std::optional<bool> nodal_sync)
 {
     if (patch_type == PatchType::fine)
     {
@@ -160,7 +165,10 @@ PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patc
 
         amrex::Periodicity const& period = m_geom->periodicity();
         const amrex::Vector<amrex::MultiFab*> mf = {pml_Br, pml_Bt};
-        ablastr::utils::communication::FillBoundary(mf, do_single_precision_comms, period, nodal_sync);
+        ablastr::utils::communication::FillBoundary(
+            mf,
+            parallelization::comms_in_single_precision_flag(),
+            period, nodal_sync);
     }
 }
 

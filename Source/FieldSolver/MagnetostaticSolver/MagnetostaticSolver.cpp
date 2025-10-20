@@ -10,6 +10,7 @@
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Parallelization/GuardCellManager.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Python/callbacks.H"
@@ -57,6 +58,7 @@
 #include <string>
 
 using namespace amrex;
+using namespace warpx;
 
 void
 WarpX::ComputeMagnetostaticField()
@@ -219,7 +221,7 @@ WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& cur
         this->grids,
         this->m_vector_poisson_boundary_handler,
         EB::enabled(),
-        WarpX::do_single_precision_comms,
+        parallelization::comms_in_single_precision_flag(),
         this->ref_ratio,
         post_A_calculation,
         gett_new(0),
@@ -403,9 +405,10 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp (amrex::M
     amrex::Real const * stencil_coeffs_z = warpx.device_field_centering_stencil_coeffs_z.data();
 
     // Synchronize the ghost cells, do halo exchange
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
     ablastr::utils::communication::FillBoundary(src,
                                                 src.nGrowVect(),
-                                                WarpX::do_single_precision_comms);
+                                                do_single_precision_comms);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
