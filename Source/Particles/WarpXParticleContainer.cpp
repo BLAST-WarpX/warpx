@@ -83,13 +83,13 @@ using namespace warpx;
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level)
     : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
-             MFItInfo().SetDynamic(parallelization::do_dynamic_scheduling))
+             MFItInfo().SetDynamic(parallelization::do_dynamic_scheduling_flag()))
 {
 }
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
     : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
-                   info.SetDynamic(parallelization::do_dynamic_scheduling))
+                   info.SetDynamic(parallelization::do_dynamic_scheduling_flag()))
 {
 }
 
