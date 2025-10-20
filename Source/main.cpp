@@ -15,18 +15,9 @@
 
 #include <AMReX_Print.H>
 
-#ifdef AMREX_USE_PETSC
-#include <petscsys.h>
-#endif
-
 int
 main (int argc, char* argv[]) {
     warpx::initialization::initialize_external_libraries(argc, argv);
-#ifdef AMREX_USE_PETSC
-    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
-    PetscInitialize(&argc, &argv, nullptr, "WarpX with PETSc");
-    amrex::Print() << "Initialized PETSc.\n";
-#endif
     {
         WARPX_PROFILE_VAR("main()", pmain);
 
@@ -47,9 +38,5 @@ main (int argc, char* argv[]) {
 
         WARPX_PROFILE_VAR_STOP(pmain);
     }
-#ifdef AMREX_USE_PETSC
-    PetscFinalize();
-    amrex::Print() << "Finalized PETSc.\n";
-#endif
     warpx::initialization::finalize_external_libraries();
 }
