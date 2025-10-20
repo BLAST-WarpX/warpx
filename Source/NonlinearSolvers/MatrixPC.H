@@ -22,10 +22,6 @@
 
 namespace MatrixPCUtils
 {
-    template <typename T>
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    T sign(const T a_x) { return (a_x < 0 ? T(-1) : T(1)); }
-
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool insertOrAdd( const int a_cidx, /*!< Column index (global) */
                       const amrex::Real a_val, /*!< Value to insert/add */
@@ -139,29 +135,29 @@ class MatrixPC : public Preconditioner<T,Ops>
             a_ncols_max = m_pc_mat_nnz;
 
             a_r_indices_g.resize(m_r_indices_g.size());
-            amrex::Gpu::copy( amrex::Gpu::deviceToDevice,
-                              m_r_indices_g.begin(),
-                              m_r_indices_g.end(),
-                              a_r_indices_g.begin() );
+            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
+                                   m_r_indices_g.begin(),
+                                   m_r_indices_g.end(),
+                                   a_r_indices_g.begin() );
 
             a_num_nz.resize(m_num_nz.size());
-            amrex::Gpu::copy( amrex::Gpu::deviceToDevice,
-                              m_num_nz.begin(),
-                              m_num_nz.end(),
-                              a_num_nz.begin() );
+            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
+                                   m_num_nz.begin(),
+                                   m_num_nz.end(),
+                                   a_num_nz.begin() );
 
             a_c_indices_g.resize(m_c_indices_g.size());
-            amrex::Gpu::copy( amrex::Gpu::deviceToDevice,
-                              m_c_indices_g.begin(),
-                              m_c_indices_g.end(),
-                              a_c_indices_g.begin() );
+            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
+                                   m_c_indices_g.begin(),
+                                   m_c_indices_g.end(),
+                                   a_c_indices_g.begin() );
 
             a_a_ij.resize(m_a_ij.size());
-            amrex::Gpu::copy( amrex::Gpu::deviceToDevice,
-                              m_a_ij.begin(),
-                              m_a_ij.end(),
-                              a_a_ij.begin() );
-
+            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
+                                   m_a_ij.begin(),
+                                   m_a_ij.end(),
+                                   a_a_ij.begin() );
+            amrex::Gpu::streamSynchronize();
         }
 
         /**
@@ -616,7 +612,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
                             for (int tdir = 1; tdir <= 2; tdir++) {
                                 auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
-                                auto sign = MatrixPCUtils::sign<int>(ctr_dir) * MatrixPCUtils::sign<int>(ctr_tdir);
+                                auto sign = std::copysign(1,ctr_dir) * std::copysign(1,ctr_tdir);
                                 auto cidx_g_rhs = (int) dof_arrays[tdir](iv,1);
                                 amrex::Real val = amrex::Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]];
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
@@ -630,7 +626,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 #endif
                     num_nz_ptr[ridx_l] = icol;
                 });
-                Gpu::synchronize();
 
                 // Add the mass matrix piece
                 if (m_pc_mass_matrix_width >= 0) {
@@ -646,7 +641,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         int icol = num_nz_ptr[ridx_l];
 
                         {
-                            auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);;
+                            auto cidx_g_lhs = dof_lhs_arr(i,j,k,1);
                             amrex::Real val = sigma_ii_arr(i,j,k,0) - 1.0;
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -660,8 +655,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                         num_nz_ptr[ridx_l] = icol;
                     });
-                    Gpu::synchronize();
                 }
+                Gpu::synchronize();
             }
         }
 
