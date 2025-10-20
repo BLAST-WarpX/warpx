@@ -15,6 +15,7 @@
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "ComputeDiagFunctors/BackTransformParticleFunctor.H"
 #include "Fields.H"
+#include "Parallelization/Parallelization.H"
 #include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -48,6 +49,7 @@
 #include <vector>
 
 using namespace amrex::literals;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 namespace
@@ -828,8 +830,9 @@ BTDiagnostics::PrepareFieldDataForOutput ()
         AMREX_ALWAYS_ASSERT( icomp_dst == m_cellcenter_varnames.size() );
         // fill boundary call is required to average_down (flatten) data to
         // the coarsest level.
+        const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
         ablastr::utils::communication::FillBoundary(*fields.get(m_cell_centered_data_name, lev),
-                                                    WarpX::do_single_precision_comms,
+                                                    do_single_precision_comms,
                                                     warpx.Geom(lev).periodicity());
     }
     // Flattening out MF over levels

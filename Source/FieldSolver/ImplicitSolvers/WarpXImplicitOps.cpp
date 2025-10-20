@@ -12,6 +12,7 @@
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Parallelization/GuardCellManager.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Python/callbacks.H"
@@ -43,6 +44,8 @@
 #include <ostream>
 #include <vector>
 
+using namespace warpx;
+
 void
 WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
@@ -57,7 +60,7 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_ti
     amrex::MultiFab::Copy(*Efield_fp[0][0], *Evec[0][0], 0, 0, ncomps, Evec[0][0]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][1], *Evec[0][1], 0, 0, ncomps, Evec[0][1]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][2], *Evec[0][2], 0, 0, ncomps, Evec[0][2]->nGrowVect());
-    FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    FillBoundaryE(guard_cells.ng_alloc_EB, parallelization::sync_nodal_points_flag());
     ApplyEfieldBoundary(0, PatchType::fine, a_time);
 }
 
@@ -75,7 +78,7 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
     EvolveB(a_thetadt, SubcyclingHalf::None, start_time);
-    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    FillBoundaryB(guard_cells.ng_alloc_EB, parallelization::sync_nodal_points_flag());
 }
 
 void
@@ -86,7 +89,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
     ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
-    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    FillBoundaryB(guard_cells.ng_alloc_EB, parallelization::sync_nodal_points_flag());
 }
 
 void
@@ -117,8 +120,8 @@ WarpX::SpectralSourceFreeFieldAdvance (amrex::Real start_time)
     current_fp[2]->setVal(0._rt);
     if (rho_fp) { rho_fp->setVal(0._rt); }
     PushPSATD(start_time); // Note that this does dt/2
-    FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
-    FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    FillBoundaryE(guard_cells.ng_alloc_EB, parallelization::sync_nodal_points_flag());
+    FillBoundaryB(guard_cells.ng_alloc_EB, parallelization::sync_nodal_points_flag());
 
     // Restore the current_fp MultiFab. Note that this is only needed for diagnostics when
     // J is being written out (since current_fp is not otherwise used).

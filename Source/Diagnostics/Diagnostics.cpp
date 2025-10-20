@@ -13,6 +13,7 @@
 #include "FlushFormats/FlushFormatPlotfile.H"
 #include "FlushFormats/FlushFormatSensei.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Parallelization/Parallelization.H"
 #include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -37,6 +38,7 @@
 #include <string>
 
 using namespace amrex::literals;
+using namespace warpx;
 
 Diagnostics::Diagnostics (int i, std::string name, DiagTypes diag_type)
     : m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
@@ -634,7 +636,8 @@ Diagnostics::ComputeAndPack ()
 
             // needed for contour plots of rho, i.e. ascent/sensei
             if (m_format == "sensei" || m_format == "ascent") {
-                ablastr::utils::communication::FillBoundary(m_mf_output[i_buffer][lev], WarpX::do_single_precision_comms,
+                const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+                ablastr::utils::communication::FillBoundary(m_mf_output[i_buffer][lev], do_single_precision_comms,
                                                             warpx.Geom(lev).periodicity());
             }
         }

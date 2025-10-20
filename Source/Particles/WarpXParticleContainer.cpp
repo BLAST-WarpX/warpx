@@ -20,6 +20,7 @@
 #include "Fields.H"
 #include "Pusher/GetAndSetPosition.H"
 #include "Pusher/UpdatePosition.H"
+#include "Parallelization/Parallelization.H"
 #include "ParticleBoundaries_K.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -78,16 +79,17 @@
 #include <cmath>
 
 using namespace amrex;
+using namespace warpx;
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level)
     : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
-             MFItInfo().SetDynamic(WarpX::do_dynamic_scheduling))
+             MFItInfo().SetDynamic(parallelization::do_dynamic_scheduling))
 {
 }
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
     : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
-                   info.SetDynamic(WarpX::do_dynamic_scheduling))
+                   info.SetDynamic(parallelization::do_dynamic_scheduling))
 {
 }
 
@@ -1713,7 +1715,7 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
                                                        rho[lev]->nComp(),
                                                        amrex::IntVect::TheZeroVector(),
                                                        amrex::IntVect::TheZeroVector(),
-                                                       WarpX::do_single_precision_comms,
+                                                       parallelization::comms_in_single_precision_flag(),
                                                        m_gdb->Geom(lev).periodicity());
         }
     }
@@ -1773,7 +1775,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         // pass less than `rho->nGrowVect()` in the fifth input variable `dst_ng`
         ablastr::utils::communication::SumBoundary(
             *rho, 0, rho->nComp(), rho->nGrowVect(), rho->nGrowVect(),
-            WarpX::do_single_precision_comms,
+            parallelization::comms_in_single_precision_flag(),
             m_gdb->Geom(lev).periodicity()
         );
     }

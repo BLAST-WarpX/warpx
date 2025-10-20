@@ -11,11 +11,13 @@
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "Parallelization/Parallelization.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 using namespace amrex;
+using namespace warpx;
 
 void EffectivePotentialES::InitData() {
     auto & warpx = WarpX::GetInstance();
@@ -254,7 +256,7 @@ void EffectivePotentialES::computePhi (
         WarpX::grid_type,
         false,
         EB::enabled(),
-        WarpX::do_single_precision_comms,
+        parallelization::comms_in_single_precision_flag(),
         warpx.refRatio(),
         post_phi_calculation,
         *m_poisson_boundary_handler,

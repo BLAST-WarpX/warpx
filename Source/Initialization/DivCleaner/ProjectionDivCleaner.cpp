@@ -25,6 +25,7 @@
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
 #include <ablastr/utils/Communication.H>
+#include "Parallelization/Parallelization.H"
 #include <Utils/WarpXProfilerWrapper.H>
 
 #include <map>
@@ -209,7 +210,7 @@ ProjectionDivCleaner::solve ()
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*m_solution[ilev],
                                                 m_solution[ilev]->nGrowVect(),
-                                                WarpX::do_single_precision_comms,
+                                                parallelization::comms_in_single_precision_flag(),
                                                 geom[ilev].periodicity(),
                                                 true);
     }
@@ -237,17 +238,17 @@ ProjectionDivCleaner::setSourceFromField ()
         // generating source
         ablastr::utils::communication::FillBoundary(*Bx,
                 Bx->nGrowVect(),
-                WarpX::do_single_precision_comms,
+                parallelization::comms_in_single_precision_flag(),
                 geom[ilev].periodicity(),
                 true);
         ablastr::utils::communication::FillBoundary(*By,
                 By->nGrowVect(),
-                WarpX::do_single_precision_comms,
+                parallelization::comms_in_single_precision_flag(),
                 geom[ilev].periodicity(),
                 true);
         ablastr::utils::communication::FillBoundary(*Bz,
                 Bz->nGrowVect(),
-                WarpX::do_single_precision_comms,
+                parallelization::comms_in_single_precision_flag(),
                 geom[ilev].periodicity(),
                 true);
 
@@ -265,7 +266,7 @@ ProjectionDivCleaner::setSourceFromField ()
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*m_source[ilev],
                                                 m_source[ilev]->nGrowVect(),
-                                                WarpX::do_single_precision_comms,
+                                                parallelization::comms_in_single_precision_flag(),
                                                 geom[ilev].periodicity(),
                                                 true);
     }
@@ -374,17 +375,17 @@ ProjectionDivCleaner::correctField ()
         // Synchronize the ghost cells, do halo exchange
         ablastr::utils::communication::FillBoundary(*Bx,
                                                     Bx->nGrowVect(),
-                                                    WarpX::do_single_precision_comms,
+                                                    parallelization::comms_in_single_precision_flag(),
                                                     geom[ilev].periodicity(),
                                                     true);
         ablastr::utils::communication::FillBoundary(*By,
                                                     By->nGrowVect(),
-                                                    WarpX::do_single_precision_comms,
+                                                    parallelization::comms_in_single_precision_flag(),
                                                     geom[ilev].periodicity(),
                                                     true);
         ablastr::utils::communication::FillBoundary(*Bz,
                                                     Bz->nGrowVect(),
-                                                    WarpX::do_single_precision_comms,
+                                                    parallelization::comms_in_single_precision_flag(),
                                                     geom[ilev].periodicity(),
                                                     true);
         amrex::Gpu::synchronize();

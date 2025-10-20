@@ -17,6 +17,7 @@
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #endif
+#include "Parallelization/Parallelization.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -60,6 +61,7 @@
 #endif
 
 using namespace amrex;
+using namespace warpx;
 using warpx::fields::FieldType;
 
 namespace
@@ -1140,12 +1142,14 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
         MultiFab::Add(totpmlmf,pml,2,0,1,0); // Sum the third split component
     }
 
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+
     // Copy from the sum of PML split field to valid cells of regular grid
     if (do_pml_in_domain){
         // Valid cells of the PML and of the regular grid overlap
         // Copy from valid cells of the PML to valid cells of the regular grid
         ablastr::utils::communication::ParallelCopy(reg, totpmlmf, 0, 0, 1, IntVect(0), IntVect(0),
-                                                    WarpX::do_single_precision_comms,
+                                                    do_single_precision_comms,
                                                     period);
     } else {
         // Valid cells of the PML only overlap with guard cells of regular grid
@@ -1155,7 +1159,7 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
         if (ngr.max() > 0) {
             MultiFab::Copy(tmpregmf, reg, 0, 0, 1, ngr);
             ablastr::utils::communication::ParallelCopy(tmpregmf, totpmlmf, 0, 0, 1, IntVect(0), ngr,
-                                   WarpX::do_single_precision_comms,
+                                   do_single_precision_comms,
                                                         period);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -1190,11 +1194,11 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
         // copy the PML (this is order to avoid overwriting PML valid cells,
         // in the next `ParallelCopy`)
         ablastr::utils::communication::ParallelCopy(tmpregmf, pml, 0, 0, ncp, IntVect(0), IntVect(0),
-                                                    WarpX::do_single_precision_comms,
+                                                    do_single_precision_comms,
                                                     period);
     }
     ablastr::utils::communication::ParallelCopy(pml, tmpregmf, 0, 0, ncp, IntVect(0), ngp,
-                                                WarpX::do_single_precision_comms, period);
+                                                do_single_precision_comms, period);
 }
 
 
@@ -1204,8 +1208,9 @@ PML::CopyToPML (MultiFab& pml, MultiFab& reg, const Geometry& geom)
   const IntVect& ngp = pml.nGrowVect();
   const auto& period = geom.periodicity();
 
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
     ablastr::utils::communication::ParallelCopy(pml, reg, 0, 0, 1, IntVect(0), ngp,
-                                                WarpX::do_single_precision_comms, period);
+                                                do_single_precision_comms, period);
 }
 
 void
@@ -1217,7 +1222,8 @@ PML::FillBoundary (ablastr::fields::VectorField mf_pml, PatchType patch_type, st
         m_cgeom->periodicity();
 
     const Vector<MultiFab*> mf{mf_pml[0], mf_pml[1], mf_pml[2]};
-    ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period, nodal_sync);
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+    ablastr::utils::communication::FillBoundary(mf, do_single_precision_comms, period, nodal_sync);
 }
 
 void
@@ -1228,7 +1234,8 @@ PML::FillBoundary (amrex::MultiFab & mf_pml, PatchType patch_type, std::optional
         m_geom->periodicity() :
         m_cgeom->periodicity();
 
-    ablastr::utils::communication::FillBoundary(mf_pml, WarpX::do_single_precision_comms, period, nodal_sync);
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+    ablastr::utils::communication::FillBoundary(mf_pml, do_single_precision_comms, period, nodal_sync);
 }
 
 void

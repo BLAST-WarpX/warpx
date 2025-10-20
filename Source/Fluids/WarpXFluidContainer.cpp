@@ -10,6 +10,7 @@
 
 #include "MusclHancockUtils.H"
 #include "Fluids/WarpXFluidContainer.H"
+#include "Parallelization/Parallelization.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/SpeciesUtils.H"
@@ -20,6 +21,7 @@
 
 using namespace ablastr::utils::communication;
 using namespace amrex;
+using namespace warpx;
 
 
 WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
@@ -411,10 +413,11 @@ void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegist
     }
 
     // Fill guard cells
-    FillBoundary(*fields.get(name_mf_N, lev), fields.get(name_mf_N, lev)->nGrowVect(), WarpX::do_single_precision_comms, period);
-    FillBoundary(*fields.get(name_mf_NU, Direction{0}, lev), fields.get(name_mf_NU, Direction{0}, lev)->nGrowVect(), WarpX::do_single_precision_comms, period);
-    FillBoundary(*fields.get(name_mf_NU, Direction{1}, lev), fields.get(name_mf_NU, Direction{1}, lev)->nGrowVect(), WarpX::do_single_precision_comms, period);
-    FillBoundary(*fields.get(name_mf_NU, Direction{2}, lev), fields.get(name_mf_NU, Direction{2}, lev)->nGrowVect(), WarpX::do_single_precision_comms, period);
+    const auto do_single_precision_comms = parallelization::comms_in_single_precision_flag();
+    FillBoundary(*fields.get(name_mf_N, lev), fields.get(name_mf_N, lev)->nGrowVect(), do_single_precision_comms, period);
+    FillBoundary(*fields.get(name_mf_NU, Direction{0}, lev), fields.get(name_mf_NU, Direction{0}, lev)->nGrowVect(), do_single_precision_comms, period);
+    FillBoundary(*fields.get(name_mf_NU, Direction{1}, lev), fields.get(name_mf_NU, Direction{1}, lev)->nGrowVect(), do_single_precision_comms, period);
+    FillBoundary(*fields.get(name_mf_NU, Direction{2}, lev), fields.get(name_mf_NU, Direction{2}, lev)->nGrowVect(), do_single_precision_comms, period);
 }
 
 // Muscl Advection Update
