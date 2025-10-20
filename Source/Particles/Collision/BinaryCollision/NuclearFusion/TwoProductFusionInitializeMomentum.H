@@ -77,6 +77,7 @@ namespace {
             ux1_out, uy1_out, uz1_out, m1_out,
             ux2_out, uy2_out, uz2_out, m2_out,
             E_fusion,
+            /*isotropic_scattering=*/true,
             engine);
 
         // Fill momentum of product species (note that we actually

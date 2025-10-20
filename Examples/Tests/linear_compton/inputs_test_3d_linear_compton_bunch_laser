@@ -45,7 +45,6 @@ warpx.const_dt = dt
 ####### PARTICLES #######
 #########################
 particles.species_names = photon1 electron1 photon2 electron2
-particles.photon_species = photon1 photon2
 
 # laser
 photon1.species_type = photon

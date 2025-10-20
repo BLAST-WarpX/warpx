@@ -65,7 +65,7 @@ Finally, since Aurora does not yet provide software modules for some of our depe
 .. code-block:: bash
 
    bash $HOME/src/warpx/Tools/machines/aurora-alcf/install_dependencies.sh
-   source ${CFS}/${proj%_g}/${USER}/sw/aurora/gpu/venvs/warpx/bin/activate
+   source /home/${USER}/sw/aurora/gpu/venvs/warpx-aurora/bin/activate
 
 .. dropdown:: Script Details
    :color: light

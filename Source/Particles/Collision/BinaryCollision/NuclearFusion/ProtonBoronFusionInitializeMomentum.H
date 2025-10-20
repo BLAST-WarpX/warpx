@@ -104,7 +104,9 @@ namespace {
             soa_2.m_rdata[PIdx::uz][idx_2], m2,
             ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
-            E_fusion, engine);
+            E_fusion,
+            /*isotropic_scattering=*/true,
+            engine);
 
         // Compute momentum of beryllium in lab frame
         const amrex::ParticleReal px_Be = static_cast<amrex::ParticleReal>(m_beryllium) * ux_Be;

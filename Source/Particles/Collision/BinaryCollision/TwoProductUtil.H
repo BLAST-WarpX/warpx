@@ -23,8 +23,7 @@ namespace {
      * \brief Given the momenta of two colliding macroparticles in a two-product reaction,
      * this function computes the momenta of the two product macroparticles.
      *
-     * This is done by using the conservation of energy and momentum,
-     * and by assuming isotropic emission of the products in the center-of-mass frame
+     * This is done by using the conservation of energy and momentum.
      *
      * @param[in] u1x_in normalized momentum of the first colliding macroparticles along x (in m.s^-1)
      * @param[in] u1y_in normalized momentum of the first colliding macroparticles along y (in m.s^-1)
@@ -42,6 +41,11 @@ namespace {
      * @param[out] u2y_out normalized momentum of the second product macroparticles along y (in m.s^-1)
      * @param[out] u2z_out normalized momentum of the second product macroparticles along z (in m.s^-1)
      * @param[in] m2_out mass of the second product macroparticles
+     * @param[in] E_reaction energy liberated during the reaction
+     * @param[in] isotropic_scattering flag to indicate whether the particles are scattered isotropically.
+     * If true, the particles are scattered isotropically in the center-of-mass frame.
+     * If false, the particles momentum do not change direction, in the center-of-mass frame.
+     * (but the magnitude of the momentum may change, esp. if E_reaction is non-zero)
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -63,6 +67,7 @@ namespace {
                             amrex::ParticleReal& u2z_out,
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
+                            const bool isotropic_scattering,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -115,39 +120,72 @@ namespace {
         const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c_sq * ( powi<2>(E_ratio) - 1._prt )
                 + powi<2>(m1_out - m2_out)*c_sq*0.25_prt * powi<2>( E_ratio - 1._prt/E_ratio );
 
-        // Compute momentum of first product in the center of mass frame, assuming isotropic
-        // distribution
-        amrex::ParticleReal px_star, py_star, pz_star;
-        ParticleUtils::RandomizeVelocity(px_star, py_star, pz_star, std::sqrt(p_star_f_sq),
-                                         engine);
-
-        // Next step is to convert momenta to lab frame
-        amrex::ParticleReal p1x_out, p1y_out, p1z_out;
         // Preliminary calculation: compute center of mass velocity vc
         const amrex::ParticleReal mass_g = m1_in * g1_in + m2_in * g2_in;
         const amrex::ParticleReal vcx    = (p1x_in+p2x_in) / mass_g;
         const amrex::ParticleReal vcy    = (p1y_in+p2y_in) / mass_g;
         const amrex::ParticleReal vcz    = (p1z_in+p2z_in) / mass_g;
         const amrex::ParticleReal vc_sq   = vcx*vcx + vcy*vcy + vcz*vcz;
+        const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
 
-        // Convert momentum of first product to lab frame, using equation (13) of F. Perez et al.,
-        // Phys.Plasmas.19.083104 (2012)
+        // Compute momentum of first product in the center of mass frame
+        amrex::ParticleReal px_star_out, py_star_out, pz_star_out;
+        if (isotropic_scattering) {
+            // Assume isotropic scattering in the center-of-mass frame
+            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
+                                             engine);
+        }
+        else {
+            // Assume that the momentum of the products has the same direction
+            // as that of the incident particle in the center of mass frame
+
+            amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
+            if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
+            {
+                // Convert momentum of first incident particle to lab frame, using equation (2)
+                // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
+                const amrex::ParticleReal vcDps = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
+                const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
+                const amrex::ParticleReal factor = factor0*vcDps - m1_in*g1_in*gc;
+                p1x_star_in = p1x_in + vcx * factor;
+                p1y_star_in = p1y_in + vcy * factor;
+                p1z_star_in = p1z_in + vcz * factor;
+            }
+            else // If center of mass velocity is zero, we are already in the lab frame
+            {
+                p1x_star_in = p1x_in;
+                p1y_star_in = p1y_in;
+                p1z_star_in = p1z_in;
+            }
+            amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
+
+            // Momentum of the first product in the center of mass frame:
+            // same direction as the incident, but scaled to have the magnitude sqrt(p_star_f_sq)
+            amrex::ParticleReal scaling = std::sqrt(p_star_f_sq)/p1_star_in;
+            px_star_out = p1x_star_in * scaling;
+            py_star_out = p1y_star_in * scaling;
+            pz_star_out = p1z_star_in * scaling;
+        }
+
+        // Next step is to convert momenta to lab frame
+        amrex::ParticleReal p1x_out, p1y_out, p1z_out;
+        // Convert momentum of first product to lab frame, using equation (13)
+        // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
         {
-            const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
             const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_f_sq / (m1_out*m1_out*c_sq));
-            const amrex::ParticleReal vcDps = vcx*px_star + vcy*py_star + vcz*pz_star;
+            const amrex::ParticleReal vcDps = vcx*px_star_out + vcy*py_star_out + vcz*pz_star_out;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
             const amrex::ParticleReal factor = factor0*vcDps + m1_out*g_star*gc;
-            p1x_out = px_star + vcx * factor;
-            p1y_out = py_star + vcy * factor;
-            p1z_out = pz_star + vcz * factor;
+            p1x_out = px_star_out + vcx * factor;
+            p1y_out = py_star_out + vcy * factor;
+            p1z_out = pz_star_out + vcz * factor;
         }
         else // If center of mass velocity is zero, we are already in the lab frame
         {
-            p1x_out = px_star;
-            p1y_out = py_star;
-            p1z_out = pz_star;
+            p1x_out = px_star_out;
+            p1y_out = py_star_out;
+            p1z_out = pz_star_out;
         }
 
         // Compute momentum of the second product in lab frame, using total momentum conservation
