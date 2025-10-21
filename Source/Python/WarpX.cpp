@@ -55,6 +55,41 @@ namespace warpx {
     struct Config {};
 }
 
+namespace detail
+{
+    /** Helper Function for Property Getters
+     *
+     * This queries an amrex::ParmParse entry. This throws a
+     * std::runtime_error if the entry is not found.
+     *
+     * This handles the most common throw exception logic in WarpX instead of
+     * going over library boundaries via amrex::Abort().
+     *
+     * @tparam T type of the amrex::ParmParse entry
+     * @param prefix the prefix, e.g., "warpx" or "amr"
+     * @param name the actual key of the entry, e.g., "particle_shape"
+     * @return the queried value (or throws if not found)
+     */
+    template< typename T>
+    auto get_or_throw (std::string const & prefix, std::string const & name)
+    {
+        using V = std::decay_t<T>;
+        V value;
+
+        bool has_name = false;
+        // TODO: if array do queryarr
+        // has_name = amrex::ParmParse(prefix).queryarr(name.c_str(), value);
+        if constexpr (std::is_same_v<V, bool> || std::is_same_v<V, std::string>)
+            has_name = amrex::ParmParse(prefix).query(name.c_str(), value);
+        else
+            has_name = amrex::ParmParse(prefix).queryWithParser(name.c_str(), value);
+
+        if (!has_name)
+            throw std::runtime_error(prefix + "." + name + " is not set yet");
+        return value;
+    }
+}
+
 void init_WarpX (py::module& m)
 {
     using ablastr::fields::Direction;
@@ -88,6 +123,20 @@ void init_WarpX (py::module& m)
         )
         .def("evolve", &WarpX::Evolve,
             "Evolve the simulation the specified number of steps"
+        )
+
+        .def_property("omp_threads",
+            [](WarpX & /* wx */){
+                return detail::get_or_throw<std::string>("amrex", "omp_threads");
+            },
+            [](WarpX & /* wx */, std::variant<int, std::string> omp_threads_var) {
+                std::visit([&]( auto && omp_threads) {
+                    amrex::ParmParse pp_amrex("amrex");
+                pp_amrex.add("omp_threads", omp_threads);
+                }, omp_threads_var);
+            },
+            "Controls the number of OpenMP threads to use (WarpX default: \"nosmt\").\n"
+            "https://amrex-codes.github.io/amrex/docs_html/InputsComputeBackends.html."
         )
 
         // from amrex::AmrCore / amrex::AmrMesh
