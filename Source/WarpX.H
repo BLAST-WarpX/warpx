@@ -1033,7 +1033,12 @@ private:
         int a_step
     );
 
-    void OneStep_nosub (amrex::Real cur_time);
+    void OneStep_nosub (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_sub1 (amrex::Real cur_time);
 
     /**
