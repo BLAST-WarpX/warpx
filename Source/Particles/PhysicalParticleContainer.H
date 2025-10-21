@@ -49,9 +49,12 @@ class PhysicalParticleContainer
 {
 public:
 
-    PhysicalParticleContainer (amrex::AmrCore* amr_core,
-                               int ispecies,
-                               const std::string& name);
+    PhysicalParticleContainer (
+        amrex::AmrCore* amr_core,
+        int ispecies,
+        const std::string& name,
+        bool const collisions_split_position_push
+    );
 
     PhysicalParticleContainer (amrex::AmrCore* amr_core);
 

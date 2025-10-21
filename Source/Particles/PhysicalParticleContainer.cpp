@@ -116,10 +116,13 @@
 
 using namespace amrex;
 
-PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int ispecies,
-                                                      const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
-      species_name(name)
+PhysicalParticleContainer::PhysicalParticleContainer (
+    AmrCore* amr_core,
+    int ispecies,
+    const std::string& name,
+    bool const collisions_split_position_push
+) : WarpXParticleContainer(amr_core, ispecies),
+    species_name(name)
 {
     BackwardCompatibility();
 
@@ -336,6 +339,14 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         utils::parser::getWithParser(pp_species_boundary,"u_th",boundary_uth);
         m_boundary_conditions.SetThermalVelocity(boundary_uth);
     }
+
+    // If the position push is split to perform collisions, add the
+    // average momentum components to deposit the current correctly
+    if (collisions_split_position_push) {
+        this->AddRealComp("ux_avg", /*communicate=*/0);
+        this->AddRealComp("uy_avg", /*communicate=*/0);
+        this->AddRealComp("uz_avg", /*communicate=*/0);
+    }
 }
 
 void
@@ -465,6 +476,13 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         !do_not_deposit &&
         (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::FirstHalf)
     );
+    // FIXME Check the logic here
+    bool const deposit_current = (
+        !skip_deposition &&
+        !do_not_deposit &&
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only) &&
+        (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::SecondHalf)
+    );
     bool const split_particles = (
         do_splitting &&
         (subcycling_half == SubcyclingHalf::None || subcycling_half == SubcyclingHalf::SecondHalf) &&
@@ -500,6 +518,11 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             auto& uxp = attribs[PIdx::ux];
             auto& uyp = attribs[PIdx::uy];
             auto& uzp = attribs[PIdx::uz];
+
+            // Average momentum
+            auto& ux_avg = pti.GetAttribs("ux_avg");
+            auto& uy_avg = pti.GetAttribs("uy_avg");
+            auto& uz_avg = pti.GetAttribs("uz_avg");
 
             const long np = pti.numParticles();
 
@@ -664,8 +687,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                 WARPX_PROFILE_VAR_STOP(blp_fg);
 
-                // Current Deposition
-                if (!skip_deposition && !(implicit_options && implicit_options->evolve_suborbit_particles_only))
+                // Current deposition
+                if (deposit_current)
                 {
                     // Deposit at t_{n+1/2} with explicit push
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);
@@ -696,7 +719,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
-                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
+                        // FIXME Use the correct momentum
+                        DepositCurrent(pti, wp, ux_avg, uy_avg, uz_avg, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
                     }
@@ -706,11 +730,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
                         amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
-                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
+                        // FIXME Use the correct momentum
+                        DepositCurrent(pti, wp, ux_avg, uy_avg, uz_avg, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
                                        lev, lev-1, dt, relative_time, push_type);
                     }
-                } // end of "if skip_deposition"
+                }
 
                 if (push_type == PushType::Implicit) {
                     if (num_unconverged_particles > 0) {
@@ -1327,6 +1352,11 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
+    // Average momentum
+    amrex::ParticleReal* const AMREX_RESTRICT ux_avg = pti.GetAttribs("ux_avg").dataPtr() + offset;
+    amrex::ParticleReal* const AMREX_RESTRICT uy_avg = pti.GetAttribs("uy_avg").dataPtr() + offset;
+    amrex::ParticleReal* const AMREX_RESTRICT uz_avg = pti.GetAttribs("uz_avg").dataPtr() + offset;
+
     CopyParticleAttribs copyAttribs;
     if (copy_particle_attribs) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
@@ -1466,6 +1496,20 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                       dt);
         }
 #endif
+        // Update average momentum
+        if (momentum_push_type != MomentumPushType::None) {
+            ux_avg[ip] = ux[ip];
+            uy_avg[ip] = uy[ip];
+            uz_avg[ip] = uz[ip];
+        }
+        else { // The momentum was updated during collisions
+            ux_avg[ip] += ux[ip];
+            uy_avg[ip] += uy[ip];
+            uz_avg[ip] += uz[ip];
+            ux_avg[ip] *= 0.5_rt;
+            uy_avg[ip] *= 0.5_rt;
+            uz_avg[ip] *= 0.5_rt;
+        }
 
         amrex::Real position_dt = dt;
         if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
