@@ -133,7 +133,8 @@ PetscErrorCode JacobianFunction( SNES a_solver,
 
     if (strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
         copyVec(context->m_U, a_U);
-        context->assemblePCMatrix();
+        auto err = context->assemblePCMatrix();
+        AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
     }
 
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -314,7 +315,7 @@ void PETScSolver_impl::applyPC( VecType& a_F, const VecType& a_U) const
 }
 
 //! Assemble preconditioner matrix
-void PETScSolver_impl::assemblePCMatrix()
+int PETScSolver_impl::assemblePCMatrix()
 {
     BL_PROFILE("PETScSolver_impl::assemblePCMatrix()");
 
@@ -349,18 +350,19 @@ void PETScSolver_impl::assemblePCMatrix()
                           a_ij.begin(), a_ij.end(),
                           h_a_ij.begin() );
         for (int i = 0; i < n; i++) {
-            MatSetValues( m_P->obj,
-                          1,
-                          &h_r_indices_g[i],
-                          h_n_nz_cols[i],
-                          &h_c_indices_g[i*ncols_max],
-                          &h_a_ij[i*ncols_max],
-                          INSERT_VALUES );
+            PetscCall(MatSetValues( m_P->obj,
+                                    1,
+                                    &h_r_indices_g[i],
+                                    h_n_nz_cols[i],
+                                    &h_c_indices_g[i*ncols_max],
+                                    &h_a_ij[i*ncols_max],
+                                    INSERT_VALUES ));
         }
     }
 
-    MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY);
+    PetscCall(MatAssemblyBegin(m_P->obj, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(m_P->obj, MAT_FINAL_ASSEMBLY));
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 KSP_impl::KSP_impl(LinOpType& a_op)
@@ -525,7 +527,8 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     copyVec(this->m_b->obj, a_R);
 
     if (this->m_linop->pcType() == PreconditionerType::pc_petsc) {
-        assemblePCMatrix();
+        auto err = assemblePCMatrix();
+        AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
     }
 
     KSPSolve(m_ksp->obj, this->m_b->obj, this->m_x->obj);

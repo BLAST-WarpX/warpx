@@ -71,7 +71,7 @@ class PETScSolver_impl
         void applyOp(VecType& a_F, const VecType& a_U) const;
 
         //! Assemble the sparse matrix for preconditioner
-        void assemblePCMatrix();
+        [[nodiscard]] int assemblePCMatrix();
 
         //! Work vector
         mutable VecType m_U;
