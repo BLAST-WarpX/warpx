@@ -95,6 +95,7 @@ void copyVec( Vec& a_pvec, const VecType& a_wvec)
 //! Compute RHS function
 PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::RHSFunction()");
     amrex::ignore_unused(a_solver);
 
@@ -117,6 +118,7 @@ PetscErrorCode JacobianFunction( SNES a_solver,
                                  Mat a_P,
                                  void* ctxt )
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::JacobianFunction()");
     amrex::ignore_unused(a_A);
     amrex::ignore_unused(a_P);
@@ -140,6 +142,7 @@ PetscErrorCode JacobianFunction( SNES a_solver,
 //! Apply matrix-free Jacobian
 PetscErrorCode applyJacobian(Mat a_A, Vec a_U, Vec a_F)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::applyJacobian()");
 
     SNES_impl *context;
@@ -154,6 +157,7 @@ PetscErrorCode applyJacobian(Mat a_A, Vec a_U, Vec a_F)
 //! Apply matrix-free linear operator
 PetscErrorCode applyMatOp(Mat a_A, Vec a_U, Vec a_F)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::applyMatOp()");
 
     KSP_impl *context;
@@ -169,6 +173,7 @@ PetscErrorCode applyMatOp(Mat a_A, Vec a_U, Vec a_F)
 //! Apply native preconditioner
 PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::applyNativePC()");
 
     PETScSolver_impl *context;
@@ -184,6 +189,7 @@ PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
 //! Print SNES residuals
 PetscErrorCode printSNESResidual(SNES a_snes, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("printSNESResidual()");
     amrex::ignore_unused(a_ctxt);
     amrex::ignore_unused(a_snes);
@@ -197,6 +203,7 @@ PetscErrorCode printSNESResidual(SNES a_snes, PetscInt a_n, PetscReal a_rnorm, v
 //! Print KSP residuals
 PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void *a_ctxt)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("printKSPSResidual()");
     amrex::ignore_unused(a_ctxt);
     amrex::ignore_unused(a_ksp);
