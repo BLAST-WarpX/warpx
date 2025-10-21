@@ -42,6 +42,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_SIMD.H>
+#include <AMReX_OpenMP.H>
 
 #if defined(AMREX_DEBUG) || defined(DEBUG)
 #   include <cstdio>
@@ -132,7 +133,13 @@ void init_WarpX (py::module& m)
             [](WarpX & /* wx */, std::variant<int, std::string> omp_threads_var) {
                 std::visit([&]( auto && omp_threads) {
                     amrex::ParmParse pp_amrex("amrex");
-                pp_amrex.add("omp_threads", omp_threads);
+                    pp_amrex.add("omp_threads", omp_threads);
+
+                    // set the value if not "system" or "nosmt"
+                    if constexpr(std::is_same_v<std::decay_t<decltype(omp_threads)>, int>) {
+                        amrex::Print() << "Changing WarpX threads to N=" << omp_threads << "\n";
+                        amrex::OpenMP::set_num_threads(omp_threads);
+                    }
                 }, omp_threads_var);
             },
             "Controls the number of OpenMP threads to use (WarpX default: \"nosmt\").\n"
