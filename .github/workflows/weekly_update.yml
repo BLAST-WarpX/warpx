@@ -2,7 +2,7 @@ name: Weekly update
 
 on:
   schedule:
-    - cron: "0 0 * * 1"  # every Monday at midnight
+    - cron: "0 9 * * 1"  # every Monday at 1:00am PST (9:00am UTC)
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,6 @@ jobs:
       - name: Open pull request
         run: |
           gh pr create \
-            --draft \
             --base development \
             --body "Automated via .github/workflows/weekly_update.yml." \
             --label "component: third party" \

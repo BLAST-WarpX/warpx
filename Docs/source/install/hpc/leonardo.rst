@@ -18,7 +18,7 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 * `Leonardo website <https://leonardo-supercomputer.cineca.eu/>`_
-* `Leonardo user guide <https://wiki.u-gov.it/confluence/display/SCAIUS/UG3.2%3A+LEONARDO+UserGuide>`_
+* `Leonardo user guide <https://docs.hpc.cineca.it/hpc/leonardo.html>`_
 
 Storage organization:
 

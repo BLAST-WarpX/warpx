@@ -8,8 +8,6 @@
  */
 #include "LaserParticleContainer.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
 #include "Particles/LaserParticleContainer.H"
@@ -86,7 +84,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
       m_laser_name{name}
 {
     charge = 1.0;
-    mass = std::numeric_limits<Real>::max();
+    m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
 
@@ -562,7 +560,9 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
+                                Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
+                                PositionPushType /*position_push_type*/,
+                                MomentumPushType /*momentum_push_type*/,
                                 ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;

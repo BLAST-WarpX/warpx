@@ -5,6 +5,7 @@
 # License: BSD-3-Clause-LBNL
 
 import argparse
+import copy
 import datetime
 import json
 import os
@@ -83,6 +84,7 @@ def update(args):
         tags_response = requests.get(repo_subdict["tags"])
         tags_list = tags_response.json()
         # filter out old-format tags for specific repositories
+        tags_list_filtered = copy.deepcopy(tags_list)
         if repo_name == "amrex":
             tags_list_filtered = [
                 tag_dict
@@ -108,7 +110,7 @@ def update(args):
         if repo_name != "warpx":
             print(f"- old commit: {dependencies_data[commit_key]}")
             print(f"- new commit: {new_commit_sha}")
-            if dependencies_data[commit_key] == repo_commit_sha:
+            if dependencies_data[commit_key] == new_commit_sha:
                 print("Skipping commit update...")
             else:
                 print("Updating commit...")

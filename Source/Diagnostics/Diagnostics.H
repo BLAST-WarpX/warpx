@@ -72,10 +72,12 @@ public:
      * (including metadata listing the total number of particles) even if the snapshot is incomplete
      */
     virtual void Flush (int i_buffer, bool force_flush) = 0;
+
     /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
-    void InitData ();
+    void InitData (const MultiParticleContainer& mpc);
     void InitDataBeforeRestart ();
-    void InitDataAfterRestart ();
+    void InitDataAfterRestart (const MultiParticleContainer& mpc);
+
     /** Initialize functors that store pointers to the fields requested by the user.
      *
      * Derived classes MUST implement this function, and it must allocate m_all_field_functors
@@ -205,8 +207,12 @@ protected:
      *  derived classes.(FullDiagnostics, BTDiagnostics)
      */
     virtual void DerivedInitData () {}
-    /** This function initialized particle buffers (not implemented in diagnostics, yet) */
-    virtual void InitializeParticleBuffer () = 0;
+
+    /** This function initialized particle buffers (not implemented in diagnostics, yet)
+     *  \param[in] mpc a constant reference to the multi-particle container.
+     */
+    virtual void InitializeParticleBuffer (const MultiParticleContainer& mpc) = 0;
+
     /** This function prepares buffer data as required for fields and particles. For back-transformed diagnostics,
      *  this function prepares the z coordinate in the boosted-frame and lab-frame.
      */
