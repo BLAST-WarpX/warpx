@@ -182,8 +182,8 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                            m_array[lev][n]->nComp(),
                                                            0 );
                 amrex::MultiFab::Copy(*m_array_lhs[lev][n], *m_array[lev][n], 0, 0, m_array[lev][n]->nComp(), 0);
-                m_array[lev][n]->FillBoundary(geom.periodicity());
-                // do NOT call FillBoundary() on m_array_lhs
+                m_array[lev][n]->FillBoundaryAndSync(geom.periodicity());
+                // do NOT call FillBoundaryAndSync() on m_array_lhs
             }
         }
     }
@@ -195,8 +195,8 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                      0 );
             amrex::MultiFab::Copy(*m_scalar_lhs[lev], *m_scalar[lev], 0, 0, m_scalar[lev]->nComp(), 0);
             const auto& geom = a_WarpX->Geom(lev);
-            m_scalar[lev]->FillBoundary(geom.periodicity());
-            // do NOT call FillBoundary() on m_scalar_lhs
+            m_scalar[lev]->FillBoundaryAndSync(geom.periodicity());
+            // do NOT call FillBoundaryAndSync() on m_scalar_lhs
         }
     }
 
