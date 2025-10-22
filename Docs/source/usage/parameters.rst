@@ -1486,7 +1486,7 @@ Particle initialization
     Breit-Wheeler lookup table should be either generated or loaded from disk to enable
     this process (see "Lookup tables for QED modules" section below).
     `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
-    **This feature requires to compile with QED=TRUE**
+    **This feature requires to compile with -DWarpX_QED=ON**
 
 * ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
     If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
