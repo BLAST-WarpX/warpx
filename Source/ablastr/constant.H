@@ -115,19 +115,19 @@ namespace ablastr::constant
 
         //! 1 eV/c in [kg*m/s] (variable template)
         template<typename T>
-        constexpr auto eV_invc_v = static_cast<T>(eV_v<double> / c_v<double>);
+        constexpr auto eV_inv_c_v = static_cast<T>(eV_v<double> / c_v<double>);
 
         //! 1 MeV/c in [kg*m/s] (variable template)
         template<typename T>
-        constexpr auto MeV_invc_v = static_cast<T>(MeV_v<double>  / c_v<double>);
+        constexpr auto MeV_inv_c_v = static_cast<T>(MeV_v<double>  / c_v<double>);
 
         //! 1 eV/c^2 in [kg] (variable template)
         template<typename T>
-        constexpr auto eV_invc2_v = static_cast<T>(eV_v<double> / (c_v<double> * c_v<double>));
+        constexpr auto eV_inv_c2_v = static_cast<T>(eV_v<double> / (c_v<double> * c_v<double>));
 
         //! 1 MeV/c^2 in [kg] (variable template)
         template<typename T>
-        constexpr auto MeV_invc2_v = static_cast<T>(MeV_v<double> / (c_v<double> * c_v<double>));
+        constexpr auto MeV_inv_c2_v = static_cast<T>(MeV_v<double> / (c_v<double> * c_v<double>));
 
         //! sqrt(4*pi*alpha) is a constant used for the Heaviside Lorentz unit system (variable template)
         template<typename T>
@@ -139,11 +139,11 @@ namespace ablastr::constant
 
         //! inverse of the vacuum speed of light [s/m] (variable template)
         template<typename T>
-        constexpr auto invc_v = static_cast<T>(1.0/c_v<double>);
+        constexpr auto inv_c_v = static_cast<T>(1.0/c_v<double>);
 
         //! inverse of the square of the vacuum speed of light [s^2/m^2] (variable template)
         template<typename T>
-        constexpr auto invc2_v = static_cast<T>(1.0/c2_v<double>);
+        constexpr auto inv_c2_v = static_cast<T>(1.0/c2_v<double>);
 
         //! vacuum speed of light [m/s]
         constexpr auto c = c_v<amrex::Real>;
@@ -195,25 +195,25 @@ namespace ablastr::constant
         constexpr auto MeV = MeV_v<amrex::Real>;
 
         //! 1 eV/c in [kg*m/s]
-        constexpr auto eV_invc = eV_invc_v<amrex::Real>;
+        constexpr auto eV_inv_c = eV_inv_c_v<amrex::Real>;
 
         //! 1 MeV/c in [kg*m/s]
-        constexpr auto MeV_invc = MeV_invc_v<amrex::Real>;
+        constexpr auto MeV_inv_c = MeV_inv_c_v<amrex::Real>;
 
         //! 1 eV/c^2 in [kg]
-        constexpr auto eV_invc2 = eV_invc2_v<amrex::Real>;
+        constexpr auto eV_inv_c2 = eV_inv_c2_v<amrex::Real>;
 
         //! 1 MeV/c^2 in [kg]
-        constexpr auto MeV_invc2 = MeV_invc2_v<amrex::Real>;
+        constexpr auto MeV_inv_c2 = MeV_inv_c2_v<amrex::Real>;
 
         //! square of the vacuum speed of light [m^2/s^2]
         constexpr auto c2 = c2_v<amrex::Real>;
 
         //! inverse of the vacuum speed of light [s/m]
-        constexpr auto invc = invc_v<amrex::Real>;
+        constexpr auto inv_c = inv_c_v<amrex::Real>;
 
         //! inverse of the square of the vacuum speed of light [s^2/m^2]
-        constexpr auto invc2 = invc2_v<amrex::Real>;
+        constexpr auto inv_c2 = inv_c2_v<amrex::Real>;
 
     } // namespace SI
 
