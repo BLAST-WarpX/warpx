@@ -737,9 +737,15 @@ WarpX::ReadParameters ()
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
         pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-_");
-        // if an electrostatic solver is used, set the Maxwell solver to None
-        if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
+        // if an electrostatic solver is used, set the electromagnetic solver to None,
+        // unless Darwin is used in which case the Yee solver must be used
+        if (electrostatic_solver_id != ElectrostaticSolverAlgo::None &&
+            evolve_scheme != EvolveScheme::SemiImplicitDarwin) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
+        }
+        else if (evolve_scheme == EvolveScheme::SemiImplicitDarwin) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee,
+                "Only the Yee electromagnetic solver can be used with Darwin");
         }
 
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -1244,10 +1250,14 @@ WarpX::ReadParameters ()
         else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
+        else if (evolve_scheme == EvolveScheme::SemiImplicitDarwin) {
+            m_implicit_solver = std::make_unique<SemiImplicitDarwin>();
+        }
 
         // implicit evolve schemes not setup to use mirrors
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+            evolve_scheme == EvolveScheme::SemiImplicitDarwin ) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
@@ -1347,7 +1357,8 @@ WarpX::ReadParameters ()
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
             evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM ||
+            evolve_scheme == EvolveScheme::SemiImplicitDarwin ) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -3560,8 +3571,14 @@ WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::
         case FieldType::vector_potential_fp :
             ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
+        case FieldType::dA_fp :
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
+            return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
-            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", dir, lev), periodicity);
+            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", lev), periodicity);
+            return phi_dotMask[lev].get();
+        case FieldType::xi_fp :
+            ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", lev), periodicity);
             return phi_dotMask[lev].get();
         default:
             WARPX_ABORT_WITH_MESSAGE("Invalid field type for dotMask");

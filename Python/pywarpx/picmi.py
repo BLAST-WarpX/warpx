@@ -1834,12 +1834,26 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
         self.max_iterations = max_iterations
 
     def linear_solver_initialize_inputs(self):
-        gmres = pywarpx.warpx.get_bucket("gmres")
+        gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         gmres.verbose_int = self.verbose_int
         gmres.restart_length = self.restart_length
         gmres.absolute_tolerance = self.absolute_tolerance
         gmres.relative_tolerance = self.relative_tolerance
         gmres.max_iterations = self.max_iterations
+
+
+class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the semi-implicit Darwin evolve scheme
+
+    """
+
+    def __init__(self, linear_solver):
+        self.linear_solver = linear_solver
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        self.linear_solver.linear_solver_initialize_inputs()
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):

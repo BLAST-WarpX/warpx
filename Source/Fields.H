@@ -41,7 +41,7 @@ namespace warpx::fields
         F_fp, /**< Used for divE cleaning */
         G_fp, /**< Used for divB cleaning */
         phi_fp, /**< Obtained by the Poisson solver, for labframe electrostatic */
-        vector_potential_fp, /**< Obtained by the magnetostatic solver */
+        vector_potential_fp, /**< Used by the magnetostatic solver and the Darwin solver */
         vector_potential_fp_nodal,
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
@@ -90,7 +90,9 @@ namespace warpx::fields
         MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
         ECTRhofield,
         Venl,
-        global_debye_length
+        global_debye_length,
+        xi_fp,  /**< Used with the semi-implicit Darwin solver to divergence clean the projected current */
+        dA_fp   /**< Used by the Darwin solver; the change in vector potential over one step */
     );
 
     /** these are vector fields */
@@ -138,7 +140,8 @@ namespace warpx::fields
         FieldType::MassMatrices_Z,
         FieldType::MassMatrices_PC,
         FieldType::ECTRhofield,
-        FieldType::Venl
+        FieldType::Venl,
+        FieldType::dA_fp,
     };
 
     /** Returns true if a FieldType represents a vector field */

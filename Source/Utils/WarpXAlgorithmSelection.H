@@ -34,6 +34,7 @@ AMREX_ENUM(EvolveScheme,
            ThetaImplicitEM,
            SemiImplicitEM,
            StrangImplicitSpectralEM,
+           SemiImplicitDarwin,
            Default = Explicit);
 
 /**
@@ -177,6 +178,7 @@ AMREX_ENUM(
     Full,
     FirstHalf,
     SecondHalf,
+    None,
     Default = Full
 );
 

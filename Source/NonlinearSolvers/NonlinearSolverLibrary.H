@@ -11,7 +11,8 @@
   */
 AMREX_ENUM (NonlinearSolverType,
     Picard,
-    Newton
+    Newton,
+    None
 );
 
 #endif
