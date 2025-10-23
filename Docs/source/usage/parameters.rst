@@ -354,6 +354,8 @@ Overall simulation parameters
     If set, the environment variable ``OMP_NUM_THREADS`` takes precedence over ``system`` and ``nosmt``, but not over integer numbers set in this option.
 
 
+.. _running-cpp-parameters-signal:
+
 Signal Handling
 ^^^^^^^^^^^^^^^
 
@@ -945,6 +947,7 @@ Particle initialization
 * ``<species_name>.mass`` (`float`) optional (default `NaN`)
     The mass of one `physical` particle of this species.
     If ``species_type`` is specified, the mass will be set to the physical value and ``mass`` is optional.
+    ``mass`` must be strictly positive. For massless species, use ``<species_name>.species_type``. The only allowed massless species type is ``photon``.
 
 * ``<species_name>.xmin,ymin,zmin`` and ``<species_name>.xmax,ymax,zmax`` (`float`) optional (default unlimited)
     When ``<species_name>.xmin`` and ``<species_name>.xmax`` are set, they delimit the region within which particles are injected.
@@ -1484,8 +1487,8 @@ Particle initialization
     Enables non-linear Breit-Wheeler process for this species.
     Breit-Wheeler lookup table should be either generated or loaded from disk to enable
     this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be a photon species.
-    **This feature requires to compile with QED=TRUE**
+    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
+    **This feature requires to compile with -DWarpX_QED=ON**
 
 * ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
     If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified

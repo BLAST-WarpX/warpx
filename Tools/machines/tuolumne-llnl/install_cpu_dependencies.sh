@@ -14,15 +14,15 @@ set -eu -o pipefail
 
 # Check: ######################################################################
 #
-#   Was tuolumne_mi300a_warpx.profile sourced and configured correctly?
+#   Was tuolumne_cpu_warpx.profile sourced and configured correctly?
 #   early access: not yet used!
-#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tuolumne_mi300a_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
+#if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your tuolumne_cpu_warpx.profile file! Please edit its line 2 to continue!"; exit 1; fi
 
 
 # Remove old dependencies #####################################################
 #
 SRC_DIR="/p/lustre5/${USER}/tuolumne/src"
-SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/mi300a"
+SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/cpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -133,17 +133,17 @@ fi
 cmake \
     --fresh \
     -S ${SRC_DIR}/blaspp                      \
-    -B ${build_dir}/blaspp-tuolumne-mi300a-build \
-    -Duse_openmp=OFF                          \
-    -Dgpu_backend=hip                         \
+    -B ${build_dir}/blaspp-tuolumne-cpu-build \
+    -Duse_openmp=ON                           \
+    -Dgpu_backend=OFF                         \
     -DBUILD_SHARED_LIBS=OFF                   \
     -DCMAKE_CXX_STANDARD=17                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
-    --build ${build_dir}/blaspp-tuolumne-mi300a-build \
+    --build ${build_dir}/blaspp-tuolumne-cpu-build \
     --target install                               \
     --parallel ${build_procs}
-rm -rf ${build_dir}/blaspp-tuolumne-mi300a-build
+rm -rf ${build_dir}/blaspp-tuolumne-cpu-build
 
 # LAPACK++ (for PSATD+RZ)
 if [ -d ${SRC_DIR}/lapackpp ]
@@ -158,18 +158,18 @@ fi
 cmake \
     --fresh                                     \
     -S ${SRC_DIR}/lapackpp                      \
-    -B ${build_dir}/lapackpp-tuolumne-mi300a-build \
+    -B ${build_dir}/lapackpp-tuolumne-cpu-build \
     -DCMAKE_CXX_STANDARD=17                     \
-    -Dgpu_backend=hip                           \
+    -Dgpu_backend=OFF                           \
     -Dbuild_tests=OFF                           \
     -DBUILD_SHARED_LIBS=OFF                     \
     -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake \
-    --build ${build_dir}/lapackpp-tuolumne-mi300a-build \
+    --build ${build_dir}/lapackpp-tuolumne-cpu-build \
     --target install                                 \
     --parallel ${build_procs}
-rm -rf ${build_dir}/lapackpp-tuolumne-mi300a-build
+rm -rf ${build_dir}/lapackpp-tuolumne-cpu-build
 
 # PETSC
 if [ -d ${SRC_DIR}/petsc ]
@@ -182,24 +182,23 @@ else
   git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git ${SRC_DIR}/petsc
 fi
 cd petsc
-./configure               \
-    COPTFLAGS="-g -O3"    \
-    FOPTFLAGS="-g -O3"    \
-    CXXOPTFLAGS="-g -O2"  \
-    HIPOPTFLAGS="-g -O3"  \
-    LDFLAGS+="${LDFLAGS}" \
+./configure    \
+    CC=${CC}   \
+    CXX=${CXX} \
+    FC=${FC}   \
+    COPTFLAGS="-g -O3"   \
+    FOPTFLAGS="-g -O3"   \
+    CXXOPTFLAGS="-g -O2" \
     --prefix=${SW_DIR}/petsc-3.24.0  \
     --with-batch                     \
     --with-cmake=1                   \
     --with-cuda=0                    \
-    --with-hip=1                     \
-    --with-hip-dir=${ROCM_PATH}      \
+    --with-hip=0                     \
     --with-fortran-bindings=0        \
-    --with-fftw=0                    \
-    --download-kokkos                \
-    --download-kokkos-kernels        \
+    --with-fftw=1                    \
+    --with-fftw-dir=${FFTW_ROOT}     \
     --with-make-np=${build_procs}    \
-    --with-mpi-dir=${MPICH_DIR}      \
+    ---with-openmp-kernels=1         \
     --with-clean=1                   \
     --with-debugging=0               \
     --with-x=0                       \
@@ -215,9 +214,9 @@ export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
 python3 -m pip install --upgrade pip
 # python3 -m pip cache purge || true  # Cache disabled on system
-rm -rf ${SW_DIR}/venvs/warpx-tuolumne-mi300a
-python3 -m venv ${SW_DIR}/venvs/warpx-tuolumne-mi300a
-source ${SW_DIR}/venvs/warpx-tuolumne-mi300a/bin/activate
+rm -rf ${SW_DIR}/venvs/warpx-tuolumne-cpu
+python3 -m venv ${SW_DIR}/venvs/warpx-tuolumne-cpu
+source ${SW_DIR}/venvs/warpx-tuolumne-cpu/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
@@ -234,23 +233,8 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies such as picmistandard
 python3 -m pip install --upgrade -r ${SRC_DIR}/warpx/requirements.txt
-# cupy for ROCm
-#   https://docs.cupy.dev/en/stable/install.html#building-cupy-for-rocm-from-source
-#   https://docs.cupy.dev/en/stable/install.html#using-cupy-on-amd-gpu-experimental
-#   https://github.com/cupy/cupy/issues/7830
-#   https://github.com/cupy/cupy/pull/8457
-#   https://github.com/cupy/cupy/pull/8319
-#python3 -m pip install --upgrade "cython<3"
-#HIPCC=${CXX} \
-#CXXFLAGS="-I${ROCM_PATH}/include/hipblas -I${ROCM_PATH}/include/hipsparse -I${ROCM_PATH}/include/hipfft -I${ROCM_PATH}/include/rocsolver -I${ROCM_PATH}/include/rccl -I${ROCM_PATH}/include/thrust" \
-#CUPY_INSTALL_USE_HIP=1  \
-#ROCM_HOME=${ROCM_PATH}  \
-#HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
-#  python3 -m pip install -v cupy
-#python3 -m pip install --upgrade "cython>=3"
 
-
-# for ML dependencies, see install_mi300a_ml.sh
+# for ML dependencies, see install_cpu_ml.sh (TODO)
 
 # remove build temporary directory
 rm -rf ${build_dir}
