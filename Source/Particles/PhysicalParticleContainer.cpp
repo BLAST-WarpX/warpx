@@ -122,7 +122,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (
     const std::string& name,
     bool const collisions_split_position_push
 ) : WarpXParticleContainer(amr_core, ispecies),
-    species_name(name)
+    species_name(name),
+    m_collisions_split_position_push(collisions_split_position_push)
 {
     BackwardCompatibility();
 
@@ -342,7 +343,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (
 
     // If the position push is split to perform collisions, add the
     // average momentum components to deposit the current correctly
-    if (collisions_split_position_push) {
+    if (m_collisions_split_position_push) {
         this->AddRealComp("ux_avg", /*communicate=*/0);
         this->AddRealComp("uy_avg", /*communicate=*/0);
         this->AddRealComp("uz_avg", /*communicate=*/0);
@@ -515,14 +516,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             // Extract particle data
             auto& attribs = pti.GetAttribs();
             auto&  wp = attribs[PIdx::w];
-            auto& uxp = attribs[PIdx::ux];
-            auto& uyp = attribs[PIdx::uy];
-            auto& uzp = attribs[PIdx::uz];
-
-            // Average momentum
-            auto& ux_avg = pti.GetAttribs("ux_avg");
-            auto& uy_avg = pti.GetAttribs("uy_avg");
-            auto& uz_avg = pti.GetAttribs("uz_avg");
+            auto& uxp = (m_collisions_split_position_push) ? pti.GetAttribs("ux_avg") : attribs[PIdx::ux];
+            auto& uyp = (m_collisions_split_position_push) ? pti.GetAttribs("uy_avg") : attribs[PIdx::uy];
+            auto& uzp = (m_collisions_split_position_push) ? pti.GetAttribs("uz_avg") : attribs[PIdx::uz];
 
             const long np = pti.numParticles();
 
@@ -719,8 +715,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
-                        // FIXME Use the correct momentum
-                        DepositCurrent(pti, wp, ux_avg, uy_avg, uz_avg, ion_lev, jx, jy, jz,
+                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
                     }
@@ -730,8 +725,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
                         amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
-                        // FIXME Use the correct momentum
-                        DepositCurrent(pti, wp, ux_avg, uy_avg, uz_avg, ion_lev, cjx, cjy, cjz,
+                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
                                        lev, lev-1, dt, relative_time, push_type);
                     }

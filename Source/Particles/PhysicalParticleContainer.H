@@ -498,6 +498,13 @@ protected:
     /* Vector of user-defined parser for initializing user-defined real attributes */
     amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_real_attrib_parser;
 
+    /**
+     * \brief Local copy of the WarpX class attribute that controls whether collisions
+     *        are placed in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_position_push;
 };
 
 #endif
