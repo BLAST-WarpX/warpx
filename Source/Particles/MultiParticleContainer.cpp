@@ -1395,7 +1395,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        std::ofstream{table_name}.write(data.data(), data.size());
+        std::ofstream{table_nam, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1479,7 +1479,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        std::ofstream{table_name}.write(data.data(), data.size());
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
