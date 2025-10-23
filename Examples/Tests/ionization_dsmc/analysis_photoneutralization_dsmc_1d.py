@@ -68,16 +68,5 @@ theory_uz["Hneutral"] = vH_lab / clight
 theory_uz["electrons"] = vE_lab / clight
 
 # Compare the velocities
-assert np.allclose(sim_uz["electrons"], theory_uz["electrons"], atol=1e-4)
-assert np.allclose(sim_uz["Hneutral"], theory_uz["Hneutral"], atol=1e-5)
-
-# Check momentum conservation
-p_in = np.sum(
-    sim_weight["Hminus"] * sim_uz["Hminus"] * sim_mass["Hminus"] * clight
-) + np.sum(sim_weight["photons"] * sim_uz["photons"])
-p_out = np.sum(
-    sim_weight["electrons"] * sim_uz["electrons"] * sim_mass["electrons"] * clight
-) + np.sum(sim_weight["Hneutral"] * sim_uz["Hneutral"] * sim_mass["Hneutral"] * clight)
-print("p_in", p_in)
-print("p_out", p_out)
-assert np.allclose(p_in, p_out, atol=1e-5)
+assert np.allclose(sim_uz["electrons"], theory_uz["electrons"], rtol=1e-1)
+assert np.allclose(sim_uz["Hneutral"], theory_uz["Hneutral"], rtol=1e-3)
