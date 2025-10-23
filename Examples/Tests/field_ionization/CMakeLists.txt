@@ -28,7 +28,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_2d_ionization_lab_restart  # inputs
     "analysis.py diags/diag1001600"  # analysis
-    "analysis_default_regression.py --path diags/diag1001600"  # checksum
+    "analysis_default_regression.py --path diags/diag1001600 --rtol 1e-12"  # checksum
     test_2d_ionization_lab  # dependency
 )
 
