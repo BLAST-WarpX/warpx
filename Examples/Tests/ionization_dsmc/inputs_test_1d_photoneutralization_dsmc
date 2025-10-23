@@ -1,3 +1,4 @@
+# This test verifies photo-neutralization process: Hminus + photons -> Hneutral + electrons
 #############################
 # Define parameter of the
 my_constants.ion_mass = m_p
