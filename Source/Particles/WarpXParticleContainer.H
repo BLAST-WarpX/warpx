@@ -69,15 +69,15 @@ struct PIdx
 #elif defined(WARPX_DIM_XZ)
     enum                          { x ,  z ,  w ,  ux ,  uy ,  uz,                 nattribs};
     static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz"};
-#elif defined(WARPX_DIM_RZ)       // RZ needs all three position components
-    enum                          { x ,  y ,  z ,  w ,  ux ,  uy ,  uz ,  theta,   nattribs};
-    static constexpr auto names = {"x", "y", "z", "w", "ux", "uy", "uz", "theta"};
-#elif defined(WARPX_DIM_RCYLINDER)
+#elif defined(WARPX_DIM_RZ)
     enum                          { x ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
     static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz", "theta"};
-#elif defined(WARPX_DIM_RSPHERE)  // 1D Sphere needs all three position components
-    enum                          { x ,  y ,  w ,  ux ,  uy ,  uz ,  theta ,  phi, nattribs};
-    static constexpr auto names = {"x", "y", "w", "ux", "uy", "uz", "theta", "phi"};
+#elif defined(WARPX_DIM_RCYLINDER)
+    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
+    static constexpr auto names = {"x", "w", "ux", "uy", "uz", "theta"};
+#elif defined(WARPX_DIM_RSPHERE)
+    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
+    static constexpr auto names = {"x", "w", "ux", "uy", "uz", "theta", "phi"};
 #elif defined(WARPX_DIM_3D)
     enum                          { x ,  y,   z,   w,   ux,   uy,   uz,            nattribs};
     static constexpr auto names = {"x", "y", "z", "w", "ux", "uy", "uz"};
