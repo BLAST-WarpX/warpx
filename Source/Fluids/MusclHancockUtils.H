@@ -505,7 +505,7 @@ const amrex::Array4<amrex::Real>& U_plus,int i,int j,int k,amrex::Real clight, i
 {
     using namespace amrex::literals;
     // dir -> x, y, z -> 0, 1, 2
-    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, comp);
+    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, dir);
 
     const amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
     const amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);
