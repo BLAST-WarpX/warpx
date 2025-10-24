@@ -2440,10 +2440,10 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         nor ``E_external_fields`` are provided). Ignored when fields are provided via dictionary
 
     load_E : bool, default=True
-        Whether to load the external electric field.
+        If True, load the external E field from file.
 
     load_B : bool, default=True
-        Whether to load the external magnetic field.
+        If True, load the external B field from file.
 
     warpx_E_time_function : str, optional
         AMReX parser expression in variable ``t`` (seconds) scaling the
@@ -2530,7 +2530,8 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             dep_key = "read_fields_E_dependency(t)"
 
         names = list(fields_dict.keys())
-        # list of field names (PICMI will serialize this to the WarpX string list)
+
+        # list of field names
         pywarpx.particles.__setattr__(list_key, names)
 
         for fname, fdict in fields_dict.items():
@@ -2541,7 +2542,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                 )
             pywarpx.particles.__setattr__(f"{fname}.read_fields_from_path", path)
 
-            # time dependence (default "1.0"), then *mangle* with my_constants
+            # time dependence (default "1.0"), then mangle with my_constants
             dep_expr_raw = fdict.get(dep_key, "1.0")
             dep_expr = pywarpx.my_constants.mangle_expression(dep_expr_raw, mangle_dict)
             pywarpx.particles.__setattr__(f"{fname}.{dep_key}", dep_expr)

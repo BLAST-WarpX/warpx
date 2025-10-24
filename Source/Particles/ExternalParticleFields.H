@@ -22,11 +22,16 @@
 //  *
 //  */
 struct ParticleFieldMetaData {
-    std::string name;               // e.g., "constant_field"
-    std::string path;               // openPMD file path
+    //! Name of the field
+    std::string name;
+    //! Path to the openPMD file containing the field
+    std::string path;
+    //! Time dependency function as a string
     std::string time_function = "1.0";
-    std::unique_ptr<amrex::Parser> time_parser;   // owns the parser
-    amrex::ParserExecutor<1> time_executor;       // compiled f(t)
+    //! User-defined parser for time dependency of the field
+    std::unique_ptr<amrex::Parser> time_parser;
+    //! Compiled executor of the parser
+    amrex::ParserExecutor<1> time_executor;
 };
 
 // /**
@@ -36,9 +41,13 @@ struct ParticleFieldMetaData {
 class ExternalParticleFields {
 public:
 
+    //! Array of E field metadata
     std::vector<ParticleFieldMetaData> m_E_field_metadata;
+    //! Array of B field metadata
     std::vector<ParticleFieldMetaData> m_B_field_metadata;
+    //! Number of external E fields
     int m_nEfields;
+    //! Number of external B fields
     int m_nBfields;
 
   void ReadParameters();
