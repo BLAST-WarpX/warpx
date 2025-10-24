@@ -73,6 +73,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                     {
                         for (int v = 0; v < ncomp; v++) {
                             dof_arr(i,j,k,2*v) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
+                                                 + v
                                                  + (amrex::Real) offset_mf
                                                  + (amrex::Real) offset;
                         }
@@ -111,6 +112,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                 {
                     for (int v = 0; v < ncomp; v++) {
                         dof_arr(i,j,k,2*v) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
+                                             + v
                                              + (amrex::Real) offset_mf
                                              + (amrex::Real) offset;
                     }
