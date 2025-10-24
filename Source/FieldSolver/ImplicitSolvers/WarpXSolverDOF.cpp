@@ -61,7 +61,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                 m_array[lev][n] = new amrex::MultiFab( this_array[n]->boxArray(),
                                                        this_array[n]->DistributionMap(),
                                                        2*ncomp, // {local, global} for each comp
-                                                       1 );
+                                                       this_array[n]->nGrowVect() );
                 m_nDoFs_g += this_array[n]->boxArray().numPts()*ncomp;
 
                 m_array[lev][n]->setVal(-1.0);
@@ -99,7 +99,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
             m_scalar[lev] = new amrex::MultiFab( this_mf->boxArray(),
                                                  this_mf->DistributionMap(),
                                                  2*ncomp, // {local, global} for each comp
-                                                 1 );
+                                                 this_mf->nGrowVect() );
             m_nDoFs_g += this_mf->boxArray().numPts()*ncomp;
 
             m_scalar[lev]->setVal(-1.0);
