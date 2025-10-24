@@ -504,29 +504,48 @@ WarpX::OneStep_nosub (
     ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
 
-    // push particles (half position and full momentum)
-    PushParticlesandDeposit(
-        a_cur_time,
-        /*skip_current=*/true,
-        PositionPushType::FirstHalf,
-        MomentumPushType::Full
-    );
+    // with collisions placed in the middle of the position push and after the momentum push
+    if (m_collisions_split_position_push) {
+        // push particles (half position and full momentum)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_current=*/true,
+            PositionPushType::FirstHalf,
+            MomentumPushType::Full
+        );
 
-    // communicate particle data
-    mypc->Redistribute();
+        // communicate particle data
+        // FIXME Copy local communication from WarpX::HandleParticlesAtBoundaries
+        mypc->Redistribute();
 
-    // perform particle collisions
-    ExecutePythonCallback("beforecollisions");
-    mypc->doCollisions(a_step, a_cur_time, a_dt);
-    ExecutePythonCallback("aftercollisions");
+        // perform particle collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
 
-    // push particles (half position)
-    PushParticlesandDeposit(
-        a_cur_time,
-        /*skip_current=*/false,
-        PositionPushType::SecondHalf,
-        MomentumPushType::None
-    );
+        // push particles (half position)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_current=*/false,
+            PositionPushType::SecondHalf,
+            MomentumPushType::None
+        );
+    }
+    // with collisions placed before the position and momentum push, or without collisions
+    else {
+        // perform particle collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+
+        // push particles (half position)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_current=*/false,
+            PositionPushType::Full,
+            MomentumPushType::Full
+        );
+    }
 
     ExecutePythonCallback("afterdeposition");
 

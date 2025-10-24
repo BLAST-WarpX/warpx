@@ -69,10 +69,7 @@ class MultiParticleContainer
 
 public:
 
-    MultiParticleContainer (
-        amrex::AmrCore* amr_core,
-        bool const collisions_split_position_push
-    );
+    MultiParticleContainer (amrex::AmrCore* amr_core);
 
     ~MultiParticleContainer() = default;
 

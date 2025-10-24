@@ -56,12 +56,9 @@
 
 using namespace amrex;
 
-RigidInjectedParticleContainer::RigidInjectedParticleContainer (
-    AmrCore* amr_core,
-    int ispecies,
-    const std::string& name,
-    bool const collisions_split_position_push
-) : PhysicalParticleContainer(amr_core, ispecies, name, collisions_split_position_push)
+RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_core, int ispecies,
+                                                                const std::string& name)
+    : PhysicalParticleContainer(amr_core, ispecies, name)
 {
 
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

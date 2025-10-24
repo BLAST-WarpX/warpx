@@ -48,13 +48,9 @@ class RigidInjectedParticleContainer
     : public PhysicalParticleContainer
 {
 public:
-    RigidInjectedParticleContainer (
-        amrex::AmrCore* amr_core,
-        int ispecies,
-        const std::string& name,
-        bool const collisions_split_position_push
-    );
-
+    RigidInjectedParticleContainer (amrex::AmrCore* amr_core,
+                                    int ispecies,
+                                    const std::string& name);
     ~RigidInjectedParticleContainer () override = default;
 
     RigidInjectedParticleContainer ( RigidInjectedParticleContainer const &)             = delete;

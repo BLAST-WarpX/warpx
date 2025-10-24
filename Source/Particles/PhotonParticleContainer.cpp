@@ -43,12 +43,9 @@
 
 using namespace amrex;
 
-PhotonParticleContainer::PhotonParticleContainer (
-    AmrCore* amr_core,
-    int ispecies,
-    const std::string& name,
-    bool const collisions_split_position_push
-) : PhysicalParticleContainer(amr_core, ispecies, name, collisions_split_position_push)
+PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecies,
+                                                  const std::string& name)
+    : PhysicalParticleContainer(amr_core, ispecies, name)
 {
     const ParmParse pp_species_name(species_name);
 
