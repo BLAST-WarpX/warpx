@@ -1844,15 +1844,34 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
 
 class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
     """
-    Sets up the semi-implicit Darwin evolve scheme
+    Sets up the semi-implicit Darwin evolve scheme.
 
+    projection_div_cleaner_atol: float
+        Controls the absolute tolerance used in the divergence cleaner solve.
+
+    projection_div_cleaner_rtol: float
+        Controls the relative tolerance used in the divergence cleaner solve.
     """
 
-    def __init__(self, linear_solver):
+    def __init__(
+        self,
+        linear_solver,
+        projection_div_cleaner_atol=None,
+        projection_div_cleaner_rtol=None,
+    ):
         self.linear_solver = linear_solver
+        self.div_cleaner_atol = projection_div_cleaner_atol
+        self.div_cleaner_rtol = projection_div_cleaner_rtol
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+
+        pywarpx.warpx.add_new_group_attr(
+            "projection_div_cleaner", "atol", self.div_cleaner_atol
+        )
+        pywarpx.warpx.add_new_group_attr(
+            "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+        )
         self.linear_solver.linear_solver_initialize_inputs()
 
 
@@ -2395,12 +2414,13 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "atol", self.div_cleaner_atol
-            )
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
-            )
+            if self.do_initial_div_cleaning:
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "atol", self.div_cleaner_atol
+                )
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+                )
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):

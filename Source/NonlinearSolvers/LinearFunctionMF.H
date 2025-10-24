@@ -69,14 +69,15 @@ class LinearFunctionMF : public LinearFunction<T,Ops>
     inline
     void setBaseSolution ( const T&  a_U )
     {
-        m_Y0.Copy(a_U);
-        m_normY0 = this->norm2(m_Y0);
+        // m_Y0.Copy(a_U);
+        // m_normY0 = this->norm2(m_Y0);
+        m_normY0 = this->norm2(a_U);
     }
 
     inline
     void setBaseRHS ( const T&  a_R )
     {
-        m_R0.Copy(a_R);
+        // m_R0.Copy(a_R);
     }
 
     inline
@@ -129,7 +130,8 @@ class LinearFunctionMF : public LinearFunction<T,Ops>
 
     PreconditionerType m_pc_type = PreconditionerType::none;
 
-    T m_Z, m_Y0, m_R0, m_R;
+    T m_R;
+    // T m_Z, m_Y0, m_R0, m_R;
     Ops* m_ops = nullptr;
     std::unique_ptr<Preconditioner<T,Ops>> m_preCond = nullptr;
 };
@@ -140,6 +142,10 @@ void LinearFunctionMF<T,Ops>::define ( const T& a_U,
                                          const PreconditionerType& a_pc_type )
 {
     BL_PROFILE("LinearFunctionMF::::define()");
+    // m_Z.Define(a_U);
+    // m_Y0.Define(a_U);
+    // m_R0.Define(a_U);
+    m_R.Define(a_U);
 
     m_ops = a_ops;
 

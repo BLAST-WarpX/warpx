@@ -43,6 +43,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX )
         m_WarpX->m_fields.alloc_init(FieldType::xi_fp, lev, ba_phi, dm, 1, amrex::IntVect(AMREX_D_DECL(1,1,1)), 0.0_rt );
     }
 
+    // Initialize a projection divergence cleaner for the current density
+    // m_div_cleaner("current_fp", true);
+
     // Define WarpXSolverVec instances for the MS equation solution (dA) and
     // source
     m_dA.Define( m_WarpX, "dA_fp", "xi_fp" );
@@ -137,18 +140,15 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
     // Accumulate current* and susceptibility (mass matrix)
     //AccumulateCurrentAndMassMatrices();
 
-    // Populate the source vector
-    //CalculateSourceVector();
-
     {
         // TEMPORARY HACK TO TEST SOLVER - THIS CALLBACK IS NOT OTHERWISE USED
         // WITHIN THE CALLBACK Python POPULATES THE dA_fp AND xi_fp
         // MULTIFABS WITH THE SOURCE VALUES
         ExecutePythonCallback("beforedeposition");
-
-        // COPY SOURCE VALUES TO SOURCE VEC
-        m_source.Copy( FieldType::dA_fp, FieldType::xi_fp );
     }
+
+    // Populate the source vector
+    CalculateSourceVector();
 
     // Solve MS equation
     m_linear_solver->solve(m_dA, m_source, m_linsol_rtol, m_linsol_atol);
@@ -158,7 +158,7 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
         auto dA_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, 0);
         const auto& dAvec = m_dA.getArrayVec();
 
-        // copy test values from a_dA to dA_fp and xi_fp
+        // copy test values from m_dA to dA_fp
         amrex::MultiFab::Copy(*dA_fp[0][0], *dAvec[0][0], 0, 0, 1, dAvec[0][0]->nGrowVect());
         amrex::MultiFab::Copy(*dA_fp[0][1], *dAvec[0][1], 0, 0, 1, dAvec[0][1]->nGrowVect());
         amrex::MultiFab::Copy(*dA_fp[0][2], *dAvec[0][2], 0, 0, 1, dAvec[0][2]->nGrowVect());
@@ -288,11 +288,40 @@ void AccumulateCurrentAndMassMatrices ()
 
 void SemiImplicitDarwin::CalculateSourceVector ()
 {
-    // Divergence clean J
+    // Zero out existing source values
+    m_source.zero();
 
-    // Add solenoidal J to source (with mu0 factor)
+    // This function calculates the "b" vector for the linear MS equation.
+    // Divergence clean J
+    // Initialize a projection divergence cleaner for the current density
+    warpx::initialization::ProjectionDivCleaner m_div_cleaner("current_fp", true);
+    m_div_cleaner.setSourceFromField();
+    m_div_cleaner.solve();
+    m_div_cleaner.correctField();
 
     // Calculate 2 nabla^2 A and add to source vector
+    const int lev = 0;
 
+    // Grab the vector potential
+    ablastr::fields::MultiLevelVectorField Afield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp, lev);
 
+    // Use the dA_fp multifabs as temporary storage for the vector Laplacian of A
+    ablastr::fields::MultiLevelVectorField dAfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, lev);
+
+    // Calculate the vector Laplacian of A and write result into dA
+    m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorLaplacian(
+        dAfield[lev], Afield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+    );
+
+    // Calculate 2 * nabla^2 A + mu_0 J
+    const auto& jfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev);
+    for (int ii = 0; ii < 3; ii++)
+    {
+        amrex::MultiFab::LinComb(
+            *dAfield[lev][ii], PhysConst::mu0, *jfield[lev][ii], 0, 2.0, *dAfield[lev][ii], 0, 0, 1, 0
+        );
+    }
+
+    // Copy calculated source to m_source
+    m_source.Copy( FieldType::dA_fp, FieldType::None, true);
 }

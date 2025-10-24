@@ -222,7 +222,8 @@ class EMModes(object):
         simulation.verbose = self.verbose
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
-            linear_solver=picmi.GMRESLinearSolver(max_iterations=50)
+            linear_solver=picmi.GMRESLinearSolver(max_iterations=50),
+            projection_div_cleaner_rtol=1e-6,
         )
 
         #######################################################################

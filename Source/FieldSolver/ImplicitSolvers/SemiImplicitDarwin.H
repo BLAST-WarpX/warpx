@@ -13,6 +13,8 @@
 #include "NonlinearSolvers/LinearFunctionMF.H"
 // #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 #include "WarpXSolverVec.H"
+#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
+#include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_MultiFab.H>
@@ -82,6 +84,11 @@ private:
      * \brief The linear solver object.
      */
     std::unique_ptr<LinearSolver<WarpXSolverVec,LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>>> m_linear_solver;
+
+    /**
+     * \brief Projection divergence cleaner to get solenoidal current.
+     */
+    // warpx::initialization::ProjectionDivCleaner m_div_cleaner;
 
     // Linear solver defaults
     int m_linsol_verbose_int = 2;

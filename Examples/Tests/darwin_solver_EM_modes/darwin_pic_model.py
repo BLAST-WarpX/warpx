@@ -203,9 +203,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         # -- Predictor velocity push, deposit J* and get chi_nn
         self._predictor_step()
 
-        # -- Populate source vector for MS solution
-        self._calculate_source_vector()
-
         # get MS operator so it doesn't have to be done at every GMRES iteration
         self.operator = self._get_MS_operator()
 
@@ -232,7 +229,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         """Update E_sol field and push particles. Then update vector potential."""
 
         # we skipped the MS solve in C++
-        # self._calculate_source_vector()
         # self._perform_MS_field_solve()
 
         # update E-field
@@ -303,13 +299,10 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
                     uy = np.array(soa.get_real_data(uy_idx), copy=False)
                     uz = np.array(soa.get_real_data(uz_idx), copy=False)
 
-                    # store current particle velocities as "old" velocity
+                    # get velocities at start of step (equals u at this point)
                     ux_old = np.array(soa.get_real_data(ux_old_idx), copy=False)
                     uy_old = np.array(soa.get_real_data(uy_old_idx), copy=False)
                     uz_old = np.array(soa.get_real_data(uz_old_idx), copy=False)
-                    ux_old[...] = ux[...]
-                    uy_old[...] = uy[...]
-                    uz_old[...] = uz[...]
 
                     # get weight
                     w = np.array(soa.get_real_data(w_idx), copy=False)
@@ -498,34 +491,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
                 minlength=self.nz + 1,
             )
 
-    def _calculate_source_vector(self):
-        # The predicted current needs divergence cleaning since only the
-        # solenoidal part enters the calculation of A
-        self._divergence_clean_J()
-
-        # Allocate array for the source vector
-        source = np.zeros(3 * self.nz + 2)
-        # Start by setting source = A^{n-1/2}
-        source[: self.nz + 1] = self.A_x[...]
-        source[self.nz + 1 : 2 * self.nz + 2] = self.A_y[...]
-        source[2 * self.nz + 2 :] = self.A_z[...]
-
-        # Get the vector Laplacian operator (which operates on edge fields)
-        L = self._get_vector_laplacian()
-        # Now update the source to be 2 \nabla^2 A
-        source = 2.0 * np.dot(L, source)
-
-        # Add mu0 J term to source
-        source[: self.nz + 1] += constants.mu0 * self.J_x[...]
-        source[self.nz + 1 : 2 * self.nz + 2] += constants.mu0 * self.J_y[...]
-        source[2 * self.nz + 2 :] += constants.mu0 * self.J_z[...]
-
-        # populate MFs
-        self.dA_x[...] = source[: self.nz + 1]
-        self.dA_y[...] = source[self.nz + 1 : 2 * self.nz + 2]
-        self.dA_z[...] = source[2 * self.nz + 2 :]
-        self.xi_fp[...] = 0.0
-
     def _perform_MS_field_solve(self):
         if self.skip_ms:
             return
@@ -545,9 +510,9 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         lu = sla.splu(Mcsc)
         solution = lu.solve(source)
 
-        self.dA_x = solution[: self.nz + 1]
-        self.dA_y = solution[self.nz + 1 : 2 * self.nz + 2]
-        self.dA_z = solution[2 * self.nz + 2 : 3 * self.nz + 2]
+        self.dA_x[...] = solution[: self.nz + 1]
+        self.dA_y[...] = solution[self.nz + 1 : 2 * self.nz + 2]
+        self.dA_z[...] = solution[2 * self.nz + 2 : 3 * self.nz + 2]
 
         # TODO confirm the divergence properties
         # print(np.max(np.abs(self.dA_x)), np.max(np.abs(self.dA_z)))
@@ -555,7 +520,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         # assert np.allclose(np.dot(M[3*self.nz+2:], solution), 0.0, atol=1e-6)
 
         # force dA_z to be zero since in 1d non-zero values here are noise
-        self.dA_z[:] = 0.0
+        self.dA_z[...] = 0.0
 
         # M = L + np.dot(Bf, np.dot(chi, Be))
         # print(np.dot(M, dZ))

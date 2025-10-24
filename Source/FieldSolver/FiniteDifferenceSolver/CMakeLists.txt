@@ -4,6 +4,7 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         ComputeDivE.cpp
         ComputeCurlA.cpp
+        ComputeVectorLaplacian.cpp
         EvolveB.cpp
         EvolveBPML.cpp
         EvolveE.cpp
