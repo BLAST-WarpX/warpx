@@ -2391,38 +2391,89 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     """
-    Load external E/B fields from file (openPMD/plotfile) and optionally
-    apply a time-dependent scalar multiplier parsed on the C++ side.
+    Load external electromagnetic fields (E and/or B) from an openPMD file
+    and optionally apply time-dependent scaling factors.
+
+    This class extends the standard PICMI interface to support both
+    **single-field loading** (one E/B field pair) and **multi-field loading**
+    (several independently scaled E/B field maps).
+
+    Examples
+    --------
+    **Single-field mode:**
+    ```python
+    applied_field = picmi.LoadAppliedField(
+        read_fields_from_path="diags/field_input",
+        load_E=True,
+        load_B=True,
+        warpx_E_time_function="cos(2*pi*2e6*t)",
+        warpx_B_time_function="cos(2*pi*2e6*t + pi/2)",
+    )
+    ```
+
+    **Multi-field mode (multiple independent field maps):**
+    ```python
+    applied_field = picmi.LoadAppliedField(
+        load_E=False,
+        load_B=True,
+        B_external_fields={
+            "b1": {
+                "read_fields_from_path": "diags/Bfield_map1",
+                "read_fields_B_dependency(t)": "cos(omega*t + phase)",
+            },
+            "b2": {
+                "read_fields_from_path": "diags/Bfield_map2",
+                "read_fields_B_dependency(t)": "cos(2*omega*t + phase)",
+            },
+        },
+    )
+    ```
+    In this case, each key (``b1``, ``b2``) identifies a field map and may include its own
+    time-dependent expression. The field dependencies are parsed and mangled with
+    ``my_constants`` before being passed to WarpX.
 
     Parameters
     ----------
-    read_fields_from_path : str
+    read_fields_from_path : str, optional
         Path to diagnostics containing the external field data to load.
+        Required in single-field mode (i.e., when neither ``B_external_fields``
+        nor ``E_external_fields`` are provided). Ignored when fields are provided via dictionary
 
     load_E : bool, default=True
-        If True, load the external E field from file.
+        Whether to load the external electric field.
 
     load_B : bool, default=True
-        If True, load the external B field from file.
+        Whether to load the external magnetic field.
 
     warpx_E_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded E field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded electric field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_B_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded B field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t + pi/2)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded magnetic field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        Run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based B-field divergence cleaner after loading.
 
     warpx_projection_div_cleaner_atol : float, optional
         Absolute tolerance for the divergence cleaner solve.
 
     warpx_projection_div_cleaner_rtol : float, optional
         Relative tolerance for the divergence cleaner solve.
+
+    B_external_fields : dict, optional
+        Dictionary specifying multiple magnetic field maps to load.
+        Each key is a unique field name, and each value is a dict containing:
+        - ``read_fields_from_path`` (str): Path to the field data.
+        - ``read_fields_B_dependency(t)`` (str, optional): Time scaling expression.
+
+    E_external_fields : dict, optional
+        Same structure as ``B_external_fields`` but for electric fields.
+        Uses the key ``read_fields_E_dependency(t)`` for time scaling.
+
     """
 
     def __init__(self, **kw):

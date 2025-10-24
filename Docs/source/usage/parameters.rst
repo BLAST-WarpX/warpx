@@ -1944,28 +1944,74 @@ are applied to the particles directly, at each timestep. As a results, these fie
 
       Note that the position is defined in Cartesian coordinates, as a function of (x,y,z), even for RZ, RCYLINDER, and RSPHERE.
 
-    * ``read_from_file``: load the external field from an openPMD file.
-        An additional parameter, indicating the path of an openPMD data file, ``particles.read_fields_from_path``
-        must be specified, from which the external E field data can be loaded into WarpX.
-        One can refer to input files in ``Examples/Tests/LoadExternalField`` for more information.
-        Regarding how to prepare the openPMD data file, one can refer to
-        the `openPMD-example-datasets <https://github.com/openPMD/openPMD-example-datasets>`__.
-        Note that if both ``B_ext_particle_init_style`` and ``E_ext_particle_init_style`` are set to
-        ``read_from_file``, the openPMD file specified by ``particles.read_fields_from_path``
-        should contain both B and E external fields data.
+    * ``read_from_file``: load external fields from openPMD files.
 
-        .. note::
+        There are two ways to specify external field data: **single-field mode**
+        and **multi-field mode**.
 
-            When using ``read_from_file``, the fields loaded from the file will be interpolated
-            to the resolution of the grid used for the simulation. These fields are seen by the diagnostics.
+        **Single-field mode**
 
-        The time dependency of the E- and B-field can be specified by the input parameter:
+        In this mode, a single external E and/or B field is loaded from the path
+        given by ``particles.read_fields_from_path``. This parameter must always
+        be provided when using ``read_from_file``.
+
+        The time dependency of the E- and B-field can be specified by the input parameters:
 
         * ``particles.read_fields_E_dependency(t)``
 
         * ``particles.read_fields_B_dependency(t)``
 
-        The time dependency scales the E- and B-field uniformly in space by the given function.
+        The time dependency scales the corresponding field uniformly in space
+        and per level by the given function of time ``t`` (in seconds).
+
+        Example:
+
+        .. code-block:: none
+
+            particles.E_ext_particle_init_style = read_from_file
+            particles.B_ext_particle_init_style = read_from_file
+            particles.read_fields_from_path = diags/field_input
+            particles.read_fields_E_dependency(t) = cos(2*pi*2e6*t)
+            particles.read_fields_B_dependency(t) = cos(2*pi*2e6*t + pi/2)
+
+        If both ``B_ext_particle_init_style`` and ``E_ext_particle_init_style`` are set to
+        ``read_from_file``, the same openPMD file specified by
+        ``particles.read_fields_from_path`` should contain both E and B field data.
+
+        **Multi-field mode**
+
+        In this mode, several field maps can be loaded independently. Each field
+        is given a unique name listed in
+
+        * ``particles.E_ext_particle_fields``  (for electric fields)
+        * ``particles.B_ext_particle_fields``  (for magnetic fields)
+
+        Each named field must define its own path and may optionally define a
+        time dependency. The general key ``particles.read_fields_from_path`` is
+        ignored when these lists are provided.
+
+        Example:
+
+        .. code-block:: none
+
+            particles.B_ext_particle_init_style = read_from_file
+            particles.B_ext_particle_fields = b1 b2
+            particles.b1.read_fields_from_path = diags/Bfield_map1
+            particles.b1.read_fields_B_dependency(t) = cos(omega*t + phase)
+            particles.b2.read_fields_from_path = diags/Bfield_map2
+            particles.b2.read_fields_B_dependency(t) = cos(2*omega*t + phase)
+
+        Each field's scaling function is evaluated independently and may contain
+        user-defined constants. The expressions are parsed on the C++ side.
+
+        .. note::
+
+            When using ``read_from_file``, the fields loaded from file are interpolated
+            to the resolution of the grid used for the simulation. These interpolated
+            fields are visible to diagnostics.
+
+        To prepare openPMD-compatible field data files, see the
+        `openPMD-example-datasets <https://github.com/openPMD/openPMD-example-datasets>`__.
 
 
     * ``repeated_plasma_lens``: apply a series of plasma lenses.
