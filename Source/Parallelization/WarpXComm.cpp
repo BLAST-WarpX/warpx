@@ -153,13 +153,12 @@ WarpX::UpdateAuxilaryData ()
             for (int ic = 0; ic < ncomp_src; ++ic) {
             const amrex::ParticleReal time_factor = metaE[ic].time_executor(t_new[lev]);
 
-            // FIXME ncomp should be taken from variable?
             // dst += time_factor * src(component=ic)
-            amrex::Saxpy(*E_aux[0], time_factor, *E_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*E_aux[0], time_factor, *E_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, E_ext_lev[0]->nComp(),
                         guard_cells.ng_FieldGather);
-            amrex::Saxpy(*E_aux[1], time_factor, *E_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*E_aux[1], time_factor, *E_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, E_ext_lev[1]->nComp(),
                         guard_cells.ng_FieldGather);
-            amrex::Saxpy(*E_aux[2], time_factor, *E_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*E_aux[2], time_factor, *E_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, E_ext_lev[2]->nComp(),
                         guard_cells.ng_FieldGather);
             }
         }
@@ -179,15 +178,14 @@ WarpX::UpdateAuxilaryData ()
 
             // Loop over field maps, multiply with time dependency function, add to field map
             for (int ic = 0; ic < ncomp_src; ++ic) {
-            const amrex::ParticleReal time_factor = metaB[ic].time_executor(t_new[lev]); // FIXME use same name for variable?
+            const amrex::ParticleReal time_factor = metaB[ic].time_executor(t_new[lev]);
 
-            // FIXME ncomp should be taken from variable?
             // dst += time_factor * src(component=ic)
-            amrex::Saxpy(*B_aux[0], time_factor, *B_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*B_aux[0], time_factor, *B_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, B_ext_lev[0]->nComp(),
                         guard_cells.ng_FieldGather);
-            amrex::Saxpy(*B_aux[1], time_factor, *B_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*B_aux[1], time_factor, *B_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, B_ext_lev[1]->nComp(),
                         guard_cells.ng_FieldGather);
-            amrex::Saxpy(*B_aux[2], time_factor, *B_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+            amrex::Saxpy(*B_aux[2], time_factor, *B_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, B_ext_lev[2]->nComp(),
                         guard_cells.ng_FieldGather);
             }
         }
