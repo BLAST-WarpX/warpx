@@ -8,9 +8,6 @@
 #ifndef WARPX_WarpXParticleContainer_fwd_H_
 #define WARPX_WarpXParticleContainer_fwd_H_
 
-#include <AMReX_GpuAllocators.H>
-
-
 enum struct ParticleBC;
 enum struct ConvertDirection;
 
