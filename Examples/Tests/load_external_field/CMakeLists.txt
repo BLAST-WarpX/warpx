@@ -100,7 +100,7 @@ add_warpx_test(
   test_3d_load_external_field_particle_multi_time     # name
   3                                                   # dims
   1                                                   # nprocs
-  inputs_test_3d_load_external_field_particle_multi_time
+  inputs_test_3d_load_external_field_particle_multi_time  # inputs
   "analysis_time_scaling.py --pf0 diags/diag1000000 --pfN diags/diag1000300 --component Bz --expected_ratio 0.0 --rtol 1e-12 --min_abs 1e-12"
   "analysis_default_regression.py --path diags/diag1000300"
   OFF
@@ -110,7 +110,7 @@ add_warpx_test(
   test_3d_load_external_field_particle_multi_time_picmi   # name
   3                                                       # dims
   1                                                       # nprocs
-  inputs_test_3d_load_external_field_particle_multi_time_picmi.py
+  inputs_test_3d_load_external_field_particle_multi_time_picmi.py  # inputs
   "analysis_time_scaling.py --pf0 diags/diag1000000 --pfN diags/diag1000300 --component Bz --expected_ratio 0.0 --rtol 1e-12 --min_abs 1e-12"
   "analysis_default_regression.py --path diags/diag1000300"
   OFF
