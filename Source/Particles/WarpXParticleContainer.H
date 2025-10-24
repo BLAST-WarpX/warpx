@@ -112,6 +112,15 @@ struct IntIdx {
     static constexpr std::initializer_list<char const *> names = {};
 };
 
+struct DiagIdx
+{
+    enum {
+        w = 0,
+        x, y, z, ux, uy, uz,
+        nattribs
+    };
+};
+
 class WarpXParIter
     : public amrex::ParIterSoA<PIdx::nattribs, 0>
 {
