@@ -338,13 +338,6 @@ public:
     std::unique_ptr<amrex::Parser> m_Ex_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ey_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ez_particle_parser;
-    // // Parser for time dependency of B_external from file on the particle
-    // std::unique_ptr<amrex::Parser> m_B_particle_from_file_parser;
-    // // Parser for time dependency of B_external from file on the particle
-    // std::unique_ptr<amrex::Parser> m_E_particle_from_file_parser;
-
-    // amrex::ParserExecutor<1> m_Efield_time_partparser;
-    // amrex::ParserExecutor<1> m_Bfield_time_partparser;
 
     ExternalParticleFields m_external_particle_fields_metadata;
 
