@@ -16,9 +16,10 @@
 #include <memory>
 
 // /**
-//  * \brief This struct contains the meta data needed to describe a single external particle field:
+//  * \brief This struct contains the meta data needed to describe a single external particle
+//  * field:
 //  * The name of the field, the path to the file, the time dependency function,
-//. * and then the parser for the time depenendcy function
+//  * and then the parser for the time depenendcy function
 //  *
 //  */
 struct ParticleFieldMetaData {
@@ -50,7 +51,9 @@ public:
     //! Number of external B fields
     int m_nBfields;
 
-  void ReadParameters();
+    /// @brief Read in the parameters via the parser and create the external particle
+    // field meta data arrays
+    void ReadParameters();
 };
 
 #endif // WARPX_EXTERNAL_PARTICLE_FIELDS_H_

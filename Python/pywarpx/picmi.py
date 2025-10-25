@@ -2487,7 +2487,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
-        # Collect user constants for mangle_expression (but keep kw intact!)
+        # Collect user constants for mangle_expression (but keep kw intact)
         # Exclude base-class params so they don't end up in my_constants.
         base_keys = {"read_fields_from_path", "load_E", "load_B"}
         self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
@@ -2498,7 +2498,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                 kw["read_fields_from_path"] = ""  # placeholder for multi-field mode
             else:
                 raise ValueError(
-                    "LoadAppliedField requires 'read_fields_from_path' in legacy mode "
+                    "LoadAppliedField requires 'read_fields_from_path' in single field mode "
                     "(no B_external_fields/E_external_fields provided)."
                 )
 
@@ -2553,7 +2553,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         # defined in my_constants with the same name but different value.
         mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
-        # In legacy mode only (no multi-map dicts) we keep the top-level path
+        # In single field mode only keep the top-level path
         if not self.B_external_fields and not self.E_external_fields:
             if hasattr(self, "read_fields_from_path") and self.read_fields_from_path:
                 pywarpx.particles.read_fields_from_path = self.read_fields_from_path
@@ -2572,7 +2572,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                     )
                     pywarpx.particles.__setattr__("read_fields_E_dependency(t)", dep)
         else:
-            # >>> ensure E is not implicitly enabled by the base class
+            # ensure E is not implicitly enabled by the base class
             pywarpx.particles.E_ext_particle_init_style = "none"
 
         if self.load_B:
@@ -2595,7 +2595,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                     )
                     pywarpx.particles.__setattr__("read_fields_B_dependency(t)", dep)
         else:
-            # >>> ensure B is not implicitly enabled by the base class
+            # ensure B is not implicitly enabled by the base class
             pywarpx.particles.B_ext_particle_init_style = "none"
 
 

@@ -1688,8 +1688,8 @@ WarpX::LoadExternalFields (int const lev)
         // Call Python callback which might write values to external field multifabs
         ExecutePythonCallback("loadExternalFields");
     }
-    // External particle fields
 
+    // External particle B fields
     if (mypc->m_B_ext_particle_s == "read_from_file") {
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
@@ -1716,7 +1716,7 @@ WarpX::LoadExternalFields (int const lev)
         }
     }
 
-    // --- E external particle fields ---
+    //  External particle E fields
     if (mypc->m_E_ext_particle_s == "read_from_file") {
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,

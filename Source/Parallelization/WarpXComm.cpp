@@ -133,10 +133,10 @@ WarpX::UpdateAuxilaryData ()
         UpdateAuxilaryDataStagToNodal();
     }
 
-    // When loading particle fields from file: add the external fields:
+    // When loading particle fields from file: add the external fields
     for (int lev = 0; lev <= finest_level; ++lev) {
 
-        // ---------- E: particle external maps ----------
+        // external particle E field maps
         if (mypc->m_E_ext_particle_s == "read_from_file") {
             ablastr::fields::VectorField E_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
             const auto& E_ext = m_fields.get_alldirs(FieldType::E_external_particle_field, lev);
@@ -144,6 +144,7 @@ WarpX::UpdateAuxilaryData ()
             const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
             const int ncomp_src = E_ext[0]->nComp();
 
+            // number of external particle fields must match m_field ncomps
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 ncomp_src == static_cast<int>(metaE.size()),
                 "Mismatch: E_external_particle_field nComp != number of E field metadata entries."
@@ -163,7 +164,7 @@ WarpX::UpdateAuxilaryData ()
             }
         }
 
-        // ---------- B: particle external maps ----------
+        // external particle B field maps
         if (mypc->m_B_ext_particle_s == "read_from_file") {
             ablastr::fields::VectorField B_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
             const auto& B_ext = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
@@ -171,6 +172,7 @@ WarpX::UpdateAuxilaryData ()
             const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
             const int ncomp_src = B_ext[0]->nComp();
 
+            // number of external particle fields must match m_field ncomps
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 ncomp_src == static_cast<int>(metaB.size()),
                 "Mismatch: B_external_particle_field nComp != number of B field metadata entries."
