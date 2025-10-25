@@ -23,10 +23,10 @@ class WarpX;
  */
 struct WarpXSolverDOF
 {
-    ablastr::fields::MultiLevelVectorField m_array;
-    ablastr::fields::MultiLevelVectorField m_array_lhs;
-    ablastr::fields::MultiLevelScalarField m_scalar;
-    ablastr::fields::MultiLevelScalarField m_scalar_lhs;
+    amrex::Vector<std::array<amrex::iMultiFab*,3>> m_array;
+    amrex::Vector<std::array<amrex::iMultiFab*,3>> m_array_lhs;
+    amrex::Vector<amrex::iMultiFab*> m_scalar;
+    amrex::Vector<amrex::iMultiFab*> m_scalar_lhs;
 
     warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
     warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;

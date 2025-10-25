@@ -58,7 +58,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
             const ablastr::fields::VectorField this_array = a_WarpX->m_fields.get_alldirs(a_vector_type_name, lev);
             for (int n = 0; n < 3; n++) {
                 auto ncomp = this_array[n]->nComp();
-                m_array[lev][n] = new amrex::MultiFab( this_array[n]->boxArray(),
+                m_array[lev][n] = new amrex::iMultiFab(this_array[n]->boxArray(),
                                                        this_array[n]->DistributionMap(),
                                                        2*ncomp, // {local, global} for each comp
                                                        this_array[n]->nGrowVect() );
@@ -72,10 +72,10 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            dof_arr(i,j,k,2*v) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
+                            dof_arr(i,j,k,2*v) = bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
                                                  + v
-                                                 + (amrex::Real) offset_mf
-                                                 + (amrex::Real) offset;
+                                                 + offset_mf
+                                                 + offset;
                         }
                     });
                     offset_mf += bx.numPts()*ncomp;
@@ -97,7 +97,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
             const amrex::MultiFab* this_mf = a_WarpX->m_fields.get(a_scalar_type_name,lev);
             auto ncomp = this_mf->nComp();
-            m_scalar[lev] = new amrex::MultiFab( this_mf->boxArray(),
+            m_scalar[lev] = new amrex::iMultiFab(this_mf->boxArray(),
                                                  this_mf->DistributionMap(),
                                                  2*ncomp, // {local, global} for each comp
                                                  this_mf->nGrowVect() );
@@ -111,10 +111,10 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        dof_arr(i,j,k,2*v) = (amrex::Real) bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
+                        dof_arr(i,j,k,2*v) = bx.index(amrex::IntVect(AMREX_D_DECL(i, j, k))) * ncomp
                                              + v
-                                             + (amrex::Real) offset_mf
-                                             + (amrex::Real) offset;
+                                             + offset_mf
+                                             + offset;
                     }
                 });
                 offset_mf += bx.numPts()*ncomp;
@@ -151,7 +151,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            dof_arr(i,j,k,2*v+1) = dof_arr(i,j,k,2*v) + (amrex::Real) offset_global;
+                            dof_arr(i,j,k,2*v+1) = dof_arr(i,j,k,2*v) + offset_global;
                         }
                     });
                 }
@@ -168,7 +168,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        dof_arr(i,j,k,2*v+1) = dof_arr(i,j,k,2*v) + (amrex::Real) offset_global;
+                        dof_arr(i,j,k,2*v+1) = dof_arr(i,j,k,2*v) + offset_global;
                     }
                 });
             }
@@ -179,11 +179,11 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
             const auto& geom = a_WarpX->Geom(lev);
             for (int n = 0; n < 3; n++) {
-                m_array_lhs[lev][n] = new amrex::MultiFab( m_array[lev][n]->boxArray(),
+                m_array_lhs[lev][n] = new amrex::iMultiFab(m_array[lev][n]->boxArray(),
                                                            m_array[lev][n]->DistributionMap(),
                                                            m_array[lev][n]->nComp(),
                                                            0 );
-                amrex::MultiFab::Copy(*m_array_lhs[lev][n], *m_array[lev][n], 0, 0, m_array[lev][n]->nComp(), 0);
+                amrex::iMultiFab::Copy(*m_array_lhs[lev][n], *m_array[lev][n], 0, 0, m_array[lev][n]->nComp(), 0);
                 m_array[lev][n]->FillBoundaryAndSync(geom.periodicity());
                 // do NOT call FillBoundaryAndSync() on m_array_lhs
             }
@@ -191,11 +191,11 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
     }
     if (m_scalar_type != FieldType::None) {
         for (int lev = 0; lev < a_num_amr_levels; ++lev) {
-            m_scalar_lhs[lev] = new amrex::MultiFab( m_scalar[lev]->boxArray(),
+            m_scalar_lhs[lev] = new amrex::iMultiFab(m_scalar[lev]->boxArray(),
                                                      m_scalar[lev]->DistributionMap(),
                                                      m_scalar[lev]->nComp(),
                                                      0 );
-            amrex::MultiFab::Copy(*m_scalar_lhs[lev], *m_scalar[lev], 0, 0, m_scalar[lev]->nComp(), 0);
+            amrex::iMultiFab::Copy(*m_scalar_lhs[lev], *m_scalar[lev], 0, 0, m_scalar[lev]->nComp(), 0);
             const auto& geom = a_WarpX->Geom(lev);
             m_scalar[lev]->FillBoundaryAndSync(geom.periodicity());
             // do NOT call FillBoundaryAndSync() on m_scalar_lhs
