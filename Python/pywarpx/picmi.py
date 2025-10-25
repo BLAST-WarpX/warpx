@@ -2419,11 +2419,11 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         B_external_fields={
             "b1": {
                 "read_fields_from_path": "diags/Bfield_map1",
-                "read_fields_B_dependency(t)": "cos(omega*t + phase)",
+                "read_fields_B_dependency(t)": f"cos({omega}*t + {phase})",
             },
             "b2": {
                 "read_fields_from_path": "diags/Bfield_map2",
-                "read_fields_B_dependency(t)": "cos(2*omega*t + phase)",
+                "read_fields_B_dependency(t)": f"cos(2*{omega}*t + {phase})",
             },
         },
     )
