@@ -905,6 +905,18 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
             )
 
 
+class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
+
+    def init(self, kw):
+        pass
+
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        species.add_new_group_attr(source_name, "injection_style", "external_file")
+        species.add_new_group_attr(source_name, "injection_file", self.file_path)
+
+
 class ParticleDistributionPlanarInjector(
     picmistandard.PICMI_ParticleDistributionPlanarInjector
 ):
