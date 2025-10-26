@@ -906,7 +906,6 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
 
 
 class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
-
     def init(self, kw):
         pass
 
