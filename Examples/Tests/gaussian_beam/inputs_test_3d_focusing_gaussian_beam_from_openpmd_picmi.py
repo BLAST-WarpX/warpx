@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# from warp import picmi
-import argparse
-
 from pywarpx import picmi
 
 constants = picmi.constants
@@ -58,16 +55,14 @@ beam1 = picmi.Species(
     initial_distribution=beam1_distribution,
 )
 
-field_diag1 = picmi.FieldDiagnostic(
+diag1 = picmi.ParticleDiagnostic(
     name="diag1",
     grid=grid,
     period=1,
-    data_list=args.fields_to_plot,
-    warpx_format=args.diagformat,
     warpx_dump_last_timestep=1,
 )
 
-part_diag1 = picmi.ParticleDiagnostic(
+openpmd = picmi.ParticleDiagnostic(
     name="openpmd",
     period=1,
     species=[beam1],
@@ -85,8 +80,8 @@ sim = picmi.Simulation(
 
 sim.add_species(beam1)
 
-sim.add_diagnostic(field_diag1)
-sim.add_diagnostic(part_diag1)
+sim.add_diagnostic(diag1)
+sim.add_diagnostic(openpmd)
 
 # write_inputs will create an inputs file that can be used to run
 # with the compiled version.
