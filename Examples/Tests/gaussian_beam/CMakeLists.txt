@@ -26,8 +26,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_focusing_gaussian_beam_from_openpmd_picmi.py  # inputs
-    "analysis.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    "analysis_focusing_beam.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000000"  # checksum
     test_3d_focusing_gaussian_beam_from_openpmd_prepare  # dependency
 )
 

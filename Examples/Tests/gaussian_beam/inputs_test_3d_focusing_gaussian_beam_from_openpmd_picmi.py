@@ -34,8 +34,8 @@ grid = picmi.Cartesian3DGrid(
     number_of_cells=[nx, ny, nz],
     lower_bound=[xmin, ymin, zmin],
     upper_bound=[xmax, ymax, zmax],
-    lower_boundary_conditions=["pec", "pec", "pec"],
-    upper_boundary_conditions=["pec", "pec", "pec"],
+    lower_boundary_conditions=["dirichlet", "dirichlet", "dirichlet"],
+    upper_boundary_conditions=["dirichlet", "dirichlet", "dirichlet"],
     lower_boundary_conditions_particles=["absorbing", "absorbing", "absorbing"],
     upper_boundary_conditions_particles=["absorbing", "absorbing", "absorbing"],
     warpx_max_grid_size=256,
@@ -57,7 +57,6 @@ beam1 = picmi.Species(
 
 diag1 = picmi.ParticleDiagnostic(
     name="diag1",
-    grid=grid,
     period=1,
     warpx_dump_last_timestep=1,
 )
@@ -75,10 +74,9 @@ sim = picmi.Simulation(
     solver=solver,
     max_steps=0,
     verbose=1,
-    warpx_particle_shape=3,
 )
 
-sim.add_species(beam1)
+sim.add_species(beam1, layout=None)
 
 sim.add_diagnostic(diag1)
 sim.add_diagnostic(openpmd)
