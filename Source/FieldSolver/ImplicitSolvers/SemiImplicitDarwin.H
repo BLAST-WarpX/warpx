@@ -13,8 +13,10 @@
 #include "NonlinearSolvers/LinearFunctionMF.H"
 // #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 #include "WarpXSolverVec.H"
-#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
+
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
+#include "Particles/MultiParticleContainer.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_MultiFab.H>
@@ -54,9 +56,12 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
-    void PredictorVelocityPush ();
+    void PrepareCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();
     void CalculateSourceVector ();
+    void UpdateEandAfromdA( int astep );
+    void ClearParticleVelocities ();
+    void FinishVelocityUpdate ();
 
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.

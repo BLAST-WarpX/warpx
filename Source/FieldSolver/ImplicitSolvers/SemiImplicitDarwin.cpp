@@ -116,10 +116,12 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
 {
     BL_PROFILE("SemiImplicitDarwin::OneStep()");
 
-    amrex::ignore_unused(a_step);
+    using ablastr::fields::Direction;
 
     // Set the member time step
     m_dt = a_dt;
+
+    const int finest_level = 0;
 
     amrex::Print() << "taking one step in Darwin solver..." << std::endl;
 
@@ -130,20 +132,32 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
     // TODO: only save u since we don't need to keep x
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Push particles with E_fp (which currently just contains -grad phi since
-    // the E-field was cleared during the last Poisson solve) and deposit current
-    // at the velocity mid-point (should actually be deposited onto the nodes and
-    // then averaged to the edges, but is that equivalent to directly depositing
-    // on the edges?)
-    //PredictorVelocityPush();
+    // Push particle velocities with E_fp (which currently just contains -grad phi since
+    // the E-field was cleared during the last Poisson solve)
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        m_WarpX->GetPartContainer().PushP(
+            lev,
+            m_dt,
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)
+        );
+    }
+
+    // Prepare current deposition by setting particle velocities to twice the
+    // t = n velocity values
+    PrepareCurrentDeposition();
 
     // Accumulate current* and susceptibility (mass matrix)
     //AccumulateCurrentAndMassMatrices();
 
     {
         // TEMPORARY HACK TO TEST SOLVER - THIS CALLBACK IS NOT OTHERWISE USED
-        // WITHIN THE CALLBACK Python POPULATES THE dA_fp AND xi_fp
-        // MULTIFABS WITH THE SOURCE VALUES
+        // WITHIN THE CALLBACK Python GETS THE CURRENT DENSITY AND MASS MATRICES
         ExecutePythonCallback("beforedeposition");
     }
 
@@ -155,19 +169,52 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
 
     {
         // TEMPORARY HACK TO TEST SOLVER - THIS CALLBACK IS NOT OTHERWISE USED
-        auto dA_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, 0);
-        const auto& dAvec = m_dA.getArrayVec();
+        if (IsPythonCallbackInstalled("particlescraper")) {
+            auto dA_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, 0);
+            const auto& source_vec = m_source.getArrayVec();
 
-        // copy test values from m_dA to dA_fp
-        amrex::MultiFab::Copy(*dA_fp[0][0], *dAvec[0][0], 0, 0, 1, dAvec[0][0]->nGrowVect());
-        amrex::MultiFab::Copy(*dA_fp[0][1], *dAvec[0][1], 0, 0, 1, dAvec[0][1]->nGrowVect());
-        amrex::MultiFab::Copy(*dA_fp[0][2], *dAvec[0][2], 0, 0, 1, dAvec[0][2]->nGrowVect());
+            // copy test values from m_dA to dA_fp
+            amrex::MultiFab::Copy(*dA_fp[0][0], *source_vec[0][0], 0, 0, 1, source_vec[0][0]->nGrowVect());
+            amrex::MultiFab::Copy(*dA_fp[0][1], *source_vec[0][1], 0, 0, 1, source_vec[0][1]->nGrowVect());
+            amrex::MultiFab::Copy(*dA_fp[0][2], *source_vec[0][2], 0, 0, 1, source_vec[0][2]->nGrowVect());
 
-        ExecutePythonCallback("particlescraper");
+            ExecutePythonCallback("particlescraper");
+
+            // Copy solution calculated in Python to the dA vector
+            m_dA.Copy( FieldType::dA_fp, FieldType::xi_fp );
+
+            amrex::Print() << "MS solve overwritten from Python." << std::endl;
+        }
     }
 
-    // add remainder of algorithm steps...
+    // Update E to E = -dA/dt and A to A += dA (recall that B is updated after Poisson solve)
+    UpdateEandAfromdA(a_step);
 
+    // Set particle velocities to 0 since the push below is just calculating
+    // the acceleratio due to the inductive E-field
+    ClearParticleVelocities();
+
+    // Push particle velocities (E-field now only includes the inductive component)
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        m_WarpX->GetPartContainer().PushP(
+            lev,
+            m_dt,
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
+            *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
+            *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)
+        );
+    }
+
+    // Update particle velocities to include acceleration from both
+    // electrostatic and inductive electric field components
+    FinishVelocityUpdate();
+
+    // Push particle positions forward (velocities are already updated)
+    m_WarpX->GetPartContainer().PushX(m_dt);
 }
 
 void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec&  a_RHS,
@@ -203,46 +250,50 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec&  a_RHS,
     }
 }
 
-void SemiImplicitDarwin::PredictorVelocityPush ()
+void SemiImplicitDarwin::PrepareCurrentDeposition ()
 {
-    BL_PROFILE("SemiImplicitDarwin::PredictorPush()");
+    BL_PROFILE("SemiImplicitDarwin::PrepareCurrentDeposition()");
+    // This function sets the particle velocity pids to twice the intermediate
+    // velocity values, i.e., the sum of the values currently stored in u and u_n
 
-    using warpx::fields::FieldType;
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
 
-    if (m_WarpX->use_filter) {
-        int finest_level = 0;
-        m_WarpX->ApplyFilterMF(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
+        // for (int lev = 0; lev <= finest_level; ++lev)
+        const int lev = 0;
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            auto particle_comps = pc->GetRealSoANames();
+
+            for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+
+                auto& attribs = pti.GetAttribs();
+                amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+
+                const long np = pti.numParticles();
+
+                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+                {
+                    // swap old and new values then add new value to old
+                    std::swap(ux[ip], ux_n[ip]);
+                    ux[ip] += ux_n[ip];
+
+                    std::swap(uy[ip], uy_n[ip]);
+                    uy[ip] += uy_n[ip];
+
+                    std::swap(uz[ip], uz_n[ip]);
+                    uz[ip] += uz_n[ip];
+                });
+            }
+        }
     }
-
-    // Set the implict solver options for particle push, use explicit push
-    // to respect the PositionPushType::None option (i.e. no spatial advance) - but then the current is not the average...
-    // ImplicitOptions options;
-    // options.linear_stage_of_jfnk = a_from_jacobian;
-    // options.evolve_suborbit_particles_only = false;
-    // options.max_particle_iterations = 1;
-    // options.particle_tolerance = 0.0;
-    // options.deposit_mass_matrices = m_use_mass_matrices;
-    // options.use_mass_matrices_pc = false; // m_use_mass_matrices_pc;
-    // options.use_explicit_push = true;
-
-    // const bool skip_current = false;
-    // // Advance the particle velocities by dt, then take average of old and new v,
-    // // deposit currents, giving J at t=n
-    // // This uses Efield_fp and Bfield_fp, where Efield_fp holds the E-field due
-    // // to phi^n and Bfield_fp holds the B-field at t = n-1/2.
-    // m_WarpX->PushParticlesandDeposit(a_cur_time, skip_current, PositionPushType::None, MomentumPushType::Full, &options);
-
-    // NEED TO USE THIS APPROACH TO GET POSITION AND CURRENT RIGHT (also to keep partially updated velocity value)
-    // Could just use PushP and do all the deposition calls ourselves...
-    // TODO: make a new WarpX function to PushP all species with _fp fields.
-    // using ablastr::fields::Direction;
-    // const int lev = 0;
-    // PushP(
-    //     lev, m_dt,
-    //     m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev), ...
-    // );
-
-
 }
 
 void AccumulateCurrentAndMassMatrices ()
@@ -288,10 +339,15 @@ void AccumulateCurrentAndMassMatrices ()
 
 void SemiImplicitDarwin::CalculateSourceVector ()
 {
+    // This function calculates the "b" vector for the linear MS equation,
+    // i.e., the source vector.
+    BL_PROFILE("SemiImplicitDarwin::CalculateSourceVector()");
+
+    const int lev = 0;
+
     // Zero out existing source values
     m_source.zero();
 
-    // This function calculates the "b" vector for the linear MS equation.
     // Divergence clean J
     // Initialize a projection divergence cleaner for the current density
     warpx::initialization::ProjectionDivCleaner m_div_cleaner("current_fp", true);
@@ -299,13 +355,10 @@ void SemiImplicitDarwin::CalculateSourceVector ()
     m_div_cleaner.solve();
     m_div_cleaner.correctField();
 
-    // Calculate 2 nabla^2 A and add to source vector
-    const int lev = 0;
-
     // Grab the vector potential
     ablastr::fields::MultiLevelVectorField Afield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp, lev);
 
-    // Use the dA_fp multifabs as temporary storage for the vector Laplacian of A
+    // Use the dA_fp MultiFabs as temporary storage for the vector Laplacian of A
     ablastr::fields::MultiLevelVectorField dAfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, lev);
 
     // Calculate the vector Laplacian of A and write result into dA
@@ -313,7 +366,7 @@ void SemiImplicitDarwin::CalculateSourceVector ()
         dAfield[lev], Afield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
     );
 
-    // Calculate 2 * nabla^2 A + mu_0 J
+    // Calculate 2 * nabla^2 A + mu_0 J and write result in dA_fp MF for temporary storage
     const auto& jfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev);
     for (int ii = 0; ii < 3; ii++)
     {
@@ -324,4 +377,122 @@ void SemiImplicitDarwin::CalculateSourceVector ()
 
     // Copy calculated source to m_source
     m_source.Copy( FieldType::dA_fp, FieldType::None, true);
+}
+
+void SemiImplicitDarwin::UpdateEandAfromdA ( int astep )
+{
+    // This function updates the Efield_fp MF to hold the new inductive E-field.
+    // And updates the vector potential to A^n+1/2 = A^n-1/2 + dA^n
+    BL_PROFILE("SemiImplicitDarwin::UpdateEandAfromdA()");
+
+    const int lev = 0;
+
+    // Grab the E-field MultiFabs
+    ablastr::fields::MultiLevelVectorField Efield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, lev);
+
+    // Grab the vector potential
+    ablastr::fields::MultiLevelVectorField Afield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp, lev);
+
+    // Grab dA_fp MultiFabs (change in vector potential)
+    const auto& dAfield = m_dA.getArrayVec();
+
+    const auto prefac = -1.0_rt / m_dt;
+    for (int ii = 0; ii < 3; ii++)
+    {
+        // Copy dA values to E-field then scale by -1/dt
+        amrex::MultiFab::Copy( *Efield[lev][ii], *dAfield[lev][ii], 0, 0, 1,
+                                dAfield[lev][ii]->nGrowVect() );
+        Efield[lev][ii]->mult(prefac, 0); // use zero ghost cells since FillBoundary is called below
+
+        // Update vector potential
+        amrex::MultiFab::Add(*Afield[lev][ii], *dAfield[lev][ii], 0, 0, 1, 0);
+        // Fill guard cell values
+        Afield[lev][ii]->FillBoundary(m_WarpX->Geom(lev).periodicity());
+    }
+
+    // Apply E-field boundary
+    m_WarpX->FillBoundaryE(Efield[lev][0]->nGrowVect(), true);
+    m_WarpX->ApplyEfieldBoundary(0, PatchType::fine, astep*m_dt);
+
+    // if (m_WarpX->use_filter) {
+    //     m_WarpX->ApplyFilterMF(Efield, lev);
+    // }
+}
+
+void SemiImplicitDarwin::ClearParticleVelocities ()
+{
+    BL_PROFILE("SemiImplicitDarwin::ClearParticleVelocities()");
+    // This function sets the particle velocities to zero since the "corrector"
+    // velocity push only calculate the velocity due to acceleration from
+    // the inductive E-field. The actual velocities are still stored in u_n.
+
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+
+        // for (int lev = 0; lev <= finest_level; ++lev)
+        const int lev = 0;
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            auto particle_comps = pc->GetRealSoANames();
+
+            for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+
+                auto& attribs = pti.GetAttribs();
+                amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+                const long np = pti.numParticles();
+
+                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+                {
+                    ux[ip] = 0.0;
+                    uy[ip] = 0.0;
+                    uz[ip] = 0.0;
+                });
+            }
+        }
+    }
+}
+
+void SemiImplicitDarwin::FinishVelocityUpdate ()
+{
+    BL_PROFILE("SemiImplicitDarwin::FinishVelocityUpdate()");
+    // This function sets the particle velocities to include the acceleration
+    // from both the electrostatic field (currently held in u_n) and the
+    // inductive field (currently held in u)
+
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+
+        // for (int lev = 0; lev <= finest_level; ++lev)
+        const int lev = 0;
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            auto particle_comps = pc->GetRealSoANames();
+
+            for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+
+                auto& attribs = pti.GetAttribs();
+                amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+
+                const long np = pti.numParticles();
+
+                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+                {
+                    ux[ip] += ux_n[ip];
+                    uy[ip] += uy_n[ip];
+                    uz[ip] += uz_n[ip];
+                });
+            }
+        }
+    }
 }

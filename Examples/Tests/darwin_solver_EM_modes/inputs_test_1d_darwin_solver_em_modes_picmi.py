@@ -84,7 +84,7 @@ class EMModes(object):
             self.total_steps = int(self.LT * self.t_ci / self.dt)
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 100  # 50
+            self.total_steps = 1000  # 50
         # output diagnostics every 0.01 ion cyclotron periods
         self.diag_steps = 1  # max(int(0.01 * self.t_ci / self.dt), 1)
 
@@ -222,7 +222,7 @@ class EMModes(object):
         simulation.verbose = self.verbose
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
-            linear_solver=picmi.GMRESLinearSolver(max_iterations=50),
+            linear_solver=picmi.GMRESLinearSolver(max_iterations=0),
             projection_div_cleaner_rtol=1e-6,
         )
 
@@ -238,7 +238,6 @@ class EMModes(object):
                 density=self.n_plasma,
                 rms_velocity=[self.v_ti] * 3,
             ),
-            warpx_do_not_push=True,
         )
         simulation.add_species(
             self.ions,
@@ -254,7 +253,6 @@ class EMModes(object):
                 density=self.n_plasma,
                 rms_velocity=[self.v_te] * 3,
             ),
-            warpx_do_not_push=True,
         )
         simulation.add_species(
             self.electrons,
@@ -272,7 +270,10 @@ class EMModes(object):
             grid=self.grid,
             dt=self.dt,
             Csi=self.C_SI,
-            skip_es=True,  # skip_ms=True,
+            skip_es=True,
+            python_ms_solve=(
+                simulation.evolve_scheme.linear_solver.max_iterations == 0
+            ),
         )
         simulation.solver = self.solver
 

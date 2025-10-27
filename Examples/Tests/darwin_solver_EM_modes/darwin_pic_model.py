@@ -3,7 +3,7 @@ from numba import jit
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
-from pywarpx import callbacks, fields, particle_containers, picmi
+from pywarpx import callbacks, fields, picmi
 
 constants = picmi.constants
 
@@ -113,7 +113,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
     """
 
     def __init__(
-        self, simulation, grid, dt, Csi, skip_es=False, skip_ms=False, **kwargs
+        self, simulation, grid, dt, Csi, skip_es=False, python_ms_solve=None, **kwargs
     ):
         # Sanity check that this solver is appropriate to use
         if not isinstance(grid, picmi.Cartesian1DGrid):
@@ -122,16 +122,22 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.simulation = simulation
         self.grid = grid
         self.dt = dt
-        self.Csi = Csi
-
-        self.new_beta = True
 
         self.skip_es = skip_es
-        self.skip_ms = skip_ms
+        self.python_ms_solve = python_ms_solve
 
         super(OneD_DarwinSolver, self).__init__(
             grid=self.grid, method="Multigrid", required_precision=1, **kwargs
         )
+
+        if not skip_es:
+            self.es_solver = picmi.ElectrostaticSolver(
+                grid=self.grid,
+                required_precision=1e-6,
+                warpx_effective_potential=True,
+                warpx_effective_potential_factor=Csi,
+                warpx_self_fields_verbosity=0,
+            )
 
     def solver_initialize_inputs(self):
         """Grab geometrical quantities from the grid."""
@@ -145,16 +151,20 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.z_grid = np.linspace(self.z_min, self.z_max, self.nz + 1)
 
         # install callback to execute step 1
-        callbacks.installbeforedeposition(self.before_solve)
+        callbacks.installbeforedeposition(self.accumulate_j_and_susceptibility)
 
         # callback for ComputeRHS - step 2 is done in C++ with GMRES
         callbacks.installafterdeposition(self.compute_rhs)
 
-        # install callback to execute step 3
-        callbacks.installparticlescraper(self.after_solve)
+        # install callback to execute step 2 (for testing purposes)
+        if self.python_ms_solve:
+            callbacks.installparticlescraper(self.run_solve)
 
-        # install SIPIC Poisson solver (step 4)
-        callbacks.installpoissonsolver(self.run_poisson_solve)
+        # install SIPIC Poisson solver (step 4) to skip the ES evolution
+        if self.skip_es:
+            callbacks.installpoissonsolver(self.skip_poisson_solve)
+        else:
+            self.es_solver.solver_initialize_inputs()
 
         # install callback to create MF wrappers
         callbacks.installbeforeInitEsolve(self._after_init)
@@ -164,13 +174,9 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.B_x = fields.BxFPWrapper()
         self.B_y = fields.ByFPWrapper()
         self.B_z = fields.BzFPWrapper()
-        self.E_x = fields.ExFPWrapper()
-        self.E_y = fields.EyFPWrapper()
-        self.E_z = fields.EzFPWrapper()
         self.J_x = fields.JxFPWrapper()
         self.J_y = fields.JyFPWrapper()
         self.J_z = fields.JzFPWrapper()
-        self.phi = fields.PhiFPWrapper()
 
         # MFs for MS solve
         self.dA_x = fields.MultiFabWrapper(mf_name="dA_fp", idir=0, level=0)
@@ -178,21 +184,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.dA_z = fields.MultiFabWrapper(mf_name="dA_fp", idir=2, level=0)
         self.xi_fp = fields.MultiFabWrapper(mf_name="xi_fp", level=0)
 
-        # Vector potential MFs
-        self.A_x = fields.MultiFabWrapper(
-            mf_name="vector_potential_fp", idir=0, level=0
-        )
-        self.A_y = fields.MultiFabWrapper(
-            mf_name="vector_potential_fp", idir=1, level=0
-        )
-        self.A_z = fields.MultiFabWrapper(
-            mf_name="vector_potential_fp", idir=2, level=0
-        )
-
-        # copy of beta to time average
-        self.beta = np.ones(self.nz + 2)
-
-    def before_solve(self):
+    def accumulate_j_and_susceptibility(self):
         """
         Get partial velocity update, predicted current and susceptibility. Then
         calculate source vector for MS equation.
@@ -200,8 +192,8 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         # define arrays to store chi
         self.chi = np.zeros((3 * (self.nz + 1), 3 * (self.nz + 1)))
 
-        # -- Predictor velocity push, deposit J* and get chi_nn
-        self._predictor_step()
+        # -- Deposit J* and susceptibility
+        self._deposition_step()
 
         # get MS operator so it doesn't have to be done at every GMRES iteration
         self.operator = self._get_MS_operator()
@@ -225,36 +217,11 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.dA_z[...] = rhs[2 * self.nz + 2 : 3 * self.nz + 2]
         self.xi_fp[...] = rhs[3 * self.nz + 2 :]
 
-    def after_solve(self):
-        """Update E_sol field and push particles. Then update vector potential."""
+    def run_solve(self):
+        # did we skipped the MS solve in C++?
+        self._perform_MS_field_solve()
 
-        # we skipped the MS solve in C++
-        # self._perform_MS_field_solve()
-
-        # update E-field
-        self.E_x[...] = -self.dA_x[...] / self.dt
-        self.E_y[...] = -self.dA_y[...] / self.dt
-        self.E_z[...] = -self.dA_z[...] / self.dt
-
-        # push particles with E_sol
-        self._corrector_step()
-
-        # update vector potential
-        # dA^n is already calculated, so simply update A with
-        #    A^n+1/2 = A^n-1/2 + dA^n
-        self.A_x[...] += self.dA_x[...]
-        self.A_y[...] += self.dA_y[...]
-        self.A_z[...] += self.dA_z[...]
-
-        # set ghost cell values according to periodic boundary conditions
-        self.A_x[-2j:0] = self.A_x[-3:-1]
-        self.A_x[1j:3j] = self.A_x[1:3]
-        self.A_y[-2j:0] = self.A_y[-3:-1]
-        self.A_y[1j:3j] = self.A_y[1:3]
-        self.A_z[-2j:0] = self.A_z[-2:]
-        self.A_z[1j:3j] = self.A_z[:2]
-
-    def _predictor_step(self):
+    def _deposition_step(self):
         # define arrays to store jn_star
         jn_star = np.zeros((self.nz + 1, 3))
 
@@ -262,9 +229,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         Bx = (self.B_x[-1j:] + self.B_x[:2j]) / 2.0
         By = (self.B_y[-1j:] + self.B_y[:2j]) / 2.0
         Bz = self.B_z[:]
-
-        # grab Ez from phi, use constant Ez per cell
-        Ez = -(self.phi[1:] - self.phi[:-1]) / self.dz
 
         # start by looping over particles, pushing their velocities to v^*,
         # depositing J* and accumulate \Theta (cell average)
@@ -276,9 +240,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
             ux_idx = pc.get_real_comp_index("ux")
             uy_idx = pc.get_real_comp_index("uy")
             uz_idx = pc.get_real_comp_index("uz")
-            ux_old_idx = pc.get_real_comp_index("ux_n")
-            uy_old_idx = pc.get_real_comp_index("uy_n")
-            uz_old_idx = pc.get_real_comp_index("uz_n")
             w_idx = pc.get_real_comp_index("w")
 
             # iterate over particle levels
@@ -290,46 +251,29 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
                     # get position
                     z = np.array(soa.get_real_data(z_idx), copy=False)
-                    cell_idx = ((z - self.z_min) / self.dz).astype(int)
-                    # deal with rare cases where z == z_max (with SP particles)
-                    cell_idx[np.where(cell_idx == self.nz)] = self.nz - 1
 
                     # get velocities
                     ux = np.array(soa.get_real_data(ux_idx), copy=False)
                     uy = np.array(soa.get_real_data(uy_idx), copy=False)
                     uz = np.array(soa.get_real_data(uz_idx), copy=False)
 
-                    # get velocities at start of step (equals u at this point)
-                    ux_old = np.array(soa.get_real_data(ux_old_idx), copy=False)
-                    uy_old = np.array(soa.get_real_data(uy_old_idx), copy=False)
-                    uz_old = np.array(soa.get_real_data(uz_old_idx), copy=False)
-
                     # get weight
                     w = np.array(soa.get_real_data(w_idx), copy=False)
-
-                    # get B and E-field at particle
-                    bx = np.interp(z, self.z_grid, Bx)
-                    by = np.interp(z, self.z_grid, By)
-                    bz = np.interp(z, self.z_grid, Bz)
-                    ex = np.zeros_like(bx)
-                    ey = np.zeros_like(bx)
-                    ez = Ez[cell_idx]
-
-                    # push particle velocity with B and phi
-                    self._pushP(
-                        ux, uy, uz, bx, by, bz, ex, ey, ez, species.charge, species.mass
-                    )
 
                     # Accumalate w_p * q_p * (u_new + u_old)
                     self._deposit_current(
                         array=jn_star,
                         z=z,
-                        vx=ux + ux_old,
-                        vy=uy + uy_old,
-                        vz=uz + uz_old,
+                        vx=ux,
+                        vy=uy,
+                        vz=uz,
                         weight=species.charge * w,
                     )
 
+                    # get B at particle
+                    bx = np.interp(z, self.z_grid, Bx)
+                    by = np.interp(z, self.z_grid, By)
+                    bz = np.interp(z, self.z_grid, Bz)
                     theta = (
                         0.5
                         * self.dt
@@ -367,106 +311,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.J_y[...] = j_edge[self.nz + 1 : 2 * self.nz + 2]
         self.J_z[...] = j_edge[2 * self.nz + 2 :]
 
-    def _corrector_step(self):
-        # grab B and interpolate to nodes
-        Bx = (self.B_x[-1j:] + self.B_x[:2j]) / 2.0
-        By = (self.B_y[-1j:] + self.B_y[:2j]) / 2.0
-        Bz = self.B_z[:]
-
-        # grab E and interpolate to nodes
-        Ex = self.E_x[:]
-        Ey = self.E_y[:]
-        Ez = np.zeros_like(Ey)
-        Ez[1:-1] = (self.E_z[1:] + self.E_z[:-1]) / 2.0
-        Ez[0] = (self.E_z[0] + self.E_z[-1]) / 2.0
-        Ez[-1] = Ez[0]
-        # Ez = (self.E_z[-1j:] + self.E_z[:2j]) / 2.0
-
-        # push particles using the inductive E-field
-        multi_pc = self.simulation.extension.warpx.multi_particle_container()
-        for species in self.simulation.species:
-            pc = multi_pc.get_particle_container_from_name(species.name)
-
-            z_idx = pc.get_real_comp_index("z")
-            ux_idx = pc.get_real_comp_index("ux")
-            uy_idx = pc.get_real_comp_index("uy")
-            uz_idx = pc.get_real_comp_index("uz")
-            ux_old_idx = pc.get_real_comp_index("ux_n")
-            uy_old_idx = pc.get_real_comp_index("uy_n")
-            uz_old_idx = pc.get_real_comp_index("uz_n")
-
-            # iterate over particle levels
-            for lvl in range(pc.finest_level + 1):
-                # get every local chunk of particles
-                for pti in pc.iterator(pc, level=lvl):
-                    # attributes in SoA format
-                    soa = pti.soa()
-
-                    # get position
-                    z = np.array(soa.get_real_data(z_idx), copy=False)
-
-                    # get velocities
-                    ux = np.array(soa.get_real_data(ux_idx), copy=False)
-                    uy = np.array(soa.get_real_data(uy_idx), copy=False)
-                    uz = np.array(soa.get_real_data(uz_idx), copy=False)
-
-                    # store current particle velocities as "old" velocity
-                    ux_old = np.array(soa.get_real_data(ux_old_idx), copy=False)
-                    uy_old = np.array(soa.get_real_data(uy_old_idx), copy=False)
-                    uz_old = np.array(soa.get_real_data(uz_old_idx), copy=False)
-                    ux_old[...] = ux[...]
-                    uy_old[...] = uy[...]
-                    uz_old[...] = uz[...]
-
-                    # set particle velocity to zero to only have magnetic
-                    # rotation from inductive E-field kick
-                    ux[...] = 0.0
-                    uy[...] = 0.0
-                    uz[...] = 0.0
-
-                    # get B and E-field at particle
-                    bx = np.interp(z, self.z_grid, Bx)
-                    by = np.interp(z, self.z_grid, By)
-                    bz = np.interp(z, self.z_grid, Bz)
-                    ex = np.interp(z, self.z_grid, Ex)
-                    ey = np.interp(z, self.z_grid, Ey)
-                    ez = np.interp(z, self.z_grid, Ez)
-
-                    # push particle velocity with B and E_ind
-                    self._pushP(
-                        ux, uy, uz, bx, by, bz, ex, ey, ez, species.charge, species.mass
-                    )
-                    # add earlier partially pushed velocities
-                    ux[...] += ux_old[...]
-                    uy[...] += uy_old[...]
-                    uz[...] += uz_old[...]
-                    # push particle position forward
-                    z[...] += uz * self.dt
-
-    def _pushP(self, ux, uy, uz, bx, by, bz, ex, ey, ez, q, m):
-        # collect vectors
-        vel = np.asarray([ux, uy, uz]).T
-        B = np.asarray([bx, by, bz]).T
-        E = np.asarray([ex, ey, ez]).T
-
-        # add first half of electric impulse
-        hqmdt = 0.5 * self.dt * q / m
-        vel += hqmdt * E
-
-        # rotate to add magnetic field
-        t = B * hqmdt
-        s = 2.0 * t / (1 + (t * t).sum(axis=1, keepdims=True))
-        vprime = vel + np.cross(vel, t)
-        vel += np.cross(vprime, s)
-
-        # add second half of electric impulse
-        vel += hqmdt * E
-
-        # write new velocity values to particle arrays
-        ux[...] = vel[:, 0]
-        uy[...] = vel[:, 1]
-        uz[...] = vel[:, 2]
-
     def _deposit_current(self, array, z, vx, vy, vz, weight):
         """Function to deposit current onto nodal grid with shape function 1."""
         # get left array index
@@ -492,9 +336,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
             )
 
     def _perform_MS_field_solve(self):
-        if self.skip_ms:
-            return
-
         # Allocate array for the source vector
         source = np.zeros(3 * self.nz + 2 + self.nz + 1)
 
@@ -514,27 +355,8 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.dA_y[...] = solution[self.nz + 1 : 2 * self.nz + 2]
         self.dA_z[...] = solution[2 * self.nz + 2 : 3 * self.nz + 2]
 
-        # TODO confirm the divergence properties
-        # print(np.max(np.abs(self.dA_x)), np.max(np.abs(self.dA_z)))
-        # assert np.allclose(self.dA_z, 0.0, atol=1e-6)
-        # assert np.allclose(np.dot(M[3*self.nz+2:], solution), 0.0, atol=1e-6)
-
         # force dA_z to be zero since in 1d non-zero values here are noise
         self.dA_z[...] = 0.0
-
-        # M = L + np.dot(Bf, np.dot(chi, Be))
-        # print(np.dot(M, dZ))
-        # print(self.dZ_x[-2j:0], self.dZ_x[-3:], self.dZ_x[()].shape, self.dZ_x[...].shape)
-        # import matplotlib.pyplot as plt
-        # # plt.plot(self.dZ_x.mesh('z', include_ghosts=True), self.dZ_x[()], 's--')
-        # # plt.plot(self.dZ_x.mesh('z', include_ghosts=False), self.dZ_x[...], 'o--')
-        # # plt.plot(np.dot(M, dZ))
-        # plt.plot(self.dA_y, ls='--', marker='s')
-        # # plt.plot(self.dZ_y[...])
-        # # plt.plot(dxi, ls='--', marker='s')
-        # plt.plot(np.dot(M[3*self.nz+2:], solution), ls='--', marker='s')
-        # plt.show()
-        # exit()
 
     def _get_MS_operator(self):
         # Now construct the linear operator of the MS equation
@@ -563,29 +385,6 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         M[3 * self.nz + 2 :, : 3 * self.nz + 2] = K
         M[3 * self.nz + 2 :, 3 * self.nz + 2 :] = -constants.mu0 * self._get_laplacian()
         return M
-
-    def _divergence_clean_J(self):
-        # In 1d divergence cleaning means just setting Jz equal to it's
-        # average
-        self.J_z[...] = np.mean(self.J_z[...])
-        return
-
-        # divergence cleaning is done by solving \nabla^2 \xi = -\nabla\cdot J
-        # for xi and then calculating J += \nabla\xi
-        # get source vector
-        source = np.zeros(3 * self.nz + 2)
-        source[: self.nz + 1] = self.J_x[...]
-        source[self.nz + 1 : 2 * self.nz + 2] = self.J_y[...]
-        source[2 * self.nz + 2 :] = self.J_z[...]
-
-        # get the Laplacian operator
-        L = csc_matrix(-self._get_laplacian())
-
-        lu = sla.splu(L)
-        xi = lu.solve(np.dot(self._get_divergence(), source))
-
-        # divergence clean J
-        self.J_z[...] += (xi[1:] - xi[:-1]) / self.dz
 
     def _get_laplacian(self):
         L = np.zeros((self.nz + 1, self.nz + 1))
@@ -619,59 +418,13 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         L[-1, 2 * self.nz + 2] = 1.0 / self.dz**2
         L[2 * self.nz + 2, -1] = 1.0 / self.dz**2
 
-        # L = (
-        #     np.dot(self._get_gradient_full(), self._get_divergence())
-        #     - np.dot(self._get_curl_face_to_edge(), self._get_curl_edge_to_face())
-        # )
-
         return L
-
-    def _get_curl_face_to_edge(self):
-        """Face to edge curl."""
-        Be = np.zeros((3 * self.nz + 2, 3 * self.nz + 1))
-        idx = np.arange(self.nz)
-        # x-component
-        Be[idx, idx + self.nz] = -1.0 / self.dz
-        Be[idx[1:], idx[:-1] + self.nz] = 1.0 / self.dz
-        # add entries to enforce periodicity
-        Be[0, 2 * self.nz - 1] = 1.0 / self.dz
-        Be[self.nz, 2 * self.nz - 1] = 1.0 / self.dz
-        Be[self.nz, self.nz] = -1.0 / self.dz
-
-        # y-component
-        Be[idx + self.nz + 1, idx] = 1.0 / self.dz
-        Be[idx[1:] + self.nz + 1, idx[:-1]] = -1.0 / self.dz
-        # add entries to enforce periodicity
-        Be[self.nz + 1, self.nz - 1] = -1.0 / self.dz
-        Be[2 * self.nz + 1, self.nz - 1] = -1.0 / self.dz
-        Be[2 * self.nz + 1, 0] = 1.0 / self.dz
-
-        return Be
-
-    def _get_curl_edge_to_face(self):
-        """Edge to face curl."""
-        Bf = np.zeros((3 * self.nz + 1, 3 * self.nz + 2))
-        idx = np.arange(self.nz)
-        # x-component
-        Bf[idx, idx + self.nz + 1] = 1.0 / self.dz
-        Bf[idx, idx + self.nz + 2] = -1.0 / self.dz
-        # y-component
-        Bf[idx + self.nz, idx] = -1.0 / self.dz
-        Bf[idx + self.nz, idx + 1] = 1.0 / self.dz
-        return Bf
 
     def _get_gradient(self):
         D = np.zeros((self.nz, self.nz + 1))
         idx = np.arange(self.nz)
         D[idx, idx + 1] = 1.0 / self.dz
         D[idx, idx] = -1.0 / self.dz
-        return D
-
-    def _get_gradient_full(self):
-        D = np.zeros((2 * self.nz + 2 + self.nz, self.nz + 1))
-        idx = np.arange(self.nz)
-        D[2 * self.nz + 2 + idx, idx + 1] = 1.0 / self.dz
-        D[2 * self.nz + 2 + idx, idx] = -1.0 / self.dz
         return D
 
     def _get_divergence(self):
@@ -707,83 +460,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         A[idx + 2 * self.nz + 2, idx + 2 * self.nz + 3] = 1.0 / 2.0
         return A
 
-    def decompose_matrix(self):
-        """Function to build the superLU object used to solve the Poisson
-        system."""
-        self.nsolve = self.nz + 1
-
-        # Set up the matrix in order to solve (\nabla \cdot \beta\nabla)phi = rho/eps0
-        beta = np.ones(self.nsolve + 1)
-
-        w_p = self._get_wpe()
-        beta += self.Csi * (w_p * self.dt) ** 2 / 4.0
-
-        if not self.new_beta:
-            self.beta = 0.95 * self.beta + 0.05 * beta
-        else:
-            self.beta = 0.0 * self.beta + 1.0 * beta
-            self.new_beta = False
-        beta[:] = self.beta[:]
-
-        A = np.zeros((self.nsolve, self.nsolve))
-        idx = np.arange(self.nsolve)
-        A[idx, idx] = -beta[idx + 1] - beta[idx]
-        A[idx[1:], idx[:-1]] = beta[idx[1:]]
-        A[idx[:-1], idx[1:]] = beta[idx[1:]]
-
-        assert beta[0] == beta[-2]
-        assert A[0, 0] == A[-1, -1]
-
-        A = csc_matrix(A, dtype=np.float64)
-        self.lu = sla.splu(A)
-
-    def run_poisson_solve(self):
-        """Function run on every step to perform the required steps to solve
-        Poisson's equation."""
-        if self.skip_es:
-            return
-
-        # build linear operator
-        self.decompose_matrix()
-
-        # get rho from WarpX
-        self.rho_data = fields.RhoFPWrapper(0)[...]
-        # run superLU solver to get phi
-        self.poisson_solve()
-
-    def poisson_solve(self):
-        """The solution step. Includes getting the boundary potentials and
-        calculating phi from rho."""
-
-        # Construct b vector
-        rho = -self.rho_data / constants.ep0
-        b = np.zeros(rho.shape[0], dtype=np.float64)
-        b[:] = rho * self.dz**2
-
-        phi = self.lu.solve(b)
-
-        # write phi to WarpX
-        self.phi[...] = phi
-
-    def _get_wpe(self):
-        pc = particle_containers.ParticleContainerWrapper("electron")
-
-        # Use cell particle count to get density
-        # electron_n_mf = pc.particle_container.get_number_density(lev=0)
-        # electron_n = np.zeros(electron_n_mf.shape[0]+2)
-        # electron_n[1:-1] = fields.MultiFabWrapper(electron_n_mf, level=0)[()]
-        # electron_n[0] = electron_n[-2]
-        # electron_n[-1] = electron_n[1]
-
-        # Deposit density using particle shape function
-        electron_rho_mf = pc.particle_container.get_charge_density(lev=0, local=False)
-        electron_rho = fields.MultiFabWrapper(electron_rho_mf, level=0)[()]
-        nghost = 2 * self.simulation.particle_shape - 1
-        # average to cell centers
-        electron_n = (
-            -0.5
-            * (electron_rho[2 + nghost :] + electron_rho[: -nghost - 2])
-            / constants.q_e
-        )
-
-        return constants.q_e * np.sqrt(electron_n / (constants.ep0 * constants.m_e))
+    def skip_poisson_solve(self):
+        """Function run on every step to perform a null solve of Poisson's
+        equation."""
+        pass
