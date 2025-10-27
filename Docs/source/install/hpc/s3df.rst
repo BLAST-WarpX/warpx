@@ -23,7 +23,7 @@ If you are new to this system, **please see the following resources**:
 Preparation
 -----------
 
-Log in to one of the pools. You can find a list of available pools `here <https://s3df.slac.stanford.edu/#/interactive-compute?id=using-a-terminal>`__. Here we will install WarpX on the iana pool:
+After connecting to the S3DF log in to one of the pools. You can find a list of available pools `here <https://s3df.slac.stanford.edu/#/interactive-compute?id=using-a-terminal>`__. Here we will install WarpX on the iana pool:
 
 .. code-block:: bash
 
