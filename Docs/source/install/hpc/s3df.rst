@@ -172,11 +172,11 @@ As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_pm_*`` 
 Running
 -------
 
-For gemeral instructions refer to `here <https://warpx.readthedocs.io/en/latest/usage/how_to_run.html#run>`__.
+For general instructions refer to `here <https://warpx.readthedocs.io/en/latest/usage/how_to_run.html#run>`__.
 
 On CPU Nodes
 
-The Perlmutter CPU partition as up to `3072 nodes <https://docs.nersc.gov/systems/perlmutter/architecture/>`__, each with 2x AMD EPYC 7763 CPUs.
+The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (see `here <https://docs.nersc.gov/systems/perlmutter/architecture/>`__.
 
 .. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/perlmutter_cpu.sbatch
   :language: bash
