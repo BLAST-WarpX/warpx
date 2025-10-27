@@ -42,8 +42,8 @@ Use the following command to download the WarpX source code:
 Compilation
 -----------
 
-S3DF is missing some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under `~/.local`.
-The version of `cmake` currently provided by S3DF is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer `cmake` manually:
+S3DF is missing some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under ``~/.local``.
+The version of ``cmake`` currently provided by S3DF is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer ``cmake`` manually:
 
 .. code-block:: bash
 
