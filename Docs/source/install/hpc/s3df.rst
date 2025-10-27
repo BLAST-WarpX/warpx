@@ -72,9 +72,9 @@ There are additional packages required to compile WarpX such as openmpi to enabl
 
 .. code-block:: bash
 
-export PATH=$HOME/.local/bin:$PATH
-export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
-export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+   export PATH=$HOME/.local/bin:$PATH
+   export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+   export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
 
 .. _building-s3df-paths:
 
