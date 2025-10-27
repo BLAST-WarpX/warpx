@@ -87,7 +87,7 @@ CPU Nodes
    cd $HOME/src/warpx
    rm -rf build
 
-In ``CMakeLists.txt`` toggle the relevant options:
+In ``CMakeLists.txt`` you can either toggle the relevant options:
 
 .. code-block:: python
 
@@ -117,6 +117,7 @@ In ``CMakeLists.txt`` toggle the relevant options:
   option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
   option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
 
+or append the options in the format `cmake -S . -B build -DWarpX_FFT=ON -WarpX_QED=ON` when calling the build command.
 
 Build and compile WarpX:
 
