@@ -117,18 +117,6 @@ In ``CMakeLists.txt`` toggle the relevant options:
   option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
   option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
 
-To build WarpX with ``fftw`` support:
-
-.. code-block:: bash
-
-  cd $HOME
-  wget http://www.fftw.org/fftw-3.3.10.tar.gz
-  tar -xzf fftw-3.3.10.tar.gz
-  cd fftw-3.3.10
-  ./configure --prefix=$FFTW_DIR --enable-shared --enable-threads
-  make -j$(nproc)
-  make install
-  export PKG_CONFIG_PATH=$HOME/opt/fftw/lib/pkgconfig:$PKG_CONFIG_PATH
 
 Build and compile WarpX:
 
