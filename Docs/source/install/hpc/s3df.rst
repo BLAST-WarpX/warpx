@@ -16,14 +16,22 @@ If you are new to this system, **please see the following resources**:
 * `Jupyter service <https://usatlas.readthedocs.io/projects/af-docs/en/latest/jupyter/SLACjupyter/>`__
 * `Filesystems <https://s3df.slac.stanford.edu/#/reference?id=backup>`__:
 
-  * ``$HOME``: sdfhome, per-user directory, default `quota <https://s3df.slac.stanford.edu/#/reference?id=storagequota>`__ 30GB
+  * ``$HOME``: sdfhome, per-user directory, default `quota <https://s3df.slac.stanford.edu/#/reference?id=storagequota>`__: 30GB
 
 .. _building-s3df-preparation:
 
 Preparation
 -----------
 
-Use the following commands to download the WarpX source code:
+Log in to one of the pools. You can find a list of available pools `here <https://s3df.slac.stanford.edu/#/interactive-compute?id=using-a-terminal>`__. Here we will install WarpX on the iana pool:
+
+.. code-block:: bash
+
+   ssh iana
+
+.. _building-s3df-compilation:
+
+Use the following command to download the WarpX source code:
 
 .. code-block:: bash
 
@@ -33,6 +41,37 @@ Use the following commands to download the WarpX source code:
 
 Compilation
 -----------
+
+S3DF is missing some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under `~/.local`:
+
+.. code-block:: bash
+
+   cd 
+   wget https://github.com/Kitware/CMake/releases/download/v4.2.0-rc1/cmake-4.2.0-rc1-linux-x86_64.sh
+   bash cmake-4.2.0-rc1-linux-x86_64.sh --skip-license --prefix=$HOME/.local
+   export PATH=$HOME/.local/bin:$PATH
+   cmake --version
+.. _building-s3df-cmake:
+the last command should print `cmake version 4.2.0-rc1`.
+
+There are additional packages required to compile WarpX. The general recipe to locally install them under `~/.local` is below:
+
+.. code-block:: bash
+
+   cd 
+   wget <url-to-package>
+   cd <package>
+   ./configure --prefix=$HOME/.local
+   make -j$(nproc)
+   make install
+
+.. _building-s3df-packages:
+
+.. code-block:: bash
+export PATH=$HOME/.local/bin:$PATH
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+.. _building-s3df-paths:
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
@@ -139,7 +178,7 @@ As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_pm_*`` 
 Running
 -------
 
-On login node, refer to `here <https://warpx.readthedocs.io/en/latest/usage/how_to_run.html#run>`__.
+For gemeral instructions refer to `here <https://warpx.readthedocs.io/en/latest/usage/how_to_run.html#run>`__.
 
 On CPU Nodes
 
