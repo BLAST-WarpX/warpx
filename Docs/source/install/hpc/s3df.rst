@@ -42,7 +42,8 @@ Use the following command to download the WarpX source code:
 Compilation
 -----------
 
-S3DF is missing some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under `~/.local`:
+S3DF is missing some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under `~/.local`.
+The version of `cmake` currently provided by S3DF is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer `cmake` manually:
 
 .. code-block:: bash
 
@@ -51,10 +52,12 @@ S3DF is missing some of the packages needed for installing WarpX. The best pract
    bash cmake-4.2.0-rc1-linux-x86_64.sh --skip-license --prefix=$HOME/.local
    export PATH=$HOME/.local/bin:$PATH
    cmake --version
+
 .. _building-s3df-cmake:
+
 the last command should print `cmake version 4.2.0-rc1`.
 
-There are additional packages required to compile WarpX. The general recipe to locally install them under `~/.local` is below:
+There are additional packages required to compile WarpX such as openmpi to enable MPI support. The general recipe to locally install such backages under `~/.local` is:
 
 .. code-block:: bash
 
@@ -68,9 +71,11 @@ There are additional packages required to compile WarpX. The general recipe to l
 .. _building-s3df-packages:
 
 .. code-block:: bash
+
 export PATH=$HOME/.local/bin:$PATH
 export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
 export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+
 .. _building-s3df-paths:
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
