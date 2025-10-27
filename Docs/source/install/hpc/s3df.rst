@@ -176,7 +176,7 @@ For general instructions refer to `here <https://warpx.readthedocs.io/en/latest/
 
 On CPU Nodes
 
-The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (see `here <https://docs.nersc.gov/systems/perlmutter/architecture/>`__.
+The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (see `here <https://docs.nersc.gov/systems/perlmutter/architecture/>`__).
 
 .. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/perlmutter_cpu.sbatch
   :language: bash
