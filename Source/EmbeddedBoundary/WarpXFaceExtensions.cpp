@@ -290,14 +290,14 @@ namespace
         }
     #else
         else if(dim == 1){
-            WARPX_ABORT_WITH_MESSAGE("GetNeigh: Only implemented in 2D3V and 3D3V");
+            amrex::Abort("GetNeigh: Only implemented in 2D3V and 3D3V");
         }
         else if(dim == 2){
             return arr(i + i_n, j + j_n, k);
         }
     #endif
 
-        WARPX_ABORT_WITH_MESSAGE("GetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("GetNeigh: dim must be 0, 1 or 2");
 
         return -1;
     }
@@ -345,7 +345,7 @@ namespace
         }
     #else
         else if(dim == 1){
-            WARPX_ABORT_WITH_MESSAGE("SetNeigh: Only implemented in 2D3V and 3D3V");
+            amrex::Abort("SetNeigh: Only implemented in 2D3V and 3D3V");
         }
         else if(dim == 2){
             arr(i + i_n, j + j_n, k) = val;
@@ -353,7 +353,7 @@ namespace
         }
     #endif
 
-        WARPX_ABORT_WITH_MESSAGE("SetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("SetNeigh: dim must be 0, 1 or 2");
     }
 
 #ifdef AMREX_USE_EB
