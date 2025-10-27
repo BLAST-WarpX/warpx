@@ -55,7 +55,7 @@ The version of ``cmake`` currently provided by S3DF is 3.20.2 but WarpX requires
 
 .. _building-s3df-cmake:
 
-the last command should print `cmake version 4.2.0-rc1`.
+the last command should print ``cmake version 4.2.0-rc1``.
 
 There are additional packages required to compile WarpX such as openmpi to enable MPI support. The general recipe to locally install such backages under `~/.local` is:
 
