@@ -356,7 +356,7 @@ namespace
         WARPX_ABORT_WITH_MESSAGE("SetNeigh: dim must be 0, 1 or 2");
     }
 
-
+#ifdef AMREX_USE_EB
 
     /**
     * \brief For the face of cell pointing in direction idim, return the number of faces
@@ -484,6 +484,7 @@ namespace
         return n_borrow;
     }
 
+    #endif //AMREX_USE_EB
 }
 
 
