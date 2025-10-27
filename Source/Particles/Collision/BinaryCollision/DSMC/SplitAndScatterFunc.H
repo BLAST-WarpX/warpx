@@ -403,7 +403,7 @@ public:
                 const amrex::ParticleReal E2 = (
                     0.5_prt * m2 * (ux_p2*ux_p2 + uy_p2*uy_p2 + uz_p2*uz_p2) / PhysConst::q_e
                 );
-                const amrex::ParticleReal E_coll = (E1 + E2);
+                const amrex::ParticleReal E_coll = E1 + E2;
 
                 // subtract the energy cost for ionization
                 const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
@@ -435,21 +435,21 @@ public:
                 // After C is determined the momentum vectors are arranged
                 // such that the net linear momentum is zero.
 
-                const double n_2 = std::min(static_cast<double>(E2 / E_coll), 0.5_rt * amrex::Random(engine));
+                const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
 
                 // find ellipse semi-major and minor axis
-                const double a = 0.5_rt * (1.0_rt - n_2);
-                const double b = 0.5_rt * std::sqrt(1.0_rt - 2.0_rt * n_2);
+                const double a = 0.5 * (1.0 - n_2);
+                const double b = 0.5 * std::sqrt(1.0 - 2.0 * n_2);
 
                 // sample random x value and calculate y
-                const double x = (2._rt * amrex::Random(engine) - 1.0_rt) * a;
+                const double x = (2.0 * amrex::Random(engine) - 1.0) * a;
                 const double y2 = b*b - b*b/(a*a) * x*x;
-                const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25_rt*n_2*n_2);
-                const double n_1 = 1.0_rt - n_0 - n_2;
+                const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25*n_2*n_2);
+                const double n_1 = 1.0 - n_0 - n_2;
 
                 // calculate the value of C
                 const double C = std::sqrt(E_out / (
-                    n_0*n_0 / (2.0_rt * m1) + n_1*n_1 / (2.0_rt * mass_product1) + n_2*n_2 / (2.0_rt * mass_product2)
+                    n_0*n_0 / (2.0 * m1) + n_1*n_1 / (2.0 * mass_product1) + n_2*n_2 / (2.0 * mass_product2)
                 ));
 
                 // Now that appropriate momenta are set for each outgoing species
@@ -457,13 +457,13 @@ public:
                 // that the net linear momentum in the current frame is 0.
                 // This is achieved by arranging the momentum vectors in
                 // a triangle and finding the required angles between the vectors.
-                const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0_rt * n_0 * n_1);
-                const double sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0_rt * n_0 * n_2);
-                const double sin_gamma = std::sqrt(1.0_rt - cos_gamma*cos_gamma);
+                const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0 * n_0 * n_1);
+                const double sin_alpha = std::sqrt(1.0 - cos_alpha*cos_alpha);
+                const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0 * n_0 * n_2);
+                const double sin_gamma = std::sqrt(1.0 - cos_gamma*cos_gamma);
 
                 // choose random theta and phi values (orientation of the triangle)
-                const double Theta = amrex::Random(engine) * 2.0_rt * MathConst::pi;
+                const double Theta = amrex::Random(engine) * 2.0 * MathConst::pi;
                 const double phi = amrex::Random(engine) * MathConst::pi;
 
                 const double cos_theta = std::cos(Theta);
