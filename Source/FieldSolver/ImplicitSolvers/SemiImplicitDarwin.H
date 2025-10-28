@@ -57,7 +57,7 @@ public:
                       bool             a_from_jacobian ) override;
 
     void PrepareCurrentDeposition ();
-    void AccumulateCurrentAndMassMatrices ();
+    void AccumulateCurrentAndSusceptibility ();
     void CalculateSourceVector ();
     void UpdateEandAfromdA( int astep );
     void ClearParticleVelocities ();

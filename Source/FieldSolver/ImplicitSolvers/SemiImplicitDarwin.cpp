@@ -149,11 +149,12 @@ void SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
     }
 
     // Prepare current deposition by setting particle velocities to twice the
-    // t = n velocity values
+    // t = n velocity values (with just the ES acceleration applied for the
+    // advanced velocity)
     PrepareCurrentDeposition();
 
-    // Accumulate current* and susceptibility (mass matrix)
-    //AccumulateCurrentAndMassMatrices();
+    // Accumulate current* and susceptibility (mass matrices)
+    AccumulateCurrentAndSusceptibility();
 
     {
         // TEMPORARY HACK TO TEST SOLVER - THIS CALLBACK IS NOT OTHERWISE USED
@@ -296,45 +297,85 @@ void SemiImplicitDarwin::PrepareCurrentDeposition ()
     }
 }
 
-void AccumulateCurrentAndMassMatrices ()
+void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
 {
+    /*
+        Note: The functionality here deposits current to the Yee grid (and
+        accumulates the susceptibility to a staggered grid). The Darwin model
+        actually requires the depositions to be done to nodal grids!
+        This should be fixed for > 1d!!
+        (In 1d the z-current component is basically divergence cleaned away.)
+    */
+
+    BL_PROFILE("SemiImplicitDarwin::AccumulateCurrentAndSusceptibility()");
+    // This function sets the particle velocities to zero since the "corrector"
+    // velocity push only calculate the velocity due to acceleration from
+    // the inductive E-field. The actual velocities are still stored in u_n.
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     const int lev = 0;
 
-    // amrex::MultiFab * jx = fields.get(FieldType::current_fp, Direction{0}, lev);
-    // amrex::MultiFab * jy = fields.get(FieldType::current_fp, Direction{1}, lev);
-    // amrex::MultiFab * jz = fields.get(FieldType::current_fp, Direction{2}, lev);
-    // amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
-    // amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
-    // amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
-    // amrex::MultiFab * Syx = fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
-    // amrex::MultiFab * Syy = fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
-    // amrex::MultiFab * Syz = fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
-    // amrex::MultiFab * Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
-    // amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
-    // amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
+    amrex::MultiFab * jx = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev);
+    amrex::MultiFab * jy = m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev);
+    amrex::MultiFab * jz = m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
+    amrex::MultiFab * Sxx = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
+    amrex::MultiFab * Sxy = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
+    amrex::MultiFab * Sxz = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
+    amrex::MultiFab * Syx = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
+    amrex::MultiFab * Syy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
+    amrex::MultiFab * Syz = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
+    amrex::MultiFab * Szx = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
+    amrex::MultiFab * Szy = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
+    amrex::MultiFab * Szz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
 
     // clear MultiFabs in preparation for new deposit
-    // jx->setVal(0.0);
-    // jy->setVal(0.0);
-    // jz->setVal(0.0);
-    // Sxx->setVal(0.0);
-    // Sxy->setVal(0.0);
-    // Sxz->setVal(0.0);
-    // Syx->setVal(0.0);
-    // Syy->setVal(0.0);
-    // Syz->setVal(0.0);
-    // Szx->setVal(0.0);
-    // Szy->setVal(0.0);
-    // Szz->setVal(0.0);
+    jx->setVal(0.0);
+    jy->setVal(0.0);
+    jz->setVal(0.0);
+    Sxx->setVal(0.0);
+    Sxy->setVal(0.0);
+    Sxz->setVal(0.0);
+    Syx->setVal(0.0);
+    Syy->setVal(0.0);
+    Syz->setVal(0.0);
+    Szx->setVal(0.0);
+    Szy->setVal(0.0);
+    Szz->setVal(0.0);
+
+    // Grab B-field MFs since it is needed for the susceptibility
+    amrex::MultiFab & Bx = *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev);
+    amrex::MultiFab & By = *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev);
+    amrex::MultiFab & Bz = *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev);
 
     // loop over particle containers
-    //      loop over particles
-    //           Get average velocity * 2 and write new velocity into "stored" index
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
 
-            // DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
-            //                 Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
-            //                 bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
+        // TODO: Add omp support
+        const int thread_num = 0;
 
+        for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti)
+        {
+            // Extract particle data
+            auto& attribs = pti.GetAttribs();
+            auto&  wp = attribs[PIdx::w];
+            auto& uxp = attribs[PIdx::ux];
+            auto& uyp = attribs[PIdx::uy];
+            auto& uzp = attribs[PIdx::uz];
+
+            const long np = pti.numParticles();
+
+            // Data on the grid
+            amrex::FArrayBox const* bxfab = &Bx[pti];
+            amrex::FArrayBox const* byfab = &By[pti];
+            amrex::FArrayBox const* bzfab = &Bz[pti];
+
+            pc->DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
+                            Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
+                            bxfab, byfab, bzfab, 0, np, thread_num, lev, lev, m_dt);
+        }
+    }
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()

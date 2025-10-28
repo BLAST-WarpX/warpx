@@ -270,7 +270,7 @@ class EMModes(object):
             grid=self.grid,
             dt=self.dt,
             Csi=self.C_SI,
-            skip_es=True,
+            skip_es=(self.B_dir == "z"),
             python_ms_solve=(
                 simulation.evolve_scheme.linear_solver.max_iterations == 0
             ),

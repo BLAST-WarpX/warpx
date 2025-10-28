@@ -300,16 +300,23 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         jn_star[0, 2] = jn_star[0, 2] + jn_star[-1, 2]
         jn_star[-1, 2] = jn_star[0, 2]
 
-        # get the node to edge averaging operator
-        A = self._get_node_to_edge_average()
-
         # Interpolate jn_star to the edges
-        j_edge = np.dot(A, jn_star.T.flatten())
+        # j_edge = np.dot(self._get_node_to_edge_average(), jn_star.T.flatten())
+
+        ## code to check if nodal current deposition works as intended ##
+        # import matplotlib.pyplot as plt
+        # plt.plot(j_edge[2 * self.nz + 2 :][1:-1], 'o--')
+        # plt.plot(self.J_z[...][1:-1], 'o--')
+        # plt.show()
+        # exit()
+        # assert np.allclose(self.J_x[...], j_edge[: self.nz + 1])
+        # assert np.allclose(self.J_y[...], j_edge[self.nz + 1 : 2 * self.nz + 2])
+        # assert np.allclose(self.J_z[...], j_edge[2 * self.nz + 2 :])
 
         # Populate the current multifab
-        self.J_x[...] = j_edge[: self.nz + 1]
-        self.J_y[...] = j_edge[self.nz + 1 : 2 * self.nz + 2]
-        self.J_z[...] = j_edge[2 * self.nz + 2 :]
+        # self.J_x[...] = j_edge[: self.nz + 1]
+        # self.J_y[...] = j_edge[self.nz + 1 : 2 * self.nz + 2]
+        # self.J_z[...] = j_edge[2 * self.nz + 2 :]
 
     def _deposit_current(self, array, z, vx, vy, vz, weight):
         """Function to deposit current onto nodal grid with shape function 1."""
