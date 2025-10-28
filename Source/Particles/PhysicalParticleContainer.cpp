@@ -339,9 +339,9 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     // Add the average momentum components to deposit the current correctly
     // if the position push is split to perform collisions
-    this->AddRealComp("ux_avg", /*communicate=*/0);
-    this->AddRealComp("uy_avg", /*communicate=*/0);
-    this->AddRealComp("uz_avg", /*communicate=*/0);
+    AddRealComp("ux_avg");
+    AddRealComp("uy_avg");
+    AddRealComp("uz_avg");
 }
 
 void
