@@ -412,6 +412,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
                                  AMREX_D_DECL(box.length(0),
                                               box.length(1),
                                               box.length(2)));
+            amrex::Gpu::streamSynchronize();
             std::swap(m_fab,tmp);
             m_FC_data_cpu.reset();
         }
