@@ -98,11 +98,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         """Function run on every step to perform the required steps to solve
         Poisson's equation."""
         # get rho from WarpX
-        self.rho_data = fields.RhoFPWrapper(0, False)[...]
+        self.rho_data = fields.RhoFPWrapper(0)[...]
         # run superLU solver to get phi
         self.solve()
         # write phi to WarpX
-        fields.PhiFPWrapper(0, True)[...] = self.phi[:]
+        fields.PhiFPWrapper(0)[()] = self.phi[:]
 
     def solve(self):
         """The solution step. Includes getting the boundary potentials and
@@ -268,32 +268,55 @@ class CapacitiveDischargeExample(object):
         #######################################################################
 
         cross_sec_direc = "../../../../warpx-data/MCC_cross_sections/He/"
-        electron_colls = picmi.MCCCollisions(
-            name="coll_elec",
-            species=self.electrons,
-            background_density=self.gas_density,
-            background_temperature=self.gas_temp,
-            background_mass=self.ions.mass,
-            ndt=self.mcc_subcycling_steps,
-            scattering_processes={
-                "elastic": {
-                    "cross_section": cross_sec_direc + "electron_scattering.dat"
-                },
-                "excitation1": {
-                    "cross_section": cross_sec_direc + "excitation_1.dat",
-                    "energy": 19.82,
-                },
-                "excitation2": {
-                    "cross_section": cross_sec_direc + "excitation_2.dat",
-                    "energy": 20.61,
-                },
-                "ionization": {
-                    "cross_section": cross_sec_direc + "ionization.dat",
-                    "energy": 24.55,
-                    "species": self.ions,
-                },
+
+        electron_scattering_processes = {
+            "elastic": {"cross_section": cross_sec_direc + "electron_scattering.dat"},
+            "excitation1": {
+                "cross_section": cross_sec_direc + "excitation_1.dat",
+                "energy": 19.82,
             },
-        )
+            "excitation2": {
+                "cross_section": cross_sec_direc + "excitation_2.dat",
+                "energy": 20.61,
+            },
+            "ionization": {
+                "cross_section": cross_sec_direc + "ionization.dat",
+                "energy": 24.55,
+                "species": self.ions,
+            },
+        }
+        if self.dsmc:
+            ionization = {"ionization": electron_scattering_processes.pop("ionization")}
+            ionization["ionization"]["target_species"] = self.neutrals
+            ionization["ionization"].pop("species")
+            electron_colls_dsmc = picmi.DSMCCollisions(
+                name="coll_elec_dsmc",
+                species=[self.electrons, self.neutrals],
+                product_species=[self.electrons, self.ions],
+                ndt=4,
+                scattering_processes=ionization,
+            )
+            electron_colls_mcc = picmi.MCCCollisions(
+                name="coll_elec",
+                species=self.electrons,
+                background_density=self.gas_density,
+                background_temperature=self.gas_temp,
+                background_mass=self.ions.mass,
+                ndt=self.mcc_subcycling_steps,
+                scattering_processes=electron_scattering_processes,
+            )
+            electron_colls = [electron_colls_mcc, electron_colls_dsmc]
+        else:
+            electron_colls_mcc = picmi.MCCCollisions(
+                name="coll_elec",
+                species=self.electrons,
+                background_density=self.gas_density,
+                background_temperature=self.gas_temp,
+                background_mass=self.ions.mass,
+                ndt=self.mcc_subcycling_steps,
+                scattering_processes=electron_scattering_processes,
+            )
+            electron_colls = [electron_colls_mcc]
 
         ion_scattering_processes = {
             "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
@@ -316,6 +339,7 @@ class CapacitiveDischargeExample(object):
                 ndt=self.mcc_subcycling_steps,
                 scattering_processes=ion_scattering_processes,
             )
+        ion_colls = [ion_colls]
 
         #######################################################################
         # Initialize simulation                                               #
@@ -325,7 +349,8 @@ class CapacitiveDischargeExample(object):
             solver=self.solver,
             time_step_size=self.dt,
             max_steps=self.max_steps,
-            warpx_collisions=[electron_colls, ion_colls],
+            warpx_collisions=electron_colls + ion_colls,
+            warpx_collisions_split_position_push=0,
             verbose=self.test,
         )
         self.solver.sim = self.sim
@@ -413,7 +438,7 @@ class CapacitiveDischargeExample(object):
     def run_sim(self):
         self.sim.step(self.max_steps - self.diag_steps)
 
-        self.rho_wrapper = fields.RhoFPWrapper(0, False)
+        self.rho_wrapper = fields.RhoFPWrapper(0)
         callbacks.installafterstep(self._get_rho_ions)
 
         self.sim.step(self.diag_steps)
@@ -423,7 +448,7 @@ class CapacitiveDischargeExample(object):
             assert hasattr(self.solver, "phi")
 
         if libwarpx.amr.ParallelDescriptor.MyProc() == 0:
-            np.save(f"ion_density_case_{self.n+1}.npy", self.ion_density_array)
+            np.save(f"ion_density_case_{self.n + 1}.npy", self.ion_density_array)
 
         # query the particle z-coordinates if this is run during CI testing
         # to cover that functionality

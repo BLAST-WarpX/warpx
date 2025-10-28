@@ -16,7 +16,7 @@
  *    This class is templated on a vector class Vec, and an operator class Ops.
  *
  *    The Ops class must have the following function:
- *    ComputeRHS( R_vec, U_vec, time, dt, nl_iter, from_jacobian ),
+ *    ComputeRHS( R_vec, U_vec, time, nl_iter, from_jacobian ),
  *    where U_vec and R_vec are of type Vec.
  *
  *    The Vec class must have basic math operators, such as Copy, +=, -=,
@@ -59,7 +59,8 @@ public:
     virtual void Solve ( Vec&,
                    const Vec&,
                          amrex::Real,
-                         amrex::Real ) const = 0;
+                         amrex::Real,
+                         int) const = 0;
 
     /**
      * \brief Print parameters used by the nonlinear solver.
@@ -72,6 +73,11 @@ public:
     virtual void GetSolverParams (amrex::Real&, amrex::Real&, int&) = 0;
 
     /**
+     * \brief Whether a preconditioner is used by the nonlinear solver.
+     */
+    virtual bool UsePreconditioner () { return m_usePC; }
+
+    /**
      * \brief Allow caller to dynamically change the verbosity flag. For
      * example, one may want to only print solver information every 100 steps.
      */
@@ -81,6 +87,9 @@ protected:
 
     bool m_is_defined = false;
     mutable bool m_verbose = true;
+    std::string m_diagnostic_file;
+    int m_diagnostic_interval = 1;
+    bool m_usePC = false;
 
 };
 

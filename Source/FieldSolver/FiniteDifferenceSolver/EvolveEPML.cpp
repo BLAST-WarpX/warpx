@@ -9,14 +9,13 @@
 #include "BoundaryConditions/PML.H"
 #include "BoundaryConditions/PMLComponent.H"
 #include "BoundaryConditions/PML_current.H"
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "EmbeddedBoundary/Enabled.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -45,21 +44,38 @@ using namespace amrex;
  * \brief Update the E field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveEPML (
-    std::array< amrex::MultiFab*, 3 > Efield,
-    std::array< amrex::MultiFab*, 3 > const Bfield,
-    std::array< amrex::MultiFab*, 3 > const Jfield,
-    std::array< amrex::MultiFab*, 3 > const edge_lengths,
-    amrex::MultiFab* const Ffield,
+    ablastr::fields::MultiFabRegister& fields,
+    PatchType patch_type,
+    int level,
     MultiSigmaBox const& sigba,
     amrex::Real const dt, bool pml_has_particles ) {
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#ifdef WARPX_DIM_RZ
-    amrex::ignore_unused(Efield, Bfield, Jfield, Ffield, sigba, dt, pml_has_particles, edge_lengths);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(fields, patch_type, level, sigba, dt, pml_has_particles);
     WARPX_ABORT_WITH_MESSAGE(
-        "PML are not implemented in cylindrical geometry.");
-#else
+        "PML are only implemented in Cartesian geometry.");
+#elif !defined(WARPX_DIM_RSPHERE)
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
+    const ablastr::fields::VectorField Bfield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_B_fp, level) : fields.get_alldirs(FieldType::pml_B_cp, level);
+    const ablastr::fields::VectorField Jfield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_j_fp, level) : fields.get_alldirs(FieldType::pml_j_cp, level);
+    ablastr::fields::VectorField edge_lengths;
+    if (fields.has_vector(FieldType::pml_edge_lengths, level)) {
+        edge_lengths = fields.get_alldirs(FieldType::pml_edge_lengths, level);
+    }
+    amrex::MultiFab * Ffield = nullptr;
+    if (fields.has(FieldType::pml_F_fp, level)) {
+        Ffield = (patch_type == PatchType::fine) ?
+            fields.get(FieldType::pml_F_fp, level) : fields.get(FieldType::pml_F_cp, level);
+    }
+
     if (m_grid_type == GridType::Collocated) {
 
         EvolveEPMLCartesian <CartesianNodalAlgorithm> (
@@ -82,7 +98,7 @@ void FiniteDifferenceSolver::EvolveEPML (
 }
 
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveEPMLCartesian (
@@ -244,4 +260,4 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
     } // MFIter
 }
 
-#endif // ifndef WARPX_DIM_RZ
+#endif // corresponds to if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)

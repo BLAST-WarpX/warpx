@@ -10,7 +10,6 @@ foreach(D IN LISTS WarpX_DIMS)
             # pybind11
             ParticleBoundaryBuffer.cpp
             MultiParticleContainer.cpp
-            PinnedMemoryParticleContainer.cpp
             WarpXParticleContainer.cpp
         )
     endif()

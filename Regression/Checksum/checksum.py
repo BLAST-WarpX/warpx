@@ -140,13 +140,13 @@ class Checksum:
             # Load time series
             ts = OpenPMDTimeSeries(self.output_file)
             data = {}
-            # Compute number of MR levels
-            # TODO This calculation of nlevels assumes that the last element
-            #      of level_fields is by default on the highest MR level.
-            level_fields = [field for field in ts.avail_fields if "lvl" in field]
-            nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
             # Compute checksum for field quantities
             if do_fields:
+                # Compute number of MR levels
+                # TODO This calculation of nlevels assumes that the last element
+                #      of level_fields is by default on the highest MR level.
+                level_fields = [field for field in ts.avail_fields if "lvl" in field]
+                nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
                 for lev in range(nlevels + 1):
                     # Create list of fields specific to level lev
                     grid_fields = []
@@ -238,14 +238,12 @@ class Checksum:
         # Dictionaries have same outer keys (levels, species)?
         if self.data.keys() != ref_benchmark.data.keys():
             print(
-                "ERROR: Benchmark and output file checksum "
-                "have different outer keys:"
+                "ERROR: Benchmark and output file checksum have different outer keys:"
             )
             print("Benchmark: %s" % ref_benchmark.data.keys())
             print("Test file: %s" % self.data.keys())
-            print("\n----------------\nNew file for " + self.test_name + ":")
+            print(f"\nNew checksums file {self.test_name}.json:")
             print(json.dumps(self.data, indent=2))
-            print("----------------")
             sys.exit(1)
 
         # Dictionaries have same inner keys (field and particle quantities)?
@@ -261,13 +259,13 @@ class Checksum:
                     % (key1, ref_benchmark.data[key1].keys())
                 )
                 print("Test file inner keys in %s: %s" % (key1, self.data[key1].keys()))
-                print("\n----------------\nNew file for " + self.test_name + ":")
+                print(f"\nNew checksums file {self.test_name}.json:")
                 print(json.dumps(self.data, indent=2))
-                print("----------------")
                 sys.exit(1)
 
         # Dictionaries have same values?
         checksums_differ = False
+        max_rel_err = 0.0
         for key1 in ref_benchmark.data.keys():
             for key2 in ref_benchmark.data[key1].keys():
                 passed = np.isclose(
@@ -297,8 +295,9 @@ class Checksum:
                     if np.abs(x) != 0.0:
                         rel_err = abs_err / np.abs(x)
                         print("Relative error: {:.2e}".format(rel_err))
+                        max_rel_err = max(max_rel_err, rel_err)
+        print("\nMaximum relative error: {:.2e}".format(max_rel_err))
         if checksums_differ:
-            print("\n----------------\nNew file for " + self.test_name + ":")
+            print(f"\nNew checksums file {self.test_name}.json:")
             print(json.dumps(self.data, indent=2))
-            print("----------------")
             sys.exit(1)

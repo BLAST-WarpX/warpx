@@ -8,21 +8,11 @@ The electron is initially at: (-0.25,0,0) and moves with a normalized momentum: 
 An input file inputs_test_3d_point_of_contact_eb is used.
 """
 
-import os
-import sys
-
 import numpy as np
 import yt
 from openpmd_viewer import OpenPMDTimeSeries
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-# Open plotfile specified in command line
-filename = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, output_format="openpmd")
 
 ts_scraping = OpenPMDTimeSeries("./diags/diag2/particles_at_eb/")
 

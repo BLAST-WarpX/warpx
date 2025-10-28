@@ -8,7 +8,7 @@
 #include "ColliderRelevant.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #if (defined WARPX_QED)
 #   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #endif
@@ -59,7 +59,7 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+
 
 ColliderRelevant::ColliderRelevant (const std::string& rd_name)
 : ReducedDiags{rd_name}
@@ -73,9 +73,9 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
         "Collider-relevant diagnostics must involve exactly two species");
 
     // RZ coordinate is not supported
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     WARPX_ABORT_WITH_MESSAGE(
-        "Collider-relevant diagnostics do not work in RZ geometry.");
+        "Collider-relevant diagnostics do not work in cylindrical and spherical geometry.");
 #endif
 
     ablastr::warn_manager::WMRecordWarning(
@@ -190,7 +190,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
 
 void ColliderRelevant::ComputeDiags (int step)
 {
-#if defined(WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     amrex::ignore_unused(step);
 #else
 
@@ -226,7 +226,7 @@ void ColliderRelevant::ComputeDiags (int step)
         num_dens[i_s] = myspc.GetChargeDensity(0);
         num_dens[i_s]->mult(1._prt/q);
 
-#if defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM == 1)
         // w_tot
         amrex::Real w_tot = ReduceSum( myspc,
             [=] AMREX_GPU_HOST_DEVICE (const PType& p)
@@ -429,6 +429,8 @@ void ColliderRelevant::ComputeDiags (int step)
         amrex::Real chimax_f = 0.0_rt;
         amrex::Real chiave_f = 0.0_rt;
 
+        using ablastr::fields::Direction;
+
         if (myspc.DoQED())
         {
             // define variables in preparation for field gatheeduce_data.value()ring
@@ -441,13 +443,14 @@ void ColliderRelevant::ComputeDiags (int step)
             const int lev = 0;
 
             // define variables in preparation for field gathering
+            using warpx::fields::FieldType;
             const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev, 0));
-            const amrex::MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
-            const amrex::MultiFab & Ey = warpx.getField(FieldType::Efield_aux, lev,1);
-            const amrex::MultiFab & Ez = warpx.getField(FieldType::Efield_aux, lev,2);
-            const amrex::MultiFab & Bx = warpx.getField(FieldType::Bfield_aux, lev,0);
-            const amrex::MultiFab & By = warpx.getField(FieldType::Bfield_aux, lev,1);
-            const amrex::MultiFab & Bz = warpx.getField(FieldType::Bfield_aux, lev,2);
+            const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+            const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+            const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+            const amrex::MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+            const amrex::MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+            const amrex::MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
             // declare reduce_op
             ReduceOps<ReduceOpMin, ReduceOpMax, ReduceOpSum> reduce_op;

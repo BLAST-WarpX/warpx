@@ -6,7 +6,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_photon_pusher  # inputs
-    analysis.py  # analysis
-    diags/diag1000050  # output
+    "analysis.py diags/diag1000050"  # analysis
+    "analysis_default_regression.py --path diags/diag1000050"  # checksum
     OFF  # dependency
 )

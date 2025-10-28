@@ -9,13 +9,13 @@
 
 #include "Diagnostics.H"
 #include "Diagnostics/ComputeDiagFunctors/ComputeDiagFunctor.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/Parser/IntervalsParser.H"
 
 #include <AMReX_Box.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
-#include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
 #include <AMReX_Vector.H>
@@ -28,7 +28,7 @@ class BTDiagnostics final : public Diagnostics
 {
 public:
 
-    BTDiagnostics (int i, const std::string& name);
+    BTDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
 private:
     /** Whether to plot raw (i.e., NOT cell-centered) fields */
@@ -92,11 +92,12 @@ private:
                                   if false, m_varnames is updated
      */
     void AddRZModesToOutputNames (const std::string& field, int ncomp, bool cellcenter_data);
+
     /** This function allocates and initializes particle buffers for all the snapshots.
-     * This is currently an empty function:
-     * The particle containers required for this must be added to populate this function.
+     *  \param[in] mpc a constant reference to the multi-particle container.
      */
-    void InitializeParticleBuffer () override;
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
+
     /** This function prepares the current z coordinate in the boosted-frame and lab-frame as required by
         the particle and fields.
      */
@@ -136,6 +137,7 @@ private:
      *  m_t_lab, and z-positions for the i^th snapshot, i_buffer, and level, lev.
      * \param[in] i_buffer i^th snapshot or buffer
      * \param[in] lev mesh-refinement level for which the field and/or particle buffer data is initialized.
+     * \param[in] restart whether this is called upon restarting a previous simulation
      */
     void InitializeBufferData ( int i_buffer , int lev, bool restart=false) override;
     /** Whether to compute back-tranformed values for field-data.
@@ -161,6 +163,7 @@ private:
      *  in z-direction for both 2D and 3D simulations in the Cartesian frame of reference.
      */
     int m_moving_window_dir;
+    amrex::Real m_moving_window_beta;
 
     /** Number of back-transformed snapshots in the lab-frame requested by the user */
     int m_num_snapshots_lab = std::numeric_limits<int>::lowest();
@@ -241,7 +244,7 @@ private:
      *  will be used by all snapshots to obtain lab-frame data at the respective
      *  z slice location.
      */
-    amrex::Vector<std::unique_ptr<amrex::MultiFab> > m_cell_centered_data;
+    std::string m_cell_centered_data_name;
     /** Vector of pointers to compute cell-centered data, per level, per component
      *  using the coarsening-ratio provided by the user.
      */
@@ -346,7 +349,7 @@ private:
      *  \param[in] i_buffer snapshot index
      */
     void SetSnapshotFullStatus (int i_buffer);
-    /** Vector of field-data stored in the cell-centered multifab, m_cell_centered_data.
+    /** Vector of field-data stored in the cell-centered MultiFab.
      *  All the fields are stored regardless of the specific fields to plot selected
      *  by the user.
      */

@@ -6,8 +6,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_dive_cleaning  # inputs
-    analysis.py  # analysis
-    diags/diag1000128  # output
+    "analysis.py diags/diag1000128"  # analysis
+    "analysis_default_regression.py --path diags/diag1000128"  # checksum
     OFF  # dependency
 )
 
@@ -16,7 +16,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_dive_cleaning  # inputs
-    analysis.py  # analysis
-    diags/diag1000128  # output
+    "analysis.py diags/diag1000128"  # analysis
+    "analysis_default_regression.py --path diags/diag1000128"  # checksum
     OFF  # dependency
 )

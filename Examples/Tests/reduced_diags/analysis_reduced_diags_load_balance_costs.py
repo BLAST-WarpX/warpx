@@ -17,14 +17,9 @@
 
 # Possible running time: ~ 1 s
 
-import os
-import re
 import sys
 
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 # Command line argument
 fn = sys.argv[1]
@@ -76,9 +71,3 @@ print("load balance efficiency (after load balance): ", efficiency_after)
 # The load balanced case is expected to be more efficient
 # than non-load balanced case
 assert efficiency_before < efficiency_after
-
-# The PICMI and native input versions run the same test, so
-# their results are compared to the same benchmark file
-test_name = os.path.split(os.getcwd())[1]
-test_name = re.sub("_picmi", "", test_name)
-checksumAPI.evaluate_checksum(test_name, fn)

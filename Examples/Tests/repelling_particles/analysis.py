@@ -24,7 +24,6 @@ beta is the velocity normalized by the speed of light
 """
 
 import glob
-import os
 import re
 import sys
 
@@ -75,10 +74,3 @@ plt.savefig("Comparison.png")
 # Check that the results are close to the theory
 assert np.allclose(beta1[1:], beta_th[1:], atol=0.01)
 assert np.allclose(-beta2[1:], beta_th[1:], atol=0.01)
-
-# Run checksum regression test
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, last_filename)

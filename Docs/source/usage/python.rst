@@ -114,6 +114,8 @@ Diagnostics
 
 .. autoclass:: pywarpx.picmi.FieldDiagnostic
 
+.. autoclass:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+
 .. autoclass:: pywarpx.picmi.ElectrostaticFieldDiagnostic
 
 .. autoclass:: pywarpx.picmi.Checkpoint
@@ -143,6 +145,10 @@ Particle distributions can be used for to initialize particles in a particle spe
 .. autoclass:: pywarpx.picmi.UniformDistribution
 
 .. autoclass:: pywarpx.picmi.AnalyticDistribution
+
+.. autoclass:: pywarpx.picmi.UniformFluxDistribution
+
+.. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
 
 .. autoclass:: pywarpx.picmi.ParticleListDistribution
 

@@ -6,8 +6,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_uniform_plasma  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -16,8 +16,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_uniform_plasma  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -26,7 +26,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_uniform_plasma_restart  # inputs
-    analysis_default_restart.py  # analysis
-    diags/diag1000010  # output
+    "analysis_default_restart.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010 --rtol 1e-12"  # checksum
     test_3d_uniform_plasma  # dependency
 )

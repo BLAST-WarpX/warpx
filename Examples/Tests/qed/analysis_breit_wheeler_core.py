@@ -12,6 +12,7 @@ import numpy as np
 import scipy.integrate as integ
 import scipy.special as spe
 import scipy.stats as st
+from scipy.constants import c, e, fine_structure, hbar, m_e
 
 # This script performs detailed checks of the Breit-Wheeler pair production process.
 # Four populations of photons are initialized with different momenta in different
@@ -43,16 +44,10 @@ import scipy.stats as st
 tol = 1.0e-8
 tol_red = 2.0e-2
 
-# Physical constants (from CODATA 2018, see: https://physics.nist.gov/cuu/Constants/index.html )
-me = 9.1093837015e-31  # electron mass
-c = 299792458  # speed of light
-hbar = 6.62607015e-34 / (2 * np.pi)  # reduced Plank constant
-fine_structure = 7.2973525693e-3  # fine structure constant
-qe = 1.602176634e-19  # elementary charge
-E_s = (me**2 * c**3) / (qe * hbar)  # Schwinger E field
+E_s = (m_e**2 * c**3) / (e * hbar)  # Schwinger E field
 B_s = E_s / c  # Schwinger B field
 
-mec = me * c
+mec = m_e * c
 mec2 = mec * c
 # ______________
 
@@ -145,12 +140,12 @@ def small_diff(vv, val):
 
 # Breit-Wheeler total and differential cross sections
 def BW_dN_dt(chi_phot, gamma_phot):
-    coeff_BW = fine_structure * me * c**2 / hbar
+    coeff_BW = fine_structure * m_e * c**2 / hbar
     return coeff_BW * BW_T(chi_phot) * (chi_phot / gamma_phot)
 
 
 def BW_d2N_dt_dchi(chi_phot, gamma_phot, chi_ele):
-    coeff_BW = fine_structure * me * c**2 / hbar
+    coeff_BW = fine_structure * m_e * c**2 / hbar
     return coeff_BW * BW_F(chi_phot, chi_ele) * (gamma_phot / gamma_phot)
 
 

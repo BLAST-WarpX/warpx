@@ -39,7 +39,7 @@ public:
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
     /** direction of the current density to save */
-    const int m_dir;
+    int m_dir;
     /** level on which mf_src is defined */
     int m_lev;
     /** (for cylindrical) whether to average all modes into 1 comp */

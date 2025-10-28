@@ -40,9 +40,9 @@ public:
      *  (cost, processor, level, i_low, j_low, k_low, gpu_ID [if GPU run], num_cells, num_macro_particles
      * note: the hostname per box is stored separately (in m_data_string) */
 #ifdef AMREX_USE_GPU
-    const int m_nDataFields = 9;
+    static const int m_nDataFields = 9;
 #else
-    const int m_nDataFields = 8;
+    static const int m_nDataFields = 8;
 #endif
 
     /** used to keep track of max number of boxes over all timesteps; this allows

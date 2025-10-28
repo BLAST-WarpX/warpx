@@ -9,7 +9,7 @@
 #define WARPX_DIAGNOSTICS_REDUCEDDIAGS_FIELDREDUCTION_H_
 
 #include "ReducedDiags.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "WarpX.H"
 
 #include <ablastr/coarsen/sample.H>
@@ -87,7 +87,9 @@ public:
     template<typename ReduceOp>
     void ComputeFieldReduction()
     {
+        using ablastr::fields::Direction;
         using namespace amrex::literals;
+        using warpx::fields::FieldType;
 
         // get a reference to WarpX instance
         auto & warpx = WarpX::GetInstance();
@@ -99,15 +101,15 @@ public:
         const auto dx = geom.CellSizeArray();
 
         // get MultiFab data
-        const amrex::MultiFab & Ex = warpx.getField(warpx::fields::FieldType::Efield_aux, lev,0);
-        const amrex::MultiFab & Ey = warpx.getField(warpx::fields::FieldType::Efield_aux, lev,1);
-        const amrex::MultiFab & Ez = warpx.getField(warpx::fields::FieldType::Efield_aux, lev,2);
-        const amrex::MultiFab & Bx = warpx.getField(warpx::fields::FieldType::Bfield_aux, lev,0);
-        const amrex::MultiFab & By = warpx.getField(warpx::fields::FieldType::Bfield_aux, lev,1);
-        const amrex::MultiFab & Bz = warpx.getField(warpx::fields::FieldType::Bfield_aux, lev,2);
-        const amrex::MultiFab & jx = warpx.getField(warpx::fields::FieldType::current_fp, lev,0);
-        const amrex::MultiFab & jy = warpx.getField(warpx::fields::FieldType::current_fp, lev,1);
-        const amrex::MultiFab & jz = warpx.getField(warpx::fields::FieldType::current_fp, lev,2);
+        const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+        const amrex::MultiFab & jx = *warpx.m_fields.get(FieldType::current_fp, Direction{0},lev);
+        const amrex::MultiFab & jy = *warpx.m_fields.get(FieldType::current_fp, Direction{1},lev);
+        const amrex::MultiFab & jz = *warpx.m_fields.get(FieldType::current_fp, Direction{2},lev);
 
 
         // General preparation of interpolation and reduction operations
@@ -175,6 +177,10 @@ public:
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
                 const amrex::Real z = (k + 0.5_rt)*dx[0] + real_box.lo(0);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::Real x = (i + 0.5_rt)*dx[0] + real_box.lo(0);
+                const amrex::Real y = 0._rt;
+                const amrex::Real z = 0._rt;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const amrex::Real x = (i + 0.5_rt)*dx[0] + real_box.lo(0);
                 const amrex::Real y = 0._rt;
@@ -225,13 +231,7 @@ public:
             amrex::ParallelDescriptor::ReduceRealSum(reduce_value);
         // If reduction operation is a sum, multiply the value by the cell volume so that the
         // result is the integral of the function over the simulation domain.
-#if defined(WARPX_DIM_1D_Z)
-            reduce_value *= dx[0];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            reduce_value *= dx[0]*dx[1];
-#else
-            reduce_value *= dx[0]*dx[1]*dx[2];
-#endif
+            reduce_value *= AMREX_D_TERM(dx[0], *dx[1], *dx[2]);
         }
 
         // Fill output array

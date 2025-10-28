@@ -3,7 +3,7 @@
 Funding and Acknowledgements
 ============================
 
-WarpX is hosted by the High Performance Computing Foundation (HPSF).
+WarpX is hosted by the High Performance Software Foundation (HPSF).
 If your organization wants to help steer the evolution of the HPC software ecosystem, visit `hpsf.io <https://hpsf.io>`__ and consider joining!
 
 WarpX is supported by the CAMPA collaboration, a project of the U.S. Department of Energy, Office of Science, Office of Advanced Scientific Computing Research and Office of High Energy Physics, Scientific Discovery through Advanced Computing (SciDAC) program.

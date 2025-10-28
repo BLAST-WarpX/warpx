@@ -6,16 +6,18 @@
 
 #include "JFunctor.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX.H>
 #include <AMReX_Extension.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_MultiFab.H>
 
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 JFunctor::JFunctor (const int dir, int lev,
                    amrex::IntVect crse_ratio,
@@ -29,30 +31,19 @@ JFunctor::JFunctor (const int dir, int lev,
 void
 JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/) const
 {
+    using ablastr::fields::Direction;
+
     auto& warpx = WarpX::GetInstance();
     /** pointer to source multifab (can be multi-component) */
-    amrex::MultiFab* m_mf_src = warpx.getFieldPointer(FieldType::current_fp, m_lev, m_dir);
+    amrex::MultiFab* m_mf_src = warpx.m_fields.get(FieldType::current_fp,Direction{m_dir},m_lev);
 
     // Deposit current if no solver or the electrostatic solver is being used
     if (m_deposit_current)
     {
         // allocate temporary multifab to deposit current density into
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_temp;
-        current_fp_temp.resize(1);
-
-        const auto& current_fp_x = warpx.getField(FieldType::current_fp, m_lev,0);
-        current_fp_temp[0][0] = std::make_unique<amrex::MultiFab>(
-            current_fp_x, amrex::make_alias, 0, current_fp_x.nComp()
-        );
-
-        const auto& current_fp_y = warpx.getField(FieldType::current_fp, m_lev,1);
-        current_fp_temp[0][1] = std::make_unique<amrex::MultiFab>(
-            current_fp_y, amrex::make_alias, 0, current_fp_y.nComp()
-        );
-        const auto& current_fp_z = warpx.getField(FieldType::current_fp, m_lev,2);
-        current_fp_temp[0][2] = std::make_unique<amrex::MultiFab>(
-            current_fp_z, amrex::make_alias, 0, current_fp_z.nComp()
-        );
+        ablastr::fields::MultiLevelVectorField current_fp_temp {
+            warpx.m_fields.get_alldirs(FieldType::current_fp, m_lev)
+        };
 
         auto& mypc = warpx.GetPartContainer();
         mypc.DepositCurrent(current_fp_temp, warpx.getdt(m_lev), 0.0);

@@ -7,10 +7,11 @@
 
 #include "FieldMaximum.H"
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/sample.H>
 
 #include <AMReX_Algorithm.H>
@@ -39,13 +40,13 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 // constructor
 FieldMaximum::FieldMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
-    // RZ coordinate is not working
+    // Non-Cartesian coordinates not working
 #if (defined WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "FieldMaximum reduced diagnostics does not work for RZ coordinate.");
@@ -60,6 +61,14 @@ FieldMaximum::FieldMaximum (const std::string& rd_name)
     constexpr int noutputs = 8;  // max of Ex,Ey,Ez,|E|,Bx,By,Bz and |B|
     // resize data array
     m_data.resize(noutputs*nLevel, 0.0_rt);
+
+#if defined(WARPX_DIM_RCYLINDER)
+    std::vector<std::string> field_names = {"r", "t", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::vector<std::string> field_names = {"r", "t", "p"};
+#else
+    std::vector<std::string> field_names = {"x", "y", "z"};
+#endif
 
     if (ParallelDescriptor::IOProcessor())
     {
@@ -76,19 +85,19 @@ FieldMaximum::FieldMaximum (const std::string& rd_name)
             for (int lev = 0; lev < nLevel; ++lev)
             {
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_Ex_lev" + std::to_string(lev) + "(V/m)";
+                ofs << "[" << c++ << "]max_E"+ field_names[0] + "_lev" + std::to_string(lev) + "(V/m)";
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_Ey_lev" + std::to_string(lev) + "(V/m)";
+                ofs << "[" << c++ << "]max_E"+ field_names[1] + "_lev" + std::to_string(lev) + "(V/m)";
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_Ez_lev" + std::to_string(lev) + "(V/m)";
+                ofs << "[" << c++ << "]max_E"+ field_names[2] + "_lev" + std::to_string(lev) + "(V/m)";
                 ofs << m_sep;
                 ofs << "[" << c++ << "]max_|E|_lev" + std::to_string(lev) + "(V/m)";
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_Bx_lev" + std::to_string(lev) + "(T)";
+                ofs << "[" << c++ << "]max_B"+ field_names[0] + "_lev" + std::to_string(lev) + "(T)";
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_By_lev" + std::to_string(lev) + "(T)";
+                ofs << "[" << c++ << "]max_B"+ field_names[1] + "_lev" + std::to_string(lev) + "(T)";
                 ofs << m_sep;
-                ofs << "[" << c++ << "]max_Bz_lev" + std::to_string(lev) + "(T)";
+                ofs << "[" << c++ << "]max_B"+ field_names[2] + "_lev" + std::to_string(lev) + "(T)";
                 ofs << m_sep;
                 ofs << "[" << c++ << "]max_|B|_lev" + std::to_string(lev) + "(T)";
             }
@@ -112,16 +121,18 @@ void FieldMaximum::ComputeDiags (int step)
     // get number of level
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
         // get MultiFab data at lev
-        const MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
-        const MultiFab & Ey = warpx.getField(FieldType::Efield_aux, lev,1);
-        const MultiFab & Ez = warpx.getField(FieldType::Efield_aux, lev,2);
-        const MultiFab & Bx = warpx.getField(FieldType::Bfield_aux, lev,0);
-        const MultiFab & By = warpx.getField(FieldType::Bfield_aux, lev,1);
-        const MultiFab & Bz = warpx.getField(FieldType::Bfield_aux, lev,2);
+        const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         constexpr int noutputs = 8; // max of Ex,Ey,Ez,|E|,Bx,By,Bz and |B|
         constexpr int index_Ex = 0;

@@ -38,8 +38,8 @@
 
 using namespace amrex::literals;
 
-Diagnostics::Diagnostics (int i, std::string name)
-    : m_diag_name(std::move(name)), m_diag_index(i)
+Diagnostics::Diagnostics (int i, std::string name, DiagTypes diag_type)
+    : m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
 {
 }
 
@@ -62,11 +62,20 @@ Diagnostics::BaseReadParameters ()
     std::string dims;
     pp_geometry.get("dims", dims);
 
+    // use warpx.verbose as global diagnostic verbosity level
+    const amrex::ParmParse pp_warpx("warpx");
+    pp_warpx.query("verbose", m_verbose);
+    // now overwrite verbosity value if it is specified for this diagnostic instance
+    pp_diag_name.query("verbose", m_verbose);
+
     // Query list of grid fields to write to output
     const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
     if (!varnames_specified){
-        if( dims == "RZ" ) {
+        if( dims == "RZ" || dims == "RCYLINDER") {
             m_varnames_fields = {"Er", "Et", "Ez", "Br", "Bt", "Bz", "jr", "jt", "jz"};
+        }
+        else if( dims == "RSPHERE") {
+            m_varnames_fields = {"Er", "Et", "Ep", "Br", "Bt", "Bp", "jr", "jt", "jp"};
         }
         else {
             m_varnames_fields = {"Ex", "Ey", "Ez", "Bx", "By", "Bz", "jx", "jy", "jz"};
@@ -74,11 +83,17 @@ Diagnostics::BaseReadParameters ()
     }
 
     // Sanity check if user requests to plot phi
-    if (utils::algorithms::is_in(m_varnames_fields, "phi")){
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+    if (utils::algorithms::is_in(m_varnames_fields, "phi") && !(
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic,
-            "plot phi only works if do_electrostatic = labframe or do_electrostatic = labframe-electromagnetostatic");
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential
+        )
+    ){
+        ablastr::warn_manager::WMRecordWarning(
+            "Diagnostics",
+            "Electrostatic potential diagnostic is requested but an EM solver is used. A Poisson solve will be added to diagnostic output steps.",
+            ablastr::warn_manager::WarnPriority::low
+        );
     }
 
     // Sanity check if user requests to plot A
@@ -229,8 +244,9 @@ Diagnostics::BaseReadParameters ()
        if (WarpX::boost_direction[ dim_map[WarpX::moving_window_dir] ] == 1) {
            // Convert user-defined lo and hi for diagnostics to account for boosted-frame
            // simulations with moving window
-           const amrex::Real convert_factor = 1._rt/(WarpX::gamma_boost * (1._rt - WarpX::beta_boost) );
-           // Assuming that the window travels with speed c
+           const amrex::Real beta_window = WarpX::moving_window_v / PhysConst::c;
+           const amrex::Real convert_factor = 1._rt/(
+               WarpX::gamma_boost * (1._rt - WarpX::beta_boost * beta_window) );
            m_lo[WarpX::moving_window_dir] *= convert_factor;
            m_hi[WarpX::moving_window_dir] *= convert_factor;
        }
@@ -303,6 +319,28 @@ Diagnostics::BaseReadParameters ()
                 + ".fields_to_plot does not match any species"
             );
         }
+
+        // Check if m_varnames contains a string of the form T_<species_name>
+        if (var.rfind("Tx_", 0) == 0 || var.rfind("Ty_", 0) == 0 || var.rfind("Tz_", 0) == 0) {
+            // Extract species name from the string T_<species_name>
+            const std::string species = var.substr(var.find("T") + 3);
+            // Boolean used to check if species name was misspelled
+            bool species_name_is_wrong = true;
+            // Loop over all species
+            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                // Check if species name extracted from the string T_<species_name>
+                // matches any of the species in the simulation
+                if (species == m_all_species_names[i]) {
+                    species_name_is_wrong = false;
+                }
+            }
+            // If species name was misspelled, abort with error message
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species_name_is_wrong,
+                "Input error: string " + var + " in " + m_diag_name
+                + ".fields_to_plot does not match any species"
+            );
+        }
     }
 
     const bool checkpoint_compatibility = (
@@ -330,7 +368,7 @@ Diagnostics::InitDataBeforeRestart ()
 }
 
 void
-Diagnostics::InitDataAfterRestart ()
+Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 {
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
         // loop over all levels
@@ -357,7 +395,7 @@ Diagnostics::InitDataAfterRestart ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
     if (write_species == 0) {
@@ -399,7 +437,7 @@ Diagnostics::InitDataAfterRestart ()
 
 
 void
-Diagnostics::InitData ()
+Diagnostics::InitData (const MultiParticleContainer& mpc)
 {
     auto& warpx = WarpX::GetInstance();
 
@@ -436,7 +474,7 @@ Diagnostics::InitData ()
     if (write_species == 1) {
         // When particle buffers, m_particle_boundary_buffer are included,
         // they will be initialized here
-        InitializeParticleBuffer();
+        InitializeParticleBuffer(mpc);
         InitializeParticleFunctors();
     }
 
@@ -494,7 +532,10 @@ Diagnostics::InitBaseData ()
     // current moving_window location
     if (WarpX::do_moving_window) {
         const int moving_dir = WarpX::moving_window_dir;
-        const int shift_num_base = static_cast<int>((warpx.getmoving_window_x() - m_lo[moving_dir]) / warpx.Geom(0).CellSize(moving_dir) );
+        const amrex::Real displacement =
+            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
+        const int shift_num_base = static_cast<int>
+            (displacement / warpx.Geom(0).CellSize(moving_dir));
         m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
         m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
     }
@@ -535,6 +576,14 @@ Diagnostics::InitBaseData ()
         m_mf_output[i].resize( nmax_lev );
     }
 
+    // allocate vector of buffers and vector of levels for each buffer for summation multifab for TimeAveragedDiagnostics
+    if (m_diag_type == DiagTypes::TimeAveraged) {
+        m_sum_mf_output.resize(m_num_buffers);
+        for (int i = 0; i < m_num_buffers; ++i) {
+            m_sum_mf_output[i].resize( nmax_lev );
+        }
+    }
+
     // allocate vector of geometry objects corresponding to each output multifab.
     m_geom_output.resize( m_num_buffers );
     for (int i = 0; i < m_num_buffers; ++i) {
@@ -573,6 +622,15 @@ Diagnostics::ComputeAndPack ()
             }
             // Check that the proper number of components of mf_avg were updated.
             AMREX_ALWAYS_ASSERT( icomp_dst == m_varnames.size() );
+
+            if (m_diag_type == DiagTypes::TimeAveraged) {
+
+                const amrex::Real real_a = 1.0;
+                // Compute m_sum_mf_output += real_a*m_mf_output
+                amrex::MultiFab::Saxpy(
+                        m_sum_mf_output[i_buffer][lev], real_a, m_mf_output[i_buffer][lev],
+                        0, 0, m_mf_output[i_buffer][lev].nComp(), m_mf_output[i_buffer][lev].nGrowVect());
+            }
 
             // needed for contour plots of rho, i.e. ascent/sensei
             if (m_format == "sensei" || m_format == "ascent") {

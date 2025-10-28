@@ -25,12 +25,11 @@
 #SBATCH -o stdout_%j
 #SBATCH -e stderr_%j
 
-# OpenMP threads per MPI rank
-export OMP_NUM_THREADS=16
-export SRUN_CPUS_PER_TASK=16
-
 # set user rights to u=rwx;g=r-x;o=---
 umask 0027
+
+# OpenMP threads per MPI rank
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 # executable & inputs file or python interpreter & PICMI script here
 EXE=./warpx.rz

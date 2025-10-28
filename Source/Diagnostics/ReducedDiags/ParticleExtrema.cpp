@@ -11,7 +11,7 @@
 #if (defined WARPX_QED)
 #   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #endif
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/MultiParticleContainer.H"
@@ -20,6 +20,8 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_Array.H>
@@ -52,7 +54,7 @@
 #include <vector>
 
 using namespace amrex::literals;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 // constructor
 ParticleExtrema::ParticleExtrema (const std::string& rd_name)
@@ -260,18 +262,20 @@ void ParticleExtrema::ComputeDiags (int step)
             const bool galerkin_interpolation = WarpX::galerkin_interpolation;
             const amrex::IntVect ngEB = warpx.getngEB();
 
+            using ablastr::fields::Direction;
+
             // loop over refinement levels
             for (int lev = 0; lev <= level_number; ++lev)
             {
                 // define variables in preparation for field gathering
                 const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev, 0));
 
-                const amrex::MultiFab & Ex = warpx.getField(FieldType::Efield_aux, lev,0);
-                const amrex::MultiFab & Ey = warpx.getField(FieldType::Efield_aux, lev,1);
-                const amrex::MultiFab & Ez = warpx.getField(FieldType::Efield_aux, lev,2);
-                const amrex::MultiFab & Bx = warpx.getField(FieldType::Bfield_aux, lev,0);
-                const amrex::MultiFab & By = warpx.getField(FieldType::Bfield_aux, lev,1);
-                const amrex::MultiFab & Bz = warpx.getField(FieldType::Bfield_aux, lev,2);
+                const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+                const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+                const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+                const amrex::MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+                const amrex::MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+                const amrex::MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
                 // declare reduce_op
                 amrex::ReduceOps<amrex::ReduceOpMin, amrex::ReduceOpMax> reduce_op;

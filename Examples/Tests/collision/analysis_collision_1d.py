@@ -15,15 +15,11 @@
 # Both populations belong to the same carbon12 ion species.
 # See test T1b from JCP 413 (2020) by D. Higginson, et al.
 #
-import os
 import sys
 
 import numpy as np
 import yt
-from scipy.constants import e
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+from scipy.constants import e, m_e, m_u
 
 # this will be the name of the plot file
 last_fn = sys.argv[1]
@@ -33,7 +29,7 @@ data = ds.covering_grid(
 )
 
 # carbon 12 ion (mass = 12*amu - 6*me)
-mass = 1.992100316897910e-26
+mass = 12.0 * m_u - 6.0 * m_e
 
 # Separate macroparticles from group A (low weight) and group B (high weight)
 # by sorting based on weight
@@ -123,6 +119,3 @@ tolerance = 0.02
 print("TApar at 30ps error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, last_fn)

@@ -42,5 +42,12 @@ i_lens: int
 strength_E, strength_B: floats
   The electric and magnetic focusing strength of the lens)pbdoc"
         )
+
+        .def("get_charge_density",
+            [](MultiParticleContainer& mpc, int lev, bool local) {
+                return mpc.GetChargeDensity(lev, local);
+            },
+            py::arg("lev"), py::arg("local")
+        )
     ;
 }

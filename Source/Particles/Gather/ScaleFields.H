@@ -47,8 +47,21 @@ struct ScaleFields
         // This only approximates what should be happening. The particles
         // should by advanced a fraction of a time step instead.
         // Scaling the fields is much easier and may be good enough.
-        const amrex::Real dtscale = 1._rt - (m_z_plane_previous - zp)/(m_vz_ave_boosted + m_v_boost)/m_dt;
-        if (0._rt < dtscale && dtscale < 1._rt)
+
+        // The scaling factor corresponds to the fraction of time that
+        // the particles spends to the right of the injection plane,
+        // between (n-1/2)*dt and (n+1/2)*dt, which is the interval
+        // over which the velocity is updated, in the leap-frog velocity push.
+        // (Note that here, `zp` is the particle position at time n*dt)
+        amrex::Real dtscale = 0.5_rt - (m_z_plane_previous - zp)/(m_vz_ave_boosted + m_v_boost)/m_dt;
+        // If the particle stays to the left of the plane during the
+        // whole push, simply set the scaling factor to 0, and thus
+        // the velocity push leaves the velocity unchanged.
+        if (dtscale < 0._rt) {
+            dtscale = 0;
+        }
+        // Scale the fields.
+        if (dtscale < 1._rt)
         {
             Exp *= dtscale;
             Eyp *= dtscale;

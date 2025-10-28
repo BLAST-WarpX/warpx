@@ -2,9 +2,9 @@
 #export proj="project_..."
 
 # required dependencies
-module load LUMI/23.09  partition/G
-module load rocm/5.2.3  # waiting for 5.5 for next bump
-module load buildtools/23.09
+module load LUMI/24.03  partition/G
+module load rocm/6.0.3
+module load buildtools/24.03
 
 # optional: just an additional text editor
 module load nano
@@ -22,12 +22,12 @@ module load Boost/1.82.0-cpeCray-23.09
 # optional: for openPMD support
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
 export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
-export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.10.10
+module load cray-python/3.11.7
 
 if [ -d "${SW_DIR}/venvs/warpx-lumi" ]
 then

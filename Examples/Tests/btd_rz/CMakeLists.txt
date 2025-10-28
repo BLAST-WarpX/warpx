@@ -6,7 +6,7 @@ add_warpx_test(
     RZ  # dims
     2  # nprocs
     inputs_test_rz_btd  # inputs
-    analysis.py  # analysis
-    diags/diag1000289  # output
+    "analysis.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000289"  # checksum
     OFF  # dependency
 )

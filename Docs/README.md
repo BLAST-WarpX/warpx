@@ -9,12 +9,13 @@ More information can be found in Docs/source/developers/documentation.rst.
 
 Install the Python requirements for compiling the documentation:
 ```
-python3 -m pip install -r Docs/requirements.txt
+cd Docs/
+python3 -m pip install -r requirements.txt
 ```
 
 ### Compiling the documentation
 
-`cd` into the `Docs/` directory and type
+Still in the `Docs/` directory, type
 ```
 make html
 ```

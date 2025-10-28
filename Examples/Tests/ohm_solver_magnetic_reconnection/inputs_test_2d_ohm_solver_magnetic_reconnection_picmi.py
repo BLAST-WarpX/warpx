@@ -83,14 +83,14 @@ class ForceFreeSheetReconnection(object):
         self.Bg *= self.B0
         self.dB *= self.B0
         self.Bx = (
-            f"{self.B0}*tanh(z*{1.0/self.l_i})"
-            f"+{-self.dB*self.Lx/(2.0*self.Lz)}*cos({2.0*np.pi/self.Lx}*x)"
-            f"*sin({np.pi/self.Lz}*z)"
+            f"{self.B0}*tanh(z*{1.0 / self.l_i})"
+            f"+{-self.dB * self.Lx / (2.0 * self.Lz)}*cos({2.0 * np.pi / self.Lx}*x)"
+            f"*sin({np.pi / self.Lz}*z)"
         )
         self.By = (
-            f"sqrt({self.Bg**2 + self.B0**2}-" f"({self.B0}*tanh(z*{1.0/self.l_i}))**2)"
+            f"sqrt({self.Bg**2 + self.B0**2}-({self.B0}*tanh(z*{1.0 / self.l_i}))**2)"
         )
-        self.Bz = f"{self.dB}*sin({2.0*np.pi/self.Lx}*x)*cos({np.pi/self.Lz}*z)"
+        self.Bz = f"{self.dB}*sin({2.0 * np.pi / self.Lx}*x)*cos({np.pi / self.Lz}*z)"
 
         self.J0 = self.B0 / constants.mu0 / self.l_i
 
@@ -103,7 +103,7 @@ class ForceFreeSheetReconnection(object):
         if comm.rank == 0:
             print(
                 f"Initializing simulation with input parameters:\n"
-                f"\tTi = {self.Ti*1e-3:.1f} keV\n"
+                f"\tTi = {self.Ti * 1e-3:.1f} keV\n"
                 f"\tn0 = {self.n_plasma:.1e} m^-3\n"
                 f"\tB0 = {self.B0:.2f} T\n"
                 f"\tM/m = {self.m_ion:.0f}\n"
@@ -117,7 +117,7 @@ class ForceFreeSheetReconnection(object):
             )
             print(
                 f"Numerical parameters:\n"
-                f"\tdz = {self.Lz/self.NZ:.1e} m\n"
+                f"\tdz = {self.Lz / self.NZ:.1e} m\n"
                 f"\tdt = {self.dt:.1e} s\n"
                 f"\tdiag steps = {self.diag_steps:d}\n"
                 f"\ttotal steps = {self.total_steps:d}\n"
@@ -257,11 +257,16 @@ class ForceFreeSheetReconnection(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.total_steps,
-                data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez"],
+                data_list=["B", "E", "phi"],
                 # warpx_format='openpmd',
                 # warpx_openpmd_backend='h5',
             )
             simulation.add_diagnostic(field_diag)
+
+            # set the solver convergence criteria low since phi is only
+            # calculated for diagnostic output testing
+            simulation.self_fields_required_precision = 1e-3
+            simulation.self_fields_verbosity = 1
 
         # reduced diagnostics for reconnection rate calculation
         # create a 2 l_i box around the X-point on which to measure
@@ -301,12 +306,12 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = fields.RhoFPWrapper(include_ghosts=False)[:, :]
-        Jiy = fields.JyFPWrapper(include_ghosts=False)[...] / self.J0
-        Jy = fields.JyFPAmpereWrapper(include_ghosts=False)[...] / self.J0
-        Bx = fields.BxFPWrapper(include_ghosts=False)[...] / self.B0
-        By = fields.ByFPWrapper(include_ghosts=False)[...] / self.B0
-        Bz = fields.BzFPWrapper(include_ghosts=False)[...] / self.B0
+        rho = fields.RhoFPWrapper()[...]
+        Jiy = fields.JyFPWrapper()[...] / self.J0
+        Jy = fields.JyFPPlasmaWrapper()[...] / self.J0
+        Bx = fields.BxFPWrapper()[...] / self.B0
+        By = fields.ByFPWrapper()[...] / self.B0
+        Bz = fields.BzFPWrapper()[...] / self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

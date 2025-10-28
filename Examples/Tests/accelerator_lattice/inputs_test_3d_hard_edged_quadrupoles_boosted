@@ -2,8 +2,8 @@ max_step = 50
 amr.n_cell = 16 16 8
 amr.max_level = 0
 geometry.dims = 3
-geometry.prob_lo     = -0.2 -0.2 -0.1
-geometry.prob_hi     = +0.2 +0.2 +0.1
+geometry.prob_lo     = -0.2 -0.2 -0.1866
+geometry.prob_hi     = +0.2 +0.2 +0.1866
 
 # Boundary condition
 boundary.field_lo = pec pec pec

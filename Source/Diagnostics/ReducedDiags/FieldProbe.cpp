@@ -7,7 +7,7 @@
 
 #include "FieldProbe.H"
 #include "FieldProbeParticleContainer.H"
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -17,6 +17,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array.H>
@@ -45,7 +46,7 @@
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 // constructor
 
@@ -90,8 +91,10 @@ FieldProbe::FieldProbe (const std::string& rd_name)
         utils::parser::getWithParser(
             pp_rd_name, "y_probe", y_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(
             pp_rd_name, "z_probe", z_probe);
+#endif
     }
     else if (m_probe_geometry_str == "Line")
     {
@@ -104,13 +107,15 @@ FieldProbe::FieldProbe (const std::string& rd_name)
         utils::parser::queryWithParser(pp_rd_name, "y_probe", y_probe);
         utils::parser::queryWithParser(pp_rd_name, "y1_probe", y1_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(pp_rd_name, "z_probe", z_probe);
         utils::parser::getWithParser(pp_rd_name, "z1_probe", z1_probe);
+#endif
         utils::parser::getWithParser(pp_rd_name, "resolution", m_resolution);
     }
     else if (m_probe_geometry_str == "Plane")
     {
-#if defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM == 1)
         WARPX_ABORT_WITH_MESSAGE(
             "Plane probe should be used in a 2D or 3D simulation only");
 #endif
@@ -156,7 +161,7 @@ FieldProbe::FieldProbe (const std::string& rd_name)
 
     // ensure assumption holds: we read the fields in the interpolation kernel as they are,
     // without further communication of guard/ghost/halo regions
-    int particle_shape;
+    int particle_shape = 0;
     const ParmParse pp_algo("algo");
     utils::parser::getWithParser(pp_algo, "particle_shape", particle_shape);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= particle_shape ,
@@ -358,6 +363,8 @@ bool FieldProbe::ProbeInDomain () const
      */
 #if defined(WARPX_DIM_1D_Z)
     return z_probe >= prob_lo[0] && z_probe < prob_hi[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    return x_probe >= prob_lo[0] && x_probe < prob_hi[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     return x_probe >= prob_lo[0] && x_probe < prob_hi[0] &&
            z_probe >= prob_lo[1] && z_probe < prob_hi[1];
@@ -381,6 +388,8 @@ void FieldProbe::ComputeDiags (int step)
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
@@ -398,12 +407,12 @@ void FieldProbe::ComputeDiags (int step)
         }
 
         // get MultiFab data at lev
-        const amrex::MultiFab &Ex = warpx.getField(FieldType::Efield_aux, lev, 0);
-        const amrex::MultiFab &Ey = warpx.getField(FieldType::Efield_aux, lev, 1);
-        const amrex::MultiFab &Ez = warpx.getField(FieldType::Efield_aux, lev, 2);
-        const amrex::MultiFab &Bx = warpx.getField(FieldType::Bfield_aux, lev, 0);
-        const amrex::MultiFab &By = warpx.getField(FieldType::Bfield_aux, lev, 1);
-        const amrex::MultiFab &Bz = warpx.getField(FieldType::Bfield_aux, lev, 2);
+        const amrex::MultiFab &Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab &Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab &Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab &By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         /*
          * Prepare interpolation of field components to probe_position
@@ -455,10 +464,12 @@ void FieldProbe::ComputeDiags (int step)
                     {
                         setPosition(ip, xp, yp+move_dist, zp);
                     }
+#if defined(WARPX_ZINDEX)
                     if (temp_warpx_moving_window == WARPX_ZINDEX)
                     {
                         setPosition(ip, xp, yp, zp+move_dist);
                     }
+#endif
                 });
             }
             if( ProbeInDomain() )

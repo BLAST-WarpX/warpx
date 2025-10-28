@@ -1,0 +1,54 @@
+# Set-up to test the PMC Boundary condition for the fields
+# Constructive interference between the incident and reflected wave result in a
+# standing wave.
+
+# max step
+max_step = 134
+
+# number of grid points
+amr.n_cell = 32 32 256
+
+# Maximum allowable size of each subdomain
+amr.max_grid_size = 1024
+amr.blocking_factor = 32
+
+amr.max_level = 0
+
+# Geometry
+geometry.dims = 3
+geometry.prob_lo     =  -8.e-6 -8.e-6 -4.e-6
+geometry.prob_hi     =   8.e-6  8.e-6  4.e-6
+
+# Boundary condition
+boundary.field_lo = periodic periodic pmc
+boundary.field_hi = periodic periodic pmc
+
+warpx.serialize_initial_conditions = 1
+
+# Verbosity
+warpx.verbose = 1
+
+# Algorithms
+algo.current_deposition = esirkepov
+# CFL
+warpx.cfl = 0.9
+
+
+my_constants.z1 = -2.e-6
+my_constants.z2 = 2.e-6
+my_constants.wavelength = 1.e-6
+warpx.E_ext_grid_init_style = parse_E_ext_grid_function
+warpx.Ez_external_grid_function(x,y,z) = "0."
+warpx.Ex_external_grid_function(x,y,z) = "0."
+warpx.Ey_external_grid_function(x,y,z) = "((1.e5*sin(2*pi*(z)/wavelength)) * (z<z2) * (z>z1))"
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z)= "(((-1.e5*sin(2*pi*(z)/wavelength))/clight))*(z<z2) * (z>z1) "
+warpx.By_external_grid_function(x,y,z)= "0."
+warpx.Bz_external_grid_function(x,y,z) = "0."
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 134
+diag1.diag_type = Full
+diag1.fields_to_plot = Ey Bx

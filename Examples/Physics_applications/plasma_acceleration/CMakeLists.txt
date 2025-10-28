@@ -6,8 +6,8 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_plasma_acceleration_picmi.py  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1001000  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1001000"  # checksum
     OFF  # dependency
 )
 
@@ -16,8 +16,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_plasma_acceleration_boosted  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000020  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
 
@@ -26,8 +26,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_plasma_acceleration_mr  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000400  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000400"  # checksum
     OFF  # dependency
 )
 
@@ -36,8 +36,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_plasma_acceleration_mr_momentum_conserving  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000400  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000400"  # checksum
     OFF  # dependency
 )
 
@@ -46,8 +46,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_plasma_acceleration_boosted  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000005  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000005"  # checksum
     OFF  # dependency
 )
 
@@ -56,8 +56,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_plasma_acceleration_boosted_hybrid  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000025  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000025"  # checksum
     OFF  # dependency
 )
 
@@ -66,8 +66,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_plasma_acceleration_mr_picmi.py  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000002  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
     OFF  # dependency
 )
 
@@ -76,7 +76,7 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_plasma_acceleration_picmi.py  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000010  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )

@@ -12,10 +12,10 @@ warpx.abort_on_warning_threshold = medium
 boundary.field_lo = pec pec
 boundary.field_hi = pec pec
 
-my_constants.xmin = -0.5
-my_constants.zmin = -0.5
-my_constants.xmax = 0.5
-my_constants.zmax = 0.5
+my_constants.xmin = -0.501 # Ensures that the stair-case EB is exactly at -0.5
+my_constants.zmin = -0.501 # Ensures that the stair-case EB is exactly at -0.5
+my_constants.xmax = 0.501 # Ensures that the stair-case EB is exactly at 0.5
+my_constants.zmax = 0.501 # Ensures that the stair-case EB is exactly at 0.5
 # Note that for amrex EB implicit function, >0 is covered, =0 is boundary and <0 is regular.
 warpx.eb_implicit_function = "max(max(x+xmin,-(x+xmax)), max(z+zmin,-(z+zmax)))"
 

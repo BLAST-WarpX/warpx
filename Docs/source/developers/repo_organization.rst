@@ -44,7 +44,7 @@ sometimes the case for AMReX headers. For instance ``AMReX_GpuLaunch.H`` is a fa
 contain respectively the CPU and the GPU implementation of some methods, and which should not be included directly.
 Whenever possible, forward declarations headers are included instead of the actual headers, in order to save compilation time (see dedicated section below). In WarpX forward
 declaration headers have the suffix ``*_fwd.H``, while in AMReX they have the suffix ``*Fwd.H``.
-The include order (see `PR #874 <https://github.com/ECP-WarpX/WarpX/pull/874#issuecomment-607038803>`__ and `PR #1947 <https://github.com/ECP-WarpX/WarpX/pull/1947>`__) and `proper quotation marks <https://gcc.gnu.org/onlinedocs/cpp/Include-Syntax.html>`__ are:
+The include order (see `PR #874 <https://github.com/BLAST-WarpX/warpx/pull/874#issuecomment-607038803>`__ and `PR #1947 <https://github.com/BLAST-WarpX/warpx/pull/1947>`__) and `proper quotation marks <https://gcc.gnu.org/onlinedocs/cpp/Include-Syntax.html>`__ are:
 
 In a ``MyName.cpp`` file:
 
@@ -70,7 +70,7 @@ In a ``MyName.H`` file:
 
 Each of these groups of header files should ideally be sorted alphabetically, and a blank line should be placed between the groups.
 
-For details why this is needed, please see `PR #874 <https://github.com/ECP-WarpX/WarpX/pull/874#issuecomment-607038803>`_, `PR #1947 <https://github.com/ECP-WarpX/WarpX/pull/1947>`_, the `LLVM guidelines <https://llvm.org/docs/CodingStandards.html#include-style>`_, and `include-what-you-use <https://github.com/include-what-you-use/include-what-you-use/blob/master/docs/WhyIWYU.md>`_.
+For details why this is needed, please see `PR #874 <https://github.com/BLAST-WarpX/warpx/pull/874#issuecomment-607038803>`_, `PR #1947 <https://github.com/BLAST-WarpX/warpx/pull/1947>`_, the `LLVM guidelines <https://llvm.org/docs/CodingStandards.html#include-style>`_, and `include-what-you-use <https://github.com/include-what-you-use/include-what-you-use/blob/master/docs/WhyIWYU.md>`_.
 
 .. _developers-cpp-includes-fwd:
 

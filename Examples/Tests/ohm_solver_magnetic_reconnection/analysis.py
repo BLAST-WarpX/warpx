@@ -184,15 +184,3 @@ if not sim.test:
 
     writervideo = FFMpegWriter(fps=14)
     anim.save("diags/mag_reconnection.mp4", writer=writervideo)
-
-if sim.test:
-    import os
-    import sys
-
-    sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-    import checksumAPI
-
-    # this will be the name of the plot file
-    fn = sys.argv[1]
-    test_name = os.path.split(os.getcwd())[1]
-    checksumAPI.evaluate_checksum(test_name, fn)

@@ -6,7 +6,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_plasma_mirror  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000020  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )

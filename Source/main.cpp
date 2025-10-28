@@ -15,8 +15,8 @@
 
 #include <AMReX_Print.H>
 
-int main(int argc, char* argv[])
-{
+int
+main (int argc, char* argv[]) {
     warpx::initialization::initialize_external_libraries(argc, argv);
     {
         WARPX_PROFILE_VAR("main()", pmain);
@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
         WarpX::Finalize();
 
         timer.record_stop_time();
-        if (is_warpx_verbose){
+        if (is_warpx_verbose) {
             amrex::Print() << "Total Time                     : "
                            << timer.get_global_duration() << '\n';
         }

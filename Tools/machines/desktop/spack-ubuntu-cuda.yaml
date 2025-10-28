@@ -25,7 +25,6 @@ spack:
   - cuda
   - fftw
   - hdf5
-  - heffte
   - lapackpp
   - mpi
   - pkgconfig
@@ -117,19 +116,6 @@ spack:
         fc: /usr/bin/gfortran
       flags: {}
       operating_system: debian11
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-  - compiler:
-      spec: gcc@8.3.0
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      operating_system: debian10
       target: x86_64
       modules: []
       environment: {}

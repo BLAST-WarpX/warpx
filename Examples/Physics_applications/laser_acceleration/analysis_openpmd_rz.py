@@ -20,15 +20,15 @@ jt = ii.meshes["j"]["t"]
 # this is in C (Python) order; r is the fastest varying index
 (Nm, Nz, Nr) = jt.shape
 
-assert (
-    Nm == 3
-), "Wrong number of angular modes stored or possible incorrect ordering when flushed"
-assert (
-    Nr == 64
-), "Wrong number of radial points stored or possible incorrect ordering when flushed"
-assert (
-    Nz == 512
-), "Wrong number of z points stored or possible incorrect ordering when flushed"
+assert Nm == 3, (
+    "Wrong number of angular modes stored or possible incorrect ordering when flushed"
+)
+assert Nr == 64, (
+    "Wrong number of radial points stored or possible incorrect ordering when flushed"
+)
+assert Nz == 512, (
+    "Wrong number of z points stored or possible incorrect ordering when flushed"
+)
 
 assert ii.meshes["part_per_grid"][io.Mesh_Record_Component.SCALAR].shape == [
     512,
@@ -60,6 +60,6 @@ rhob0 = rhob[0]  # 0 mode
 electron_meanz = np.sum(np.dot(zlist, rhoe0)) / np.sum(rhoe0)
 beam_meanz = np.sum(np.dot(zlist, rhob0)) / np.sum(rhob0)
 
-assert (
-    (electron_meanz > 0) and (beam_meanz < 0)
-), "problem with openPMD+RZ.  Maybe openPMD+RZ mixed up the order of rho_<species> diagnostics?"
+assert (electron_meanz > 0) and (beam_meanz < 0), (
+    "problem with openPMD+RZ.  Maybe openPMD+RZ mixed up the order of rho_<species> diagnostics?"
+)

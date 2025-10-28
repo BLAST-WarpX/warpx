@@ -12,7 +12,6 @@
 #include <AMReX_IParser.H>
 
 #include <cctype>
-#include <stdexcept>
 
 // For sigaction() et al.
 #if defined(__linux__) || defined(__APPLE__)
@@ -37,7 +36,7 @@ SignalHandling::parseSignalNameToNumber (const std::string &str)
 #if defined(__linux__) || defined(__APPLE__)
     const struct {
         const char* abbrev;
-        const int value;
+        int value;
     } signals_to_parse[] = {
         {"ABRT", SIGABRT},
         {"ALRM", SIGALRM},

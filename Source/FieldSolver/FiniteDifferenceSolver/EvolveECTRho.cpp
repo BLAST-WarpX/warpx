@@ -6,12 +6,10 @@
  */
 #include "FiniteDifferenceSolver.H"
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -42,18 +40,19 @@
 #include <memory>
 
 using namespace amrex;
+using namespace ablastr::fields;
 
 /**
  * \brief Update the B field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveECTRho (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield,
     const int lev) {
 
-#if !defined(WARPX_DIM_RZ) and defined(AMREX_USE_EB)
+#if !defined(WARPX_DIM_RZ) and !defined(WARPX_DIM_RCYLINDER) and !defined(WARPX_DIM_RSPHERE) and defined(AMREX_USE_EB)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
         EvolveRhoCartesianECT(Efield, edge_lengths, face_areas, ECTRhofield, lev);
@@ -65,12 +64,12 @@ void FiniteDifferenceSolver::EvolveECTRho (
 }
 
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 void FiniteDifferenceSolver::EvolveRhoCartesianECT (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield, const int lev ) {
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield, const int lev ) {
 #ifdef AMREX_USE_EB
 
 #if !(defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ))

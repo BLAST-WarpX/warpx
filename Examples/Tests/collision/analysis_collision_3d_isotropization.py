@@ -11,15 +11,11 @@
 # https://smileipic.github.io/tutorials/advanced_collisions.html
 # https://smileipic.github.io/Smilei/Understand/collisions.html#test-cases-for-collisions
 
-import os
 import sys
 
 import numpy as np
 import scipy.constants as sc
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 e = sc.e
 pi = sc.pi
@@ -63,6 +59,3 @@ error = np.maximum(abs(Tx - Tx0 / e) / Tx, abs(Ty - Ty0 / e) / Ty)
 print(f"error = {error}")
 print(f"tolerance = {tolerance}")
 assert error < tolerance
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)

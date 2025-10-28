@@ -7,6 +7,8 @@
 #ifndef WARPX_MAGNETOSTATICSOLVER_H_
 #define WARPX_MAGNETOSTATICSOLVER_H_
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_MLMG.H>
@@ -34,23 +36,23 @@ namespace MagnetostaticSolver {
      */
     class EBCalcBfromVectorPotentialPerLevel {
       private:
-        const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& m_b_field;
-        const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& m_grad_buf_e_stag;
-        const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& m_grad_buf_b_stag;
+        ablastr::fields::MultiLevelVectorField m_b_field;
+        ablastr::fields::MultiLevelVectorField m_grad_buf_e_stag;
+        ablastr::fields::MultiLevelVectorField m_grad_buf_b_stag;
 
       public:
-        EBCalcBfromVectorPotentialPerLevel(const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& b_field,
-                                           const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& grad_buf_e_stag,
-                                           const amrex::Vector<amrex::Array<std::unique_ptr<amrex::MultiFab>, 3>>& grad_buf_b_stag)
+        EBCalcBfromVectorPotentialPerLevel (ablastr::fields::MultiLevelVectorField const & b_field,
+                                            ablastr::fields::MultiLevelVectorField const & grad_buf_e_stag,
+                                            ablastr::fields::MultiLevelVectorField const & grad_buf_b_stag)
                 : m_b_field(b_field),
                   m_grad_buf_e_stag(grad_buf_e_stag),
                   m_grad_buf_b_stag(grad_buf_b_stag)
         {}
 
-        void operator()(amrex::Array<std::unique_ptr<amrex::MLMG>,3> & mlmg, int lev);
+        void operator() (amrex::Array<std::unique_ptr<amrex::MLMG>, 3> & mlmg, int lev);
 
         // Function to perform interpolation from cell edges to cell faces
-        void doInterp(const std::unique_ptr<amrex::MultiFab> &src, const std::unique_ptr<amrex::MultiFab> &dst);
+        void doInterp (amrex::MultiFab & src, amrex::MultiFab & dst);
     };
 } // namespace MagnetostaticSolver
 

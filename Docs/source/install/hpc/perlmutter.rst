@@ -30,7 +30,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 On Perlmutter, you can run either on GPU nodes with fast A100 GPUs (recommended) or CPU nodes.
 
@@ -76,7 +76,7 @@ On Perlmutter, you can run either on GPU nodes with fast A100 GPUs (recommended)
       .. code-block:: bash
 
          bash $HOME/src/warpx/Tools/machines/perlmutter-nersc/install_gpu_dependencies.sh
-         source ${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx-gpu/bin/activate
+         source ${PSCRATCH}/storage/sw/warpx/perlmutter/gpu/venvs/warpx-gpu/bin/activate
 
       .. dropdown:: Script Details
          :color: light
@@ -126,7 +126,7 @@ On Perlmutter, you can run either on GPU nodes with fast A100 GPUs (recommended)
       .. code-block:: bash
 
          bash $HOME/src/warpx/Tools/machines/perlmutter-nersc/install_cpu_dependencies.sh
-         source ${CFS}/${proj}/${USER}/sw/perlmutter/cpu/venvs/warpx-cpu/bin/activate
+         source ${PSCRATCH}/storage/sw/warpx/perlmutter/cpu/venvs/warpx-cpu/bin/activate
 
       .. dropdown:: Script Details
          :color: light
@@ -153,7 +153,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_gpu
 
-         cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_gpu -j 16
 
       The WarpX application executables are now in ``$HOME/src/warpx/build_pm_gpu/bin/``.
@@ -164,7 +164,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_gpu_py
 
-         cmake -S . -B build_pm_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_gpu_py -j 16 --target pip_install
 
    .. tab-item:: CPU Nodes
@@ -174,7 +174,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cd $HOME/src/warpx
          rm -rf build_pm_cpu
 
-         cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu -j 16
 
       The WarpX application executables are now in ``$HOME/src/warpx/build_pm_cpu/bin/``.
@@ -184,7 +184,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
          rm -rf build_pm_cpu_py
 
-         cmake -S . -B build_pm_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_HEFFTE=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake -S . -B build_pm_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Perlmutter compute jobs <running-cpp-perlmutter>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
@@ -292,7 +292,7 @@ Create your own Conda environment and `Jupyter kernel <https://docs.nersc.gov/se
    # create Jupyter kernel
    rm -rf $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/
    python -m ipykernel install --user --name warpx-pm-postproc --display-name WarpX-PM-PostProcessing
-   echo -e '#!/bin/bash\nmodule load python\nsource activate warpx-pm-postproc\nexec "$@"' > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
+   echo -e '#!/bin/bash\nmodule load python\nconda activate warpx-pm-postproc\nexec "$@"' > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
    chmod a+rx $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
    KERNEL_STR=$(jq '.argv |= ["{resource_dir}/kernel-helper.sh"] + .' $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json | jq '.argv[1] = "python"')
    echo ${KERNEL_STR} | jq > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json

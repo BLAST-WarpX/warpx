@@ -13,7 +13,6 @@ In both cases, the reference energy corresponds to unstable results due to NCI
 (suppressed by the Galilean PSATD method, without or with averaging, respectively).
 """
 
-import os
 import re
 import sys
 
@@ -22,8 +21,6 @@ import scipy.constants as scc
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 filename = sys.argv[1]
 
@@ -117,6 +114,3 @@ if current_correction:
     print(f"err_charge = {err_charge}")
     print(f"tol_charge = {tol_charge}")
     assert err_charge < tol_charge
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, filename, rtol=1.0e-8)

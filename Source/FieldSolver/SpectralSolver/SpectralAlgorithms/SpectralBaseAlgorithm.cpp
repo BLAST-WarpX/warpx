@@ -9,6 +9,8 @@
 #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #include "Utils/WarpX_Complex.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <AMReX_Array4.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_Config.H>
@@ -58,8 +60,9 @@ void
 SpectralBaseAlgorithm::ComputeSpectralDivE (
     const int lev,
     SpectralFieldData& field_data,
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-    amrex::MultiFab& divE )
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab& divE
+)
 {
     const SpectralFieldIndex& Idx = m_spectral_index;
 

@@ -140,7 +140,7 @@ solver = picmi.ElectromagneticSolver(
 
 # Diagnostics
 particle_diag = picmi.ParticleDiagnostic(
-    name="diag1",
+    name="diagInst",
     period=100,
     warpx_format="openpmd",
     warpx_openpmd_backend="h5",
@@ -153,13 +153,25 @@ ncell_field = []
 for ncell_comp, cr in zip([nx, nz], coarsening_ratio):
     ncell_field.append(int(ncell_comp / cr))
 field_diag = picmi.FieldDiagnostic(
-    name="diag1",
+    name="diagInst",
     grid=grid,
     period=100,
     number_of_cells=ncell_field,
     data_list=["B", "E", "J", "rho", "rho_electrons", "rho_hydrogen"],
     warpx_format="openpmd",
     warpx_openpmd_backend="h5",
+)
+
+field_time_avg_diag = picmi.TimeAveragedFieldDiagnostic(
+    name="diagTimeAvg",
+    grid=grid,
+    period=100,
+    number_of_cells=ncell_field,
+    data_list=["B", "E", "J", "rho", "rho_electrons", "rho_hydrogen"],
+    warpx_format="openpmd",
+    warpx_openpmd_backend="h5",
+    warpx_time_average_mode="dynamic_start",
+    warpx_average_period_time=2.67e-15,
 )
 
 particle_fw_diag = picmi.ParticleDiagnostic(
@@ -184,7 +196,6 @@ particle_bw_diag = picmi.ParticleDiagnostic(
 histuH_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histuH",
-    period=100,
     species=hydrogen,
     bin_number=1000,
     bin_min=0.0,
@@ -196,7 +207,6 @@ histuH_rdiag = picmi.ReducedDiagnostic(
 histue_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histue",
-    period=100,
     species=electrons,
     bin_number=1000,
     bin_min=0.0,
@@ -210,7 +220,6 @@ histue_rdiag = picmi.ReducedDiagnostic(
 histuzAll_rdiag = picmi.ReducedDiagnostic(
     diag_type="ParticleHistogram",
     name="histuzAll",
-    period=100,
     species=hydrogen,
     bin_number=1000,
     bin_min=-0.474,
@@ -221,7 +230,6 @@ histuzAll_rdiag = picmi.ReducedDiagnostic(
 field_probe_z_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_Z",
-    period=100,
     integrate=0,
     probe_geometry="Line",
     x_probe=0.0,
@@ -234,7 +242,6 @@ field_probe_z_rdiag = picmi.ReducedDiagnostic(
 field_probe_scat_point_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_ScatPoint",
-    period=1,
     integrate=0,
     probe_geometry="Point",
     x_probe=0.0,
@@ -244,7 +251,6 @@ field_probe_scat_point_rdiag = picmi.ReducedDiagnostic(
 field_probe_scat_line_rdiag = picmi.ReducedDiagnostic(
     diag_type="FieldProbe",
     name="FieldProbe_ScatLine",
-    period=100,
     integrate=1,
     probe_geometry="Line",
     x_probe=-2.5e-6,
@@ -255,7 +261,8 @@ field_probe_scat_line_rdiag = picmi.ReducedDiagnostic(
 )
 
 load_balance_costs_rdiag = picmi.ReducedDiagnostic(
-    diag_type="LoadBalanceCosts", name="LBC", period=100
+    diag_type="LoadBalanceCosts",
+    name="LBC",
 )
 
 # Set up simulation
@@ -266,6 +273,7 @@ sim = picmi.Simulation(
     particle_shape="cubic",
     warpx_numprocs=[1, 2],  # deactivate `numprocs` for dynamic load balancing
     warpx_use_filter=1,
+    warpx_reduced_diags_intervals=100,
     warpx_load_balance_intervals=100,
     warpx_load_balance_costs_update="heuristic",
 )
@@ -292,6 +300,7 @@ sim.add_laser(laser, injection_method=laser_antenna)
 # Add full diagnostics
 sim.add_diagnostic(particle_diag)
 sim.add_diagnostic(field_diag)
+sim.add_diagnostic(field_time_avg_diag)
 sim.add_diagnostic(particle_fw_diag)
 sim.add_diagnostic(particle_bw_diag)
 # Add reduced diagnostics

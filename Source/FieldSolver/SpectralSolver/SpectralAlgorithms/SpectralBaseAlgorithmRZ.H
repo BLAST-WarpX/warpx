@@ -10,6 +10,7 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpaceRZ.H"
 #include "FieldSolver/SpectralSolver/SpectralFieldDataRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
 
@@ -66,7 +67,7 @@ class SpectralBaseAlgorithmRZ
          */
         void ComputeSpectralDivE ( int lev,
                                    SpectralFieldDataRZ& field_data,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+                                   ablastr::fields::VectorField const & Efield,
                                    amrex::MultiFab& divE );
 
         /**

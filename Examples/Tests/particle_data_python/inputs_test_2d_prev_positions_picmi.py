@@ -111,8 +111,8 @@ elec_wrapper = particle_containers.ParticleContainerWrapper("electrons")
 elec_count = elec_wrapper.nps
 
 # check that the runtime attributes have the right indices
-assert elec_wrapper.particle_container.get_comp_index("prev_x") == 6
-assert elec_wrapper.particle_container.get_comp_index("prev_z") == 7
+assert elec_wrapper.particle_container.get_real_comp_index("prev_x") == 6
+assert elec_wrapper.particle_container.get_real_comp_index("prev_z") == 7
 
 # sanity check that the prev_z values are reasonable and
 # that the correct number of values are returned

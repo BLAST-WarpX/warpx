@@ -7,43 +7,47 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#include "FieldSolver/Fields.H"
+#include "Fields.H"
 #include "Particles/ParticleIO.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
-#include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include "ablastr/fields/MultiFabRegister.H"
 #include <ablastr/utils/text/StreamUtils.H>
 
+#include <AMReX_Array.H>
+#include <AMReX_Array4.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Config.H>
-#include <AMReX_Extension.H>
+#include <AMReX_FArrayBox.H>
+#include <AMReX_FabArray.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
-#include <AMReX_PODVector.H>
+#include <AMReX_IndexType.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParIter.H>
 #include <AMReX_ParticleIO.H>
+#include <AMReX_Print.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
 #include <algorithm>
-#include <array>
-#include <istream>
 #include <memory>
 #include <string>
 #include <sstream>
 #include <vector>
 
 using namespace amrex;
-using namespace warpx::fields;
+using warpx::fields::FieldType;
 
 void
 LaserParticleContainer::ReadHeader (std::istream& is)
@@ -110,7 +114,7 @@ RigidInjectedParticleContainer::WriteHeader (std::ostream& os) const
 void
 PhysicalParticleContainer::ReadHeader (std::istream& is)
 {
-    is >> charge >> mass;
+    is >> charge >> m_mass;
     ablastr::utils::text::goto_next_line(is);
 }
 
@@ -118,7 +122,7 @@ void
 PhysicalParticleContainer::WriteHeader (std::ostream& os) const
 {
     // no need to write species_id
-    os << charge << " " << mass << "\n";
+    os << charge << " " << m_mass << "\n";
 }
 
 void
@@ -153,21 +157,24 @@ MultiParticleContainer::Restart (const std::string& dir)
             real_comp_names.push_back(comp_name);
         }
 
-        for (auto const& comp : pc->getParticleRuntimeComps()) {
-            auto search = std::find(real_comp_names.begin(), real_comp_names.end(), comp.first);
+        int n_rc = 0;
+        for (auto const& comp : pc->GetRealSoANames()) {
+            // skip compile-time components
+            if (n_rc < WarpXParticleContainer::NArrayReal) { continue; }
+            n_rc++;
+
+            auto search = std::find(real_comp_names.begin(), real_comp_names.end(), comp);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != real_comp_names.end(),
                 "Species " + species_names[i]
-                + "needs runtime real component " +  comp.first
+                + " needs runtime real component " +  comp
                 + ", but it was not found in the checkpoint file."
             );
         }
 
         for (int j = PIdx::nattribs-AMREX_SPACEDIM; j < nr; ++j) {
             const auto& comp_name = real_comp_names[j];
-            auto current_comp_names = pc->getParticleComps();
-            auto search = current_comp_names.find(comp_name);
-            if (search == current_comp_names.end()) {
+            if (!pc->HasRealComp(comp_name)) {
                 amrex::Print() << Utils::TextMsg::Info(
                     "Runtime real component " + comp_name
                     + " was found in the checkpoint file, but it has not been added yet. "
@@ -187,20 +194,23 @@ MultiParticleContainer::Restart (const std::string& dir)
             int_comp_names.push_back(comp_name);
         }
 
-        for (auto const& comp : pc->getParticleRuntimeiComps()) {
-            auto search = std::find(int_comp_names.begin(), int_comp_names.end(), comp.first);
+        int n_ic = 0;
+        for (auto const& comp : pc->GetIntSoANames()) {
+            // skip compile-time components
+            if (n_ic < WarpXParticleContainer::NArrayInt) { continue; }
+            n_ic++;
+
+            auto search = std::find(int_comp_names.begin(), int_comp_names.end(), comp);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != int_comp_names.end(),
-                "Species " + species_names[i] + "needs runtime int component " + comp.first
+                "Species " + species_names[i] + " needs runtime int component " + comp
                 + ", but it was not found in the checkpoint file."
             );
         }
 
         for (int j = 0; j < ni; ++j) {
             const auto& comp_name = int_comp_names[j];
-            auto current_comp_names = pc->getParticleiComps();
-            auto search = current_comp_names.find(comp_name);
-            if (search == current_comp_names.end()) {
+            if (!pc->HasIntComp(comp_name)) {
                 amrex::Print()<< Utils::TextMsg::Info(
                     "Runtime int component " + comp_name
                     + " was found in the checkpoint file, but it has not been added yet. "
@@ -259,17 +269,17 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
         "Output of the electrostatic potential (phi) on the particles was requested, "
         "but this is only available with `diag_type = Full`.");
     tmp.AddRealComp("phi");
-    int const phi_index = tmp.getParticleComps().at("phi");
+    int const phi_index = tmp.GetRealCompIndex("phi");
     auto& warpx = WarpX::GetInstance();
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
     for (int lev=0; lev<=warpx.finestLevel(); lev++) {
         const amrex::Geometry& geom = warpx.Geom(lev);
         auto plo = geom.ProbLoArray();
         auto dxi = geom.InvCellSizeArray();
-        amrex::MultiFab const& phi = warpx.getField( FieldType::phi_fp, lev, 0 );
+        amrex::MultiFab const& phi = *warpx.m_fields.get(FieldType::phi_fp, lev);
 
+#ifdef AMREX_USE_OMP
+        #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
         for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
 
             auto phi_grid = phi[pti].array();

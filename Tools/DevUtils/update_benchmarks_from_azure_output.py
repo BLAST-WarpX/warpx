@@ -1,4 +1,4 @@
-# Copyright 2023 Neil Zaim
+# Copyright 2023 Neil Zaim, Edoardo Zoni
 #
 # This file is part of WarpX.
 #
@@ -9,56 +9,45 @@ import re
 import sys
 
 """
-This Python script updates the Azure benchmarks automatically using a raw Azure output textfile
-that is given as the first and only argument of the script.
-
-In the Azure output, we read the lines contained between
-"New file for Test_Name:"
-and the next occurrence of
-"'----------------'"
-And use these lines to update the benchmarks
+This Python script updates the Azure benchmarks automatically using a raw
+Azure output text file that is passed as command line argument of the script.
 """
 
-azure_output_filename = sys.argv[1]
+# read path to Azure output text file
+azure_output = sys.argv[1]
 
-pattern_test_name = "New file for (?P<testname>[\w\-]*)"
-closing_string = "----------------"
+# string to identify failing tests that require a checksums reset
+new_checksums = "New checksums"
+failing_test = ""
+
+# path of all checksums benchmark files
 benchmark_path = "../../Regression/Checksum/benchmarks_json/"
-benchmark_suffix = ".json"
 
-first_line_read = False
-current_test = ""
-
-with open(azure_output_filename, "r") as f:
+with open(azure_output, "r") as f:
+    # find length of Azure prefix to be removed from each line,
+    # first line of Azure output starts with "##[section]Starting:"
+    first_line = f.readline()
+    prefix_length = first_line.find("#")
+    # loop over lines
     for line in f:
-        if current_test == "":
-            # Here we search lines that read, for example,
-            # "New file for LaserAcceleration_BTD"
-            # and we set current_test = "LaserAcceleration_BTD"
-            match_test_name = re.search(pattern_test_name, line)
-            if match_test_name:
-                current_test = match_test_name.group("testname")
-                new_file_string = ""
-
+        # remove Azure prefix from line
+        line = line[prefix_length:]
+        if failing_test == "":
+            # no failing test found yet
+            if re.search(new_checksums, line):
+                # failing test found, set failing test name
+                failing_test = line[line.find("test_") : line.find(".json")]
+                json_file_string = ""
         else:
-            # We add each line to the new file string until we find the line containing
-            # "----------------"
-            # which indicates that we have read the new file entirely
-
-            if closing_string not in line:
-                if not first_line_read:
-                    # Raw Azure output comes with a prefix at the beginning of each line that we do
-                    # not need here. The first line that we will read is the prefix followed by the
-                    # "{" character, so we determine how long the prefix is by finding the last
-                    # occurrence of the "{" character in this line.
-                    azure_indent = line.rfind("{")
-                    first_line_read = True
-                new_file_string += line[azure_indent:]
-
-            else:
-                # We have read the new file entirely. Dump it in the json file.
-                new_file_json = json.loads(new_file_string)
-                json_filepath = benchmark_path + current_test + benchmark_suffix
-                with open(json_filepath, "w") as f_json:
-                    json.dump(new_file_json, f_json, indent=2)
-                current_test = ""
+            # extract and dump new checksums of failing test
+            json_file_string += line
+            if line.startswith("}"):  # end of new checksums
+                json_file = json.loads(json_file_string)
+                json_filename = failing_test + ".json"
+                json_filepath = benchmark_path + json_filename
+                print(f"\nDumping new checksums file {json_filename}:")
+                print(json_file_string)
+                with open(json_filepath, "w") as json_f:
+                    json.dump(json_file, json_f, indent=2)
+                # reset to empty string to continue search of failing tests
+                failing_test = ""

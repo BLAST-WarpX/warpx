@@ -9,7 +9,7 @@ on:
 jobs:
   CleanUpCcacheCachePostPR:
     name: Clean Up Ccache Cache Post PR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
       contents: read

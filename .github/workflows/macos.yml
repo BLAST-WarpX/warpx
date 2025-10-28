@@ -1,30 +1,43 @@
 name: 🍏 macOS
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-macos
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_appleclang:
     name: AppleClang
     runs-on: macos-latest
-    if: github.event.pull_request.draft == false
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
-      CXXFLAGS: "-Werror -Wno-error=pass-failed"
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - uses: actions/setup-python@v5
+      name: Install Python
+      with:
+        python-version: '3.x'
+    - name: install brew dependencies
       run: |
         set +e
         brew unlink gcc
         brew update
         brew upgrade || true
-        brew install --overwrite python
         brew install ccache
         brew install fftw
         brew install libomp
@@ -34,13 +47,14 @@ jobs:
         brew install pkg-config
         set -e
         brew tap openpmd/openpmd
+        brew uninstall cmake  # https://github.com/actions/runner-images/issues/12912
         brew install openpmd-api
-
-        python3 -m venv py-venv
-        source py-venv/bin/activate
+    - name: install pip dependencies
+      run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade build packaging setuptools wheel
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
         python3 -m pip install --upgrade mpi4py
+        python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -56,7 +70,7 @@ jobs:
         export CCACHE_SLOPPINESS=time_macros
         ccache -z
 
-        source py-venv/bin/activate
+        export CXXFLAGS="-Werror -Wno-error=pass-failed -Wno-error=c++23-attribute-extensions"
 
         cmake -S . -B build_dp         \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
@@ -67,7 +81,6 @@ jobs:
 
         cmake -S . -B build_sp         \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DPython_EXECUTABLE=$(which python3) \
           -DWarpX_EB=OFF               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_OPENPMD=ON           \
@@ -81,7 +94,6 @@ jobs:
 
     - name: run pywarpx
       run: |
-        source py-venv/bin/activate
         export OMP_NUM_THREADS=1
 
         mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

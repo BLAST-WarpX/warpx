@@ -48,14 +48,20 @@ if(ABLASTR_FFT)
     #
 
     # cuFFT  (CUDA)
-    #   TODO: check if `find_package` search works
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        # nothing to do (cuFFT is part of the CUDA SDK)
+        # TODO: check if `find_package` search works for cuFFT
 
     # rocFFT (HIP)
-    if(WarpX_COMPUTE STREQUAL HIP)
+    elseif(WarpX_COMPUTE STREQUAL HIP)
         find_package(rocfft REQUIRED)
 
-    # FFTW   (NOACC, OMP, SYCL)
-    elseif(NOT WarpX_COMPUTE STREQUAL CUDA)
+    elseif(WarpX_COMPUTE STREQUAL SYCL)
+        # nothing to do (oneMKL is part of oneAPI)
+        # TODO: check if `find_package` search works for oneMKL
+
+    # FFTW   (NOACC, OMP)
+    else()
         # On Windows, try searching for FFTW3(f)Config.cmake files first
         #   Installed .pc files wrongly and unconditionally add -lm
         #   https://github.com/FFTW/fftw3/issues/236
@@ -106,6 +112,8 @@ if(ABLASTR_FFT)
         warpx_make_third_party_includes_system(cufft FFT)
     elseif(WarpX_COMPUTE STREQUAL HIP)
         warpx_make_third_party_includes_system(roc::rocfft FFT)
+    elseif(WarpX_COMPUTE STREQUAL SYCL)
+        warpx_make_third_party_includes_system(AMReX::SYCL FFT)
     else()
         if(WarpX_FFTW_SEARCH STREQUAL CMAKE)
             warpx_make_third_party_includes_system(FFTW3::fftw3${HFFTWp} FFT)

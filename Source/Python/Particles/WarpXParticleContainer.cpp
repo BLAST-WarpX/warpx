@@ -85,19 +85,19 @@ void init_WarpXParticleContainer (py::module& m)
             py::arg("nattr_int"), py::arg("attr_int"),
             py::arg("uniqueparticles"), py::arg("id")=-1
         )
-        .def("get_comp_index",
+        .def("get_comp_index",  // deprecated: use pyAMReX get_real_comp_index
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
-                auto particle_comps = pc.getParticleComps();
-                return particle_comps.at(comp_name);
+                py::print("get_comp_index is deprecated. Use get_real_comp_index instead.");
+                return pc.GetRealCompIndex(comp_name);
             },
             py::arg("comp_name")
         )
-        .def("get_icomp_index",
+        .def("get_icomp_index",  // deprecated: use pyAMReX get_int_comp_index
             [](WarpXParticleContainer& pc, std::string comp_name)
             {
-                auto particle_comps = pc.getParticleiComps();
-                return particle_comps.at(comp_name);
+                py::print("get_icomp_index is deprecated. Use get_int_comp_index instead.");
+                return pc.GetIntCompIndex(comp_name);
             },
             py::arg("comp_name")
         )
@@ -115,6 +115,10 @@ void init_WarpXParticleContainer (py::module& m)
         )
         .def("sum_particle_charge",
             &WarpXParticleContainer::sumParticleCharge,
+            py::arg("local")
+        )
+        .def("sum_particle_energy",
+            &WarpXParticleContainer::sumParticleEnergy,
             py::arg("local")
         )
         .def("deposit_charge",
@@ -139,6 +143,14 @@ void init_WarpXParticleContainer (py::module& m)
         )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_gather",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotGather(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_deposit",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotDeposit(flag); },
             py::arg("flag")
         )
     ;

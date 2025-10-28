@@ -8,8 +8,8 @@ amr.max_level = 0
 
 # Geometry
 geometry.dims = 3
-geometry.prob_lo     = -1.0  -1.0  -1.0   # physical domain
-geometry.prob_hi     =  1.0   1.0   2.0
+geometry.prob_lo     = -1.0  -1.0  -1.866   # physical domain
+geometry.prob_hi     =  1.0   1.0   3.732
 
 boundary.field_lo = pec pec pec
 boundary.field_hi = pec pec pec
