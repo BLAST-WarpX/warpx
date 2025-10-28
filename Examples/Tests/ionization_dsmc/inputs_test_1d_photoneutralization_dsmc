@@ -86,7 +86,7 @@ electrons.save_particles_at_zlo = 1
 bound.dump_last_timestep = 1
 
 #############################
-# Setup charge exchange
+# Setup photo-ionization
 collisions.collision_names = photoioniz
 
 photoioniz.type = dsmc
