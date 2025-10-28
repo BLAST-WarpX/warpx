@@ -354,6 +354,8 @@ Overall simulation parameters
     If set, the environment variable ``OMP_NUM_THREADS`` takes precedence over ``system`` and ``nosmt``, but not over integer numbers set in this option.
 
 
+.. _running-cpp-parameters-signal:
+
 Signal Handling
 ^^^^^^^^^^^^^^^
 
@@ -945,6 +947,7 @@ Particle initialization
 * ``<species_name>.mass`` (`float`) optional (default `NaN`)
     The mass of one `physical` particle of this species.
     If ``species_type`` is specified, the mass will be set to the physical value and ``mass`` is optional.
+    ``mass`` must be strictly positive. For massless species, use ``<species_name>.species_type``. The only allowed massless species type is ``photon``.
 
 * ``<species_name>.xmin,ymin,zmin`` and ``<species_name>.xmax,ymax,zmax`` (`float`) optional (default unlimited)
     When ``<species_name>.xmin`` and ``<species_name>.xmax`` are set, they delimit the region within which particles are injected.
@@ -1493,8 +1496,8 @@ Particle initialization
     Enables non-linear Breit-Wheeler process for this species.
     Breit-Wheeler lookup table should be either generated or loaded from disk to enable
     this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be a photon species.
-    **This feature requires to compile with QED=TRUE**
+    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
+    **This feature requires to compile with -DWarpX_QED=ON**
 
 * ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
     If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
@@ -2161,7 +2164,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
     The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
-    If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
+    If using ``dsmc`` with ``charge_exchange`` and ``twoproduct_reaction``, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
     If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
@@ -2269,7 +2272,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.scattering_processes`` (`strings` separated by spaces)
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, and ``charge_exchange``
+    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, ``twoproduct_reaction`` and ``charge_exchange``
     for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
     Multiple excitation events can be included for electrons corresponding to
     excitation to different levels, the ``X`` above can be changed to a unique
@@ -2286,7 +2289,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.<scattering_process>_energy`` (`float`)
     Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
-    ``excitationX`` or ``ionization`` the energy cost of that process must be given in eV.
+    ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
 
 * ``<collision_name>.ionization_species`` (`float`)
     Only for ``background_mcc``. If the scattering process is ``ionization`` the

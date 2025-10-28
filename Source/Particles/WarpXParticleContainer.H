@@ -674,7 +674,6 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_Szz;
 
 public:
-    using PairIndex = std::pair<int, int>;
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
 
