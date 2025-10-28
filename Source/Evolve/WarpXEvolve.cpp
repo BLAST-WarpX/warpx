@@ -402,7 +402,7 @@ void WarpX::OneStep (
                 // push particles (half position and full momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
-                    /*skip_current=*/true,
+                    /*skip_deposition=*/true,
                     PositionPushType::FirstHalf,
                     MomentumPushType::Full
                 );
@@ -418,7 +418,7 @@ void WarpX::OneStep (
                 // push particles (half position)
                 PushParticlesandDeposit(
                     a_cur_time,
-                    /*skip_current=*/true,
+                    /*skip_deposition=*/true,
                     PositionPushType::SecondHalf,
                     MomentumPushType::None
                 );
@@ -433,7 +433,7 @@ void WarpX::OneStep (
                 // push particles (half position)
                 PushParticlesandDeposit(
                     a_cur_time,
-                    /*skip_current=*/true,
+                    /*skip_deposition=*/true,
                     PositionPushType::Full,
                     MomentumPushType::Full
                 );
@@ -1250,7 +1250,7 @@ WarpX::doQEDEvents ()
 void
 WarpX::PushParticlesandDeposit (
     amrex::Real cur_time,
-    bool skip_current,
+    bool skip_deposition,
     PositionPushType position_push_type,
     MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
@@ -1263,7 +1263,7 @@ WarpX::PushParticlesandDeposit (
             lev,
             cur_time,
             SubcyclingHalf::None,
-            skip_current,
+            skip_deposition,
             position_push_type,
             momentum_push_type,
             implicit_options
@@ -1276,7 +1276,7 @@ WarpX::PushParticlesandDeposit (
     int lev,
     amrex::Real cur_time,
     SubcyclingHalf subcycling_half,
-    bool skip_current,
+    bool skip_deposition,
     PositionPushType position_push_type,
     MomentumPushType momentum_push_type,
     ImplicitOptions const * implicit_options
@@ -1307,13 +1307,13 @@ WarpX::PushParticlesandDeposit (
         cur_time,
         dt[lev],
         subcycling_half,
-        skip_current,
+        skip_deposition,
         position_push_type,
         momentum_push_type,
         implicit_options
     );
 
-    if (! skip_current) {
+    if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
         ApplyInverseVolumeScalingToCurrentDensity(
@@ -1347,7 +1347,7 @@ WarpX::PushParticlesandDeposit (
                          lev,
                          current_fp_string,
                          cur_time,
-                         skip_current
+                         skip_deposition
             );
         }
     }
