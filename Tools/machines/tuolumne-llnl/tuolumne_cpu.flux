@@ -34,14 +34,14 @@ WARPX_WT="warpx.break_signals=USR1"
 # enviroment setup
 if [[ -z "${MY_PROFILE}" ]]; then
     echo "WARNING: FORGOT TO"
-    echo "   source $HOME/tuolumne_mi300a_warpx.profile"
+    echo "   source $HOME/tuolumne_cpu_warpx.profile"
     echo "before submission. Doing that now."
 
-    source $HOME/tuolumne_mi300a_warpx.profile
+    source $HOME/tuolumne_cpu_warpx.profile
 fi
 
-# pin to closest NIC to GPU
-export MPICH_OFI_NIC_POLICY=GPU
+# pin to closest NIC to APU
+#export MPICH_OFI_NIC_POLICY=APU
 
 # Not yet tested: Transparent huge pages on CPU
 # https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems/introduction-and-quickstart/pro-tips
@@ -52,13 +52,9 @@ export MPICH_OFI_NIC_POLICY=GPU
 #   note: 21 physical cores per socket maximum (system reserves 3)
 export OMP_NUM_THREADS=21
 
-# GPU-aware MPI optimizations
-GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
-
 # start MPI parallel processes
 NNODES=$(flux resource list -s up -no {nnodes})
 flux run ${FLUX_WT_SIG} --exclusive --nodes=${NNODES} \
-  --tasks-per-node=4 \
-  ${EXE} ${INPUTS} \
-  ${GPU_AWARE_MPI} ${WARPX_WT} \
+  --tasks-per-node=4           \
+  ${EXE} ${INPUTS} ${WARPX_WT} \
   > output.txt

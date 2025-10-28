@@ -44,73 +44,132 @@ Use the following commands to download the WarpX source code:
 
    git clone https://github.com/BLAST-WarpX/warpx.git /p/lustre5/${USER}/tuolumne/src/warpx
 
-We use system software modules, add environment hints and further dependencies via the file ``$HOME/tuolumne_mi300a_warpx.profile``.
-Create it now:
+On Tuolumne, we usually accelerate all computations with the GPU cores of the MI300A APU.
+For development purposes, you can also limit yourself to the CPU cores of the MI300A.
 
-.. code-block:: bash
+.. tab-set::
 
-   cp /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/tuolumne_mi300a_warpx.profile.example $HOME/tuolumne_mi300a_warpx.profile
+   .. tab-item:: GPU
 
-.. dropdown:: Script Details
-   :color: light
-   :icon: info
-   :animate: fade-in-slide-down
+      We use system software modules, add environment hints and further dependencies via the file ``$HOME/tuolumne_mi300a_warpx.profile``.
+      Create it now:
 
-   .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a_warpx.profile.example
-      :language: bash
+      .. code-block:: bash
 
-Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-**Currently, this is unused and can be kept empty.**
-Once project allocation becomes required, e.g., if you are member of the project ``abcde``, then run ``vi $HOME/tuolumne_mi300a_warpx.profile``.
-Enter the edit mode by typing ``i`` and edit line 2 to read:
+         cp /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/tuolumne_mi300a_warpx.profile.example $HOME/tuolumne_mi300a_warpx.profile
 
-.. code-block:: bash
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
 
-   export proj="abcde"
+         .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a_warpx.profile.example
+            :language: bash
 
-Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+      **Currently, this is unused and can be kept empty.**
+      Once project allocation becomes required, e.g., if you are member of the project ``abcde``, then run ``vi $HOME/tuolumne_mi300a_warpx.profile``.
+      Enter the edit mode by typing ``i`` and edit line 2 to read:
 
-.. important::
+      .. code-block:: bash
 
-   Now, and as the first step on future logins to Tuolumne, activate these environment settings:
+         export proj="abcde"
 
-   .. code-block:: bash
+      Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
 
-      source $HOME/tuolumne_mi300a_warpx.profile
+      .. important::
 
-Finally, since Tuolumne does not yet provide software modules for some of our dependencies, install them once:
+         Now, and as the first step on future logins to Tuolumne, activate these environment settings:
+
+         .. code-block:: bash
+
+            source $HOME/tuolumne_mi300a_warpx.profile
+
+      Finally, since Tuolumne does not yet provide software modules for some of our dependencies, install them once:
 
 
-  .. code-block:: bash
+        .. code-block:: bash
 
-     bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_mi300a_dependencies.sh
-     source /p/lustre5/${USER}/tuolumne/warpx/mi300a/venvs/warpx-tuolumne-mi300a/bin/activate
+           bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_mi300a_dependencies.sh
+           source /p/lustre5/${USER}/tuolumne/warpx/mi300a/venvs/warpx-tuolumne-mi300a/bin/activate
 
-  .. dropdown:: Script Details
-     :color: light
-     :icon: info
-     :animate: fade-in-slide-down
+        .. dropdown:: Script Details
+           :color: light
+           :icon: info
+           :animate: fade-in-slide-down
 
-     .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/install_mi300a_dependencies.sh
-        :language: bash
+           .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/install_mi300a_dependencies.sh
+              :language: bash
 
-  .. dropdown:: AI/ML Dependencies (Optional)
-     :animate: fade-in-slide-down
+        .. dropdown:: AI/ML Dependencies (Optional)
+           :animate: fade-in-slide-down
 
-     If you plan to run AI/ML workflows depending on PyTorch et al., run the next step as well.
-     This will take a while and should be skipped if not needed.
+           If you plan to run AI/ML workflows depending on PyTorch et al., run the next step as well.
+           This will take a while and should be skipped if not needed.
 
-     .. code-block:: bash
+           .. code-block:: bash
 
-        bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_mi300a_ml.sh
+              bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_mi300a_ml.sh
 
-     .. dropdown:: Script Details
-        :color: light
-        :icon: info
-        :animate: fade-in-slide-down
+           .. dropdown:: Script Details
+              :color: light
+              :icon: info
+              :animate: fade-in-slide-down
 
-        .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/install_mi300a_ml.sh
-           :language: bash
+              .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/install_mi300a_ml.sh
+                 :language: bash
+
+   .. tab-item:: CPU
+
+      We use system software modules, add environment hints and further dependencies via the file ``$HOME/tuolumne_cpu_warpx.profile``.
+      Create it now:
+
+      .. code-block:: bash
+
+         cp /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/tuolumne_cpu_warpx.profile.example $HOME/tuolumne_cpu_warpx.profile
+
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
+
+         .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_cpu_warpx.profile.example
+            :language: bash
+
+      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+      **Currently, this is unused and can be kept empty.**
+      Once project allocation becomes required, e.g., if you are member of the project ``abcde``, then run ``vi $HOME/tuolumne_cpu_warpx.profile``.
+      Enter the edit mode by typing ``i`` and edit line 2 to read:
+
+      .. code-block:: bash
+
+         export proj="abcde"
+
+      Exit the ``vi`` editor with ``Esc`` and then type ``:wq`` (write & quit).
+
+      .. important::
+
+         Now, and as the first step on future logins to Tuolumne, activate these environment settings:
+
+         .. code-block:: bash
+
+            source $HOME/tuolumne_cpu_warpx.profile
+
+      Finally, since Tuolumne does not yet provide software modules for some of our dependencies, install them once:
+
+
+        .. code-block:: bash
+
+           bash /p/lustre5/${USER}/tuolumne/src/warpx/Tools/machines/tuolumne-llnl/install_cpu_dependencies.sh
+           source /p/lustre5/${USER}/tuolumne/warpx/cpu/venvs/warpx-tuolumne-cpu/bin/activate
+
+        .. dropdown:: Script Details
+           :color: light
+           :icon: info
+           :animate: fade-in-slide-down
+
+           .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/install_cpu_dependencies.sh
+              :language: bash
 
 
 .. _building-tuolumne-compilation:
@@ -120,20 +179,41 @@ Compilation
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
-.. code-block:: bash
+.. tab-set::
 
-   cd /p/lustre5/${USER}/tuolumne/src/warpx
+   .. tab-item:: GPU
 
-   cmake --fresh -S . -B build_tuolumne -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_DIMS="1;2;RZ;3"
-   cmake --build build_tuolumne -j 24
+      .. code-block:: bash
 
-The WarpX application executables are now in ``/p/lustre5/${USER}/tuolumne/src/warpx/build_tuolumne/bin/``.
-Additionally, the following commands will install WarpX as a Python module:
+         cd /p/lustre5/${USER}/tuolumne/src/warpx
 
-.. code-block:: bash
+         cmake --fresh -S . -B build_tuolumne -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_tuolumne -j 24
 
-   cmake --fresh -S . -B build_tuolumne_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
-   cmake --build build_tuolumne_py -j 24 --target pip_install
+      The WarpX application executables are now in ``/p/lustre5/${USER}/tuolumne/src/warpx/build_tuolumne/bin/``.
+      Additionally, the following commands will install WarpX as a Python module:
+
+      .. code-block:: bash
+
+         cmake --fresh -S . -B build_tuolumne_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_tuolumne_py -j 24 --target pip_install
+
+   .. tab-item:: CPU
+
+      .. code-block:: bash
+
+         cd /p/lustre5/${USER}/tuolumne/src/warpx
+
+         cmake --fresh -S . -B build_tuolumne_cpu -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_tuolumne_cpu -j 24
+
+      The WarpX application executables are now in ``/p/lustre5/${USER}/tuolumne/src/warpx/build_tuolumne_cpu/bin/``.
+      Additionally, the following commands will install WarpX as a Python module:
+
+      .. code-block:: bash
+
+         cmake --fresh -S . -B build_tuolumne_cpu_py -DWarpX_COMPUTE=OMP -DWarpX_FFT=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_tuolumne_cpu_py -j 24 --target pip_install
 
 Now, you can :ref:`submit tuolumne compute jobs <running-cpp-tuolumne>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
 Or, you can use the WarpX executables to submit tuolumne jobs (:ref:`example inputs <usage-examples>`).
@@ -183,26 +263,41 @@ MI300A APUs (128GB)
 
 `Each compute node <https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems/introduction-and-quickstart/pro-tips>`__ is divided into 4 sockets, each with:
 
-* 1 MI300A GPU,
+* 1 MI300A APU (incl. 1 GPU),
 * 21 available user CPU cores, with 3 cores reserved for the OS (2 hardware threads per core)
 * 128GB HBM3 memory (a single NUMA domain)
 
 The batch script below can be used to run a WarpX simulation on 1 node with 4 APUs on the supercomputer Tuolumne at LLNL.
 Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<input file>`` could be ``plasma_mirror_inputs``.
-WarpX runs with one MPI rank per GPU.
+WarpX runs with one MPI rank per GPU and uses 21 (of 24) CPU cores (3 are reserved for the system).
 
-Note that we append these non-default runtime options:
+The batch script below also :ref:`sends WarpX a signal <running-cpp-parameters-signal>` when the simulations gets close to the walltime of the job, to shut down cleanly.
+Adjust the ``FLUX_WT_SIG`` and ``WARPX_WT`` to modify or disable this behavior as needed.
 
-* ``amrex.use_gpu_aware_mpi=1``: make use of fast APU to APU MPI communications
+.. tab-set::
 
-.. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux``.
+   .. tab-item:: GPU
 
-To run a simulation, copy the lines above to a file ``tuolumne_mi300a.flux`` and run
+      .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux
+         :language: bash
+         :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_mi300a.flux``.
 
-.. code-block:: bash
+      To run a simulation, copy the lines above to a file ``tuolumne_mi300a.flux`` and run
 
-   flux batch tuolumne_mi300a.flux
+      .. code-block:: bash
+
+         flux batch tuolumne_mi300a.flux
+
+   .. tab-item:: CPU
+
+      .. literalinclude:: ../../../../Tools/machines/tuolumne-llnl/tuolumne_cpu.flux
+         :language: bash
+         :caption: You can copy this file from ``Tools/machines/tuolumne-llnl/tuolumne_cpu.flux``.
+
+      To run a simulation, copy the lines above to a file ``tuolumne_cpu.flux`` and run
+
+      .. code-block:: bash
+
+         flux batch tuolumne_cpu.flux
 
 to submit the job.
