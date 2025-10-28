@@ -60,16 +60,6 @@ We also have a `discussion page <https://github.com/BLAST-WarpX/warpx/discussion
    acknowledge_us
    highlights
 
-Theory
-------
-.. toctree::
-   :titlesonly:
-   :caption: THEORY
-   :maxdepth: 1
-   :hidden:
-
-   theory/intro
-
 Installation
 ------------
 .. toctree::
@@ -105,6 +95,16 @@ Tutorials
    :hidden:
 
    tutorials
+
+Theory
+------
+.. toctree::
+   :titlesonly:
+   :caption: THEORY
+   :maxdepth: 1
+   :hidden:
+
+   theory/intro
 
 Data Analysis
 -------------
