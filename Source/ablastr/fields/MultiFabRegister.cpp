@@ -273,7 +273,7 @@ namespace ablastr::fields
                 }
 
                 // replace old MultiFab with new one, deallocate old one
-                mf_owner.m_mf = std::move(new_mf);
+                std::swap(mf_owner.m_mf, new_mf);
             }
         }
 
