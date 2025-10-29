@@ -648,8 +648,11 @@ for (const auto & particle_diag : particle_diags) {
     real_flags.resize(tmp.NumRealComps());
     for (size_t index = PIdx::nattribs; index < rn.size(); ++index) {
         real_flags[index] = tmp.h_redistribute_real_comp[index];
+        // Do not write the average momentum runtime components added in PhysicalParticleContainer
+        if (rn[index] == "ux_avg" || rn[index] == "uy_avg" || rn[index] == "uz_avg") {
+            real_flags[index] = 0;
+        }
     }
-
 
     // and the int components
     amrex::Vector<int> int_flags(tmp.NumIntComps());
