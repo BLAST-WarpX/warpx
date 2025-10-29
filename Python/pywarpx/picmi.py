@@ -3031,6 +3031,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_amrex_use_gpu_aware_mpi: bool, optional
         Whether to use GPU-aware MPI communications
 
+    warpx_omp_threads: int or string, optional
+        Controls the number of OpenMP threads to use (WarpX default: "nosmt").
+        See the detailed AMReX docs for details in the accepted values.
+        https://amrex-codes.github.io/amrex/docs_html/InputsComputeBackends.html
+
     warpx_zmax_plasma_to_compute_max_step: float, optional
         Sets the simulation run time based on the maximum z value
 
@@ -3156,6 +3161,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         self.amrex_the_arena_init_size = kw.pop("warpx_amrex_the_arena_init_size", None)
         self.amrex_use_gpu_aware_mpi = kw.pop("warpx_amrex_use_gpu_aware_mpi", None)
+        self.warpx_omp_threads = kw.pop("warpx_omp_threads", None)
         self.zmax_plasma_to_compute_max_step = kw.pop(
             "warpx_zmax_plasma_to_compute_max_step", None
         )
@@ -3363,6 +3369,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         if self.amrex_use_gpu_aware_mpi is not None:
             pywarpx.amrex.use_gpu_aware_mpi = self.amrex_use_gpu_aware_mpi
+
+        if self.warpx_omp_threads is not None:
+            pywarpx.amrex.omp_threads = self.warpx_omp_threads
 
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:
