@@ -88,6 +88,7 @@
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_TagBox.H>
+#include <AMReX_VisMF.H>
 
 #include <algorithm>
 #include <cmath>
@@ -319,6 +320,9 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    m_instance = this; // This guarantees that GetInstance() can be
+                       // indirectly used in WarpX constructor.
+
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
@@ -876,9 +880,13 @@ WarpX::ReadParameters ()
 #endif
         pp_warpx.query("do_shared_mem_charge_deposition", do_shared_mem_charge_deposition);
         pp_warpx.query("do_shared_mem_current_deposition", do_shared_mem_current_deposition);
-#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA))
+#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) || \
+    (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_shared_mem_current_deposition,
-                "requested shared memory for current deposition, but shared memory is only available for CUDA or HIP");
+            "requested shared memory for current deposition,\
+            but shared memory is only available for CUDA or HIP,\
+            and for geometries other than 1D cylindrical and 1D spherical."
+        );
 #endif
         pp_warpx.query("shared_mem_current_tpb", shared_mem_current_tpb);
 
@@ -1020,13 +1028,6 @@ WarpX::ReadParameters ()
 
         {
             // Parameters below control all plotfile diagnostics
-            bool plotfile_min_max = true;
-            pp_warpx.query("plotfile_min_max", plotfile_min_max);
-            if (plotfile_min_max) {
-                plotfile_headerversion = amrex::VisMF::Header::Version_v1;
-            } else {
-                plotfile_headerversion = amrex::VisMF::Header::NoFabHeader_v1;
-            }
             pp_warpx.query("usesingleread", use_single_read);
             pp_warpx.query("usesinglewrite", use_single_write);
             ParmParse pp_vismf("vismf");
@@ -1891,6 +1892,43 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    // Set the default value of m_collisions_split_position_push
+    m_collisions_split_position_push = false;
+    const amrex::ParmParse pp_collisions("collisions");
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    if (collisions) {
+        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+            m_collisions_split_position_push = true;
+        }
+
+        // Override m_collisions_split_position_push if the corresponding input
+        // parameter collisions.split_position_push is set in the input file
+        pp_collisions.query("split_position_push", m_collisions_split_position_push);
+
+        // Warn the user if collisions with split position push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_position_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (EB::enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with embedded\
+                    boundaries, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+        }
+    }
 }
 
 void
@@ -2108,6 +2146,14 @@ WarpX::BackwardCompatibility ()
     if (pp_particles.query("nspecies", nspecies)){
         ablastr::warn_manager::WMRecordWarning("Species",
             "particles.nspecies is ignored. Just use particles.species_names please.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future. "
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
             ablastr::warn_manager::WarnPriority::low);
     }
 
@@ -3060,8 +3106,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,

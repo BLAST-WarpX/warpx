@@ -66,7 +66,6 @@
 #include <AMReX_RealBox.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_Vector.H>
-#include <AMReX_VisMF.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -388,10 +387,6 @@ public:
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-    const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
-#endif
-
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
@@ -450,12 +445,6 @@ public:
      * In doding so, only positions attributes are changed while fields remain unchanged.
      */
     void ShiftGalileanBoundary ();
-
-    /**
-     * \brief Update injection position for continuous injection of
-     *        particles and lasers (loops over species and lasers).
-     */
-    void UpdateInjectionPosition (amrex::Real dt);
 
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
@@ -641,9 +630,14 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
-    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
+
+    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
@@ -920,14 +914,6 @@ public:
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
     void ComputeFaceExtensions();
-    /**
-    * \brief Initialize the memory for the FaceInfoBoxes
-    */
-    void InitBorrowing();
-    /**
-    * \brief Shrink the vectors in the FaceInfoBoxes
-    */
-    void ShrinkBorrowing();
     /**
     * \brief Do the one-way extension
     */
@@ -1358,9 +1344,6 @@ private:
     /** When `true`, write the diagnostics after restart at the time of the restart. */
     bool write_diagnostics_on_restart = false;
 
-    amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-    amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-
     bool synchronize_velocity_for_diagnostics = true;
 
     bool use_single_read = true;
@@ -1605,6 +1588,13 @@ private:
     bool m_JRhom = false;
     int m_JRhom_subintervals;
 
+    /**
+     * \brief WarpX class attribute that controls whether collisions are placed
+     *        in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_position_push;
 };
 
 #endif

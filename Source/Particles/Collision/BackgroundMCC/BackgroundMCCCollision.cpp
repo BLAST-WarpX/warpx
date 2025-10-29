@@ -419,7 +419,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // and target velocities which doesn't require any of the Lorentz
                                   // transformations below; note that if the projectile and target
                                   // have the same mass this is identical to back scattering
-                                  if (scattering_process.m_type == ScatteringProcessType::CHARGE_EXCHANGE) {
+                                  if (scattering_process.m_type == ScatteringProcessType::TWOPRODUCT_REACTION) {
                                       ux[ip] = ua_x;
                                       uy[ip] = ua_y;
                                       uz[ip] = ua_z;

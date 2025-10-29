@@ -81,6 +81,14 @@ Slurm is used at NERSC, OLCF Frontier, among others.
 
 .. include:: batch/slurm.rst
 
+Flux
+""""
+
+Flux is a modern batch system and resource manager framework.
+Flux is used at LLNL LC, among others.
+
+.. include:: batch/flux.rst
+
 
 LSF
 """

@@ -112,6 +112,15 @@ struct IntIdx {
     static constexpr std::initializer_list<char const *> names = {};
 };
 
+struct DiagIdx
+{
+    enum {
+        w = 0,
+        x, y, z, ux, uy, uz,
+        nattribs
+    };
+};
+
 class WarpXParIter
     : public amrex::ParIterSoA<PIdx::nattribs, 0>
 {
@@ -230,14 +239,14 @@ public:
     virtual PlasmaInjector* GetPlasmaInjector (const int /*i*/) { return nullptr; }
 
     /**
-     * Evolve is the central WarpXParticleContainer function that advances
-     * particles for a time dt (typically one timestep). It is a pure virtual
-     * function for flexibility.
+     * \brief Pure virtual function to advance particles (typically by one time step).
      */
     virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
                          int lev,
                          const std::string& current_fp_string,
                          amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
@@ -674,7 +683,6 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_Szz;
 
 public:
-    using PairIndex = std::pair<int, int>;
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
 

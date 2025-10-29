@@ -354,6 +354,8 @@ Overall simulation parameters
     If set, the environment variable ``OMP_NUM_THREADS`` takes precedence over ``system`` and ``nosmt``, but not over integer numbers set in this option.
 
 
+.. _running-cpp-parameters-signal:
+
 Signal Handling
 ^^^^^^^^^^^^^^^
 
@@ -903,10 +905,6 @@ Particle initialization
     The name of each species. This is then used in the rest of the input deck ;
     in this documentation we use `<species_name>` as a placeholder.
 
-* ``particles.photon_species`` (`strings`, separated by spaces)
-    List of species that are photon species, if any.
-    **This is required when compiling with QED=TRUE.**
-
 * ``particles.use_fdtd_nci_corr`` (`0` or `1`) optional (default `0`)
     Whether to activate the FDTD Numerical Cherenkov Instability corrector.
     Not currently available in the RZ, RCYLINDER, and RSPHERE configuration.
@@ -949,6 +947,7 @@ Particle initialization
 * ``<species_name>.mass`` (`float`) optional (default `NaN`)
     The mass of one `physical` particle of this species.
     If ``species_type`` is specified, the mass will be set to the physical value and ``mass`` is optional.
+    ``mass`` must be strictly positive. For massless species, use ``<species_name>.species_type``. The only allowed massless species type is ``photon``.
 
 * ``<species_name>.xmin,ymin,zmin`` and ``<species_name>.xmax,ymax,zmax`` (`float`) optional (default unlimited)
     When ``<species_name>.xmin`` and ``<species_name>.xmax`` are set, they delimit the region within which particles are injected.
@@ -1075,7 +1074,7 @@ Particle initialization
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant `double` scalars) then the species will use these, unless overwritten in the input file (see ``<species_name>.mass``, ``<species_name>.charge`` or ``<species_name>.species_type``).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
       For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-developers>`.
-      See `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
+      See `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
       for an example of how to prepare the openPMD data file.
 
     * ``NFluxPerCell``: Continuously inject a flux of macroparticles from a surface. The emitting surface can be chosen to be either a plane
@@ -1173,7 +1172,7 @@ Particle initialization
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field named ``density``. See
-      `this file <https://github.com/BLAST-WarpX/WarpX/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
+      `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
       for an example of how to prepare the openPMD data file.
 
 * ``<species_name>.flux_profile`` (`string`)
@@ -1488,8 +1487,8 @@ Particle initialization
     Enables non-linear Breit-Wheeler process for this species.
     Breit-Wheeler lookup table should be either generated or loaded from disk to enable
     this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be a photon species.
-    **This feature requires to compile with QED=TRUE**
+    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
+    **This feature requires to compile with -DWarpX_QED=ON**
 
 * ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
     If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
@@ -2156,7 +2155,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
     The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
-    If using ``dsmc`` with charge exchange, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
+    If using ``dsmc`` with ``charge_exchange`` and ``twoproduct_reaction``, the order of the ``product_species`` should match the order of the species in ``<collision_name>.species``.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
     If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
@@ -2264,7 +2263,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.scattering_processes`` (`strings` separated by spaces)
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, and ``charge_exchange``
+    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, ``twoproduct_reaction`` and ``charge_exchange``
     for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
     Multiple excitation events can be included for electrons corresponding to
     excitation to different levels, the ``X`` above can be changed to a unique
@@ -2281,7 +2280,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 * ``<collision_name>.<scattering_process>_energy`` (`float`)
     Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
-    ``excitationX`` or ``ionization`` the energy cost of that process must be given in eV.
+    ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
 
 * ``<collision_name>.ionization_species`` (`float`)
     Only for ``background_mcc``. If the scattering process is ``ionization`` the
@@ -2326,6 +2325,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
 * ``collisions.beta_weight_exponent`` (`float`) optional (default 1.)
     For pairwisecoulomb collisions, when correcting the energy and momentum conservation, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
     With a value greater than 1, it will distribute more of the correction to particles with higher weights.
+
+* ``collisions.split_position_push`` (``bool``, optional, default = 1)
+    If true, collisions are performed in the middle of the position push, which is split into two substeps.
+    This improves energy conservation, as demonstrated in (`Vay et al., Phys. Rev. E 111, 2025 <https://doi.org/10.1103/PhysRevE.111.025306>`__).
+    This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes.
+    It is also not available with embedded boundaries.
 
 * ``<collision_name>.correct_energy_momentum`` (`bool`) optional
     For pairwisecoulomb collisions, override the parameter ``collisions.correct_energy_momentum`` for the specific collision.

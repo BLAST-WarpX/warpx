@@ -280,6 +280,11 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
         "Error: Gaussian beam z_rms must be strictly greater than 0 with RCYLINDER "
         "(it is used when computing the particles' weights from the total beam charge)");
 #endif
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !do_rotation && !do_rotation_momenta,
+        "Error: Gaussian beam cannot be rotated in 1D, RCYLINDER, RSPHERE, and RZ geometries.");
+#endif
 }
 
 void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)

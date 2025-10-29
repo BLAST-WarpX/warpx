@@ -1,0 +1,97 @@
+# This test verifies photo-neutralization process: Hminus + photons -> Hneutral + electrons
+#############################
+# Define parameter of the
+my_constants.ion_mass = m_p
+
+my_constants.beam_energy_ev = 1.2 # [eV]
+my_constants.beam_beta = sqrt(2*beam_energy_ev*q_e/m_p)/clight # [-]
+my_constants.beam_flux = 1e20 # [m^-2 s^-1]
+my_constants.gas_length = 0.2 # m
+my_constants.photon_density = 1e22 # [m^-3]
+
+#############################
+# Simulation time
+max_step = 100
+warpx.const_dt = gas_length/beam_beta/clight/32
+
+#############################
+# Grid
+amr.n_cell = 32
+amr.max_level = 0
+amr.max_grid_size = 256
+geometry.dims = 1
+
+geometry.prob_lo = 0.0
+geometry.prob_hi = gas_length
+
+boundary.particle_lo = absorbing
+boundary.particle_hi = absorbing
+
+#############################
+# Algorithms:
+algo.particle_shape = 1
+
+# - Without space charge
+algo.maxwell_solver = none
+boundary.field_lo = pec
+boundary.field_hi = pec
+#############################
+# Create species
+particles.species_names = Hneutral Hminus electrons photons
+particles.photon_species = photons
+
+Hminus.do_continuous_injection = 1
+Hminus.injection_style = NFluxPerCell
+Hminus.mass = m_p
+Hminus.charge = -q_e
+Hminus.surface_flux_pos = 0
+Hminus.flux_normal_axis = z
+Hminus.flux_direction = 1
+Hminus.num_particles_per_cell = 800
+Hminus.flux_profile = constant
+Hminus.flux = beam_flux
+Hminus.momentum_distribution_type = constant
+Hminus.uz = beam_beta
+
+Hneutral.injection_style = none
+Hneutral.mass = ion_mass
+Hneutral.charge = 0
+
+electrons.injection_style = none
+electrons.mass = m_e
+electrons.charge = -q_e
+
+photons.species_type = photon
+photons.injection_style = NRandomPerCell
+photons.num_particles_per_cell = 100
+photons.profile = constant
+photons.density = photon_density
+photons.momentum_distribution_type = constant
+photons.uz = -1.9569471624266145e-06 # 1 eV, normalized by m_e*c^2
+photons.do_not_push = 1
+
+#############################
+# Add diagnostics
+diagnostics.diags_names = diag bound
+diag.intervals = 50
+diag.fields_to_plot = rho Ex Ey Ez
+diag.diag_type = Full
+diag.format = openpmd
+diag.write_species = 1
+
+bound.diag_type = BoundaryScraping
+bound.format = openpmd
+bound.intervals = -1
+electrons.save_particles_at_zlo = 1
+bound.dump_last_timestep = 1
+
+#############################
+# Setup photo-ionization
+collisions.collision_names = photoioniz
+
+photoioniz.type = dsmc
+photoioniz.species = Hminus photons
+photoioniz.scattering_processes = two_product_reaction
+photoioniz.two_product_reaction_energy = 0.756  # [eV]
+photoioniz.product_species =  Hneutral electrons
+photoioniz.two_product_reaction_cross_section = ../../../../warpx-data/MCC_cross_sections/H/Hminus_photoionization.dat
