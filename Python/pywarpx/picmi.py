@@ -3736,6 +3736,9 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     warpx_file_min_digits: integer
         Minimum number of digits for the time step number in the checkpoint
         directory name.
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def __init__(self, period=1, write_dir=None, name=None, **kw):
@@ -3748,6 +3751,8 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         if self.name is None:
             self.name = "chkpoint"
 
+        self.verbose = kw.pop("warpx_verbose", None)
+
         self.handle_init(kw)
 
     def diagnostic_initialize_inputs(self):
@@ -3757,6 +3762,7 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self.diagnostic.diag_type = "Full"
         self.diagnostic.format = "checkpoint"
         self.diagnostic.file_min_digits = self.file_min_digits
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.set_write_dir()
 
