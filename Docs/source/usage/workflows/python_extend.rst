@@ -103,18 +103,6 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
 
       Get the current physical time step size on mesh-refinement level ``lev``.
 
-   .. py:method:: multifab(multifab_name: str)
-
-      Return MultiFabs by name, e.g., ``"Efield_aux[x][level=0]"``, ``"Efield_cp[x][level=0]"``, ...
-
-      The physical fields in WarpX have the following naming:
-
-      - ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
-      - ``_aux`` are temporary (auxiliar) patches at the same resolution as ``_fp``.
-        They usually include contributions from other levels and can be interpolated for gather routines of particles.
-      - ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
-        (only for level 1 and higher).
-
    .. py:method:: multi_particle_container
 
    .. py:method:: get_particle_boundary_buffer
