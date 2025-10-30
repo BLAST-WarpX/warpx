@@ -71,13 +71,13 @@ struct PIdx
     static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz"};
 #elif defined(WARPX_DIM_RZ)
     enum                          { x ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
-    static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz", "theta"};
+    static constexpr auto names = {"r", "z", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RCYLINDER)
     enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
-    static constexpr auto names = {"x", "w", "ux", "uy", "uz", "theta"};
+    static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RSPHERE)
     enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
-    static constexpr auto names = {"x", "w", "ux", "uy", "uz", "theta", "phi"};
+    static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta", "phi"};
 #elif defined(WARPX_DIM_3D)
     enum                          { x ,  y,   z,   w,   ux,   uy,   uz,            nattribs};
     static constexpr auto names = {"x", "y", "z", "w", "ux", "uy", "uz"};
