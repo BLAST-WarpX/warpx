@@ -51,7 +51,8 @@ public:
 
     PhysicalParticleContainer (amrex::AmrCore* amr_core,
                                int ispecies,
-                               const std::string& name);
+                               const std::string& name,
+                               bool const collisions_split_position_push);
 
     PhysicalParticleContainer (amrex::AmrCore* amr_core);
 
@@ -470,6 +471,14 @@ protected:
 
     // Flag controlling whether or not variance and then temperatures are computed per species
     bool m_do_temperature_deposition = false;
+
+    /**
+     * \brief Local copy of the WarpX class attribute that controls whether collisions
+     *        are placed in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_position_push;
 
     std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
