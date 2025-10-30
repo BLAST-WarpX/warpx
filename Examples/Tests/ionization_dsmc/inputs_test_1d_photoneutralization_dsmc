@@ -38,7 +38,6 @@ boundary.field_hi = pec
 #############################
 # Create species
 particles.species_names = Hneutral Hminus electrons photons
-particles.photon_species = photons
 
 Hminus.do_continuous_injection = 1
 Hminus.injection_style = NFluxPerCell
