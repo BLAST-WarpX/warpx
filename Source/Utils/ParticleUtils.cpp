@@ -33,9 +33,9 @@ namespace ParticleUtils
        Note that this does *not* rearrange particle arrays */
     amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachSuperCell (amrex::Geometry const& geom_lev,
-				  amrex::MFIter const & mfi,
-				  ParticleTileType & ptile,
-				  const amrex::IntVect& supercell_size) {
+                  amrex::MFIter const & mfi,
+                  ParticleTileType & ptile,
+                  const amrex::IntVect& supercell_size) {
 
         // Extract number of particles for this tile
         int const np = ptile.numParticles();
@@ -46,13 +46,13 @@ namespace ParticleUtils
         const auto plo = geom_lev.ProbLoArray();
         const auto domain = geom_lev.Domain();
 
-	int ntiles = amrex::numTilesInBox(box, true, supercell_size);
+    int ntiles = amrex::numTilesInBox(box, true, supercell_size);
 
-	// Find particles that are in each cell;
+    // Find particles that are in each cell;
         // results are stored in the object `bins`.
         ParticleBins bins;
-	bins.build(np, ptile.getParticleTileData(), ntiles,
-		   amrex::GetParticleBin{plo, dxi, domain, supercell_size, box});
+    bins.build(np, ptile.getParticleTileData(), ntiles,
+           amrex::GetParticleBin{plo, dxi, domain, supercell_size, box});
         return bins;
     }
 
@@ -60,9 +60,9 @@ namespace ParticleUtils
        Note that this does *not* rearrange particle arrays */
     amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (amrex::Geometry const& geom_lev,
-			     amrex::MFIter const & mfi,
-			     ParticleTileType & ptile) {
-	return findParticlesInEachSuperCell(geom_lev, mfi, ptile, amrex::IntVect(AMREX_D_DECL(1, 1, 1)));
+                 amrex::MFIter const & mfi,
+                 ParticleTileType & ptile) {
+    return findParticlesInEachSuperCell(geom_lev, mfi, ptile, amrex::IntVect(AMREX_D_DECL(1, 1, 1)));
     }
 
 } // namespace ParticleUtils
