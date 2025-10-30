@@ -132,7 +132,7 @@ def mirror_reflection():
             "electrons", "eb", "deltaTimeScraped", lev
         )
     )
-    r = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "x", lev))
+    r = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "r", lev))
     theta = concat(
         buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
     )
