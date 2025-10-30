@@ -193,16 +193,10 @@ namespace {
         soa1_out.m_rdata[PIdx::ux][idx1_out_start] = new_photon_ux;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start] = new_photon_uy;
         soa1_out.m_rdata[PIdx::uz][idx1_out_start] = new_photon_uz;
-        soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = new_photon_ux;
-        soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = new_photon_uy;
-        soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = new_photon_uz;
         // - Scattered electron (obtained by conserving momentum)
         soa2_out.m_rdata[PIdx::ux][idx2_out_start] = lepton_ux - (new_photon_ux - photon_ux);
         soa2_out.m_rdata[PIdx::uy][idx2_out_start] = lepton_uy - (new_photon_uy - photon_uy);
         soa2_out.m_rdata[PIdx::uz][idx2_out_start] = lepton_uz - (new_photon_uz - photon_uz);
-        soa2_out.m_rdata[PIdx::ux][idx2_out_start + 1] = lepton_ux - (new_photon_ux - photon_ux);
-        soa2_out.m_rdata[PIdx::uy][idx2_out_start + 1] = lepton_uy - (new_photon_uy - photon_uy);
-        soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = lepton_uz - (new_photon_uz - photon_uz);
     }
 }
 
