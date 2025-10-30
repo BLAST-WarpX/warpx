@@ -105,6 +105,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     if (m_dofs == nullptr) {
         m_dofs = std::make_unique<WarpXSolverDOF>();
         m_dofs->Define(m_WarpX, m_num_amr_levels, m_vector_type_name, m_scalar_type_name);
+        amrex::ExecOnFinalize([p=&m_dofs] () { p->reset(); });
     }
 
     m_is_defined = true;
