@@ -45,7 +45,7 @@ def _chi_accumalation_loop(z_pos, w, dz, z_min, nz, prefac, chi, theta):
                     1.0 + theta[pid][2] * theta[pid][2],
                 ],
             ]
-        ) / (1.0 + np.linalg.norm(theta[pid]) ** 2)
+        ) / (1.0 + theta[pid][0] ** 2 + theta[pid][1] ** 2 + theta[pid][2] ** 2)
 
         # each particle contributes to 4 entries of chi_ii' with
         # 1) i = idx_left;  i' = idx_left
@@ -68,27 +68,43 @@ def _chi_accumalation_loop(z_pos, w, dz, z_min, nz, prefac, chi, theta):
         # force chi to be periodic - if idx_left = 0, also add
         # the contribution to the right most node and vice-versa
         # for idx_right = nz
-        if idx_left == 0 or idx_right == nz:
-            if idx_left == 0:
-                idx_left = nz
-            else:
-                idx_right = 0
+        # if idx_left == 0:
+        #     idx_left = nz
 
-            for i, j in [
-                (idx_left, idx_right),
-                (idx_right, idx_left),
-                (idx_left, idx_left),
-                (idx_right, idx_right),
-            ]:
-                coef1 = coefs[int(i == idx_right)]
-                coef2 = coefs[int(j == idx_right)]
+        #     for i, j in [
+        #         (idx_left, idx_right),
+        #         (idx_right, idx_left),
+        #         (idx_left, idx_left),
+        #         # (idx_right, idx_right),
+        #     ]:
+        #         coef1 = coefs[int(i == idx_right)]
+        #         coef2 = coefs[int(j == idx_right)]
 
-                # populate chi array at appropriate indices
-                for ii in range(3):
-                    for jj in range(3):
-                        chi[i + ii * (nz + 1), j + jj * (nz + 1)] += (
-                            prefac * w[pid] * (coef1 * A[ii, jj] * coef2)
-                        )
+        #         # populate chi array at appropriate indices
+        #         for ii in range(3):
+        #             for jj in range(3):
+        #                 chi[i + ii * (nz + 1), j + jj * (nz + 1)] += (
+        #                     prefac * w[pid] * (coef1 * A[ii, jj] * coef2)
+        #                 )
+
+        # if idx_right == nz:
+        #     idx_right = 0
+
+        #     for i, j in [
+        #         (idx_left, idx_right),
+        #         (idx_right, idx_left),
+        #         # (idx_left, idx_left),
+        #         (idx_right, idx_right),
+        #     ]:
+        #         coef1 = coefs[int(i == idx_right)]
+        #         coef2 = coefs[int(j == idx_right)]
+
+        #         # populate chi array at appropriate indices
+        #         for ii in range(3):
+        #             for jj in range(3):
+        #                 chi[i + ii * (nz + 1), j + jj * (nz + 1)] += (
+        #                     prefac * w[pid] * (coef1 * A[ii, jj] * coef2)
+        #                )
 
 
 class OneD_DarwinSolver(picmi.ElectrostaticSolver):
@@ -151,10 +167,10 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.z_grid = np.linspace(self.z_min, self.z_max, self.nz + 1)
 
         # install callback to execute step 1
-        callbacks.installbeforedeposition(self.accumulate_j_and_susceptibility)
+        callbacks.installafterdeposition(self.accumulate_susceptibility)
 
         # callback for ComputeRHS - step 2 is done in C++ with GMRES
-        callbacks.installafterdeposition(self.compute_rhs)
+        # callbacks.installbeforedeposition(self.compute_rhs)
 
         # install callback to execute step 2 (for testing purposes)
         if self.python_ms_solve:
@@ -162,6 +178,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
         # install SIPIC Poisson solver (step 4) to skip the ES evolution
         if self.skip_es:
+            print("Skipping ES evolution.")
             callbacks.installpoissonsolver(self.skip_poisson_solve)
         else:
             self.es_solver.solver_initialize_inputs()
@@ -184,7 +201,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.dA_z = fields.MultiFabWrapper(mf_name="dA_fp", idir=2, level=0)
         self.xi_fp = fields.MultiFabWrapper(mf_name="xi_fp", level=0)
 
-    def accumulate_j_and_susceptibility(self):
+    def accumulate_susceptibility(self):
         """
         Get partial velocity update, predicted current and susceptibility. Then
         calculate source vector for MS equation.
@@ -197,6 +214,99 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
         # get MS operator so it doesn't have to be done at every GMRES iteration
         self.operator = self._get_MS_operator()
+
+        #################################################################
+        # only add chi terms to rhs
+        self.partial_operator = np.zeros(
+            (3 * self.nz + 2 + self.nz + 1, 3 * self.nz + 2 + self.nz + 1)
+        )
+        # get chi -> V^-1 A chi A^T
+        chi = np.dot(
+            self._get_node_to_edge_average(),
+            np.dot(self.chi, self._get_edge_to_node_average()),
+        )
+        # add chi to linear operator
+        self.partial_operator[: 3 * self.nz + 2, : 3 * self.nz + 2] += chi
+        # now build the second equation and add it to M
+        self.partial_operator[3 * self.nz + 2 :, : 3 * self.nz + 2] = np.dot(
+            self._get_divergence(), chi
+        )
+
+        #################################################################
+        # Fix susceptibility for periodic boundaries
+        #################################################################
+
+        S_xx = fields.MultiFabWrapper(mf_name="MassMatrices_X", idir=0, level=0)
+        S_xy = fields.MultiFabWrapper(mf_name="MassMatrices_X", idir=1, level=0)
+        # S_xz = fields.MultiFabWrapper(mf_name="MassMatrices_X", idir=2, level=0)
+
+        S_xx[0, 0] += S_xx[-1, 0]
+        S_xx[-1, 2] += S_xx[0, 2]
+        S_xx[0, 1] += S_xx[-1, 1]
+        S_xx[-1, 1] = S_xx[0, 1]
+
+        S_xy[0, 0] += S_xy[-1, 0]
+        S_xy[-1, 2] += S_xy[0, 2]
+        S_xy[0, 1] += S_xy[-1, 1]
+        S_xy[-1, 1] = S_xy[0, 1]
+
+        # S_xz[0, 0] += S_xz[-1, 0]
+        # S_xz[-1, 2] += S_xz[0, 2]
+        # S_xz[0, 1] += S_xz[-1, 1]
+        # S_xz[-1, 1] = S_xz[0, 1]
+
+        S_yx = fields.MultiFabWrapper(mf_name="MassMatrices_Y", idir=0, level=0)
+        S_yy = fields.MultiFabWrapper(mf_name="MassMatrices_Y", idir=1, level=0)
+        # S_yz = fields.MultiFabWrapper(mf_name="MassMatrices_Y", idir=2, level=0)
+
+        S_yx[0, 0] += S_yx[-1, 0]
+        S_yx[-1, 2] += S_yx[0, 2]
+        S_yx[0, 1] += S_yx[-1, 1]
+        S_yx[-1, 1] = S_yx[0, 1]
+
+        S_yy[0, 0] += S_yy[-1, 0]
+        S_yy[-1, 2] += S_yy[0, 2]
+        S_yy[0, 1] += S_yy[-1, 1]
+        S_yy[-1, 1] = S_yy[0, 1]
+
+        # S_yz[0, 0] += S_yz[-1, 0]
+        # S_yz[-1, 2] += S_yz[0, 2]
+        # S_yz[0, 1] += S_yz[-1, 1]
+        # S_yz[-1, 1] = S_yz[0, 1]
+
+        # S_zx = fields.MultiFabWrapper(mf_name="MassMatrices_Z", idir=0, level=0)
+        # S_zy = fields.MultiFabWrapper(mf_name="MassMatrices_Z", idir=1, level=0)
+        # S_zz = fields.MultiFabWrapper(mf_name="MassMatrices_Z", idir=2, level=0)
+
+        # S_zx[0, 1] += S_zx[-1, 1]
+        # S_zx[-1, 1] = S_zx[0, 1]
+        # S_zy[0, 1] += S_zy[-1, 1]
+        # S_zy[-1, 1] = S_zy[0, 1]
+        # S_zz[0, 1] += S_zz[-1, 1]
+        # S_zz[-1, 1] = S_zz[0, 1]
+
+        # print(S_xx.shape)
+        # print(S_xy.shape)
+        # print(S_xz[0, :], S_xz[-1, :])
+        # # print(self.chi[1, :self.nz + 1] / (2.0 * constants.mu0 / self.dt))
+        # print(chi[0, 2*self.nz+2:3*self.nz + 3] / (2.0 * constants.mu0 / self.dt))
+        # print(chi[self.nz, 2*self.nz+2:3*self.nz + 3] / (2.0 * constants.mu0 / self.dt))
+
+        # print(S_yx[1, :], S_yx[-2, :])
+        # # # print(self.chi[0, :self.nz + 1][:5] / (2.0 * constants.mu0 / self.dt))
+        # print(chi[self.nz + 1+1, :self.nz+1] / (2.0 * constants.mu0 / self.dt))
+
+        # print(S_xz[1, :], S_xz[-2, :])
+        # # # print(self.chi[0, :self.nz + 1][:5] / (2.0 * constants.mu0 / self.dt))
+        # print(chi[1, 2*self.nz + 2:3*self.nz + 2] / (2.0 * constants.mu0 / self.dt))
+
+        # print(S_zz[0, :], S_zz[-1, :])
+        # # # # print(self.chi[0, :self.nz + 1][:5] / (2.0 * constants.mu0 / self.dt))
+        # print(chi[2*self.nz + 2, 2*self.nz + 2:2*self.nz + 2+ self.nz + 1] / (2.0 * constants.mu0 / self.dt))
+
+        # exit()
+
+        #################################################################
 
     def compute_rhs(self):
         """Python function that performs the task of the C++ function
@@ -217,13 +327,83 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.dA_z[...] = rhs[2 * self.nz + 2 : 3 * self.nz + 2]
         self.xi_fp[...] = rhs[3 * self.nz + 2 :]
 
+        # set rhs to C++ calculated values
+        # self.dA_x[...] = fields.ExFPWrapper()[...]
+        # self.dA_y[...] = fields.EyFPWrapper()[...]
+        # self.dA_z[...] = fields.EzFPWrapper()[...]
+        # self.xi_fp[...] = fields.RhoFPWrapper()[...]
+
+        ########################################################
+        # only add the susceptibility response in Python
+        # rhs = np.dot(self.partial_operator, guess)
+
+        # self.dA_x[...] = fields.ExFPWrapper()[...] + rhs[: self.nz + 1]
+        # self.dA_y[...] = fields.EyFPWrapper()[...] + rhs[self.nz + 1 : 2 * self.nz + 2]
+        # self.dA_z[...] = fields.EzFPWrapper()[...] + rhs[2 * self.nz + 2 : 3 * self.nz + 2]
+        # self.xi_fp[...] = fields.RhoFPWrapper()[...] + rhs[3 * self.nz + 2 :]
+        ########################################################
+
+        #### JUST FOR TESTING PURPOSES ###
+        # E_x = fields.ExFPWrapper()
+        # E_y = fields.EyFPWrapper()
+        E_z = fields.EzFPWrapper()
+        # rho = fields.RhoFPWrapper()
+
+        import matplotlib.pyplot as plt
+
+        # plt.plot(E_x[...], 'o-', label='WarpX')
+        # plt.plot(E_y[...], 'o-', label='WarpX')
+        plt.plot(E_z[...], "o-", label="WarpX")
+        # plt.plot(rho[...], 'o-', label='WarpX')
+
+        # plt.plot(rhs[self.nz + 1:2*self.nz+2], 's--')
+        plt.plot(rhs[2 * self.nz + 2 : 3 * self.nz + 2], "s--")
+        plt.legend()
+        plt.show()
+
+        # susceptibility application:
+        # operator = np.dot(
+        #     self._get_node_to_edge_average(),
+        #     np.dot(self.chi, self._get_edge_to_node_average())
+        # )
+
+        # vector laplacian
+        # operator = self._get_vector_laplacian()
+
+        # plt.plot(np.dot(operator, guess[:3 * self.nz + 2])[:self.nz + 1], 's--', label='Python')
+        # plt.plot(np.dot(operator, guess[:3 * self.nz + 2])[self.nz + 1:2*self.nz+2], 's--', label='Python')
+        # plt.plot(np.dot(operator, guess[:3 * self.nz + 2])[2*self.nz+2:], 's--', label='Python')
+
+        # Vector Laplacian and gradient
+        # operator = np.zeros((3 * self.nz + 2 + self.nz + 1, 3 * self.nz + 2 + self.nz + 1))
+        # operator[: 3 * self.nz + 2, : 3 * self.nz + 2] = -self._get_vector_laplacian()
+        # operator[2 * self.nz + 2 : 3 * self.nz + 2, 3 * self.nz + 2 :] = (
+        #     -constants.mu0 * self._get_gradient()
+        # )
+
+        # full operator
+        # operator = self.operator
+
+        # plt.plot(np.dot(operator, guess)[:self.nz + 1], 's--', label='Python')
+        # plt.plot(np.dot(operator, guess)[self.nz + 1:2*self.nz+2], 's--', label='Python')
+        # plt.plot(np.dot(operator, guess)[2*self.nz+2:3*self.nz+2], 's--', label='Python')
+        # plt.plot(np.dot(operator, guess)[3*self.nz+2:], 's--', label='Python')
+
+        # operator = self._get_laplacian()
+        # plt.plot(np.dot(operator, guess[3*self.nz+2:]), 's--', label='Python')
+
+        # plt.legend()
+        # plt.show()
+        # exit()
+        ###################################
+
     def run_solve(self):
         # did we skipped the MS solve in C++?
         self._perform_MS_field_solve()
 
     def _deposition_step(self):
         # define arrays to store jn_star
-        jn_star = np.zeros((self.nz + 1, 3))
+        # jn_star = np.zeros((self.nz + 1, 3))
 
         # grab B and interpolate to nodes
         Bx = (self.B_x[-1j:] + self.B_x[:2j]) / 2.0
@@ -237,9 +417,9 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
             pc = multi_pc.get_particle_container_from_name(species.name)
 
             z_idx = pc.get_real_comp_index("z")
-            ux_idx = pc.get_real_comp_index("ux")
-            uy_idx = pc.get_real_comp_index("uy")
-            uz_idx = pc.get_real_comp_index("uz")
+            # ux_idx = pc.get_real_comp_index("ux")
+            # uy_idx = pc.get_real_comp_index("uy")
+            # uz_idx = pc.get_real_comp_index("uz")
             w_idx = pc.get_real_comp_index("w")
 
             # iterate over particle levels
@@ -253,22 +433,34 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
                     z = np.array(soa.get_real_data(z_idx), copy=False)
 
                     # get velocities
-                    ux = np.array(soa.get_real_data(ux_idx), copy=False)
-                    uy = np.array(soa.get_real_data(uy_idx), copy=False)
-                    uz = np.array(soa.get_real_data(uz_idx), copy=False)
+                    # ux = np.array(soa.get_real_data(ux_idx), copy=False)
+                    # uy = np.array(soa.get_real_data(uy_idx), copy=False)
+                    # uz = np.array(soa.get_real_data(uz_idx), copy=False)
 
                     # get weight
                     w = np.array(soa.get_real_data(w_idx), copy=False)
 
+                    # ux_n = np.array(soa.get_real_data(pc.get_real_comp_index("ux_n")), copy=False)
+                    # uy_n = np.array(soa.get_real_data(pc.get_real_comp_index("uy_n")), copy=False)
+                    # uz_n = np.array(soa.get_real_data(pc.get_real_comp_index("uz_n")), copy=False)
+                    # u2 = (ux_n**2 + uy_n**2 + uz_n**2)
+                    # ux_t = 2.0*ux - ux_n
+                    # uy_t = 2.0*uy - uy_n
+                    # uz_t = 2.0*uz - uz_n
+                    # g1 = np.sqrt(1.0 + u2 / constants.c**2)
+                    # g2 = np.sqrt(1.0 + (ux_t**2 + uy_t**2 + uz_t**2) / constants.c**2)
+                    # gamma_inv = 2.0 / (g1 + g2)
+                    # gamma_inv = 1.0
+
                     # Accumalate w_p * q_p * (u_new + u_old)
-                    self._deposit_current(
-                        array=jn_star,
-                        z=z,
-                        vx=ux,
-                        vy=uy,
-                        vz=uz,
-                        weight=species.charge * w,
-                    )
+                    # self._deposit_current(
+                    #     array=jn_star,
+                    #     z=z,
+                    #     vx=ux*gamma_inv,
+                    #     vy=uy*gamma_inv,
+                    #     vz=uz*gamma_inv,
+                    #     weight=species.charge * w,
+                    # )
 
                     # get B at particle
                     bx = np.interp(z, self.z_grid, Bx)
@@ -287,60 +479,130 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
                         self.dz,
                         self.z_min,
                         self.nz,
-                        constants.mu0 * species.charge**2 / species.mass,
+                        constants.mu0 * species.charge**2 / species.mass / self.dz,
                         self.chi,
                         theta,
                     )
 
-        # Apply periodic boundaries to jn_star
-        jn_star[0, 0] = jn_star[0, 0] + jn_star[-1, 0]
-        jn_star[-1, 0] = jn_star[0, 0]
-        jn_star[0, 1] = jn_star[0, 1] + jn_star[-1, 1]
-        jn_star[-1, 1] = jn_star[0, 1]
-        jn_star[0, 2] = jn_star[0, 2] + jn_star[-1, 2]
-        jn_star[-1, 2] = jn_star[0, 2]
+        # # Apply periodic boundaries to jn_star
+        # jn_star[0, 0] = jn_star[0, 0] + jn_star[-1, 0]
+        # jn_star[-1, 0] = jn_star[0, 0]
+        # jn_star[0, 1] = jn_star[0, 1] + jn_star[-1, 1]
+        # jn_star[-1, 1] = jn_star[0, 1]
+        # jn_star[0, 2] = jn_star[0, 2] + jn_star[-1, 2]
+        # jn_star[-1, 2] = jn_star[0, 2]
 
-        # Interpolate jn_star to the edges
+        # # Interpolate jn_star to the edges
         # j_edge = np.dot(self._get_node_to_edge_average(), jn_star.T.flatten())
 
+        # force chi to be periodic - if idx_left = 0, also add
+        # the contribution to the right most node and vice-versa
+
+        # avoid double counting
+        # self.chi[1, self.nz] = 0.0
+        # self.chi[self.nz-1, 0] = 0.0
+
+        # self.chi[self.nz+1+1, self.nz] = 0.0
+        # self.chi[self.nz+1+self.nz-1, 0] = 0.0
+
+        # self.chi[1, self.nz+1+self.nz] = 0.0
+        # self.chi[self.nz-1, self.nz+1+0] = 0.0
+
+        # self.chi[self.nz+1+1, self.nz+1+self.nz] = 0.0
+        # self.chi[self.nz+1+self.nz-1, self.nz+1+0] = 0.0
+
+        # xx
+        self.chi[0, 0] += self.chi[self.nz, self.nz]
+        self.chi[self.nz, self.nz] = self.chi[0, 0]
+        # yx
+        self.chi[self.nz + 1 + 0, 0] += self.chi[self.nz + 1 + self.nz, self.nz]
+        self.chi[self.nz + 1 + self.nz, self.nz] = self.chi[self.nz + 1 + 0, 0]
+        # xy
+        self.chi[0, self.nz + 1 + 0] += self.chi[self.nz, self.nz + 1 + self.nz]
+        self.chi[self.nz, self.nz + 1 + self.nz] = self.chi[0, self.nz + 1 + 0]
+        # yy
+        self.chi[self.nz + 1 + 0, self.nz + 1 + 0] += self.chi[
+            self.nz + 1 + self.nz, self.nz + 1 + self.nz
+        ]
+        self.chi[self.nz + 1 + self.nz, self.nz + 1 + self.nz] = self.chi[
+            self.nz + 1 + 0, self.nz + 1 + 0
+        ]
+
+        # zz
+        self.chi[2 * self.nz + 2 + 0, 2 * self.nz + 2 + 0] += self.chi[
+            2 * self.nz + 2 + self.nz, 2 * self.nz + 2 + self.nz
+        ]
+        self.chi[2 * self.nz + 2 + self.nz, 2 * self.nz + 2 + self.nz] = self.chi[
+            2 * self.nz + 2, 2 * self.nz + 2
+        ]
+
+        # xx
+        self.chi[0, self.nz - 1] = self.chi[self.nz, self.nz - 1]
+        self.chi[self.nz, 1] = self.chi[0, 1]
+        # yx
+        self.chi[self.nz + 1 + 0, self.nz - 1] = self.chi[
+            self.nz + 1 + self.nz, self.nz - 1
+        ]
+        self.chi[self.nz + 1 + self.nz, 1] = self.chi[self.nz + 1 + 0, 1]
+        # xy
+        self.chi[0, self.nz + 1 + self.nz - 1] = self.chi[
+            self.nz, self.nz + 1 + self.nz - 1
+        ]
+        self.chi[self.nz, self.nz + 1 + 1] = self.chi[0, self.nz + 1 + 1]
+        # yy
+        self.chi[self.nz + 1 + 0, self.nz + 1 + self.nz - 1] = self.chi[
+            self.nz + 1 + self.nz, self.nz + 1 + self.nz - 1
+        ]
+        self.chi[self.nz + 1 + self.nz, self.nz + 1 + 1] = self.chi[
+            self.nz + 1 + 0, self.nz + 1 + 1
+        ]
+
+        # zz
+        self.chi[2 * self.nz + 2 + 0, 2 * self.nz + 2 + self.nz - 1] = self.chi[
+            2 * self.nz + 2 + self.nz, 2 * self.nz + 2 + self.nz - 1
+        ]
+        self.chi[2 * self.nz + 2 + self.nz, 2 * self.nz + 2 + 1] = self.chi[
+            2 * self.nz + 2 + 0, 2 * self.nz + 2 + 1
+        ]
+
         ## code to check if nodal current deposition works as intended ##
+        # assert np.allclose(self.J_y[...][1:-1], j_edge[self.nz + 1 : 2 * self.nz + 2][1:-1])
+        # assert np.allclose(self.J_z[...], j_edge[2 * self.nz + 2 :])
         # import matplotlib.pyplot as plt
         # plt.plot(j_edge[2 * self.nz + 2 :][1:-1], 'o--')
         # plt.plot(self.J_z[...][1:-1], 'o--')
         # plt.show()
         # exit()
-        # assert np.allclose(self.J_x[...], j_edge[: self.nz + 1])
-        # assert np.allclose(self.J_y[...], j_edge[self.nz + 1 : 2 * self.nz + 2])
-        # assert np.allclose(self.J_z[...], j_edge[2 * self.nz + 2 :])
 
-        # Populate the current multifab
+        # Overwrite the current multifabs since the deposition was not done
+        # to a nodal grid
         # self.J_x[...] = j_edge[: self.nz + 1]
         # self.J_y[...] = j_edge[self.nz + 1 : 2 * self.nz + 2]
         # self.J_z[...] = j_edge[2 * self.nz + 2 :]
 
-    def _deposit_current(self, array, z, vx, vy, vz, weight):
-        """Function to deposit current onto nodal grid with shape function 1."""
-        # get left array index
-        idx_left = ((z - self.z_min) / self.dz).astype(int)
-        idx_left[np.where(idx_left == self.nz)] = self.nz - 1
-        idx_right = idx_left + 1
+    # def _deposit_current(self, array, z, vx, vy, vz, weight):
+    #     """Function to deposit current onto nodal grid with shape function 1."""
+    #     # get left array index
+    #     idx_left = ((z - self.z_min) / self.dz).astype(int)
+    #     idx_left[np.where(idx_left == self.nz)] = 0
+    #     idx_right = idx_left + 1
 
-        # get right coefficients
-        coef = (z - self.z_min) / self.dz - idx_left
+    #     # get right coefficients
+    #     coef = (z - self.z_min) / self.dz - idx_left
 
-        v = np.array([vx, vy, vz]).T
+    #     v = np.array([vx, vy, vz]).T
 
-        for ii in range(3):
-            array[:, ii] += np.bincount(
-                idx_left,
-                weights=(1.0 - coef) * weight * v[:, ii] / self.dz,
-                minlength=self.nz + 1,
-            )
-            array[:, ii] += np.bincount(
-                idx_right,
-                weights=coef * weight * v[:, ii] / self.dz,
-                minlength=self.nz + 1,
-            )
+    #     for ii in range(3):
+    #         array[:, ii] += np.bincount(
+    #             idx_left,
+    #             weights=(1.0 - coef) * weight * v[:, ii] / self.dz,
+    #             minlength=self.nz + 1,
+    #         )
+    #         array[:, ii] += np.bincount(
+    #             idx_right,
+    #             weights=coef * weight * v[:, ii] / self.dz,
+    #             minlength=self.nz + 1,
+    #         )
 
     def _perform_MS_field_solve(self):
         # Allocate array for the source vector
@@ -372,11 +634,8 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
         # get chi -> V^-1 A chi A^T
         chi = np.dot(
-            np.identity(3 * self.nz + 2) / self.dz,
-            np.dot(
-                self._get_node_to_edge_average(),
-                np.dot(self.chi, self._get_edge_to_node_average()),
-            ),
+            self._get_node_to_edge_average(),
+            np.dot(self.chi, self._get_edge_to_node_average()),
         )
 
         # add chi to linear operator

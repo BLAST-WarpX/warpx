@@ -56,6 +56,9 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    void ApplySusceptibility ( ablastr::fields::MultiLevelVectorField& rhs,
+                               const ablastr::fields::MultiLevelVectorField& dA);
+
     void PrepareCurrentDeposition ();
     void AccumulateCurrentAndSusceptibility ();
     void CalculateSourceVector ();

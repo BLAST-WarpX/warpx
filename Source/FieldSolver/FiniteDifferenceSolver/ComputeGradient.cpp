@@ -23,9 +23,9 @@
 
 using namespace amrex;
 
-void FiniteDifferenceSolver::ComputeVectorLaplacian (
+void FiniteDifferenceSolver::ComputeGradient (
     ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
+    ablastr::fields::ScalarField const& in_field,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
@@ -33,62 +33,62 @@ void FiniteDifferenceSolver::ComputeVectorLaplacian (
     // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        ComputeVectorLaplacianCylindrical <CylindricalYeeAlgorithm> (
+        ComputeGradientCylindrical <CylindricalYeeAlgorithm> (
             out_field, in_field, eb_update, lev
         );
 
 #elif defined(WARPX_DIM_RSPHERE)
-        ComputeVectorLaplacianSpherical <SphericalYeeAlgorithm> (
+        ComputeGradientSpherical <SphericalYeeAlgorithm> (
             out_field, in_field, eb_update, lev
         );
 
 #else
-    ComputeVectorLaplacianCartesian <CartesianYeeAlgorithm> (
+    ComputeGradientCartesian <CartesianYeeAlgorithm> (
         out_field, in_field, eb_update, lev
     );
 
 #endif
     } else {
         amrex::Abort(Utils::TextMsg::Err(
-            "ComputeVectorLaplacian: Unsupported FDTD algorithm choice."));
+            "ComputeLaplacian: Unsupported FDTD algorithm choice."));
     }
 }
 
 /**
-     * \brief Calculation of the vector Laplacian of the given vector field.
+     * \brief Calculation of the gradient of the given scalar field.
      *
      * \param[out] out_field  vector of output MultiFabs at a given level
-     * \param[in] in_field   vector of input MultiFabs at a given level
+     * \param[in] in_field   input MultiFab at a given level
      * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
      * \param[in] lev  level number for the calculation
      */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeVectorLaplacianCylindrical (
+void FiniteDifferenceSolver::ComputeGradientCylindrical (
     ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
+    ablastr::fields::ScalarField const& in_field,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
-    WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianCylindrical not fully implemented");
+    WARPX_ABORT_WITH_MESSAGE("ComputeGradientCylindrical not fully implemented");
 }
 
 #elif defined(WARPX_DIM_RSPHERE)
 template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeVectorLaplacianSpherical (
+void FiniteDifferenceSolver::ComputeGradientSpherical (
     ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
+    ablastr::fields::ScalarField const& in_field,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
-    WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianSpherical not fully implemented");
+    WARPX_ABORT_WITH_MESSAGE("ComputeGradientSpherical not fully implemented");
 }
 
 #else
 template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
+void FiniteDifferenceSolver::ComputeGradientCartesian (
     ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
+    ablastr::fields::ScalarField const& in_field,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
@@ -106,7 +106,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(*in_field[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+    for ( MFIter mfi(*in_field, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
             amrex::Gpu::synchronize();
         }
@@ -116,9 +116,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
         Array4<Real> const &Fx = out_field[0]->array(mfi);
         Array4<Real> const &Fy = out_field[1]->array(mfi);
         Array4<Real> const &Fz = out_field[2]->array(mfi);
-        Array4<Real const> const &Gx = in_field[0]->const_array(mfi);
-        Array4<Real const> const &Gy = in_field[1]->const_array(mfi);
-        Array4<Real const> const &Gz = in_field[2]->const_array(mfi);
+        Array4<Real const> const &G = in_field->const_array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
@@ -150,11 +148,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
                 // Skip field update in the embedded boundaries
                 if (update_x_arr && update_x_arr(i, j, k) == 0) { return; }
 
-                Fx(i, j, k) = (
-                        T_Algo::Dxx(Gx, coefs_x, n_coefs_x, i, j, k) +
-                        T_Algo::Dyy(Gx, coefs_y, n_coefs_y, i, j, k) +
-                        T_Algo::Dzz(Gx, coefs_z, n_coefs_z, i, j, k)
-                );
+                Fx(i, j, k) = T_Algo::UpwardDx(G, coefs_x, n_coefs_x, i, j, k);
             },
 
             // y calculation
@@ -162,11 +156,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
                 // Skip field update in the embedded boundaries
                 if (update_y_arr && update_y_arr(i, j, k) == 0) { return; }
 
-                Fy(i, j, k) = (
-                        T_Algo::Dxx(Gy, coefs_x, n_coefs_x, i, j, k) +
-                        T_Algo::Dyy(Gy, coefs_y, n_coefs_y, i, j, k) +
-                        T_Algo::Dzz(Gy, coefs_z, n_coefs_z, i, j, k)
-                );
+                Fy(i, j, k) = T_Algo::UpwardDy(G, coefs_y, n_coefs_y, i, j, k);
             },
 
             // z calculation
@@ -174,11 +164,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
                 // Skip field update in the embedded boundaries
                 if (update_z_arr && update_z_arr(i, j, k) == 0) { return; }
 
-                Fz(i, j, k) = (
-                        T_Algo::Dxx(Gz, coefs_x, n_coefs_x, i, j, k) +
-                        T_Algo::Dyy(Gz, coefs_y, n_coefs_y, i, j, k) +
-                        T_Algo::Dzz(Gz, coefs_z, n_coefs_z, i, j, k)
-                );
+                Fz(i, j, k) = T_Algo::UpwardDz(G, coefs_z, n_coefs_z, i, j, k);
             }
         );
 

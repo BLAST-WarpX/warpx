@@ -672,6 +672,11 @@ public:
      */
     void SyncCurrentAndRho ();
 
+    void SumBoundaryJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev,
+        const amrex::Periodicity& period);
+
     /**
      * \brief Apply filter and sum guard cells across MR levels.
      * If current centering is used, center the current from a nodal grid
@@ -1054,10 +1059,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& current,
         int lev,
         int idim,
-        const amrex::Periodicity& period);
-    void SumBoundaryJ (
-        const ablastr::fields::MultiLevelVectorField& current,
-        int lev,
         const amrex::Periodicity& period);
 
     void RestrictRhoFromFineToCoarsePatch (int lev );
