@@ -106,7 +106,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
     if (!context->m_fd_jac_comput) {
-        ((JacobianFunctionMF<VecType,TIType>*)context->m_linop)->updatePreCondMat(context->m_U);
+        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat(context->m_U);
     }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -133,7 +133,7 @@ PetscErrorCode JacobianFunction( SNES a_solver,
 
     if (strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
         copyVec(context->m_U, a_U);
-        auto err = context->assemblePCMatrix();
+        auto err = context->assemblePCMatrix(context->m_linop.get());
         AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
     }
 
@@ -149,7 +149,7 @@ PetscErrorCode applyJacobian(Mat a_A, Vec a_U, Vec a_F)
     SNES_impl *context;
     MatShellGetContext(a_A, &context);
     copyVec(context->m_U, a_U);
-    context->applyOp(context->m_F, context->m_U);
+    context->applyOp(context->m_F, context->m_U, context->m_linop.get());
     copyVec(a_F, context->m_F);
 
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -165,7 +165,7 @@ PetscErrorCode applyMatOp(Mat a_A, Vec a_U, Vec a_F)
     MatShellGetContext(a_A,&context);
 
     copyVec( context->m_U, a_U );
-    context->applyOp( context->m_F, context->m_U );
+    context->applyOp( context->m_F, context->m_U, context->m_linop );
     copyVec( a_F, context->m_F);
 
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -180,8 +180,16 @@ PetscErrorCode applyNativePC( PC  a_pc, Vec a_X, Vec a_Y )
     PETScSolver_impl *context;
     PCShellGetContext(a_pc, &context);
 
+    LinOpType* linop = nullptr;
+    if (dynamic_cast<KSP_impl*>(context) != nullptr) {
+        linop = dynamic_cast<KSP_impl*>(context)->m_linop;
+    } else if (dynamic_cast<SNES_impl*>(context) != nullptr) {
+        linop = dynamic_cast<SNES_impl*>(context)->m_linop.get();
+    } else {
+        amrex::Abort("Error in warpx_petsc::applyNativePC - unable to case context pointer");
+    }
     copyVec( context->m_U, a_X );
-    context->applyPC( context->m_F, context->m_U );
+    context->applyPC( context->m_F, context->m_U, linop );
     copyVec( a_Y, context->m_F );
 
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -214,6 +222,18 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
                    << ", " << a_rnorm / norm0 << " (rel.)\n";
     PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+//! Constructor
+PETScSolver_impl::PETScSolver_impl()
+{
+    m_A = std::make_unique<MatObj>();
+    m_P = std::make_unique<MatObj>();
+    m_x = std::make_unique<VecObj>();
+    m_b = std::make_unique<VecObj>();
+}
+
+//! Destructor
+PETScSolver_impl::~PETScSolver_impl() { }
 
 // Set PETSc options from WarpX input file
 void PETScSolver_impl::setOptions()
@@ -298,24 +318,28 @@ void PETScSolver_impl::setOptions()
 }
 
 // Apply Jacobian operator
-void PETScSolver_impl::applyOp(VecType& a_F, const VecType& a_U) const
+void PETScSolver_impl::applyOp( VecType& a_F,
+                                const VecType& a_U,
+                                LinOpType* const a_linop ) const
 {
     BL_PROFILE("PETScSolver_impl::applyOp()");
     AMREX_ALWAYS_ASSERT(m_is_defined);
-    m_linop->apply(a_F, a_U);
+    a_linop->apply(a_F, a_U);
 }
 
 // Apply preconditioner
-void PETScSolver_impl::applyPC( VecType& a_F, const VecType& a_U) const
+void PETScSolver_impl::applyPC( VecType& a_F,
+                                const VecType& a_U,
+                                LinOpType* const a_linop ) const
 {
     BL_PROFILE("PETScSolver_impl::applypC()");
     AMREX_ALWAYS_ASSERT(m_is_defined);
     a_F.zero();
-    m_linop->precond(a_F, a_U);
+    a_linop->precond(a_F, a_U);
 }
 
 //! Assemble preconditioner matrix
-int PETScSolver_impl::assemblePCMatrix()
+int PETScSolver_impl::assemblePCMatrix(LinOpType* const a_linop)
 {
     BL_PROFILE("PETScSolver_impl::assemblePCMatrix()");
 
@@ -330,7 +354,7 @@ int PETScSolver_impl::assemblePCMatrix()
     amrex::Gpu::DeviceVector<int> c_indices_g; // non-zero column indices (row-major)
     amrex::Gpu::DeviceVector<amrex::Real> a_ij;
 
-    m_linop->getPCMatrix( r_indices_g, n_nz_cols, c_indices_g, a_ij, n, ncols_max );
+    a_linop->getPCMatrix( r_indices_g, n_nz_cols, c_indices_g, a_ij, n, ncols_max );
 
     {
         std::vector<int> h_r_indices_g(r_indices_g.size());
@@ -365,28 +389,17 @@ int PETScSolver_impl::assemblePCMatrix()
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+//! Constructor
 KSP_impl::KSP_impl(LinOpType& a_op)
 {
     BL_PROFILE("KSP_impl::KSP_impl()");
-    this->m_linop = &a_op;
+    m_linop = &a_op;
     amrex::Print() << "KSP_impl: Initialized PETSc's KSP solver.\n";
 
-    m_ksp = new KSPObj;
-    this->m_A = new MatObj;
-    this->m_P = new MatObj;
-    this->m_x = new VecObj;
-    this->m_b = new VecObj;
+    m_ksp = std::make_unique<KSPObj>();
 }
 
-KSP_impl::~KSP_impl()
-{
-    BL_PROFILE("KSP_impl::~KSP_impl()");
-    delete m_ksp;
-    delete this->m_A;
-    delete this->m_P;
-    delete this->m_x;
-    delete this->m_b;
-}
+KSP_impl::~KSP_impl() { }
 
 void KSP_impl::createObjects(const VecType& a_vec)
 {
@@ -434,7 +447,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     PC pc;
     KSPGetPC(m_ksp->obj, &pc);
     KSPSetPCSide(m_ksp->obj, PC_RIGHT);
-    this->m_pc_type = this->m_linop->pcType();
+    this->m_pc_type = m_linop->pcType();
     // set PETSc options from WarpX inputs
     setOptions();
     if (this->m_pc_type != PreconditionerType::pc_petsc) {
@@ -526,8 +539,8 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     copyVec(this->m_x->obj, a_Y);
     copyVec(this->m_b->obj, a_R);
 
-    if (this->m_linop->pcType() == PreconditionerType::pc_petsc) {
-        auto err = assemblePCMatrix();
+    if (m_linop->pcType() == PreconditionerType::pc_petsc) {
+        auto err = assemblePCMatrix(m_linop);
         AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
     }
 
@@ -588,14 +601,10 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     AMREX_ALWAYS_ASSERT(a_op != nullptr);
     m_op = a_op;
 
-    this->m_linop = new JacobianFunctionMF<VecType,TIType>;
-    this->m_linop->define(m_F, m_op, this->m_pc_type);
+    m_linop = std::make_unique<JacobianFunctionMF<VecType,TIType>>();
+    m_linop->define(m_F, m_op, this->m_pc_type);
 
-    m_snes = new SNESObj;
-    this->m_A = new MatObj;
-    this->m_P = new MatObj;
-    this->m_x = new VecObj;
-    this->m_b = new VecObj;
+    m_snes = std::make_unique<SNESObj>();
 
     VecCreate(PETSC_COMM_WORLD, &this->m_x->obj);
 #if defined AMREX_USE_GPU
@@ -695,16 +704,7 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     m_fd_jac_comput = (is_specified == PETSC_TRUE);
 }
 
-SNES_impl::~SNES_impl()
-{
-    BL_PROFILE("SNES_impl::~SNES_impl()");
-    delete m_snes;
-    delete this->m_A;
-    delete this->m_P;
-    delete this->m_x;
-    delete this->m_b;
-    delete this->m_linop;
-}
+SNES_impl::~SNES_impl() { }
 
 void SNES_impl::printParams () const
 {
@@ -717,7 +717,7 @@ void SNES_impl::printParams () const
     amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
     amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
 
-    ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->printParams();
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->printParams();
 }
 
 void SNES_impl::setTolerances( const amrex::Real a_rtol,
@@ -777,7 +777,7 @@ void SNES_impl::setMaxIters(const int a_its, const int a_its_l )
 bool SNES_impl::usePC() const
 {
     AMREX_ALWAYS_ASSERT(isDefined());
-    return ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->usePreconditioner();
+    return dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->usePreconditioner();
 }
 
 void SNES_impl::solve(  VecType& a_U,
@@ -792,7 +792,7 @@ void SNES_impl::solve(  VecType& a_U,
 
     m_time = a_time;
     m_iter = a_step;
-    ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->curTimeStep(a_dt);
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTimeStep(a_dt);
 
     copyVec(this->m_x->obj, a_U);
     copyVec(this->m_b->obj, a_B);
@@ -835,8 +835,8 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U) const
         m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
     }
 
-    ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseSolution(a_U);
-    ((JacobianFunctionMF<VecType,TIType>*)this->m_linop)->setBaseRHS(a_F);
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(a_U);
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseRHS(a_F);
 }
 
 void SNES_impl::setVerbose(bool a_v)

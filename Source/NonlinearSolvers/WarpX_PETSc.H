@@ -54,10 +54,10 @@ class PETScSolver_impl
     public:
 
         //! Constructor
-        PETScSolver_impl () = default;
+        PETScSolver_impl ();
 
         //! Destructor
-        virtual ~PETScSolver_impl () = default;
+        virtual ~PETScSolver_impl ();
 
         // Prohibit Move and Copy operations
         PETScSolver_impl(const PETScSolver_impl&) = delete;
@@ -66,12 +66,12 @@ class PETScSolver_impl
         PETScSolver_impl& operator=(PETScSolver_impl&&) noexcept = delete;
 
         //! Apply the action of the preconditioner
-        void applyPC(VecType&, const VecType&) const;
+        void applyPC(VecType&, const VecType&, LinOpType* const) const;
         //! Apply the action of the Jacobian
-        void applyOp(VecType& a_F, const VecType& a_U) const;
+        void applyOp(VecType& a_F, const VecType& a_U, LinOpType* const) const;
 
         //! Assemble the sparse matrix for preconditioner
-        [[nodiscard]] int assemblePCMatrix();
+        [[nodiscard]] int assemblePCMatrix(LinOpType* const);
 
         //! Work vector
         mutable VecType m_U;
@@ -84,16 +84,13 @@ class PETScSolver_impl
         long m_ndofs_g = 0;
 
         //! Matrix (lin operator) object
-        MatObj* m_A = nullptr;
+        std::unique_ptr<MatObj> m_A;
         //! Matrix (PC) object
-        MatObj* m_P = nullptr;
+        std::unique_ptr<MatObj> m_P;
         //! solution vector
-        VecObj* m_x = nullptr;
+        std::unique_ptr<VecObj> m_x;
         //! right-hand-side vector
-        VecObj* m_b = nullptr;
-
-        //! Linear operator object
-        LinOpType* m_linop = nullptr;
+        std::unique_ptr<VecObj> m_b;
 
         //! is defined?
         bool m_is_defined = false;
@@ -162,8 +159,11 @@ class KSP_impl : public PETScSolver_impl
         //! Check if object is defined
         [[nodiscard]] bool isDefined () const
         {
-            return (this->m_is_defined && (this->m_linop != nullptr));
+            return (this->m_is_defined && (m_linop != nullptr));
         }
+
+        //! Linear operator object
+        LinOpType* m_linop = nullptr;
 
     private:
 
@@ -184,7 +184,7 @@ class KSP_impl : public PETScSolver_impl
         amrex::Real m_norm = DBL_MAX;
 
         //! Solver object
-        KSPObj* m_ksp = nullptr;
+        std::unique_ptr<KSPObj> m_ksp;
 };
 
 /**
@@ -271,6 +271,9 @@ class SNES_impl : public PETScSolver_impl
         //! Using SNES FD?
         bool m_fd_jac_comput = false;
 
+        //! Linear operator object
+        std::unique_ptr<LinOpType> m_linop;
+
     private:
 
         //! absolute tolerance
@@ -318,7 +321,7 @@ class SNES_impl : public PETScSolver_impl
         TIType* m_op = nullptr;
 
         //! Solver object
-        SNESObj* m_snes = nullptr;
+        std::unique_ptr<SNESObj> m_snes;
 };
 
 }
