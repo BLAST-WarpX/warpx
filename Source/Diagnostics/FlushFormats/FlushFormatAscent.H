@@ -44,7 +44,7 @@ public:
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
         bool isLastBTDFlush = false) const override;
 
-    FlushFormatAscent ()          = default;
+    explicit FlushFormatAscent (WarpX* warpx) : FlushFormatInSitu(warpx) {}
     ~FlushFormatAscent() override = default;
 
     FlushFormatAscent ( FlushFormatAscent const &)             = default;

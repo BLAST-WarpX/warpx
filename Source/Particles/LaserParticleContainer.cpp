@@ -588,7 +588,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     const bool has_rho = fields.has(FieldType::rho_fp, lev);
     const bool has_buffer = fields.has_vector(FieldType::current_buf, lev);
@@ -731,7 +731,7 @@ LaserParticleContainer::PostRestart ()
 void
 LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
 {
-    const std::array<Real,3>& dx = WarpX::CellSize(lev);
+    const std::array<Real,3>& dx = m_warpx->CellSize(lev);
 
 #if !defined(WARPX_DIM_RZ)
     constexpr float small_float_coeff = 1.e-25f;

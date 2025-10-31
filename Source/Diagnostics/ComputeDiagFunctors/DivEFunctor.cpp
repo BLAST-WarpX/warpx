@@ -14,13 +14,14 @@
 #include <AMReX_MultiFab.H>
 
 DivEFunctor::DivEFunctor (
+    WarpX* warpx,
     ablastr::fields::VectorField const & arr_mf_src,
     const int lev,
     const amrex::IntVect crse_ratio,
     bool convertRZmodes2cartesian,
     const int ncomp
 )
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
       m_convertRZmodes2cartesian(convertRZmodes2cartesian)
 {
     amrex::ignore_unused(m_arr_mf_src);
@@ -29,7 +30,7 @@ DivEFunctor::DivEFunctor (
 void
 DivEFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     // Guard cell is set to 1 for generality. However, for a cell-centered
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering
     // the operations performend in the CoarsenAndInterpolate function.

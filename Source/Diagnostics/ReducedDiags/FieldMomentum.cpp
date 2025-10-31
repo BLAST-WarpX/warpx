@@ -41,8 +41,8 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
-FieldMomentum::FieldMomentum (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+FieldMomentum::FieldMomentum (WarpX* warpx, const std::string& rd_name)
+    : ReducedDiags{warpx,rd_name}
 {
     // RZ coordinate is not working
 #if (defined WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -100,7 +100,7 @@ void FieldMomentum::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // Get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // Get number of refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
@@ -187,7 +187,7 @@ void FieldMomentum::ComputeDiags (int step)
         amrex::ParallelDescriptor::ReduceRealSum({ExB_x,ExB_y,ExB_z});
 
         // Get cell volume
-        const std::array<Real, 3> &dx = WarpX::CellSize(lev);
+        const std::array<Real, 3> &dx = m_warpx->CellSize(lev);
         const amrex::Real dV = dx[0]*dx[1]*dx[2];
 
         // Save data (offset: 3 values for each refinement level)

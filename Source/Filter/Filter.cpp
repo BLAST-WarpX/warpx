@@ -40,7 +40,7 @@ Filter::ApplyStencil (MultiFab& dstmf, const MultiFab& srcmf, const int lev, int
     WARPX_PROFILE("Filter::ApplyStencil(MultiFab)");
     ncomp = std::min(ncomp, srcmf.nComp());
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     for (MFIter mfi(dstmf); mfi.isValid(); ++mfi)
     {
@@ -200,7 +200,7 @@ Filter::ApplyStencil (amrex::MultiFab& dstmf, const amrex::MultiFab& srcmf, cons
     WARPX_PROFILE("Filter::ApplyStencil(MultiFab)");
     ncomp = std::min(ncomp, srcmf.nComp());
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
 #ifdef AMREX_USE_OMP
 // never runs on GPU since in the else branch of AMREX_USE_GPU

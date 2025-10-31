@@ -16,6 +16,8 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
 
+class WarpX;
+
 /**
  * \brief This class defines an operator to create product particles from DSMC
  * collisions and sets the particle properties (position, momentum, weight).
@@ -522,7 +524,9 @@ public:
                                        pc_products[i]->get_quantum_sync_engine_ptr(),
 #endif
                                        pc_products[i]->getIonizationInitialLevel(),
-                                       start_index, stop_index);
+                                       start_index, stop_index,
+                                       m_warpx->gett_new(0));
+
         }
 
         amrex::Gpu::synchronize();
@@ -530,6 +534,8 @@ public:
     }
 
 private:
+    WarpX* m_warpx = nullptr;
+
     // How many different type of species the collision produces
     int m_num_product_species;
     // If ionization collisions are included, what is the energy cost

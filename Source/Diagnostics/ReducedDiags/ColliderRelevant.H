@@ -24,9 +24,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    ColliderRelevant(const std::string& rd_name);
+    ColliderRelevant(WarpX* warpx, const std::string& rd_name);
 
     /// name of the two colliding species
     std::vector<std::string> m_beam_name;

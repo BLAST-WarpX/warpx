@@ -22,7 +22,8 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
-HybridPICModel::HybridPICModel ()
+HybridPICModel::HybridPICModel (WarpX* warpx)
+    : m_warpx(warpx)
 {
     ReadParameters();
 }
@@ -66,7 +67,7 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("add_external_fields", m_add_external_fields);
 
     if (m_add_external_fields) {
-        m_external_vector_potential = std::make_unique<ExternalVectorPotential>();
+        m_external_vector_potential = std::make_unique<ExternalVectorPotential>(m_warpx);
     }
 }
 
@@ -185,7 +186,7 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
         m_external_current_has_time_dependence += J_ext_symbols.count("t");
     }
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     using ablastr::fields::Direction;
 
     // Get the grid staggering of the fields involved in calculating E
@@ -260,7 +261,7 @@ void HybridPICModel::GetCurrentExternal ()
 {
     if (!m_external_current_has_time_dependence) { return; }
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         warpx.ComputeExternalFieldOnGridUsingParser(
@@ -277,7 +278,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E)
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         CalculatePlasmaCurrent(Bfield[lev], eb_update_E[lev], lev);
@@ -291,7 +292,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
 {
     WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
         current_fp_plasma, Bfield, eb_update_E, lev
@@ -321,7 +322,7 @@ void HybridPICModel::HybridPICSolveE (
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
     const bool solve_for_Faraday) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         HybridPICSolveE(
@@ -363,7 +364,7 @@ void HybridPICModel::HybridPICSolveE (
     const int lev, PatchType patch_type,
     const bool solve_for_Faraday) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     auto* const electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
@@ -379,7 +380,7 @@ void HybridPICModel::HybridPICSolveE (
 
 void HybridPICModel::CalculateElectronPressure() const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         CalculateElectronPressure(lev);
@@ -390,7 +391,7 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
 {
     WARPX_PROFILE("WarpX::CalculateElectronPressure()");
 
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
     ablastr::fields::ScalarField rho_fp = warpx.m_fields.get(FieldType::rho_fp, lev);
 
@@ -446,7 +447,7 @@ void HybridPICModel::BfieldEvolveRK (
     amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         BfieldEvolveRK(
@@ -579,7 +580,7 @@ void HybridPICModel::FieldPush (
     amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     amrex::Real const t_old = warpx.gett_old(0);
 

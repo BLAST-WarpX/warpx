@@ -250,7 +250,7 @@ MultiParticleContainer::WriteHeader (std::ostream& os) const
 }
 
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpX* warpx, PinnedMemoryParticleContainer& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic ) {
 
     using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
@@ -270,12 +270,11 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
         "but this is only available with `diag_type = Full`.");
     tmp.AddRealComp("phi");
     int const phi_index = tmp.GetRealCompIndex("phi");
-    auto& warpx = WarpX::GetInstance();
-    for (int lev=0; lev<=warpx.finestLevel(); lev++) {
-        const amrex::Geometry& geom = warpx.Geom(lev);
+    for (int lev=0; lev<=warpx->finestLevel(); lev++) {
+        const amrex::Geometry& geom = warpx->Geom(lev);
         auto plo = geom.ProbLoArray();
         auto dxi = geom.InvCellSizeArray();
-        amrex::MultiFab const& phi = *warpx.m_fields.get(FieldType::phi_fp, lev);
+        amrex::MultiFab const& phi = *warpx->m_fields.get(FieldType::phi_fp, lev);
 
 #ifdef AMREX_USE_OMP
         #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

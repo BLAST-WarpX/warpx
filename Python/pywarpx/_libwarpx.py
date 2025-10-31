@@ -157,6 +157,8 @@ class LibWarpX:
         if self.initialized:
             del self.warpx
             # The call to warpx_finalize causes a crash - don't know why
+            # I think it's because the ownership of the singleton has been
+            # taken over by Python, and WarpX::Finalize does not know that.
             # self.libwarpx_so.warpx_finalize()
             self.libwarpx_so.amrex_finalize()
 

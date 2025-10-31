@@ -16,6 +16,7 @@ public:
     /**
      * \brief Constructor
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] lev level of MultiFab
      * \param[in] crse_ratio coarsening ratio for interpolation of field values
      *                       from simulation MultiFabs to the output MultiFab mf_dst
@@ -23,7 +24,7 @@ public:
      * \param[in] ncomp optional number of component of source MultiFab mf_src
      *                  to be cell-centered in output MultiFab mf_dst
      */
-    PhiFunctor (int lev,
+    PhiFunctor (WarpX* warpx, int lev,
                 amrex::IntVect crse_ratio,
                 bool convertRZmodes2cartesian = true,
                 int ncomp = 1);

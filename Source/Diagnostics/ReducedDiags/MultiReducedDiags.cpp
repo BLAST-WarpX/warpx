@@ -43,7 +43,7 @@
 using namespace amrex;
 
 // constructor
-MultiReducedDiags::MultiReducedDiags ()
+MultiReducedDiags::MultiReducedDiags (WarpX* warpx)
 {
     // read reduced diags names
     const ParmParse pp_warpx("warpx");
@@ -54,28 +54,28 @@ MultiReducedDiags::MultiReducedDiags ()
 
     using CS = const std::string& ;
     const auto reduced_diags_dictionary =
-        std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS)>>{
-            {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
-            {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
-            {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
-            {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
-            {"DifferentialLuminosity2D",[](CS s){return std::make_unique<DifferentialLuminosity2D>(s);}},
-            {"ParticleEnergy",        [](CS s){return std::make_unique<ParticleEnergy>(s);}},
-            {"ParticleExtrema",       [](CS s){return std::make_unique<ParticleExtrema>(s);}},
-            {"ParticleHistogram",     [](CS s){return std::make_unique<ParticleHistogram>(s);}},
-            {"ParticleHistogram2D",   [](CS s){return std::make_unique<ParticleHistogram2D>(s);}},
-            {"ParticleMomentum",      [](CS s){return std::make_unique<ParticleMomentum>(s);}},
-            {"ParticleNumber",        [](CS s){return std::make_unique<ParticleNumber>(s);}},
-            {"FieldEnergy",           [](CS s){return std::make_unique<FieldEnergy>(s);}},
-            {"FieldMaximum",          [](CS s){return std::make_unique<FieldMaximum>(s);}},
-            {"FieldMomentum",         [](CS s){return std::make_unique<FieldMomentum>(s);}},
-            {"FieldPoyntingFlux",     [](CS s){return std::make_unique<FieldPoyntingFlux>(s);}},
-            {"FieldProbe",            [](CS s){return std::make_unique<FieldProbe>(s);}},
-            {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
-            {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
-            {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
-            {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
-            {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
+        std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(WarpX*,CS)>>{
+            {"BeamRelevant",          [](WarpX* w, CS s){return std::make_unique<BeamRelevant>(w, s);}},
+            {"ChargeOnEB",            [](WarpX* w, CS s){return std::make_unique<ChargeOnEB>(w, s);}},
+            {"ColliderRelevant",      [](WarpX* w, CS s){return std::make_unique<ColliderRelevant>(w, s);}},
+            {"DifferentialLuminosity",[](WarpX* w, CS s){return std::make_unique<DifferentialLuminosity>(w, s);}},
+            {"DifferentialLuminosity2D",[](WarpX* w, CS s){return std::make_unique<DifferentialLuminosity2D>(w, s);}},
+            {"ParticleEnergy",        [](WarpX* w, CS s){return std::make_unique<ParticleEnergy>(w, s);}},
+            {"ParticleExtrema",       [](WarpX* w, CS s){return std::make_unique<ParticleExtrema>(w, s);}},
+            {"ParticleHistogram",     [](WarpX* w, CS s){return std::make_unique<ParticleHistogram>(w, s);}},
+            {"ParticleHistogram2D",   [](WarpX* w, CS s){return std::make_unique<ParticleHistogram2D>(w, s);}},
+            {"ParticleMomentum",      [](WarpX* w, CS s){return std::make_unique<ParticleMomentum>(w, s);}},
+            {"ParticleNumber",        [](WarpX* w, CS s){return std::make_unique<ParticleNumber>(w, s);}},
+            {"FieldEnergy",           [](WarpX* w, CS s){return std::make_unique<FieldEnergy>(w, s);}},
+            {"FieldMaximum",          [](WarpX* w, CS s){return std::make_unique<FieldMaximum>(w, s);}},
+            {"FieldMomentum",         [](WarpX* w, CS s){return std::make_unique<FieldMomentum>(w, s);}},
+            {"FieldPoyntingFlux",     [](WarpX* w, CS s){return std::make_unique<FieldPoyntingFlux>(w, s);}},
+            {"FieldProbe",            [](WarpX* w, CS s){return std::make_unique<FieldProbe>(w, s);}},
+            {"FieldReduction",        [](WarpX* w, CS s){return std::make_unique<FieldReduction>(w, s);}},
+            {"LoadBalanceCosts",      [](WarpX* w, CS s){return std::make_unique<LoadBalanceCosts>(w, s);}},
+            {"LoadBalanceEfficiency", [](WarpX* w, CS s){return std::make_unique<LoadBalanceEfficiency>(w, s);}},
+            {"RhoMaximum",            [](WarpX* w, CS s){return std::make_unique<RhoMaximum>(w, s);}},
+            {"Timestep",              [](WarpX* w, CS s){return std::make_unique<Timestep>(w, s);}}
     };
     // loop over all reduced diags and fill m_multi_rd with requested reduced diags
     std::transform(m_rd_names.begin(), m_rd_names.end(), std::back_inserter(m_multi_rd),
@@ -91,7 +91,7 @@ MultiReducedDiags::MultiReducedDiags ()
                 rd_type + " is not a valid type for reduced diagnostic " + rd_name
             );
 
-            return reduced_diags_dictionary.at(rd_type)(rd_name);
+            return reduced_diags_dictionary.at(rd_type)(warpx,rd_name);
         });
     // end loop over all reduced diags
 }

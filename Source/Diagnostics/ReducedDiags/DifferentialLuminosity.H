@@ -25,9 +25,10 @@ public:
 
     /**
      * constructor
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] rd_name reduced diags names
      */
-    DifferentialLuminosity(const std::string& rd_name);
+    DifferentialLuminosity(WarpX* warpx, const std::string& rd_name);
 
     /// name of the two colliding species
     std::vector<std::string> m_beam_name;

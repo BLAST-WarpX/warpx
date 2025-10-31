@@ -17,7 +17,7 @@
 using namespace amrex;
 
 void LabFrameExplicitES::InitData() {
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
 }
 
@@ -46,7 +46,7 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
 
     // Apply filter, perform MPI exchange, interpolate across levels
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
 
 #ifndef WARPX_DIM_RZ
@@ -104,7 +104,7 @@ void LabFrameExplicitES::computePhiTriDiagonal (
     "The tridiagonal solver cannot be used with mesh refinement");
 
     const int lev = 0;
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     const amrex::Real* dx = warpx.Geom(lev).CellSize();
     const amrex::Real xmin = warpx.Geom(lev).ProbLo(0);

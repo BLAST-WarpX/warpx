@@ -28,6 +28,8 @@
 
 #include <vector>
 
+class WarpX;
+
 // Declare type for spectral fields
 using SpectralField = amrex::FabArray< amrex::BaseFab <Complex> >;
 
@@ -144,7 +146,8 @@ class SpectralFieldData
 {
 
     public:
-        SpectralFieldData( const amrex::BoxArray& realspace_ba,
+        SpectralFieldData( WarpX* warpx,
+                           const amrex::BoxArray& realspace_ba,
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
                            int n_field_required,
@@ -164,6 +167,8 @@ class SpectralFieldData
 
         void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
                                 const amrex::IntVect& fill_guards, int i_comp);
+
+        WarpX* m_warpx = nullptr;
 
         // `fields` stores fields in spectral space, as multicomponent FabArray
         SpectralField fields;

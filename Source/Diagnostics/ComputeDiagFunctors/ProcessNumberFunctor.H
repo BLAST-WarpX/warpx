@@ -12,6 +12,7 @@ class ProcessNumberFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] mf_src source multifab. Must be nullptr as a source is not needed
                   to compute the box-to-processes mapping.
      * \param[in] lev level of multifab. Used for averaging in rz.
@@ -19,7 +20,7 @@ public:
                   to diags MultiFab mf_dst
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    ProcessNumberFunctor(const amrex::MultiFab * mf_src, int lev,
+    ProcessNumberFunctor(WarpX* warpx, const amrex::MultiFab * mf_src, int lev,
                          amrex::IntVect crse_ratio, int ncomp=1);
 
     /** \brief Store the process assignment of each box in mf_dst.

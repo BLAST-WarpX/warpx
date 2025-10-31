@@ -80,7 +80,7 @@ FlushFormatPlotfile::WriteToFile (
     bool isLastBTDFlush) const
 {
     WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         if (!isBTD)
@@ -126,7 +126,7 @@ void
 FlushFormatPlotfile::WriteJobInfo(const std::string& dir) const
 {
 
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     if (ParallelDescriptor::IOProcessor())
     {
@@ -249,7 +249,7 @@ FlushFormatPlotfile::WriteWarpXHeader(
     const std::string& name,
     amrex::Vector<amrex::Geometry>& geom) const
 {
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     if (ParallelDescriptor::IOProcessor())
     {
         VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
@@ -461,7 +461,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
  *  as a raw field (i.e. no interpolation to cell centers).
  *  Write guard cells if `plot_guards` is True.
  */
-void
+static void
 WriteRawMF ( const MultiFab& F, const DistributionMapping& dm,
              const std::string& filename,
              const std::string& level_prefix,
@@ -487,7 +487,7 @@ WriteRawMF ( const MultiFab& F, const DistributionMapping& dm,
  *  coarse/fine patch to be written, but WarpX does not have data for
  *  the coarse patch of level 0 (meaningless).
  */
-void
+static void
 WriteZeroRawMF( const MultiFab& F, const DistributionMapping& dm,
                 const std::string& filename,
                 const std::string& level_prefix,
@@ -507,8 +507,8 @@ WriteZeroRawMF( const MultiFab& F, const DistributionMapping& dm,
  *  to `F*_fp`. This is mainly needed because the yt reader requires the
  *  coarse and fine patch to have the same shape.
  */
-void
-WriteCoarseVector( const std::string& field_name,
+static void
+WriteCoarseVector( const WarpX* warpx, const std::string& field_name,
     const MultiFab* Fx_cp,
     const MultiFab* Fy_cp,
     const MultiFab* Fz_cp,
@@ -531,8 +531,8 @@ WriteCoarseVector( const std::string& field_name,
         WriteZeroRawMF( *Fz_fp, dm, filename, level_prefix, field_name+"z_cp", lev, ng );
     } else {
         // Interpolate coarse data onto fine grid
-        const amrex::IntVect r_ratio = WarpX::GetInstance().refRatio(lev-1);
-        const Real* dx = WarpX::GetInstance().Geom(lev-1).CellSize();
+        const amrex::IntVect r_ratio = warpx->refRatio(lev-1);
+        const Real* dx = warpx->Geom(lev-1).CellSize();
         auto F = Interpolate::getInterpolatedVector( Fx_cp, Fy_cp, Fz_cp, Fx_fp, Fy_fp, Fz_fp,
                                     dm, r_ratio, dx, ng );
         // Write interpolated raw data
@@ -547,8 +547,8 @@ WriteCoarseVector( const std::string& field_name,
  *  to `F_fp`. This is mainly needed because the yt reader requires the
  *  coarse and fine patch to have the same shape.
  */
-void
-WriteCoarseScalar( const std::string& field_name,
+static void
+WriteCoarseScalar( const WarpX* warpx, const std::string& field_name,
     const MultiFab* F_cp,
     const MultiFab* F_fp,
     const DistributionMapping& dm,
@@ -568,8 +568,8 @@ WriteCoarseScalar( const std::string& field_name,
         // Create an alias to the component `icomp` of F_cp
         const MultiFab F_comp(*F_cp, amrex::make_alias, icomp, 1);
         // Interpolate coarse data onto fine grid
-        const amrex::IntVect r_ratio = WarpX::GetInstance().refRatio(lev-1);
-        const Real* dx = WarpX::GetInstance().Geom(lev-1).CellSize();
+        const amrex::IntVect r_ratio = warpx->refRatio(lev-1);
+        const Real* dx = warpx->Geom(lev-1).CellSize();
         auto F = Interpolate::getInterpolatedScalar( F_comp, *F_fp, dm, r_ratio, dx, ng );
         // Write interpolated raw data
         WriteRawMF( *F, dm, filename, level_prefix, field_name+"_cp", lev, plot_guards );
@@ -585,7 +585,7 @@ FlushFormatPlotfile::WriteAllRawFields(
     using WARPX_UNITY_ID::default_level_prefix;
 
     if (!plot_raw_fields) { return; }
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     for (int lev = 0; lev < nlevels; ++lev)
     {
         const std::unique_ptr<MultiFab> empty_ptr;
@@ -662,7 +662,7 @@ FlushFormatPlotfile::WriteAllRawFields(
 
         // Coarse path
         if (lev > 0) {
-            WriteCoarseVector( "E",
+            WriteCoarseVector( m_warpx, "E",
                                warpx.m_fields.get(FieldType::Efield_cp, Direction{0}, lev),
                                warpx.m_fields.get(FieldType::Efield_cp, Direction{1}, lev),
                                warpx.m_fields.get(FieldType::Efield_cp, Direction{2}, lev),
@@ -670,7 +670,7 @@ FlushFormatPlotfile::WriteAllRawFields(
                                warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
                                warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
-            WriteCoarseVector( "B",
+            WriteCoarseVector( m_warpx, "B",
                                warpx.m_fields.get(FieldType::Bfield_cp, Direction{0}, lev),
                                warpx.m_fields.get(FieldType::Bfield_cp, Direction{1}, lev),
                                warpx.m_fields.get(FieldType::Bfield_cp, Direction{2}, lev),
@@ -678,19 +678,19 @@ FlushFormatPlotfile::WriteAllRawFields(
                                warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
                                warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
-            WriteCoarseVector( "j",
+            WriteCoarseVector( m_warpx, "j",
                                warpx.m_fields.get(FieldType::current_cp, Direction{0}, lev), warpx.m_fields.get(FieldType::current_cp, Direction{1}, lev), warpx.m_fields.get(FieldType::current_cp, Direction{2}, lev),
                                warpx.m_fields.get(FieldType::current_fp, Direction{0}, lev), warpx.m_fields.get(FieldType::current_fp, Direction{1}, lev), warpx.m_fields.get(FieldType::current_fp, Direction{2}, lev),
                                dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards);
             if (warpx.m_fields.has(FieldType::F_fp, lev) && warpx.m_fields.has(FieldType::F_cp, lev))
             {
-                WriteCoarseScalar("F", warpx.m_fields.get(FieldType::F_cp, lev), warpx.m_fields.get(FieldType::F_fp, lev),
+                WriteCoarseScalar( m_warpx,"F", warpx.m_fields.get(FieldType::F_cp, lev), warpx.m_fields.get(FieldType::F_fp, lev),
                     dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, 0);
             }
             if (warpx.m_fields.has(FieldType::rho_fp, lev) && warpx.m_fields.has(FieldType::rho_cp, lev))
             {
                 // Use the component 1 of `rho_cp`, i.e. rho_new for time synchronization
-                WriteCoarseScalar("rho", warpx.m_fields.get(FieldType::rho_cp, lev), warpx.m_fields.get(FieldType::rho_fp, lev),
+                WriteCoarseScalar( m_warpx,"rho", warpx.m_fields.get(FieldType::rho_cp, lev), warpx.m_fields.get(FieldType::rho_fp, lev),
                     dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, 1);
             }
         }

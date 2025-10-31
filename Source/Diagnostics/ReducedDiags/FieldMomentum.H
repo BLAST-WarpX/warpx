@@ -22,9 +22,10 @@ public:
     /**
      * \brief Constructor
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] rd_name reduced diags names
      */
-    FieldMomentum(const std::string& rd_name);
+    FieldMomentum(WarpX* warpx, const std::string& rd_name);
 
     /**
      * \brief This function computes the electromagnetic momentum,

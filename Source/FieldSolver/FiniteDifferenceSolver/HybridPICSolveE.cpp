@@ -48,7 +48,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (m_warpx->grid_type == GridType::Staggered)
     {
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
             Jfield, Bfield, eb_update_E, lev
@@ -85,7 +85,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Jfield
     Jfield[0]->setVal(0);
@@ -275,7 +275,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
 )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Jfield
     Jfield[0]->setVal(0);
@@ -377,7 +377,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Jfield
     Jfield[0]->setVal(0);
@@ -510,7 +510,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (m_warpx->grid_type == GridType::Staggered)
     {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
@@ -549,7 +549,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         "Ohm's law solver only support m = 0 azimuthal mode at present.");
 
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     using namespace ablastr::coarsen::sample;
 
@@ -565,7 +565,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
@@ -982,7 +982,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool solve_for_Faraday )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     using namespace ablastr::coarsen::sample;
 
@@ -998,7 +998,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0

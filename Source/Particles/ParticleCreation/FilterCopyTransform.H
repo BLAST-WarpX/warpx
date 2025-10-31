@@ -48,6 +48,8 @@
  *        where dst and src refer to the destination and source tiles and
  *        i_src and i_dst and the particle indices in each tile.
  *
+ * \param t new time
+ *
  * \return num_added the number of particles that were written to dst.
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
@@ -55,7 +57,8 @@ template <int N, typename DstPC, typename DstTile, typename SrcTile, typename In
           amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
 Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
                                     Index* mask, Index dst_index,
-                                    CopyFunc&& copy, TransFunc&& transform) noexcept
+                                    CopyFunc&& copy, TransFunc&& transform,
+                                    amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -99,7 +102,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
                                        pc.get_quantum_sync_engine_ptr(),
 #endif
                                        pc.getIonizationInitialLevel(),
-                                       old_np, new_np);
+                                       old_np, new_np, t);
 
     Gpu::synchronize();
     return num_added;
@@ -141,12 +144,15 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
  *        where dst and src refer to the destination and source tiles and
  *        i_src and i_dst and the particle indices in each tile.
  *
+ * \param t new time
+ *
  * \return num_added the number of particles that were written to dst.
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename PredFunc, typename TransFunc, typename CopyFunc>
 Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index dst_index,
-                                    PredFunc&& filter, CopyFunc&& copy, TransFunc&& transform) noexcept
+                                    PredFunc&& filter, CopyFunc&& copy, TransFunc&& transform,
+                                    amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -166,7 +172,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
 
     return filterCopyTransformParticles<N>(pc, dst, src, mask.dataPtr(), dst_index,
                                            std::forward<CopyFunc>(copy),
-                                           std::forward<TransFunc>(transform));
+                                           std::forward<TransFunc>(transform), t);
 }
 
 /**
@@ -210,6 +216,8 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
  *        where dst and src refer to the destination and source tiles and
  *        i_src and i_dst and the particle indices in each tile.
  *
+ * \param t new time
+ *
  * \return num_added the number of particles that were written to dst.
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
@@ -218,7 +226,7 @@ template <int N, typename DstPC, typename DstTile, typename SrcTile, typename In
 Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTile& dst2, SrcTile& src, Index* mask,
                                     Index dst1_index, Index dst2_index,
                                     CopyFunc1&& copy1, CopyFunc2&& copy2,
-                                    TransFunc&& transform) noexcept
+                                    TransFunc&& transform, amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -272,7 +280,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                        pc1.get_quantum_sync_engine_ptr(),
 #endif
                                        pc1.getIonizationInitialLevel(),
-                                       old_np1, new_np1);
+                                       old_np1, new_np1, t);
     ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
                                        0, 0,
                                        pc2.getUserRealAttribs(), pc2.getUserIntAttribs(),
@@ -286,7 +294,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                        pc2.get_quantum_sync_engine_ptr(),
 #endif
                                        pc2.getIonizationInitialLevel(),
-                                       old_np2, new_np2);
+                                       old_np2, new_np2, t);
 
     Gpu::synchronize();
     return num_added;
@@ -334,6 +342,8 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
  *        where dst and src refer to the destination and source tiles and
  *        i_src and i_dst and the particle indices in each tile.
  *
+ * \param t new time
+ *
  * \return num_added the number of particles that were written to dst.
  */
 template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
@@ -341,7 +351,7 @@ template <int N, typename DstPC, typename DstTile, typename SrcTile, typename In
 Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTile& dst2, SrcTile& src,
                                     Index dst1_index, Index dst2_index,
                                     PredFunc&& filter, CopyFunc1&& copy1, CopyFunc2&& copy2,
-                                    TransFunc&& transform) noexcept
+                                    TransFunc&& transform, amrex::Real t) noexcept
 {
     using namespace amrex;
 
@@ -363,7 +373,7 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
                                         dst1_index, dst2_index,
                                         std::forward<CopyFunc1>(copy1),
                                         std::forward<CopyFunc2>(copy2),
-                                        std::forward<TransFunc>(transform));
+                                        std::forward<TransFunc>(transform), t);
 }
 
 #endif //WARPX_FILTER_COPY_TRANSFORM_H_

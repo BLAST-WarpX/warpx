@@ -15,6 +15,7 @@
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
+class WarpX;
 
 /* \brief Top-level class for the electromagnetic spectral solver
  *
@@ -31,7 +32,7 @@ class SpectralSolverRZ
         // underlying classes `SpectralFieldData` and `PsatdAlgorithm`
 
         // Constructor
-        SpectralSolverRZ (int lev,
+        SpectralSolverRZ (WarpX* warpx, int lev,
                           amrex::BoxArray const & realspace_ba,
                           amrex::DistributionMapping const & dm,
                           int n_rz_azimuthal_modes,
@@ -131,6 +132,8 @@ class SpectralSolverRZ
          * \param[in] scale_factor scale factor to use for scaling
          */
         void ScaleDataComp (int icomp, amrex::Real scale_factor);
+
+        WarpX* m_warpx;
 
         SpectralFieldIndex m_spectral_index;
 

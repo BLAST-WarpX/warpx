@@ -44,7 +44,7 @@ void FiniteDifferenceSolver::ComputeCurlA (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (m_warpx->grid_type == GridType::Staggered)
     {
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev
@@ -82,7 +82,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Bfield
     Bfield[0]->setVal(0);
@@ -226,7 +226,7 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
 )
 {
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Bfield
     Bfield[0]->setVal(0);
@@ -324,7 +324,7 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
     using ablastr::fields::Direction;
 
     // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // reset Bfield
     Bfield[0]->setVal(0);

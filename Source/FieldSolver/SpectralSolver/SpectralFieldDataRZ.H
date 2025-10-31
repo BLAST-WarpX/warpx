@@ -16,6 +16,8 @@
 
 #include <AMReX_MultiFab.H>
 
+class WarpX;
+
 /* \brief Class that stores the fields in spectral space, and performs the
  *  Fourier transforms between real space and spectral space
  */
@@ -34,7 +36,7 @@ class SpectralFieldDataRZ
 
         using BinomialFilter = amrex::LayoutData<SpectralBinomialFilter>;
 
-        SpectralFieldDataRZ (int lev,
+        SpectralFieldDataRZ (WarpX* warpx, int lev,
                              const amrex::BoxArray& realspace_ba,
                              const SpectralKSpaceRZ& k_space,
                              const amrex::DistributionMapping& dm,
@@ -105,6 +107,8 @@ class SpectralFieldDataRZ
         HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {
             return multi_spectral_hankel_transformer[mfi].getKrArray();
         }
+
+        WarpX* m_warpx;
 
         //! `fields` stores fields in spectral space, as multicomponent FabArray
         SpectralField fields;

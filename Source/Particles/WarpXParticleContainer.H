@@ -52,6 +52,8 @@
 #include <string>
 #include <utility>
 
+class WarpX;
+
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
  *
  *  x, y, z  : position components
@@ -492,6 +494,10 @@ public:
     /** \brief Apply particle BC.
      */
     void ApplyBoundaryConditions ();
+
+    [[nodiscard]] WarpX& GetWarpX () const { return *m_warpx; }
+
+    WarpX* m_warpx = nullptr;
 
     bool do_splitting = false;
     int do_not_deposit = 0;

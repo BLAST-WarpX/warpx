@@ -50,8 +50,8 @@ using warpx::fields::FieldType;
 
 // constructor
 
-FieldProbe::FieldProbe (const std::string& rd_name)
-: ReducedDiags{rd_name}, m_probe(&WarpX::GetInstance())
+FieldProbe::FieldProbe (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}, m_probe(static_cast<AmrCore*>(warpx))
 {
 
     // read number of levels
@@ -349,7 +349,7 @@ void FieldProbe::LoadBalance ()
 bool FieldProbe::ProbeInDomain () const
 {
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     int const lev = 0;
     const amrex::Geometry& gm = warpx.Geom(lev);
     const auto *const prob_lo = gm.ProbLo();
@@ -383,7 +383,7 @@ void FieldProbe::ComputeDiags (int step)
         if (!m_intervals.contains(step+1)) { return; }
     }
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
@@ -393,7 +393,7 @@ void FieldProbe::ComputeDiags (int step)
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
-        amrex::Real const dt = WarpX::GetInstance().getdt(lev);
+        amrex::Real const dt = warpx.getdt(lev);
         // Calculates particle movement in moving window sims
         amrex::Real move_dist = 0.0;
         bool const update_particles_moving_window =
@@ -500,8 +500,8 @@ void FieldProbe::ComputeDiags (int step)
 
                 auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
 
-                const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-                const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
+                const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
+                const amrex::XDim3 dinv = m_warpx->InvCellSize(lev);
                 const Dim3 lo = lbound(box);
 
                 // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.
@@ -681,7 +681,7 @@ void FieldProbe::WriteToFile (int step) const
         ofs << m_sep;
         ofs << std::fixed << std::setprecision(14) << std::scientific;
         // write time
-        ofs << WarpX::GetInstance().gett_new(0);
+        ofs << m_warpx->gett_new(0);
 
         // start at k = 1 since the particle id is not written to file
         for (int k = 1; k < noutputs; k++)

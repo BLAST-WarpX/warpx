@@ -85,7 +85,7 @@ RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_cor
 void RigidInjectedParticleContainer::InitData()
 {
     // Perform Lorentz transform of `z_inject_plane`
-    const amrex::Real t_boost = WarpX::GetInstance().gett_new(0);
+    const amrex::Real t_boost = m_warpx->gett_new(0);
     const amrex::Real zinject_plane_boost = zinject_plane/WarpX::gamma_boost
                                     - WarpX::beta_boost*PhysConst::c*t_boost;
     zinject_plane_levels.resize(finestLevel()+1, zinject_plane_boost);
@@ -320,7 +320,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
 
     if (do_not_push) { return; }
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(lev,0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -343,7 +343,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
 
             const auto getPosition = GetParticlePosition<PIdx>(pti);
 
-            const auto getExternalEB = GetExternalEBField(pti);
+            const auto getExternalEB = GetExternalEBField(m_warpx, pti);
 
             const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
             const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -359,7 +359,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             const int nox = WarpX::nox;
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
-            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
 
             amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
             amrex::Array4<const amrex::Real> const& ey_arr = eyfab.array();

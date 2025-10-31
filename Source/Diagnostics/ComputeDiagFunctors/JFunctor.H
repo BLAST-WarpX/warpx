@@ -13,6 +13,7 @@ class JFunctor final : public ComputeDiagFunctor
 public:
     /** Constructor.
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] dir direction of vector field to operate on
      * \param[in] lev level of multifab. Used for averaging in rz.
      * \param[in] crse_ratio for interpolating field values from the simulation MultiFab, src_mf,
@@ -23,7 +24,7 @@ public:
                   where no field solve is used.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    JFunctor (int dir, int lev,
+    JFunctor(WarpX* warpx, int dir, int lev,
              amrex::IntVect crse_ratio,
              bool convertRZmodes2cartesian=true,
              bool deposit_current=false, int ncomp=1);

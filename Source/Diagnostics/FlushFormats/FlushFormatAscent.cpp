@@ -26,7 +26,7 @@ FlushFormatAscent::WriteToFile (
 {
 #ifdef AMREX_USE_ASCENT
     WARPX_PROFILE("FlushFormatAscent::WriteToFile()");
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !isBTD,

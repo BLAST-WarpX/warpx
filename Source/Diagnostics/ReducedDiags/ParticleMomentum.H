@@ -23,9 +23,10 @@ public:
     /**
      * \brief Constructor
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] rd_name reduced diags names
      */
-    ParticleMomentum(const std::string& rd_name);
+    ParticleMomentum(WarpX* warpx, const std::string& rd_name);
 
     /**
      * \brief This function computes the particle relativistic momentum,

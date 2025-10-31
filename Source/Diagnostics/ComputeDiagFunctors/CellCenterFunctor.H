@@ -13,6 +13,7 @@ class CellCenterFunctor final : public ComputeDiagFunctor
 public:
     /** Constructor.
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] mf_src source multifab.
      * \param[in] lev level of multifab. Used for averaging in rz.
      * \param[in] crse_ratio for interpolating field values from the simulation MultiFab, src_mf,
@@ -21,7 +22,7 @@ public:
      *            sum all modes in mf_src before cell-centering into dst multifab.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    CellCenterFunctor(const amrex::MultiFab * mf_src, int lev,
+    CellCenterFunctor(WarpX * warpx, const amrex::MultiFab * mf_src, int lev,
                       amrex::IntVect crse_ratio,
                       bool convertRZmodes2cartesian=true, int ncomp=1);
     /** \brief Cell-center m_mf_src and write the result in mf_dst.

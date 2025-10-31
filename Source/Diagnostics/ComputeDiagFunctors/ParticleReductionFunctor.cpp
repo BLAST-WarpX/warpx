@@ -17,11 +17,11 @@
 
 using namespace amrex::literals;
 
-ParticleReductionFunctor::ParticleReductionFunctor (const amrex::MultiFab* mf_src, const int lev,
+ParticleReductionFunctor::ParticleReductionFunctor (WarpX* warpx, const amrex::MultiFab* mf_src, const int lev,
         const amrex::IntVect crse_ratio, const std::string& fn_str,
         const int ispec, const bool do_average,
         const bool do_filter, const std::string& filter_str, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev), m_ispec(ispec), m_do_average(do_average), m_do_filter(do_filter)
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_lev(lev), m_ispec(ispec), m_do_average(do_average), m_do_filter(do_filter)
 {
     // mf_src will not be used, let's make sure it's null.
     AMREX_ALWAYS_ASSERT(mf_src == nullptr);
@@ -45,7 +45,7 @@ ParticleReductionFunctor::ParticleReductionFunctor (const amrex::MultiFab* mf_sr
 void
 ParticleReductionFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     // Guard cell is set to 1 for generality. However, for a cell-centered
     // output Multifab, mf_dst, the guard-cell data is not needed especially considering
     // the operations performend in the CoarsenAndInterpolate function.

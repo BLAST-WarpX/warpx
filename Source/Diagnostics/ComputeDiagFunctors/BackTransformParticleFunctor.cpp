@@ -70,10 +70,11 @@ LorentzTransformParticles::LorentzTransformParticles (
  * particle buffers
  */
 BackTransformParticleFunctor::BackTransformParticleFunctor (
+                              WarpX* warpx,
                               WarpXParticleContainer *pc_src,
                               std::string species_name,
                               int num_buffers)
-    : m_pc_src{pc_src}, m_species_name{std::move(species_name)}, m_num_buffers{num_buffers}
+    : ComputeParticleDiagFunctor(warpx), m_pc_src{pc_src}, m_species_name{std::move(species_name)}, m_num_buffers{num_buffers}
 {
     InitData();
 }
@@ -83,7 +84,7 @@ void
 BackTransformParticleFunctor::operator () (PinnedMemoryParticleContainer& pc_dst, int &totalParticleCounter, int i_buffer) const
 {
     if (m_perform_backtransform[i_buffer] == 0) { return; }
-    auto &warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     // get particle slice
     const int nlevs = std::max(0, m_pc_src->finestLevel()+1);
     for (int lev = 0; lev < nlevs; ++lev) {

@@ -36,6 +36,8 @@
 #include <string>
 #include <vector>
 
+class WarpX;
+
 struct Sigma : amrex::Gpu::DeviceVector<amrex::Real>
 {
     [[nodiscard]] int lo() const { return m_lo; }
@@ -137,7 +139,7 @@ private:
 class PML
 {
 public:
-    PML (int lev, const amrex::BoxArray& ba,
+    PML (WarpX* warpx, int lev, const amrex::BoxArray& ba,
          const amrex::DistributionMapping& dm, bool do_similar_dm_pml,
          const amrex::Geometry* geom, const amrex::Geometry* cgeom,
          int ncell, int delta, amrex::IntVect ref_ratio,

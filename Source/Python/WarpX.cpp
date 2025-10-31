@@ -100,10 +100,13 @@ void init_WarpX (py::module& m)
 
     // Expose the WarpX instance
     m.def("get_instance",
-        [] () { return &WarpX::GetInstance(); },
+        [] () { return &WarpX::GetInstance_detail(); },
         "Return a reference to the WarpX object.");
 
-    m.def("finalize", &WarpX::Finalize,
+    // IMHO, this should NOT be exposed because the ownership of the
+    // singleton has been taken over by Python, and WarpX::Finalize_detail
+    // does not know that.
+    m.def("finalize", &WarpX::Finalize_detail,
         "Close out the WarpX related data");
 
     py::class_<WarpX> warpx(m, "WarpX");
@@ -112,13 +115,13 @@ void init_WarpX (py::module& m)
         //   https://github.com/BLAST-WarpX/warpx/pull/4104
         //   https://pybind11.readthedocs.io/en/stable/advanced/classes.html?highlight=singleton#custom-constructors
         .def(py::init([]() {
-            return &WarpX::GetInstance();
+            return &WarpX::GetInstance_detail();
         }))
         .def_static("get_instance",
-            [] () { return &WarpX::GetInstance(); },
+            [] () { return &WarpX::GetInstance_detail(); },
             "Return a reference to the WarpX object."
         )
-        .def_static("finalize", &WarpX::Finalize,
+        .def_static("finalize", &WarpX::Finalize_detail,
             "Close out the WarpX related data"
         )
 

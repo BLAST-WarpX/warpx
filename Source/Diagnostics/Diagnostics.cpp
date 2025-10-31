@@ -38,8 +38,8 @@
 
 using namespace amrex::literals;
 
-Diagnostics::Diagnostics (int i, std::string name, DiagTypes diag_type)
-    : m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
+Diagnostics::Diagnostics (WarpX* warpx, int i, std::string name, DiagTypes diag_type)
+    : m_warpx(warpx), m_diag_type(diag_type), m_diag_name(std::move(name)), m_diag_index(i)
 {
 }
 
@@ -48,7 +48,7 @@ Diagnostics::~Diagnostics () = default;
 bool
 Diagnostics::BaseReadParameters ()
 {
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     const amrex::ParmParse pp_diag_name(m_diag_name);
     m_file_prefix = "diags/" + m_diag_name;
@@ -439,7 +439,7 @@ Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 void
 Diagnostics::InitData (const MultiParticleContainer& mpc)
 {
-    auto& warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     // Get current finest level available
     const int finest_level = warpx.finestLevel();
@@ -519,7 +519,7 @@ Diagnostics::InitData (const MultiParticleContainer& mpc)
 void
 Diagnostics::InitBaseData ()
 {
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     // Number of levels in the simulation at the current timestep
     nlev = warpx.finestLevel() + 1;
     // default number of levels to be output = nlev
@@ -541,18 +541,18 @@ Diagnostics::InitBaseData ()
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){
-        m_flush_format = std::make_unique<FlushFormatPlotfile>() ;
+        m_flush_format = std::make_unique<FlushFormatPlotfile>(m_warpx) ;
     } else if (m_format == "checkpoint"){
         // creating checkpoint format
-        m_flush_format = std::make_unique<FlushFormatCheckpoint>() ;
+        m_flush_format = std::make_unique<FlushFormatCheckpoint>(m_warpx) ;
     } else if (m_format == "ascent"){
-        m_flush_format = std::make_unique<FlushFormatAscent>();
+        m_flush_format = std::make_unique<FlushFormatAscent>(m_warpx);
     } else if (m_format == "catalyst") {
-        m_flush_format = std::make_unique<FlushFormatCatalyst>();
+        m_flush_format = std::make_unique<FlushFormatCatalyst>(m_warpx);
     } else if (m_format == "sensei") {
 #ifdef AMREX_USE_SENSEI_INSITU
-        m_flush_format = std::make_unique<FlushFormatSensei>(
-            dynamic_cast<amrex::AmrMesh*>(const_cast<WarpX*>(&warpx)),
+        m_flush_format = std::make_unique<FlushFormatSensei>(m_warpx,
+            static_cast<amrex::AmrMesh*>(m_warpx),
             m_diag_name);
 #else
         WARPX_ABORT_WITH_MESSAGE(
@@ -560,7 +560,7 @@ Diagnostics::InitBaseData ()
 #endif
     } else if (m_format == "openpmd"){
 #ifdef WARPX_USE_OPENPMD
-        m_flush_format = std::make_unique<FlushFormatOpenPMD>(m_diag_name);
+        m_flush_format = std::make_unique<FlushFormatOpenPMD>(m_warpx, m_diag_name);
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "To use openpmd output format, need to compile with USE_OPENPMD=TRUE");
@@ -605,7 +605,7 @@ Diagnostics::ComputeAndPack ()
     // to determine if the transform is to be done this step.
     PrepareParticleDataForOutput();
 
-    auto & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     // compute the necessary fields and store result in m_mf_output.
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {

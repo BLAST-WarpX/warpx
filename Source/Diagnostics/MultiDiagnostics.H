@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+class WarpX;
 
 /**
  * \brief This class contains a vector of all diagnostics in the simulation.
@@ -18,7 +19,7 @@
 class MultiDiagnostics
 {
 public:
-    MultiDiagnostics ();
+    explicit MultiDiagnostics (WarpX* warpx);
     /** \brief Read Input parameters. Called in constructor. */
     void ReadParameters ();
 

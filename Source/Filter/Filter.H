@@ -14,10 +14,12 @@
 #ifndef WARPX_FILTER_H_
 #define WARPX_FILTER_H_
 
+class WarpX;
+
 class Filter
 {
 public:
-    Filter () = default;
+    explicit Filter (WarpX* warpx) : m_warpx(warpx) {}
 
     // Apply stencil on MultiFab.
     // Guard cells are handled inside this function
@@ -35,6 +37,8 @@ public:
                    amrex::Array4<amrex::Real const> const& tmp,
                    amrex::Array4<amrex::Real      > const& dst,
                    int scomp, int dcomp, int ncomp);
+
+    WarpX* m_warpx;
 
     // Length of stencil in each included direction
     amrex::IntVect stencil_length_each_dir;

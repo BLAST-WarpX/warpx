@@ -15,9 +15,9 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
-TemperatureFunctor::TemperatureFunctor (const int lev,
+TemperatureFunctor::TemperatureFunctor (WarpX* warpx, const int lev,
         const amrex::IntVect crse_ratio, const int ispec, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev), m_ispec(ispec)
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_lev(lev), m_ispec(ispec)
 {
     // Write only in one output component.
     AMREX_ALWAYS_ASSERT(ncomp == 1);
@@ -27,7 +27,7 @@ void
 TemperatureFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
     using namespace amrex::literals;
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     auto& pc = warpx.GetPartContainer().GetParticleContainer(m_ispec);
     amrex::Real const mass = pc.getMass();  // Note, implicit conversion from ParticleReal

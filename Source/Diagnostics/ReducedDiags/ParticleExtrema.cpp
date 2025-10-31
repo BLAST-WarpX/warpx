@@ -57,18 +57,15 @@ using namespace amrex::literals;
 using warpx::fields::FieldType;
 
 // constructor
-ParticleExtrema::ParticleExtrema (const std::string& rd_name)
-: ReducedDiags{rd_name}
+ParticleExtrema::ParticleExtrema (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // read species name
     const amrex::ParmParse pp_rd_name(rd_name);
     pp_rd_name.get("species",m_species_name);
 
-    // get WarpX class object
-    auto & warpx = WarpX::GetInstance();
-
     // get MultiParticleContainer class object
-    auto & mypc = warpx.GetPartContainer();
+    auto & mypc = warpx->GetPartContainer();
 
     // get number of species (int)
     const auto nSpecies = mypc.nSpecies();
@@ -158,7 +155,7 @@ void ParticleExtrema::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get MultiParticleContainer class object
-    auto & mypc = WarpX::GetInstance().GetPartContainer();
+    auto & mypc = m_warpx->GetPartContainer();
 
     // get number of species (int)
     const auto nSpecies = mypc.nSpecies();
@@ -242,7 +239,7 @@ void ParticleExtrema::ComputeDiags (int step)
 
 #if (defined WARPX_QED)
         // get number of level (int)
-        const auto level_number = WarpX::GetInstance().finestLevel();
+        const auto level_number = m_warpx->finestLevel();
 
         // compute chimin and chimax
         amrex::Real chimin_f = 0.0_rt;
@@ -256,7 +253,7 @@ void ParticleExtrema::ComputeDiags (int step)
             chimax.resize(level_number+1,0.0_rt);
 
             // define variables in preparation for field gathering
-            auto & warpx = WarpX::GetInstance();
+            auto & warpx = *m_warpx;
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
             const int nox = WarpX::nox;
             const bool galerkin_interpolation = WarpX::galerkin_interpolation;
@@ -268,7 +265,7 @@ void ParticleExtrema::ComputeDiags (int step)
             for (int lev = 0; lev <= level_number; ++lev)
             {
                 // define variables in preparation for field gathering
-                const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev, 0));
+                const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(lev, 0));
 
                 const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
                 const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
@@ -292,7 +289,7 @@ void ParticleExtrema::ComputeDiags (int step)
                     amrex::ParticleReal* const AMREX_RESTRICT uz = pti.GetAttribs()[PIdx::uz].dataPtr();
                     // declare external fields
                     const int offset = 0;
-                    const auto getExternalEB = GetExternalEBField(pti, offset);
+                    const auto getExternalEB = GetExternalEBField(m_warpx, pti, offset);
                     const amrex::ParticleReal Ex_external_particle = myspc.m_E_external_particle[0];
                     const amrex::ParticleReal Ey_external_particle = myspc.m_E_external_particle[1];
                     const amrex::ParticleReal Ez_external_particle = myspc.m_E_external_particle[2];
@@ -304,7 +301,7 @@ void ParticleExtrema::ComputeDiags (int step)
                     amrex::Box box = pti.tilebox();
                     box.grow(ngEB);
                     const amrex::Dim3 lo = amrex::lbound(box);
-                    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+                    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
                     const auto& ex_arr = Ex[pti].array();
                     const auto& ey_arr = Ey[pti].array();
                     const auto& ez_arr = Ez[pti].array();

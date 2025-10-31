@@ -25,6 +25,8 @@
 #include <array>
 #include <memory>
 
+class WarpX;
+
 #ifdef WARPX_USE_FFT
 /**
  * \brief Top-level class for the electromagnetic spectral solver
@@ -44,6 +46,7 @@ class SpectralSolver
          * for the discrete field update equations, and prepare the structures that store
          * the fields in spectral space.
          *
+         * \param[in] warpx pointer to a WarpX object
          * \param[in] realspace_ba BoxArray in real space
          * \param[in] dm DistributionMapping for the given BoxArray
          * \param[in] norder_x spectral order along x
@@ -72,7 +75,8 @@ class SpectralSolver
          * \param[in] divb_cleaning whether to use div(B) cleaning to account for errors in
          *                          div(B) = 0 law (new field G in the update equations)
          */
-        SpectralSolver (const amrex::BoxArray& realspace_ba,
+        SpectralSolver (WarpX* warpx,
+                        const amrex::BoxArray& realspace_ba,
                         const amrex::DistributionMapping& dm,
                         int norder_x,
                         int norder_y,
@@ -170,6 +174,8 @@ class SpectralSolver
          * \param[in] scale_factor scale factor to use for scaling
          */
         void ScaleDataComp (int icomp, amrex::Real scale_factor);
+
+        WarpX* m_warpx;
 
         SpectralFieldIndex m_spectral_index;
 

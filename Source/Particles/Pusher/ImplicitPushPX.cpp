@@ -408,7 +408,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     if (np_to_push == 0) { return; }
 
     // Get cell size on gather_lev
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -416,7 +416,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     if (lev == gather_lev) {
         box = pti.tilebox();
     } else {
-        const amrex::IntVect& ref_ratio = WarpX::RefRatio(gather_lev);
+        const amrex::IntVect& ref_ratio = m_warpx->refRatio(gather_lev);
         box = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -425,7 +425,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     auto setPosition = SetParticlePosition(pti, offset);
 
-    const auto getExternalEB = GetExternalEBField(pti, offset);
+    const auto getExternalEB = GetExternalEBField(m_warpx, pti, offset);
 
     const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
     const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -435,7 +435,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, gather_lev, 0.0_rt);
 
     const amrex::Dim3 lo = lbound(box);
 
@@ -708,7 +708,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     }
 
     // Get cell size on gather_lev
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(gather_lev,0));
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
     // Get box from which field is gathered.
@@ -717,7 +717,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     if (lev == gather_lev) {
         box = pti.tilebox();
     } else {
-        const amrex::IntVect& ref_ratio = WarpX::RefRatio(gather_lev);
+        const amrex::IntVect& ref_ratio = m_warpx->refRatio(gather_lev);
         box = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -726,7 +726,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     auto setPosition = SetParticlePosition(pti, 0);
 
-    const auto getExternalEB = GetExternalEBField(pti, 0);
+    const auto getExternalEB = GetExternalEBField(m_warpx, pti, 0);
 
     const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
     const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -736,7 +736,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, gather_lev, 0.0_rt);
 
     const amrex::Dim3 lo = lbound(box);
 

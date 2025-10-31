@@ -15,6 +15,7 @@ JdispFunctor final: public ComputeDiagFunctor
 public:
     /**
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] dir direction of vector field to operate on
      * \param[in] lev level of multifab. Used for averaging in rz.
      * \param[in] crse_ratio for interpolating field values from the simulation Multifab, src_mf,
@@ -23,7 +24,7 @@ public:
      *            sum all modes in mf_src before cell-centering into dst multifab.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
     */
-    JdispFunctor (int dir, int lev,
+    JdispFunctor (WarpX* warpx, int dir, int lev,
                 amrex::IntVect crse_ratio,
                 bool convertRZmodes2cartesian=true,
                 int ncomp=1);

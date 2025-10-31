@@ -18,7 +18,8 @@
 using namespace amrex;
 using namespace warpx::fields;
 
-ExternalVectorPotential::ExternalVectorPotential ()
+ExternalVectorPotential::ExternalVectorPotential (WarpX* warpx)
+    : m_warpx(warpx)
 {
     ReadParameters();
 }
@@ -141,7 +142,7 @@ void
 ExternalVectorPotential::InitData ()
 {
     using ablastr::fields::Direction;
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     for (int i = 0; i < m_nFields; ++i) {
 
@@ -209,7 +210,7 @@ ExternalVectorPotential::InitData ()
         amrex::Gpu::streamSynchronize();
 
         if (m_do_clean_divA) {
-            warpx::initialization::ProjectionDivCleaner dc(Aext_field, true);
+            warpx::initialization::ProjectionDivCleaner dc(m_warpx, Aext_field, true);
             dc.setSourceFromField();
             dc.solve();
             dc.correctField();
@@ -240,7 +241,7 @@ void
 ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
 {
     using ablastr::fields::Direction;
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     // Compute the curl of the reference A field (unscaled by time function)
     const std::string Aext_field = coil_name + std::string{"_Aext"};
@@ -332,7 +333,7 @@ void
 ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const amrex::Real dt)
 {
     using ablastr::fields::Direction;
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     ablastr::fields::MultiLevelVectorField B_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_B_fp_external, warpx.finestLevel());

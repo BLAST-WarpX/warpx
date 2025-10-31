@@ -25,13 +25,14 @@ using namespace amrex::literals;
  * \param n_field_required Specifies the number of fields that will be transformed
  * \param n_modes Number of cylindrical modes
  * */
-SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
+SpectralFieldDataRZ::SpectralFieldDataRZ (WarpX* warpx, const int lev,
                                           amrex::BoxArray const & realspace_ba,
                                           SpectralKSpaceRZ const & k_space,
                                           amrex::DistributionMapping const & dm,
                                           int const n_field_required,
                                           int const n_modes)
-    : n_rz_azimuthal_modes(n_modes),
+    : m_warpx(warpx),
+      n_rz_azimuthal_modes(n_modes),
       m_ncomps(2 * n_modes - 1),
       m_n_fields(n_field_required)
 {
@@ -199,7 +200,7 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
 #endif
 
         // Create the Hankel transformer for each box.
-        amrex::XDim3 const xyzmax = WarpX::UpperCorner(mfi.tilebox(), lev, 0._rt);
+        amrex::XDim3 const xyzmax = m_warpx->UpperCorner(mfi.tilebox(), lev, 0._rt);
         multi_spectral_hankel_transformer[mfi] = SpectralHankelTransformer(grid_size[0], n_rz_azimuthal_modes, xyzmax.x);
     }
 }
@@ -452,7 +453,7 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
                                        amrex::MultiFab const & field_mf, int const field_index,
                                        int const i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf.boxArray(), field_mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space.
@@ -512,7 +513,7 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
                                        amrex::MultiFab const & field_mf_r, int const field_index_r,
                                        amrex::MultiFab const & field_mf_t, int const field_index_t)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf_r.boxArray(), field_mf_r.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space.
@@ -577,7 +578,7 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
                                         amrex::MultiFab& field_mf, int const field_index,
                                         int const i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf.boxArray(), field_mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space.
@@ -661,7 +662,7 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
                                         amrex::MultiFab& field_mf_r, int const field_index_r,
                                         amrex::MultiFab& field_mf_t, int const field_index_t)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, field_mf_r.boxArray(), field_mf_r.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space.
@@ -816,7 +817,7 @@ SpectralFieldDataRZ::InitFilter (amrex::IntVect const & filter_npass_each_dir, b
 void
 SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, binomialfilter.boxArray(), binomialfilter.DistributionMap());
 
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){
@@ -861,7 +862,7 @@ void
 SpectralFieldDataRZ::ApplyFilter (const int lev, int const field_index1,
                                   int const field_index2, int const field_index3)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, binomialfilter.boxArray(), binomialfilter.DistributionMap());
 
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){

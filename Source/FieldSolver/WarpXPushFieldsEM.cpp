@@ -1425,7 +1425,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const amrex::XDim3 xyzmin = this->LowerCorner(tilebox, lev, 0._rt);
         const Real rmin  = xyzmin.x;
         const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
@@ -1608,7 +1608,7 @@ void
 WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
 {
     const amrex::IntVect ngRho = Rho->nGrowVect();
-    const std::array<Real,3>& dx = WarpX::CellSize(lev);
+    const std::array<Real,3>& dx = this->CellSize(lev);
     const Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
@@ -1633,7 +1633,7 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const amrex::XDim3 xyzmin = this->LowerCorner(tilebox, lev, 0._rt);
         const Dim3 lo = lbound(tilebox);
         const Real rmin = xyzmin.x;
         const Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);

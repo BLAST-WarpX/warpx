@@ -34,8 +34,8 @@ using namespace amrex::literals;
 using warpx::fields::FieldType;
 
 // constructor
-FieldEnergy::FieldEnergy (const std::string& rd_name)
-: ReducedDiags{rd_name}
+FieldEnergy::FieldEnergy (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
 
     // read number of levels
@@ -84,7 +84,7 @@ void FieldEnergy::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto const & warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
 
     // get number of level
     int const nLevel = warpx.finestLevel() + 1;
@@ -103,7 +103,7 @@ void FieldEnergy::ComputeDiags (int step)
         amrex::MultiFab const & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         // get cell volume
-        std::array<amrex::Real, 3> const &dx = WarpX::CellSize(lev);
+        std::array<amrex::Real, 3> const &dx = m_warpx->CellSize(lev);
         amrex::Real const dV = dx[0]*dx[1]*dx[2];
 
         // compute E squared
@@ -171,10 +171,10 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // Lower corner of tile box physical domain
-        auto const & warpx = WarpX::GetInstance();
+        auto const& warpx = *m_warpx;
         amrex::Geometry const & geom = warpx.Geom(lev);
         amrex::Real const dr = geom.CellSize(0);
-        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        amrex::XDim3 const xyzmin = m_warpx->LowerCorner(tilebox, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x + (is_nodal[0] ? 0._rt : 0.5_rt*dr);
 #endif
 

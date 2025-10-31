@@ -33,6 +33,8 @@
 
 #include <optional>
 
+class WarpX;
+
 /**
  * \brief This class contains the parameters needed to evaluate hybrid field
  * solutions (kinetic ions with fluid electrons).
@@ -40,7 +42,7 @@
 class HybridPICModel
 {
 public:
-    HybridPICModel ();
+    explicit HybridPICModel (WarpX* warpx);
 
     /** Read user-defined model parameters. Called in constructor. */
     void ReadParameters ();
@@ -170,6 +172,8 @@ public:
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
+
+    WarpX* m_warpx;
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B */

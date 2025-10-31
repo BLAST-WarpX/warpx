@@ -35,7 +35,7 @@ public:
     std::vector<std::unique_ptr<ReducedDiags>> m_multi_rd;
 
     /// constructor
-    MultiReducedDiags ();
+    explicit MultiReducedDiags (WarpX* warpx);
 
     /** Loop over all ReducedDiags and call their InitData
      */

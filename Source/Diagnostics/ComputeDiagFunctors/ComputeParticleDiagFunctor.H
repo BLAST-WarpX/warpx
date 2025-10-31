@@ -12,6 +12,8 @@
 #include <AMReX.H>
 #include <AMReX_AmrParticles.H>
 
+class WarpX;
+
 /**
  * \brief Functor to compute a diagnostic and store the result in existing ParticleContainer.
  */
@@ -19,7 +21,7 @@ class ComputeParticleDiagFunctor
 {
 public:
 
-    ComputeParticleDiagFunctor( ) = default;
+    explicit ComputeParticleDiagFunctor(WarpX* warpx) : m_warpx(warpx) {}
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~ComputeParticleDiagFunctor() = default;
 
@@ -61,6 +63,8 @@ public:
      */
     virtual void operator () (PinnedMemoryParticleContainer& pc_dst, int &totalParticlesInBuffer, int i_buffer = 0) const = 0;
     virtual void InitData () {}
+
+    WarpX* m_warpx = nullptr;
 };
 
 #endif // WARPX_COMPUTEPARTICLEDIAGFUNCTOR_H_

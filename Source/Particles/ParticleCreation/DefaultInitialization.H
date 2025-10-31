@@ -113,6 +113,7 @@ namespace ParticleCreation {
      * @param[in] ionization_initial_level the ionization level particles created should start at
      * @param[in] start the index to start initializing particles
      * @param[in] stop the index to stop initializing particles
+     * @param[in] t new time
      */
 template <typename PTile>
 void DefaultInitializeRuntimeAttributes (PTile& ptile,
@@ -130,7 +131,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          QuantumSynchrotronEngine* p_qs_engine,
 #endif
                                          const int ionization_initial_level,
-                                         int start, int stop)
+                                         int start, int stop, const amrex::Real t)
 {
         using namespace amrex::literals;
 
@@ -142,8 +143,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         const amrex::ParticleReal* AMREX_RESTRICT ux = soa.m_rdata[PIdx::ux];
         const amrex::ParticleReal* AMREX_RESTRICT uy = soa.m_rdata[PIdx::uy];
         const amrex::ParticleReal* AMREX_RESTRICT uz = soa.m_rdata[PIdx::uz];
-        constexpr int lev = 0;
-        const amrex::Real t = WarpX::GetInstance().gett_new(lev);
 
         // Initialize the last NumRuntimeRealComps() - n_external_attr_real runtime real attributes
         for (int j = PIdx::nattribs + n_external_attr_real; j < ptile.NumRealComps() ; ++j)

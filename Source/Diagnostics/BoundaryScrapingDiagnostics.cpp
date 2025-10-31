@@ -24,8 +24,8 @@
 
 using namespace amrex::literals;
 
-BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type)
-    : Diagnostics{i, name, diag_type}
+BoundaryScrapingDiagnostics::BoundaryScrapingDiagnostics (WarpX* warpx, int i, const std::string& name, DiagTypes diag_type)
+    : Diagnostics{warpx, i, name, diag_type}
 {
     ReadParameters();
 }
@@ -88,7 +88,7 @@ BoundaryScrapingDiagnostics::InitializeBufferData (int /*i_buffer*/, int /*lev*/
 void
 BoundaryScrapingDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     // If the user does not specify any species, dump all species
     if (m_output_species_names.empty()) {
@@ -125,7 +125,7 @@ BoundaryScrapingDiagnostics::DoDump (int step, int /*i_buffer*/, bool force_flus
 void
 BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
 {
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     ParticleBoundaryBuffer& particle_buffer = warpx.GetParticleBoundaryBuffer();
 
     int n_particles = 0;

@@ -61,8 +61,8 @@
 using namespace amrex;
 
 
-ColliderRelevant::ColliderRelevant (const std::string& rd_name)
-: ReducedDiags{rd_name}
+ColliderRelevant::ColliderRelevant (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // read colliding species names - must be 2
     const amrex::ParmParse pp_rd_name(m_rd_name);
@@ -90,11 +90,8 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
         coarsest level of refinement for the calculations involving chi.",
         ablastr::warn_manager::WarnPriority::low);
 
-    // get WarpX class object
-    auto& warpx = WarpX::GetInstance();
-
     // get MultiParticleContainer class object
-    const MultiParticleContainer& mypc =  warpx.GetPartContainer();
+    const MultiParticleContainer& mypc =  warpx->GetPartContainer();
 
     // loop over species
     for (int i_s = 0; i_s < 2; ++i_s)
@@ -198,10 +195,10 @@ void ColliderRelevant::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get MultiParticleContainer class object
-    const MultiParticleContainer& mypc = WarpX::GetInstance().GetPartContainer();
+    const MultiParticleContainer& mypc = m_warpx->GetPartContainer();
 
     // get a reference to WarpX instance
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     // get cell volume
     amrex::Geometry const & geom = warpx.Geom(0);
@@ -444,7 +441,7 @@ void ColliderRelevant::ComputeDiags (int step)
 
             // define variables in preparation for field gathering
             using warpx::fields::FieldType;
-            const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev, 0));
+            const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(lev, 0));
             const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
             const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
             const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
@@ -468,7 +465,7 @@ void ColliderRelevant::ComputeDiags (int step)
                 amrex::ParticleReal* const AMREX_RESTRICT w = pti.GetAttribs()[PIdx::w].dataPtr();
                 // declare external fields
                 const int offset = 0;
-                const auto getExternalEB = GetExternalEBField(pti, offset);
+                const auto getExternalEB = GetExternalEBField(m_warpx, pti, offset);
                 const amrex::ParticleReal Ex_external_particle = myspc.m_E_external_particle[0];
                 const amrex::ParticleReal Ey_external_particle = myspc.m_E_external_particle[1];
                 const amrex::ParticleReal Ez_external_particle = myspc.m_E_external_particle[2];
@@ -480,7 +477,7 @@ void ColliderRelevant::ComputeDiags (int step)
                 amrex::Box box = pti.tilebox();
                 box.grow(ngEB);
                 const amrex::Dim3 lo = amrex::lbound(box);
-                const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+                const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
                 const amrex::Array4<const amrex::Real> & ex_arr = Ex[pti].array();
                 const amrex::Array4<const amrex::Real> & ey_arr = Ey[pti].array();
                 const amrex::Array4<const amrex::Real> & ez_arr = Ez[pti].array();

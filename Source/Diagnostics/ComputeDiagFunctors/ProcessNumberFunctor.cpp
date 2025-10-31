@@ -20,8 +20,11 @@
 
 #include <memory>
 
-ProcessNumberFunctor::ProcessNumberFunctor(const amrex::MultiFab * const mf_src, const int lev, const amrex::IntVect crse_ratio, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
+ProcessNumberFunctor::ProcessNumberFunctor ( WarpX* warpx,
+                                             const amrex::MultiFab * const mf_src,
+                                             const int lev, const amrex::IntVect crse_ratio,
+                                             const int ncomp)
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio), m_lev(lev)
 {
     // mf_src will not be used, let's make sure it's null.
     AMREX_ALWAYS_ASSERT(mf_src == nullptr);
@@ -33,7 +36,7 @@ void
 ProcessNumberFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
 {
     // fill tmp multifab with the proc num
-    auto& warpx = WarpX::GetInstance();
+    auto const& warpx = *m_warpx;
     amrex::MultiFab proc_mf(warpx.boxArray(m_lev), warpx.DistributionMap(m_lev), 1, 0);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel

@@ -9,6 +9,8 @@
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
 
+class WarpX;
+
 /**
  * \brief Functor to compute a diagnostic and store the result in existing
  * MultiFab
@@ -16,8 +18,8 @@
 class ComputeDiagFunctor
 {
 public:
-    ComputeDiagFunctor( int ncomp, amrex::IntVect crse_ratio) :
-                        m_ncomp(ncomp), m_crse_ratio(crse_ratio) {}
+    ComputeDiagFunctor(WarpX* warpx, int ncomp, amrex::IntVect crse_ratio) :
+                        m_warpx(warpx), m_ncomp(ncomp), m_crse_ratio(crse_ratio) {}
     //** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~ComputeDiagFunctor() = default;
 
@@ -95,6 +97,8 @@ public:
         amrex::ignore_unused(convertRZmodes2cartesian, dm);
 #endif
     }
+
+    WarpX* m_warpx = nullptr;
 
 private:
     /** Number of components of mf_dst that this functor updates. */

@@ -32,7 +32,6 @@ using AmrMeshParticleInSituBridge = void;
 class FlushFormatSensei : public FlushFormat
 {
 public:
-    FlushFormatSensei();
     ~FlushFormatSensei() override;
 
     FlushFormatSensei(const FlushFormatSensei &)            = delete;
@@ -42,10 +41,11 @@ public:
 
     /** Construct.
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] amr_mesh an AmrMesh instance
      * \param[in] diag_name ParmParse scope string.
      */
-    FlushFormatSensei (amrex::AmrMesh *amr_mesh, const std::string& diag_name);
+    FlushFormatSensei (WarpX* warpx, amrex::AmrMesh *amr_mesh, const std::string& diag_name);
 
     /** Do in-situ visualization for field and particle data */
     void WriteToFile (

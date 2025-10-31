@@ -314,7 +314,7 @@ WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = LowerCorner(tilebox, lev, 0._rt);
+        const amrex::XDim3 xyzmin = this->LowerCorner(tilebox, lev, 0._rt);
         const amrex::Real rmin = xyzmin.x;
 
         // Skip blocks that don't touch the axis

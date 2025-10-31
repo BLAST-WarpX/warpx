@@ -132,7 +132,7 @@ void FiniteDifferenceSolver::EvolveBCartesian (
     amrex::MultiFab const * Gfield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -241,7 +241,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
         "EvolveBCartesianECT: Embedded Boundaries are only implemented in 2D3V and 3D3V");
 #endif
 
-    amrex::LayoutData<amrex::Real> *cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real> *cost = m_warpx->getCosts(lev);
 
     Venl[0]->setVal(0.);
     Venl[1]->setVal(0.);
@@ -396,7 +396,7 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
     ablastr::fields::VectorField const& Efield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -513,7 +513,7 @@ void FiniteDifferenceSolver::EvolveBSpherical (
     ablastr::fields::VectorField const& Efield,
     int lev, amrex::Real const dt ) {
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP

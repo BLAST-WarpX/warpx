@@ -94,6 +94,7 @@ namespace
 }
 
 MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
+    : m_warpx(static_cast<WarpX*>(amr_core))
 {
 
     ReadParameters();
@@ -566,7 +567,7 @@ MultiParticleContainer::PushP (int lev, Real dt,
 std::unique_ptr<MultiFab>
 MultiParticleContainer::GetZeroChargeDensity (const int lev)
 {
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
 
     BoxArray nba = warpx.boxArray(lev);
     const DistributionMapping dmap = warpx.DistributionMap(lev);
@@ -610,7 +611,7 @@ MultiParticleContainer::DepositCurrent (
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int lev = 0; lev < J.size(); ++lev)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
+        m_warpx->ApplyInverseVolumeScalingToCurrentDensity(
             J[lev][0], J[lev][1], J[lev][2], lev);
     }
 #endif
@@ -648,7 +649,7 @@ MultiParticleContainer::DepositCharge (
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int lev = 0; lev < rho.size(); ++lev)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
+        m_warpx->ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
     }
 #endif
 }
@@ -669,11 +670,11 @@ MultiParticleContainer::DepositTemperatures (
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
         ablastr::fields::MultiLevelVectorField T_vf =
-            fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
+            fields.get_mr_levels_alldirs(temperature_vf_str, m_warpx->finestLevel());
 
         // Clear temperature MF for this species
         for (int idim = 0; idim < 3; ++idim) {
-            for (int lev = 0; lev <= WarpX::GetInstance().finestLevel(); ++lev) {
+            for (int lev = 0; lev <= m_warpx->finestLevel(); ++lev) {
                 T_vf[lev][Direction{idim}]->setVal(0.0_rt);
             }
         }
@@ -708,7 +709,7 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 void
 MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
-    WarpX & warpx = WarpX::GetInstance();
+    WarpX & warpx = *m_warpx;
 
     if (allcontainers.size() == 0) { return; }
 
@@ -839,7 +840,7 @@ MultiParticleContainer::ApplyBoundaryConditions ()
 Vector<Long>
 MultiParticleContainer::GetZeroParticlesInGrid (const int lev) const
 {
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
     const auto num_boxes = static_cast<int>(warpx.boxArray(lev).size());
     Vector<Long> r(num_boxes, 0);
     return r;
@@ -1066,7 +1067,7 @@ MultiParticleContainer::doFieldIonization (int lev,
 {
     WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop over all species.
     // Ionized particles in pc_source create particles in pc_product
@@ -1107,7 +1108,8 @@ MultiParticleContainer::doFieldIonization (int lev,
 
             const auto np_dst = dst_tile.numParticles();
             const auto num_added = filterCopyTransformParticles<1>(*pc_product, dst_tile, src_tile, np_dst,
-                                                                   Filter, Copy, Transform);
+                                                                   Filter, Copy, Transform,
+                                                                   m_warpx->gett_new(0));
 
             setNewParticleIDs(dst_tile, np_dst, num_added);
 
@@ -1502,7 +1504,7 @@ MultiParticleContainer::doQEDSchwinger ()
 
     if (!m_do_qed_schwinger) {return;}
 
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.grid_type == GridType::Collocated ||
        warpx.field_gathering_algo == GatheringAlgo::MomentumConserving,
@@ -1595,7 +1597,8 @@ MultiParticleContainer::doQEDSchwinger ()
         const auto num_added = filterCreateTransformFromFAB<1>( *pc_product_ele, *pc_product_pos, dst_ele_tile,
                                dst_pos_tile, box, fieldsEB, np_ele_dst,
                                np_pos_dst,Filter, CreateEle, CreatePos,
-                               Transform, geom_level_zero);
+                               Transform, geom_level_zero,
+                               m_warpx->gett_new(0));
 
         setNewParticleIDs(dst_ele_tile, np_ele_dst, num_added);
         setNewParticleIDs(dst_pos_tile, np_pos_dst, num_added);
@@ -1606,7 +1609,7 @@ MultiParticleContainer::doQEDSchwinger ()
 amrex::Box
 MultiParticleContainer::ComputeSchwingerGlobalBox () const
 {
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
     constexpr int level_0 = 0;
     amrex::Geometry const & geom = warpx.Geom(level_0);
 
@@ -1690,7 +1693,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
 {
     WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop over all species.
     // Photons undergoing Breit Wheeler process create electrons
@@ -1732,7 +1735,8 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
             }
             auto wt = static_cast<amrex::Real>(amrex::second());
 
-            auto Transform = PairGenerationTransformFunc(pair_gen_functor,
+            auto Transform = PairGenerationTransformFunc(&(pc_source->GetWarpX()),
+                                                         pair_gen_functor,
                                                          pti, lev, Ex.nGrowVect(),
                                                          Ex[pti], Ey[pti], Ez[pti],
                                                          Bx[pti], By[pti], Bz[pti],
@@ -1748,7 +1752,8 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
             const auto num_added = filterCopyTransformParticles<1>(*pc_product_ele, *pc_product_pos,
                                                       dst_ele_tile, dst_pos_tile,
                                                       src_tile, np_dst_ele, np_dst_pos,
-                                                      Filter, CopyEle, CopyPos, Transform);
+                                                      Filter, CopyEle, CopyPos, Transform,
+                                                      m_warpx->gett_new(0));
 
             setNewParticleIDs(dst_ele_tile, np_dst_ele, num_added);
             setNewParticleIDs(dst_pos_tile, np_dst_pos, num_added);
@@ -1773,7 +1778,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 {
     WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     // Loop over all species.
     // Electrons or positrons undergoing Quantum photon emission process
@@ -1810,6 +1815,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
             auto wt = static_cast<amrex::Real>(amrex::second());
 
             auto Transform = PhotonEmissionTransformFunc(
+                  &(pc_source->GetWarpX()),
                   m_shr_p_qs_engine->build_optical_depth_functor(),
                   pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
@@ -1826,7 +1832,8 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             const auto num_added =
                 filterCopyTransformParticles<1>(*pc_product_phot, dst_tile, src_tile, np_dst,
-                                                Filter, CopyPhot, Transform);
+                                                Filter, CopyPhot, Transform,
+                                                m_warpx->gett_new(0));
 
             setNewParticleIDs(dst_tile, np_dst, num_added);
 

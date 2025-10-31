@@ -12,12 +12,14 @@ class EBCoveredFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] lev level of multifab.
      * \param[in] crse_ratio coarsening ratio for interpolation of field values
      *                       from simulation MultiFabs to the output MultiFab mf_dst
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
     EBCoveredFunctor (
+        WarpX* warpx,
         int lev,
         amrex::IntVect crse_ratio,
         int ncomp=1

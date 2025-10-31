@@ -93,6 +93,7 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
 
 WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
     : amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>(amr_core->GetParGDB())
+    , m_warpx(static_cast<WarpX*>(amr_core))
     , species_id(ispecies)
 {
     SetParticleSize();
@@ -338,7 +339,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
     // Remove particles that are inside the embedded boundaries
 #ifdef AMREX_USE_EB
     if (EB::enabled()) {
-        auto & warpx = WarpX::GetInstance();
+        auto & warpx = *m_warpx;
         scrapeParticlesAtEB(
             *this,
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
@@ -404,7 +405,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     if (do_not_deposit) { return; }
 
     // Number of guard cells for local deposition of J
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
 
     const amrex::IntVect& ng_J = warpx.get_ng_depos_J();
 
@@ -440,7 +441,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(depos_lev,0));
 
     const amrex::ParticleReal q = this->charge;
 
@@ -461,7 +462,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     if (lev == depos_lev) {
         tilebox = pti.tilebox();
     } else {
-        const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
+        const IntVect& ref_ratio = m_warpx->refRatio(depos_lev);
         tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -512,7 +513,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // Note that this includes guard cells since it is after tilebox.ngrow
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
 
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
         WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
@@ -951,7 +952,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     if (do_not_deposit) { return; }
 
     // Number of guard cells for local deposition of J
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
 
     const amrex::IntVect& ng_J = warpx.get_ng_depos_J();
 
@@ -987,7 +988,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(depos_lev,0));
 
     const amrex::ParticleReal qs = this->charge;
     const amrex::ParticleReal mass = this->m_mass;
@@ -1009,7 +1010,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     if (lev == depos_lev) {
         tilebox = pti.tilebox();
     } else {
-        const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
+        const IntVect& ref_ratio = m_warpx->refRatio(depos_lev);
         tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -1105,7 +1106,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     // Note that this includes guard cells since it is after tilebox.ngrow
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
 
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
         WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
@@ -1410,7 +1411,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         if (np_to_deposit == 0) { return; }
 
         // Number of guard cells for local deposition of rho
-        const WarpX& warpx = WarpX::GetInstance();
+        const WarpX& warpx = *m_warpx;
         const amrex::IntVect& ng_rho = warpx.get_ng_depos_rho();
 
         // Extract deposition order and check that particles shape fits within the guard cells.
@@ -1457,7 +1458,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         if (lev == depos_lev) {
             tilebox = pti.tilebox();
         } else {
-            const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
+            const IntVect& ref_ratio = m_warpx->refRatio(depos_lev);
             tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
         }
 
@@ -1493,12 +1494,12 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         // Take into account Galilean shift
         const Real dt = warpx.getdt(lev);
         const amrex::Real time_shift_delta = (icomp == 0 ? 0.0_rt : dt);
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, time_shift_delta);
+        const amrex::XDim3 xyzmin = m_warpx->LowerCorner(tilebox, depos_lev, time_shift_delta);
 
         // Indices of the lower bound
         const Dim3 lo = lbound(tilebox);
 
-        const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+        const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(depos_lev,0));
 
         // HACK - sort particles by bin here.
         WARPX_PROFILE_VAR_START(blp_sort);
@@ -1632,7 +1633,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 #endif
     } else {
 
-        const WarpX& warpx = WarpX::GetInstance();
+        const WarpX& warpx = *m_warpx;
 
         // deposition guards
         //   note: this is smaller than rho->nGrowVect() for PSATD
@@ -1642,7 +1643,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         if (lev == depos_lev) {
             ref_ratio = IntVect(AMREX_D_DECL(1, 1, 1 ));
         } else {
-            ref_ratio = WarpX::RefRatio(depos_lev);
+            ref_ratio = m_warpx->refRatio(depos_lev);
         }
         const int nc = WarpX::ncomps;
 
@@ -1662,8 +1663,8 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         // Take into account Galilean shift
         const amrex::Real dt = warpx.getdt(lev);
         const amrex::Real time_shift_delta = (icomp == 0 ? 0.0_rt : dt);
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, time_shift_delta);
-        const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+        const amrex::XDim3 xyzmin = m_warpx->LowerCorner(tilebox, depos_lev, time_shift_delta);
+        const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(depos_lev,0));
 
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noy);
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noz);
@@ -1763,7 +1764,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     if (apply_boundary_and_scale_volume)
     {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
+        m_warpx->ApplyInverseVolumeScalingToChargeDensity(rho, lev);
     }
 #endif
 
@@ -1782,7 +1783,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     if (apply_boundary_and_scale_volume)
     {
         // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
+        m_warpx->ApplyRhofieldBoundary(lev, rho, PatchType::fine);
     }
 #endif
 }
@@ -1805,7 +1806,7 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     }
 
     // Number of guard cells for local deposition of rho
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
     const int ng_rho = warpx.get_ng_depos_rho().max();
 
     auto rho = std::make_unique<MultiFab>(nba, dm, WarpX::ncomps,ng_rho);
@@ -1979,7 +1980,7 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const box_lo_r = box.smallEnd(0);
-        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::XDim3 const xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
         amrex::Real const dr = Geom(lev).CellSize(0);
 #endif
@@ -2286,7 +2287,7 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
     if (do_not_push) { return; }
 
-    amrex::LayoutData<amrex::Real>* costs = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* costs = m_warpx->getCosts(lev);
 
     // local copy for device lambda capture
     amrex::ParticleReal const mass = this->m_mass;

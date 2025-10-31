@@ -50,8 +50,8 @@ struct NormalizationType {
 };
 
 // constructor
-ParticleHistogram::ParticleHistogram (const std::string& rd_name)
-: ReducedDiags{rd_name}
+ParticleHistogram::ParticleHistogram (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     const ParmParse pp_rd_name(rd_name);
 
@@ -96,7 +96,7 @@ ParticleHistogram::ParticleHistogram (const std::string& rd_name)
     }
 
     // get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
     // get species names (std::vector<std::string>)
     auto const species_names = mypc.GetSpeciesNames();
     // select species
@@ -161,7 +161,7 @@ void ParticleHistogram::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get a reference to WarpX instance
-    auto & warpx = WarpX::GetInstance();
+    auto & warpx = *m_warpx;
 
     // get time at level 0
     auto const t = warpx.gett_new(0);

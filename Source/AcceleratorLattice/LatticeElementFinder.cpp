@@ -15,11 +15,13 @@
 using namespace amrex::literals;
 
 void
-LatticeElementFinder::InitElementFinder (int const lev, const amrex::Real gamma_boost,
+LatticeElementFinder::InitElementFinder (WarpX* warpx, int const lev,
+                                         const amrex::Real gamma_boost,
                                          const amrex::Vector<amrex::Real>& time,
                                          amrex::MFIter const& a_mfi,
                                          AcceleratorLattice const& accelerator_lattice)
 {
+    m_warpx = warpx;
 
     // The lattice is assumed to extend in the z-direction
     // Get the number of nodes where indices will be setup
@@ -31,7 +33,7 @@ LatticeElementFinder::InitElementFinder (int const lev, const amrex::Real gamma_
     ignore_unused(box);
 #endif
 
-    m_dz = WarpX::CellSize(lev)[2];
+    m_dz = m_warpx->CellSize(lev)[2];
 
     m_gamma_boost = gamma_boost;
     m_uz_boost = std::sqrt(m_gamma_boost*m_gamma_boost - 1._prt)*PhysConst::c;
@@ -66,7 +68,7 @@ LatticeElementFinder::UpdateIndices (int const lev, amrex::MFIter const& a_mfi,
     // Note that the current box is used since the box may have been updated since
     // the initialization in InitElementFinder.
     const amrex::Box box = a_mfi.tilebox();
-    m_zmin = WarpX::LowerCorner(box, lev, 0._rt).z;
+    m_zmin = m_warpx->LowerCorner(box, lev, 0._rt).z;
     m_time = time[lev];
 
     if (accelerator_lattice.h_quad.nelements > 0) {

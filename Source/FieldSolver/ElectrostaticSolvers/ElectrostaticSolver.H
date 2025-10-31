@@ -16,6 +16,7 @@
 
 #include <AMReX_Array.H>
 
+class WarpX;
 
 /**
  * \brief Base class for Electrostatic Solver
@@ -24,8 +25,8 @@
 class ElectrostaticSolver
 {
 public:
-    ElectrostaticSolver() = default;
-    ElectrostaticSolver( int nlevs_max );
+
+    ElectrostaticSolver( WarpX* warpx, int nlevs_max );
 
     virtual ~ElectrostaticSolver();
 
@@ -138,6 +139,8 @@ public:
         ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta
     ) const;
+
+    WarpX* m_warpx;
 
     /** Maximum levels for the electrostatic solver grid */
     int num_levels;

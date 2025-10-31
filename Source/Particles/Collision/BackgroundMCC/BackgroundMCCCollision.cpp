@@ -22,8 +22,8 @@
 
 #include <string>
 
-BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_name)
-    : CollisionBase(collision_name)
+BackgroundMCCCollision::BackgroundMCCCollision (WarpX* warpx, std::string const& collision_name)
+    : CollisionBase(warpx, collision_name)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
                                      "Background MCC must have exactly one species.");
@@ -291,7 +291,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
     auto const flvl = species1.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
-        auto *cost = WarpX::getCosts(lev);
+        auto *cost = m_warpx->getCosts(lev);
 
         // firstly loop over particles box by box and do all particle conserving
         // scattering
@@ -518,7 +518,7 @@ void BackgroundMCCCollision::doBackgroundIonization
 
         const auto num_added = filterCopyTransformParticles<1>(species1, species2,
                                                                elec_tile, ion_tile, elec_tile, np_elec, np_ion,
-                                                               Filter, CopyElec, CopyIon, Transform
+                                                               Filter, CopyElec, CopyIon, Transform, m_warpx->gett_new(0)
                                                                );
 
         setNewParticleIDs(elec_tile, np_elec, num_added);

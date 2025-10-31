@@ -173,8 +173,6 @@ int WarpX::n_current_deposition_buffer = -1;
 
 amrex::IntVect m_rho_nodal_flag;
 
-WarpX* WarpX::m_instance = nullptr;
-
 namespace
 {
     [[nodiscard]] bool
@@ -271,7 +269,7 @@ namespace
     }
 }
 
-void WarpX::MakeWarpX ()
+void WarpX::Initialize ()
 {
     warpx::initialization::check_dims();
 
@@ -291,39 +289,42 @@ void WarpX::MakeWarpX ()
         warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
     CheckGriddingForRZSpectral();
+}
 
-    m_instance = new WarpX();
+WarpX* WarpX::MakeWarpX_detail (bool make)
+{
+    static bool first_call = true;
+    if (first_call) {
+        first_call = false;
+        WarpX::Initialize();
+    }
+
+    // We use a raw pointer here because of how Python binding is set up.
+    static auto* warpx = new WarpX();
+
+    if (!make) {
+        delete warpx;
+        warpx = nullptr;
+    }
+
+    return warpx;
 }
 
 WarpX&
-WarpX::GetInstance ()
+WarpX::GetInstance_detail ()
 {
-    if (!m_instance) {
-        MakeWarpX();
-    }
-    return *m_instance;
+    auto* warpx = WarpX::MakeWarpX_detail(true);
+    return *warpx;
 }
 
 void
-WarpX::ResetInstance ()
+WarpX::Finalize_detail ()
 {
-    if (m_instance){
-        delete m_instance;
-        m_instance = nullptr;
-    }
-}
-
-void
-WarpX::Finalize()
-{
-    WarpX::ResetInstance();
+    WarpX::MakeWarpX_detail(false);
 }
 
 WarpX::WarpX ()
 {
-    m_instance = this; // This guarantees that GetInstance() can be
-                       // indirectly used in WarpX constructor.
-
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
@@ -374,11 +375,11 @@ WarpX::WarpX ()
     }
 
     // Particle Boundary Buffer (i.e., scraped particles on boundary)
-    m_particle_boundary_buffer = std::make_unique<ParticleBoundaryBuffer>();
+    m_particle_boundary_buffer = std::make_unique<ParticleBoundaryBuffer>(this);
 
     // Fluid Container
     if (do_fluid_species) {
-        myfl = std::make_unique<MultiFluidContainer>();
+        myfl = std::make_unique<MultiFluidContainer>(this);
     }
 
     Efield_dotMask.resize(nlevs_max);
@@ -398,22 +399,22 @@ WarpX::WarpX ()
     if ((WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame)
         || (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic))
     {
-        m_electrostatic_solver = std::make_unique<LabFrameExplicitES>(nlevs_max);
+        m_electrostatic_solver = std::make_unique<LabFrameExplicitES>(this, nlevs_max);
     }
     // Initialize the effective potential electrostatic solver if required
     else if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameEffectivePotential)
     {
-        m_electrostatic_solver = std::make_unique<EffectivePotentialES>(nlevs_max);
+        m_electrostatic_solver = std::make_unique<EffectivePotentialES>(this, nlevs_max);
     }
     else
     {
-        m_electrostatic_solver = std::make_unique<RelativisticExplicitES>(nlevs_max);
+        m_electrostatic_solver = std::make_unique<RelativisticExplicitES>(this, nlevs_max);
     }
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
         // Create hybrid-PIC model object if needed
-        m_hybrid_pic_model = std::make_unique<HybridPICModel>();
+        m_hybrid_pic_model = std::make_unique<HybridPICModel>(this);
     }
 
     current_buffer_masks.resize(nlevs_max);
@@ -1844,7 +1845,7 @@ WarpX::ReadParameters ()
     }
 
     // Setup pec_insulator boundary conditions
-    pec_insulator_boundary = std::make_unique<PEC_Insulator>();
+    pec_insulator_boundary = std::make_unique<PEC_Insulator>(this);
 
     // for slice generation //
     {
@@ -2248,6 +2249,8 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
 
     // Initialize filter before guard cells manager
     // (needs info on length of filter's stencil)
+    bilinear_filter = std::make_unique<BilinearFilter>
+        (this, WarpX::filter_npass_each_dir.toArray<unsigned int>());
     if (use_filter)
     {
         InitFilter();
@@ -2278,7 +2281,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
         WarpX::pml_ncell,
         this->refRatio(),
         use_filter,
-        bilinear_filter.stencil_length_each_dir);
+        bilinear_filter->stencil_length_each_dir);
 
 #ifdef AMREX_USE_EB
     bool const eb_enabled = EB::enabled();
@@ -2313,7 +2316,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
     AllocLevelMFs(lev, ba, dm, guard_cells.ng_alloc_EB, guard_cells.ng_alloc_J,
                   guard_cells.ng_alloc_Rho, guard_cells.ng_alloc_F, guard_cells.ng_alloc_G, aux_is_nodal);
 
-    m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>();
+    m_accelerator_lattice[lev] = std::make_unique<AcceleratorLattice>(this);
     m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
 }
@@ -2495,8 +2498,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     // Allocate extra multifabs needed for fluids
     if (do_fluid_species) {
         myfl->AllocateLevelMFs(m_fields, ba, dm, lev);
-        auto & warpx = GetInstance();
-        const amrex::Real cur_time = warpx.gett_new(lev);
+        const amrex::Real cur_time = this->gett_new(lev);
         myfl->InitData(m_fields, geom[lev].Domain(), cur_time, lev, geom[lev], gamma_boost, beta_boost);
     }
 
@@ -2729,7 +2731,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 #endif
     } // ElectromagneticSolverAlgo::PSATD
     else {
-        m_fdtd_solver_fp[lev] = std::make_unique<FiniteDifferenceSolver>(electromagnetic_solver_id, dx, grid_type);
+        m_fdtd_solver_fp[lev] = std::make_unique<FiniteDifferenceSolver>(this, electromagnetic_solver_id, dx, grid_type);
     }
 
     //
@@ -2940,7 +2942,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 #endif
         } // ElectromagneticSolverAlgo::PSATD
         else {
-            m_fdtd_solver_cp[lev] = std::make_unique<FiniteDifferenceSolver>(electromagnetic_solver_id, cdx,
+            m_fdtd_solver_cp[lev] = std::make_unique<FiniteDifferenceSolver>(this, electromagnetic_solver_id, cdx,
                                                                              grid_type);
         }
     }
@@ -3030,7 +3032,8 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolverRZ>(lev,
+    auto pss = std::make_unique<SpectralSolverRZ>(this,
+                                                  lev,
                                                   realspace_ba,
                                                   dm,
                                                   n_rz_azimuthal_modes,
@@ -3089,7 +3092,8 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(this,
+                                                realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,
@@ -3114,9 +3118,9 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 #endif
 
 std::array<Real,3>
-WarpX::CellSize (int lev)
+WarpX::CellSize (int lev) const
 {
-    const amrex::Geometry& gm = GetInstance().Geom(lev);
+    const amrex::Geometry& gm = this->Geom(lev);
     const Real* dx = gm.CellSize();
 #if defined(WARPX_DIM_3D)
     return { dx[0], dx[1], dx[2] };
@@ -3130,33 +3134,32 @@ WarpX::CellSize (int lev)
 }
 
 amrex::XDim3
-WarpX::InvCellSize (int lev)
+WarpX::InvCellSize (int lev) const
 {
-    std::array<Real,3> dx = WarpX::CellSize(lev);
+    std::array<Real,3> dx = this->CellSize(lev);
     return {1._rt/dx[0], 1._rt/dx[1], 1._rt/dx[2]};
 }
 
 amrex::RealBox
-WarpX::getRealBox(const Box& bx, int lev)
+WarpX::getRealBox(const Box& bx, int lev) const
 {
-    const amrex::Geometry& gm = GetInstance().Geom(lev);
+    const amrex::Geometry& gm = this->Geom(lev);
     const RealBox grid_box{bx, gm.CellSize(), gm.ProbLo()};
     return( grid_box );
 }
 
 amrex::XDim3
-WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta)
+WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta) const
 {
-    auto & warpx = GetInstance();
     const RealBox grid_box = getRealBox( bx, lev );
 
     const Real* grid_min = grid_box.lo();
 
-    const amrex::Real cur_time = warpx.gett_new(lev);
-    const amrex::Real time_shift = (cur_time + time_shift_delta - warpx.time_of_last_gal_shift);
-    amrex::Array<amrex::Real,3> galilean_shift = { warpx.m_v_galilean[0]*time_shift,
-                                                   warpx.m_v_galilean[1]*time_shift,
-                                                   warpx.m_v_galilean[2]*time_shift };
+    const amrex::Real cur_time = this->gett_new(lev);
+    const amrex::Real time_shift = (cur_time + time_shift_delta - this->time_of_last_gal_shift);
+    amrex::Array<amrex::Real,3> galilean_shift = { this->m_v_galilean[0]*time_shift,
+                                                   this->m_v_galilean[1]*time_shift,
+                                                   this->m_v_galilean[2]*time_shift };
 
 #if defined(WARPX_DIM_3D)
     return { grid_min[0] + galilean_shift[0], grid_min[1] + galilean_shift[1], grid_min[2] + galilean_shift[2] };
@@ -3174,18 +3177,17 @@ WarpX::LowerCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
 }
 
 amrex::XDim3
-WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta)
+WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_delta) const
 {
-    auto & warpx = GetInstance();
     const RealBox grid_box = getRealBox( bx, lev );
 
     const Real* grid_max = grid_box.hi();
 
-    const amrex::Real cur_time = warpx.gett_new(lev);
-    const amrex::Real time_shift = (cur_time + time_shift_delta - warpx.time_of_last_gal_shift);
-    amrex::Array<amrex::Real,3> galilean_shift = { warpx.m_v_galilean[0]*time_shift,
-                                                   warpx.m_v_galilean[1]*time_shift,
-                                                   warpx.m_v_galilean[2]*time_shift };
+    const amrex::Real cur_time = this->gett_new(lev);
+    const amrex::Real time_shift = (cur_time + time_shift_delta - this->time_of_last_gal_shift);
+    amrex::Array<amrex::Real,3> galilean_shift = { this->m_v_galilean[0]*time_shift,
+                                                   this->m_v_galilean[1]*time_shift,
+                                                   this->m_v_galilean[2]*time_shift };
 
 #if defined(WARPX_DIM_3D)
     return { grid_max[0] + galilean_shift[0], grid_max[1] + galilean_shift[1], grid_max[2] + galilean_shift[2] };
@@ -3200,12 +3202,6 @@ WarpX::UpperCorner(const Box& bx, const int lev, const amrex::Real time_shift_de
 #elif defined(WARPX_DIM_1D_Z)
     return { std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), grid_max[0] + galilean_shift[0] };
 #endif
-}
-
-IntVect
-WarpX::RefRatio (int lev)
-{
-    return GetInstance().refRatio(lev);
 }
 
 void
@@ -3224,7 +3220,7 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
     const Real dxinv = 1._rt/dx[0], dyinv = 1._rt/dx[1], dzinv = 1._rt/dx[2];
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const Real rmin = GetInstance().Geom(0).ProbLo(0);
+    const Real rmin = this->Geom(0).ProbLo(0);
 #endif
 
 #ifdef AMREX_USE_OMP
@@ -3314,37 +3310,19 @@ WarpX::getPMLdirections() const
 amrex::LayoutData<amrex::Real>*
 WarpX::getCosts (int lev)
 {
-    if (m_instance)
-    {
-        return m_instance->costs[lev].get();
-    } else
-    {
-        return nullptr;
-    }
+    return costs[lev].get();
 }
 
 void
 WarpX::setLoadBalanceEfficiency (const int lev, const amrex::Real efficiency)
 {
-    if (m_instance)
-    {
-        m_instance->load_balance_efficiency[lev] = efficiency;
-    } else
-    {
-        return;
-    }
+    load_balance_efficiency[lev] = efficiency;
 }
 
 amrex::Real
 WarpX::getLoadBalanceEfficiency (const int lev)
 {
-    if (m_instance)
-    {
-        return m_instance->load_balance_efficiency[lev];
-    } else
-    {
-        return -1;
-    }
+    return load_balance_efficiency[lev];
 }
 
 
@@ -3462,13 +3440,13 @@ WarpX::BuildBufferMasksInBox ( const amrex::Box tbx, amrex::IArrayBox &buffer_ma
 const iMultiFab*
 WarpX::CurrentBufferMasks (int lev)
 {
-    return GetInstance().getCurrentBufferMasks(lev);
+    return this->getCurrentBufferMasks(lev);
 }
 
 const iMultiFab*
 WarpX::GatherBufferMasks (int lev)
 {
-    return GetInstance().getGatherBufferMasks(lev);
+    return this->getGatherBufferMasks(lev);
 }
 
 bool

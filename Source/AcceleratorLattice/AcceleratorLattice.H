@@ -15,13 +15,15 @@
 #include <memory>
 #include <string>
 
+class WarpX;
+
 /* \brief AcceleratorLattice contains the lattice elements
  */
 class AcceleratorLattice
 {
 public:
 
-    AcceleratorLattice ();
+    explicit AcceleratorLattice (WarpX* warpx);
 
     /**
      * \brief Read in the MAD like lattice description
@@ -31,6 +33,8 @@ public:
      */
     void
     ReadLattice (std::string const & root_name, amrex::ParticleReal & z_location);
+
+    WarpX* m_warpx;
 
     /* Refinement level at which this accelerator lattice is defined */
     int m_level;

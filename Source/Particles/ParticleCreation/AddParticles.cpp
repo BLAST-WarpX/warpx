@@ -328,7 +328,7 @@ void PhysicalParticleContainer::MapParticletoBoostedFrame (
 
     //Move the particles to where they will be at t = t0, the current simulation time in the boosted frame
     constexpr int lev = 0;
-    const amrex::Real t0 = WarpX::GetInstance().gett_new(lev);
+    const amrex::Real t0 = m_warpx->gett_new(lev);
     if (boost_adjust_transverse_positions) {
         x = xpr - (tpr-t0)*vxpr;
         y = ypr - (tpr-t0)*vypr;
@@ -757,7 +757,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
 
     defineAllParticleTiles();
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
     amrex::Box fine_injection_box;
     amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
@@ -768,7 +768,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
-    const amrex::Real t = WarpX::GetInstance().gett_new(lev);
+    const amrex::Real t = m_warpx->gett_new(lev);
     const amrex::Real density_min = plasma_injector.density_min;
     const amrex::Real density_max = plasma_injector.density_max;
 
@@ -803,7 +803,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         const amrex::Box& tile_box = mfi.tilebox();
-        const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
+        const amrex::RealBox tile_realbox = m_warpx->getRealBox(tile_box, lev);
 
         // Find the cells of part_box that overlap with tile_realbox
         // If there is no overlap, just go to the next tile in the loop
@@ -1193,7 +1193,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
     if (EB::enabled())
     {
         using warpx::fields::FieldType;
-        auto & warpx = WarpX::GetInstance();
+        auto & warpx = *m_warpx;
         scrapeParticlesAtEB(
             *this,
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
@@ -1227,17 +1227,17 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     amrex::EBFArrayBoxFactory const* eb_factory = nullptr;
     amrex::FabArray<amrex::EBCellFlagFab> const* eb_flag = nullptr;
     if (inject_from_eb) {
-        eb_factory = &(WarpX::GetInstance().fieldEBFactory(0));
+        eb_factory = &(m_warpx->fieldEBFactory(0));
         eb_flag = &(eb_factory->getMultiEBCellFlagFab());
     }
 #endif
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(0);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(0);
 
     // Create temporary particle container to which particles will be added;
     // we will then call Redistribute on this new container and finally
     // add the new particles to the original container.
-    PhysicalParticleContainer tmp_pc(&WarpX::GetInstance());
+    PhysicalParticleContainer tmp_pc(m_warpx);
     for (int ic = 0; ic < NumRuntimeRealComps(); ++ic) { tmp_pc.AddRealComp(GetRealSoANames()[ic + NArrayReal], false); }
     for (int ic = 0; ic < NumRuntimeIntComps(); ++ic) { tmp_pc.AddIntComp(GetIntSoANames()[ic + NArrayInt], false); }
     tmp_pc.defineAllParticleTiles();
@@ -1250,7 +1250,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     InjectorFlux*  inj_flux = plasma_injector.getInjectorFlux();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     constexpr int level_zero = 0;
-    const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
+    const amrex::Real t = m_warpx->gett_new(level_zero);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     const int nmodes = WarpX::n_rz_azimuthal_modes;
@@ -1284,7 +1284,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         const amrex::Box& tile_box = mfi.tilebox();
-        const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+        const amrex::RealBox tile_realbox = m_warpx->getRealBox(tile_box, 0);
 
         // Find the cells of part_realbox that overlap with tile_realbox
         // If there is no overlap, just go to the next tile in the loop
@@ -1737,7 +1737,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     if (EB::enabled())
     {
         using warpx::fields::FieldType;
-        auto & warpx = WarpX::GetInstance();
+        auto & warpx = *m_warpx;
         scrapeParticlesAtEB(
             tmp_pc,
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),

@@ -96,7 +96,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  MomentumPushType /*momentum_push_type*/)
 {
     // Get inverse cell size on gather_lev
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -104,7 +104,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     if (lev == gather_lev) {
         box = pti.tilebox();
     } else {
-        const IntVect& ref_ratio = WarpX::RefRatio(gather_lev);
+        const IntVect& ref_ratio = m_warpx->refRatio(gather_lev);
         box = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -137,7 +137,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
     auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
 
-    const auto getExternalEB = GetExternalEBField(pti, offset);
+    const auto getExternalEB = GetExternalEBField(m_warpx, pti, offset);
 
     const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
     const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -147,7 +147,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 

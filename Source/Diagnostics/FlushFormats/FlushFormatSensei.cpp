@@ -5,8 +5,9 @@
 # include <AMReX_AmrMeshParticleInSituBridge.H>
 #endif
 
-FlushFormatSensei::FlushFormatSensei (amrex::AmrMesh *amr_mesh,
+FlushFormatSensei::FlushFormatSensei (WarpX* warpx, amrex::AmrMesh *amr_mesh,
     const std::string& diag_name) :
+    FlushFormat(warpx),
     m_amr_mesh(amr_mesh)
 {
 #ifndef AMREX_USE_SENSEI_INSITU

@@ -14,6 +14,8 @@
 #include <AMReX_MLMG.H>
 #include <AMReX_REAL.H>
 
+class WarpX;
+
 namespace MagnetostaticSolver {
 
     /** Boundary Handler for the Vector Potential Poisson Solver
@@ -27,7 +29,7 @@ namespace MagnetostaticSolver {
         std::array<std::array<bool, AMREX_SPACEDIM * 2>, 3> dirichlet_flag;
         bool has_non_periodic = false;
 
-        void defineVectorPotentialBCs ();
+        void defineVectorPotentialBCs (WarpX const* warpx);
     };
 
     /** use amrex to directly calculate the magnetic field since with EB's the
@@ -36,15 +38,18 @@ namespace MagnetostaticSolver {
      */
     class EBCalcBfromVectorPotentialPerLevel {
       private:
+        WarpX* m_warpx;
         ablastr::fields::MultiLevelVectorField m_b_field;
         ablastr::fields::MultiLevelVectorField m_grad_buf_e_stag;
         ablastr::fields::MultiLevelVectorField m_grad_buf_b_stag;
 
       public:
-        EBCalcBfromVectorPotentialPerLevel (ablastr::fields::MultiLevelVectorField const & b_field,
+        EBCalcBfromVectorPotentialPerLevel (WarpX* warpx,
+                                            ablastr::fields::MultiLevelVectorField const & b_field,
                                             ablastr::fields::MultiLevelVectorField const & grad_buf_e_stag,
                                             ablastr::fields::MultiLevelVectorField const & grad_buf_b_stag)
-                : m_b_field(b_field),
+                : m_warpx(warpx),
+                  m_b_field(b_field),
                   m_grad_buf_e_stag(grad_buf_e_stag),
                   m_grad_buf_b_stag(grad_buf_b_stag)
         {}

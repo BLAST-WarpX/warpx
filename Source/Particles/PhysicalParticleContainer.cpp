@@ -230,7 +230,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("do_field_ionization", do_field_ionization);
 
     pp_species_name.query("do_resampling", do_resampling);
-    if (do_resampling) { m_resampler = Resampling(species_name); }
+    if (do_resampling) { m_resampler = Resampling(m_warpx,species_name); }
 
     //check if Radiation Reaction is enabled and do consistency checks
     pp_species_name.query("do_classical_radiation_reaction", do_classical_radiation_reaction);
@@ -347,7 +347,7 @@ PhysicalParticleContainer::AllocData ()
     if (m_do_temperature_deposition) {
         using ablastr::fields::Direction;
 
-        auto& warpx = WarpX::GetInstance();
+        auto& warpx = *m_warpx;
         ablastr::fields::MultiLevelVectorField J_vf =
             warpx.m_fields.get_mr_levels_alldirs(warpx::fields::FieldType::current_fp, warpx.finestLevel());
 
@@ -369,7 +369,7 @@ PhysicalParticleContainer::AllocData ()
 
         // Allocate Accumulation Arrays
         local_temperature_arrays = std::make_unique<warpx::particles::deposition::VarianceAccumulationBuffer>(
-            T_vf, species_name);
+            m_warpx, T_vf, species_name);
     }
 }
 
@@ -419,7 +419,8 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
                                        m_shr_p_qs_engine.get(),
 #endif
                                        ionization_initial_level,
-                                       0,pinned_tile.numParticles());
+                                       0,pinned_tile.numParticles(),
+                                       m_warpx->gett_new(0));
 }
 
 void
@@ -441,10 +442,10 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
 
-    const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
-    const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
+    const iMultiFab* current_masks = m_warpx->CurrentBufferMasks(lev);
+    const iMultiFab* gather_masks = m_warpx->GatherBufferMasks(lev);
 
     const bool has_rho = fields.has(FieldType::rho_fp, lev);
     const bool has_J_buf = fields.has_vector(FieldType::current_buf, lev);
@@ -604,7 +605,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                 if (np_gather < np)
                 {
-                    const IntVect& ref_ratio = WarpX::RefRatio(lev-1);
+                    const IntVect& ref_ratio = m_warpx->refRatio(lev-1);
                     const Box& cbox = amrex::coarsen(box,ref_ratio);
 
                     amrex::MultiFab & cEx = *fields.get(FieldType::Efield_cax, Direction{0}, lev);
@@ -819,8 +820,8 @@ PhysicalParticleContainer::applyNCIFilter (
 {
 
     // Get instances of NCI Godfrey filters
-    const auto& nci_godfrey_filter_exeybz = WarpX::GetInstance().nci_godfrey_filter_exeybz;
-    const auto& nci_godfrey_filter_bxbyez = WarpX::GetInstance().nci_godfrey_filter_bxbyez;
+    const auto& nci_godfrey_filter_exeybz = m_warpx->nci_godfrey_filter_exeybz;
+    const auto& nci_godfrey_filter_bxbyez = m_warpx->nci_godfrey_filter_bxbyez;
 
 #if defined(WARPX_DIM_1D_Z)
     const Box& tbox = amrex::grow(box, static_cast<int>(WarpX::noz));
@@ -886,7 +887,7 @@ PhysicalParticleContainer::applyNCIFilter (
 void
 PhysicalParticleContainer::SplitParticles (int lev)
 {
-    PhysicalParticleContainer pctmp_split(&WarpX::GetInstance());
+    PhysicalParticleContainer pctmp_split(m_warpx);
     RealVector psplit_x, psplit_y, psplit_z, psplit_w;
     RealVector psplit_ux, psplit_uy, psplit_uz;
     long np_split_to_add = 0;
@@ -904,7 +905,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
         const auto GetPosition = GetParticlePosition<PIdx>(pti);
 
         const amrex::Vector<int> ppc_nd = plasma_injectors[0]->num_particles_per_cell_each_dim;
-        const std::array<Real,3>& dx = WarpX::CellSize(lev);
+        const std::array<Real,3>& dx = m_warpx->CellSize(lev);
         amrex::Vector<Real> split_offset = {dx[0]/2._rt,
                                             dx[1]/2._rt,
                                             dx[2]/2._rt};
@@ -1096,7 +1097,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
     if (do_not_push) { return; }
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(lev,0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -1119,7 +1120,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const auto getPosition = GetParticlePosition<PIdx>(pti);
 
-            const auto getExternalEB = GetExternalEBField(pti);
+            const auto getExternalEB = GetExternalEBField(m_warpx, pti);
 
             const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
             const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -1128,7 +1129,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
-            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
 
@@ -1261,7 +1262,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     if (np_to_push == 0) { return; }
 
     // Get cell size on gather_lev
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -1269,7 +1270,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     if (lev == gather_lev) {
         box = pti.tilebox();
     } else {
-        const IntVect& ref_ratio = WarpX::RefRatio(gather_lev);
+        const IntVect& ref_ratio = m_warpx->refRatio(gather_lev);
         box = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -1290,7 +1291,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const auto getPosition = GetParticlePosition<PIdx>(pti, offset);
           auto setPosition = SetParticlePosition<PIdx>(pti, offset);
 
-    const auto getExternalEB = GetExternalEBField(pti, offset);
+    const auto getExternalEB = GetExternalEBField(m_warpx, pti, offset);
 
     const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
     const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
@@ -1300,7 +1301,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
@@ -1535,7 +1536,7 @@ PhysicalParticleContainer::InitIonizationModule ()
     constexpr Real UH = utils::physics::table_ionization_energies[0];
     const Real l_eff = std::sqrt(UH/h_ionization_energies[0]) - 1._rt;
 
-    const Real dt = WarpX::GetInstance().getdt(0);
+    const Real dt = m_warpx->getdt(0);
 
     ionization_energies.resize(ion_atomic_number);
     adk_power.resize(ion_atomic_number);
@@ -1589,7 +1590,7 @@ PhysicalParticleContainer::getIonizationFunc (const WarpXParIter& pti,
 {
     WARPX_PROFILE("PhysicalParticleContainer::getIonizationFunc()");
 
-    return {pti, lev, ngEB, Ex, Ey, Ez, Bx, By, Bz,
+    return {m_warpx, pti, lev, ngEB, Ex, Ey, Ez, Bx, By, Bz,
                                 m_E_external_particle, m_B_external_particle,
                                 ionization_energies.dataPtr(),
                                 adk_prefactor.dataPtr(),
@@ -1658,7 +1659,7 @@ PhysicalParticleContainer::findRefinedInjectionBox (amrex::Box& a_fine_injection
     static bool refine_injection = false;
     static Box fine_injection_box;
     static amrex::IntVect rrfac(AMREX_D_DECL(1,1,1));
-    if (!refine_injection and WarpX::moving_window_active(WarpX::GetInstance().getistep(0)+1) and WarpX::refine_plasma and do_continuous_injection and numLevels() == 2) {
+    if (!refine_injection and WarpX::moving_window_active(m_warpx->getistep(0)+1) and WarpX::refine_plasma and do_continuous_injection and numLevels() == 2) {
         refine_injection = true;
         fine_injection_box = ParticleBoxArray(1).minimalBox();
         fine_injection_box.setSmall(WarpX::moving_window_dir, std::numeric_limits<int>::lowest()/2);
@@ -1772,7 +1773,7 @@ PhysicalParticleContainer::DepositTemperature (
     if (do_not_deposit) { return; }
 
     // Number of guard cells for local deposition of J
-    const WarpX& warpx = WarpX::GetInstance();
+    const WarpX& warpx = *m_warpx;
 
     amrex::IntVect ng_J = warpx.get_ng_depos_J();
 
@@ -1804,7 +1805,7 @@ PhysicalParticleContainer::DepositTemperature (
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+    const amrex::XDim3 dinv = m_warpx->InvCellSize(std::max(depos_lev,0));
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1813,7 +1814,7 @@ PhysicalParticleContainer::DepositTemperature (
     if (lev == depos_lev) {
         tilebox = pti.tilebox();
     } else {
-        const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
+        const IntVect& ref_ratio = m_warpx->refRatio(depos_lev);
         tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
     }
 
@@ -1844,7 +1845,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Note that this includes guard cells since it is after tilebox.ngrow
     const Dim3 lo = lbound(tilebox);
     // Take into account Galilean shift
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.0_rt);
+    const amrex::XDim3 xyzmin = m_warpx->LowerCorner(tilebox, depos_lev, 0.0_rt);
 
     if        (WarpX::nox == 1){
         warpx::particles::deposition::doVarianceDepositionShapeN<1>(
@@ -1898,7 +1899,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
     // Will fix this in a follow up PR.
     auto depos_type = TemperatureDepositionType::DOUBLE_PASS;
 
-    const auto& warpx = WarpX::GetInstance();
+    const auto& warpx = *m_warpx;
 
     // Loop over the refinement levels
     auto const finest_level = static_cast<int>(T_vf.size() - 1);

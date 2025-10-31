@@ -82,7 +82,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     // Store the boundary conditions for the field solver if they haven't been
     // stored yet
     if (!m_vector_poisson_boundary_handler.bcs_set) {
-        m_vector_poisson_boundary_handler.defineVectorPotentialBCs();
+        m_vector_poisson_boundary_handler.defineVectorPotentialBCs(this);
     }
 
 #ifdef WARPX_DIM_RZ
@@ -187,6 +187,7 @@ WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& cur
     const ablastr::fields::MultiLevelVectorField Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
     const std::optional<MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel> post_A_calculation(
     {
+        this,
         Bfield_fp,
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_grad_buf_e_stag, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_grad_buf_b_stag, finest_level)
@@ -194,12 +195,11 @@ WarpX::computeVectorPotential (ablastr::fields::MultiLevelVectorField const& cur
 
 #if defined(AMREX_USE_EB)
     std::optional<amrex::Vector<amrex::EBFArrayBoxFactory const *> > eb_farray_box_factory;
-    auto &warpx = WarpX::GetInstance();
 
     if (EB::enabled()) {
         amrex::Vector<amrex::EBFArrayBoxFactory const *> factories;
         for (int lev = 0; lev <= finest_level; ++lev) {
-            factories.push_back(&warpx.fieldEBFactory(lev));
+            factories.push_back(&this->fieldEBFactory(lev));
         }
         eb_farray_box_factory = factories;
     }
@@ -293,13 +293,13 @@ WarpX::setVectorPotentialBC (ablastr::fields::MultiLevelVectorField const& A) co
     } // lev
 }
 
-void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs ( )
+void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs (WarpX const* warpx)
 {
+    amrex::ignore_unused(warpx);
     for (int adim = 0; adim < 3; adim++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int dim_start = 0;
-        WarpX& warpx = WarpX::GetInstance();
-        auto geom = warpx.Geom(0);
+        auto geom = warpx->Geom(0);
         if (geom.ProbLo(0) == 0){
             lobc[adim][0] = LinOpBCType::Neumann;
             dirichlet_flag[adim][0] = false;
@@ -389,7 +389,7 @@ void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs
 void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp (amrex::MultiFab & src,
                                                                         amrex::MultiFab & dst)
 {
-    WarpX &warpx = WarpX::GetInstance();
+    WarpX &warpx = *m_warpx;
 
     // Grab Interpolation Coefficients
     // Order of finite-order centering of fields

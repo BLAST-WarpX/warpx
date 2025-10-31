@@ -18,13 +18,13 @@
 
 #include <memory>
 
-RhoFunctor::RhoFunctor (const int lev,
+RhoFunctor::RhoFunctor (WarpX* warpx, const int lev,
                         const amrex::IntVect crse_ratio,
                         bool apply_rz_psatd_filter,
                         const int species_index,
                         bool convertRZmodes2cartesian,
                         const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio),
+    : ComputeDiagFunctor(warpx, ncomp, crse_ratio),
       m_lev(lev),
       m_apply_rz_psatd_filter(apply_rz_psatd_filter),
       m_species_index(species_index),
@@ -34,7 +34,7 @@ RhoFunctor::RhoFunctor (const int lev,
 void
 RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/ ) const
 {
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     std::unique_ptr<amrex::MultiFab> rho;
 
     // Deposit charge density

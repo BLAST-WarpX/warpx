@@ -24,6 +24,8 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
+class WarpX;
+
 /**
  * \brief This functor creates photons produced from a binary collision and sets their initial
  * properties (position, momentum, weight).
@@ -284,7 +286,8 @@ public:
                                        pc_products[i]->get_quantum_sync_engine_ptr(),
 #endif
                                        pc_products[i]->getIonizationInitialLevel(),
-                                       start_index, stop_index);
+                                       start_index, stop_index,
+                                       m_warpx->gett_new(0));
         }
 
         amrex::Gpu::synchronize();
@@ -293,6 +296,8 @@ public:
     }
 
 private:
+    WarpX* m_warpx = nullptr;
+
     // How many different type of species the collision produces
     int m_num_product_species;
 

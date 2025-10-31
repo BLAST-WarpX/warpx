@@ -20,7 +20,8 @@
 using namespace amrex;
 
 
-FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
+FlushFormatOpenPMD::FlushFormatOpenPMD (WarpX* warpx, const std::string& diag_name)
+    : FlushFormat(warpx)
 {
     ParmParse pp_diag_name(diag_name);
     // Which backend to use (ADIOS, ADIOS2 or HDF5). Default depends on what is available
@@ -113,13 +114,12 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         engine_parameters.insert({k, v});
     }
 
-    auto & warpx = WarpX::GetInstance();
     m_OpenPMDPlotWriter = std::make_unique<WarpXOpenPMDPlot>(
         encoding, openpmd_backend,
         operator_type, operator_parameters,
         engine_type, engine_parameters,
-        warpx.getPMLdirections(),
-        warpx.GetAuthors()
+        warpx->getPMLdirections(),
+        warpx->GetAuthors()
     );
 }
 

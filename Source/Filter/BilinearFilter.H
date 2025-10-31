@@ -17,7 +17,9 @@ class BilinearFilter : public Filter
 {
 public:
 
-    BilinearFilter() = default;
+    BilinearFilter(WarpX* warpx,
+                   amrex::Array<unsigned int, AMREX_SPACEDIM> const& np)
+        : Filter(warpx), npass_each_dir(np) {}
 
     void ComputeStencils();
 

@@ -56,8 +56,8 @@
 #include <vector>
 
 
-DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
-: ReducedDiags{rd_name}
+DifferentialLuminosity::DifferentialLuminosity (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     using namespace amrex::literals;
 
@@ -138,7 +138,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
     const Real c_over_qe = PhysConst::c/PhysConst::q_e;
 
     // get a reference to WarpX instance
-    auto& warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
     const Real dt = warpx.getdt(0);
     // get cell volume
     Geometry const & geom = warpx.Geom(0);

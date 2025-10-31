@@ -25,7 +25,7 @@
  * \param dt       Time step
  * \param with_pml Whether PML boundary will be used
  */
-SpectralSolverRZ::SpectralSolverRZ (const int lev,
+SpectralSolverRZ::SpectralSolverRZ (WarpX* warpx, const int lev,
                                     amrex::BoxArray const & realspace_ba,
                                     amrex::DistributionMapping const & dm,
                                     int const n_rz_azimuthal_modes,
@@ -40,7 +40,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     const TimeDependencyRho time_dependency_rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
-    : m_dt(dt), k_space(realspace_ba, dm, dx)
+    : m_warpx(warpx), m_dt(dt), k_space(realspace_ba, dm, dx)
 {
     // Initialize all structures using the same distribution mapping dm
 
@@ -71,7 +71,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
     }
 
     // - Initialize arrays for fields in spectral space + FFT plans
-    field_data = SpectralFieldDataRZ(lev, realspace_ba, k_space, dm,
+    field_data = SpectralFieldDataRZ(warpx, lev, realspace_ba, k_space, dm,
                                      m_spectral_index.n_fields,
                                      n_rz_azimuthal_modes);
 }

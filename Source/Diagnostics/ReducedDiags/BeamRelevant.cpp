@@ -32,8 +32,8 @@
 using namespace amrex;
 
 // constructor
-BeamRelevant::BeamRelevant (const std::string& rd_name)
-: ReducedDiags{rd_name}
+BeamRelevant::BeamRelevant (WarpX* warpx, const std::string& rd_name)
+: ReducedDiags{warpx,rd_name}
 {
     // read beam name
     const ParmParse pp_rd_name(rd_name);
@@ -195,7 +195,7 @@ void BeamRelevant::ComputeDiags (int step)
     if (!m_intervals.contains(step+1)) { return; }
 
     // get MultiParticleContainer class object
-    const auto & mypc = WarpX::GetInstance().GetPartContainer();
+    const auto & mypc = m_warpx->GetPartContainer();
 
     // get number of species
     int const nSpecies = mypc.nSpecies();

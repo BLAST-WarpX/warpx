@@ -801,10 +801,10 @@ WarpX::InitData ()
     Print() << utils::logo::get_logo();
 
     // Diagnostics
-    multi_diags = std::make_unique<MultiDiagnostics>();
+    multi_diags = std::make_unique<MultiDiagnostics>(this);
 
     /** create object for reduced diagnostics */
-    reduced_diags = std::make_unique<MultiReducedDiags>();
+    reduced_diags = std::make_unique<MultiReducedDiags>(this);
 
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,
@@ -1013,7 +1013,7 @@ WarpX::InitPML ()
         // Note: fill_guards_fields and fill_guards_current are both set to
         // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
         // to the PML, for example in the presence of mesh refinement patches)
-        pml[0] = std::make_unique<PML>(
+        pml[0] = std::make_unique<PML>(this,
             0, boxArray(0), DistributionMap(0), do_similar_dm_pml, &Geom(0), nullptr,
             pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
             dt[0], nox_fft, noy_fft, noz_fft, grid_type,
@@ -1054,7 +1054,7 @@ WarpX::InitPML ()
             // Note: fill_guards_fields and fill_guards_current are both set to
             // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
             // to the PML, for example in the presence of mesh refinement patches)
-            pml[lev] = std::make_unique<PML>(
+            pml[lev] = std::make_unique<PML>(this,
                 lev, boxArray(lev), DistributionMap(lev), do_similar_dm_pml,
                 &Geom(lev), &Geom(lev-1),
                 pml_ncell, pml_delta, refRatio(lev-1),
@@ -1162,10 +1162,10 @@ WarpX::InitNCICorrector ()
             // Same filter for fields Ex, Ey and Bz
             const bool nodal_gather = !galerkin_interpolation;
             nci_godfrey_filter_exeybz[lev] = std::make_unique<NCIGodfreyFilter>(
-                godfrey_coeff_set::Ex_Ey_Bz, cdtodz, nodal_gather);
+                this, godfrey_coeff_set::Ex_Ey_Bz, cdtodz, nodal_gather);
             // Same filter for fields Bx, By and Ez
             nci_godfrey_filter_bxbyez[lev] = std::make_unique<NCIGodfreyFilter>(
-                godfrey_coeff_set::Bx_By_Ez, cdtodz, nodal_gather);
+                this, godfrey_coeff_set::Bx_By_Ez, cdtodz, nodal_gather);
             // Compute Godfrey filters stencils
             nci_godfrey_filter_exeybz[lev]->ComputeStencils();
             nci_godfrey_filter_bxbyez[lev]->ComputeStencils();
@@ -1177,8 +1177,7 @@ WarpX::InitNCICorrector ()
 void
 WarpX::InitFilter (){
     if (WarpX::use_filter){
-        WarpX::bilinear_filter.npass_each_dir = WarpX::filter_npass_each_dir.toArray<unsigned int>();
-        WarpX::bilinear_filter.ComputeStencils();
+        bilinear_filter->ComputeStencils();
     }
 }
 
@@ -1332,13 +1331,14 @@ WarpX::InitLevelData (int lev, Real /*time*/)
         const auto iarr = costs[lev]->IndexArray();
         for (const auto& i : iarr) {
             (*costs[lev])[i] = 0.0;
-            WarpX::setLoadBalanceEfficiency(lev, -1);
+            this->setLoadBalanceEfficiency(lev, -1);
         }
     }
 }
 
 template<typename T>
 void ComputeExternalFieldOnGridUsingParser_template (
+    WarpX* warpx,
     const T& field,
     amrex::ParserExecutor<4> const& fx_parser,
     amrex::ParserExecutor<4> const& fy_parser,
@@ -1347,15 +1347,14 @@ void ComputeExternalFieldOnGridUsingParser_template (
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > const& eb_update_field,
     bool use_eb_flags)
 {
-    auto &warpx = WarpX::GetInstance();
-    auto const &geom = warpx.Geom(lev);
+    auto const &geom = warpx->Geom(lev);
 
-    auto t = warpx.gett_new(lev);
+    auto t = warpx->gett_new(lev);
 
     auto dx_lev = geom.CellSizeArray();
     const RealBox& real_box = geom.ProbDomain();
 
-    amrex::IntVect refratio = (lev > 0 ) ? WarpX::RefRatio(lev-1) : amrex::IntVect(1);
+    amrex::IntVect refratio = (lev > 0 ) ? warpx->refRatio(lev-1) : amrex::IntVect(1);
     if (patch_type == PatchType::coarse) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             dx_lev[idim] = dx_lev[idim] * refratio[idim];
@@ -1363,9 +1362,9 @@ void ComputeExternalFieldOnGridUsingParser_template (
     }
 
     using ablastr::fields::Direction;
-    amrex::MultiFab* mfx = warpx.m_fields.get(field, Direction{0}, lev);
-    amrex::MultiFab* mfy = warpx.m_fields.get(field, Direction{1}, lev);
-    amrex::MultiFab* mfz = warpx.m_fields.get(field, Direction{2}, lev);
+    amrex::MultiFab* mfx = warpx->m_fields.get(field, Direction{0}, lev);
+    amrex::MultiFab* mfy = warpx->m_fields.get(field, Direction{1}, lev);
+    amrex::MultiFab* mfz = warpx->m_fields.get(field, Direction{2}, lev);
 
     const amrex::IntVect x_nodal_flag = mfx->ixType().toIntVect();
     const amrex::IntVect y_nodal_flag = mfy->ixType().toIntVect();
@@ -1501,6 +1500,7 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
 {
     if (std::holds_alternative<warpx::fields::FieldType>(field)){
         ComputeExternalFieldOnGridUsingParser_template<warpx::fields::FieldType> (
+            this,
             std::get<warpx::fields::FieldType>(field),
             fx_parser, fy_parser, fz_parser,
             lev, patch_type, eb_update_field,
@@ -1508,6 +1508,7 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
     }
     else{
         ComputeExternalFieldOnGridUsingParser_template<std::string> (
+            this,
             std::get<std::string>(field),
             fx_parser, fy_parser, fz_parser,
             lev, patch_type, eb_update_field,

@@ -219,7 +219,8 @@ struct CopyAndTimestamp {
 };
 
 
-ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
+ParticleBoundaryBuffer::ParticleBoundaryBuffer (WarpX* warpx)
+    : m_warpx(warpx)
 {
     m_particle_containers.resize(numBoundaries());
     m_do_boundary_buffer.resize(numBoundaries());
@@ -385,7 +386,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
     WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles");
 
     using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
-    const auto& warpx_instance = WarpX::GetInstance();
+    const auto& warpx_instance = *m_warpx;
     const amrex::Geometry& geom = warpx_instance.Geom(0);
     auto plo = geom.ProbLoArray();
     auto phi = geom.ProbHiArray();
@@ -469,7 +470,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         }
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
-                          auto& warpx = WarpX::GetInstance();
+                          auto& warpx = *m_warpx;
                           const auto dt = warpx.getdt(pti.GetLevel());
                           auto & buf = buffer[i];
                           const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
@@ -496,7 +497,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
 
 
         using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
-        const auto &warpx_instance = WarpX::GetInstance();
+        const auto &warpx_instance = *m_warpx;
         const amrex::Geometry &geom = warpx_instance.Geom(0);
         auto plo = geom.ProbLoArray();
 
@@ -577,7 +578,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                         if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
                         ptile_buffer.resize(new_np);
                     }
-                    auto &warpx = WarpX::GetInstance();
+                    auto &warpx = *m_warpx;
                     const auto dt = warpx.getdt(pti.GetLevel());
                     auto & buf = buffer[i];
                     const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
@@ -605,7 +606,7 @@ int ParticleBoundaryBuffer::getNumParticlesInContainer(
         const std::string& species_name, int boundary, bool local) {
 
     auto& buffer = m_particle_containers[boundary];
-    auto index = WarpX::GetInstance().GetPartContainer().getSpeciesID(species_name);
+    auto index = m_warpx->GetPartContainer().getSpeciesID(species_name);
 
     if (buffer[index].isDefined()){
         return static_cast<int>(buffer[index].TotalNumberOfParticles(false, local));
@@ -619,7 +620,7 @@ PinnedMemoryParticleContainer &
 ParticleBoundaryBuffer::getParticleBuffer(const std::string& species_name, int boundary) {
 
     auto& buffer = m_particle_containers[boundary];
-    auto index = WarpX::GetInstance().GetPartContainer().getSpeciesID(species_name);
+    auto index = m_warpx->GetPartContainer().getSpeciesID(species_name);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_boundary_buffer[boundary][index],
                                      "Attempted to get particle buffer for boundary "
@@ -634,7 +635,7 @@ PinnedMemoryParticleContainer *
 ParticleBoundaryBuffer::getParticleBufferPointer(const std::string& species_name, int boundary) {
 
     auto& buffer = m_particle_containers[boundary];
-    auto index = WarpX::GetInstance().GetPartContainer().getSpeciesID(species_name);
+    auto index = m_warpx->GetPartContainer().getSpeciesID(species_name);
 
     return &buffer[index];
 }

@@ -24,6 +24,8 @@
 
 #include <AMReX_BaseFwd.H>
 
+class WarpX;
+
 /** @file
  *
  * This file contains the implementation of the elementary process
@@ -84,6 +86,7 @@ public:
     * only few integer and real parameters and few pointers to the raw data of the
     * lookup tables. Therefore, it should be rather lightweight to copy.
     *
+    * @param[in] warpx pointer to a WarpX object
     * @param[in] generate_functor functor to be called to determine the properties of the generated pairs
     * @param[in] a_pti particle iterator to iterate over photons undergoing QED pair generation process
     * @param[in] lev   the mesh-refinement level
@@ -98,7 +101,8 @@ public:
     * @param[in] B_external_particle reference to external B field
     * @param[in] a_offset offset to apply to the particle indices
     */
-    PairGenerationTransformFunc(BreitWheelerGeneratePairs generate_functor,
+    PairGenerationTransformFunc(WarpX* warpx,
+                                BreitWheelerGeneratePairs const& generate_functor,
                                 const WarpXParIter& a_pti, int lev, amrex::IntVect ngEB,
                                 amrex::FArrayBox const& exfab,
                                 amrex::FArrayBox const& eyfab,

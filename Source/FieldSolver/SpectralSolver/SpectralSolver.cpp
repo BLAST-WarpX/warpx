@@ -24,6 +24,7 @@
 #if WARPX_USE_FFT
 
 SpectralSolver::SpectralSolver (
+                WarpX* warpx,
                 const amrex::BoxArray& realspace_ba,
                 const amrex::DistributionMapping& dm,
                 const int norder_x,
@@ -41,7 +42,7 @@ SpectralSolver::SpectralSolver (
                 const TimeDependencyRho time_dependency_rho,
                 const bool dive_cleaning,
                 const bool divb_cleaning)
-    : m_dt(dt)
+    : m_warpx(warpx), m_dt(dt)
 {
     // Initialize all structures using the same distribution mapping dm
 
@@ -109,7 +110,7 @@ SpectralSolver::SpectralSolver (
     }
 
     // - Initialize arrays for fields in spectral space + FFT plans
-    field_data = SpectralFieldData(realspace_ba, k_space, dm,
+    field_data = SpectralFieldData(m_warpx, realspace_ba, k_space, dm,
                                    m_spectral_index.n_fields, periodic_single_box);
 }
 

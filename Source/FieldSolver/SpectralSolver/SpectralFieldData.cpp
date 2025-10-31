@@ -129,11 +129,13 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 }
 
 /* \brief Initialize fields in spectral space, and FFT plans */
-SpectralFieldData::SpectralFieldData( const amrex::BoxArray& realspace_ba,
+SpectralFieldData::SpectralFieldData( WarpX* warpx,
+                                      const amrex::BoxArray& realspace_ba,
                                       const SpectralKSpace& k_space,
                                       const amrex::DistributionMapping& dm,
                                       const int n_field_required,
                                       const bool periodic_single_box):
+    m_warpx(warpx),
     m_periodic_single_box{periodic_single_box}
 {
     const BoxArray& spectralspace_ba = k_space.spectralspace_ba;
@@ -209,7 +211,7 @@ SpectralFieldData::ForwardTransform (const int lev,
                                      const MultiFab& mf, const int field_index,
                                      const int i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space
@@ -309,7 +311,7 @@ SpectralFieldData::BackwardTransform (const int lev,
                                       const amrex::IntVect& fill_guards,
                                       const int i_comp)
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+    amrex::LayoutData<amrex::Real>* cost = m_warpx->getCosts(lev);
     const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, mf.boxArray(), mf.DistributionMap());
 
     // Check field index type, in order to apply proper shift in spectral space

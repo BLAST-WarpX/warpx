@@ -17,6 +17,7 @@
 
 class AcceleratorLattice;
 struct LatticeElementFinderDevice;
+class WarpX;
 
 // Instances of the LatticeElementFinder class are saved in the AcceleratorLattice class
 // as the objects in a LayoutData.
@@ -25,17 +26,17 @@ struct LatticeElementFinderDevice;
 
 struct LatticeElementFinder
 {
-
     /**
      * \brief Initialize the element finder at the level and grid
      *
+     * @param[in] warpx pointer to a WarpX object
      * @param[in] lev the refinement level
      * @param[in] gamma_boost the Lorentz factor of the boosted frame
      * @param[in] time the current time on all refinement levels
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
-    void InitElementFinder (int lev, amrex::Real gamma_boost,
+    void InitElementFinder (WarpX* warpx, int lev, amrex::Real gamma_boost,
                             const amrex::Vector<amrex::Real>& time,
                             amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
@@ -58,6 +59,8 @@ struct LatticeElementFinder
     void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
                         AcceleratorLattice const& accelerator_lattice,
                         const amrex::Vector<amrex::Real>& time);
+
+    WarpX* m_warpx = nullptr;
 
     /* Define the location and size of the index lookup table */
     /* Use the type Real to be consistent with the way the main grid is defined */

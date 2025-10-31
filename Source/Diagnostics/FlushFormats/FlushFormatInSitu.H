@@ -36,7 +36,7 @@ public:
         void WriteParticles(const amrex::Vector<ParticleDiag>& particle_diags, conduit::Node& a_bp_mesh) const;
     #endif
 
-    FlushFormatInSitu ()          = default;
+    explicit FlushFormatInSitu (WarpX* warpx) : FlushFormat(warpx) {}
     ~FlushFormatInSitu() override = default;
 
     FlushFormatInSitu ( FlushFormatInSitu const &)             = default;

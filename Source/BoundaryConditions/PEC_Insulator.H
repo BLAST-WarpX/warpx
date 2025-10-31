@@ -12,11 +12,13 @@
 #include <array>
 #include <memory>
 
+class WarpX;
+
 class PEC_Insulator
 {
 public:
 
-    PEC_Insulator();
+    explicit PEC_Insulator(WarpX* warpx);
 
     /**
      * \brief Apply either the PEC or insulator boundary condition on the boundary and in the
@@ -139,6 +141,8 @@ private:
                                     std::string const & input_name,
                                     std::string const & coord1,
                                     std::string const & coord2);
+
+    WarpX* m_warpx;
 
     std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
     std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;

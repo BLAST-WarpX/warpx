@@ -16,6 +16,7 @@ class ParticleReductionFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] mf_src source multifab. Must be nullptr as no source MF is needed
      *            to compute the number of particles per cell, banane.
      * \param[in] lev level of multifab.
@@ -29,7 +30,7 @@ public:
      * \param[in] filter_str Parser string for filter function to apply before averaging
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    ParticleReductionFunctor(const amrex::MultiFab * mf_src, int lev,
+    ParticleReductionFunctor(WarpX* warpx, const amrex::MultiFab * mf_src, int lev,
                        amrex::IntVect crse_ratio, const std::string& fn_str,
                        int ispec, bool do_average,
                        bool do_filter, const std::string& filter_str,

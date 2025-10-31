@@ -17,6 +17,7 @@
 
 #include <string>
 
+class WarpX;
 
 /**
  * WarpXFluidContainer is the base class from which all concrete
@@ -31,7 +32,7 @@ class WarpXFluidContainer
 public:
     friend MultiFluidContainer;
 
-    WarpXFluidContainer (int ispecies, const std::string &name);
+    WarpXFluidContainer (WarpX* warpx, int ispecies, const std::string &name);
     ~WarpXFluidContainer() = default;
 
     WarpXFluidContainer (WarpXFluidContainer const &)             = delete;
@@ -145,6 +146,8 @@ public:
     [[nodiscard]] amrex::Real getMass () const {return mass;}
 
 protected:
+    WarpX* m_warpx;
+
     int species_id;
     std::string species_name;
     amrex::Real charge;

@@ -32,13 +32,14 @@
 
 using namespace amrex;
 
-BackTransformFunctor::BackTransformFunctor (amrex::MultiFab const * mf_src, int lev,
+BackTransformFunctor::BackTransformFunctor (WarpX* warpx,
+                                            amrex::MultiFab const * mf_src, int lev,
                                             const int ncomp, const int num_buffers,
                                             amrex::Vector< std::string > varnames,
                                             amrex::Vector< std::string > varnames_fields,
                                             const amrex::IntVect crse_ratio
                                             ):
-    ComputeDiagFunctor(ncomp, crse_ratio),
+    ComputeDiagFunctor(warpx, ncomp, crse_ratio),
     m_mf_src{mf_src}, m_lev{lev}, m_num_buffers{num_buffers},
     m_varnames{std::move(varnames)}, m_varnames_fields{std::move(varnames_fields)}
 {
@@ -51,7 +52,7 @@ BackTransformFunctor::operator ()(amrex::MultiFab& mf_dst, int /*dcomp*/, const 
     // Perform back-transformation only if z slice is within the domain stored as 0/1
     // in m_perform_backtransform[i_buffer]
     if ( m_perform_backtransform[i_buffer] == 1) {
-        auto& warpx = WarpX::GetInstance();
+        auto const& warpx = *m_warpx;
         auto geom = warpx.Geom(m_lev);
         const amrex::Real gamma_boost = WarpX::gamma_boost;
         const int moving_window_dir = WarpX::moving_window_dir;

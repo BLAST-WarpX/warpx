@@ -12,10 +12,14 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 
+class WarpX;
+
 namespace warpx::particles::deposition {
 
 class VarianceAccumulationBuffer {
     protected:
+    WarpX* m_warpx;
+
     // Species name for array lookup from register
     std::string m_species_name;
 
@@ -24,7 +28,7 @@ class VarianceAccumulationBuffer {
     public:
     // Constructor for accumulation buffer
     // This is built after the T vector fields are created, so use it to allocate the
-    VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name );
+    VarianceAccumulationBuffer (WarpX* warpx, ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name );
 
     // This public member functions
     void reset ();

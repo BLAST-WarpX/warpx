@@ -34,6 +34,7 @@ class BackTransformFunctor final : public ComputeDiagFunctor
 public:
     /** Constructor description
      *
+     * \param[in] warpx pointer to a WarpX object
      * \param[in] mf_src cell-centered multifab containing all user-requested
                          fields in boosted-frame
      * \param[in] lev mesh-refinement level of multifab.
@@ -44,7 +45,7 @@ public:
      * \param[in] varnames_fields base names of field-components for the RZ modes
      * \param[in] crse_ratio the coarsening ratio for fields
      */
-    BackTransformFunctor ( const amrex::MultiFab * mf_src, int lev,
+    BackTransformFunctor ( WarpX* warpx, const amrex::MultiFab * mf_src, int lev,
                            int ncomp, int num_buffers,
                            amrex::Vector< std::string > varnames,
                            amrex::Vector< std::string > varnames_fields,

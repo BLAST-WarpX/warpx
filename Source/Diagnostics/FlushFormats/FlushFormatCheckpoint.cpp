@@ -59,7 +59,7 @@ FlushFormatCheckpoint::WriteToFile (
 
     WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = *m_warpx;
 
     const VisMF::Header::Version current_version = VisMF::GetHeaderVersion();
     VisMF::SetHeaderVersion(amrex::VisMF::Header::NoFabHeader_v1);
@@ -253,7 +253,7 @@ void
 FlushFormatCheckpoint::WriteDMaps (const std::string& dir, int nlev) const
 {
     if (ParallelDescriptor::IOProcessor()) {
-        auto & warpx = WarpX::GetInstance();
+        auto const& warpx = *m_warpx;
         for (int lev = 0; lev < nlev; ++lev) {
             std::string DMFileName = dir;
             if (!DMFileName.empty() && DMFileName[DMFileName.size()-1] != '/') {DMFileName += '/';}
@@ -282,7 +282,7 @@ void
 FlushFormatCheckpoint::WriteReducedDiagsData (std::string const & dir) const
 {
     if (ParallelDescriptor::IOProcessor()) {
-        auto & warpx = WarpX::GetInstance();
+        auto const& warpx = *m_warpx;
         warpx.reduced_diags->WriteCheckpointData(dir);
     }
 }
