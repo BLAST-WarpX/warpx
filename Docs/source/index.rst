@@ -27,11 +27,11 @@ In addition, WarpX is a *highly-parallel and highly-optimized code*:
 Contact us
 ^^^^^^^^^^
 
-The `WarpX GitHub repo <https://github.com/BLAST-WarpX/warpx>`__ is the main communication platform:
+The `WarpX GitHub repository <https://github.com/BLAST-WarpX/warpx>`__ is the main communication platform:
 
    - If you are new to WarpX or have a question, we encourage you to visit our `discussions page <https://github.com/BLAST-WarpX/warpx/discussions>`__ and connect with the community. This page is also a great place to browse answers to previously asked questions, post new ones, get help with installation, exchange ideas, and share feedback.
-   - You can also explore the action icons in the upper right corner of the `WarpX GitHub page <https://github.com/BLAST-WarpX/warpx>`__ : feel free to watch the repo if you want to receive updates, or to star the repo to support the project.
-   - For bug reports or feature requests, you can also open a new `issue <https://github.com/BLAST-WarpX/warpx/issues>`__.
+   - You can also explore the icons in the upper right corner of the `WarpX GitHub repository <https://github.com/BLAST-WarpX/warpx>`__ (e.g., ``Watch``, ``Star``, etc.): feel free to watch the repository if you want to receive updates, or to star the repository to support the project.
+   - For bug reports, feature requests, or installation issues, you can also open a new `issue <https://github.com/BLAST-WarpX/warpx/issues>`__.
 
 .. raw:: html
 
