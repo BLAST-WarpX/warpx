@@ -42,10 +42,7 @@ if __name__ == "__main__":
     # Identify whether the test is a restart test,
     # if it is, use a 1e-12 tolerance for the restart checksum analysis
     test_name = os.path.split(os.getcwd())[1]
-    if "_restart" in test_name:
-        default_tolerance = 1e-12
-    else:
-        default_tolerance = 1e-9
+    default_tolerance = 1e-12 if "_restart" in test_name else 1e-9
     parser.add_argument(
         "--rtol",
         help="relative tolerance to compare checksums",
