@@ -29,15 +29,15 @@ for dirpath, dirnames, filenames in os.walk(top="./Examples"):
                 line = line.lstrip()
                 # find lines where 'add_warpx_test' is called
                 if re.match("add_warpx_test", line):
-                    # strip leading whitespaces, remove end-of-line comments
-                    testname = next(f).lstrip().split(" ")[0]
+                    # strip whitespaces, remove end-of-line comments
+                    testname = next(f).strip().split()[0]
                     # skip lines related to other function arguments
                     # NOTE: update range call to reflect changes
                     #       in the interface of 'add_warpx_test'
                     for _ in range(2):  # skip over: dims, nprocs
                         next(f)
-                    # strip leading whitespaces, remove end-of-line comments
-                    testinput = next(f).lstrip().split(" ")[0]
+                    # strip whitespaces, remove end-of-line comments
+                    testinput = next(f).strip().split()[0]
                     # some Python input scripts are quoted
                     # to account for command-line arguments:
                     # strip initial quotation mark from string
