@@ -96,16 +96,6 @@ Tutorials
 
    tutorials
 
-Theory
-------
-.. toctree::
-   :titlesonly:
-   :caption: THEORY
-   :maxdepth: 1
-   :hidden:
-
-   theory/intro
-
 Data Analysis
 -------------
 .. toctree::
@@ -123,6 +113,16 @@ Data Analysis
    dataanalysis/picviewer
    dataanalysis/reduced_diags
    dataanalysis/workflows
+
+Theory
+------
+.. toctree::
+   :titlesonly:
+   :caption: THEORY
+   :maxdepth: 1
+   :hidden:
+
+   theory/intro
 
 Development
 -----------
