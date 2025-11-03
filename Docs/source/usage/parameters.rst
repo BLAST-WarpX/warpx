@@ -1,7 +1,7 @@
 .. _running-cpp-parameters:
 
-Parameters: Inputs File
-=======================
+Inputs: Parameter List
+======================
 
 This documents on how to use WarpX with an inputs file (e.g., ``warpx.3d input_3d``).
 
