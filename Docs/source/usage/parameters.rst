@@ -2671,7 +2671,7 @@ Maxwell solver: kinetic-fluid hybrid
 .. note::
 
     **Required Parameters:**
-    
+
     - ``hybrid_pic_model.elec_temp`` must be specified when using the hybrid solver.
     - ``hybrid_pic_model.n0_ref`` should be specified if ``hybrid_pic_model.gamma != 1``.
 
@@ -2683,7 +2683,7 @@ Maxwell solver: kinetic-fluid hybrid
 .. warning::
 
     **Constraints and Limitations:**
-    
+
     - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if ``lev > 0``.
     - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
     - *External vector potential:* If using ``hybrid_pic_model.add_external_fields = true``, then ``external_vector_potential.fields`` must be non-empty.
