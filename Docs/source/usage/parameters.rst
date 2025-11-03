@@ -2385,7 +2385,7 @@ Filtering
     With the implicit evolve schemes, the filtering is turned off by default.
     The filtering smoothes the charge and currents on the mesh, after depositing them from the macro-particles.
     With implicit schemes, the electric field is also filtered (to maintain consistency for energy conservation).
-    This uses a bilinear filter (see the :ref:`filtering section <theory-pic-filter>`).
+    This uses a bilinear filter (see the :ref:`filtering section <theory-filter>`).
     With the RZ PSATD solver, the filtering is done in :math:`k`-space.
 
     .. warning::
@@ -2486,7 +2486,7 @@ Two families of Maxwell solvers are implemented in WarpX, based on the Finite-Di
      - ``yee``: Yee FDTD solver.
      - ``ckc``: (not available in ``RZ``, ``RCYLINDER``, and ``RSPHERE`` geometries) Cole-Karkkainen solver with Cowan
        coefficients (see :cite:t:`param-CowanPRSTAB13`).
-     - ``psatd``: Pseudo-spectral solver (see :ref:`theory <theory-pic-mwsolve-psatd>`).
+     - ``psatd``: Pseudo-spectral solver (see :ref:`theory <theory-mwsolve-psatd>`).
      - ``ect``: Enlarged cell technique (conformal finite difference solver. See :cite:t:`param-XiaoIEEE2005`).
      - ``hybrid``: The E-field will be solved using Ohm's law and a kinetic-fluid hybrid model (see :ref:`theory <theory-kinetic-fluid-hybrid-model>`).
      - ``none``: No field solve will be performed.
