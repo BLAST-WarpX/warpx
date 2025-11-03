@@ -102,14 +102,9 @@ Data Analysis
    :hidden:
 
    dataanalysis/formats
+   dataanalysis/openpmd
    dataanalysis/yt
-   dataanalysis/openpmdviewer
-   dataanalysis/openpmdapi
-   dataanalysis/paraview
-   dataanalysis/visit
-   dataanalysis/visualpic
-   dataanalysis/picviewer
-   dataanalysis/reduced_diags
+   dataanalysis/3dvisualizations
    dataanalysis/workflows
 
 Theory
