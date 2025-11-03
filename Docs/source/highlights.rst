@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Lei B., Zhang H., Bonţoiu C., Bonatto A., Resta-López J., Xia G., Qiao B. and Welsch C.
+   **100 TeV/m-level particle accelerators driven by high-density electron beams in micro structured carbon nanotube forest channel**.
+   New Journal of Physics **27**, 2025.
+   `DOI:10.1088/1367-2630/adf87d <https://doi.org/10.1088/1367-2630/adf87d>`__
+
 #. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
    **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
    Optics Express **33**, 10, 2025.
@@ -266,6 +271,11 @@ Nuclear Fusion and Plasma Confinement
 
 Plasma Thrusters and Spacecraft Physics
 ***************************************
+
+#. Zhou Z., Luo X., Zhao Y., Yu D.
+   **Impact of azimuthal magnetic field inhomogeneity on Hall thruster high-frequency azimuthal instability via 2D radial–azimuthal PIC simulations**.
+   Plasma Sources Sci. Technol. **34**, 105006, 2025.
+   `DOI:10.1088/1361-6595/ae0af5 <https://doi.org/10.1088/1361-6595/ae0af5>`__
 
 #. Xie L., Zhou Z., Luo X., Zhao Y.
    **The influence of adding Monte Carlo collisions on convergence in 3D PIC simulations of Hall thruster azimuthal instability**.

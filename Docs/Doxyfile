@@ -739,7 +739,7 @@ GENERATE_DEPRECATEDLIST= YES
 # sections, marked by \if <section_label> ... \endif and \cond <section_label>
 # ... \endcond blocks.
 
-ENABLED_SECTIONS       =
+ENABLED_SECTIONS       = WARPX_ZINDEX
 
 # The MAX_INITIALIZER_LINES tag determines the maximum number of lines that the
 # initial value of a variable or macro / define can have for it to appear in the
@@ -1347,7 +1347,7 @@ HTML_COLORSTYLE_GAMMA  = 80
 # The default value is: NO.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-HTML_TIMESTAMP         = NO
+TIMESTAMP         = NO
 
 # If the HTML_DYNAMIC_MENUS tag is set to YES then the generated HTML
 # documentation will contain a main index with vertical navigation menus that
@@ -2009,14 +2009,6 @@ LATEX_HIDE_INDICES     = NO
 
 LATEX_BIB_STYLE        = plain
 
-# If the LATEX_TIMESTAMP tag is set to YES then the footer of each generated
-# page will contain the date and time when the page was generated. Setting this
-# to NO can help when comparing the output of multiple runs.
-# The default value is: NO.
-# This tag requires that the tag GENERATE_LATEX is set to YES.
-
-LATEX_TIMESTAMP        = NO
-
 # The LATEX_EMOJI_DIRECTORY tag is used to specify the (relative or absolute)
 # path from which the emoji images will be read. If a relative path is entered,
 # it will be relative to the LATEX_OUTPUT directory. If left blank the
@@ -2285,17 +2277,14 @@ INCLUDE_FILE_PATTERNS  =
 # recursively expanded use the := operator instead of the = operator.
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
-PREDEFINED             = AMREX_Linux=1 \
-                         AMREX_PARTICLES=1 \
+PREDEFINED             = AMREX_PARTICLES=1 \
                          AMREX_USE_MPI=1 \
                          AMREX_USE_OMP=1 \
                          AMREX_SPACEDIM=1 \
                          AMREX_TINY_PROFILING=1 \
-                         BL_Linux=1 \
                          BL_USE_MPI=1 \
                          BL_USE_OMP=1 \
                          AMREX_USE_SENSEI_INSITU=1 \
-                         WARPX=1 \
                          WARPX_DIM_1D_Z=1 \
                          WARPX_ZINDEX=1 \
                          WARPX_USE_GPU=1 \
@@ -2709,3 +2698,6 @@ GENERATE_LEGEND        = YES
 # The default value is: YES.
 
 DOT_CLEANUP            = YES
+
+# Overwrite value of WARN_AS_ERROR
+WARN_AS_ERROR = YES

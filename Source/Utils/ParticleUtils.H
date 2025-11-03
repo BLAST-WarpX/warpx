@@ -110,6 +110,80 @@ namespace ParticleUtils {
     }
 
     /**
+     * \brief Perform a Lorentz transformation of the given velocity
+     * to a frame moving with gamma*velocity (Ux, Uy, Uz) relative to the present one.
+     *
+     * @param[in,out] ux,uy,uz components of velocity vector in the current
+                      frame - importantly these quantities are gamma * velocity
+     * @param[in] Ux,Uy,Uz velocity of the new frame relative to the current one,
+                      importantly these quantities are gamma * velocity
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void doLorentzTransformWithU ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+                                   amrex::ParticleReal& uz,
+                                   amrex::ParticleReal const Ux, amrex::ParticleReal const Uy,
+                                   amrex::ParticleReal const Uz )
+    {
+        using namespace amrex::literals;
+
+        constexpr auto c2 = PhysConst::c * PhysConst::c;
+
+        amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
+        amrex::ParticleReal const U = std::sqrt(Usq);
+        if (U > 0._prt) {
+            amrex::ParticleReal const gamma = std::sqrt(1._prt + Usq/c2);
+            // A nice way of calculating (gamma - 1) when it is small
+            amrex::ParticleReal const gammam1 = Usq/c2/(gamma + 1.0_prt);
+            amrex::ParticleReal const Ux_hat = Ux/U;
+            amrex::ParticleReal const Uy_hat = Uy/U;
+            amrex::ParticleReal const Uz_hat = Uz/U;
+            amrex::ParticleReal const P0 = std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)/c2);
+            amrex::ParticleReal const udotn = ux*Ux_hat + uy*Uy_hat + uz*Uz_hat;
+            ux = ux + gammam1*udotn*Ux_hat - Ux*P0;
+            uy = uy + gammam1*udotn*Uy_hat - Uy*P0;
+            uz = uz + gammam1*udotn*Uz_hat - Uz*P0;
+        }
+
+    }
+
+    /**
+     * \brief Perform a Lorentz transformation of the given momentum
+     * to a frame moving with gamma*velocity (Ux, Uy, Uz) relative to the present one.
+     *
+     * @param[in,out] px,py,pz components of momentum vector in the current frame
+     * @param[in] mass the particle mass
+     * @param[in] Ux,Uy,Uz velocity of the new frame relative to the current one,
+                      importantly these quantities are gamma * velocity
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void doLorentzTransformWithP ( amrex::ParticleReal& px, amrex::ParticleReal& py,
+                                   amrex::ParticleReal& pz, amrex::ParticleReal mass,
+                                   amrex::ParticleReal const Ux, amrex::ParticleReal const Uy,
+                                   amrex::ParticleReal const Uz )
+    {
+        using namespace amrex::literals;
+
+        constexpr auto c2 = PhysConst::c * PhysConst::c;
+
+        amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
+        amrex::ParticleReal const U = std::sqrt(Usq);
+        if (U > 0._prt) {
+            amrex::ParticleReal const gamma = std::sqrt(1._prt + Usq/c2);
+            // A nice way of calculating (gamma - 1) when it is small
+            amrex::ParticleReal const gammam1 = Usq/c2/(gamma + 1.0_prt);
+            amrex::ParticleReal const Ux_hat = Ux/U;
+            amrex::ParticleReal const Uy_hat = Uy/U;
+            amrex::ParticleReal const Uz_hat = Uz/U;
+            amrex::ParticleReal const P0 = std::sqrt(px*px + py*py + pz*pz + mass*mass*c2);
+            amrex::ParticleReal const pdotn = px*Ux_hat + py*Uy_hat + pz*Uz_hat;
+            px = px + gammam1*pdotn*Ux_hat - Ux*P0/PhysConst::c;
+            py = py + gammam1*pdotn*Uy_hat - Uy*P0/PhysConst::c;
+            pz = pz + gammam1*pdotn*Uz_hat - Uz*P0/PhysConst::c;
+        }
+
+    }
+
+    /**
      * \brief Generate random unit vector in 3 dimensions
      * https://mathworld.wolfram.com/SpherePointPicking.html
      *

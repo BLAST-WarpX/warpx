@@ -51,6 +51,7 @@ he_ions.momentum_distribution_type = maxwell_boltzmann
 he_ions.theta = (kb*Tgas/(Mion*clight^2))
 
 collisions.collision_names = coll_elec coll_ion
+collisions.split_position_push = 0
 coll_ion.type = background_mcc
 coll_ion.species = he_ions
 coll_ion.background_density = Ngas

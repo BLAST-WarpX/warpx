@@ -25,11 +25,11 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Executable: Input File
 
-            This example can be run **either** as WarpX **executable** using an input file: ``warpx.3d inputs_test_3d_uniform_plasma``
+            This example can be run **either** as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``
 
-             .. literalinclude:: inputs_test_3d_uniform_plasma
+             .. literalinclude:: inputs_base_3d
                 :language: ini
-                :caption: You can copy this file from ``usage/examples/lwfa/inputs_test_3d_uniform_plasma``.
+                :caption: You can copy this file from ``usage/examples/lwfa/inputs_base_3d``.
 
    .. tab-item:: 2D
 
