@@ -60,12 +60,13 @@ the last command should print ``cmake version 4.2.0-rc1``.
 S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>`__ system to administrate common software packages not found in the usual software repositories. You can find more information `here <https://s3df.slac.stanford.edu/#/software?id=s3df-centrally-installed-software>`__. WarpX relies on MPI for communicating between compute nodes. We can use the distribution preinstalled on S3DF:
 
 .. code-block:: bash
+
     module avail openmpi
     module load openmpi/v4.1.6
 
 .. _building-s3df-mpi:
 
-There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. The general recipe to locally install such packages manually, under `~/opt` is:
+**Make sure you have MPI loaded when you want to install/run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. The general recipe to locally install such packages manually, under `~/opt` is:
 
 .. code-block:: bash
 
