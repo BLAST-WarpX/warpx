@@ -1,7 +1,7 @@
 .. _install-users:
 
-Users
-=====
+Installation Methods
+====================
 
 .. raw:: html
 
@@ -20,16 +20,6 @@ Our community is here to help.
 Please `report installation problems <https://github.com/BLAST-WarpX/warpx/issues/new>`_ in case you should get stuck.
 
 Choose **one** of the installation methods below to get started:
-
-
-.. only:: html
-
-   .. image:: hpc.svg
-
-HPC Systems
------------
-
-If want to use WarpX on a specific high-performance computing (HPC) systems, jump directly to our :ref:`HPC system-specific documentation <install-hpc>`.
 
 
 .. _install-conda:
@@ -179,3 +169,13 @@ Tips for macOS Users
    If you are trying annother package manager than ``brew``, run `brew unlink ... <https://docs.brew.sh/Tips-N%27-Tricks#quickly-remove-something-from-usrlocal>`__ on such packages first to avoid software incompatibilities.
 
 See also: A. Huebl, `Working With Multiple Package Managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__, `Collegeville Workshop (CW20) <https://collegeville.github.io/CW20/>`_, 2020
+
+
+.. only:: html
+
+   .. image:: hpc.svg
+
+HPC Systems
+-----------
+
+If want to use WarpX on a specific high-performance computing (HPC) systems, jump directly to our :ref:`HPC system-specific documentation <install-hpc>`.

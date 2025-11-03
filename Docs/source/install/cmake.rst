@@ -2,15 +2,15 @@
 .. _building-cmake:
 .. _building-cmake-intro:
 
-Developers
-==========
+Compile from Source with CMake
+==============================
 
 `CMake <https://cmake.org>`_ is our primary build system.
 If you are new to CMake, `this short tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`_ from the HEP Software foundation is the perfect place to get started.
 If you just want to use CMake to build the project, jump into sections `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__ and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
 
-Dependencies
+Requirements
 ------------
 
 Before you start, you will need a copy of the WarpX source code:
@@ -31,8 +31,8 @@ WarpX depends on popular third party software.
    dependencies
 
 
-Compile
--------
+Compile the Executable
+----------------------
 
 From the base of the WarpX source directory, execute:
 
@@ -170,7 +170,7 @@ Pass ``-G Ninja`` to the CMake configuration call to speed up parallel compiles.
 
 .. _building-cmake-envvars:
 
-Configure your compiler
+Configure your Compiler
 -----------------------
 
 If you don't want to use your default compiler, you can set the following environment variables.
@@ -201,8 +201,8 @@ We also support adding `additional compiler flags via environment variables <htt
    Now call ``cmake -S . -B build`` (+ further options) again to re-initialize the build configuration.
 
 
-Run
----
+Executable File
+---------------
 
 An executable WarpX binary with the current compile-time options encoded in its file name will be created in ``build/bin/``.
 Note that you need separate binaries to run 1D, 2D, 3D, RZ, RCYLINDER, RSPHERE geometry inputs scripts.
@@ -214,8 +214,8 @@ Alternatively, read on and also build our PICMI Python interface.
 
 .. _building-cmake-python:
 
-PICMI Python Bindings
----------------------
+Build the PICMI Python Interface
+--------------------------------
 
 .. note::
 
@@ -252,8 +252,8 @@ Developers could now change the WarpX source code and then call the build line a
 
 .. _building-pip-python:
 
-Python Bindings (Package Management)
-------------------------------------
+Python Bindings Management
+--------------------------
 
 This section is relevant for Python package management, mainly for maintainers or people that rather like to interact only with ``pip``.
 
