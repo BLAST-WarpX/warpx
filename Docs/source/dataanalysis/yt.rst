@@ -1,7 +1,7 @@
 .. _dataanalysis-yt:
 
-yt-project
-==========
+AMReX Plotfiles with yt
+=======================
 
 `yt <http://yt-project.org/>`__ is a Python package that can help in analyzing and visualizing WarpX data (among other data formats).
 It is convenient to use yt within a `Jupyter notebook <http://jupyter.org/>`__.

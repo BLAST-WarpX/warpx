@@ -5,15 +5,26 @@ Output formats
 
 WarpX can :ref:`write diagnostics data <running-cpp-parameters>` either in
 
-* `plotfile format <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ or in
 * `openPMD format(s) <https://www.openpmd.org/>`__.
-
-Plotfiles are AMReX' native data format, while openPMD is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
+* `AMReX plotfile format <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ or in
 
 This section describes some of the tools available to visualize the data.
 
-Asynchronous IO
+
+OpenPMD Outputs
 ---------------
+
+OpenPMD is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
+More details about how to use openPMD outputs with WarpX can be found in :ref:`dataanalysis-openpmd`.
+
+
+AMReX Plotfiles
+---------------
+
+Plotfiles are AMReX' native data format. See :ref:`dataanalysis-yt` for tools to read AMReX plotfiles.
+
+Asynchronous IO
+^^^^^^^^^^^^^^^
 
 When using the AMReX `plotfile` format, users can set the ``amrex.async_out=1``
 option to perform the IO in a non-blocking fashion, meaning that the simulation
@@ -27,6 +38,34 @@ When writing plotfiles, each rank will write to a separate file, up to some maxi
 parameter. To use asynchronous IO with than ``amrex.async_out_nfiles`` MPI ranks, WarpX
 WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
 Please see :ref:`the building instructions <install-developers>` for details.
+
+
+Staggering Data Output
+----------------------
+
+Time
+^^^^
+
+Warning: currently, quantities in the output file for iteration ``n`` are not all defined at the same physical time due to the staggering in time in WarpX.
+The table below provides the physical time at which each quantity in the output file is written, in units of time step, for time step ``n``.
+
+======== ===== =====
+quantity staggering
+-------- -----------
+         FDTD  PSATD
+======== ===== =====
+E        n     n
+B        n     n
+j        n-1/2 n-1/2
+rho      n     n
+position n     n
+momentum n     n
+======== ===== =====
+
+Space
+^^^^^
+Warning: currently, the field quantities (see `<diag_name>.fields_to_plot` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged on the cell centers.
+
 
 In Situ Capabilities
 --------------------
@@ -52,22 +91,3 @@ analysis script :download:`video_yt.py <../../../Tools/PostProcessing/video_yt.p
 as a parallel analysis script
 :download:`video_yt.py <../../../Tools/PostProcessing/yt3d_mpi.py>` used to make a similar
 rendering for a beam-driven wakefield simulation, running parallel.
-
-Staggering in Data Output
--------------------------
-
-Warning: currently, quantities in the output file for iteration ``n`` are not all defined at the same physical time due to the staggering in time in WarpX.
-The table below provides the physical time at which each quantity in the output file is written, in units of time step, for time step ``n``.
-
-======== ===== =====
-quantity staggering
--------- -----------
-         FDTD  PSATD
-======== ===== =====
-E        n     n
-B        n     n
-j        n-1/2 n-1/2
-rho      n     n
-position n     n
-momentum n-1/2 n-1/2
-======== ===== =====

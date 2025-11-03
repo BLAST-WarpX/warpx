@@ -10,3 +10,4 @@ This section collects typical user workflows and best practices for data analysi
    :maxdepth: 1
 
    workflows/tunneling
+   reduced_diags
