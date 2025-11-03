@@ -115,10 +115,10 @@ Data Analysis
 Theory
 ------
 .. toctree::
-   :titlesonly:
    :caption: THEORY
    :maxdepth: 1
    :hidden:
+   :titlesonly:
 
    theory/intro
 

@@ -6,7 +6,7 @@ Models & Algorithms
 .. _theory-pic:
 
 In the *particle-in-cell method* :cite:p:`i-Birdsalllangdon`,
-the electromagnetic fields are solved on a discretized grid while particles are
+the electric and magnetic fields are solved on a discretized grid while particles are
 evolved in continuous space. A high-level schematic of the method is shown in the
 figure below with details of the different field solvers, particle handling algorithms,
 additional physics modules, etc. described in the sections linked further down.
@@ -35,8 +35,10 @@ Various techniques or reduced models have been developed to allow multidimension
 ponderomotive guiding center (PGC) models :cite:p:`i-Antonsenprl1992,i-Krallpre1993,i-Quickpic,i-Benedettiaac2010,i-Cowanjcp11`, simulation in an optimal Lorentz boosted frame :cite:p:`i-Vayprl07,i-Bruhwileraac08,i-Vayscidac09,i-Vaypac09,i-Martinspac09,i-VayAAC2010,i-Martinsnaturephysics10,i-Martinspop10,i-Martinscpc10,i-Vayjcp2011,i-VayPOPL2011,i-Vaypop2011,i-Yu2016`,
 expanding the fields into a truncated series of azimuthal modes :cite:p:`i-godfrey1985iprop,i-LifschitzJCP2009,i-DavidsonJCP2015,i-Lehe2016,i-AndriyashPoP2016`, fluid approximation :cite:p:`i-Krallpre1993,i-Shadwickpop09,i-Benedettiaac2010` and scaled parameters :cite:p:`i-Cormieraac08,i-Geddespac09`.
 
+.. _theory-field_solvers:
+
 Field Solvers
--------------
+=============
 
 .. toctree::
    :maxdepth: 1
@@ -45,10 +47,10 @@ Field Solvers
    kinetic_fluid_hybrid_model
 
 Grid & Geometries
------------------
+=================
 
 Boundary Conditions
--------------------
+===================
 
 .. toctree::
    :maxdepth: 1
@@ -56,7 +58,7 @@ Boundary Conditions
    boundary_conditions
 
 Species Representations
------------------------
+=======================
 
 .. toctree::
    :maxdepth: 1
@@ -65,7 +67,7 @@ Species Representations
    cold_fluid_model
 
 Multiphysics Processes
-----------------------
+======================
 
 .. toctree::
    :maxdepth: 1
@@ -73,7 +75,7 @@ Multiphysics Processes
    multiphysics_extensions
 
 Advanced Modes of Running
--------------------------
+=========================
 
 .. toctree::
    :maxdepth: 1
