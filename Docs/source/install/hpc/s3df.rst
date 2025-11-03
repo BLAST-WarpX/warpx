@@ -57,18 +57,29 @@ The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20
 
 the last command should print ``cmake version 4.2.0-rc1``.
 
-There are additional packages required to compile WarpX such as ``openmpi`` to enable MPI support. The general recipe to locally install such backages under `~/.local` is:
+S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>`__ system to administrate common software packages not found in the usual software repositories. You can find more information `here <https://s3df.slac.stanford.edu/#/software?id=s3df-centrally-installed-software>`__. WarpX relies on MPI for communicating between compute nodes. We can use the distribution preinstalled on S3DF:
+
+.. code-block:: bash
+    module avail openmpi
+    module load openmpi/v4.1.6
+
+.. _building-s3df-mpi:
+
+There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. The general recipe to locally install such packages manually, under `~/opt` is:
 
 .. code-block:: bash
 
-   cd 
-   wget <url-to-package>
-   cd <package>
-   ./configure --prefix=$HOME/.local
-   make -j$(nproc)
-   make install
+    cd 
+    wget <url-to-package>
+    cd <package>
+    mkdir build && cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name> -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_THREADS=ON
+    make -j$(nproc)
+    make install
 
 .. _building-s3df-packages:
+
+It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters: ``ADIOS2-2.10.1``->``<package-name>=adios2`` or ``openPMD-api-0.15.1``->``<package-name>=openpmd``.
 
 .. code-block:: bash
 
