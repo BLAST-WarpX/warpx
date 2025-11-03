@@ -196,45 +196,16 @@ You can run an interactive job directly from the terminal by typing:
 
 .. code-block:: bash
 
-    srun --partition <partitionname> --account <accountname> -n 1 --time=01:00:00 --pty /bin/bash
+    srun --partition <partitionname> --account <accountname> -n 2 --time=01:00:00 --pty /bin/bash
 
 .. _running-s3df-terminal:
 
-where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``.
+where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``. Here we request 2 nodes for 1 hour to test WarpX with MPI.
 
-Post-Processing
----------------
-
-For post-processing, most users use Python via NERSC's `Jupyter service <https://jupyter.nersc.gov>`__ (`documentation <https://docs.nersc.gov/services/jupyter/>`__).
-
-As a one-time preparatory setup, log into Perlmutter via SSH and do *not* source the WarpX profile script above.
-Create your own Conda environment and `Jupyter kernel <https://docs.nersc.gov/services/jupyter/how-to-guides/#how-to-use-a-conda-environment-as-a-python-kernel>`__ for post-processing:
+Once the scheduler allocated the resources you can run WarpX:
 
 .. code-block:: bash
 
-   module load python
+    mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
 
-   conda config --set auto_activate_base false
-
-   # create conda environment
-   rm -rf $HOME/.conda/envs/warpx-pm-postproc
-   conda create --yes -n warpx-pm-postproc -c conda-forge mamba conda-libmamba-solver
-   conda activate warpx-pm-postproc
-   conda config --set solver libmamba
-   mamba install --yes -c conda-forge python ipykernel ipympl matplotlib numpy pandas yt openpmd-viewer openpmd-api h5py fast-histogram dask dask-jobqueue pyarrow
-
-   # create Jupyter kernel
-   rm -rf $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/
-   python -m ipykernel install --user --name warpx-pm-postproc --display-name WarpX-PM-PostProcessing
-   echo -e '#!/bin/bash\nmodule load python\nconda activate warpx-pm-postproc\nexec "$@"' > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
-   chmod a+rx $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel-helper.sh
-   KERNEL_STR=$(jq '.argv |= ["{resource_dir}/kernel-helper.sh"] + .' $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json | jq '.argv[1] = "python"')
-   echo ${KERNEL_STR} | jq > $HOME/.local/share/jupyter/kernels/warpx-pm-postproc/kernel.json
-
-   exit
-
-
-When opening a Jupyter notebook on `https://jupyter.nersc.gov <https://jupyter.nersc.gov>`__, just select ``WarpX-PM-PostProcessing`` from the list of available kernels on the top right of the notebook.
-
-Additional software can be installed later on, e.g., in a Jupyter cell using ``!mamba install -y -c conda-forge ...``.
-Software that is not available via conda can be installed via ``!python -m pip install ...``.
+.. _running-s3df-run:
