@@ -29,7 +29,7 @@ After connecting to the S3DF log in to one of the pools. You can find a list of 
 
    ssh iana
 
-.. _building-s3df-compilation:
+.. _building-s3df-login:
 
 Use the following command to download the WarpX source code:
 
@@ -37,7 +37,7 @@ Use the following command to download the WarpX source code:
 
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
-.. _building-s3df-compilation:
+.. _building-s3df-preparation:
 
 Compilation
 -----------
@@ -83,9 +83,11 @@ It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<packag
 
 .. code-block:: bash
 
-   export PATH=$HOME/.local/bin:$PATH
-   export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
-   export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+    echo 'export ADIOS2_DIR=$HOME/opt/adios2' >> ~/.bashrc
+    echo 'export FFTW_ROOT=$HOME/opt/fftw' >> ~/.bashrc
+    echo 'export PATH=$HOME/opt/adios2/bin:$HOME/opt/fftw/bin:$PATH' >> ~/.bashrc
+    echo 'export LD_LIBRARY_PATH=$HOME/opt/adios2/lib64:$HOME/opt/adios2/lib:$HOME/opt/fftw/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+    source ~/.bashrc
 
 .. _building-s3df-paths:
 
@@ -137,6 +139,8 @@ Build and compile WarpX:
    cmake -S . -B build
    cmake --build build -j$(nproc)
 
+.. _building-s3df-compile:
+
 The WarpX application executables are now in ``$HOME/src/warpx/build/bin/``.
 Additionally, the following commands will install WarpX as a Python module:
 
@@ -169,6 +173,8 @@ If you already installed WarpX in the past and want to update it, start by getti
    git status
    git log # press q to exit
 
+.. _update-s3df-update:
+
 And, if needed,
 
 - :ref:`update the s3df_warpx files <building-s3df-preparation>`,
@@ -176,9 +182,6 @@ And, if needed,
 - :ref:`execute the dependency install scripts <building-s3df-preparation>`.
 
 As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_pm_*`` and rebuild WarpX.
-
-
-.. _running-cpp-s3df:
 
 Running
 -------
@@ -189,11 +192,15 @@ On CPU Nodes
 
 The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (see `here <https://s3df.slac.stanford.edu/#/interactive-compute?id=using-a-terminal>`__).
 
-.. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/perlmutter_cpu.sbatch
-  :language: bash
-  :caption: You can copy this file from ``$HOME/src/warpx/Tools/machines/perlmutter-nersc/perlmutter_cpu.sbatch``.
+You can run an interactive job directly from the terminal by typing:
 
-.. _post-processing-s3df:
+.. code-block:: bash
+
+    srun --partition <partitionname> --account <accountname> -n 1 --time=01:00:00 --pty /bin/bash
+
+.. _running-s3df-terminal:
+
+where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``.
 
 Post-Processing
 ---------------
