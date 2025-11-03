@@ -60,7 +60,7 @@ struct SmartCreate
         prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(x,y);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        prt.m_rdata[PIdx::x][i_prt] = x;
+        prt.m_rdata[PIdx::r][i_prt] = x;
         amrex::ignore_unused(y,z);
 #endif
 

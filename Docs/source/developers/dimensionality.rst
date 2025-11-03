@@ -8,16 +8,17 @@ This section describes the handling of dimensionality in WarpX.
 Build Options
 -------------
 
-===============  ==========================
+===============  =========================================
 Dimensions       CMake Option
-===============  ==========================
+===============  =========================================
 **3D3V**         ``WarpX_DIMS=3`` (default)
 **2D3V**         ``WarpX_DIMS=2``
 **1D3V**         ``WarpX_DIMS=1``
 **RZ3V**         ``WarpX_DIMS=RZ``
 **RCYLINDER3V**  ``WarpX_DIMS=RCYLINDER``
 **RSPHERE3V**    ``WarpX_DIMS=RSPHERE``
-===============  ==========================
+**all**          ``WarpX_DIMS=1;2;RZ;RCYLINDER;RSPHERE;3``
+===============  =========================================
 
 Note that one can :ref:`build multiple WarpX dimensions at once <building-cmake-options>` via ``-DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"``.
 

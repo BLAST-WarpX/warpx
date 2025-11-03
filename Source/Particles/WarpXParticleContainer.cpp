@@ -263,16 +263,16 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         amrex::ignore_unused(y);
 #ifdef WARPX_DIM_RZ
-        pinned_tile.push_back_real(PIdx::x, r.data(), r.data() + np);
+        pinned_tile.push_back_real(PIdx::r, r.data(), r.data() + np);
 #else
-        pinned_tile.push_back_real(PIdx::x, x.data() + ibegin, x.data() + iend);
+        pinned_tile.push_back_real(PIdx::r, x.data() + ibegin, x.data() + iend);
 #endif
         pinned_tile.push_back_real(PIdx::z, z.data() + ibegin, z.data() + iend);
 #elif defined(WARPX_DIM_1D_Z)
         amrex::ignore_unused(x,y);
         pinned_tile.push_back_real(PIdx::z, z.data() + ibegin, z.data() + iend);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        pinned_tile.push_back_real(PIdx::x, x.data() + ibegin, x.data() + iend);
+        pinned_tile.push_back_real(PIdx::r, x.data() + ibegin, x.data() + iend);
         amrex::ignore_unused(y,z);
 #endif
 
