@@ -18,7 +18,7 @@ If you are new to this system, **please see the following resources**:
 
   * ``$HOME``: sdfhome, per-user directory, default `quota <https://s3df.slac.stanford.edu/#/reference?id=storagequota>`__: 30GB
 
-.. _building-s3df-preparation:
+.. _building-s3df-init:
 
 Preparation
 -----------
