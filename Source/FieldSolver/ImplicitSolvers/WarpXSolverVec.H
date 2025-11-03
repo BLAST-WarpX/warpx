@@ -310,10 +310,13 @@ public:
     void copyTo   (amrex::Real* const) const;
 
     // return WarpX pointer
-    inline auto getWarpX () const { return m_WarpX; }
+    [[nodiscard]] auto getWarpX () const { return m_WarpX; }
 
     // return the number of AMR levels
-    inline auto numAMRLevels () const { return m_num_amr_levels; }
+    [[nodiscard]] auto numAMRLevels () const { return m_num_amr_levels; }
+
+    // return DOFs object pointer
+    inline const auto& getDOFsObject () const { return m_dofs; }
 
 private:
 
