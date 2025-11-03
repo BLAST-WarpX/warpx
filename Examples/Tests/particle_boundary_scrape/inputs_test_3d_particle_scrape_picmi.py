@@ -50,6 +50,10 @@ electrons = picmi.Species(
     initial_distribution=uniform_plasma_elec,
     warpx_save_particles_at_xhi=1,
     warpx_save_particles_at_eb=1,
+    warpx_add_real_attributes={
+        "r_birth": "sqrt(x*x+y*y)",
+        "z_birth": "z",
+    },
 )
 
 ##########################
@@ -135,6 +139,11 @@ scraped_steps = particle_buffer.get_particle_boundary_buffer(
 )
 for arr in scraped_steps:
     assert all(np.array(arr, copy=False) > 40)
+
+# check that the initial r-values are correctly copied to the buffer
+r_births = particle_buffer.get_particle_boundary_buffer("electrons", "eb", "r_birth", 0)
+for arr in r_births:
+    assert all(np.array(arr, copy=False) > 0)
 
 weights = particle_buffer.get_particle_boundary_buffer("electrons", "eb", "w", 0)
 n = sum(len(arr) for arr in weights)
