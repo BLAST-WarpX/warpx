@@ -79,7 +79,7 @@ There are additional packages required to successfully compile WarpX such as ``f
 
 .. _building-s3df-packages:
 
-It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters: ``ADIOS2-2.10.1``->``<package-name>=adios2`` or ``openPMD-api-0.15.1``->``<package-name>=openpmd``.
+It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters: ``ADIOS2-2.10.1``-> ``<package-name>=adios2`` or ``openPMD-api-0.15.1``-> ``<package-name>=openpmd``.
 
 .. code-block:: bash
 
