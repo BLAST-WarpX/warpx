@@ -1,7 +1,7 @@
 .. _theory:
 
-Models & Algorithms
-===================
+Overview
+========
 
 .. _theory-pic:
 
