@@ -72,7 +72,8 @@ There are additional packages required to successfully compile WarpX such as ``f
     cd 
     wget <url-to-package>
     cd <package>
-    cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name> -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_THREADS=ON
+    mkdir build && cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name> -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_THREADS=ON
     make -j$(nproc)
     make install
 
