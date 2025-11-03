@@ -3411,6 +3411,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         """
         return self.extension.warpx.multifab_register()
 
+
 # ----------------------------
 # Simulation frame diagnostics
 # ----------------------------
