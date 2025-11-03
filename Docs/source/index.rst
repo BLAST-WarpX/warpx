@@ -105,6 +105,7 @@ Data Analysis
    dataanalysis/openpmd
    dataanalysis/yt
    dataanalysis/3dvisualizations
+   dataanalysis/insitu
    dataanalysis/workflows
 
 Theory
