@@ -11,7 +11,7 @@ docutils>=0.17.1
 
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
-picmistandard==0.33.0
+picmistandard==0.34.0
 # for development against an unreleased PICMI version, use:
 # picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
 

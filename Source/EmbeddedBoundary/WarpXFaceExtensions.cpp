@@ -252,109 +252,239 @@ namespace
 
 #endif
 
-}
 
-/**
-* \brief Get the value of arr in the neighbor (i_n, j_n) on the plane with normal 'dim'.
-*
-*        I.E. If dim==0 it return arr(i, j + i_n, k + j_n),
-*             if dim==1 it return arr(i + i_n, j, k + j_n),
-*             if dim==2 it return arr(i + i_n, j + j_n, k)
-*
-* \param[in] arr data To be accessed
-* \param[in] i, j, k the indices of the "center" cell
-* \param[in] i_n the offset of the neighbor in the first direction
-* \param[in] j_n the offset of the neighbor in the second direction
-* \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
-*/
-template <class T>
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-constexpr
-T
-GetNeigh(const amrex::Array4<T>& arr,
-         const int i, const int j, const int k,
-         const int i_n, const int j_n, const int dim){
+    /**
+    * \brief Get the value of arr in the neighbor (i_n, j_n) on the plane with normal 'dim'.
+    *
+    *        I.E. If dim==0 it return arr(i, j + i_n, k + j_n),
+    *             if dim==1 it return arr(i + i_n, j, k + j_n),
+    *             if dim==2 it return arr(i + i_n, j + j_n, k)
+    *
+    * \param[in] arr data To be accessed
+    * \param[in] i, j, k the indices of the "center" cell
+    * \param[in] i_n the offset of the neighbor in the first direction
+    * \param[in] j_n the offset of the neighbor in the second direction
+    * \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
+    */
+    template <class T>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    constexpr
+    T
+    GetNeigh(const amrex::Array4<T>& arr,
+            const int i, const int j, const int k,
+            const int i_n, const int j_n, const int dim){
 
-    if(dim == 0){
-        return arr(i, j + i_n, k + j_n);
-    }
-#ifdef WARPX_DIM_XZ
-    else if(dim == 1 || (dim == 2)){
-        return arr(i + i_n, j + j_n, k);
-    }
-#elif defined(WARPX_DIM_3D)
-    else if(dim == 1){
-        return arr(i + i_n, j, k + j_n);
-    }
-    else if(dim == 2){
-        return arr(i + i_n, j + j_n, k);
-    }
-#else
-    else if(dim == 1){
-        amrex::Abort("GetNeigh: Only implemented in 2D3V and 3D3V");
-    }
-    else if(dim == 2){
-        return arr(i + i_n, j + j_n, k);
-    }
-#endif
+        if(dim == 0){
+            return arr(i, j + i_n, k + j_n);
+        }
+    #ifdef WARPX_DIM_XZ
+        else if(dim == 1 || (dim == 2)){
+            return arr(i + i_n, j + j_n, k);
+        }
+    #elif defined(WARPX_DIM_3D)
+        else if(dim == 1){
+            return arr(i + i_n, j, k + j_n);
+        }
+        else if(dim == 2){
+            return arr(i + i_n, j + j_n, k);
+        }
+    #else
+        else if(dim == 1){
+            amrex::Abort("GetNeigh: Only implemented in 2D3V and 3D3V");
+        }
+        else if(dim == 2){
+            return arr(i + i_n, j + j_n, k);
+        }
+    #endif
 
-    amrex::Abort("GetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("GetNeigh: dim must be 0, 1 or 2");
 
-    return -1;
-}
+        return -1;
+    }
 
 
-/**
-* \brief Set the value of arr in the neighbor (i_n, j_n) on the plane with normal 'dim'.
-*
-*        I.E. If dim==0 it return arr(i, j + i_n, k + j_n),
-*             if dim==1 it return arr(i + i_n, j, k + j_n),
-*             if dim==2 it return arr(i + i_n, j + j_n, k)
-*
-* \param[in] arr data to be modified
-* \param[in] val the value to be set
-* \param[in] i, j, k the indices of the "center" cell
-* \param[in] i_n the offset of the neighbor in the first direction
-* \param[in] j_n the offset of the neighbor in the second direction
-* \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
-*/
-template <class T>
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-constexpr
-void
-SetNeigh(const amrex::Array4<T>& arr, const T val,
-         const int i, const int j, const int k,
-         const int i_n, const int j_n, const int dim){
+    /**
+    * \brief Set the value of arr in the neighbor (i_n, j_n) on the plane with normal 'dim'.
+    *
+    *        I.E. If dim==0 it return arr(i, j + i_n, k + j_n),
+    *             if dim==1 it return arr(i + i_n, j, k + j_n),
+    *             if dim==2 it return arr(i + i_n, j + j_n, k)
+    *
+    * \param[in] arr data to be modified
+    * \param[in] val the value to be set
+    * \param[in] i, j, k the indices of the "center" cell
+    * \param[in] i_n the offset of the neighbor in the first direction
+    * \param[in] j_n the offset of the neighbor in the second direction
+    * \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
+    */
+    template <class T>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    constexpr
+    void
+    SetNeigh(const amrex::Array4<T>& arr, const T val,
+            const int i, const int j, const int k,
+            const int i_n, const int j_n, const int dim){
 
-    if(dim == 0){
-        arr(i, j + i_n, k + j_n) = val;
-        return;
-    }
-#ifdef WARPX_DIM_XZ
-    else if(dim == 1 || (dim == 2)){
-        arr(i + i_n, j + j_n, k) = val;
-        return;
-    }
-#elif defined(WARPX_DIM_3D)
-    else if(dim == 1){
-        arr(i + i_n, j, k + j_n) = val;
-        return;
-    }
-    else if(dim == 2){
-        arr(i + i_n, j + j_n, k) = val;
-        return;
-    }
-#else
-    else if(dim == 1){
-        amrex::Abort("SetNeigh: Only implemented in 2D3V and 3D3V");
-    }
-    else if(dim == 2){
-        arr(i + i_n, j + j_n, k) = val;
-        return;
-    }
-#endif
+        if(dim == 0){
+            arr(i, j + i_n, k + j_n) = val;
+            return;
+        }
+    #ifdef WARPX_DIM_XZ
+        else if(dim == 1 || (dim == 2)){
+            arr(i + i_n, j + j_n, k) = val;
+            return;
+        }
+    #elif defined(WARPX_DIM_3D)
+        else if(dim == 1){
+            arr(i + i_n, j, k + j_n) = val;
+            return;
+        }
+        else if(dim == 2){
+            arr(i + i_n, j + j_n, k) = val;
+            return;
+        }
+    #else
+        else if(dim == 1){
+            amrex::Abort("SetNeigh: Only implemented in 2D3V and 3D3V");
+        }
+        else if(dim == 2){
+            arr(i + i_n, j + j_n, k) = val;
+            return;
+        }
+    #endif
 
-    amrex::Abort("SetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("SetNeigh: dim must be 0, 1 or 2");
+    }
+
+#ifdef AMREX_USE_EB
+
+    /**
+    * \brief For the face of cell pointing in direction idim, return the number of faces
+    * we need to intrude with the one-way extension. Returns only one or zero: one if the
+    * face can be extended with the the one-way extension, zeros if it can't.
+    *
+    * \param[in] cell \c Dim3 storing the indices of the face to extended
+    * \param[in] S_ext amount of area needed for the extension
+    * \param[in] S_red \c Array4 storing the amount of  area each face can still give away
+    * \param[in] flag_info_face \c Array4 storing face information
+    * \param[in] flag_ext_face \c Array4 storing face information
+    * \param[in] idim normal direction to the face in consideration (0 for x, 1 for y, 2 for z)
+    */
+    AMREX_GPU_DEVICE
+    int ComputeNBorrowOneFaceExtension(
+        const amrex::Dim3 cell, const amrex::Real S_ext,
+        const amrex::Array4<amrex::Real>& S_red,
+        const amrex::Array4<int>& flag_info_face,
+        const amrex::Array4<int>& flag_ext_face, const int idim)
+    {
+        const int i = cell.x;
+        const int j = cell.y;
+        const int k = cell.z;
+        int n_borrow = 0;
+        bool stop = false;
+        for (int i_n = -1; i_n < 2; i_n++) {
+            for (int j_n = -1; j_n < 2; j_n++) {
+                //This if makes sure that we don't visit the "diagonal neighbours"
+                if ((i_n != j_n) && (i_n != -j_n)) {
+                    // Here a face is available if it doesn't need to be extended itself and if its
+                    // area exceeds Sz_ext. Here we need to take into account if the intruded face
+                    // has given away already some area, so we use Sz_red rather than Sz.
+                    // If no face is available we don't do anything and we will need to use the
+                    // multi-face extensions.
+                    if (GetNeigh(S_red, i, j, k, i_n, j_n, idim) > S_ext
+                        && (GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
+                        || GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
+                        && flag_ext_face(i, j, k) && ! stop) {
+                        n_borrow += 1;
+                        stop = true;
+                    }
+                }
+            }
+        }
+
+        return n_borrow;
+    }
+
+
+    /**
+    * \brief For the face of cell pointing in direction idim, return the number of faces
+    * we need to intrude with the eight-ways extension.
+    *
+    * \param[in] cell \c Dim3 storing the indices of the face to extended
+    * \param[in] S_ext amount of area needed for the extension
+    * \param[in] S_red \c Array4 storing the amount of  area each face can still give away
+    * \param[in] S \c Array4 storing the area of face
+    * \param[in] flag_info_face \c Array4 storing face information
+    * \param[in] idim normal direction to the face in consideration (0 for x, 1 for y, 2 for z)
+    */
+    AMREX_GPU_DEVICE
+    int ComputeNBorrowEightFacesExtension(
+        const amrex::Dim3 cell, const amrex::Real S_ext,
+        const amrex::Array4<amrex::Real> &S_red,
+        const amrex::Array4<amrex::Real> &S,
+        const amrex::Array4<int> &flag_info_face,
+        int idim)
+    {
+        const int i = cell.x;
+        const int j = cell.y;
+        const int k = cell.z;
+        int n_borrow = 0;
+        amrex::Array2D<int, 0, 2, 0, 2> local_avail{};
+
+        for(int i_loc = 0; i_loc <= 2; i_loc++){
+            for(int j_loc = 0; j_loc <= 2; j_loc++){
+                const int flag = GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
+                local_avail(i_loc, j_loc) = flag == 1 || flag == 2;
+            }
+        }
+
+        amrex::Real denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
+                            local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
+                            local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
+                            local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
+                            local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
+                            local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
+                            local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
+                            local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+
+        bool neg_face = true;
+
+        while(denom >= S_ext && neg_face && denom > 0){
+            neg_face = false;
+            for (int i_n = -1; i_n < 2; i_n++) {
+                for (int j_n = -1; j_n < 2; j_n++) {
+                    if(local_avail(i_n + 1, j_n + 1)){
+                        const amrex::Real patch = S_ext * GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
+                        if(GetNeigh(S_red, i, j, k, i_n, j_n, idim) - patch <= 0) {
+                            neg_face = true;
+                            local_avail(i_n + 1, j_n + 1) = false;
+                        }
+                    }
+                }
+            }
+
+            denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
+                    local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
+                    local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
+                    local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
+                    local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
+                    local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
+                    local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
+                    local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+        }
+
+        // We count the number of entries in local_avail which are still True, this is the number of
+        // neighboring faces which are intruded
+        for(int ii = 0; ii < 3; ii++) {
+            for (int jj = 0; jj < 3; jj++) {
+                n_borrow += local_avail(ii, jj);
+            }
+        }
+
+        return n_borrow;
+    }
+
+    #endif //AMREX_USE_EB
 }
 
 
@@ -443,108 +573,6 @@ WarpX::ComputeFaceExtensions ()
 #endif
 }
 
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-int
-ComputeNBorrowOneFaceExtension(const amrex::Dim3 cell, const amrex::Real S_ext,
-                               const amrex::Array4<amrex::Real>& S_red,
-                               const amrex::Array4<int>& flag_info_face,
-                               const amrex::Array4<int>& flag_ext_face, const int idim) {
-    const int i = cell.x;
-    const int j = cell.y;
-    const int k = cell.z;
-    int n_borrow = 0;
-    bool stop = false;
-    for (int i_n = -1; i_n < 2; i_n++) {
-        for (int j_n = -1; j_n < 2; j_n++) {
-            //This if makes sure that we don't visit the "diagonal neighbours"
-            if ((i_n != j_n) && (i_n != -j_n)) {
-                // Here a face is available if it doesn't need to be extended itself and if its
-                // area exceeds Sz_ext. Here we need to take into account if the intruded face
-                // has given away already some area, so we use Sz_red rather than Sz.
-                // If no face is available we don't do anything and we will need to use the
-                // multi-face extensions.
-                if (GetNeigh(S_red, i, j, k, i_n, j_n, idim) > S_ext
-                    && (GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
-                    || GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
-                    && flag_ext_face(i, j, k) && ! stop) {
-                    n_borrow += 1;
-                    stop = true;
-                }
-            }
-        }
-    }
-
-    return n_borrow;
-}
-
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-int
-ComputeNBorrowEightFacesExtension(const amrex::Dim3 cell, const amrex::Real S_ext,
-                                  const amrex::Array4<amrex::Real>& S_red,
-                                  const amrex::Array4<amrex::Real>& S,
-                                  const amrex::Array4<int>& flag_info_face, const int idim) {
-    const int i = cell.x;
-    const int j = cell.y;
-    const int k = cell.z;
-    int n_borrow = 0;
-    amrex::Array2D<int, 0, 2, 0, 2> local_avail{};
-
-    for(int i_loc = 0; i_loc <= 2; i_loc++){
-        for(int j_loc = 0; j_loc <= 2; j_loc++){
-            const int flag = GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
-            local_avail(i_loc, j_loc) = flag == 1 || flag == 2;
-        }
-    }
-
-    amrex::Real denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                        local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                        local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                        local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                        local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                        local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                        local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                        local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
-
-    bool neg_face = true;
-
-    while(denom >= S_ext && neg_face && denom > 0){
-        neg_face = false;
-        for (int i_n = -1; i_n < 2; i_n++) {
-            for (int j_n = -1; j_n < 2; j_n++) {
-                if(local_avail(i_n + 1, j_n + 1)){
-                    const amrex::Real patch = S_ext * GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
-                    if(GetNeigh(S_red, i, j, k, i_n, j_n, idim) - patch <= 0) {
-                        neg_face = true;
-                        local_avail(i_n + 1, j_n + 1) = false;
-                    }
-                }
-            }
-        }
-
-        denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
-    }
-
-    // We count the number of entries in local_avail which are still True, this is the number of
-    // neighboring faces which are intruded
-    for(int ii = 0; ii < 3; ii++) {
-        for (int jj = 0; jj < 3; jj++) {
-            n_borrow += local_avail(ii, jj);
-        }
-    }
-
-    return n_borrow;
-}
-
-
 void
 WarpX::ComputeOneWayExtensions ()
 {
@@ -608,7 +636,7 @@ WarpX::ComputeOneWayExtensions ()
 
                 const amrex::Real S_ext = S_stab - S(i, j, k);
                 const int n_borrow =
-                    ComputeNBorrowOneFaceExtension(cell, S_ext, S_mod, flag_info_face,
+                    ::ComputeNBorrowOneFaceExtension(cell, S_ext, S_mod, flag_info_face,
                                                    flag_ext_face, idim);
 
 
@@ -638,13 +666,13 @@ WarpX::ComputeOneWayExtensions ()
                                 // has given away already some area, so we use Sz_red rather than Sz.
                                 // If no face is available we don't do anything and we will need to use the
                                 // multi-face extensions.
-                                if (GetNeigh(S_mod, i, j, k, i_n, j_n, idim) > S_ext
-                                    && (GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
+                                if (::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) > S_ext
+                                    && (::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
                                          || GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
                                     && flag_ext_face(i, j, k)) {
 
-                                    SetNeigh(S_mod,
-                                             GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - S_ext,
+                                    ::SetNeigh(S_mod,
+                                             ::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - S_ext,
                                              i, j, k, i_n, j_n, idim);
 
                                     // Insert the index of the face info
@@ -655,7 +683,7 @@ WarpX::ComputeOneWayExtensions ()
                                                                       borrowing_neigh_faces);
                                     borrowing_area[ps] = S_ext;
 
-                                    SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    ::SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
                                     // Add the area to the intruding face.
                                     S_mod(i, j, k) = S(i, j, k) + S_ext;
                                     flag_ext_face(i, j, k) = false;
@@ -735,7 +763,7 @@ WarpX::ComputeEightWaysExtensions ()
                 const amrex::Real S_stab = ::ComputeSStab(i, j, k, lx, ly, lz, dx, dy, dz, idim);
 
                 const amrex::Real S_ext = S_stab - S(i, j, k);
-                const int n_borrow = ComputeNBorrowEightFacesExtension(cell, S_ext, S_mod, S,
+                const int n_borrow = ::ComputeNBorrowEightFacesExtension(cell, S_ext, S_mod, S,
                                                                        flag_info_face, idim);
 
               borrowing_size(i, j, k) = n_borrow;
@@ -767,19 +795,19 @@ WarpX::ComputeEightWaysExtensions ()
                     amrex::Array2D<amrex::Real, 0, 2, 0, 2> local_avail{};
                     for(int i_loc = 0; i_loc <= 2; i_loc++){
                         for(int j_loc = 0; j_loc <= 2; j_loc++){
-                            auto const flag = GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
+                            auto const flag = ::GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
                             local_avail(i_loc, j_loc) = flag == 1 || flag == 2;
                         }
                     }
 
-                    amrex::Real denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                                        local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                                        local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                                        local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                                        local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                                        local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                                        local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                                        local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+                    amrex::Real denom = local_avail(0, 1) * ::GetNeigh(S, i, j, k, -1, 0, idim) +
+                                        local_avail(2, 1) * ::GetNeigh(S, i, j, k, 1, 0, idim) +
+                                        local_avail(1, 0) * ::GetNeigh(S, i, j, k, 0, -1, idim) +
+                                        local_avail(1, 2) * ::GetNeigh(S, i, j, k, 0, 1, idim) +
+                                        local_avail(0, 0) * ::GetNeigh(S, i, j, k, -1, -1, idim) +
+                                        local_avail(2, 0) * ::GetNeigh(S, i, j, k, 1, -1, idim) +
+                                        local_avail(0, 2) * ::GetNeigh(S, i, j, k, -1, 1, idim) +
+                                        local_avail(2, 2) * ::GetNeigh(S, i, j, k, 1, 1, idim);
 
                     bool neg_face = true;
 
@@ -788,8 +816,8 @@ WarpX::ComputeEightWaysExtensions ()
                         for (int i_n = -1; i_n < 2; i_n++) {
                             for (int j_n = -1; j_n < 2; j_n++) {
                                 if (local_avail(i_n + 1, j_n + 1) != 0_rt){
-                                    const amrex::Real patch = S_ext * GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
-                                    if(GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch <= 0) {
+                                    const amrex::Real patch = S_ext * ::GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
+                                    if(::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch <= 0) {
                                         neg_face = true;
                                         local_avail(i_n + 1, j_n + 1) = false;
                                     }
@@ -797,14 +825,14 @@ WarpX::ComputeEightWaysExtensions ()
                             }
                         }
 
-                        denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                                local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                                local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                                local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                                local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                                local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                                local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                                local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+                        denom = local_avail(0, 1) * ::GetNeigh(S, i, j, k, -1, 0, idim) +
+                                local_avail(2, 1) * ::GetNeigh(S, i, j, k, 1, 0, idim) +
+                                local_avail(1, 0) * ::GetNeigh(S, i, j, k, 0, -1, idim) +
+                                local_avail(1, 2) * ::GetNeigh(S, i, j, k, 0, 1, idim) +
+                                local_avail(0, 0) * ::GetNeigh(S, i, j, k, -1, -1, idim) +
+                                local_avail(2, 0) * ::GetNeigh(S, i, j, k, 1, -1, idim) +
+                                local_avail(0, 2) * ::GetNeigh(S, i, j, k, -1, 1, idim) +
+                                local_avail(2, 2) * ::GetNeigh(S, i, j, k, 1, 1, idim);
                     }
 
                     if(denom >= S_ext){
@@ -813,17 +841,17 @@ WarpX::ComputeEightWaysExtensions ()
                         for (int i_n = -1; i_n < 2; i_n++) {
                             for (int j_n = -1; j_n < 2; j_n++) {
                                 if(local_avail(i_n + 1, j_n + 1) != 0_rt){
-                                    const amrex::Real patch = S_ext * GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
+                                    const amrex::Real patch = S_ext * ::GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
                                     borrowing_inds[ps + count] = ps + count;
                                     FaceInfoBox::addConnectedNeighbor(i_n, j_n, ps + count,
                                                                       borrowing_neigh_faces);
                                     borrowing_area[ps + count] = patch;
 
-                                    SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    ::SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
 
                                     S_mod(i, j, k) += patch;
-                                    SetNeigh(S_mod,
-                                             GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch,
+                                    ::SetNeigh(S_mod,
+                                             ::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch,
                                              i, j, k, i_n, j_n, idim);
                                     count +=1;
                                 }

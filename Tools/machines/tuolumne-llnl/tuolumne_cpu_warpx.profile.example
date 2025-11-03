@@ -7,8 +7,9 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 # if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load rocm/6.4.1
+module unload cray-libsci
 module load cmake/3.29.2
+module load cray-fftw/3.3.10.11
 
 # optional: faster builds
 # ccache is system provided
@@ -18,7 +19,7 @@ module load ninja/1.10.2
 # TODO: no Boost module found
 
 # optional: for openPMD and PSATD+RZ support
-SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/mi300a"
+SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/cpu"
 export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-2.15.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
@@ -39,9 +40,9 @@ export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
 # python
 module load cray-python/3.11.7
 
-if [ -d "${SW_DIR}/venvs/warpx-tuolumne-mi300a" ]
+if [ -d "${SW_DIR}/venvs/warpx-tuolumne-cpu" ]
 then
-  source ${SW_DIR}/venvs/warpx-tuolumne-mi300a/bin/activate
+  source ${SW_DIR}/venvs/warpx-tuolumne-cpu/bin/activate
 fi
 
 # an alias to request an interactive batch node for one hour
@@ -51,21 +52,17 @@ alias getNode="salloc -N 1 -t 1:00:00"
 #   usage: runNode <command>
 alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00"
 
-# GPU-aware MPI
-export MPICH_GPU_SUPPORT_ENABLED=1
-export LDFLAGS="${PE_MPICH_GTL_DIR_amd_gfx942} ${PE_MPICH_GTL_LIBS_amd_gfx942} -Wl,-rpath,${CRAYLIBS_X86_64}"
-
 # Transparent huge pages on CPU
 # https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems/introduction-and-quickstart/pro-tips
 #export LDFLAGS="${LDFLAGS} -lhugetlbfs"
 #export HSA_XNACK=1
 #export HUGETLB_MORECORE=yes
 
-# optimize ROCm/HIP compilation for MI300A
-export AMREX_AMD_ARCH=gfx942
+# optimize compilation for MI300A CPU part (Zen4)
+export CXXFLAGS="-march=znver4"
+export CFLAGS="-march=znver4"
 
 # compiler environment hints
-export CC=$(which amdclang)
-export CXX=$(which amdclang++)
-export FC=$(which amdflang)
-export HIPCXX=${CXX}
+export CC=$(which cc)
+export CXX=$(which CC)
+export FC=$(which ftn)
