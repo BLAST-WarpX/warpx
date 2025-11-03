@@ -11,12 +11,8 @@
 # the script `inputs_1d`. This simulates a 1D periodic plasma using the implicit solver.
 import os
 import re
-import sys
 
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
@@ -37,9 +33,3 @@ print(f"max change in energy: {max_delta_E}")
 print(f"tolerance: {tolerance_rel}")
 
 assert max_delta_E < tolerance_rel
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

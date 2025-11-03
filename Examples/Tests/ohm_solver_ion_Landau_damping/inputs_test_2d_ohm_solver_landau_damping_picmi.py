@@ -93,7 +93,7 @@ class IonLandauDamping(object):
         if comm.rank == 0:
             print(
                 f"Initializing simulation with input parameters:\n"
-                f"\tT = {self.T_plasma*1e-3:.1f} keV\n"
+                f"\tT = {self.T_plasma * 1e-3:.1f} keV\n"
                 f"\tn = {self.n_plasma:.1e} m^-3\n"
                 f"\tB0 = {self.B0:.2f} T\n"
                 f"\tM/m = {self.m_ion:.0f}\n"

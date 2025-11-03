@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         ComputeDivE.cpp
+        ComputeCurlA.cpp
         EvolveB.cpp
         EvolveBPML.cpp
         EvolveE.cpp

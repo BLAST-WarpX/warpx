@@ -36,11 +36,12 @@ public:
         std::string prefix, int file_min_digits,
         bool plot_raw_fields,
         bool plot_raw_fields_guards,
+        int verbose,
         bool use_pinned_pc = false,
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
         const amrex::Geometry& full_BTD_snapshot = amrex::Geometry(),
-        bool isLastBTDFlush = false ) const override;
+        bool isLastBTDFlush = false) const override;
 
     ~FlushFormatOpenPMD () override = default;
 
@@ -52,6 +53,11 @@ public:
 private:
     /** This is responsible for dumping to file */
     std::unique_ptr< WarpXOpenPMDPlot > m_OpenPMDPlotWriter;
+
+    /** This parameter is corresponding to the input option
+        "buffer_flush_limit_btd" at the diagnostic level.
+        By default we set to flush every 5 buffers per snapshot */
+    int m_NumAggBTDBufferToFlush = 5;
 };
 
 #endif // WARPX_FLUSHFORMATOPENPMD_H_

@@ -7,15 +7,17 @@
 
 #include "BoundaryScrapingDiagnostics.H"
 #include "EmbeddedBoundary/Enabled.H"
-#include "ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <AMReX.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_REAL.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Vector.H>
 
 #include <set>
 #include <string>
@@ -84,10 +86,9 @@ BoundaryScrapingDiagnostics::InitializeBufferData (int /*i_buffer*/, int /*lev*/
 }
 
 void
-BoundaryScrapingDiagnostics::InitializeParticleBuffer ()
+BoundaryScrapingDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
     auto & warpx = WarpX::GetInstance();
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
 
     // If the user does not specify any species, dump all species
     if (m_output_species_names.empty()) {
@@ -153,7 +154,7 @@ BoundaryScrapingDiagnostics::Flush (int i_buffer, bool /* force_flush */)
         warpx.gett_new(0),
         m_output_species.at(i_buffer),
         nlev_output, file_prefix,
-        m_file_min_digits, false, false, use_pinned_pc, isBTD,
+        m_file_min_digits, false, false, m_verbose, use_pinned_pc, isBTD,
         warpx.getistep(0), bufferID, numBTDBuffers, geom,
         isLastBTD);
 

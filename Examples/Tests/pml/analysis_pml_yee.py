@@ -8,7 +8,6 @@
 # License: BSD-3-Clause-LBNL
 
 
-import os
 import sys
 
 import numpy as np
@@ -16,8 +15,6 @@ import scipy.constants as scc
 import yt
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 
@@ -56,9 +53,3 @@ print("error_rel    : " + str(error_rel))
 print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

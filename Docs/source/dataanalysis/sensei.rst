@@ -250,7 +250,7 @@ First, log into cori and clone the git repo's.
    cd $SCRATCH
    mkdir warpx
    cd warpx/
-   git clone https://github.com/ECP-WarpX/WarpX.git WarpX-libsim
+   git clone https://github.com/BLAST-WarpX/warpx.git WarpX-libsim
    git clone https://github.com/AMReX-Codes/amrex
    git clone https://github.com/ECP-WarpX/picsar.git
    cd WarpX-libsim
@@ -301,7 +301,7 @@ First, log into cori and clone the git repo's.
    cd $SCRATCH
    mkdir warpx
    cd warpx/
-   git clone https://github.com/ECP-WarpX/WarpX.git WarpX-catalyst
+   git clone https://github.com/BLAST-WarpX/warpx.git WarpX-catalyst
    git clone --branch development https://github.com/AMReX-Codes/amrex
    git clone https://github.com/ECP-WarpX/picsar.git
    cd WarpX-catalyst

@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import numpy as np
 import openpmd_api as io
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 series = io.Series(f"{filename}/openpmd_%T.h5", io.Access.read_only)
@@ -24,15 +20,15 @@ jt = ii.meshes["j"]["t"]
 # this is in C (Python) order; r is the fastest varying index
 (Nm, Nz, Nr) = jt.shape
 
-assert (
-    Nm == 3
-), "Wrong number of angular modes stored or possible incorrect ordering when flushed"
-assert (
-    Nr == 64
-), "Wrong number of radial points stored or possible incorrect ordering when flushed"
-assert (
-    Nz == 512
-), "Wrong number of z points stored or possible incorrect ordering when flushed"
+assert Nm == 3, (
+    "Wrong number of angular modes stored or possible incorrect ordering when flushed"
+)
+assert Nr == 64, (
+    "Wrong number of radial points stored or possible incorrect ordering when flushed"
+)
+assert Nz == 512, (
+    "Wrong number of z points stored or possible incorrect ordering when flushed"
+)
 
 assert ii.meshes["part_per_grid"][io.Mesh_Record_Component.SCALAR].shape == [
     512,
@@ -64,13 +60,6 @@ rhob0 = rhob[0]  # 0 mode
 electron_meanz = np.sum(np.dot(zlist, rhoe0)) / np.sum(rhoe0)
 beam_meanz = np.sum(np.dot(zlist, rhob0)) / np.sum(rhob0)
 
-assert (
-    (electron_meanz > 0) and (beam_meanz < 0)
-), "problem with openPMD+RZ.  Maybe openPMD+RZ mixed up the order of rho_<species> diagnostics?"
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
+assert (electron_meanz > 0) and (beam_meanz < 0), (
+    "problem with openPMD+RZ.  Maybe openPMD+RZ mixed up the order of rho_<species> diagnostics?"
 )

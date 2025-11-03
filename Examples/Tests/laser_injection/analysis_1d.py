@@ -12,7 +12,6 @@
 # the simulation and it compares it with theory. It also checks that the
 # central frequency of the Fourier transform is the expected one.
 
-import os
 import sys
 
 import matplotlib
@@ -22,9 +21,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import hilbert
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Maximum acceptable error for this test
 relative_error_threshold = 0.05
@@ -191,12 +187,6 @@ def main():
     filename_end = sys.argv[1]
 
     check_laser(filename_end)
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-    )
 
 
 if __name__ == "__main__":

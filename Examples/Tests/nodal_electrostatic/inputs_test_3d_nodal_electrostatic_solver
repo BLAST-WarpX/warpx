@@ -41,7 +41,7 @@ algo.particle_shape = 3
 
 # SPECIES
 particles.species_names = beam_p qsg_p
-particles.photon_species = qsg_p
+
 beam_p.species_type = positron
 beam_p.injection_style = "NUniformPerCell"
 beam_p.num_particles_per_cell_each_dim = 1 1 1

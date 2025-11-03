@@ -5,6 +5,7 @@ CEXE_sources += EvolveF.cpp
 CEXE_sources += EvolveG.cpp
 CEXE_sources += EvolveECTRho.cpp
 CEXE_sources += ComputeDivE.cpp
+CEXE_sources += ComputeCurlA.cpp
 CEXE_sources += MacroscopicEvolveE.cpp
 CEXE_sources += EvolveBPML.cpp
 CEXE_sources += EvolveEPML.cpp

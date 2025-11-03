@@ -41,7 +41,7 @@ public:
 private:
     /** Vector of pointer to source multifab Bx, By, Bz */
     ablastr::fields::VectorField m_arr_mf_src;
-    int const m_lev; /**< level on which mf_src is defined (used in cylindrical) */
+    int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
     /**< (for cylindrical) whether to average all modes into 1 comp */
     bool m_convertRZmodes2cartesian;
 };

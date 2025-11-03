@@ -34,19 +34,15 @@ void
 computePhiIGF ( amrex::MultiFab const & rho,
                 amrex::MultiFab & phi,
                 std::array<amrex::Real, 3> const & cell_size,
-                amrex::BoxArray const & ba)
+                bool const is_igf_2d_slices)
 {
     using namespace amrex::literals;
 
     BL_PROFILE("ablastr::fields::computePhiIGF");
 
     // Define box that encompasses the full domain
-    amrex::Box domain = ba.minimalBox();
-    domain.surroundingNodes(); // get nodal points, since `phi` and `rho` are nodal
+    amrex::Box domain = rho.boxArray().minimalBox();
     domain.grow( phi.nGrowVect() ); // include guard cells
-
-    // Do we grow the domain in the z-direction in the 2D mode?
-    bool const do_2d_fft = false;
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
@@ -61,7 +57,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     }
     if (!obc_solver || obc_solver->Domain() != domain) {
         amrex::FFT::Info info{};
-        if (do_2d_fft) { info.setBatchMode(true); }
+        if (is_igf_2d_slices) { info.setTwoDMode(true); } // do 2D FFTs
         info.setNumProcs(nprocs);
         obc_solver = std::make_unique<amrex::FFT::OpenBCSolver<amrex::Real>>(domain, info);
     }
@@ -71,7 +67,9 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Real const dy = cell_size[1];
     amrex::Real const dz = cell_size[2];
 
-    obc_solver->setGreensFunction(
+    if (!is_igf_2d_slices){
+        // fully 3D solver
+        obc_solver->setGreensFunction(
         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real
         {
             int const i0 = i - lo[0];
@@ -80,9 +78,26 @@ computePhiIGF ( amrex::MultiFab const & rho,
             amrex::Real const x = i0*dx;
             amrex::Real const y = j0*dy;
             amrex::Real const z = k0*dz;
-            return SumOfIntegratedPotential(x, y, z, dx, dy, dz);
+
+            return SumOfIntegratedPotential3D(x, y, z, dx, dy, dz);
+        });
+    }else{
+        // 2D sliced solver
+        obc_solver->setGreensFunction(
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::Real
+        {
+            int const i0 = i - lo[0];
+            int const j0 = j - lo[1];
+            amrex::Real const x = i0*dx;
+            amrex::Real const y = j0*dy;
+            amrex::ignore_unused(k);
+
+            return SumOfIntegratedPotential2D(x, y, dx, dy);
         });
 
+    }
+
     obc_solver->solve(phi, rho);
-}
+} // computePhiIGF
+
 } // namespace ablastr::fields

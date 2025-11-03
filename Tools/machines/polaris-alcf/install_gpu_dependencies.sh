@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2024 The WarpX Community
+# Copyright 2024-2025 The WarpX Community
 #
 # This file is part of WarpX.
 #
@@ -50,13 +50,13 @@ if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
   git fetch --prune
-  git checkout v2.8.3
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
 fi
 rm -rf $HOME/src/adios2-pm-gpu-build
-cmake -S $HOME/src/adios2 -B $HOME/src/adios2-pm-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.8.3
+cmake -S $HOME/src/adios2 -B $HOME/src/adios2-pm-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build $HOME/src/adios2-pm-gpu-build --target install -j 16
 rm -rf $HOME/src/adios2-pm-gpu-build
 
@@ -102,7 +102,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
-python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade setuptools[core]
 python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
@@ -113,9 +113,8 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies such as picmistandard
 python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
-python3 -m pip install cupy-cuda11x  # CUDA 11.8 compatible wheel
-# optional: for libEnsemble
-python3 -m pip install -r $HOME/src/warpx/Tools/LibEnsemble/requirements.txt
-# optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-python3 -m pip install --upgrade torch  # CUDA 11.8 compatible wheel
-python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt
+python3 -m pip install cupy-cuda12x  # CUDA 12.6 compatible wheel
+# optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
+python3 -m pip install --upgrade torch  # CUDA 12.6 compatible wheel
+python3 -m pip install --upgrade optimas[all]
+python3 -m pip install --upgrade lasy

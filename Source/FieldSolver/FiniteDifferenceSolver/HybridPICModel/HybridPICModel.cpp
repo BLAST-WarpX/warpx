@@ -1,16 +1,22 @@
-/* Copyright 2023 The WarpX Community
+/* Copyright 2023-2024 The WarpX Community
  *
  * This file is part of WarpX.
  *
  * Authors: Roelof Groenewald (TAE Technologies)
+ *          S. Eric Clark (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
 
 #include "HybridPICModel.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include "EmbeddedBoundary/Enabled.H"
+#include "Python/callbacks.H"
 #include "Fields.H"
+#include "Particles/MultiParticleContainer.H"
+#include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
 using namespace amrex;
@@ -29,6 +35,8 @@ void HybridPICModel::ReadParameters ()
     // of sub steps can be specified by the user (defaults to 50).
     utils::parser::queryWithParser(pp_hybrid, "substeps", m_substeps);
 
+    utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
+
     // The hybrid model requires an electron temperature, reference density
     // and exponent to be given. These values will be used to calculate the
     // electron pressure according to p = n0 * Te * (n/n0)^gamma
@@ -42,9 +50,9 @@ void HybridPICModel::ReadParameters ()
     }
 
     pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
-    utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
+    pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
-    utils::parser::queryWithParser(pp_hybrid, "plasma_hyper_resistivity", m_eta_h);
+    utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -53,15 +61,31 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("Jx_external_grid_function(x,y,z,t)", m_Jx_ext_grid_function);
     pp_hybrid.query("Jy_external_grid_function(x,y,z,t)", m_Jy_ext_grid_function);
     pp_hybrid.query("Jz_external_grid_function(x,y,z,t)", m_Jz_ext_grid_function);
+
+    // external fields
+    pp_hybrid.query("add_external_fields", m_add_external_fields);
+
+    if (m_add_external_fields) {
+        m_external_vector_potential = std::make_unique<ExternalVectorPotential>();
+    }
 }
 
-void HybridPICModel::AllocateLevelMFs (ablastr::fields::MultiFabRegister & fields,
-                                       int lev, const BoxArray& ba, const DistributionMapping& dm,
-                                       const int ncomps, const IntVect& ngJ, const IntVect& ngRho,
-                                       const IntVect& jx_nodal_flag,
-                                       const IntVect& jy_nodal_flag,
-                                       const IntVect& jz_nodal_flag,
-                                       const IntVect& rho_nodal_flag)
+void HybridPICModel::AllocateLevelMFs (
+    ablastr::fields::MultiFabRegister & fields,
+    int lev, const BoxArray& ba, const DistributionMapping& dm,
+    const int ncomps,
+    const IntVect& ngJ, const IntVect& ngRho,
+    const IntVect& ngEB,
+    const IntVect& jx_nodal_flag,
+    const IntVect& jy_nodal_flag,
+    const IntVect& jz_nodal_flag,
+    const IntVect& rho_nodal_flag,
+    const IntVect& Ex_nodal_flag,
+    const IntVect& Ey_nodal_flag,
+    const IntVect& Ez_nodal_flag,
+    const IntVect& Bx_nodal_flag,
+    const IntVect& By_nodal_flag,
+    const IntVect& Bz_nodal_flag) const
 {
     using ablastr::fields::Direction;
 
@@ -113,6 +137,16 @@ void HybridPICModel::AllocateLevelMFs (ablastr::fields::MultiFabRegister & field
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, IntVect(1), 0.0_rt);
 
+    if (m_add_external_fields) {
+        m_external_vector_potential->AllocateLevelMFs(
+            fields,
+            lev, ba, dm,
+            ncomps, ngEB,
+            Ex_nodal_flag, Ey_nodal_flag, Ez_nodal_flag,
+            Bx_nodal_flag, By_nodal_flag, Bz_nodal_flag
+        );
+    }
+
 #ifdef WARPX_DIM_RZ
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (ncomps == 1),
@@ -120,13 +154,20 @@ void HybridPICModel::AllocateLevelMFs (ablastr::fields::MultiFabRegister & field
 #endif
 }
 
-void HybridPICModel::InitData ()
+void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 {
     m_resistivity_parser = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_eta_expression, {"rho","J"}));
     m_eta = m_resistivity_parser->compile<2>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
+
+    m_include_hyper_resistivity_term = (m_eta_h_expression != "0.0");
+    m_hyper_resistivity_parser = std::make_unique<amrex::Parser>(
+        utils::parser::makeParser(m_eta_h_expression, {"rho","B"}));
+    m_eta_h = m_hyper_resistivity_parser->compile<2>();
+    const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
+    m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
     m_J_external_parser[0] = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
@@ -141,42 +182,22 @@ void HybridPICModel::InitData ()
     // check if the external current parsers depend on time
     for (int i=0; i<3; i++) {
         const std::set<std::string> J_ext_symbols = m_J_external_parser[i]->symbols();
-        m_external_field_has_time_dependence += J_ext_symbols.count("t");
+        m_external_current_has_time_dependence += J_ext_symbols.count("t");
     }
 
-    auto & warpx = WarpX::GetInstance();
+    auto& warpx = WarpX::GetInstance();
     using ablastr::fields::Direction;
 
     // Get the grid staggering of the fields involved in calculating E
-    amrex::IntVect Jx_stag = warpx.m_fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect Jy_stag = warpx.m_fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Jz_stag = warpx.m_fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect();
-    amrex::IntVect Bx_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect By_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Bz_stag = warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect();
-    amrex::IntVect Ex_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect();
-    amrex::IntVect Ey_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect();
-    amrex::IntVect Ez_stag = warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect();
-
-    // Check that the grid types are appropriate
-    const bool appropriate_grids = (
-#if   defined(WARPX_DIM_1D_Z)
-        // AMReX convention: x = missing dimension, y = missing dimension, z = only dimension
-        Ex_stag == IntVect(1) && Ey_stag == IntVect(1) && Ez_stag == IntVect(0) &&
-        Bx_stag == IntVect(0) && By_stag == IntVect(0) && Bz_stag == IntVect(1) &&
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        // AMReX convention: x = first dimension, y = missing dimension, z = second dimension
-        Ex_stag == IntVect(0,1) && Ey_stag == IntVect(1,1) && Ez_stag == IntVect(1,0) &&
-        Bx_stag == IntVect(1,0) && By_stag == IntVect(0,0) && Bz_stag == IntVect(0,1) &&
-#elif defined(WARPX_DIM_3D)
-        Ex_stag == IntVect(0,1,1) && Ey_stag == IntVect(1,0,1) && Ez_stag == IntVect(1,1,0) &&
-        Bx_stag == IntVect(1,0,0) && By_stag == IntVect(0,1,0) && Bz_stag == IntVect(0,0,1) &&
-#endif
-        Jx_stag == Ex_stag && Jy_stag == Ey_stag && Jz_stag == Ez_stag
-    );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        appropriate_grids,
-        "Ohm's law E-solve only works with staggered (Yee) grids.");
+    amrex::IntVect Jx_stag = fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect Jy_stag = fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Jz_stag = fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect();
+    amrex::IntVect Bx_stag = fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect By_stag = fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Bz_stag = fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect();
+    amrex::IntVect Ex_stag = fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect();
+    amrex::IntVect Ey_stag = fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect();
+    amrex::IntVect Ez_stag = fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect();
 
     // copy data to device
     for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -226,15 +247,18 @@ void HybridPICModel::InitData ()
             m_J_external[0],
             m_J_external[1],
             m_J_external[2],
-            lev, PatchType::fine, 'e',
-            warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            warpx.m_fields.get_alldirs(FieldType::face_areas, lev));
+            lev, PatchType::fine,
+            warpx.GetEBUpdateEFlag());
+    }
+
+    if (m_add_external_fields) {
+        m_external_vector_potential->InitData();
     }
 }
 
 void HybridPICModel::GetCurrentExternal ()
 {
-    if (!m_external_field_has_time_dependence) { return; }
+    if (!m_external_current_has_time_dependence) { return; }
 
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
@@ -244,26 +268,25 @@ void HybridPICModel::GetCurrentExternal ()
             m_J_external[0],
             m_J_external[1],
             m_J_external[2],
-            lev, PatchType::fine, 'e',
-            warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
-            warpx.m_fields.get_alldirs(FieldType::face_areas, lev));
+            lev, PatchType::fine,
+            warpx.GetEBUpdateEFlag());
     }
 }
 
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::MultiLevelVectorField const& Bfield,
-    ablastr::fields::MultiLevelVectorField const& edge_lengths)
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E)
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
-        CalculatePlasmaCurrent(Bfield[lev], edge_lengths[lev], lev);
+        CalculatePlasmaCurrent(Bfield[lev], eb_update_E[lev], lev);
     }
 }
 
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& edge_lengths,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev)
 {
     WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
@@ -271,7 +294,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
-        current_fp_plasma, Bfield, edge_lengths, lev
+        current_fp_plasma, Bfield, eb_update_E, lev
     );
 
     // we shouldn't apply the boundary condition to J since J = J_i - J_e but
@@ -295,7 +318,7 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
-    ablastr::fields::MultiLevelVectorField const& edge_lengths,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
     const bool solve_for_Faraday) const
 {
     auto& warpx = WarpX::GetInstance();
@@ -303,9 +326,11 @@ void HybridPICModel::HybridPICSolveE (
     {
         HybridPICSolveE(
             Efield[lev], Jfield[lev], Bfield[lev], *rhofield[lev],
-            edge_lengths[lev], lev, solve_for_Faraday
+            eb_update_E[lev], lev, solve_for_Faraday
         );
     }
+    // Allow execution of Python callback after E-field push
+    ExecutePythonCallback("afterEpush");
 }
 
 void HybridPICModel::HybridPICSolveE (
@@ -313,13 +338,13 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::VectorField const& Jfield,
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
-    ablastr::fields::VectorField const& edge_lengths,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, const bool solve_for_Faraday) const
 {
     WARPX_PROFILE("WarpX::HybridPICSolveE()");
 
     HybridPICSolveE(
-        Efield, Jfield, Bfield, rhofield, edge_lengths, lev,
+        Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
         PatchType::fine, solve_for_Faraday
     );
     if (lev > 0)
@@ -334,21 +359,22 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::VectorField const& Jfield,
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
-    ablastr::fields::VectorField const& edge_lengths,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, PatchType patch_type,
     const bool solve_for_Faraday) const
 {
     auto& warpx = WarpX::GetInstance();
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    const ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    auto* const electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
-        *electron_pressure_fp, edge_lengths, lev, this, solve_for_Faraday
+        *electron_pressure_fp, eb_update_E, lev, this, solve_for_Faraday
     );
-    warpx.ApplyEfieldBoundary(lev, patch_type);
+    amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
+    warpx.ApplyEfieldBoundary(lev, patch_type, time);
 }
 
 void HybridPICModel::CalculateElectronPressure() const
@@ -374,7 +400,11 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
-    electron_pressure_fp->FillBoundary(warpx.Geom(lev).periodicity());
+    ablastr::utils::communication::FillBoundary(
+        *electron_pressure_fp,
+        WarpX::do_single_precision_comms,
+        warpx.Geom(lev).periodicity(),
+        true);
 }
 
 void HybridPICModel::FillElectronPressureMF (
@@ -412,15 +442,15 @@ void HybridPICModel::BfieldEvolveRK (
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
-    ablastr::fields::MultiLevelVectorField  const& edge_lengths,
-    amrex::Real dt, DtType dt_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+    amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         BfieldEvolveRK(
-            Bfield, Efield, Jfield, rhofield, edge_lengths, dt, lev, dt_type,
+            Bfield, Efield, Jfield, rhofield, eb_update_E, dt, lev, subcycling_half,
             ng, nodal_sync
         );
     }
@@ -431,8 +461,8 @@ void HybridPICModel::BfieldEvolveRK (
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
-    ablastr::fields::MultiLevelVectorField const& edge_lengths,
-    amrex::Real dt, int lev, DtType dt_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+    amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     // Make copies of the B-field multifabs at t = n and create multifabs for
@@ -458,8 +488,8 @@ void HybridPICModel::BfieldEvolveRK (
     // The Runge-Kutta scheme begins here.
     // Step 1:
     FieldPush(
-        Bfield, Efield, Jfield, rhofield, edge_lengths,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        Bfield, Efield, Jfield, rhofield, eb_update_E,
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -474,8 +504,8 @@ void HybridPICModel::BfieldEvolveRK (
 
     // Step 2:
     FieldPush(
-        Bfield, Efield, Jfield, rhofield, edge_lengths,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        Bfield, Efield, Jfield, rhofield, eb_update_E,
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -494,8 +524,8 @@ void HybridPICModel::BfieldEvolveRK (
 
     // Step 3:
     FieldPush(
-        Bfield, Efield, Jfield, rhofield, edge_lengths,
-        dt, dt_type, ng, nodal_sync
+        Bfield, Efield, Jfield, rhofield, eb_update_E,
+        dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -510,8 +540,8 @@ void HybridPICModel::BfieldEvolveRK (
 
     // Step 4:
     FieldPush(
-        Bfield, Efield, Jfield, rhofield, edge_lengths,
-        0.5_rt*dt, dt_type, ng, nodal_sync
+        Bfield, Efield, Jfield, rhofield, eb_update_E,
+        0.5_rt*dt, subcycling_half, ng, nodal_sync
     );
 
     // The Bfield is now given by:
@@ -539,23 +569,27 @@ void HybridPICModel::BfieldEvolveRK (
     }
 }
 
+
 void HybridPICModel::FieldPush (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
-    ablastr::fields::MultiLevelVectorField const& edge_lengths,
-    amrex::Real dt, DtType dt_type,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+    amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
 
+    amrex::Real const t_old = warpx.gett_old(0);
+
     // Calculate J = curl x B / mu0 - J_ext
-    CalculatePlasmaCurrent(Bfield, edge_lengths);
+    CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
-    HybridPICSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
+    HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
     warpx.FillBoundaryE(ng, nodal_sync);
+
     // Push forward the B-field using Faraday's law
-    warpx.EvolveB(dt, dt_type);
+    warpx.EvolveB(dt, subcycling_half, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
 }

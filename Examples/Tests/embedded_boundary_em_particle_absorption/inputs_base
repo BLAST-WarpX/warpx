@@ -1,0 +1,35 @@
+max_step = 100
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 256
+
+algo.charge_deposition = standard
+algo.field_gathering = energy-conserving
+warpx.const_dt = 1.17957283598e-09
+warpx.use_filter = 0
+
+my_constants.R = 6.35
+warpx.eb_implicit_function = "(x**2 + y**2 - R**2)"
+
+particles.species_names = electron positron
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_style = "SingleParticle"
+electron.single_particle_pos = 0.0  0.0 0.0
+electron.single_particle_u = 1.e20  0.0 0.4843221e20  # gamma*beta
+electron.single_particle_weight = 1.0
+
+positron.charge = q_e
+positron.mass = m_e
+positron.injection_style = "SingleParticle"
+positron.single_particle_pos = 0.0   0.0 0.0
+positron.single_particle_u = -1.e20  0.0 -0.4843221e20  # gamma*beta
+positron.single_particle_weight = 1.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = divE rho
+diag1.format = openpmd

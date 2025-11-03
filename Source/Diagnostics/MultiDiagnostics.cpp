@@ -9,8 +9,6 @@
 #include <AMReX.H>
 #include <AMReX_REAL.H>
 
-#include <algorithm>
-
 using namespace amrex;
 
 MultiDiagnostics::MultiDiagnostics ()
@@ -34,10 +32,10 @@ MultiDiagnostics::MultiDiagnostics ()
 }
 
 void
-MultiDiagnostics::InitData ()
+MultiDiagnostics::InitData (const MultiParticleContainer& mpc)
 {
     for( auto& diag : alldiags ){
-        diag->InitData();
+        diag->InitData(mpc);
     }
 }
 
@@ -75,6 +73,16 @@ MultiDiagnostics::ReadParameters ()
         if (diag_type_str == "BackTransformed") { diags_types[i] = DiagTypes::BackTransformed; }
         if (diag_type_str == "BoundaryScraping") { diags_types[i] = DiagTypes::BoundaryScraping; }
     }
+}
+
+bool
+MultiDiagnostics::DoComputeAndPack (int step, bool force_flush)
+{
+    bool result = false;
+    for( auto& diag : alldiags ){
+        result = result || diag->DoComputeAndPack(step, force_flush);
+    }
+    return result;
 }
 
 void

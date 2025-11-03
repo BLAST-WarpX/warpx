@@ -15,29 +15,36 @@
 #include <AMReX_Print.H>
 #include <AMReX_BaseFwd.H>
 
-SelectParticles::SelectParticles (const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
-                                  amrex::Real current_z_boost, amrex::Real old_z_boost,
-                                  int a_offset)
+SelectParticles::SelectParticles (
+    const WarpXParticleContainer& /*pc*/,
+    WarpXParIter& a_pti,
+    amrex::Real current_z_boost,
+    amrex::Real old_z_boost,
+    int a_offset
+)
     : m_current_z_boost(current_z_boost), m_old_z_boost(old_z_boost)
 {
     m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
 
-    const auto lev = a_pti.GetLevel();
-    const auto index = a_pti.GetPairIndex();
-
-    zpold = tmp_particle_data[lev][index][TmpIdx::zold].dataPtr();
+    zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
 }
 
 
-LorentzTransformParticles::LorentzTransformParticles ( const WarpXParIter& a_pti,
-                                TmpParticles& tmp_particle_data,
-                                amrex::Real t_boost, amrex::Real dt,
-                                amrex::Real t_lab, int a_offset)
-    : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab)
+LorentzTransformParticles::LorentzTransformParticles (
+    const WarpXParticleContainer& /*pc*/,
+    WarpXParIter& a_pti,
+    amrex::Real t_boost,
+    amrex::Real dt,
+    amrex::Real t_lab,
+    int a_offset
+)
+    : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab),
+      m_gammaboost(WarpX::gamma_boost), m_betaboost(WarpX::beta_boost),
+      m_Phys_c(PhysConst::c), m_inv_c2(amrex::Real(1.0)/(m_Phys_c * m_Phys_c)),
+      m_uzfrm(-m_gammaboost*m_betaboost*m_Phys_c)
 {
     using namespace amrex::literals;
 
-    if (tmp_particle_data.empty()) { return; }
     m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
 
     const auto& attribs = a_pti.GetAttribs();
@@ -46,21 +53,16 @@ LorentzTransformParticles::LorentzTransformParticles ( const WarpXParIter& a_pti
     m_uypnew = attribs[PIdx::uy].dataPtr();
     m_uzpnew = attribs[PIdx::uz].dataPtr();
 
-    const auto lev = a_pti.GetLevel();
-    const auto index = a_pti.GetPairIndex();
-
-    m_xpold = tmp_particle_data[lev][index][TmpIdx::xold].dataPtr();
-    m_ypold = tmp_particle_data[lev][index][TmpIdx::yold].dataPtr();
-    m_zpold = tmp_particle_data[lev][index][TmpIdx::zold].dataPtr();
-    m_uxpold = tmp_particle_data[lev][index][TmpIdx::uxold].dataPtr();
-    m_uypold = tmp_particle_data[lev][index][TmpIdx::uyold].dataPtr();
-    m_uzpold = tmp_particle_data[lev][index][TmpIdx::uzold].dataPtr();
-
-    m_betaboost = WarpX::beta_boost;
-    m_gammaboost = WarpX::gamma_boost;
-    m_Phys_c = PhysConst::c;
-    m_inv_c2 = 1._rt/(m_Phys_c * m_Phys_c);
-    m_uzfrm = -m_gammaboost*m_betaboost*m_Phys_c;
+#if (AMREX_SPACEDIM >= 2)
+    m_xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+    m_ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+#endif
+    m_zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
+    m_uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
+    m_uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
+    m_uzpold = a_pti.GetAttribs("uz_n_btd").dataPtr();
 }
 
 /**
@@ -84,7 +86,6 @@ BackTransformParticleFunctor::operator () (PinnedMemoryParticleContainer& pc_dst
     auto &warpx = WarpX::GetInstance();
     // get particle slice
     const int nlevs = std::max(0, m_pc_src->finestLevel()+1);
-    auto tmp_particle_data = m_pc_src->getTmpParticleData();
     for (int lev = 0; lev < nlevs; ++lev) {
         const amrex::Real t_boost = warpx.gett_new(0);
         const amrex::Real dt = warpx.getdt(0);
@@ -107,13 +108,19 @@ BackTransformParticleFunctor::operator () (PinnedMemoryParticleContainer& pc_dst
 
                 auto index = std::make_pair(pti.index(), pti.LocalTileIndex());
 
-                const auto GetParticleFilter = SelectParticles(pti, tmp_particle_data,
-                                               m_current_z_boost[i_buffer],
-                                               m_old_z_boost[i_buffer]);
+                const auto GetParticleFilter = SelectParticles(
+                    *m_pc_src,
+                    pti,
+                    m_current_z_boost[i_buffer],
+                    m_old_z_boost[i_buffer]
+                );
                 const auto GetParticleLorentzTransform = LorentzTransformParticles(
-                                                         pti, tmp_particle_data,
-                                                         t_boost, dt,
-                                                         m_t_lab[i_buffer]);
+                    *m_pc_src,
+                    pti,
+                    t_boost,
+                    dt,
+                    m_t_lab[i_buffer]
+                );
 
                 long const np = pti.numParticles();
 

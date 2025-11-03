@@ -6,7 +6,6 @@
 #
 # License: BSD-3-Clause-LBNL
 
-import os
 import sys
 
 import numpy as np
@@ -14,9 +13,6 @@ import yt
 from scipy.constants import epsilon_0
 
 yt.funcs.mylog.setLevel(50)
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Plotfile data set
 fn = sys.argv[1]
@@ -34,9 +30,3 @@ print("Error on charge conservation:")
 print("error_rel = {}".format(error_rel))
 print("tolerance = {}".format(tolerance))
 assert error_rel < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

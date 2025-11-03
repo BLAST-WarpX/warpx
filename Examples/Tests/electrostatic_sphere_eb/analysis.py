@@ -4,13 +4,10 @@
 # using the same reference file as for the non-PICMI test since the two
 # tests are otherwise the same.
 
-import os
-import sys
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
 # Check reduced diagnostics for charge on EB
+
 import numpy as np
-from checksumAPI import evaluate_checksum
+from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import epsilon_0
 
 # Theoretical charge on the embedded boundary, for sphere at potential phi_0
@@ -28,8 +25,19 @@ data_eighth = np.loadtxt("diags/reducedfiles/eb_charge_one_eighth.txt")
 q_sim_eighth = data_eighth[1, 2]
 assert abs((q_sim_eighth - q_th / 8) / (q_th / 8)) < 0.06
 
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
+# Check that the eb_covered field is correct
+ts = OpenPMDTimeSeries("diags/diag1")
+eb_covered, info = ts.get_field("eb_covered", iteration=0)
+r = np.sqrt(
+    info.x[:, np.newaxis, np.newaxis] ** 2
+    + info.y[np.newaxis, :, np.newaxis] ** 2
+    + info.z[np.newaxis, np.newaxis, :] ** 2
 )
+# Check that the number is between 0 and 1
+assert np.all(eb_covered >= 0)
+assert np.all(eb_covered <= 1)
+# Check that it is 1 everywhere inside the sphere
+R = 0.1
+assert np.all(eb_covered[r < R - info.dx] == 1)
+# Check that it is 0 everywhere outside the sphere
+assert np.all(eb_covered[r > R + info.dx] == 0)

@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import numpy as np
 import openpmd_api as io
 import pandas as pd
 from scipy.constants import c, e, hbar, m_e
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 sys.path.append("../../../../warpx/Tools/Parser/")
 from input_file_parser import parse_input_file
@@ -179,9 +175,3 @@ for species in ["beam_p", "beam_e"]:
     # dL/dt
     dL_dt_cr = df[[col for col in df.columns if "dL_dt" in col]].to_numpy()
     assert np.allclose(dL_dt_cr, dL_dt(), rtol=1e-8)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

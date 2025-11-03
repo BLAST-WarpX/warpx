@@ -18,6 +18,7 @@ FlushFormatAscent::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int verbose,
     const bool /*use_pinned_pc*/,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
     const amrex::Geometry& /*full_BTD_snapshot*/,
@@ -32,7 +33,9 @@ FlushFormatAscent::WriteToFile (
         "In-situ visualization is not currently supported for back-transformed diagnostics.");
 
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
-    amrex::Print() << Utils::TextMsg::Info("Writing Ascent file " + filename);
+    if (verbose > 0) {
+        amrex::Print() << Utils::TextMsg::Info("Writing Ascent file " + filename);
+    }
 
     // wrap mesh data
     WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::MultiLevelToBlueprint", prof_ascent_mesh_blueprint);
@@ -67,7 +70,7 @@ FlushFormatAscent::WriteToFile (
 
 #else
     amrex::ignore_unused(varnames, mf, geom, iteration, time,
-        particle_diags, nlev, file_min_digits, isBTD);
+        particle_diags, nlev, file_min_digits, verbose, isBTD);
 #endif // AMREX_USE_ASCENT
     amrex::ignore_unused(prefix, plot_raw_fields, plot_raw_fields_guards);
 }

@@ -63,8 +63,10 @@ class Bucket(object):
             if value is None:
                 continue
             if isinstance(value, str):
-                if value.find("=") > -1:
-                    # --- Expressions with temporary variables need to be inside quotes
+                if value.find('"') == -1:
+                    # All expressions are wrapped in double quotes
+                    # (unless there are already double quotes).
+                    # This makes the string parsing more robust
                     rhs = f'"{value}"'
                 else:
                     rhs = value
@@ -77,6 +79,10 @@ class Bucket(object):
                 rhs = " ".join(map(lambda s: f"{s}", value))
             elif isinstance(value, bool):
                 rhs = 1 if value else 0
+            elif isinstance(value, Bucket):
+                subresult = value.attrlist()
+                result.extend(subresult)
+                continue
             else:
                 rhs = value
             attrstring = f"{self.instancename}.{attr} = {rhs}"

@@ -12,13 +12,7 @@
 # than other gathering scheme. This tests checks that the energy does not increase by
 # more than 0.3% over the duration of the simulatoin.
 
-import os
-import sys
-
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Get energy as a function of time, from reduced diagnostics
 EFdata = np.genfromtxt("./diags/reducedfiles/EF.txt")  # Field energy
@@ -29,9 +23,3 @@ E = field_energy + particle_energy
 print(abs(E - E[0]) / E[0])
 # Check that the energy is conserved to 0.3%
 assert np.all(abs(E - E[0]) / E[0] < 0.003)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

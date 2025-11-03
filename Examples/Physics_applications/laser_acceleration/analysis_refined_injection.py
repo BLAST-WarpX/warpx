@@ -9,15 +9,11 @@
 
 # This script tests the "warpx.refine_plasma=1" option by comparing
 # the actual number of electrons at step 200 to the expected value
-import os
 import sys
 
 import yt
 
 yt.funcs.mylog.setLevel(50)
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # this will be the name of the plot file
 fn = sys.argv[1]
@@ -58,9 +54,3 @@ rho = ad["rho"].to_ndarray().squeeze()
 rho_slice = rho[13:51, 475]
 # Test uniformity up to 0.5% relative variation
 assert rho_slice.std() < 0.005 * abs(rho_slice.mean())
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

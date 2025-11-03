@@ -35,8 +35,8 @@ using namespace amrex;
 
 SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
                                         const bool time_averaging,
-                                        const JInTime J_in_time,
-                                        const RhoInTime rho_in_time,
+                                        const TimeDependencyJ time_dependency_J,
+                                        const TimeDependencyRho time_dependency_rho,
                                         const bool dive_cleaning,
                                         const bool divb_cleaning,
                                         const bool pml,
@@ -67,21 +67,33 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 
         if (divb_cleaning) { G = c++; }
 
-        if (J_in_time == JInTime::Constant)
+        if (time_dependency_J == TimeDependencyJ::Constant)
         {
             Jx_mid = c++; Jy_mid = c++; Jz_mid = c++;
         }
-        else if (J_in_time == JInTime::Linear)
+        if (time_dependency_J == TimeDependencyJ::Quadratic)
+        {
+            Jx_old = c++; Jy_old = c++; Jz_old = c++;
+            Jx_new = c++; Jy_new = c++; Jz_new = c++;
+            Jx_mid = c++; Jy_mid = c++; Jz_mid = c++;
+        }
+        else if (time_dependency_J == TimeDependencyJ::Linear)
         {
             Jx_old = c++; Jy_old = c++; Jz_old = c++;
             Jx_new = c++; Jy_new = c++; Jz_new = c++;
         }
 
-        if (rho_in_time == RhoInTime::Constant)
+        if (time_dependency_rho == TimeDependencyRho::Constant)
         {
             rho_mid = c++;
         }
-        else if (rho_in_time == RhoInTime::Linear)
+        if (time_dependency_rho == TimeDependencyRho::Quadratic)
+        {
+            rho_old = c++;
+            rho_mid = c++;
+            rho_new = c++;
+        }
+        else if (time_dependency_rho == TimeDependencyRho::Linear)
         {
             rho_old = c++;
             rho_new = c++;
@@ -117,17 +129,13 @@ SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,
 }
 
 /* \brief Initialize fields in spectral space, and FFT plans */
-SpectralFieldData::SpectralFieldData( const int lev,
-                                      const amrex::BoxArray& realspace_ba,
+SpectralFieldData::SpectralFieldData( const amrex::BoxArray& realspace_ba,
                                       const SpectralKSpace& k_space,
                                       const amrex::DistributionMapping& dm,
                                       const int n_field_required,
                                       const bool periodic_single_box):
     m_periodic_single_box{periodic_single_box}
 {
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    const bool do_costs = WarpXUtilLoadBalance::doCosts(cost, realspace_ba, dm);
-
     const BoxArray& spectralspace_ba = k_space.spectralspace_ba;
 
     // Allocate the arrays that contain the fields in spectral space
@@ -165,12 +173,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
     // Loop over boxes and allocate the corresponding plan
     // for each box owned by the local MPI proc
     for ( MFIter mfi(spectralspace_ba, dm); mfi.isValid(); ++mfi ){
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
-
         // Note: the size of the real-space box and spectral-space box
         // differ when using real-to-complex FFT. When initializing
         // the FFT plan, the valid dimensions are those of the real-space box.
@@ -185,13 +187,6 @@ SpectralFieldData::SpectralFieldData( const int lev,
             fft_size, tmpRealField[mfi].dataPtr(),
             reinterpret_cast<ablastr::math::anyfft::Complex*>( tmpSpectralField[mfi].dataPtr()),
             ablastr::math::anyfft::direction::C2R, AMREX_SPACEDIM);
-
-        if (do_costs)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
     }
 }
 
@@ -252,7 +247,7 @@ SpectralFieldData::ForwardTransform (const int lev,
             AMREX_ALWAYS_ASSERT( realspace_bx.contains(tmpRealField[mfi].box()) );
             const Array4<const Real> mf_arr = mf[mfi].array();
             const Array4<Real> tmp_arr = tmpRealField[mfi].array();
-            ParallelFor( tmpRealField[mfi].box(),
+            ParallelForOMP( tmpRealField[mfi].box(),
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 tmp_arr(i,j,k) = mf_arr(i,j,k,i_comp);
             });
@@ -279,7 +274,7 @@ SpectralFieldData::ForwardTransform (const int lev,
             // Loop over indices within one box
             const Box spectralspace_bx = tmpSpectralField[mfi].box();
 
-            ParallelFor( spectralspace_bx,
+            ParallelForOMP( spectralspace_bx,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 Complex spectral_field_value = tmp_arr(i,j,k);
                 // Apply proper shift in each dimension
@@ -352,7 +347,7 @@ SpectralFieldData::BackwardTransform (const int lev,
             // Loop over indices within one box
             const Box spectralspace_bx = tmpSpectralField[mfi].box();
 
-            ParallelFor( spectralspace_bx,
+            ParallelForOMP( spectralspace_bx,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                 Complex spectral_field_value = field_arr(i,j,k,field_index);
                 // Apply proper shift in each dimension
@@ -405,7 +400,7 @@ SpectralFieldData::BackwardTransform (const int lev,
             }
 
             // Loop over cells within full box, including ghost cells
-            ParallelFor(mf_box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+            ParallelForOMP(mf_box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
                 // Assume periodicity and set the last outer guard cell equal to the first one:
                 // this is necessary in order to get the correct value along a nodal direction,

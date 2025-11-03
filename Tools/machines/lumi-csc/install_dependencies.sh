@@ -124,10 +124,10 @@ if [ -d ${SRC_DIR}/adios2 ]
 then
   cd ${SRC_DIR}/adios2
   git fetch --prune
-  git checkout v2.8.3
+  git checkout v2.10.2
   cd -
 else
-  git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
 rm -rf ${build_dir}/adios2-lu-build
 cmake -S ${SRC_DIR}/adios2             \
@@ -137,7 +137,7 @@ cmake -S ${SRC_DIR}/adios2             \
       -DADIOS2_USE_HDF5=OFF            \
       -DADIOS2_USE_Python=OFF          \
       -DADIOS2_USE_ZeroMQ=OFF          \
-      -DCMAKE_INSTALL_PREFIX=${HOME}/sw/lumi/gpu/adios2-2.8.3
+      -DCMAKE_INSTALL_PREFIX=${HOME}/sw/lumi/gpu/adios2-2.10.2
 cmake --build ${build_dir}/adios2-lu-build --target install -j 16
 rm -rf ${build_dir}/adios2-lu-build
 
@@ -154,7 +154,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
-python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade setuptools[core]
 python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas

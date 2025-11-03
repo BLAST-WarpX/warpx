@@ -31,10 +31,10 @@
  * @param[in] multiplier factor by which the collision probability is increased to
  *            account for all other possible binary collision partners.
  * @param[in] process_count number of scattering processes to consider.
- * @param[in] scattering processes an array of scattering processes included for consideration.
+ * @param[in] scattering_processes an array of scattering processes included for consideration.
  * @param[in] engine the random engine.
  */
-template <typename index_type>
+template <int max_process_count, typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleReal u1y,
                           const amrex::ParticleReal u1z, const amrex::ParticleReal u2x,
@@ -51,8 +51,17 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
+    // For massless particles, the momentum is normalized to the electron mass
+    constexpr amrex::ParticleReal me = PhysConst::m_e;
+    amrex::ParticleReal p1x = (m1 == 0) ? me*u1x : m1*u1x;
+    amrex::ParticleReal p1y = (m1 == 0) ? me*u1y : m1*u1y;
+    amrex::ParticleReal p1z = (m1 == 0) ? me*u1z : m1*u1z;
+    amrex::ParticleReal p2x = (m2 == 0) ? me*u2x : m2*u2x;
+    amrex::ParticleReal p2y = (m2 == 0) ? me*u2y : m2*u2y;
+    amrex::ParticleReal p2z = (m2 == 0) ? me*u2z : m2*u2z;
+
     BinaryCollisionUtils::get_collision_parameters(
-        u1x, u1y, u1z, u2x, u2y, u2z, m1, m2,
+        p1x, p1y, p1z, p2x, p2y, p2z, m1, m2,
         E_coll, v_coll, lab_to_COM_factor);
 
     using namespace amrex::literals;
@@ -65,11 +74,10 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 
     // Evaluate the cross-section for each scattering process to determine
     // the total collision probability.
-    AMREX_ASSERT_WITH_MESSAGE(
-        (process_count < 4), "Too many scattering processes in DSMC routine."
-    );
-    int coll_type[4] = {0, 0, 0, 0};
-    amrex::ParticleReal sigma_sums[4] = {0._prt, 0._prt, 0._prt, 0._prt};
+    // The size of the arrays below is a compile-time constant (template parameter)
+    // for performance reasons: it avoids dynamic memory allocation on the GPU.
+    int coll_type[max_process_count] = {0};
+    amrex::ParticleReal sigma_sums[max_process_count] = {0._prt};
     for (int ii = 0; ii < process_count; ii++) {
         auto const& scattering_process = scattering_processes[ii];
         coll_type[ii] = int(scattering_process.m_type);

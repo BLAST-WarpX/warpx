@@ -13,7 +13,6 @@ We check that the embedded boundary emits the correct number of particles, and t
 the particle distributions are consistent with the expected distributions.
 """
 
-import os
 import re
 import sys
 
@@ -22,9 +21,6 @@ import numpy as np
 import yt
 from scipy.constants import c, m_e
 from scipy.special import erf
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
 
 yt.funcs.mylog.setLevel(0)
 
@@ -151,11 +147,8 @@ wx = ny * vz - nz * vy
 wy = nz * vx - nx * vz
 wz = nx * vy - ny * vx
 u_perp2 = ux * wx + uy * wy + uz * wz
-compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp")
+compare_gaussian(u_perp2, w, u_th=0.01, label="u_perp2")
 
+plt.legend()
 plt.tight_layout()
 plt.savefig("Distribution.png")
-
-# Verify checksum
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn)

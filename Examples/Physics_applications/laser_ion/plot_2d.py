@@ -120,7 +120,7 @@ def visualize_density_iteration(ts, iteration, out_dir):
     for ax in axs[:-1]:
         ax.set_xticklabels([])
     axs[2].set_xlabel(r"$z$ ($\mu$m)")
-    fig.suptitle(f"Iteration: {it}, Time: {time/1e-15:.1f} fs")
+    fig.suptitle(f"Iteration: {it}, Time: {time / 1e-15:.1f} fs")
 
     plt.tight_layout()
 
@@ -190,7 +190,7 @@ def visualize_field_iteration(ts, iteration, out_dir):
     for ax in axs[:-1]:
         ax.set_xticklabels([])
     axs[2].set_xlabel(r"$z$ ($\mu$m)")
-    fig.suptitle(f"Iteration: {it}, Time: {time/1e-15:.1f} fs")
+    fig.suptitle(f"Iteration: {it}, Time: {time / 1e-15:.1f} fs")
 
     plt.tight_layout()
 

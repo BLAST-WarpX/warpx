@@ -12,6 +12,36 @@ Git workflow
 The WarpX project uses `git <https://git-scm.com>`_ for version control.
 If you are new to git, you can follow `this tutorial <https://swcarpentry.github.io/git-novice/>`__.
 
+
+What to do when
+^^^^^^^^^^^^^^^
+
+Issues
+""""""
+
+`Issues <https://github.com/BLAST-WarpX/warpx/issues>`__ are used to track tasks that the contributors and/or maintainers can work on.
+Use issues for reporting bugs or installation problems and for requesting new features.
+
+If you've found a bug and wish to report it, first search the open issues and `pull requests <https://github.com/BLAST-WarpX/warpx/pulls>`__ to see if someone else has already reported the same thing.
+If it's something new, open an issue using a template.
+We'll use the issue to address the problem you've encountered.
+
+Discussions
+"""""""""""
+
+`Discussions <https://github.com/BLAST-WarpX/warpx/discussions>`__ are for open-ended conversations, general questions, brainstorming ideas.
+Please, use discussions if you want to ask us something that is not technically a bug or a feature.
+Feel free to ping us there!
+
+Pull Requests (PRs)
+"""""""""""""""""""
+
+Open a `pull request <https://github.com/BLAST-WarpX/warpx/pulls>`__ if you want to add a new feature yourself.
+Follow the guide below for more details.
+
+
+Thank you for contributing! 🥰
+
 Configure your GitHub Account & Development Machine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -28,7 +58,7 @@ First, let's setup your Git environment and GitHub account.
 Make your own fork
 ^^^^^^^^^^^^^^^^^^
 
-First, fork the WarpX `"mainline" repo on GitHub <https://github.com/ECP-WarpX/WarpX>`__ by pressing the *Fork* button on the top right of the page.
+First, fork the WarpX `"mainline" repo on GitHub <https://github.com/BLAST-WarpX/warpx>`__ by pressing the *Fork* button on the top right of the page.
 A fork is a copy of WarpX on GitHub, which is under your full control.
 
 Then, we create local copies, for development:
@@ -37,7 +67,7 @@ Then, we create local copies, for development:
 
    # Clone the mainline WarpX source code to your local computer.
    # You cannot write to this repository, but you can read from it.
-   git clone git@github.com:ECP-WarpX/WarpX.git
+   git clone git@github.com:BLAST-WarpX/warpx.git
    cd WarpX
 
    # rename what we just cloned: call it "mainline"

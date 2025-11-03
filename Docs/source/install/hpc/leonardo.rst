@@ -18,7 +18,7 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 * `Leonardo website <https://leonardo-supercomputer.cineca.eu/>`_
-* `Leonardo user guide <https://wiki.u-gov.it/confluence/display/SCAIUS/UG3.2%3A+LEONARDO+UserGuide>`_
+* `Leonardo user guide <https://docs.hpc.cineca.it/hpc/leonardo.html>`_
 
 Storage organization:
 
@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/leonardo_gpu_warpx.profile``.
 Create it now:

@@ -10,14 +10,22 @@
 module purge
 
 # A CrayPE environment version
-module load cpe/23.12
+module load cpe/24.07
 # An architecture
 module load craype-accel-amd-gfx90a craype-x86-trento
 # A compiler to target the architecture
 module load PrgEnv-cray
 # Some architecture related libraries and tools
-module load CCE-GPU-3.0.0
-module load amd-mixed/5.2.3
+module load develop
+module load CCE-GPU-4.0.0
+# AMD related libraries
+module load rocm/6.1.2
+module load amd-mixed/6.1.2
+# note
+# cray-mpich versions 8.1.28 and 8.1.30 have known issues
+# that cause node memory increase over time which leads
+# to slowdown and out-of-memory crashes.
+module load cray-mpich/8.1.26
 
 date
 module list

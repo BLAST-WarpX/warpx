@@ -150,8 +150,8 @@ sim.step(max_steps - 1)
 ##########################
 
 assert elec_wrapper.nps == 270 / (2 - args.unique)
-assert elec_wrapper.particle_container.get_comp_index("w") == 2
-assert elec_wrapper.particle_container.get_comp_index("newPid") == 6
+assert elec_wrapper.particle_container.get_real_comp_index("w") == 2
+assert elec_wrapper.particle_container.get_real_comp_index("newPid") == 6
 
 new_pid_vals = elec_wrapper.get_particle_real_arrays("newPid", 0)
 for vals in new_pid_vals:

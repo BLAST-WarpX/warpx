@@ -33,12 +33,11 @@ from .Constants import my_constants  # noqa
 from .Diagnostics import diagnostics, reduced_diagnostics  # noqa
 from .EB2 import eb2  # noqa
 from .Geometry import geometry  # noqa
-from .HybridPICModel import hybridpicmodel  # noqa
+from .HybridPICModel import hybridpicmodel, external_vector_potential  # noqa
 from .Interpolation import interpolation  # noqa
 from .Lasers import lasers  # noqa
 from .LoadThirdParty import load_cupy  # noqa
-from .Particles import newspecies, particles  # noqa
-from .ProjectionDivBCleaner import projectiondivbcleaner  # noqa
+from .Particles import new_species, particles  # noqa
 from .PSATD import psatd  # noqa
 from .WarpX import warpx  # noqa
 

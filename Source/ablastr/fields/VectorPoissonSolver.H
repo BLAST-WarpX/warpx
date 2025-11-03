@@ -110,11 +110,6 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
         rel_ref_ratio = amrex::Vector<amrex::IntVect>{{amrex::IntVect(AMREX_D_DECL(1, 1, 1))}};
     }
 
-#if !defined(AMREX_USE_EB)
-    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(!eb_enabled,
-                                       "Embedded boundary solve requested but not compiled in");
-#endif
-
     auto const finest_level = static_cast<int>(curr.size()) - 1;
 
     // scale J appropriately; also determine if current is zero everywhere
@@ -210,7 +205,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
             mlmg[adim]->setVerbose(verbosity);
             mlmg[adim]->setMaxIter(max_iters);
-            mlmg[adim]->setAlwaysUseBNorm(always_use_bnorm);
+            mlmg[adim]->setConvergenceNormType(always_use_bnorm ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
             // Solve Poisson equation at lev
             mlmg[adim]->solve( {A[lev][adim]}, {curr[lev][adim]},

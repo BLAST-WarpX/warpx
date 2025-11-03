@@ -6,7 +6,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_subcycling_mr  # inputs
-    analysis_default_regression.py  # analysis
-    diags/diag1000250  # output
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000250"  # checksum
     OFF  # dependency
 )

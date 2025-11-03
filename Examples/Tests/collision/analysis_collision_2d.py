@@ -31,9 +31,7 @@ import sys
 import numpy
 import post_processing_utils
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
+from scipy.constants import c, m_e
 
 test_name = os.path.split(os.getcwd())[1]
 
@@ -44,9 +42,7 @@ ne = ng * 200
 ni = ng * 200
 np = ne + ni
 
-c = 299792458.0
-me = 9.10938356e-31
-mi = me * 5.0
+mi = m_e * 5.0
 
 ## In the first part of the test we verify that the output data is consistent with the exponential
 ## fit.
@@ -79,7 +75,7 @@ for fn in fn_list:
     # get time index j
     j = int(fn[-5:])
     # compute error
-    vxe = numpy.mean(px[0:ne]) / me / c
+    vxe = numpy.mean(px[0:ne]) / m_e / c
     vxi = numpy.mean(px[ne:np]) / mi / c
     vxd = vxe - vxi
     fit = a * math.exp(b * j)
@@ -119,10 +115,4 @@ random_filter_fn = "diags/diag_random_filter" + last_it
 random_fraction = 0.77
 post_processing_utils.check_random_filter(
     last_fn, random_filter_fn, random_fraction, dim, species_name
-)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
 )
