@@ -51,6 +51,7 @@ Grid & Geometries
 
    planar_geometries
    twoD_cylindrical_geometry
+   oneD_cylindrical_and_spherical_geometries
 
 .. _theory-species_representations:
 
