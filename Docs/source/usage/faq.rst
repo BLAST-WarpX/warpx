@@ -45,6 +45,7 @@ Leave a cushion between lasers, particles, and the edge of computational domain.
 The laser antenna and plasma species ``zmin`` can be less than or greater than  the ``geometry.prob_hi``,
 but not exactly equal.
 
+.. _faq_boosted_frame:
 
 What do I need to know about using the boosted frame?
 -----------------------------------------------------

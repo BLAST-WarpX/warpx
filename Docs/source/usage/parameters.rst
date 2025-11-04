@@ -39,8 +39,8 @@ Overall simulation parameters
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
 
 * ``warpx.gamma_boost`` (`float`)
-    The Lorentz factor of the boosted frame in which the simulation is run.
-    (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
 
     When using this parameter, the input parameters are interpreted as in the
     lab-frame and automatically converted to the boosted frame.
