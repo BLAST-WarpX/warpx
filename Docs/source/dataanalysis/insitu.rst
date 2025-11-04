@@ -3,7 +3,7 @@
 In Situ Capabilities
 ====================
 
-In addition, WarpX also has vn-situ visualization capabilities (i.e.
+In addition, WarpX also has in situ visualization capabilities (i.e.
 visualizing the data directly from the simulation, without dumping data
 files to disk).
 

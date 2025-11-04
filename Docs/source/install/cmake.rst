@@ -3,7 +3,7 @@
 .. _building-cmake:
 .. _building-cmake-intro:
 
-Compile from Source
+Build from Source
 ===================
 
 `CMake <https://cmake.org>`_ is our primary build system.
@@ -37,7 +37,7 @@ Please refer to the :ref:`install-hpc` section.
 
 Install with Conda-Forge
 ^^^^^^^^^^^^^^^^^^^^^^^^
-(Linux/macOS/Windows)
+Conda can be used to install dependencies on Linux, macOS, and Windows.
 
 `Conda-Forge <https://conda-forge.org/download/>`__ is a repository for cross-compatible, user-level packages.
 
@@ -106,7 +106,7 @@ More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/statu
 
 Install with Spack
 ^^^^^^^^^^^^^^^^^^
-(Linux/macOS)
+Spack can be used to install dependencies on Linux and macOS.
 
 `Spack <https://spack.readthedocs.io>`__ is a user-level package manager.
 It is primarily written for Linux, with slightly less support for macOS, and future support for Windows.
@@ -162,7 +162,7 @@ For ``pip``, use ``export WARPX_MPI=ON``.
 Install with Brew
 ^^^^^^^^^^^^^^^^^
 
-(macOS/Linux)
+Brew can be used to install dependencies on Linux and macOS.
 
 `Homebrew (Brew) <https://brew.sh>`__ is a user-level package manager primarily for `Apple macOS <https://en.wikipedia.org/wiki/MacOS>`__, but also supports Linux.
 

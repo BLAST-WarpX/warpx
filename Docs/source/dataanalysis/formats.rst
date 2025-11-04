@@ -11,32 +11,30 @@ Field and Particle Data
 
 OpenPMD Outputs
 ^^^^^^^^^^^^^^^
-`OpenPMD<https://www.openpmd.org/>`__ is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
+`OpenPMD <https://www.openpmd.org/>`__ is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
 More details about how to use openPMD outputs with WarpX can be found in :ref:`dataanalysis-openpmd`.
 
 
 AMReX Plotfiles
 ^^^^^^^^^^^^^^^
 
-`AMReX plotfile format <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ or in
-
-Plotfiles are AMReX' native data format. See :ref:`dataanalysis-yt` for tools to read AMReX plotfiles.
+`Plotfiles <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ are AMReX' native data format. See :ref:`dataanalysis-yt` for tools to read AMReX plotfiles.
 
 
 Reduced diagnostics
 -------------------
 WarpX includes so-called :ref:`reduced diagnostics <running-cpp-parameters-diagnostics-reduced>`.
-Reduced diagnostics create observables on-the-fly, such as energy histograms or particle beam statistics and are :ref:`easily visualized in post-processing <dataanalysis-reduced-diagnostics>`.
+Reduced diagnostics create observables on-the-fly, such as energy histograms or particle beam statistics, and can be :ref:`easily visualized in post-processing <dataanalysis-reduced-diagnostics>`.
 
 WarpX has optional reduced diagnostics, that typically return one value (e.g., particle energy) per timestep.
 
-A simple and quick way to read the data using python is
+A simple and quick way to read the data using Python is
 
 .. code-block:: python
 
     data = numpy.genfromtxt("filename.txt")
 
-where ``data`` is a two dimensional array, ``data[i][j]`` gives the data in the ith row and the jth column.
+where ``data`` is a two-dimensional array, ``data[i][j]`` gives the data in the i-th row and the j-th column.
 
 
 Asynchronous IO
@@ -56,7 +54,7 @@ WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
 Please see :ref:`the building instructions <install-developers>` for details.
 
 
-Staggering Data Output
+Staggering of Output Data
 ----------------------
 
 Time
