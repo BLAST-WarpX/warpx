@@ -49,9 +49,8 @@ Grid & Geometries
 .. toctree::
    :maxdepth: 1
 
-   Cartesian
-   2D Cylindrical (RZ + azimuthal modes)
-   1D Cylindrical and Spherical
+   planar_geometries
+   twoD_cylindrical_geometry
 
 .. _theory-species_representations:
 
