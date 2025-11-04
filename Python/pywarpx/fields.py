@@ -202,9 +202,9 @@ class MultiFabWrapper(object):
             fields = warpx.multifab_register()
             if self.idir is not None:
                 direction = libwarpx.libwarpx_so.Direction(self.idir)
-                return fields.get(self.mf_name, direction, self.level)
+                return fields.get(self.mf_name, dir=direction, level=self.level)
             else:
-                return fields.get(self.mf_name, self.level)
+                return fields.get(self.mf_name, level=self.level)
 
     def create_new_MultiFab(self):
         warpx = libwarpx.libwarpx_so.get_instance()
