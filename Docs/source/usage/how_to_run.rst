@@ -5,10 +5,10 @@ Run WarpX
 
 In order to run a new simulation:
 
-#. create a **new directory**, where the simulation will be run
-#. make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__
-#. add an **inputs file** and on :ref:`HPC systems <install-hpc>` a **submission script** to the directory
-#. run the code
+#. Create a **new directory**, where the simulation will run.
+#. Make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__.
+#. Add an **inputs file** in the same directory. On :ref:`HPC systems <install-hpc>`, add also a **job submission script**.
+#. Run the executable.
 
 Simulation Directory
 --------------------
