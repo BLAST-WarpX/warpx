@@ -44,6 +44,7 @@ Field Solvers
    :maxdepth: 1
 
    maxwell_solvers
+   poisson_solvers
    kinetic_fluid_hybrid_model
 
 Grid & Geometries

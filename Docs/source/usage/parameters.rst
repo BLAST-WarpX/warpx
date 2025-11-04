@@ -214,61 +214,18 @@ Overall simulation parameters
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
+.. _param-poisson-solvers:
+
 * ``warpx.do_electrostatic`` (`string`) optional (default `none`)
     Specifies the electrostatic mode. When turned on, instead of updating
     the fields at each iteration with the full Maxwell equations, the fields
     are recomputed at each iteration from the Poisson equation.
     There is no limitation on the timestep in this case, but
     electromagnetic effects (e.g. propagation of radiation, lasers, etc.)
-    are not captured. There are several options:
-
-    * ``labframe``: Poisson's equation is solved in the lab frame with
-      the charge density of all species combined. More specifically, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
-
-    * ``labframe-electromagnetostatic``: Poisson's equation is solved in the lab frame with
-      the charge density of all species combined.  Additionally the 3-component vector potential
-      is solved in the Coulomb Gauge with the current density of all species combined
-      to include self magnetic fields. More specifically, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi \\
-        \boldsymbol{\nabla}^2 \boldsymbol{A} = - \mu_0 \boldsymbol{j} \qquad \boldsymbol{B} = \boldsymbol{\nabla}\times\boldsymbol{A}
-
-    * ``labframe-effective-potential``: Poisson's equation is solved with a modified dielectric function
-      (resulting in an "effective potential") to create a semi-implicit scheme which is robust to the
-      numerical instability seen in explicit electrostatic PIC when :math:`\Delta t \omega_{pe} > 2`.
-      If this option is used the additional parameter ``warpx.effective_potential_factor`` can also be
-      specified to set the value of :math:`C_{EP}` (default 4). The method is stable for :math:`C_{EP} \geq 1`
-      regardless of :math:`\Delta t`, however, the larger :math:`C_{EP}` is set, the lower the numerical plasma
-      frequency will be and therefore care must be taken to not set it so high that the plasma mode
-      hybridizes with other modes of interest.
-      Details of the method can be found in Appendix A of :cite:t:`param-Barnes2021` (note that in that paper
-      the method is referred to as "semi-implicit electrostatic" but here it has been renamed to "effective potential"
-      to avoid confusion with the semi-implicit method of Chen et al.).
-      In short, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}\cdot\left(1+\frac{C_{EP}}{4}\sum_{s \in \text{species}}(\omega_{ps}\Delta t)^2 \right)\boldsymbol{\nabla} \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
-
-    * ``relativistic``: Poisson's equation is solved **for each species**
-      in their respective rest frame. The corresponding field
-      is mapped back to the simulation frame and will produce both E and B
-      fields. More specifically, in the simulation frame, this is equivalent to solving **for each species**
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2\phi = - \rho/\epsilon_0 \qquad
-        \boldsymbol{E} = -\boldsymbol{\nabla}\phi + \boldsymbol{\beta}(\boldsymbol{\beta} \cdot \boldsymbol{\nabla}\phi)
-        \qquad \boldsymbol{B} = -\frac{1}{c}\boldsymbol{\beta}\times\boldsymbol{\nabla}\phi
-
-      where :math:`\boldsymbol{\beta}` is the average (normalized) velocity of the considered species (which can be relativistic).
-      See, e.g., :cite:t:`param-Vaypop2008` for more information.
+    are not captured. Several options for the electrostatic scheme are available,
+    including, ``labframe``, ``labframe-electromagnetostatic``, ``labframe-effective-potential``,
+    and ``relativistic``. See :ref:`here <theory-poisson-solvers>` for details
+    of each scheme.
 
 * ``warpx.poisson_solver`` (`string`) optional (default `multigrid`)
 
