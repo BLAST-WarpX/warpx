@@ -17,14 +17,13 @@ Extend a Simulation with Python
          #   sim = picmi.Simulation(...)
          #   ...
 
+         # register callbacks ...
+
          steps = 1000
          for _ in range(steps):
              sim.step(nsteps=1)
 
              # do something custom with the sim object
-
-      As a more flexible alternative, one can install callback functions (see next).
-
 
    .. tab-item:: Inputs File
 
@@ -161,13 +160,12 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
    @callfromafterstep
    def set_E_x():
        warpx = sim.extension.warpx
-       multifab_register = warpx.multifab_register()
 
        # data access
        #   vector field E, component x, on the fine patch of MR level 0
-       E_x_mf = multifab_register.get("Efield_fp", dir=0, level=0)
+       E_x_mf = sim.fields.get("Efield_fp", dir=0, level=0)
        #   scalar field rho, on the fine patch of MR level 0
-       rho_mf = multifab_register.get("rho_fp", level=0)
+       rho_mf = sim.fields.get("rho_fp", level=0)
 
        # compute on E_x_mf
        # iterate over mesh-refinement levels
@@ -200,23 +198,9 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
 
 For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``E_x``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
-A warning is that it is recommended that the reference to the MultiFab returned by multifab_register.get should not be saved across time steps. If there is load balancing, the MultiFabs will be regenerated and that reference will become invalid.
+Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
 
-High-Level Field Wrapper
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``fields`` module provides wrappers around the MultiFabs that are defined in the WarpX class, those that are added to the MultiFab registry.
-For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
-For each MultiFab, there is a function that will return a wrapper around the data.
-The wrappers provide a convenient interface to the MultiFabs, which have the advantage that they can be used when load balancing is done.
-For example, the function ``ExWrapper`` returns a wrapper around the ``x`` component of the MultiFab vector ``Efield_aux`` at level 0.
-
-.. code-block:: python
-
-   from pywarpx import fields
-   Ex = fields.ExWrapper(level=0)
-
-The wrapper provides access to the data via global indexing.
+The field MultiFab object provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
 When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
 For indices within the domain, values from valid cells are always returned.
@@ -225,8 +209,7 @@ This example will return the ``Bz`` field at all valid interior points along ``x
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Bz = fields.BzWrapper()
+   Bz = sim.fields.get("Bfield_fp", dir=2, level=0)
    Bz_along_x = Bz[:,5,6]
 
 The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
@@ -234,8 +217,7 @@ specified ``x``. The data will be scattered appropriately to the underlying FABs
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Jy = fields.JyFPWrapper()
+   Jy = sim.fields.get("current_fp", dir=1, level=0)
    Jy[5,6:20,8:30] = 7.
 
 In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
@@ -243,31 +225,29 @@ Note that the ``+=`` will be a global operation.
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Jx = fields.JxFPWrapper()
+   Jx = sim.fields.get("current_fp", dir=0, level=0)
    Jx[(),-1j,-1:2j] += 7.
 
 To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
 Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
 The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
-The wrapper allows new MultiFabs to be created at the Python level and added to the registry.
+New MultiFabs can be created at the Python level and added to the registry. Using this method, the new MultiFabs will be handled in the same way as internal MultiFabs, for example that data can be redistributed during load balancing (when the flags are set as shpwn in the example).
 In this example, a new MultiFab is added with the same properties as `Ex`.
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Ex = fields.ExWrapper()
-   normalized_Ex = fields.MultiFabWrapper(create_new=True,
-                                          mf_name="normalized_Ex",
-                                          idir=0,
-                                          ba=Ex.box_array(),
-                                          ngrow=Ex.n_grow_vect)
-
-Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
-The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
-
-Through the wrapper, all of the operations available on the underlying MultiFab can be done. For example, to find the max value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
+   Ex = sim.fields.get("Efield_fp", dir=0, level=0)
+   normalized_Ex = sim.fields.alloc_init(name="normalized_Ex",
+                                         dir=0,
+                                         level=0,
+                                         ba=Ex.box_array(),
+                                         dm=Ex.dm(),
+                                         ncomp=Ex.n_comp,
+                                         ngrow=Ex.n_grow_vect,
+                                         initial_value=0.,
+                                         redistribute=True,
+                                         redistribute_on_remake=True)
 
 Particles
 ^^^^^^^^^
