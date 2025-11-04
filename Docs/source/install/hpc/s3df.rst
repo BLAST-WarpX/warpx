@@ -201,7 +201,13 @@ You can run an interactive job directly from the terminal by typing:
 
 .. _running-s3df-terminal:
 
-where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 2`` CPU cores (physical threads) per task. This means 4 CPU cores will be requested by this job, 1 job will run per node, each job with 2 CPU cores.
+where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 2`` CPU cores (physical threads) per task. This means 4 CPU cores will be requested by this job, 1 job will run per node, each job with 2 CPU cores. Once the scheduler allocated the resources you can run WarpX:
+
+.. code-block:: bash
+
+    mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
+
+.. _running-s3df-run:
 
 Alternatively you can create a bash submission script and launch the job using this script:
 
@@ -245,11 +251,4 @@ Alternatively you can create a bash submission script and launch the job using t
 
 .. _running-s3df-script:
 
-
-Once the scheduler allocated the resources you can run WarpX:
-
-.. code-block:: bash
-
-    mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
-
-.. _running-s3df-run:
+Here and example is shown using the group account ``facet`` and the ``preemptable`` queue. We request 2 nodes and run 2 MPI ranks each using 4 threads. 
