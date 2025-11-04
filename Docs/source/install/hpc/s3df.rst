@@ -70,7 +70,7 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
 .. _building-s3df-mpi:
 
-**Make sure you have this MPI loaded whenever you want to (re)compile or run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` which is used for the FFT based EM solver and ``ADIOS2`` which is required for the ``openPMD`` data format WarpX uses. They can be installed in a similar way to ``cmake``. The general recipe to locally install such packages manually, under `~/opt` is:
+**Make sure you have this MPI loaded whenever you want to (re)compile or run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` which is used for the FFT based EM solver and ``ADIOS2`` which is required for the ``openPMD`` data format WarpX uses. The general recipe to locally install such packages manually with ``cmake``, under ``~/opt`` is:
 
 .. code-block:: bash
 
