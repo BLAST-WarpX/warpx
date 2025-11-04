@@ -251,4 +251,4 @@ Alternatively you can create a bash submission script and launch the job using t
 
 .. _running-s3df-script:
 
-Here and example is shown using the group account ``facet`` and the ``preemptable`` queue. We request 2 nodes and run 2 MPI ranks each using 4 threads. 
+Here an example is shown using the group account ``facet`` and the ``preemptable`` queue. We request 2 nodes and run 2 MPI ranks each using 4 threads. 
