@@ -80,7 +80,7 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
 .. _building-s3df-packages:
 
-It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters: ``ADIOS2-2.10.1``-> ``<package-name>=adios2`` or ``openPMD-api-0.15.1``-> ``<package-name>=openpmd``.
+It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters: ``ADIOS2-2.10.1``-> ``<package-name>=adios2`` or ``openPMD-api-0.15.1``-> ``<package-name>=openpmd``. After this we have to add the path of these installed packages to some environment variables so that WarpX finds them during installation. The commands below append the necessary lines into the `~/.bashrc` file so that we don't have to manually add them every time we login to the ``iana`` cluster.
 
 .. code-block:: bash
 
