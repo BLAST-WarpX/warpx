@@ -118,15 +118,9 @@ Theory
    :caption: THEORY
    :maxdepth: 1
    :hidden:
+   :titlesonly:
 
    theory/intro
-   theory/pic
-   theory/amr
-   theory/boundary_conditions
-   theory/boosted_frame
-   theory/multiphysics_extensions
-   theory/kinetic_fluid_hybrid_model
-   theory/cold_fluid_model
 
 Development
 -----------

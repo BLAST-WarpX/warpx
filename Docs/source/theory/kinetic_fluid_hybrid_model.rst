@@ -58,7 +58,7 @@ and substituting in :math:`\vec{J}` calculated from the Maxwell-Ampere equation,
 
         \frac{\partial\vec{J}_e}{\partial t} = -\frac{1}{\mu_0}\nabla\times\left(\nabla\times\vec{E}\right) - \frac{\partial\vec{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t}.
 
-Plugging this back into the generalized Ohm' law gives:
+Plugging this back into the generalized Ohm's law gives:
 
     .. math::
 
@@ -97,7 +97,7 @@ The kinetic-fluid hybrid extension mostly uses the same routines as the standard
 PIC algorithm with the only exception that the E-field is calculated from the
 above equation rather than it being updated from the full Maxwell-Ampere equation. The
 function ``WarpX::HybridPICEvolveFields()`` handles the logic to update the E&M fields
-when the "hybridPIC" model is used. This function is executed after particle pushing
+when ``algo.maxwell_solver = hybrid`` is set. This function is executed after particle pushing
 and deposition (charge and current density) has been completed. Therefore, based
 on the usual time-staggering in the PIC algorithm, when ``HybridPICEvolveFields()`` is called
 at timestep :math:`t=t_n`, the quantities :math:`\rho^n`, :math:`\rho^{n+1}`, :math:`\vec{J}_i^{n-1/2}`
