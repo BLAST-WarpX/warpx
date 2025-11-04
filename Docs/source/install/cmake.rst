@@ -1,4 +1,4 @@
-.. _compile-from-source:
+.. _install-compile-from-source:
 .. _install-developers:
 .. _building-cmake:
 .. _building-cmake-intro:
@@ -297,7 +297,7 @@ Additionally, a `symbolic link <https://en.wikipedia.org/wiki/Symbolic_link>`__ 
 More details on running simulations are in the section :ref:`Run WarpX <usage_run>`.
 Alternatively, read on and also build our PICMI Python interface.
 
-.. _build-the-python-interface-with-cmake:
+.. _install-build-python-cmake:
 .. _building-cmake-python:
 
 Build the Python Interface with CMake
@@ -336,7 +336,7 @@ Developers could now change the WarpX source code and then call the build line a
    Otherwise, without a virtual environment, you likely need to add the CMake option ``-DPY_PIP_INSTALL_OPTIONS="--user"``.
 
 
-.. _build-the-python-interface-with-pip:
+.. _install-build-python-pip:
 .. _building-pip-python:
 
 Build the Python Interface with pip
@@ -355,13 +355,12 @@ This will call the CMake logic above implicitly.
 Using this workflow has the advantage that it can build and package up multiple libraries with varying ``WarpX_DIMS`` into one ``pywarpx`` package.
 
 
-.. _build-options:
+.. _install-build-options:
 .. _building-cmake-options:
 
 Build Options
 -------------
 
-.. _configure-your-compiler:
 .. _building-cmake-envvars:
 
 Configure your Compiler

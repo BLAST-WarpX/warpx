@@ -1,4 +1,3 @@
-.. _run-warpx:
 .. _usage_run:
 
 Run WarpX

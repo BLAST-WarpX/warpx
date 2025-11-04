@@ -1,4 +1,4 @@
-.. _installation-methods:
+.. _install-methods:
 .. _install-users:
 
 Installation Methods
@@ -8,7 +8,6 @@ Installation Methods
 
    .. image:: hpc.svg
 
-.. _hpc-systems:
 
 HPC Systems
 -----------

@@ -1,4 +1,3 @@
-.. _inputs-python-script-picmi:
 .. _usage-picmi:
 .. _usage-picmi-run:
 

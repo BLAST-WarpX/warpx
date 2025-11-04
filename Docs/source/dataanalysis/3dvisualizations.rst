@@ -1,4 +1,3 @@
-.. _3d-visualizations:
 .. _dataanalysis-3dvisualizations:
 
 3D Visualizations
