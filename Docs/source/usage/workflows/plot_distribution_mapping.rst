@@ -144,7 +144,7 @@ This generates plots like in `[fig:knapsack_sfc_distribution_mapping_2D] <#fig:k
    \centering
 
 .. figure:: knapsack_sfc_distribution_mapping_2D.png
-   :alt: figure not found
+   :alt: Figure not found
    :name: fig:knapsack_sfc_distribution_mapping_2D
    :width: 15cm
 
@@ -177,7 +177,7 @@ This generates plots like in `[fig:knapsack_sfc_costs_2D] <#fig:knapsack_sfc_cos
    \centering
 
 .. figure:: knapsack_sfc_costs_2D.png
-   :alt: figure not found
+   :alt: Figure not found
    :name: fig:knapsack_sfc_costs_2D
    :width: 15cm
 
@@ -268,7 +268,7 @@ This generates plots like in `[fig:distribution_mapping_3D] <#fig:distribution_m
    \centering
 
 .. figure:: distribution_mapping_3D.png
-   :alt: figure not found
+   :alt: Figure not found
    :name: fig:distribution_mapping_3D
    :width: 15cm
 
