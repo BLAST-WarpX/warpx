@@ -46,6 +46,13 @@ Models & Algorithms
 Grid & Geometries
 =================
 
+.. toctree::
+   :maxdepth: 1
+
+   Cartesian
+   2D Cylindrical (RZ + azimuthal modes)
+   1D Cylindrical and Spherical
+
 .. _theory-species_representations:
 
 Species Representations
