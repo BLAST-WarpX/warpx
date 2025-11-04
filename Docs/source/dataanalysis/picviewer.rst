@@ -2,7 +2,7 @@ PICViewer
 =========
 
 .. figure:: sample_image.png
-   :alt: picture
+   :alt: Figure not found
 
 PICViewer is a visualization GUI implemented on PyQt.
 The toolkit provides various easy-to-use functions for data analysis of

@@ -26,7 +26,9 @@ The plasma, of total length L, has a density profile that consists of a lr long 
 With this configuration the driver excites a nonlinear plasma wake and drives the bubble depleted of plasma electrons where the beam accelerates, as can be seen in Fig. `[fig:PWFA] <#fig:PWFA>`__.
 
 .. figure:: PWFA.png
-   :alt: [fig:PWFA] Plot of 2D PWFA example at dump 1000
+   :alt: Figure not found
+
+   Plot of 2D PWFA example at dump 1000.
 
    [fig:PWFA] Plot of the driver (blue), beam (red) and plasma_e (green) electron macroparticle distribution at the time step 1000 of the example simulation.
    These are overlapping the 2D plot of the longitudinal electric field showing the accelerating/deccelerating (red/blue) regions of the plasma bubble.
