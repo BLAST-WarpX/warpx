@@ -308,7 +308,10 @@ class ForceFreeSheetReconnection(object):
 
         rho = simulation.fields.get("rho_fp", level=0)[...]
         Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
-        Jy = simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...] / self.J0
+        Jy = (
+            simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
+            / self.J0
+        )
         Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
         By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
         Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0

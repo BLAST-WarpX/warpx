@@ -81,35 +81,41 @@ class SpaceChargeFieldCorrector(object):
         # in WarpX's multifab register. This allows to get these fields at later
         # iterations with sim.fields.get( ... ).
         # These new fields are automatically redistributed when doing load balancing.
-        normalized_Er = sim.fields.alloc_init(name="normalized_Er",
-                                              level=0,
-                                              ba=Er.box_array(),
-                                              dm=Er.dm(),
-                                              ncomp=Er.n_comp,
-                                              ngrow=Er.n_grow_vect,
-                                              initial_value=0.,
-                                              redistribute=True,
-                                              redistribute_on_remake=True)
+        normalized_Er = sim.fields.alloc_init(
+            name="normalized_Er",
+            level=0,
+            ba=Er.box_array(),
+            dm=Er.dm(),
+            ncomp=Er.n_comp,
+            ngrow=Er.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
 
-        normalized_Ez = sim.fields.alloc_init(name="normalized_Ez",
-                                              level=0,
-                                              ba=Ez.box_array(),
-                                              dm=Ez.dm(),
-                                              ncomp=Ez.n_comp,
-                                              ngrow=Ez.n_grow_vect,
-                                              initial_value=0.,
-                                              redistribute=True,
-                                              redistribute_on_remake=True)
+        normalized_Ez = sim.fields.alloc_init(
+            name="normalized_Ez",
+            level=0,
+            ba=Ez.box_array(),
+            dm=Ez.dm(),
+            ncomp=Ez.n_comp,
+            ngrow=Ez.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
 
-        normalized_phi = sim.fields.alloc_init(name="normalized_phi",
-                                               level=0,
-                                               ba=phi.box_array(),
-                                               dm=phi.dm(),
-                                               ncomp=phi.n_comp,
-                                               ngrow=phi.n_grow_vect,
-                                               initial_value=0.,
-                                               redistribute=True,
-                                               redistribute_on_remake=True)
+        normalized_phi = sim.fields.alloc_init(
+            name="normalized_phi",
+            level=0,
+            ba=phi.box_array(),
+            dm=phi.dm(),
+            ncomp=phi.n_comp,
+            ngrow=phi.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
 
         # Record fields
 
