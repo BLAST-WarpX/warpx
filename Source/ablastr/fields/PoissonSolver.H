@@ -51,6 +51,8 @@
 #ifdef AMREX_USE_EB
 #   include <AMReX_EBFabFactory.H>
 #endif
+#include <AMReX_GMRES_MLMG.H>
+#include "WarpX.H"
 
 #include <algorithm>
 #include <array>
@@ -406,6 +408,10 @@ computePhi (
         mlmg.setMaxIter(max_iters);
         mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
+        amrex::ParmParse pp2("mlmg");
+        int solver_type = 0; // 0 = MLMG, 1 = GMRES
+        pp2.get("solver_type",solver_type);
+
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
             // In this case, computeE needs to use ghost nodes data. So we
@@ -414,8 +420,14 @@ computePhi (
         }
 
         // Solve Poisson equation at lev
-        mlmg.solve( {phi[lev]}, {rho[lev]},
-                     relative_tolerance, absolute_tolerance );
+        if (solver_type == 0) {
+            mlmg.solve( {phi[lev]}, {rho[lev]},
+                        relative_tolerance, absolute_tolerance );
+        } else {
+            amrex::GMRESMLMG gmsolve(mlmg);
+            gmsolve.solve( *phi[lev], *rho[lev], relative_tolerance, absolute_tolerance );
+            linop->postSolve({phi[lev]});
+        }
 
         const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
         const int ncomp = linop->getNComp();
@@ -435,12 +447,45 @@ computePhi (
                                         ng);
         }
 
-        // Run additional operations, such as calculation of the E field for embedded boundaries
-        if constexpr (!std::is_same_v<T_PostPhiCalculationFunctor, std::nullopt_t>) {
-            if (post_phi_calculation.has_value()) {
-                post_phi_calculation.value()(mlmg, lev);
+        if (solver_type == 0) {
+            // Run additional operations, such as calculation of the E field for embedded boundaries
+            if constexpr (!std::is_same_v<T_PostPhiCalculationFunctor, std::nullopt_t>) {
+                if (post_phi_calculation.has_value()) {
+                    post_phi_calculation.value()(mlmg, lev);
+                }
+            }
+        } else {
+
+            // create an alieas to the WarpX Efield
+            auto & warpx = WarpX::GetInstance();
+
+            amrex::Vector< amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> > e_field;
+            e_field.push_back(
+#if defined(WARPX_DIM_1D_Z)
+                amrex::Array<amrex::MultiFab*, 1>{
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{2}, lev)
+                }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                amrex::Array<amrex::MultiFab*, 2>{
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{0}, lev),
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{2}, lev)
+                        }
+#elif defined(WARPX_DIM_3D)
+                amrex::Array<amrex::MultiFab *, 3>{
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{0}, lev),
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{1}, lev),
+                    warpx.m_fields.get(warpx::fields::FieldType::Efield_fp, Direction{2}, lev)
+                        }
+#endif
+                );
+
+            // compute E = grad(phi)
+            linop->compGrad(0, e_field[0], *phi[0], amrex::MLLinOp::Location::CellCenter);
+            for(int dir=0; dir<AMREX_SPACEDIM; ++dir) {
+                e_field[lev][dir]->mult(-1.);
             }
         }
+
         rho[lev]->mult(-ablastr::constant::SI::ep0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
