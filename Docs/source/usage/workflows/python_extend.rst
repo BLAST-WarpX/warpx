@@ -57,8 +57,8 @@ specific location in the WarpX simulation loop.
 pyAMReX
 -------
 
-Many of the following classes are provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
-After the simulation is initialized, the pyAMReX module can be accessed via
+The Python interface to WarpX is provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
+After the simulation is initialized, the pyAMReX module if needed can be accessed via
 
 .. code-block:: python
 
@@ -73,6 +73,7 @@ After the simulation is initialized, the pyAMReX module can be accessed via
 
 
 Full details for pyAMReX APIs are `documented here <https://pyamrex.readthedocs.io/en/latest/usage/api.html>`__.
+The major objects used in the WarpX interface will be of types defined by pyAMReX.
 Important APIs include:
 
 * `amr.ParallelDescriptor <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParallelDescriptor.IOProcessor>`__: MPI-parallel rank information
@@ -83,7 +84,7 @@ Important APIs include:
 Data Access
 -----------
 
-While the simulation is running, callbacks can have read and write access the WarpX simulation data *in situ*.
+While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
 
 An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
 This object is the Python equivalent to the C++ ``WarpX`` simulation class.
@@ -145,7 +146,9 @@ The :py:class:`WarpX` also provides read and write access to field ``MultiFab`` 
 Fields
 ^^^^^^
 
-This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time step and calculate the largest value in it.
+All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
+This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to 42.
+This shows how to loop over levels and grid blocks.
 
 .. code-block:: python3
 
@@ -158,32 +161,32 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
 
 
    @callfromafterstep
-   def set_E_x():
+   def set_Ex():
        warpx = sim.extension.warpx
 
        # data access
        #   vector field E, component x, on the fine patch of MR level 0
-       E_x_mf = sim.fields.get("Efield_fp", dir=0, level=0)
+       Ex_mf = sim.fields.get("Efield_fp", dir=0, level=0)
        #   scalar field rho, on the fine patch of MR level 0
        rho_mf = sim.fields.get("rho_fp", level=0)
 
-       # compute on E_x_mf
+       # compute on Ex_mf
        # iterate over mesh-refinement levels
        for lev in range(warpx.finest_level + 1):
            # grow (aka guard/ghost/halo) regions
-           ngv = E_x_mf.n_grow_vect
+           ngv = Ex_mf.n_grow_vect
 
            # get every local block of the field
-           for mfi in E_x_mf:
+           for mfi in Ex_mf:
                # global index space box, including guards
                bx = mfi.tilebox().grow(ngv)
                print(bx)  # note: global index space of this block
 
                # numpy representation: non-copying view, including the
                # guard/ghost region;     .to_cupy() for GPU!
-               E_x_np = E_x_mf.array(mfi).to_numpy()
+               Ex_np = Ex_mf.array(mfi).to_numpy()
 
-               # notes on indexing in E_x_np:
+               # notes on indexing in Ex_np:
                # - numpy uses locally zero-based indexing
                # - layout is F_CONTIGUOUS by default, just like AMReX
 
@@ -191,14 +194,14 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
                # Only the next lines are the "HOT LOOP" of the computation.
                # For efficiency, use numpy array operation for speed on CPUs.
                # For GPUs use .to_cupy() above and compute with cupy or numba.
-               E_x_np[()] = 42.0
+               Ex_np[()] = 42.0
 
 
    sim.step(nsteps=100)
 
-For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``E_x``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
+For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
-Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
+Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
 
 The field MultiFab object provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
