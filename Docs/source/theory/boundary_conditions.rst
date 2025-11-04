@@ -294,7 +294,7 @@ the right boundary is reflecting.
 .. _fig_PEC_boundary_deposition:
 
 .. figure:: https://user-images.githubusercontent.com/40245517/221491318-b0a2bcbc-b04f-4b8c-8ec5-e9c92e55ee53.png
-   :alt: Plot of PEC boundary current deposition showing current vs position along the ``x``-axis.
+   :alt: Figure not found
    :width: 100%
 
    PEC boundary current deposition along the ``x``-axis. The left boundary is absorbing while the right boundary is reflecting.
