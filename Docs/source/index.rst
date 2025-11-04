@@ -80,8 +80,8 @@ Usage
 
    usage/how_to_run
    usage/examples
-   usage/python
    usage/parameters
+   usage/python
    usage/workflows
    usage/faq
 

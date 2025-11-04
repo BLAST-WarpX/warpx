@@ -8,10 +8,10 @@ In order to run a new simulation:
 #. create a **new directory**, where the simulation will be run
 #. make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__
 #. add an **inputs file** and on :ref:`HPC systems <install-hpc>` a **submission script** to the directory
-#. run
+#. run the code
 
-1. Simulation Directory
------------------------
+Simulation Directory
+--------------------
 
 On Linux/macOS, this is as easy as this
 
@@ -21,8 +21,8 @@ On Linux/macOS, this is as easy as this
 
 Where ``<run_directory>`` by the actual path to the run directory.
 
-2. Executable File
-------------------
+Executable File
+---------------
 
 If you installed warpX with a :ref:`package manager <install-users>`, a ``warpx``-prefixed executable will be available as a regular system command to you.
 Depending on the chosen build options, the name is suffixed with more details.
@@ -49,8 +49,8 @@ Copy the **executable** to this directory:
 
 where ``<warpx_executable>`` should be replaced by the actual name of the executable (see above) and ``<run_directory>`` by the actual path to the run directory.
 
-3. Input File
--------------
+Input File
+----------
 
 You need to provide WarpX with an input file that configures the simulation.
 This can either be a parameter list or a Python script, depending on how you wish to run WarpX.
@@ -64,8 +64,8 @@ This is Python script that contains the numerical and physical parameters throug
 On :ref:`HPC systems <install-hpc>`, also copy and adjust a submission script that allocated computing nodes for you.
 Please :ref:`reach out to us <contact>` if you need help setting up a template that runs with ideal performance.
 
-4. Run Simulation
------------------
+Run Simulation
+--------------
 
 WarpX Executable
 ^^^^^^^^^^^^^^^^
@@ -112,8 +112,8 @@ On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job sc
 
       mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
 
-5. Outputs and Diagnostics
---------------------------
+Outputs and Diagnostics
+-----------------------
 
 By default, WarpX will write a status update to the terminal (``stdout``).
 On :ref:`HPC systems <install-hpc>`, we usually store a copy of this in a file called ``outputs.txt``.
