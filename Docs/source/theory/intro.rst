@@ -9,11 +9,9 @@ WarpX simulates the **self-consistent** evolution of **particle species** (e.g.,
 In this context, *self-consistent* indicates that the particle dynamics are influenced by the fields, while the fields themselves evolve in response to the particles' changing charge and current density.
 
 The fields are represented on a discrete spatial grid (see :ref:`theory-grid`).
-The species are most commonly represented by discrete macro-particles moving continuously through the grid, but can also be represented as fluids in WarpX (see :ref:`theory-species_representations`).
+The species are most commonly represented by discrete macro-particles moving continuously through the grid, but can also be represented as fluids discretized on a grid (see :ref:`theory-species_representations`).
 
-At each time step of a simulation, both the species and the fields are updated -- using the equations of motion and the field equations respectively.
-Different types of field equations can be used in WarpX (see :ref:`theory-field_solvers`), and this choice determines many of the algorithmic details --
-such as the maximum time step size, the time staggering of the fields and particles position/momentum, the exact time-stepping algorithm, and whether the species' charge density or current density is used.
+At each **time step** of a simulation, both the species and the fields are updated -- using the equations of motion and the field equations respectively.
 
 .. _fig-pic:
 
@@ -22,10 +20,13 @@ such as the maximum time step size, the time staggering of the fields and partic
 
    The core Particle-In-Cell (PIC) algorithm involves four operations at each time step: 1) evolve the field equation on the grid,  2) deposit the charge and/or current densities through interpolation from the particles distributions onto the grid, 3) evolve the fields on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push.
 
+Different types of field equations can be used to update the fields in WarpX (e.g., Maxwell's equations for fully-electromagnetic field update, Poisson equation for electrostatic field update, etc.).
+This choice -- and the choice of a corresponding field solver -- determine many of the algorithmic details of the above loop (see :ref:`theory-field_solvers`), such as the maximum time step size, the exact time-stepping algorithm, and whether the species' charge density or current density is used.
+
 .. _theory-field_solvers:
 
-Field Solvers
-=============
+Models & Algorithms
+===================
 
 .. toctree::
    :maxdepth: 1
