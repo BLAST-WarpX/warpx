@@ -85,7 +85,7 @@ public:
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or
      *                                    split pml field
      * \param[in]     E_like whether the field is E like or B like
-     * \if WARPX_DIM_NOT_1D_Z
+     * \if !WARPX_DIM_1D_Z
      *   \param[in]     set_F_x_lo whether the tangential field at the boundary was specified
      *   \param[in]     set_F_x_hi whether the tangential field at the boundary was specified
      *   \param[in]     a_Fy_x_lo the parser for the tangential field at the boundary

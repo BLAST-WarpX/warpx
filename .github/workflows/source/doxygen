@@ -23,5 +23,12 @@ if ! grep -q "WARN_AS_ERROR = YES" Doxyfile; then
     echo "WARN_AS_ERROR = YES" >> Doxyfile
 fi
 
+# Read command line argument if provided
+if [ "$#" -eq 1 ]; then
+    WARPX_DIM="$1"
+    # Search and replace the WARPX_DIM_<> macro set as PREDEFINED in Doxyfile
+    sed -i "s/^\([[:space:]]*\)WARPX_DIM[^=]*=1 \\\\/\1${WARPX_DIM}=1 \\\\/" Doxyfile
+fi
+
 # Run doxygen
 doxygen

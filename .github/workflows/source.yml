@@ -36,4 +36,6 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
-        .github/workflows/source/doxygen
+        .github/workflows/source/doxygen WARPX_DIM_1D_Z
+        .github/workflows/source/doxygen WARPX_DIM_XZ
+        .github/workflows/source/doxygen WARPX_DIM_3D
