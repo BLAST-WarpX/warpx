@@ -12,7 +12,7 @@ Installation Methods
 HPC Systems
 -----------
 
-If want to use WarpX on a specific high-performance computing (HPC) systems, jump directly to our :ref:`HPC system-specific documentation <install-hpc>`.
+If you want to use WarpX on a specific high-performance computing (HPC) system, please go directly to our :ref:`HPC system-specific documentation <install-hpc>`.
 
 
 .. raw:: html
