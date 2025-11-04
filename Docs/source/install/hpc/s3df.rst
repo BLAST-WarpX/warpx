@@ -209,7 +209,7 @@ where ``<partitionname>`` is the cluster partiction that you want to use (see `h
 
 .. _running-s3df-run:
 
-Alternatively you can create a bash submission script and launch the job using this script:
+Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it like ``sbatch submit.sh``.
 
 .. code-block:: bash
 
