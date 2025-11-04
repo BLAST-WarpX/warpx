@@ -3,7 +3,7 @@
 Run WarpX
 =========
 
-In order to run a new simulation:
+To run a new simulation, please follow these steps:
 
 #. Create a **new directory**, where the simulation will run.
 #. Make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__.
