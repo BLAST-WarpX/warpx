@@ -5,22 +5,22 @@ Overview
 
 .. _theory-pic:
 
-In the *particle-in-cell method* :cite:p:`i-Birdsalllangdon`,
-the electric and magnetic fields are solved on a discretized grid while particles are
-evolved in continuous space. A high-level schematic of the method is shown in the
-figure below with details of the different field solvers, particle handling algorithms,
-additional physics modules, etc. described in the sections linked further down.
+WarpX simulates the **self-consistent** evolution of particle species (e.g., electrons, ions, etc.) in the presence of electric and magnetic fields.
+In this context, *self-consistent* indicates that the particle dynamics are influenced by the fields, while the fields themselves evolve in response to the particles' changing charge and current density.
+
+The fields are represented on a discrete spatial grid (see :ref:`theory-grid`).
+The species are most commonly represented by discrete macro-particles moving continuously through the grid, but can also be represented as fluids in WarpX (see :ref:`theory-species_representations`).
+
+At each time step of a simulation, both the species and the fields are updated -- using the equations of motion and field equation respectively.
+Different types of field equations can be used in WarpX (see :ref:`theory-field_solvers`), and this choice determines many of the algorithmic details --
+such as the maximum allowed time-step, the time staggering of the fields and particles position/momentum, the exact time-stepping algorithm, and whether the species' charge density or current density is the source of the fields' update.
 
 .. _fig-pic:
 
 .. figure:: PIC.png
-   :alt: [fig:PIC] The Particle-In-Cell (PIC) method follows the evolution of a collection of charged macro-particles (positively charged in blue on the left plot, negatively charged in red) that evolve self-consistently with their electromagnetic (or electrostatic) fields. The core PIC algorithm involves four operations at each time step: 1) evolve the velocity and position of the particles using the Newton-Lorentz equations, 2) deposit the charge and/or current densities through interpolation from the particles distributions onto the grid, 3) evolve Maxwell’s wave equations (for electromagnetic) or solve Poisson’s equation (for electrostatic) on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push. Additional “add-ons” operations are inserted between these core operations to account for additional physics (e.g. absorption/emission of particles, addition of external forces to account for accelerator focusing or accelerating component) or numerical effects (e.g. smoothing/filtering of the charge/current densities and/or fields on the grid).
+   :alt: figure not found
 
-   The Particle-In-Cell (PIC) method follows the evolution of a collection of charged macro-particles (positively charged in blue on the left plot, negatively charged in red) that evolve self-consistently with their electromagnetic (or electrostatic) fields. The core PIC algorithm involves four operations at each time step: 1) evolve the velocity and position of the particles using the Newton-Lorentz equations, 2) deposit the charge and/or current densities through interpolation from the particles distributions onto the grid, 3) evolve Maxwell’s wave equations (for electromagnetic) or solve Poisson’s equation (for electrostatic) on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push. Additional “add-ons” operations are inserted between these core operations to account for additional physics (e.g. absorption/emission of particles, addition of external forces to account for accelerator focusing or accelerating component) or numerical effects (e.g. smoothing/filtering of the charge/current densities and/or fields on the grid).
-
-the most popular algorithm is the Particle-In-Cell (or PIC) technique,
-which represents electromagnetic fields on a grid and particles by
-a sample of macroparticles.
+   The core Particle-In-Cell (PIC) algorithm involves four operations at each time step: 1) evolve the field equation on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push.
 
 .. _theory-field_solvers:
 
@@ -33,16 +33,10 @@ Field Solvers
    maxwell_solvers
    kinetic_fluid_hybrid_model
 
+.. _theory-grid:
+
 Grid & Geometries
 =================
-
-Boundary Conditions
-===================
-
-.. toctree::
-   :maxdepth: 1
-
-   boundary_conditions
 
 Species Representations
 =======================
@@ -52,6 +46,16 @@ Species Representations
 
    kinetic_particles
    cold_fluid_model
+
+Boundary Conditions
+===================
+
+.. toctree::
+   :maxdepth: 1
+
+   boundary_conditions
+
+.. _theory-species_representations:
 
 Multiphysics Processes
 ======================
