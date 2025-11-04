@@ -61,6 +61,8 @@ Here are a few practical items to assist in designing boosted frame simulations:
 
 An in-depth discussion of the boosted frame is provided in the :ref:`moving window and optimal Lorentz boosted frame <theory-boostedframe>` section.
 
+.. _faq_btd:
+
 What about Back-transformed diagnostics (BTD)?
 ----------------------------------------------
 
