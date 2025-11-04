@@ -66,7 +66,7 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
 .. _building-s3df-mpi:
 
-**Make sure you have MPI loaded when you want to install/run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. The general recipe to locally install such packages manually, under `~/opt` is:
+**Make sure you have this MPI loaded when you want to install/run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. The general recipe to locally install such packages manually, under `~/opt` is:
 
 .. code-block:: bash
 
@@ -197,11 +197,15 @@ You can run an interactive job directly from the terminal by typing:
 
 .. code-block:: bash
 
-    srun --partition <partitionname> --account <accountname> -n 2 --time=01:00:00 --pty /bin/bash
+    srun --partition <partitionname> --account <accountname> -N 2 -n 32 -c 4 --time=01:00:00 --pty /bin/bash
 
 .. _running-s3df-terminal:
 
-where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``. Here we request 2 nodes for 1 hour to test WarpX with MPI.
+where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the project you are associated with e.g. ``facet``. Here we request ``-N 2`` nodes, ``-n 32`` tasks (MPI processes) and ``-c 4`` CPU cores (physical threads) per task. This means 128 CPU cores will be requested by this job, or 2 nodes each with 64 CPU cores, and 16 MPI processes per node.
+
+Alternatively you can create a bash submission script and launch the job using this script:
+
+
 
 Once the scheduler allocated the resources you can run WarpX:
 
