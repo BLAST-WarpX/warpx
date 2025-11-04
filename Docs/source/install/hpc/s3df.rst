@@ -197,11 +197,11 @@ You can run an interactive job directly from the terminal by typing:
 
 .. code-block:: bash
 
-    srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 2 --time=01:00:00 --pty /bin/bash
+    srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 4 --time=01:00:00 --pty /bin/bash
 
 .. _running-s3df-terminal:
 
-where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 2`` CPU cores (physical threads) per task. This means 4 CPU cores will be requested by this job, 1 job will run per node, each job with 2 CPU cores. Once the scheduler allocated the resources you can run WarpX:
+where ``<partitionname>`` is the cluster partiction that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 4`` CPU cores (physical threads) per task. This means 8 CPU cores will be requested by this job, 1 job will run per node, each job with 4 CPU cores. Once the scheduler allocated the resources you can run WarpX:
 
 .. code-block:: bash
 
