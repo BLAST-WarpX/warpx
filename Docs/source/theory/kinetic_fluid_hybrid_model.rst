@@ -1,6 +1,6 @@
 .. _theory-kinetic-fluid-hybrid-model:
 
-Hybrid Model based on Maxwell-Ampere coupled with Ohm's law
+Maxwell-Ampere coupled with Ohm's law (a.k.a. "hybrid PIC")
 ===========================================================
 
 Many problems in plasma physics fall in a class where both electron kinetics and electromagnetic waves do not
