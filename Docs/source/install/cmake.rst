@@ -1,3 +1,4 @@
+.. _compile-from-source:
 .. _install-developers:
 .. _building-cmake:
 .. _building-cmake-intro:
@@ -9,6 +10,7 @@ Compile from Source
 If you are new to CMake, `this short tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`_ from the HEP Software foundation is the perfect place to get started.
 If you just want to use CMake to build the project, jump into sections `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__ and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
+.. _install-dependencies:
 
 Install Dependencies
 --------------------
@@ -21,18 +23,16 @@ Before you start, you will need a copy of the WarpX source code:
    cd $HOME/src/warpx
 
 WarpX depends on popular third party software.
-
-* On your development machine, :ref:`follow the instructions here <install-dependencies>`.
-* If you are on an HPC machine, :ref:`follow the instructions here <install-hpc>`.
+Find below a list of dependencies and how to install them.
 
 .. toctree::
    :hidden:
 
    dependencies
 
-Install on HPC
-^^^^^^^^^^^^^^
-Link to HPC installation instructions
+Install on HPC Systems
+^^^^^^^^^^^^^^^^^^^^^^
+Please refer to the :ref:`install-hpc` section.
 
 
 Install with Conda-Forge
@@ -242,8 +242,12 @@ The `Advanced Package Tool (APT) <https://en.wikipedia.org/wiki/APT_(software)>`
          # for pip, use: export WARPX_MPI=OFF
 
 
+.. _build-the-code:
+
 Build the Code
 --------------
+
+.. _build-the-executable-with-cmake:
 
 Build the Executable with CMake
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -293,7 +297,7 @@ Additionally, a `symbolic link <https://en.wikipedia.org/wiki/Symbolic_link>`__ 
 More details on running simulations are in the section :ref:`Run WarpX <usage_run>`.
 Alternatively, read on and also build our PICMI Python interface.
 
-
+.. _build-the-python-interface-with-cmake:
 .. _building-cmake-python:
 
 Build the Python Interface with CMake
@@ -331,6 +335,8 @@ Developers could now change the WarpX source code and then call the build line a
    If you do *not* develop with :ref:`a user-level package manager <install-dependencies>`, e.g., because you rely on a HPC system's environment modules, then consider to set up a virtual environment via `Python venv <https://docs.python.org/3/library/venv.html>`__.
    Otherwise, without a virtual environment, you likely need to add the CMake option ``-DPY_PIP_INSTALL_OPTIONS="--user"``.
 
+
+.. _build-the-python-interface-with-pip:
 .. _building-pip-python:
 
 Build the Python Interface with pip
@@ -349,11 +355,13 @@ This will call the CMake logic above implicitly.
 Using this workflow has the advantage that it can build and package up multiple libraries with varying ``WarpX_DIMS`` into one ``pywarpx`` package.
 
 
+.. _build-options:
 .. _building-cmake-options:
 
 Build Options
 -------------
 
+.. _configure-your-compiler:
 .. _building-cmake-envvars:
 
 Configure your Compiler
@@ -479,7 +487,6 @@ More details on this :ref:`workflow are described here <developers-local-compile
 
 If you re-compile often, consider installing the `Ninja <https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages>`__ build system.
 Pass ``-G Ninja`` to the CMake configuration call to speed up parallel compiles.
-
 
 
 pip

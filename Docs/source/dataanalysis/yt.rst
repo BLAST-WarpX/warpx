@@ -1,3 +1,4 @@
+.. _read-amrex-plotfiles-with-yt:
 .. _dataanalysis-yt:
 
 Read AMReX Plotfiles with yt

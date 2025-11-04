@@ -1,3 +1,4 @@
+.. _read-openpmd-data:
 .. _dataanalysis-openpmd:
 
 Read OpenPMD Data

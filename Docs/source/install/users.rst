@@ -1,3 +1,4 @@
+.. _installation-methods:
 .. _install-users:
 
 Installation Methods
@@ -6,6 +7,8 @@ Installation Methods
 .. only:: html
 
    .. image:: hpc.svg
+
+.. _hpc-systems:
 
 HPC Systems
 -----------
@@ -31,7 +34,7 @@ Please `report installation problems <https://github.com/BLAST-WarpX/warpx/issue
 
 Choose **one** of the installation methods below to get started:
 
-
+.. _using-the-conda-forge-package:
 .. _install-conda:
 
 .. only:: html
@@ -68,7 +71,7 @@ A package for WarpX is available via `Conda-Forge <https://conda-forge.org/downl
 
    The ``warpx`` package on conda-forge does not yet provide `GPU support <https://github.com/conda-forge/warpx-feedstock/issues/89>`__.
 
-
+.. _using-the-spack-package:
 .. _install-spack:
 
 .. only:: html
@@ -94,7 +97,7 @@ The package ``warpx`` installs executables and the variant ``warpx +python`` als
 
 See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
 
-
+.. _using-the-pypi-package:
 .. _install-pypi:
 
 .. only:: html
@@ -118,7 +121,7 @@ Given that you have the :ref:`WarpX dependencies <install-dependencies>` install
 In the future, will publish pre-compiled binary packages on `PyPI <https://pypi.org/>`__ for faster installs.
 (Consider using :ref:`conda <install-conda>` in the meantime.)
 
-
+.. _using-the-brew-package:
 .. _install-brew:
 
 .. only:: html
@@ -133,6 +136,7 @@ Using the Brew Package
    Coming soon.
 
 
+.. _from-source-with-cmake:
 .. _install-cmake:
 
 .. only:: html
@@ -164,7 +168,7 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
 
 We document the details in the :ref:`developer installation <install-developers>`.
 
-
+.. _tips-for-macos-users:
 .. _install-users-macos:
 
 Tips for macOS Users

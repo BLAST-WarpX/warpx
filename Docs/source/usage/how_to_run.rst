@@ -1,3 +1,4 @@
+.. _run-warpx:
 .. _usage_run:
 
 Run WarpX
@@ -102,7 +103,6 @@ Job Script
 On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job script <install-hpc>` at this point, e.g. ``sbatch <submission_script>`` (SLURM on Cori/NERSC) or ``bsub <submission_script>`` (LSF on Summit/OLCF).
 
 
-
 .. tip::
 
    In the :ref:`next sections <running-cpp-parameters>`, we will explain parameters of the ``<input_file>``.
@@ -111,6 +111,7 @@ On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job sc
    .. code-block:: bash
 
       mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
+
 
 Outputs and Diagnostics
 -----------------------
