@@ -43,7 +43,7 @@ Please `report installation issues <https://github.com/BLAST-WarpX/warpx/issues/
 Using the Conda-Forge Package
 -----------------------------
 
-A package for WarpX is available via `Conda-Forge <https://conda-forge.org/download/>`__.
+A package for WarpX is available via `conda-forge <https://conda-forge.org/download/>`__.
 
 .. tip::
 
@@ -165,7 +165,7 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
 
    # executables for WarpX are now in build/bin/
 
-We document the details in the :ref:`developer installation <install-developers>`.
+For more details on how to configure WarpX from source, please see the section :ref:`Build from Source <install-developers>`.
 
 .. _tips-for-macos-users:
 .. _install-users-macos:
