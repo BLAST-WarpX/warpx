@@ -17,4 +17,3 @@ Three dimensions
 -------------
 
 No explaination is required for a Cartesian geometry in three dimensions.
-
