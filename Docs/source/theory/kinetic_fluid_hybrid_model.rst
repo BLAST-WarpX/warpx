@@ -1,7 +1,7 @@
 .. _theory-kinetic-fluid-hybrid-model:
 
-Kinetic-fluid Hybrid Model
-==========================
+Hybrid Model based on Maxwell-Ampere coupled with Ohm's law
+===========================================================
 
 Many problems in plasma physics fall in a class where both electron kinetics and electromagnetic waves do not
 play a critical role in the solution. Examples of such situations include the
