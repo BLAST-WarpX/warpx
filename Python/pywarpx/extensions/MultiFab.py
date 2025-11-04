@@ -32,6 +32,8 @@ def mesh(self, direction, include_ghosts=False):
             idir = ["r", "z"].index(direction)
         elif libwarpx.geometry_dim == "1d":
             idir = ["z"].index(direction)
+        else:
+            raise Exception(f"Direction not implemented: {libwarpx.geometry_dim}")
     except ValueError:
         raise Exception("Inappropriate direction given")
 
