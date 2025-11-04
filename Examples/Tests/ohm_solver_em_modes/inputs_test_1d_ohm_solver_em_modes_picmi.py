@@ -315,9 +315,9 @@ class EMModes(object):
         if step % self.diag_steps != 0:
             return
 
-        Bx_warpx = sim.fields.get("Bfields_fp", dir="x", level=0)[...]
-        By_warpx = sim.fields.get("Bfields_fp", dir="y", level=0)[...]
-        Ez_warpx = sim.fields.get("Efields_fp", dir="z", level=0)[...]
+        Bx_warpx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...]
+        By_warpx = simulation.fields.get("Bfield_fp", dir="y", level=0)[...]
+        Ez_warpx = simulation.fields.get("Efield_fp", dir="z", level=0)[...]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return
