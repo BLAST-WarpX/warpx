@@ -25,6 +25,7 @@ The general form of the differential divergence, gradient, and curl operators in
    \\
    \nabla\times\mathbf{F}    & = \frac{1}{r}\left[\frac{\partial F_{\phi}}{\partial r} - \frac{\partial}{\partial}\left(\cos\phi F_{\theta}\right)\right]\hat{\mathbf{r}}
    \\
+   \end{aligned}
 
 where :math:`\mathbf{t}=\left(q\Delta t/2m\right)\mathbf{B}^{i}/\bar{\gamma}^{i}` and where
 
