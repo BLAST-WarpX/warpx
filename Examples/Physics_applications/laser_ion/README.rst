@@ -43,7 +43,7 @@ This example can be run **either** as:
    .. tab-item:: Executable: Input File
 
       .. literalinclude:: inputs_test_2d_laser_ion_acc
-         :language: ini
+         :language: none
          :caption: You can copy this file from ``Examples/Physics_applications/laser_ion/inputs_test_2d_laser_ion_acc``.
 
 Analyze
