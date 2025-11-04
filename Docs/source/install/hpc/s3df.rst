@@ -42,7 +42,7 @@ Use the following command to download the WarpX source code:
 Compilation
 -----------
 
-S3DF pools may miss some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under ``~/.local``.
+S3DF pools may miss some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under a new folder called ``opt``.
 The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer ``cmake`` manually:
 
 .. code-block:: bash
@@ -54,7 +54,7 @@ The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20
    ./bootstrap --prefix=$HOME/opt/cmake-4.1.2
    make -j$(nproc)
    make install
-   export PATH=$HOME/opt/cmake-4.2.0/bin:$PATH
+   export PATH=$HOME/opt/cmake-4.1.2/bin:$PATH
    cmake --version
 
 .. _building-s3df-cmake:
