@@ -27,9 +27,9 @@ More specifically, the following operations are performed at each time step, as 
    Schematic high-level representation of the Particle-In-Cell (PIC) algorithm.
 
 In WarpX, different types of field equations can be used to update the fields (e.g., Maxwell's equations for fully-electromagnetic field update, Poisson equation for electrostatic field update, etc.).
-This choice -- and the choice of a corresponding field solver -- determine many of the algorithmic details of the above loop (see :ref:`theory-field_solvers`), such as the maximum time step size, the exact time-stepping algorithm, and whether the species' charge density or current density is used.
+This choice -- and the choice of a corresponding field solver -- determine many of the algorithmic details of the above loop (see :ref:`theory-models_algorithms`), such as the maximum time step size, the exact time-stepping algorithm, and whether the species' charge density or current density is used.
 
-.. _theory-field_solvers:
+.. _theory-models_algorithms:
 
 Models & Algorithms
 ===================
