@@ -52,8 +52,7 @@ def my_advanced_callback():
     print(f"    {electrons_pc}")
 
     # electric field: access (and potentially manipulate)
-    multifab_register = warpx.multifab_register()
-    Ex_mf = multifab_register.get("Efield_fp", dir="x", level=0)
+    Ex_mf = sim.fields.get("Efield_fp", dir="x", level=0)
     print(f"    {Ex_mf}")
 
 
