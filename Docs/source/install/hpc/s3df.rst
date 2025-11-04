@@ -70,7 +70,7 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
 .. _building-s3df-mpi:
 
-**Make sure you have this MPI loaded whenever you want to (re)compile or run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` ``ADIOS2`` and ``openPMD``. They can be installed in a similar way to ``cmake``. The general recipe to locally install such packages manually, under `~/opt` is:
+**Make sure you have this MPI loaded whenever you want to (re)compile or run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` and ``ADIOS2``. They can be installed in a similar way to ``cmake``. The general recipe to locally install such packages manually, under `~/opt` is:
 
 .. code-block:: bash
 
@@ -85,14 +85,14 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
 .. _building-s3df-packages:
 
-It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters and the version number: ``ADIOS2-2.10.1``-> ``<package-name>=adios2-2.10.1`` or ``openPMD-api-0.15.1``-> ``<package-name>=openpmd-0.15.1``. After this we have to add the path of these installed packages to environment variables so that WarpX finds them during installation. The commands below append the necessary lines into the `~/.bashrc` file so that we don't have to manually add them every time we login to the ``iana`` cluster.
+It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters and the version number, e.g.: ``ADIOS2-2.10.1``-> ``<package-name>=adios2-2.10.1`` or ``fftw-3.3.10``-> ``<package-name>=fftw-3.3.10``. After this we have to add the path of these installed packages to environment variables so that WarpX finds them during installation. The commands below append the necessary lines into the `~/.bashrc` file so that we don't have to manually add them every time we login to the ``iana`` cluster.
 
 .. code-block:: bash
 
-    echo 'export ADIOS2_DIR=$HOME/opt/adios2' >> ~/.bashrc
-    echo 'export FFTW_ROOT=$HOME/opt/fftw' >> ~/.bashrc
-    echo 'export PATH=$HOME/opt/adios2/bin:$HOME/opt/fftw/bin:$PATH' >> ~/.bashrc
-    echo 'export LD_LIBRARY_PATH=$HOME/opt/adios2/lib64:$HOME/opt/adios2/lib:$HOME/opt/fftw/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+    echo 'export ADIOS2_DIR=$HOME/opt/adios2-2.10.1' >> ~/.bashrc
+    echo 'export FFTW_ROOT=$HOME/opt/fftw-3.3.10' >> ~/.bashrc
+    echo 'export PATH=$HOME/opt/adios2-2.10.1/bin:$HOME/opt/fftw-3.3.10/bin:$PATH' >> ~/.bashrc
+    echo 'export LD_LIBRARY_PATH=$HOME/opt/adios2-2.10.1/lib64:$HOME/opt/adios2-2.10.1/lib:$HOME/opt/fftw-3.3.10/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
     source ~/.bashrc
 
 .. _building-s3df-paths:
