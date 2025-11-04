@@ -1894,28 +1894,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     A_external: dict
         Function of space and time specifying external (non-plasma) vector potential fields.
-        It is expected that a nested dicitonary will be passed
-        into picmi for each field that has different timings
-        e.g.
-        A_external = {
-            '<field_name1>': {
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ay_external_function': <implicit function with (x,y,z) dependence>,
-                'Az_external_function': <implicit function with (x,y,z) dependence>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
-
-        or if fields are to be loaded from an OpenPMD file
-        A_external = {
-            '<field_name1>': {
-                'load_from_file': True,
-                'path': <path to OpenPMD file>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
+        It is expected that a nested dictionary will be passed in for each separate vector potential that may have
+        different spatial configuration or time dependence. Each field entry should contain either implicit functions
+        with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function',
+        'Az_external_function', plus 'A_time_external_function' with (t) dependence, or
+        alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with
+        'A_time_external_function'.
 
     do_external_diva_cleaning: bool (default=True)
         This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
