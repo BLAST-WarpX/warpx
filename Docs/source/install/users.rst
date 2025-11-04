@@ -4,6 +4,8 @@
 Installation Methods
 ====================
 
+Please choose **one** of the installation methods below to get started.
+
 .. only:: html
 
    .. image:: hpc.svg
@@ -29,9 +31,7 @@ If you want to use WarpX on a specific high-performance computing (HPC) system, 
    </style>
 
 Our community is here to help.
-Please `report installation problems <https://github.com/BLAST-WarpX/warpx/issues/new>`_ in case you should get stuck.
-
-Choose **one** of the installation methods below to get started:
+Please `report installation issues <https://github.com/BLAST-WarpX/warpx/issues/new>`__ if you encounter any.
 
 .. _using-the-conda-forge-package:
 .. _install-conda:
