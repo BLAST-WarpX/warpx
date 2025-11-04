@@ -210,6 +210,7 @@ where ``<partitionname>`` is the cluster partition that you want to use (see `he
 
 .. code-block:: bash
 
+    module load openmpi/v4.1.6
     mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
 
 .. _running-s3df-run:
