@@ -76,6 +76,7 @@ S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>
 
     cd 
     wget <url-to-package>
+    tar -xzf <package.gz>
     cd <package>
     mkdir build && cd build
     cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name> -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_THREADS=ON
