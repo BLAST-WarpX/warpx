@@ -81,7 +81,7 @@ Using the Spack Package
 -----------------------
 
 Packages for WarpX are available via the `Spack <https://spack.readthedocs.io>`__ package manager.
-The package ``warpx`` installs executables and the variant ``warpx +python`` also includes Python bindings, i.e. `PICMI <https://github.com/picmi-standard/picmi>`__.
+The package ``warpx`` installs executables and the variant ``warpx +python`` also includes Python bindings, which can be used in combination with `PICMI <https://github.com/picmi-standard/picmi>`__.
 
 .. code-block:: bash
 
