@@ -1,8 +1,8 @@
 .. _usage-picmi:
 .. _usage-picmi-run:
 
-Inputs: Python Script (PICMI)
-=============================
+Inputs: PICMI Python Script
+===========================
 
 This documents on how to use WarpX as a Python script (e.g., ``python3 PICMI_script.py``).
 
