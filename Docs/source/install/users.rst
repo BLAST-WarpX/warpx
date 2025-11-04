@@ -30,8 +30,7 @@ If you want to use WarpX on a specific high-performance computing (HPC) system, 
    }
    </style>
 
-Our community is here to help.
-Please `report installation issues <https://github.com/BLAST-WarpX/warpx/issues/new>`__ if you encounter any.
+Our community is here to help -- please `report installation issues <https://github.com/BLAST-WarpX/warpx/issues/new>`__ if you encounter any.
 
 .. _using-the-conda-forge-package:
 .. _install-conda:
@@ -47,14 +46,14 @@ A package for WarpX is available via `conda-forge <https://conda-forge.org/downl
 
 .. tip::
 
-   We recommend to deactivate that conda self-activates its ``base`` environment.
-   This `avoids interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
+   We recommend disabling conda's automatic activation of the ``base`` environment.
+   This helps `avoid interference with the system and other package managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__.
 
    .. code-block:: bash
 
       conda config --set auto_activate_base false
 
-   In order to make sure that the conda configuration uses ``conda-forge`` as the only channel, which will help avoid issues with blocked ``defaults`` or ``anaconda`` repositories, please set the following configurations:
+   To ensure conda uses ``conda-forge`` as the only channel (which helps avoid issues with blocked ``defaults`` or ``anaconda`` repositories), set the following configuration options:
 
    .. code-block:: bash
 
@@ -81,7 +80,7 @@ Using the Spack Package
 -----------------------
 
 Packages for WarpX are available via the `Spack <https://spack.readthedocs.io>`__ package manager.
-The package ``warpx`` installs executables and the variant ``warpx +python`` also includes Python bindings, which can be used in combination with `PICMI <https://github.com/picmi-standard/picmi>`__.
+The ``warpx`` package installs executables. The ``warpx +python`` variant also builds Python bindings, which can be used with `PICMI <https://github.com/picmi-standard/picmi>`__.
 
 .. code-block:: bash
 
@@ -106,7 +105,7 @@ See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutoria
 Using the PyPI Package
 ----------------------
 
-Given that you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX with `PICMI <https://github.com/picmi-standard/picmi>`_ :ref:`from source <install-developers>`:
+If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX (with PICMI) from source :ref:`from source <install-developers>`:
 
 .. code-block:: bash
 
@@ -117,8 +116,8 @@ Given that you have the :ref:`WarpX dependencies <install-dependencies>` install
    python3 -m pip wheel -v git+https://github.com/BLAST-WarpX/warpx.git
    python3 -m pip install *whl
 
-In the future, will publish pre-compiled binary packages on `PyPI <https://pypi.org/>`__ for faster installs.
-(Consider using :ref:`conda <install-conda>` in the meantime.)
+Pre-compiled binary packages will be published on `PyPI <https://pypi.org/>`__ in the future for faster installs.
+Please consider using :ref:`conda <install-conda>` in the meantime.
 
 .. _using-the-brew-package:
 .. _install-brew:
@@ -175,10 +174,10 @@ Tips for macOS Users
 
 .. tip::
 
-   Before getting started with package managers, please check what you manually installed in ``/usr/local``.
-   If you find entries in ``bin/``, ``lib/`` et al. that look like you manually installed MPI, HDF5 or other software in the past, then remove those files first.
+   Before using package managers, check for manually installed software under ``/usr/local``.
+   If you find entries in ``bin/``, ``lib/``, etc., that look like MPI, HDF5, or other previously installed software, remove them first.
 
-   If you find software such as MPI in the same directories that are shown as symbolic links then it is likely you `brew installed <https://brew.sh/>`__ software before.
-   If you are trying annother package manager than ``brew``, run `brew unlink ... <https://docs.brew.sh/Tips-N%27-Tricks#quickly-remove-something-from-usrlocal>`__ on such packages first to avoid software incompatibilities.
+   If you find software such as MPI in those directories as symbolic links, it likely means you previously installed them with `brew <https://brew.sh/>`__.
+   If you plan to use a package manager other than ``brew``, first run `brew unlink ... <https://docs.brew.sh/Tips-N%27-Tricks#quickly-remove-something-from-usrlocal>`__ on those packages to avoid incompatibilities.
 
 See also: A. Huebl, `Working With Multiple Package Managers <https://collegeville.github.io/CW20/WorkshopResources/WhitePapers/huebl-working-with-multiple-pkg-mgrs.pdf>`__, `Collegeville Workshop (CW20) <https://collegeville.github.io/CW20/>`_, 2020
