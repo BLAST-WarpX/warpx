@@ -8,8 +8,8 @@ Overview
 WarpX simulates the **self-consistent** evolution of **particle species** (e.g., electrons, ions, etc.) in the presence of **electric and magnetic fields**.
 In this context, *self-consistent* indicates that the particle dynamics are influenced by the fields, while the fields themselves evolve in response to the particles' changing charge and current density.
 
-The fields are represented on a discrete spatial grid (see :ref:`theory-grid`).
-The species are most commonly represented by discrete macroparticles moving continuously through the grid, but can also be represented as fluids discretized on a grid (see :ref:`theory-species_representations`).
+The fields are represented on a **discrete spatial grid** (see :ref:`theory-grid`).
+The species are most commonly represented by **discrete macroparticles** moving continuously through the grid, but can also be represented as **fluids** discretized on a grid (see :ref:`theory-species_representations`).
 
 At each **time step** of a simulation, both the species and the fields are updated -- using the equations of motion and the field equations respectively.
 More specifically, the following operations are performed at each time step, as represented in the figure below:
