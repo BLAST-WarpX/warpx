@@ -33,7 +33,7 @@ Looking closer at the z-pz space, we see that some particles were not trapped in
 .. _fig_unclean_phase_space:
 
 .. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/unclean_stage_0.png
-   :alt: Figure not found
+   :alt: Phase space projections showing partially accelerated beam particles
 
    The final phase space projections of a particle beam through a laser-plasma acceleration element where some beam particles were not accelerated.
 
@@ -45,7 +45,7 @@ After filtering, we can see in :numref:`fig_clean_phase_space` that the beam pha
 .. _fig_clean_phase_space:
 
 .. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/clean_stage_0.png
-   :alt: Figure not found
+   :alt: Phase space projections of filtered beam particles
 
    The final phase space projections of a particle beam through a laser-plasma acceleration element after filtering out outlying particles.
 
@@ -246,14 +246,14 @@ When the test-loss starts to trend flat or even upward, the neural network is no
 .. _fig_train_test_loss:
 
 .. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/beam_stage_0_training_testing_error.png
-   :alt: Figure not found
+   :alt: Training and testing loss evolution over epochs
 
    Training (in blue) and testing (in green) loss curves versus number of training epochs.
 
 .. _fig_train_evaluation:
 
 .. figure:: https://gist.githubusercontent.com/RTSandberg/649a81cc0e7926684f103729483eff90/raw/095ac2daccbcf197fa4e18a8f8505711b27e807a/beam_stage_0_model_evaluation.png
-   :alt: Figure not found
+   :alt: Model predictions compared with simulation results
 
    A comparison of model prediction (yellow-red dots, colored by mean-squared error) with simulation output (black dots).
 

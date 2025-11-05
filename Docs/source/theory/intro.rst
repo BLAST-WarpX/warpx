@@ -18,7 +18,7 @@ such as the maximum time step size, the time staggering of the fields and partic
 .. _fig-pic:
 
 .. figure:: PIC.png
-   :alt: figure not found
+   :alt: Core PIC algorithm cycle showing field and particle operations
 
    The core Particle-In-Cell (PIC) algorithm involves four operations at each time step: 1) evolve the field equation on the grid,  2) deposit the charge and/or current densities through interpolation from the particles distributions onto the grid, 3) evolve the fields on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push.
 

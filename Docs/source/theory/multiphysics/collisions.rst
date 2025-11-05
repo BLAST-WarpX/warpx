@@ -160,7 +160,7 @@ See for example :cite:t:`b-Lim2007` for a derivation. The result is that given a
 The impact of incorporating relativistic effects in the MCC routine can be seen in the plots below where high energy collisions are considered with both a classical and relativistic implementation of MCC. It is observed that the classical version of MCC reproduces the classical limit of the above equation but especially for ions, this result differs substantially from the fully relativistic result.
 
 .. figure:: https://user-images.githubusercontent.com/40245517/170900079-74e505a5-2790-44f5-ac84-5847eda954e6.png
-   :alt: Figure not found
+   :alt: Comparison of classical and relativistic MCC collision results
    :width: 96%
 
    Classical v. relativistic MCC.

@@ -2,7 +2,7 @@ PICViewer
 =========
 
 .. figure:: sample_image.png
-   :alt: Figure not found
+   :alt: PICViewer GUI interface for WarpX data visualization
 
 PICViewer is a visualization GUI implemented on PyQt.
 The toolkit provides various easy-to-use functions for data analysis of
