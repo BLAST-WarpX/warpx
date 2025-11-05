@@ -19,7 +19,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Inputs: Parameter List
 
-            This example can be run **either** as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``
+            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``
 
              .. literalinclude:: inputs_base_3d
                 :language: none
@@ -31,7 +31,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Inputs: Parameter List
 
-            This example can be run **either** as WarpX **executable** using an input file: ``warpx.2d inputs_test_2d_uniform_plasma``
+            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_test_2d_uniform_plasma``
 
              .. literalinclude:: inputs_test_2d_uniform_plasma
                 :language: none
