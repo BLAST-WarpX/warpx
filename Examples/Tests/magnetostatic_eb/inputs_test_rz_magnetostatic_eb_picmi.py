@@ -207,7 +207,7 @@ assert er_err < 0.02, "Er Error increased above 2%"
 # Check B field
 ########################
 
-Bth = sim.fields.get("Bfield_aux", dir="t", level=0)
+Bth = sim.fields.get("Bfield_aux", dir="theta", level=0)
 
 r_vec = Bth.mesh("r")
 z_vec = Bth.mesh("z")
