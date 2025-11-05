@@ -45,7 +45,7 @@ Implementation details
 .. _fig_fluid_loop:
 
 .. figure:: https://github.com/BLAST-WarpX/warpx/assets/69021085/dcbcc0e4-7899-43e4-b580-f57eb359b457
-   :alt: Figure not found
+   :alt: Fluid time step integration within PIC loop
 
    Fluid loop embedded within the overall PIC loop.
 

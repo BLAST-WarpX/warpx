@@ -23,7 +23,7 @@ The 1st line is the number of parallel MPI processes (also called *MPI ranks*).
 The 2nd line reports on the `support level of MPI functions to be called from threads <https://www.mpich.org/static/docs/v3.1/www3/MPI_Init_thread.html>`__.
 We currently only use this for optional, :ref:`async IO with AMReX plotfiles <running-cpp-parameters-diagnostics>`.
 In the past, requesting MPI threading support had performance penalties, but we have not seen such anymore on recent systems.
-Thus, we request it by default but you can overwrite it with a :ref:`compile time option <building-cmake-options>` if it ever becomes needed.
+Thus, we request it by default but you can overwrite it with a :ref:`compile time option <install-build-options>` if it ever becomes needed.
 
 The 3rd line is the number of CPU OpenMP (OMP) threads per MPI process.
 After that, information on software versions follow.
@@ -32,7 +32,7 @@ After that, information on software versions follow.
 How do I suppress tiny profiler output if I do not care to see it?
 ------------------------------------------------------------------
 
-Via ``AMReX_TINY_PROFILE=OFF`` (see: :ref:`build options <building-cmake-options>` and then `AMReX build options <https://amrex-codes.github.io/amrex/docs_html/BuildingAMReX.html#customization-options>`__).
+Via ``AMReX_TINY_PROFILE=OFF`` (see: :ref:`build options <install-build-options>` and then `AMReX build options <https://amrex-codes.github.io/amrex/docs_html/BuildingAMReX.html#customization-options>`__).
 We change the default in ``cmake/dependencies/AMReX.cmake``.
 
 Note that the tiny profiler adds literally no overhead to the simulation runtime, thus we enable it by default.
@@ -68,7 +68,7 @@ What about Back-transformed diagnostics (BTD)?
 ----------------------------------------------
 
 .. figure:: https://user-images.githubusercontent.com/10621396/198702232-9dd595ad-479e-4170-bd25-51e2b72cd50a.png
-   :alt: Figure not found
+   :alt: Minkowski diagram showing BTD features and time relationships
 
    Minkowski diagram indicating several features of the back-transformed diagnostic (BTD). The diagram explains why the first BTD begins to fill at boosted time :math:`t'=0` but this doesn't necessarily correspond to lab time :math:`t=0`, how the BTD grid-spacing is determined by the boosted time step :math:`\Delta t'`, hence why the snapshot length don't correspond to the grid spacing and length in the input script, and how the BTD snapshots complete when the effective snapshot length is covered in the boosted frame.
 

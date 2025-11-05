@@ -8,7 +8,7 @@ The simulations of plasma accelerators from first principles are extremely compu
 .. _fig_Boosted_frame:
 
 .. figure:: Boosted_frame.png
-   :alt: Figure not found
+   :alt: Scale transformation in boosted frame simulation
 
    A first principle simulation of a short driver beam (laser or charged particles) propagating through a plasma that is orders of magnitude longer necessitates a very large number of time steps. Recasting the simulation in a frame of reference that is moving close to the speed of light in the direction of the driver beam leads to simulating a driver beam that appears longer propagating through a plasma that appears shorter than in the laboratory. Thus, this relativistic transformation of space and time reduces the disparity of scales, and thereby the number of time steps to complete the simulation, by orders of magnitude.
 

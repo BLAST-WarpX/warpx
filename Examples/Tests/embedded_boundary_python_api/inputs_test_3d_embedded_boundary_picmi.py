@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 max_steps = 1
 unit = 1e-3
@@ -87,12 +87,12 @@ sim.initialize_inputs()
 
 sim.step(1)
 
-edge_lengths_x = fields.EdgeLengthsxWrapper()
-edge_lengths_y = fields.EdgeLengthsyWrapper()
-edge_lengths_z = fields.EdgeLengthszWrapper()
-face_areas_x = fields.FaceAreasxWrapper()
-face_areas_y = fields.FaceAreasyWrapper()
-face_areas_z = fields.FaceAreaszWrapper()
+edge_lengths_x = sim.fields.get("edge_lengths", dir="x", level=0)
+edge_lengths_y = sim.fields.get("edge_lengths", dir="y", level=0)
+edge_lengths_z = sim.fields.get("edge_lengths", dir="z", level=0)
+face_areas_x = sim.fields.get("face_areas", dir="x", level=0)
+face_areas_y = sim.fields.get("face_areas", dir="y", level=0)
+face_areas_z = sim.fields.get("face_areas", dir="z", level=0)
 
 print("======== Testing the wrappers of edge_lengths =========")
 

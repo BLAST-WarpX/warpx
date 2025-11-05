@@ -29,14 +29,12 @@ void UpdateMomentumHigueraCary(
 
     // Constants
     const T qmt = 0.5_prt*q*dt/m;
-    constexpr T invclight = 1._prt/PhysConst::c;
-    constexpr T invclightsq = 1._prt/(PhysConst::c*PhysConst::c);
     // Compute u_minus
     const T umx = ux + qmt*Ex;
     const T umy = uy + qmt*Ey;
     const T umz = uz + qmt*Ez;
     // Compute gamma squared of u_minus
-    T gamma = 1._prt + (umx*umx + umy*umy + umz*umz)*invclightsq;
+    T gamma = 1._prt + (umx*umx + umy*umy + umz*umz)*PhysConst::inv_c2_v<T>;
     // Compute beta and betam squared
     const T betax = qmt*Bx;
     const T betay = qmt*By;
@@ -45,7 +43,7 @@ void UpdateMomentumHigueraCary(
     // Compute sigma
     const T sigma = gamma - betam;
     // Get u*
-    const T ust = (umx*betax + umy*betay + umz*betaz)*invclight;
+    const T ust = (umx*betax + umy*betay + umz*betaz)*PhysConst::inv_c_v<T>;
     // Get new gamma inverse
     gamma = 1._prt/std::sqrt(0.5_prt*(sigma + std::sqrt(sigma*sigma + 4._prt*(betam + ust*ust)) ));
     // Compute t

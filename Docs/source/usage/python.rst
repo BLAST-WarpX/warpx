@@ -1,8 +1,8 @@
 .. _usage-picmi:
 .. _usage-picmi-run:
 
-Parameters: Python (PICMI)
-==========================
+Inputs: PICMI Python Script
+===========================
 
 This documents on how to use WarpX as a Python script (e.g., ``python3 PICMI_script.py``).
 
@@ -27,7 +27,6 @@ Once the simulation is fully configured, it can be used in one of two modes.
 
 When run directly from Python, one can also extend WarpX with further custom user logic.
 See the :ref:`detailed workflow page <usage-python-extend>` on how to extend WarpX from Python.
-
 
 .. _usage-picmi-parameters:
 

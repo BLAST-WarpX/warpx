@@ -55,16 +55,6 @@ High Energy Astrophysical Plasma Physics
 
    examples/ohm_solver_magnetic_reconnection/README.rst
 
-
-Microelectronics
-----------------
-
-`ARTEMIS (Adaptive mesh Refinement Time-domain ElectrodynaMIcs Solver) <https://ccse.lbl.gov/Research/Microelectronics/>`__ is based on WarpX and couples the Maxwell's equations implementation in WarpX with classical equations that describe quantum material behavior (such as, LLG equation for micromagnetics and London equation for superconducting materials) for quantifying the performance of `next-generation microelectronics <https://www.lbl.gov/research/microelectronics-and-beyond/>`__.
-
-* `ARTEMIS examples <https://github.com/AMReX-Microelectronics/artemis/tree/development/Examples>`__
-* `ARTEMIS manual <https://artemis-em.readthedocs.io>`__
-
-
 Fundamental Plasma Physics
 --------------------------
 

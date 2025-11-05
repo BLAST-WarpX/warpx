@@ -87,7 +87,7 @@ struct InjectorDensityPredefined
             const double rc        = p[4];
             const double n0        = p[5];
             const double kp = PhysConst::q_e/PhysConst::c
-                *std::sqrt( n0/(PhysConst::m_e*PhysConst::ep0) );
+                *std::sqrt( n0/(PhysConst::m_e*PhysConst::epsilon_0) );
             double n;
 
             // Longitudinal profile, normalized to 1
