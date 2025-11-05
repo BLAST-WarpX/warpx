@@ -54,7 +54,7 @@ WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``. See
 
 
 Staggering of Output Data
-----------------------
+-------------------------
 
 Time
 ^^^^

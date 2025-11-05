@@ -4,7 +4,7 @@
 .. _building-cmake-intro:
 
 Build from Source
-===================
+=================
 
 `CMake <https://cmake.org>`__ is our primary build system.
 If you are new to CMake, we recommend starting with `this concise tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`__ from the HEP Software Foundation.
@@ -22,8 +22,9 @@ To begin, obtain a copy of the WarpX source code:
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
-WarpX relies on several widely-used third-party software packages.
+WarpX relies on :ref:`widely-used third-party software <list-of-dependencies>`.
 Below, you'll find instructions for installing these dependencies using various package managers.
+To ensure compatibility, pick **one** package manager for your development workflows.
 
 .. toctree::
    :hidden:
@@ -32,11 +33,13 @@ Below, you'll find instructions for installing these dependencies using various 
 
 Install on HPC Systems
 ^^^^^^^^^^^^^^^^^^^^^^
+
 Please refer to the :ref:`install-hpc` section.
 
 
 Install with conda-forge
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
 Conda provides a convenient way to install dependencies across Linux, macOS, and Windows platforms.
 
 `conda-forge <https://conda-forge.org/download/>`__ is a community-led collection of recipes, build infrastructure and distributions for the conda package manager, offering cross-platform compatibility at the user level.
@@ -106,6 +109,7 @@ More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/statu
 
 Install with Spack
 ^^^^^^^^^^^^^^^^^^
+
 Spack provides another option for installing dependencies on Linux and macOS systems.
 
 `Spack <https://spack.readthedocs.io>`__ is a flexible, user-level package manager designed primarily for Linux, with growing support for macOS and planned future support for Windows.
@@ -202,7 +206,6 @@ For ``pip``, use ``export WARPX_MPI=ON``.
 
 Install with APT
 ^^^^^^^^^^^^^^^^
- (Debian/Ubuntu Linux)
 
 The `Advanced Package Tool (APT) <https://en.wikipedia.org/wiki/APT_(software)>`__ is a system-level package manager on Debian-based Linux distributions, including Ubuntu.
 
