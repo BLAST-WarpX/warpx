@@ -95,7 +95,7 @@ WarpX supports this with :ref:`the following CMake flags <building-cmake-options
    cmake --build build -j 8
    cmake --build build -j 8 --target pip_install
 
-As a background, this is also the workflow how WarpX is built in :ref:`package managers such as Spack and Conda-Forge <install-dependencies>`.
+As a background, this is also the workflow how WarpX is built in :ref:`package managers such as Spack and conda-forge <install-dependencies>`.
 
 
 .. _developers-local-compile-pylto:

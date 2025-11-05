@@ -39,7 +39,7 @@ Our community is here to help -- please `report installation issues <https://git
 
    .. image:: conda.svg
 
-Using the Conda-Forge Package
+Using the conda-forge Package
 -----------------------------
 
 A package for WarpX is available via `conda-forge <https://conda-forge.org/download/>`__.

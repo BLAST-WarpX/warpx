@@ -35,11 +35,11 @@ Install on HPC Systems
 Please refer to the :ref:`install-hpc` section.
 
 
-Install with Conda-Forge
+Install with conda-forge
 ^^^^^^^^^^^^^^^^^^^^^^^^
 Conda provides a convenient way to install dependencies across Linux, macOS, and Windows platforms.
 
-`Conda-forge <https://conda-forge.org/download/>`__ is a community-led collection of recipes, build infrastructure and distributions for the conda package manager, offering cross-platform compatibility at the user level.
+`conda-forge <https://conda-forge.org/download/>`__ is a community-led collection of recipes, build infrastructure and distributions for the conda package manager, offering cross-platform compatibility at the user level.
 
 .. tip::
 
