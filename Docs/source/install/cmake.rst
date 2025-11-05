@@ -8,9 +8,32 @@ If you are new to CMake, we recommend starting with `this concise tutorial <http
 For those primarily interested in building the project, focus on these key sections: `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__, and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
 
-.. attention::
+.. grid:: 2
+   :gutter: 2
 
-    To install on HPC systems, please refer to the :ref:`install-hpc` section.
+   .. grid-item-card:: :octicon:`alert` Build on HPC
+      :link: install-hpc
+      :link-type: ref
+
+      Please refer to the :ref:`install-hpc` section.
+
+   .. grid-item-card:: Install Dependencies
+      :link: install-build-dependencies
+      :link-type: ref
+
+      Software dependencies of WarpX.
+
+   .. grid-item-card:: Build the Code
+      :link: install-build-code
+      :link-type: ref
+
+      Configuration, compilation and install.
+
+   .. grid-item-card:: Build Options
+      :link: install-build-options
+      :link-type: ref
+
+      All build configuration options.
 
 
 .. _install-build-dependencies:
@@ -242,7 +265,7 @@ The `Advanced Package Tool (APT) <https://en.wikipedia.org/wiki/APT_(software)>`
          # for pip, use: export WARPX_MPI=OFF
 
 
-.. _build-the-code:
+.. _install-build-code:
 
 Build the Code
 --------------
