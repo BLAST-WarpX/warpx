@@ -24,11 +24,10 @@
 #include <array>
 #include <memory>
 
+#if WARPX_USE_FFT
+
 using namespace amrex;
 
-/**
- * \brief Constructor
- */
 SpectralBaseAlgorithm::SpectralBaseAlgorithm (
     const SpectralKSpace& spectral_kspace,
     const amrex::DistributionMapping& dm,
@@ -113,3 +112,5 @@ SpectralBaseAlgorithm::ComputeSpectralDivE (
     const amrex::IntVect& fill_guards = amrex::IntVect(0);
     field_data.BackwardTransform(lev, divE, Idx.divE, fill_guards, 0);
 }
+
+#endif // WARPX_USE_FFT
