@@ -454,7 +454,9 @@ computePhi (
                     post_phi_calculation.value()(mlmg, lev);
                 }
             }
-        } else {
+        }
+
+        if (solver_type == 1 && eb_enabled) {
 
             // create an alieas to the WarpX Efield
             auto & warpx = WarpX::GetInstance();
