@@ -3,9 +3,9 @@
 Parameters: Inputs File
 =======================
 
-This documents on how to use WarpX with an inputs file (e.g., ``warpx.3d input_3d``).
+This section describes the list of parameters that can be set in the WarpX inputs file.
 
-Complete example input files can be found in :ref:`the examples section <usage-examples>`.
+Examples of input files can be found in the :ref:`Examples <usage-examples>` section.
 
 .. note::
 
