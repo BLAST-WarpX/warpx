@@ -1,4 +1,4 @@
-.. _theory-electrostatic_pic:
+.. _theory-electrostatic-pic:
 
 Electrostatic PIC
 =================
