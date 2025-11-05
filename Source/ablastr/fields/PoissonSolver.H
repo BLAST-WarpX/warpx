@@ -480,7 +480,7 @@ computePhi (
                 );
 
             // compute E = grad(phi)
-            linop->compGrad(0, e_field[0], *phi[0], amrex::MLLinOp::Location::CellCenter);
+            linop->compGrad(lev, e_field[lev], *phi[lev], amrex::MLLinOp::Location::CellCenter);
             for(int dir=0; dir<AMREX_SPACEDIM; ++dir) {
                 e_field[lev][dir]->mult(-1.);
             }
