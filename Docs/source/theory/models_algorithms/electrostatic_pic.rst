@@ -1,7 +1,7 @@
-.. _theory-poisson-solvers:
+.. _theory-electrostatic_pic:
 
-Poisson solvers
-===============
+Electrostatic PIC
+=================
 
 In the *electrostatic particle-in-cell method* only the electric field is
 self-consistently updated with the particle motion. This approach uses the
@@ -9,9 +9,9 @@ Poisson equation to obtain the electrostatic potential from the charge density
 (which is obtained directly from the simulation macro-particle). There are a
 few different variations of the electrostatic PIC method implemented in WarpX
 as outlined below. For details of the possible input parameters for each case
-see :ref:`here <param-poisson-solvers>`.
+see :ref:`here <param-electrostatic-pic>`.
 
-.. _theory-poisson-solvers-labframe:
+.. _theory-electrostatic-pic-labframe:
 
 Labframe
 --------
@@ -23,7 +23,7 @@ the charge density of all species combined. More specifically, the code solves:
 
     \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
 
-.. _theory-poisson-solvers-electromagnetostatic:
+.. _theory-electrostatic-pic-electromagnetostatic:
 
 Electromagnetostatic
 --------------------
@@ -38,7 +38,7 @@ to include self magnetic fields. More specifically, the code solves:
     \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi \\
     \boldsymbol{\nabla}^2 \boldsymbol{A} = - \mu_0 \boldsymbol{j} \qquad \boldsymbol{B} = \boldsymbol{\nabla}\times\boldsymbol{A}
 
-.. _theory-poisson-solvers-effective-potential:
+.. _theory-electrostatic-pic-effective-potential:
 
 Effective Potential
 -------------------

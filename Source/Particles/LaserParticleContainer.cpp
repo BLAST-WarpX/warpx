@@ -771,7 +771,7 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
     // `eps` of the speed of light, at the peak of the laser field.
     constexpr Real eps = 0.05_rt;
     m_mobility = eps/m_e_max;
-    m_weight = PhysConst::ep0 / m_mobility;
+    m_weight = PhysConst::epsilon_0 / m_mobility;
     // Multiply by particle spacing
     m_weight *= AMREX_D_TERM(1._rt, * Sx, * Sy);
     // When running in the boosted-frame, the input parameters (and in particular

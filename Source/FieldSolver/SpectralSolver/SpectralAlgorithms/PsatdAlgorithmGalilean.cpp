@@ -193,7 +193,7 @@ PsatdAlgorithmGalilean::pushSpectralFields (SpectralFieldData& f) const
 #endif
             // Physical constants and imaginary unit
             constexpr Real c2 = PhysConst::c * PhysConst::c;
-            constexpr Real ep0 = PhysConst::ep0;
+            constexpr Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 
             // These coefficients are initialized in the function InitializeSpectralCoefficients
@@ -350,7 +350,7 @@ void PsatdAlgorithmGalilean::InitializeSpectralCoefficients (
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 
             const amrex::Real c2 = amrex::Math::powi<2>(c);
@@ -498,7 +498,7 @@ void PsatdAlgorithmGalilean::InitializeSpectralCoefficientsAveraging (
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 
             const amrex::Real c2 = amrex::Math::powi<2>(c);

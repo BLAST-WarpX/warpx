@@ -7,7 +7,7 @@ WarpX is an advanced **Particle-In-Cell** code.
 
 It supports many features including:
 
-    - Multiple types of field solvers (incl. for `Maxwell's equations <https://warpx.readthedocs.io/en/latest/theory/pic.html#field-solve>`__, Poisson's equation, and `Maxwell-Ampere coupled with Ohm's law <https://warpx.readthedocs.io/en/latest/theory/kinetic_fluid_hybrid_model.html>`__)
+    - Multiple types of field solvers (incl. for :ref:`Maxwell's equations <theory-em-pic>`, Poisson's equation, and :ref:`Maxwell-Ampere coupled with Ohm's law <theory-kinetic-fluid-hybrid-model>`)
     - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic, fusion and collisional physics, as well as quantum electrodynamics)
     - Advanced numerical methods (incl. explicit and implicit time advance, mesh refinement, boosted-frame simulations, embedded boundaries, pseudo-spectral solvers)

@@ -214,7 +214,7 @@ Overall simulation parameters
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
-.. _param-poisson-solvers:
+.. _param-electrostatic-pic:
 
 * ``warpx.do_electrostatic`` (`string`) optional (default `none`)
     Specifies the electrostatic mode. When turned on, instead of updating
@@ -224,7 +224,7 @@ Overall simulation parameters
     electromagnetic effects (e.g. propagation of radiation, lasers, etc.)
     are not captured. Several options for the electrostatic scheme are available,
     including, ``labframe``, ``labframe-electromagnetostatic``, ``labframe-effective-potential``,
-    and ``relativistic``. See :ref:`here <theory-poisson-solvers>` for details
+    and ``relativistic``. See :ref:`here <theory-electrostatic-pic>` for details
     of each scheme.
 
 * ``warpx.poisson_solver`` (`string`) optional (default `multigrid`)

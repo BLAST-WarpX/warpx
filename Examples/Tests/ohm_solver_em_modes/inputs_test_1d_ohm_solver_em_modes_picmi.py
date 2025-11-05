@@ -15,7 +15,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 constants = picmi.constants
 
@@ -315,9 +315,9 @@ class EMModes(object):
         if step % self.diag_steps != 0:
             return
 
-        Bx_warpx = fields.BxWrapper()[...]
-        By_warpx = fields.ByWrapper()[...]
-        Ez_warpx = fields.EzWrapper()[...]
+        Bx_warpx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...]
+        By_warpx = simulation.fields.get("Bfield_fp", dir="y", level=0)[...]
+        Ez_warpx = simulation.fields.get("Efield_fp", dir="z", level=0)[...]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

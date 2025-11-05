@@ -144,7 +144,7 @@ This generates plots like in `[fig:knapsack_sfc_distribution_mapping_2D] <#fig:k
    \centering
 
 .. figure:: knapsack_sfc_distribution_mapping_2D.png
-   :alt: Sample distribution mappings from simulations with knapsack (left) and space-filling curve (right) policies for update of the distribution mapping when load balancing.
+   :alt: Comparison of knapsack vs space-filling curve distribution mappings
    :name: fig:knapsack_sfc_distribution_mapping_2D
    :width: 15cm
 
@@ -177,7 +177,7 @@ This generates plots like in `[fig:knapsack_sfc_costs_2D] <#fig:knapsack_sfc_cos
    \centering
 
 .. figure:: knapsack_sfc_costs_2D.png
-   :alt: Sample computational cost per box from simulations with knapsack (left) and space-filling curve (right) policies for update of the distribution mapping when load balancing.
+   :alt: Computational cost comparison between knapsack and space-filling curve methods
    :name: fig:knapsack_sfc_costs_2D
    :width: 15cm
 
@@ -268,7 +268,7 @@ This generates plots like in `[fig:distribution_mapping_3D] <#fig:distribution_m
    \centering
 
 .. figure:: distribution_mapping_3D.png
-   :alt: Sample distribution mappings from 3D simulations, visualized as slices in the :math:`ik` plane along :math:`j`.
+   :alt: 3D distribution mapping slices in the ik plane
    :name: fig:distribution_mapping_3D
    :width: 15cm
 
