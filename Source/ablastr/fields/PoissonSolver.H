@@ -488,7 +488,7 @@ computePhi (
             }
         }
 
-        rho[lev]->mult(-ablastr::constant::SI::epsion_0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
 } // computePhi
