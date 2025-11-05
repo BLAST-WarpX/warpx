@@ -343,8 +343,8 @@ class HybridPICBeamInstability(object):
 
         status_dict = {
             "step": step,
-            "nplive beam ions": self.ion_container.size,
-            "nplive ions": self.beam_ion_container.size,
+            "nplive ions": self.ion_container.size,
+            "nplive beam ions": self.beam_ion_container.size,
             "wall_time": wall_time,
             "step_rate": step_rate,
             "diag_steps": self.diag_steps,
