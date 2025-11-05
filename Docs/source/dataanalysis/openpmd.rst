@@ -21,6 +21,6 @@ The api provides a more sophisticated C++ and python interface to open particle 
 It's particularly useful for debugging purposes or to write a new dataset.
 The data can be handled in parallel in chunks.
 
-openPMD-api also enables seamless coupling to `Pandas <https://openpmd-api.readthedocs.io/en/0.16.1/analysis/pandas.html>`, `DASK <https://openpmd-api.readthedocs.io/en/0.16.1/analysis/dask.html>`, `RAPIDS <https://openpmd-api.readthedocs.io/en/0.16.1/analysis/rapids.html>` and `other frameworks <https://openpmd-api.readthedocs.io/en/0.16.1/analysis/contrib.html>`.
+openPMD-api also enables seamless coupling to `Pandas <https://openpmd-api.readthedocs.io/en/latest/analysis/pandas.html>`__, `DASK <https://openpmd-api.readthedocs.io/en/latest/analysis/dask.html>`__, `RAPIDS <https://openpmd-api.readthedocs.io/en/latest/analysis/rapids.html>`__ and `other frameworks <https://openpmd-api.readthedocs.io/en/latest/analysis/contrib.html>`__.
 
 Furthermore, consider with our :ref:`3D visualization <dataanalysis-3dvisualizations>` section for openPMD support in those.
