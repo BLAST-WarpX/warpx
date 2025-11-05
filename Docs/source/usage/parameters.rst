@@ -442,7 +442,7 @@ Setting up the field mesh
     * For ``RCYLINDER``, a cylindrical geometry with the axis ``r``, invariant in ``theta`` and ``z``.
     * For ``RSPHERE``, a spherical geometry with the axis ``r``, invariant in ``theta`` and ``phi``. The polar angle ``phi`` is relative to the ``x-y`` plane.
 
-    Note that this value must be consistent with the :ref:`WarpX_DIMS <building-cmake-options>` compile-time option.
+    Note that this value must be consistent with the :ref:`WarpX_DIMS <install-build-options>` compile-time option.
     If you installed WarpX from a :ref:`package manager <install-users>`, then pick the right executable by name.
 
 * ``warpx.n_rz_azimuthal_modes`` (`integer`; 1 by default)
@@ -1073,7 +1073,7 @@ Particle initialization
       The external file must include the species ``openPMD::Record`` labeled ``position`` and ``momentum`` (`double` arrays), with dimensionality and units set via ``openPMD::setUnitDimension`` and ``setUnitSI``.
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant `double` scalars) then the species will use these, unless overwritten in the input file (see ``<species_name>.mass``, ``<species_name>.charge`` or ``<species_name>.species_type``).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
-      For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-developers>`.
+      For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-build-cmake>`.
       See `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
       for an example of how to prepare the openPMD data file.
 

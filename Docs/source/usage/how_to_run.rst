@@ -39,7 +39,7 @@ Pressing the ``<TAB>`` key will suggest available WarpX executables found in you
       WarpX provides a separate binary for each dimensionality: 1D, 2D, 3D, RZ, RCYLINDER, and RSPHERE.
       We encode the supported dimensionality in the binary file name.
 
-If you :ref:`compiled the code yourself <install-developers>`, the WarpX executable is located in the source tree under ``build/bin``.
+If you :ref:`compiled the code yourself <install-build-cmake>`, the WarpX executable is located in the source tree under ``build/bin``.
 A symbolic link named ``warpx`` pointing to the most recently built executable is also created; you can copy either that link or the binary into your run directory.
 Copy the **executable** to this directory:
 

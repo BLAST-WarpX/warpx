@@ -1,7 +1,4 @@
-.. _install-compile-from-source:
-.. _install-developers:
-.. _building-cmake:
-.. _building-cmake-intro:
+.. _install-build-cmake:
 
 Build from Source
 =================
@@ -10,7 +7,7 @@ Build from Source
 If you are new to CMake, we recommend starting with `this concise tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`__ from the HEP Software Foundation.
 For those primarily interested in building the project, focus on these key sections: `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__, and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
-.. _install-dependencies:
+.. _install-build-dependencies:
 
 Install Dependencies
 --------------------
@@ -22,7 +19,7 @@ To begin, obtain a copy of the WarpX source code:
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
-WarpX relies on :ref:`widely-used third-party software <list-of-dependencies>`.
+WarpX relies on :ref:`widely-used third-party software <install-dependencies>`.
 Below, you'll find instructions for installing these dependencies using various package managers.
 To ensure compatibility, pick **one** package manager for your development workflows.
 
@@ -30,6 +27,7 @@ To ensure compatibility, pick **one** package manager for your development workf
    :hidden:
 
    dependencies
+
 
 Install on HPC Systems
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -300,7 +298,6 @@ More details on running simulations are in the section :ref:`Run WarpX <usage_ru
 Alternatively, read on and also build our PICMI Python interface.
 
 .. _install-build-python-cmake:
-.. _building-cmake-python:
 
 Build the Python Interface with CMake
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -338,7 +335,6 @@ Developers could now change the WarpX source code and then call the build line a
 
 
 .. _install-build-python-pip:
-.. _building-pip-python:
 
 Build the Python Interface with pip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -357,12 +353,9 @@ Using this workflow has the advantage that it can build and package up multiple 
 
 
 .. _install-build-options:
-.. _building-cmake-options:
 
 Build Options
 -------------
-
-.. _building-cmake-envvars:
 
 Configure your Compiler
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -482,7 +475,7 @@ More details on this :ref:`workflow are described here <developers-local-compile
 
 You can speed up the install further if you pre-install these dependencies, e.g. with a package manager.
 Set ``-DWarpX_<dependency-name>_internal=OFF`` and add installation prefix of the dependency to the environment variable `CMAKE_PREFIX_PATH <https://cmake.org/cmake/help/latest/envvar/CMAKE_PREFIX_PATH.html>`__.
-Please see the :ref:`introduction to CMake <building-cmake-intro>` if this sounds new to you.
+Please see the :ref:`introduction to CMake <install-build-cmake>` if this sounds new to you.
 More details on this :ref:`workflow are described here <developers-local-compile-findpackage>`.
 
 If you re-compile often, consider installing the `Ninja <https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages>`__ build system.
@@ -543,7 +536,7 @@ Some Developers like to code directly against a local copy of AMReX, changing bo
 
    WARPX_AMREX_SRC=$PWD/../amrex python3 -m pip install --force-reinstall --no-deps -v .
 
-Additional environment control as common for CMake (:ref:`see above <building-cmake-intro>`) can be set as well, e.g. ``CC``, `CXX``, and ``CMAKE_PREFIX_PATH`` hints.
+Additional environment control as common for CMake (:ref:`see above <install-build-cmake>`) can be set as well, e.g. ``CC``, `CXX``, and ``CMAKE_PREFIX_PATH`` hints.
 So another sophisticated example might be: use Clang as the compiler, build with local source copies of PICSAR and AMReX, support the FFT-based solvers, MPI and openPMD, hint a parallel HDF5 installation in ``$HOME/sw/hdf5-parallel-1.10.4``, and only build 2D and 3D geometry:
 
 .. code-block:: bash

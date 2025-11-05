@@ -56,7 +56,7 @@ When writing plotfiles, each rank writes to a separate file, up to a maximum num
 default 64). This maximum can be adjusted using the ``amrex.async_out_nfiles`` input
 parameter. To use asynchronous I/O with more than ``amrex.async_out_nfiles`` MPI ranks,
 WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``. See
-:ref:`the building instructions <install-developers>` for details.
+:ref:`the building instructions <install-build-cmake>` for details.
 
 
 Staggering of Output Data

@@ -106,7 +106,7 @@ See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutoria
 Using the PyPI Package
 ----------------------
 
-If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX (with PICMI) from source :ref:`from source <install-developers>`:
+If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX (with PICMI) from source :ref:`from source <install-build-cmake>`:
 
 .. code-block:: bash
 
@@ -165,7 +165,7 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
 
    # executables for WarpX are now in build/bin/
 
-For more details on how to configure WarpX from source, please see the section :ref:`Build from Source <install-developers>`.
+For more details on how to configure WarpX from source, please see the section :ref:`Build from Source <install-build-cmake>`.
 
 .. _tips-for-macos-users:
 .. _install-users-macos:

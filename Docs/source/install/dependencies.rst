@@ -1,4 +1,4 @@
-.. _list-of-dependencies:
+.. _install-dependencies:
 
 List of Dependencies
 ====================
