@@ -8,20 +8,20 @@
 # electrons will be emitted.
 # Simulation is initialized with four ions with i_dist distribution and spherical
 # embedded boundary given by implicit function.
-import numpy as np
 from scipy.constants import e, elementary_charge, m_e, proton_mass
 
 from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
+xp, _ = load_cupy()
 ##########################
 # numerics parameters
-##########################
 
 dt = 0.000000075
 
 # --- Nb time steps
 Te = 0.0259  # in eV
-dist_th = np.sqrt(Te * elementary_charge / m_e)
+dist_th = xp.sqrt(Te * elementary_charge / m_e)
 
 max_steps = 3
 diagnostic_interval = 1
@@ -37,7 +37,7 @@ zmax = 2
 delta_H = 0.4
 E_HMax = 250
 
-np.random.seed(10025015)
+xp.random.seed(10025015)
 ##########################
 # numerics components
 ##########################
@@ -147,9 +147,9 @@ sim.initialize_warpx()
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
-        return np.empty(0)
+        return xp.empty(0)
     else:
-        return np.concatenate(list_of_arrays)
+        return xp.concatenate(list_of_arrays)
 
 
 def sigma_nascap(energy_kEv, delta_H, E_HMax):
@@ -164,7 +164,7 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
     Returns:
     - numpy array, computed probability sigma_nascap
     """
-    sigma_nascap = np.array([])
+    sigma_nascap = xp.array([])
     # Loop through each energy value
     for energy in energy_kEv:
         if energy > 0.0:
@@ -172,11 +172,11 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
                 delta_H
                 * (E_HMax + 1.0)
                 / (E_HMax * 1.0 + energy)
-                * np.sqrt(energy / 1.0)
+                * xp.sqrt(energy / 1.0)
             )
         else:
             sigma = 0.0
-        sigma_nascap = np.append(sigma_nascap, sigma)
+        sigma_nascap = xp.append(sigma_nascap, sigma)
     return sigma_nascap
 
 
@@ -193,8 +193,8 @@ def secondary_emission():
             buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev)
         )
         z = concat(buffer.get_particle_scraped_this_step("ions", "eb", "z", lev))
-        x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-        y = r * np.sin(theta)
+        x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+        y = r * xp.sin(theta)
         ux = concat(buffer.get_particle_scraped_this_step("ions", "eb", "ux", lev))
         uy = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uy", lev))
         uz = concat(buffer.get_particle_scraped_this_step("ions", "eb", "uz", lev))
@@ -213,21 +213,21 @@ def secondary_emission():
         for i in range(0, len(w)):
             sigma = sigma_nascap_ions[i]
             # Ne_sec is number of the secondary electrons to be emitted
-            Ne_sec = int(sigma + np.random.uniform())
+            Ne_sec = int(sigma + xp.random.uniform())
             for _ in range(Ne_sec):
-                xe = np.array([])
-                ye = np.array([])
-                ze = np.array([])
-                we = np.array([])
-                delta_te = np.array([])
-                uxe = np.array([])
-                uye = np.array([])
-                uze = np.array([])
+                xe = xp.array([])
+                ye = xp.array([])
+                ze = xp.array([])
+                we = xp.array([])
+                delta_te = xp.array([])
+                uxe = xp.array([])
+                uye = xp.array([])
+                uze = xp.array([])
 
                 # Random thermal momenta distribution
-                ux_th = np.random.normal(0, dist_th)
-                uy_th = np.random.normal(0, dist_th)
-                uz_th = np.random.normal(0, dist_th)
+                ux_th = xp.random.normal(0, dist_th)
+                uy_th = xp.random.normal(0, dist_th)
+                uz_th = xp.random.normal(0, dist_th)
 
                 un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
 
@@ -238,28 +238,28 @@ def secondary_emission():
                     uy_th_reflect = -2 * un_th * ny[i] + uy_th
                     uz_th_reflect = -2 * un_th * nz[i] + uz_th
 
-                    uxe = np.append(uxe, ux_th_reflect)
-                    uye = np.append(uye, uy_th_reflect)
-                    uze = np.append(uze, uz_th_reflect)
+                    uxe = xp.append(uxe, ux_th_reflect)
+                    uye = xp.append(uye, uy_th_reflect)
+                    uze = xp.append(uze, uz_th_reflect)
                 else:
-                    uxe = np.append(uxe, ux_th)
-                    uye = np.append(uye, uy_th)
-                    uze = np.append(uze, uz_th)
+                    uxe = xp.append(uxe, ux_th)
+                    uye = xp.append(uye, uy_th)
+                    uze = xp.append(uze, uz_th)
 
-                xe = np.append(xe, x[i])
-                ye = np.append(ye, y[i])
-                ze = np.append(ze, z[i])
-                we = np.append(we, w[i])
-                delta_te = np.append(delta_te, delta_t[i])
+                xe = xp.append(xe, x[i])
+                ye = xp.append(ye, y[i])
+                ze = xp.append(ze, z[i])
+                we = xp.append(we, w[i])
+                delta_te = xp.append(delta_te, delta_t[i])
 
                 elect_pc.add_particles(
-                    x=xe + (dt - delta_te) * uxe,
-                    y=ye + (dt - delta_te) * uye,
-                    z=ze + (dt - delta_te) * uze,
-                    ux=uxe,
-                    uy=uye,
-                    uz=uze,
-                    w=we,
+                    x=(xe + (dt - delta_te) * uxe).get(),
+                    y=(ye + (dt - delta_te) * uye).get(),
+                    z=(ze + (dt - delta_te) * uze).get(),
+                    ux=uxe.get(),
+                    uy=uye.get(),
+                    uz=uze.get(),
+                    w=we.get(),
                 )
 
 
