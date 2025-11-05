@@ -7,6 +7,12 @@ Build from Source
 If you are new to CMake, we recommend starting with `this concise tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`__ from the HEP Software Foundation.
 For those primarily interested in building the project, focus on these key sections: `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__, and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
+
+.. attention::
+
+    To install on HPC systems, please refer to the :ref:`install-hpc` section.
+
+
 .. _install-build-dependencies:
 
 Install Dependencies
@@ -27,12 +33,6 @@ To ensure compatibility, pick **one** package manager for your development workf
    :hidden:
 
    dependencies
-
-
-Install on HPC Systems
-^^^^^^^^^^^^^^^^^^^^^^
-
-Please refer to the :ref:`install-hpc` section.
 
 
 Install with conda-forge
