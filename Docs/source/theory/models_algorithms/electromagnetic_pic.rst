@@ -1,3 +1,5 @@
+.. _theory-em-pic:
+
 Fully electromagnetic PIC
 =========================
 
@@ -9,7 +11,7 @@ the fields are updated using Maxwell's equations.
    :label: Faraday-1
 
 .. math::
-   \frac{\mathbf{\partial E}}{\partial t} = \nabla\times\mathbf{B}-\mathbf{J}
+   \frac{1}{c^2}\frac{\mathbf{\partial E}}{\partial t} = \nabla\times\mathbf{B}-\mu_0\mathbf{J}
    :label: Ampere-1
 
 where :math:`\mathbf{E}` and :math:`\mathbf{B}` are the electric and magnetic field
