@@ -160,6 +160,10 @@ class WarpX(Bucket):
         argv = [sys.executable] + self.create_argv_list(**kw)
         libwarpx.initialize(argv, mpi_comm=mpi_comm)
 
+    @property
+    def fields(self):
+        return libwarpx.warpx.multifab_register()
+
     def evolve(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
 

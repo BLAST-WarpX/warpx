@@ -160,7 +160,7 @@ computeEffectivePotentialPhi (
 
         // Use the Multigrid (MLMG) solver but first scale rho appropriately
         using namespace ablastr::constant::SI;
-        rho[lev]->mult(-1._rt/ep0);
+        rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
         // In the presence of EB or RZ the EB enabled linear solver is used
@@ -267,7 +267,7 @@ computeEffectivePotentialPhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-epsilon_0);  // Multiply rho by epsilon again
     } // loop over lev(els)
 }
 

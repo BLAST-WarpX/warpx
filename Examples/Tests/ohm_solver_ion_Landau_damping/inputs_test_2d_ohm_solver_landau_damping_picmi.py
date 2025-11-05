@@ -14,7 +14,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, particle_containers, picmi
 
 constants = picmi.constants
 
@@ -299,7 +299,7 @@ class IonLandauDamping(object):
         if step % self.diag_steps != 0:
             return
 
-        Ez_warpx = fields.EzWrapper()[...]
+        Ez_warpx = simulation.fields.get("Efield_fp", dir="z", level=0)[...]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

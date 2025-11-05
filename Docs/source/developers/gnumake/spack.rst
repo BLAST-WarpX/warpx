@@ -3,7 +3,7 @@
 Building WarpX with Spack
 =========================
 
-As mentioned in the :ref:`install section <install-users>`, WarpX can be installed using Spack.
+As mentioned in the :ref:`install section <install-methods>`, WarpX can be installed using Spack.
 From the `Spack web page <https://spack.io>`__: "Spack is a package management tool designed to support multiple versions and configurations of software on a wide variety of platforms and environments."
 
 .. note::
