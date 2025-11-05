@@ -23,7 +23,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
              .. literalinclude:: inputs_base_3d
                 :language: none
-                :caption: You can copy this file from ``/WarpX/Examples/Physics_applications/uniform_plasma/inputs_base_3d``.
+                :caption: You can copy this file from ``Examples/Physics_applications/uniform_plasma/inputs_base_3d``.
 
    .. tab-item:: 2D
 
@@ -35,4 +35,4 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
              .. literalinclude:: inputs_test_2d_uniform_plasma
                 :language: none
-                :caption: You can copy this file from ``/WarpX/Examples/Physics_applications/uniform_plasma/inputs_test_2d_uniform_plasma``.
+                :caption: You can copy this file from ``Examples/Physics_applications/uniform_plasma/inputs_test_2d_uniform_plasma``.
