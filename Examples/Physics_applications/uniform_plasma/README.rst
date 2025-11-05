@@ -36,18 +36,3 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
              .. literalinclude:: inputs_test_2d_uniform_plasma
                 :language: none
                 :caption: You can copy this file from ``/WarpX/Examples/Physics_applications/uniform_plasma/inputs_test_2d_uniform_plasma``.
-
-Analyze
--------
-
-.. note::
-
-   This section is TODO.
-
-
-Visualize
----------
-
-.. note::
-
-   This section is TODO.
