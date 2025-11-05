@@ -63,7 +63,7 @@ is described in, e.g., :cite:t:`pt-VayCSD12,pt-Vaycpc04`.
 .. _fig_yee_grid:
 
 .. figure:: Yee_grid.png
-   :alt: Figure not found
+   :alt: Yee grid layout and leapfrog time integration
 
    (left) Layout of field components on the staggered “Yee” grid. Current densities and electric fields are defined on the edges of the cells and magnetic fields on the faces. (right) Time integration using a second-order finite-difference "leapfrog" integrator.
 
@@ -346,7 +346,7 @@ During these subintervals, :math:`\boldsymbol{\widetilde{J}}` and :math:`\wideti
 .. _fig-psatd_jrhom:
 
 .. figure:: https://gist.githubusercontent.com/oshapoval/88a73cada764364ad4ffce13563cedf1/raw/697ce1897cde0416bebdde8f1c1e8fcf859cb419/psatd_jrhom.png
-   :alt: Figure not found
+   :alt: Time dependencies of current and charge density in PSATD schemes
 
    Diagrams illustrating various time dependencies of the current density :math:`\boldsymbol{\widetilde{J}}` and charge density :math:`\widetilde{\rho}` for constant/linear (CL), both constant (CC), linear (LL) and quadratic (QQ) dependencies with :math:`m` subintervals: (first column) :math:`m=1`, (second) :math:`m=2` and (third) :math:`m=4`. CL1 corresponds to the standard PSATD PIC method. The triangle and circle glyphs represent the times at which the macroparticles deposit :math:`\boldsymbol{\widetilde{J}}` and :math:`\widetilde{\rho}` on the grid, respectively. The dashed and solid lines represent the assumed time dependency of :math:`\boldsymbol{\widetilde{J}}` and :math:`\widetilde{\rho}` within one time step, when integrating the Maxwell equations analytically.
 
@@ -394,7 +394,7 @@ Here, :math:`\boldsymbol{a_J}, \boldsymbol{b_J}, \boldsymbol{c_J}, a_{\rho}, b_{
 .. _fig-j_rho_table:
 
 .. figure:: https://gist.githubusercontent.com/oshapoval/88a73cada764364ad4ffce13563cedf1/raw/ebc249f8e875a952c65a5319fd523821baccfd5a/j_rho_table.png
-   :alt: Figure not found
+   :alt: Table of polynomial coefficients for current and charge density time evolution
 
    Polynomial coefficients based on the time dependency of the current and charge densities :math:`{\boldsymbol{\widetilde{J}}}(t)` and :math:`\widetilde{\rho}(t)` over one time subinterval, :math:`\delta t = \Delta t/m`.
 
