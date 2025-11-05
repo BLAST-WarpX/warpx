@@ -182,19 +182,18 @@ This shows how to loop over levels and grid blocks.
                bx = mfi.tilebox().grow(ngv)
                print(bx)  # note: global index space of this block
 
-               # numpy representation: non-copying view, including the
-               # guard/ghost region;     .to_cupy() for GPU!
-               Ex_np = Ex_mf.array(mfi).to_numpy()
+               # numpy/cupy representation: non-copying view, including
+               # the guard/ghost region
+               Ex = Ex_mf.array(mfi).to_xp()
 
-               # notes on indexing in Ex_np:
-               # - numpy uses locally zero-based indexing
+               # notes on indexing in Ex:
+               # - numpy/cupy use locally zero-based indexing
                # - layout is F_CONTIGUOUS by default, just like AMReX
 
                # notes:
                # Only the next lines are the "HOT LOOP" of the computation.
-               # For efficiency, use numpy array operation for speed on CPUs.
-               # For GPUs use .to_cupy() above and compute with cupy or numba.
-               Ex_np[()] = 42.0
+               # For efficiency, we use array operation for speed.
+               Ex[()] = 42.0
 
 
    sim.step(nsteps=100)
