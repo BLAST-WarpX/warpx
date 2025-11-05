@@ -3,10 +3,6 @@
 Explicit electromagnetic PIC
 ============================
 
-.. warning::
-
-   TODO: Describe the overall PIC loop
-
 .. _theory-mwsolve:
 
 Field solve
