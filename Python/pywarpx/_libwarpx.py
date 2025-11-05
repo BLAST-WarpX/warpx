@@ -129,6 +129,15 @@ class LibWarpX:
 
         self.__version__ = self.libwarpx_so.__version__
 
+        # Extend pybind11 types in libwarpx_so (and pyAMReX) with pure Python
+        from .extensions.MultiFab import register_warpx_MultiFab_extension
+        from .extensions.MultiFabRegister import (
+            register_warpx_MultiFabRegister_extension,
+        )
+
+        register_warpx_MultiFab_extension(self.amr)
+        register_warpx_MultiFabRegister_extension(self.libwarpx_so)
+
     def amrex_init(self, argv, mpi_comm=None):
         if mpi_comm is None:  # or MPI is None:
             self.libwarpx_so.amrex_init(argv)

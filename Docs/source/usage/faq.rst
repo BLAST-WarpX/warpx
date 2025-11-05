@@ -65,9 +65,9 @@ What about Back-transformed diagnostics (BTD)?
 ----------------------------------------------
 
 .. figure:: https://user-images.githubusercontent.com/10621396/198702232-9dd595ad-479e-4170-bd25-51e2b72cd50a.png
-   :alt: [fig:BTD_features] Minkowski diagram indicating several features of the back-transformed diagnostic (BTD). The diagram explains why the first BTD begins to fill at boosted time :math:`t'=0` but this doesn't necessarily correspond to lab time :math:`t=0`, how the BTD grid-spacing is determined by the boosted time step :math:`\Delta t'`, hence why the snapshot length don't correspond to the grid spacing and length in the input script, and how the BTD snapshots complete when the effective snapshot length is covered in the boosted frame.
+   :alt: Figure not found
 
-   [fig:BTD_features] Minkowski diagram indicating several features of the back-transformed diagnostic (BTD). The diagram explains why the first BTD begins to fill at boosted time :math:`t'=0` but this doesn't necessarily correspond to lab time :math:`t=0`, how the BTD grid-spacing is determined by the boosted time step :math:`\Delta t'`, hence why the snapshot length don't correspond to the grid spacing and length in the input script, and how the BTD snapshots complete when the effective snapshot length is covered in the boosted frame.
+   Minkowski diagram indicating several features of the back-transformed diagnostic (BTD). The diagram explains why the first BTD begins to fill at boosted time :math:`t'=0` but this doesn't necessarily correspond to lab time :math:`t=0`, how the BTD grid-spacing is determined by the boosted time step :math:`\Delta t'`, hence why the snapshot length don't correspond to the grid spacing and length in the input script, and how the BTD snapshots complete when the effective snapshot length is covered in the boosted frame.
 
 
 Several BTD quantities differ slightly from the lab frame domain described in the input deck.

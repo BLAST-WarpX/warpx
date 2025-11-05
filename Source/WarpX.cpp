@@ -53,6 +53,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
 #include <ablastr/math/FiniteDifference.H>
+#include <ablastr/math/RandomSeed.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -666,25 +667,7 @@ WarpX::ReadParameters ()
         // set random seed
         std::string random_seed = "default";
         pp_warpx.query("random_seed", random_seed);
-        if ( random_seed != "default" ) {
-            const unsigned long myproc_1 = ParallelDescriptor::MyProc() + 1;
-            if ( random_seed == "random" ) {
-                std::random_device rd;
-                std::uniform_int_distribution<int> dist(2, INT_MAX);
-                const unsigned long cpu_seed = myproc_1 * dist(rd);
-                const unsigned long gpu_seed = myproc_1 * dist(rd);
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else if ( std::stoi(random_seed) > 0 ) {
-                const unsigned long nprocs = ParallelDescriptor::NProcs();
-                const unsigned long seed_long = std::stoul(random_seed);
-                const unsigned long cpu_seed = myproc_1 * seed_long;
-                const unsigned long gpu_seed = (myproc_1 + nprocs) * seed_long;
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(
-                    "warpx.random_seed must be \"default\", \"random\" or an integer > 0.");
-            }
-        }
+        ablastr::math::set_random_seed(random_seed);
 
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);

@@ -188,7 +188,7 @@ def secondary_emission():
     elect_pc = particle_containers.ParticleContainerWrapper("electrons")
 
     if n != 0:
-        r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "x", lev))
+        r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "r", lev))
         theta = concat(
             buffer.get_particle_scraped_this_step("ions", "eb", "theta", lev)
         )

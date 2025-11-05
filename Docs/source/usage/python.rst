@@ -53,6 +53,8 @@ Field solvers define the updates of electric and magnetic fields.
 
 .. autoclass:: pywarpx.picmi.ElectrostaticSolver
 
+.. autoclass:: pywarpx.picmi.HybridPICSolver
+
 Object that allows smoothing of fields.
 
 .. autoclass:: pywarpx.picmi.BinomialSmoother
@@ -151,6 +153,8 @@ Particle distributions can be used for to initialize particles in a particle spe
 .. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
 
 .. autoclass:: pywarpx.picmi.ParticleListDistribution
+
+.. autoclass:: pywarpx.picmi.FromFileDistribution
 
 Particle layouts determine how to microscopically place macro particles in a grid cell.
 

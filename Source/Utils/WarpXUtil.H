@@ -96,17 +96,6 @@ void NullifyMF (
     amrex::Real zmax
 );
 
-namespace WarpXUtilIO{
-/**
- * A helper function to write binary data on disk.
- * @param[in] filename where to write
- * @param[in] data Vector containing binary data to write on disk
- * return true if it succeeds, false otherwise
- */
-bool WriteBinaryDataOnFile(const std::string& filename, const amrex::Vector<char>& data);
-
-}
-
 namespace WarpXUtilLoadBalance
 {
     /** \brief We only want to update the cost data if the grids we are working on

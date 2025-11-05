@@ -35,7 +35,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
             Check out ``Examples/Tests/langmuir/inputs_test_3d_langmuir_multi`` for additional input parameters.
 
             .. literalinclude:: inputs_base_3d
-               :language: ini
+               :language: none
                :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_3d``.
 
    .. tab-item:: 2D
@@ -56,7 +56,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
             Check out ``Examples/Tests/langmuir/inputs_test_2d_langmuir_multi`` for additional input parameters.
 
             .. literalinclude:: inputs_base_2d
-               :language: ini
+               :language: none
                :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_2d``.
 
 
@@ -78,7 +78,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
             Check out ``Examples/Tests/langmuir/inputs_test_rz_langmuir_multi`` for additional input parameters.
 
             .. literalinclude:: inputs_base_rz
-               :language: ini
+               :language: none
                :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_rz``.
 
 
@@ -97,7 +97,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
             This example can be run as WarpX **executable** using an input file: ``warpx.1d inputs_test_1d_langmuir_multi``
 
             .. literalinclude:: inputs_test_1d_langmuir_multi
-               :language: ini
+               :language: none
                :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_1d_langmuir_multi``.
 
 
