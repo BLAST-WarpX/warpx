@@ -167,6 +167,10 @@ class WarpX(Bucket):
     def evolve(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
 
+    def step(self, nsteps=-1):
+        """An alias of evolve, to be consistent with the PICMI Simulation class"""
+        self.evolve(nsteps)
+
     def finalize(self, finalize_mpi=1):
         libwarpx.finalize(finalize_mpi)
 

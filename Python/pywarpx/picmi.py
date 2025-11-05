@@ -3405,7 +3405,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 nsteps = self.max_steps
             else:
                 nsteps = -1
-        pywarpx.warpx.evolve(nsteps)
+        pywarpx.warpx.step(nsteps)
 
     def finalize(self):
         if self.warpx_initialized:
