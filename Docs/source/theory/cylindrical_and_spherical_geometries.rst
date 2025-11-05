@@ -1,7 +1,7 @@
-.. _theory-grid-cylindrical_rz:
+.. _theory-grid-cylindrical-spherical:
 
 Cylindrical and Spherical Geometries
-=================
+====================================
 
 Coordinates
 -----------
@@ -13,10 +13,17 @@ Coordinates
 
    Cylindrical (left) and spherical (right) coordinate systems. The azimuthal angle :math:`\theta` is the same in both systems and ranges from :math:`0` to :math:`2\pi`. The elevation angle :math:`\phi` in the spherical system ranges from :math:`-\pi/2` to :math:`\pi/2`.
 
+The cylindrical and spherical coordinate systems are shown in :numref:`fig_cyl_and_sph_coords` (see :cite:t:`cyl_sph-Angusjcp2024` for further details).
+
+1D cylindrical coordinates
+--------------------------
+
+The cylindrical coordinate system is shown in the left panel of :numref:`fig_cyl_and_sph_coords`. General expressions for the divergence and curl operators in this coordinate system are
+
 1D spherical coordinates
 ------------------------
 
-The spherical coordinate system is shown in the right panel of :numref:`fig_cyl_and_sph_coords`. General expressions for the divergence and curl operators in this spherical coordinate system are
+The spherical coordinate system is shown in the right panel of :numref:`fig_cyl_and_sph_coords`. General expressions for the divergence and curl operators in this coordinate system are
 
 .. math::
 
@@ -39,8 +46,5 @@ where :math:`f` is any scalar field. Under these assumptions, the differential o
 
    \nabla\cdot\mathbf{F} = \frac{1}{r^2}\frac{\partial}{\partial r}\left(r^2F_r\right), \qquad \nabla\times\mathbf{F} = 0.
 
-Jacobian
--------------
-
 .. bibliography::
-    :keyprefix: kp-
+    :keyprefix: cyl_sph-
