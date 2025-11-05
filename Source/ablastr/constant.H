@@ -96,7 +96,7 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto xi_c2_v = static_cast<T>(1.1728865075613984e-35);
 
-        //! Schwinger field [V/m] (variable template)
+        //! Schwinger electric field [V/m] (variable template)
         template<typename T>
         constexpr auto schwinger_field_v = static_cast<T>(
             (m_e_v<double>*m_e_v<double>)*(c_v<double>*c_v<double>*c_v<double>)/(hbar_v<double>*q_e_v<double>));
@@ -181,7 +181,7 @@ namespace ablastr::constant
         //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38)
         constexpr auto xi_c2 = xi_c2_v<amrex::Real>;
 
-        //! Schwinger field [V/m] (variable template)
+        //! Schwinger electric field [V/m]
         template<typename T>
         constexpr auto schwinger_field = schwinger_field_v<amrex::Real>;
 
