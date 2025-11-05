@@ -3,9 +3,9 @@
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
-import numpy as np
 
 from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # numerics parameters
@@ -112,14 +112,15 @@ sim.initialize_warpx()
 ##########################
 # python particle data access
 ##########################
+xp, _ = load_cupy()
 
 
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
-        return np.empty(0)
+        return xp.empty(0)
     else:
-        return np.concatenate(list_of_arrays)
+        return xp.concatenate(list_of_arrays)
 
 
 def mirror_reflection():
@@ -136,9 +137,10 @@ def mirror_reflection():
     theta = concat(
         buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
     )
+
     z = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev))
-    x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-    y = r * np.sin(theta)
+    x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * xp.sin(theta)
     ux = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ux", lev))
     uy = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uy", lev))
     uz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uz", lev))
@@ -158,13 +160,13 @@ def mirror_reflection():
     uy_reflect = -2 * un * ny + uy
     uz_reflect = -2 * un * nz + uz
     elect_pc.add_particles(
-        x=x + (dt - delta_t) * ux_reflect,
-        y=y + (dt - delta_t) * uy_reflect,
-        z=z + (dt - delta_t) * uz_reflect,
-        ux=ux_reflect,
-        uy=uy_reflect,
-        uz=uz_reflect,
-        w=w,
+        x=(x + (dt - delta_t) * ux_reflect).get(),
+        y=(y + (dt - delta_t) * uy_reflect).get(),
+        z=(z + (dt - delta_t) * uz_reflect).get(),
+        ux=ux_reflect.get(),
+        uy=uy_reflect.get(),
+        uz=uz_reflect.get(),
+        w=w.get(),
     )  # adds the particle in the general particle container at the next step
     #### Can be modified depending on the model of interaction.
 
