@@ -1,5 +1,4 @@
 .. _install-methods:
-.. _install-users:
 
 Installation Methods
 ====================
@@ -33,8 +32,7 @@ HPC Systems
 If you want to use WarpX on a specific high-performance computing (HPC) system, please go directly to our :ref:`HPC system-specific documentation <install-hpc>`.
 
 
-.. _using-the-conda-forge-package:
-.. _install-conda:
+.. _install-methods-conda:
 
 .. only:: html
 
@@ -70,8 +68,7 @@ A package for WarpX is available via `conda-forge <https://conda-forge.org/downl
 
    The ``warpx`` package on conda-forge does not yet provide `GPU support <https://github.com/conda-forge/warpx-feedstock/issues/89>`__.
 
-.. _using-the-spack-package:
-.. _install-spack:
+.. _install-methods-spack:
 
 .. only:: html
 
@@ -96,8 +93,7 @@ The ``warpx`` package installs executables. The ``warpx +python`` variant also b
 
 See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutorial.readthedocs.io>`__ for more information.
 
-.. _using-the-pypi-package:
-.. _install-pypi:
+.. _install-methods-pypi:
 
 .. only:: html
 
@@ -118,10 +114,9 @@ If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you 
    python3 -m pip install *whl
 
 Pre-compiled binary packages will be published on `PyPI <https://pypi.org/>`__ in the future for faster installs.
-Please consider using :ref:`conda <install-conda>` in the meantime.
+Please consider using :ref:`conda <install-methods-conda>` in the meantime.
 
-.. _using-the-brew-package:
-.. _install-brew:
+.. _install-methods-brew:
 
 .. only:: html
 
@@ -135,8 +130,7 @@ Using the Brew Package
    Coming soon.
 
 
-.. _from-source-with-cmake:
-.. _install-cmake:
+.. _install-methods-cmake:
 
 .. only:: html
 
@@ -167,8 +161,7 @@ After installing the :ref:`WarpX dependencies <install-dependencies>`, you can a
 
 For more details on how to configure WarpX from source, please see the section :ref:`Build from Source <install-build-cmake>`.
 
-.. _tips-for-macos-users:
-.. _install-users-macos:
+.. _install-tips-macos:
 
 Tips for macOS Users
 --------------------

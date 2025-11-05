@@ -24,7 +24,7 @@ Where ``<run_directory>`` is the actual path to the run directory.
 Executable File
 ---------------
 
-If you installed WarpX with a :ref:`package manager <install-users>`, a ``warpx``-prefixed executable will be available as a regular system command.
+If you installed WarpX with a :ref:`package manager <install-methods>`, a ``warpx``-prefixed executable will be available as a regular system command.
 Depending on build options, the executable name includes additional suffixes.
 Try it like this:
 
