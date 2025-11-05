@@ -1,7 +1,7 @@
 .. _examples-pwfa:
 
-Beam-Driven Wakefield Acceleration of Electrons
-===============================================
+Beam-Driven Wakefield Acceleration of Electrons in a boosted frame
+==================================================================
 
 This example shows how to model a beam-driven plasma-wakefield accelerator (PWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996`.
 

@@ -1,7 +1,7 @@
 .. _examples-lwfa:
 
-Laser-Wakefield Acceleration of Electrons
-=========================================
+Laser-Wakefield Acceleration of Electrons in a lab frame
+========================================================
 
 This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996`.
 
