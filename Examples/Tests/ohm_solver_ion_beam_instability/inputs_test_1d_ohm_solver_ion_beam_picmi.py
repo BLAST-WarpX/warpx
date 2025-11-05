@@ -15,7 +15,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, particle_containers, picmi
 
 constants = picmi.constants
 
@@ -426,7 +426,7 @@ class HybridPICBeamInstability(object):
         if step % self.diag_steps != 0:
             return
 
-        By_warpx = fields.BxWrapper()[...]
+        By_warpx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

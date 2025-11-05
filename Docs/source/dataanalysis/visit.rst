@@ -26,7 +26,7 @@ Assuming that you ran a 2D simulation, here are instructions for making a simple
 Your image should look similar to the one below
 
 .. figure:: Ez.png
-   :alt: Figure not found
+   :alt: Visit visualization of Ez field component
 
 
 In 3D, you must apply the “Operators” -> “Slicing”

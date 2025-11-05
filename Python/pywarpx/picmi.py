@@ -3412,6 +3412,14 @@ class Simulation(picmistandard.PICMI_Simulation):
             self.warpx_initialized = False
             pywarpx.warpx.finalize()
 
+    @property
+    def fields(self):
+        """
+        This is a convenience property that returns the MultiFab registry, allowing
+        easy fetching of the MultiFabs.
+        """
+        return self.extension.warpx.multifab_register()
+
 
 # ----------------------------
 # Simulation frame diagnostics
