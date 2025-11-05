@@ -183,8 +183,8 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
             amrex::Real const kz = modified_kz_arr[j];
 
             constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
-            constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
+            constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
             amrex::Real const C = C_arr(i,j,k,mode);
             amrex::Real const S_ck = S_ck_arr(i,j,k,mode);
@@ -199,7 +199,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
                 Complex const divE = kr*(Ep_old - Em_old) + I*kz*Ez_old;
                 Complex const divJ = kr*(Jp - Jm) + I*kz*Jz;
 
-                rho_diff = (X2 - X3)*PhysConst::ep0*divE - X2*dt*divJ;
+                rho_diff = (X2 - X3)*PhysConst::epsilon_0*divE - X2*dt*divJ;
             }
 
             // Update E (see WarpX online documentation: theory section)
@@ -381,7 +381,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
 
             // Calculate coefficients
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             if (k_norm != 0){
                 C(i,j,k,mode) = std::cos(c*k_norm*dt);
                 S_ck(i,j,k,mode) = std::sin(c*k_norm*dt)/(c*k_norm);

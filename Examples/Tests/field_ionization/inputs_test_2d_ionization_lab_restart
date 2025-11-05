@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_ionization_lab
+
+# test input parameters
+amr.restart = "../test_2d_ionization_lab/diags/chk001000"

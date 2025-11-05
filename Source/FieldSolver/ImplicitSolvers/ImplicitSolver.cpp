@@ -443,18 +443,29 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 {
 
-    std::string nlsolver_type_str;
-    pp.get("nonlinear_solver", nlsolver_type_str);
+    pp.get("nonlinear_solver", m_nlsolver_type);
 
-    if (nlsolver_type_str=="picard") {
-        m_nlsolver_type = NonlinearSolverType::Picard;
+    if (m_nlsolver_type == NonlinearSolverType::picard) {
+
+        // Picard
         m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
         m_max_particle_iterations = 1;
         m_particle_tolerance = 0.0;
+
     }
-    else if (nlsolver_type_str=="newton") {
-        m_nlsolver_type = NonlinearSolverType::Newton;
-        m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+    else if (      (m_nlsolver_type == NonlinearSolverType::newton)
+                || (m_nlsolver_type == NonlinearSolverType::petsc_snes) ) {
+
+        // JFNK solvers
+        if (m_nlsolver_type == NonlinearSolverType::newton) {
+            m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
+        } else {
+#ifdef AMREX_USE_PETSC
+            m_nlsolver = std::make_unique<PETScSNES<WarpXSolverVec,ImplicitSolver>>();
+#else
+            WARPX_ABORT_WITH_MESSAGE("ImplicitSolver::parseNonlinearSolverParams(): must compile with PETSc to use petsc_snes (AMREX_USE_PETSC must be defined)");
+#endif
+        }
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_tolerance", m_particle_tolerance);
         pp.query("particle_suborbits", m_particle_suborbits);
@@ -846,7 +857,7 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
     amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
     amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
     amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
-    if (m_nlsolver_type==NonlinearSolverType::Newton) {
+    if (m_nlsolver_type==NonlinearSolverType::newton) {
         amrex::Print() << "use mass matrices:                   " << (m_use_mass_matrices ? "true":"false") << "\n";
         if (m_use_mass_matrices) {
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";

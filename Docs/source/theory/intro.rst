@@ -1,23 +1,78 @@
 .. _theory:
 
-Introduction
-============
+Overview
+========
 
-.. figure:: Plasma_acceleration_sim.png
-   :alt: Plasma laser-driven (top) and charged-particles-driven (bottom) acceleration (rendering from 3-D Particle-In-Cell simulations). A laser beam (red and blue disks in top picture) or a charged particle beam (red dots in bottom picture) propagating (from left to right) through an under-dense plasma (not represented) displaces electrons, creating a plasma wakefield that supports very high electric fields (pale blue and yellow). These electric fields, which can be orders of magnitude larger than with conventional techniques, can be used to accelerate a short charged particle beam (white) to high-energy over a very short distance.
+.. _theory-pic:
 
-   Plasma laser-driven (top) and charged-particles-driven (bottom) acceleration (rendering from 3-D Particle-In-Cell simulations). A laser beam (red and blue disks in top picture) or a charged particle beam (red dots in bottom picture) propagating (from left to right) through an under-dense plasma (not represented) displaces electrons, creating a plasma wakefield that supports very high electric fields (pale blue and yellow). These electric fields, which can be orders of magnitude larger than with conventional techniques, can be used to accelerate a short charged particle beam (white) to high-energy over a very short distance.
+WarpX simulates the **self-consistent** evolution of **particle species** (e.g., electrons, ions, etc.) in the presence of **electric and magnetic fields**.
+In this context, *self-consistent* indicates that the particle dynamics are influenced by the fields, while the fields themselves evolve in response to the particles' changing charge and current density.
 
-Computer simulations have had a profound impact on the design and understanding of past and present plasma acceleration experiments :cite:p:`i-Tsungpop06,i-Geddesjp08,i-Geddesscidac09,i-Geddespac09,i-Huangscidac09`. Accurate modeling of wake formation, electron self-trapping and acceleration require fully kinetic methods (usually Particle-In-Cell) using large computational resources due to the wide range of space and time scales involved. Numerical modeling complements and guides the design and analysis of advanced accelerators, and can reduce development costs significantly. Despite the major recent experimental successes :cite:p:`i-LeemansPRL2014,i-Blumenfeld2007,i-BulanovSV2014,i-Steinke2016`, the various advanced acceleration concepts need significant progress to fulfill their potential. To this end, large-scale simulations will continue to be a key component toward reaching a detailed understanding of the complex interrelated physics phenomena at play.
+The fields are represented on a discrete spatial grid (see :ref:`theory-grid`).
+The species are most commonly represented by discrete macro-particles moving continuously through the grid, but can also be represented as fluids in WarpX (see :ref:`theory-species_representations`).
 
-For such simulations,
-the most popular algorithm is the Particle-In-Cell (or PIC) technique,
-which represents electromagnetic fields on a grid and particles by
-a sample of macroparticles.
-However, these simulations are extremely computationally intensive, due to the need to resolve the evolution of a driver (laser or particle beam) and an accelerated beam into a structure that is orders of magnitude longer and wider than the accelerated beam.
-Various techniques or reduced models have been developed to allow multidimensional simulations at manageable computational costs: quasistatic approximation :cite:p:`i-Sprangleprl90,i-Antonsenprl1992,i-Krallpre1993,i-Morapop1997,i-Quickpic`,
-ponderomotive guiding center (PGC) models :cite:p:`i-Antonsenprl1992,i-Krallpre1993,i-Quickpic,i-Benedettiaac2010,i-Cowanjcp11`, simulation in an optimal Lorentz boosted frame :cite:p:`i-Vayprl07,i-Bruhwileraac08,i-Vayscidac09,i-Vaypac09,i-Martinspac09,i-VayAAC2010,i-Martinsnaturephysics10,i-Martinspop10,i-Martinscpc10,i-Vayjcp2011,i-VayPOPL2011,i-Vaypop2011,i-Yu2016`,
-expanding the fields into a truncated series of azimuthal modes :cite:p:`i-godfrey1985iprop,i-LifschitzJCP2009,i-DavidsonJCP2015,i-Lehe2016,i-AndriyashPoP2016`, fluid approximation :cite:p:`i-Krallpre1993,i-Shadwickpop09,i-Benedettiaac2010` and scaled parameters :cite:p:`i-Cormieraac08,i-Geddespac09`.
+At each time step of a simulation, both the species and the fields are updated -- using the equations of motion and the field equations respectively.
+Different types of field equations can be used in WarpX (see :ref:`theory-field_solvers`), and this choice determines many of the algorithmic details --
+such as the maximum time step size, the time staggering of the fields and particles position/momentum, the exact time-stepping algorithm, and whether the species' charge density or current density is used.
+
+.. _fig-pic:
+
+.. figure:: PIC.png
+   :alt: Core PIC algorithm cycle showing field and particle operations
+
+   The core Particle-In-Cell (PIC) algorithm involves four operations at each time step: 1) evolve the field equation on the grid,  2) deposit the charge and/or current densities through interpolation from the particles distributions onto the grid, 3) evolve the fields on the grid, 4) interpolate the fields from the grid onto the particles for the next particle push.
+
+.. _theory-field_solvers:
+
+Field Solvers
+=============
+
+.. toctree::
+   :maxdepth: 1
+
+   maxwell_solvers
+   kinetic_fluid_hybrid_model
+
+.. _theory-grid:
+
+Grid & Geometries
+=================
+
+.. _theory-species_representations:
+
+Species Representations
+=======================
+
+.. toctree::
+   :maxdepth: 1
+
+   kinetic_particles
+   cold_fluid_model
+
+Boundary Conditions
+===================
+
+.. toctree::
+   :maxdepth: 1
+
+   boundary_conditions
+
+Multiphysics Processes
+======================
+
+.. toctree::
+   :maxdepth: 1
+
+   multiphysics_extensions
+
+Advanced Modes of Running
+=========================
+
+.. toctree::
+   :maxdepth: 1
+
+   amr
+   boosted_frame
 
 .. bibliography::
     :keyprefix: i-
