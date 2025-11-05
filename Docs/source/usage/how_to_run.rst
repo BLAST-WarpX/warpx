@@ -67,49 +67,50 @@ Please :ref:`reach out to us <contact>` if you need help setting up a template t
 Run Simulation
 --------------
 
-WarpX Executable
-^^^^^^^^^^^^^^^^
+.. tab-set::
 
-Run the executable directly, e.g. with MPI:
+   .. tab-item:: WarpX Executable
 
-.. code-block:: bash
+      Run the executable directly, e.g. with MPI:
 
-   cd <run_directory>
+      .. code-block:: bash
 
-   # run with an inputs file:
-   mpirun -np <n_ranks> ./warpx <input_file>
+         cd <run_directory>
 
-Here, ``<n_ranks>`` is the number of MPI ranks used, and ``<input_file>`` is the name of the parameter list.
-Note that the actual executable might have a longer name, depending on build options.
+         # run with an inputs file:
+         mpirun -np <n_ranks> ./warpx <input_file>
 
-The example above uses the copied executable in the current directory (``./``). If you installed WarpX with a package manager, omit the ``./`` because WarpX will be found in your ``PATH``.
+      Here, ``<n_ranks>`` is the number of MPI ranks used, and ``<input_file>`` is the name of the parameter list.
+      Note that the actual executable might have a longer name, depending on build options.
 
-Python Script
-^^^^^^^^^^^^^
-
-Run via the Python interface:
-
-.. code-block:: bash
-
-   # run with a PICMI input script:
-   mpirun -np <n_ranks> python <python_script>
-
-Here, ``<n_ranks>`` is the number of MPI ranks used, ``<python_script>`` is the name of the :ref:`PICMI <usage-picmi>` script.
-
-Job Script
-^^^^^^^^^^
-
-On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job script <install-hpc>` at this point, e.g. ``sbatch <submission_script>`` (SLURM) or ``bsub <submission_script>`` (LSF).
+      The example above uses the copied executable in the current directory (``./``). If you installed WarpX with a package manager, omit the ``./`` because WarpX will be found in your ``PATH``.
 
 
-.. tip::
+   .. tab-item:: Python Script
 
-   In the :ref:`next sections <running-cpp-parameters>`, we explain the parameters in the ``<input_file>``.
-   You can also overwrite parameters from the command line, for example:
+      Run via the Python interface:
 
-   .. code-block:: bash
+      .. code-block:: bash
 
-      mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
+         # run with a PICMI input script:
+         mpirun -np <n_ranks> python <python_script>
+
+      Here, ``<n_ranks>`` is the number of MPI ranks used, ``<python_script>`` is the name of the :ref:`PICMI <usage-picmi>` script.
+
+
+   .. tab-item:: Job Script
+
+      On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job script <install-hpc>` at this point, e.g. ``sbatch <submission_script>`` (SLURM) or ``bsub <submission_script>`` (LSF).
+
+
+      .. tip::
+
+         In the :ref:`next sections <running-cpp-parameters>`, we explain the parameters in the ``<input_file>``.
+         You can also overwrite parameters from the command line, for example:
+
+         .. code-block:: bash
+
+            mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
 
 
 Outputs and Diagnostics
