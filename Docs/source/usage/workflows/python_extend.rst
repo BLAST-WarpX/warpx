@@ -3,6 +3,24 @@
 Extend a Simulation with Python
 ===============================
 
+Overview
+--------
+
+WarpX's Python bindings let you integrate Python code directly into a WarpX simulation.
+Through this interface, you can **access and modify simulation data** -- such as particle properties, field values -- as the simulation runs.
+This versatility opens the door to a wide range of workflows, including:
+
+   - **Adding a custom physics module** (for instance, a specific collision model) that may not yet be available in WarpX's C++ implementation, and that can be quickly implemented in Python.
+   - **Coupling WarpX with another simulation tool** that has a Python interface, enabling both codes to operate on the same particle or field data.
+   - **Incorporating AI-based surrogate models** built in Python (e.g., with PyTorch or TensorFlow) to emulate complex physical processes.
+
+If your custom Python code uses high-performance, GPU-accelerated libraries -- such as `cupy <https://cupy.dev/>`__, `pytorch <https://pytorch.org/>`__,
+or `numba <https://numba.pydata.org/>`__ -- the extra computations are unlikely to significantly impact simulation speed.
+Note that WarpX's Python bindings provide direct access to particle and field data without creating copies, resulting in very low overhead.
+
+How to run a simulation with Python extensions
+----------------------------------------------
+
 .. tab-set::
 
    .. tab-item:: PICMI
