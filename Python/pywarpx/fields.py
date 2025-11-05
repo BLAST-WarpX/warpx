@@ -41,6 +41,7 @@ BxCPPMLWrapper, ByCPPMLWrapper, BzCPPMLWrapper
 JxCPPMLWrapper, JyCPPMLWrapper, JzCPPMLWrapper
 FCPPMLWrapper, GCPPMLWrapper
 """
+import warnings
 
 from ._libwarpx import libwarpx
 
@@ -111,6 +112,16 @@ class MultiFabWrapper(object):
         remake=True,
         redistribute_on_remake=True,
     ):
+
+        warnings.warn(
+            """The fields wrapper is now obsolete and should not be used. The
+            recommended way of obtaining the MultiFabs is directly from the register.
+            This is done using the 'sim.fields.get' routine where 'sim' is a PICMI
+            Simulation instance or the 'warpx' instance of pywarpx.WarpX.""",
+            UserWarning,
+            stacklevel=2,
+        )
+
         self._mf = mf
         self.mf_name = mf_name
         self.idir = idir
