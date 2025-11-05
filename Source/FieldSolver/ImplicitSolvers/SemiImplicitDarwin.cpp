@@ -292,9 +292,6 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
     // Calculate divergence of chi dA (currently stored in dA_fp) and write
     // result to xivec - ComputeDivE is used since the staggering matches dA
     xi_fp[lev]->setVal(0);
-    dA_fp[lev][0]->FillBoundary(m_WarpX->Geom(lev).periodicity());
-    dA_fp[lev][1]->FillBoundary(m_WarpX->Geom(lev).periodicity());
-    dA_fp[lev][2]->FillBoundary(m_WarpX->Geom(lev).periodicity());
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeDivE(dA_fp[lev], *xi_fp[lev]);
 
     // Get div chi dA - \mu_0 nabla^2 xi
@@ -302,7 +299,7 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
         *rhs_scalar[lev], -PhysConst::mu0, *rhs_scalar[lev], 0, 1.0, *xi_fp[lev], 0, 0, ncomps, 0
     );
 
-    // HACK TO JUST TEST SOLVER
+    // ------- HACK TO JUST TEST SOLVER -------
     if (IsPythonCallbackInstalled("beforedeposition")) {
         // copy test values from a_dA to dA_fp and xi_fp
         amrex::MultiFab::Copy(*dA_fp[lev][0], *dAvec[lev][0], 0, 0, ncomps, dAvec[lev][0]->nGrowVect());
@@ -381,9 +378,9 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
 {
     /*
         Note: The functionality here deposits current to the Yee grid (and
-        accumulates the susceptibility to a staggered grid). The Darwin model
-        actually requires the depositions to be done to nodal grids!
-        This should be fixed for > 1d!!
+        accumulates the susceptibility to a staggered grid). The prototype
+        Darwin solver does the depositions to nodal grids!
+        This should maybe be fixed for > 1d!!
         (In 1d the z-current component is basically divergence cleaned away.)
 
         Note: There is an outstanding issue with this function - the
@@ -396,9 +393,6 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
     */
 
     BL_PROFILE("SemiImplicitDarwin::AccumulateCurrentAndSusceptibility()");
-    // This function sets the particle velocities to zero since the "corrector"
-    // velocity push only calculate the velocity due to acceleration from
-    // the inductive E-field. The actual velocities are still stored in u_n.
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -640,6 +634,10 @@ void SemiImplicitDarwin::ApplySusceptibility (
     const ablastr::fields::MultiLevelVectorField& dA )
 {
     BL_PROFILE("SemiImplicitDarwin::ApplySusceptibility()");
+    // This function applies the susceptibility matrices to the given dA.
+    // The functionality is copied from the ``ImplicitSolver::ComputeJfromMassMatrices``
+    // function.
+
     using namespace amrex::literals;
 
     using warpx::fields::FieldType;
@@ -905,5 +903,9 @@ void SemiImplicitDarwin::ApplySusceptibility (
             });
         }
 
+        // Apply boundary conditions
+        rhs[lev][0]->FillBoundary(m_WarpX->Geom(lev).periodicity());
+        rhs[lev][1]->FillBoundary(m_WarpX->Geom(lev).periodicity());
+        rhs[lev][2]->FillBoundary(m_WarpX->Geom(lev).periodicity());
     }
 }

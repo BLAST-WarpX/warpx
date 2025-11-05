@@ -167,7 +167,8 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
         self.z_grid = np.linspace(self.z_min, self.z_max, self.nz + 1)
 
         # install callback to execute step 1
-        callbacks.installafterdeposition(self.accumulate_susceptibility)
+        # callbacks.installafterdeposition(self.accumulate_susceptibility)
+        callbacks.installafterdeposition(self.make_mass_matrices_periodic)
 
         # callback for ComputeRHS - step 2 is done in C++ with GMRES
         # callbacks.installbeforedeposition(self.compute_rhs)
@@ -184,7 +185,7 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
             self.es_solver.solver_initialize_inputs()
 
         # install callback to create MF wrappers
-        callbacks.installbeforeInitEsolve(self._after_init)
+        # callbacks.installbeforeInitEsolve(self._after_init)
 
     def _after_init(self):
         # grab needed multifab wrappers
@@ -217,21 +218,22 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
         #################################################################
         # only add chi terms to rhs
-        self.partial_operator = np.zeros(
-            (3 * self.nz + 2 + self.nz + 1, 3 * self.nz + 2 + self.nz + 1)
-        )
-        # get chi -> V^-1 A chi A^T
-        chi = np.dot(
-            self._get_node_to_edge_average(),
-            np.dot(self.chi, self._get_edge_to_node_average()),
-        )
-        # add chi to linear operator
-        self.partial_operator[: 3 * self.nz + 2, : 3 * self.nz + 2] += chi
-        # now build the second equation and add it to M
-        self.partial_operator[3 * self.nz + 2 :, : 3 * self.nz + 2] = np.dot(
-            self._get_divergence(), chi
-        )
+        # self.partial_operator = np.zeros(
+        #     (3 * self.nz + 2 + self.nz + 1, 3 * self.nz + 2 + self.nz + 1)
+        # )
+        # # get chi -> V^-1 A chi A^T
+        # chi = np.dot(
+        #     self._get_node_to_edge_average(),
+        #     np.dot(self.chi, self._get_edge_to_node_average()),
+        # )
+        # # add chi to linear operator
+        # self.partial_operator[: 3 * self.nz + 2, : 3 * self.nz + 2] += chi
+        # # now build the second equation and add it to M
+        # self.partial_operator[3 * self.nz + 2 :, : 3 * self.nz + 2] = np.dot(
+        #     self._get_divergence(), chi
+        # )
 
+    def make_mass_matrices_periodic(self):
         #################################################################
         # Fix susceptibility for periodic boundaries
         #################################################################
@@ -345,19 +347,19 @@ class OneD_DarwinSolver(picmi.ElectrostaticSolver):
 
         #### JUST FOR TESTING PURPOSES ###
         # E_x = fields.ExFPWrapper()
-        # E_y = fields.EyFPWrapper()
-        E_z = fields.EzFPWrapper()
+        E_y = fields.EyFPWrapper()
+        # E_z = fields.EzFPWrapper()
         # rho = fields.RhoFPWrapper()
 
         import matplotlib.pyplot as plt
 
         # plt.plot(E_x[...], 'o-', label='WarpX')
-        # plt.plot(E_y[...], 'o-', label='WarpX')
-        plt.plot(E_z[...], "o-", label="WarpX")
+        plt.plot(E_y[...], "o-", label="WarpX")
+        # plt.plot(E_z[...], "o-", label="WarpX")
         # plt.plot(rho[...], 'o-', label='WarpX')
 
-        # plt.plot(rhs[self.nz + 1:2*self.nz+2], 's--')
-        plt.plot(rhs[2 * self.nz + 2 : 3 * self.nz + 2], "s--")
+        plt.plot(rhs[self.nz + 1 : 2 * self.nz + 2], "s--")
+        # plt.plot(rhs[2 * self.nz + 2 : 3 * self.nz + 2], "s--")
         plt.legend()
         plt.show()
 
