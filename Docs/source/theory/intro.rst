@@ -17,7 +17,7 @@ More specifically, the following operations are performed at each time step, as 
    - The electric and magnetic fields are interpolated from the grid to the macroparticles (or to the nodes of the fluid grid, for species represented as fluids)
    - These fields are used in the equation of motion to update the macroparticles' position and momentum (or the fluid density and velocity)
    - The species deposit their charge density and/or current density onto the grid.
-   - The fields are updated on the grid using the field equations, using the charge and/or current density as source terms.
+   - The fields are updated on the grid using the field equations, with the charge and/or current density as source terms.
 
 .. _fig-pic:
 
@@ -37,8 +37,8 @@ Models & Algorithms
 .. toctree::
    :maxdepth: 1
 
-   maxwell_solvers
-   kinetic_fluid_hybrid_model
+   models_algorithms/electromagnetic_pic
+   models_algorithms/kinetic_fluid_hybrid_model
 
 .. _theory-grid:
 
