@@ -22,7 +22,7 @@ More specifically, the following operations are performed at each time step, as 
 .. _fig-pic:
 
 .. figure:: PIC.png
-   :alt: figure not found
+   :alt: Core PIC algorithm cycle showing field and particle operations
 
    Schematic high-level representation of the Particle-In-Cell (PIC) algorithm.
 
