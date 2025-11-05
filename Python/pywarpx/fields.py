@@ -42,8 +42,6 @@ JxCPPMLWrapper, JyCPPMLWrapper, JzCPPMLWrapper
 FCPPMLWrapper, GCPPMLWrapper
 """
 
-import warnings
-
 from ._libwarpx import libwarpx
 
 
@@ -113,6 +111,7 @@ class MultiFabWrapper(object):
         remake=True,
         redistribute_on_remake=True,
     ):
+        import warnings
         warnings.warn(
             """The fields wrapper is now obsolete and should not be used. The
             recommended way of obtaining the MultiFabs is directly from the register.

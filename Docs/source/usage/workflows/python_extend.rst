@@ -135,7 +135,7 @@ Fields
 ^^^^^^
 
 All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
-This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to 42.
+This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
 This shows how to loop over levels and grid blocks.
 
 .. code-block:: python3
@@ -186,7 +186,7 @@ This shows how to loop over levels and grid blocks.
 
    sim.step(nsteps=100)
 
-The physical fields in WarpX have the following naming:
+The physical fields in WarpX have the following :ref:`naming convention <developers-fields>`:
 
 - ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
 - ``_aux`` are temporary (auxiliary) patches at the same resolution as ``_fp``.
@@ -198,7 +198,7 @@ For further details on how to `access GPU data <https://pyamrex.readthedocs.io/e
 
 Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
 
-The field MultiFab object provides access to the data via global indexing.
+The field ``MultiFab`` object provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
 When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
 For indices within the domain, values from valid cells are always returned.
