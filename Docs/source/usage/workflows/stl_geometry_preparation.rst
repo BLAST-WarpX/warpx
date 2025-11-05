@@ -3,17 +3,15 @@
 STL Geometry Preparation for WarpX
 ===================================
 
-This workflow describes how to prepare multiple STL (STereoLithography) files of a device for input into WarpX.
-STL files are a common format for representing 3D geometries and can be used to define complex embedded boundaries in WarpX simulations.
+WarpX has the ability to define the embedded boundary (EB) in a simulation using externally provided STL (STereoLithography) files.
+STL files are a common format for representing 3D geometries and can be used to define complex embedded boundaries in WarpX simulations, without having to define extensive EB implicit functions.
+However, there are some limitations to using STL files which must be resolved, including:
 
-Overview
---------
-
-When working with STL files in WarpX, you need to ensure that:
-
-1. Multiple STL files representing different parts of a device are combined into a single file
-2. The resulting geometry is "watertight" (no gaps or holes in the mesh)
+1. Multiple STL files representing different parts of a device must be combined into a single file
+2. The STL geometry is "watertight" (The STL file shouldn't have duplicate faces or vertices, overlapping vertices should be merged, and there shouldn't be any gaps or holes in the mesh)
 3. The STL file is properly formatted for WarpX input
+
+.. 2. The STL file shouldn't have duplicate faces or vertices, and overlapping vertices should be merged. (issues with vertices can cause the MLMG solver to crash)
 
 Step 1: Combining Multiple STL Files
 -------------------------------------
@@ -29,8 +27,10 @@ Using MeshLab
 2. Import the first STL file: ``File -> Import Mesh``
 3. Import additional STL files: ``File -> Import Mesh`` (repeat for each file)
 4. All parts should now be visible in the same scene
-5. Export the combined mesh: ``File -> Export Mesh As``
-6. Choose STL format and save
+5. Create a union of the two parts, either by ``Filters -> Remeshing, Simplification and Reconstruction -> Mesh Boolean: Union``
+   or by right-clicking on one of the parts in the Layer Dialog panel on the right and clicking ``Mesh Boolean: Union``
+6. Select the union and export the combined mesh: ``File -> Export Mesh As``
+7. Choose STL format and save
 
 Using Python with trimesh
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -44,19 +44,21 @@ You can also use Python with the ``trimesh`` library:
    # Load individual STL files
    mesh1 = trimesh.load('part1.stl')
    mesh2 = trimesh.load('part2.stl')
-   mesh3 = trimesh.load('part3.stl')
 
    # Combine meshes
-   combined = trimesh.util.concatenate([mesh1, mesh2, mesh3])
+   combined = trimesh.util.concatenate([mesh1, mesh2])
 
    # Export combined mesh
    combined.export('device_combined.stl')
 
-Step 2: Making the Geometry Watertight
+Step 2: Making the Geometry Watertight and Removing and Merging Duplicate Faces and Vertices
 ---------------------------------------
+
 
 WarpX requires that STL geometries be "watertight" (manifold), meaning the mesh has no holes, gaps, or open edges.
 This ensures that WarpX can properly determine which regions are inside or outside the geometry.
+STL files that have overlapping or duplicate faces and vertices can cause the MLMG solver to crash, while a non-manifold file can be inherently leaky for Poynting flux in an EM simulation.
+These issues with the mesh might happen while exporting the STL file from a CAD program (such as SolidWorks)
 
 Using MeshLab
 ^^^^^^^^^^^^^
@@ -66,52 +68,54 @@ To check and repair a mesh in MeshLab:
 1. **Check for issues:**
    
    * ``Filters -> Quality Measure and Computations -> Compute Topological Measures``
+   * Look for holes in the output
    * Look for non-manifold edges and vertices in the output
-
+   
 2. **Repair the mesh:**
    
+   * When loading in the mesh, there is an option to ``Unify Duplicated Vertices in STL files``, this will perform the next steps automatically, but gives the user less control.
    * ``Filters -> Cleaning and Repairing -> Remove Duplicate Faces``
    * ``Filters -> Cleaning and Repairing -> Remove Duplicate Vertices``
-   * ``Filters -> Cleaning and Repairing -> Remove Zero Area Faces``
-   * ``Filters -> Remeshing, Simplification and Reconstruction -> Close Holes``
+   * ``Filters -> Cleaning and Repairing -> Merge Close Vertices``
+
+      * This filter gives the user an option to set an absolute or relative tolerance on the distance between the vertices to merge.
+
+   .. * ``Filters -> Cleaning and Repairing -> Remove Zero Area Faces``
+   .. * ``Filters -> Remeshing, Simplification and Reconstruction -> Close Holes``
 
 3. **Verify the mesh is watertight:**
    
    * Run ``Filters -> Quality Measure and Computations -> Compute Topological Measures`` again
+   * Check that the mesh has no holes
    * Check that the mesh is manifold (no warnings about non-manifold edges)
+   
+      * An STL file with non-manifold edges won't necessarily crash a simulation, but may present other numerical issues.
 
-Using Python with trimesh
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. Using Python with trimesh
+.. ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: python
+.. .. code-block:: python
 
-   import trimesh
+..    import trimesh
 
-   # Load the mesh
-   mesh = trimesh.load('device_combined.stl')
+..    # Load the mesh
+..    mesh = trimesh.load('device_combined.stl')
 
-   # Check if watertight
-   print(f"Is watertight: {mesh.is_watertight}")
-   print(f"Is manifold: {mesh.is_winding_consistent}")
+..    # Check if watertight
+..    print(f"Is watertight: {mesh.is_watertight}")
+..    print(f"Is manifold: {mesh.is_winding_consistent}")
 
-   # Attempt to repair
-   trimesh.repair.fix_normals(mesh)
-   trimesh.repair.fill_holes(mesh)
-   trimesh.repair.fix_inversion(mesh)
+..    # Attempt to repair
+..    trimesh.repair.fix_normals(mesh)
+..    trimesh.repair.fill_holes(mesh)
+..    trimesh.repair.fix_inversion(mesh)
 
-   # Check again
-   print(f"After repair - Is watertight: {mesh.is_watertight}")
+..    # Check again
+..    print(f"After repair - Is watertight: {mesh.is_watertight}")
 
-   # Export repaired mesh
-   mesh.export('device_watertight.stl')
+..    # Export repaired mesh
+..    mesh.export('device_watertight.stl')
 
-Using netfabb or Meshmixer
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Other popular tools for repairing STL files include:
-
-* `Autodesk Meshmixer <https://www.meshmixer.com/>`__: Free tool with analysis and repair features
-* `netfabb <https://www.autodesk.com/products/netfabb/overview>`__: Professional tool with automatic repair
 
 Step 3: Using STL Files in WarpX
 ---------------------------------
@@ -133,7 +137,10 @@ You can also optionally set an electric potential on the embedded boundary:
    # Define electric potential at the embedded boundary (optional)
    warpx.eb_potential(x,y,z,t) = "voltage_function"
 
-For more details on embedded boundary parameters, see :ref:`running-cpp-parameters-eb`.
+For more details on embedded boundary parameters, see:
+
+* `Embedded Boundary Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html#embedded-boundary-conditions:~:text=in%20this%20case.-,Embedded%20Boundary%20Conditions,-%EF%83%81>`__
+* `Embedded Boundary PICMI Input Parameters <https://warpx.readthedocs.io/en/latest/usage/python.html#pywarpx.picmi.EmbeddedBoundary:~:text=Custom%20class%20to,translated%20and%20inverted.>`__
 
 Tips and Best Practices
 ------------------------
@@ -142,14 +149,11 @@ Tips and Best Practices
 * *Scale:* If needed, scale your geometry in your CAD software or mesh editor before exporting
 * *Orientation:* Check that your geometry is properly oriented relative to WarpX's coordinate system
 * *Resolution:* The STL mesh resolution should be appropriate for your simulation - too coarse may miss important features, too fine may slow down initialization
+
+      * It's generally a good idea to simplify your geometery and remove features that are significantly smaller than the WarpX simulation grid
+
 * *Binary vs ASCII:* WarpX can read both binary and ASCII STL files, but binary files are typically smaller and faster to load
 
-Further Reading
----------------
-
-* :ref:`running-cpp-parameters-eb` - Full documentation on embedded boundary parameters
-* `STL file format <https://en.wikipedia.org/wiki/STL_(file_format)>`__ - Wikipedia article on STL format
-* `AMReX Embedded Boundary documentation <https://amrex-codes.github.io/amrex/docs_html/EB.html>`__ - Details on how AMReX handles embedded boundaries
 
 Examples
 --------
