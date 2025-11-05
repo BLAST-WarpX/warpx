@@ -54,11 +54,11 @@ namespace ablastr::constant
 
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m] (variable template)
         template<typename T>
-        constexpr auto ep0_v = static_cast<T>(8.8541878188e-12);
+        constexpr auto epsilon_0_v = static_cast<T>(8.8541878188e-12);
 
         //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m] (variable template)
         //! Note that this is adjusted from the CODATA2022 value, 1.25663706127e-06
-        //! So that the relation between mu0, ep0, and c is exact
+        //! So that the relation between mu0, epsilon_0, and c is exact
         template<typename T>
         constexpr auto mu0_v = static_cast<T>(1.2566370612685e-06);
 
@@ -88,7 +88,7 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto alpha_v = static_cast<T>(0.0072973525643330135);
 
-        //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m] (variable template)
+        //! classical electron radius = 1./(4*pi*epsilon_0) * q_e*q_e/(m_e*c*c) [m] (variable template)
         template<typename T>
         constexpr auto r_e_v = static_cast<T>(2.8179403205e-15);
 
@@ -149,7 +149,7 @@ namespace ablastr::constant
         constexpr auto c = c_v<amrex::Real>;
 
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
-        constexpr auto ep0 = ep0_v<amrex::Real>;
+        constexpr auto epsilon_0 = epsilon_0_v<amrex::Real>;
 
         //! vacuum permeability: magnetic permeability of vacuum = 4.0e-7 * pi [H/m]
         constexpr auto mu0 = mu0_v<amrex::Real>;
@@ -172,10 +172,10 @@ namespace ablastr::constant
         //! fine-structure constant = mu0/(4*pi)*q_e*q_e*c/hbar [dimensionless]
         constexpr auto alpha = alpha_v<amrex::Real>;
 
-        //! classical electron radius = 1./(4*pi*ep0) * q_e*q_e/(m_e*c*c) [m]
+        //! classical electron radius = 1./(4*pi*epsilon_0) * q_e*q_e/(m_e*c*c) [m]
         constexpr auto r_e = r_e_v<amrex::Real>;
 
-        //! xi: nonlinearity parameter of Heisenberg-Euler effective theory = (2.*alpha**2*ep0**2*hbar**3)/(45.*m_e**4*c**5)
+        //! xi: nonlinearity parameter of Heisenberg-Euler effective theory = (2.*alpha**2*epsilon_0**2*hbar**3)/(45.*m_e**4*c**5)
         constexpr double xi = 1.3050122383827227e-52;
 
         //! xi times c2 = xi*c*c. This should be usable for single precision instead of xi; very close to smallest float32 number possible (1.2e-38)

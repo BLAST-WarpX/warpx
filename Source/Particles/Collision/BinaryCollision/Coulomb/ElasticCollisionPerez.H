@@ -74,8 +74,8 @@ void ElasticCollisionPerez (
     T_PR lmdD = T_PR(-1.0);
     if ( L <= T_PR(0.0) ) {
         if (global_lamdb <= T_PR(0.0)) {
-            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
-                                        n2*q2*q2/(T2*PhysConst::ep0) );
+            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::epsilon_0) +
+                                        n2*q2*q2/(T2*PhysConst::epsilon_0) );
         } else {
             lmdD = global_lamdb;
         }
