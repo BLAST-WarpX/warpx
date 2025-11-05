@@ -1,9 +1,9 @@
 .. _dataanalysis-openpmd:
 
-Read OpenPMD Data
+Read openPMD Data
 =================
 
-OpenPMD is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
+openPMD is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
 
 
 .. toctree::
