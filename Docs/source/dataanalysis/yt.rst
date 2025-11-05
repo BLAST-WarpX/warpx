@@ -119,3 +119,5 @@ corresponding notebook tutorials `here <http://yt-project.org/doc/>`__.
 
    plot_parallel
    advanced
+
+In the WarpX repository you can find other examples of visualization scripts, e.g., the serial script :download:`video_yt.py <../../../Tools/PostProcessing/video_yt.py>` and the parallel script :download:`yt3d_mpi.py <../../../Tools/PostProcessing/yt3d_mpi.py>`.
