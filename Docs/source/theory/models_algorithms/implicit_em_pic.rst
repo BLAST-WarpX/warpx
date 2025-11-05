@@ -1,4 +1,4 @@
 .. _theory-implicit-em-pic:
 
-Implicit electromagnetic particle-in-cell method
-================================================
+Implicit electromagnetic PIC
+============================

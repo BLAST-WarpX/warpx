@@ -1,7 +1,7 @@
 .. _theory-explicit-em-pic:
 
-Explicit electromagnetic particle-in-cell method
-================================================
+Explicit electromagnetic PIC
+============================
 
 .. warning::
 
