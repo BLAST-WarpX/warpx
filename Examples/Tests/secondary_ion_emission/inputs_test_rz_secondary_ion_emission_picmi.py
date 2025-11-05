@@ -13,7 +13,6 @@ from scipy.constants import e, elementary_charge, m_e, proton_mass
 from pywarpx import callbacks, particle_containers, picmi
 from pywarpx.LoadThirdParty import load_cupy
 
-xp, _ = load_cupy()
 ##########################
 # numerics parameters
 
@@ -21,7 +20,6 @@ dt = 0.000000075
 
 # --- Nb time steps
 Te = 0.0259  # in eV
-dist_th = xp.sqrt(Te * elementary_charge / m_e)
 
 max_steps = 3
 diagnostic_interval = 1
@@ -36,8 +34,6 @@ zmin = -2
 zmax = 2
 delta_H = 0.4
 E_HMax = 250
-
-xp.random.seed(10025015)
 ##########################
 # numerics components
 ##########################
@@ -139,11 +135,14 @@ sim.add_diagnostic(field_diag)
 sim.initialize_inputs()
 sim.initialize_warpx()
 
+xp, _ = load_cupy()
+dist_th = xp.sqrt(Te * elementary_charge / m_e)
+xp.random.seed(10025015)
+
+
 ##########################
 # python particle data access
 ##########################
-
-
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
