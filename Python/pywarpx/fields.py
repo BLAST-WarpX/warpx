@@ -112,6 +112,7 @@ class MultiFabWrapper(object):
         redistribute_on_remake=True,
     ):
         import warnings
+
         warnings.warn(
             """The fields wrapper is now obsolete and should not be used. The
             recommended way of obtaining the MultiFabs is directly from the register.
