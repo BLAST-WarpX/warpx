@@ -3,25 +3,36 @@
 Fully electromagnetic PIC
 =========================
 
-In the *fully electromagnetic particle-in-cell method* :cite:p:`pt-Birdsalllangdon,pt-HockneyEastwoodBook`,
-the fields are updated using Maxwell's equations.
+In the *fully electromagnetic Particle-In-Cell method* :cite:p:`pt-Birdsalllangdon,pt-HockneyEastwoodBook`,
+the fields are updated using Maxwell's equations:
 
 .. math::
-   \frac{\mathbf{\partial B}}{\partial t} = -\nabla\times\mathbf{E}
+   \frac{\partial B}{\partial t} = -\nabla\times E
    :label: Faraday-1
 
 .. math::
-   \frac{1}{c^2}\frac{\mathbf{\partial E}}{\partial t} = \nabla\times\mathbf{B}-\mu_0\mathbf{J}
+   \frac{1}{c^2}\frac{\partial E}{\partial t} = \nabla\times B-\mu_0 j
    :label: Ampere-1
 
-where :math:`\mathbf{E}` and :math:`\mathbf{B}` are the electric and magnetic field
-components, and :math:`\mathbf{J}` is the current density.
+where :math:`E` and :math:`B` are the electric and magnetic field
+components, and :math:`j` is the current density.
 
-.. warning::
+Because the electromagnetic PIC method retains the full Maxwell equations,
+this method can capture the **physics of the electromagnetic waves**,
+including their propagation and self-consistent interaction with particles.
 
-   TODO: Mention current deposition ; introduce different method.
-   TODO: Mention what physics can be captured, at which cost
-   TODO: Change units
+The electromagnetic PIC method can be run either with an explicit or implicit time integration scheme:
+
+   - In the **explicit integration scheme**, the particles and fields are updated sequentially at each time step
+     (see :ref:`theory-explicit-em-pic`). This integration scheme is simple, but requires a small enough time step
+     size :math:`\Delta t` to ensure the stability of the simulation (e.g., CFL condition :math:`c\Delta t \lessapprox \Delta x`, need to resolve the plasma frequency :math:`\omega_p \Delta t \leq 2`).
+
+   - In the **implicit integration scheme**, the particles and fields are updated simultaneously at each time step, using
+     an iterative solver (see :ref:`theory-implicit-em-pic`). While this integration scheme is more complex, it can use
+     larger time step sizes :math:`\Delta t` and still retain the stability of the simulation. In addition, the implicit
+     integration scheme is exactly energy conserving.
+
+For more details, see the sections below:
 
 .. toctree::
    :maxdepth: 1
