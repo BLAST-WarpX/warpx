@@ -11,22 +11,22 @@ Field and Particle Data
 
 OpenPMD Outputs
 ^^^^^^^^^^^^^^^
-`OpenPMD <https://www.openpmd.org/>`__ is implemented in popular community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
-More details about how to use openPMD outputs with WarpX can be found in :ref:`dataanalysis-openpmd`.
+`OpenPMD <https://www.openpmd.org/>`__ is supported by common community formats such as `ADIOS <https://csmd.ornl.gov/adios>`__ and `HDF5 <https://www.hdfgroup.org/>`__.
+More details about using OpenPMD outputs with WarpX are available in :ref:`dataanalysis-openpmd`.
 
 
 AMReX Plotfiles
 ^^^^^^^^^^^^^^^
 
-`Plotfiles <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ are AMReX' native data format. See :ref:`dataanalysis-yt` for tools to read AMReX plotfiles.
+`Plotfiles <https://amrex-codes.github.io/amrex/docs_html/IO.html>`__ are AMReX's native data format. See :ref:`dataanalysis-yt` for tools to read AMReX plotfiles.
 
 
 Reduced diagnostics
 -------------------
-WarpX includes so-called :ref:`reduced diagnostics <running-cpp-parameters-diagnostics-reduced>`.
-Reduced diagnostics create observables on-the-fly, such as energy histograms or particle beam statistics, and can be :ref:`easily visualized in post-processing <dataanalysis-reduced-diagnostics>`.
+WarpX includes :ref:`reduced diagnostics <running-cpp-parameters-diagnostics-reduced>`.
+Reduced diagnostics compute observables on the fly, such as energy histograms or particle beam statistics, and can be :ref:`easily visualized in post-processing <dataanalysis-reduced-diagnostics>`.
 
-WarpX has optional reduced diagnostics, that typically return one value (e.g., particle energy) per timestep.
+WarpX also provides optional reduced diagnostics that typically return a single value (e.g., particle energy) per time step.
 
 A simple and quick way to read the data using Python is
 
@@ -34,24 +34,23 @@ A simple and quick way to read the data using Python is
 
     data = numpy.genfromtxt("filename.txt")
 
-where ``data`` is a two-dimensional array, ``data[i][j]`` gives the data in the i-th row and the j-th column.
+where ``data`` is a two-dimensional array and ``data[i][j]`` gives the value in the i-th row and j-th column.
 
 
 Asynchronous IO
 ^^^^^^^^^^^^^^^
 
 When using the AMReX `plotfile` format, users can set the ``amrex.async_out=1``
-option to perform the IO in a non-blocking fashion, meaning that the simulation
-will continue to run while an IO thread controls writing the data to disk.
-This can significantly reduce the overall time spent in IO. This is primarily intended for
-large runs on supercomputers (e.g. at OLCF or NERSC); depending on the MPI
-implementation you are using, you may not see a benefit on your workstation.
+option to perform I/O in a non-blocking fashion: the simulation continues while an I/O thread
+writes data to disk. This can significantly reduce the overall time spent in I/O. It is
+primarily intended for large runs on supercomputers (e.g., at OLCF or NERSC); depending on
+your MPI implementation, you may not see a benefit on a workstation.
 
-When writing plotfiles, each rank will write to a separate file, up to some maximum number
-(by default, 64). This maximum can be adjusted using the ``amrex.async_out_nfiles`` inputs
-parameter. To use asynchronous IO with than ``amrex.async_out_nfiles`` MPI ranks, WarpX
-WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
-Please see :ref:`the building instructions <install-developers>` for details.
+When writing plotfiles, each rank writes to a separate file, up to a maximum number (by
+default 64). This maximum can be adjusted using the ``amrex.async_out_nfiles`` input
+parameter. To use asynchronous I/O with more than ``amrex.async_out_nfiles`` MPI ranks,
+WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``. See
+:ref:`the building instructions <install-developers>` for details.
 
 
 Staggering of Output Data
@@ -60,8 +59,8 @@ Staggering of Output Data
 Time
 ^^^^
 
-Warning: currently, quantities in the output file for iteration ``n`` are not all defined at the same physical time due to the staggering in time in WarpX.
-The table below provides the physical time at which each quantity in the output file is written, in units of time step, for time step ``n``.
+Warning: quantities in the output file for iteration ``n`` are not all defined at the same physical time due to temporal staggering in WarpX.
+The table below shows the physical time (in units of time steps) at which each quantity is written for time step ``n``.
 
 ======== ===== =====
 quantity staggering
@@ -78,4 +77,4 @@ momentum n     n
 
 Space
 ^^^^^
-Warning: currently, the field quantities (see `<diag_name>.fields_to_plot` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged on the cell centers.
+Warning: field quantities (see `<diag_name>.fields_to_plot` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged at cell centers.
