@@ -3420,6 +3420,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         """
         return self.extension.warpx.multifab_register()
 
+    @property
+    def particles(self):
+        """
+        This is a convenience property that returns the MultiParticleContainer, allowing
+        easy fetching of the WarpXParticleContainer instances.
+        """
+        return self.extension.warpx.multi_particle_container()
+
 
 # ----------------------------
 # Simulation frame diagnostics

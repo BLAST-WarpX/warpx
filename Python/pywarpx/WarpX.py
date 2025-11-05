@@ -164,6 +164,10 @@ class WarpX(Bucket):
     def fields(self):
         return libwarpx.warpx.multifab_register()
 
+    @property
+    def particles(self):
+        return libwarpx.warpx.multi_particle_container()
+
     def evolve(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
 
