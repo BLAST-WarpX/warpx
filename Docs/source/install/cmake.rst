@@ -6,24 +6,24 @@
 Build from Source
 ===================
 
-`CMake <https://cmake.org>`_ is our primary build system.
-If you are new to CMake, `this short tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`_ from the HEP Software foundation is the perfect place to get started.
-If you just want to use CMake to build the project, jump into sections `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__ and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
+`CMake <https://cmake.org>`__ is our primary build system.
+If you are new to CMake, we recommend starting with `this concise tutorial <https://hsf-training.github.io/hsf-training-cmake-webpage/>`__ from the HEP Software Foundation.
+For those primarily interested in building the project, focus on these key sections: `1. Introduction <https://hsf-training.github.io/hsf-training-cmake-webpage/01-intro/index.html>`__, `2. Building with CMake <https://hsf-training.github.io/hsf-training-cmake-webpage/02-building/index.html>`__, and `9. Finding Packages <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
 .. _install-dependencies:
 
 Install Dependencies
 --------------------
 
-Before you start, you will need a copy of the WarpX source code:
+To begin, obtain a copy of the WarpX source code:
 
 .. code-block:: bash
 
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
    cd $HOME/src/warpx
 
-WarpX depends on popular third party software.
-Find below a list of dependencies and how to install them.
+WarpX relies on several widely-used third-party software packages.
+Below, you'll find instructions for installing these dependencies using various package managers.
 
 .. toctree::
    :hidden:
@@ -37,9 +37,9 @@ Please refer to the :ref:`install-hpc` section.
 
 Install with Conda-Forge
 ^^^^^^^^^^^^^^^^^^^^^^^^
-Conda can be used to install dependencies on Linux, macOS, and Windows.
+Conda provides a convenient way to install dependencies across Linux, macOS, and Windows platforms.
 
-`Conda-Forge <https://conda-forge.org/download/>`__ is a repository for cross-compatible, user-level packages.
+`Conda-forge <https://conda-forge.org/download/>`__ is a community-led collection of recipes, build infrastructure and distributions for the conda package manager, offering cross-platform compatibility at the user level.
 
 .. tip::
 
@@ -106,13 +106,12 @@ More info for `CUDA-enabled ML packages <https://twitter.com/jeremyphoward/statu
 
 Install with Spack
 ^^^^^^^^^^^^^^^^^^
-Spack can be used to install dependencies on Linux and macOS.
+Spack provides another option for installing dependencies on Linux and macOS systems.
 
-`Spack <https://spack.readthedocs.io>`__ is a user-level package manager.
-It is primarily written for Linux, with slightly less support for macOS, and future support for Windows.
+`Spack <https://spack.readthedocs.io>`__ is a flexible, user-level package manager designed primarily for Linux, with growing support for macOS and planned future support for Windows.
 
-First, download a `WarpX Spack desktop development environment <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/machines/desktop>`__ of your choice.
-For most desktop developments, pick the OpenMP environment for CPUs unless you have a supported GPU.
+To begin, download a `WarpX Spack desktop development environment <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/machines/desktop>`__ configuration.
+For most desktop development work, we recommend using the OpenMP environment for CPUs, unless you have a supported GPU device.
 
 * **Debian/Ubuntu** Linux:
 
@@ -252,24 +251,24 @@ Build the Code
 Build the Executable with CMake
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-From the base of the WarpX source directory, execute:
+To build WarpX from the source directory, execute these commands:
 
 .. code-block:: bash
 
-   # find dependencies & configure
-   #   see additional options below, e.g.
-   #                   -DWarpX_PYTHON=ON
-   #                   -DCMAKE_INSTALL_PREFIX=$HOME/sw/warpx
+   # Configure the build system
+   # Additional options available, such as:
+   #   -DWarpX_PYTHON=ON
+   #   -DCMAKE_INSTALL_PREFIX=$HOME/sw/warpx
    cmake -S . -B build
 
-   # compile, here we use four threads
+   # Compile using four parallel threads
    cmake --build build -j 4
 
 **That's it!**
-A 3D WarpX binary is now in ``build/bin/`` and :ref:`can be run <usage_run>` with a :ref:`3D example inputs file <usage-examples>`.
-Most people execute the binary directly or copy it out.
+The 3D WarpX binary is now available in ``build/bin/`` and is ready to :ref:`run <usage_run>` with any :ref:`3D example input file <usage-examples>`.
+You can either run the binary directly from this location or copy it to another directory.
 
-If you want to install the executables in a programmatic way, run this:
+For a system-wide installation, use the following command:
 
 .. code-block:: bash
 
@@ -305,7 +304,7 @@ Build the Python Interface with CMake
 
 .. note::
 
-   Preparation: make sure you work with up-to-date Python tooling.
+   First, ensure your Python development environment is up-to-date:
 
    .. code-block:: bash
 
@@ -314,15 +313,14 @@ Build the Python Interface with CMake
       python3 -m pip install -U cmake
       python3 -m pip install -r requirements.txt
 
-For PICMI Python bindings, configure WarpX to produce a library and call our ``pip_install`` *CMake target*:
+To build the PICMI Python bindings, configure WarpX to generate a library and install it using our ``pip_install`` *CMake target*:
 
 .. code-block:: bash
 
-   # find dependencies & configure for all WarpX dimensionalities
+   # Configure with all WarpX dimensionalities and Python support enabled
    cmake -S . -B build_py -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE" -DWarpX_PYTHON=ON
 
-
-   # build and then call "python3 -m pip install ..."
+   # Build and install the Python package
    cmake --build build_py --target pip_install -j 4
 
 **That's it!**
@@ -366,15 +364,15 @@ Build Options
 Configure your Compiler
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-If you don't want to use your default compiler, you can set the following environment variables.
-For example, using a Clang/LLVM:
+To use a specific compiler instead of the system default, set the appropriate environment variables.
+For instance, to use Clang/LLVM:
 
 .. code-block:: bash
 
    export CC=$(which clang)
    export CXX=$(which clang++)
 
-If you also want to select a CUDA compiler:
+For CUDA development, specify both the CUDA compiler and the host C++ compiler:
 
 .. code-block:: bash
 
