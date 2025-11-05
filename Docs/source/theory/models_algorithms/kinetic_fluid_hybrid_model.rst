@@ -24,32 +24,32 @@ The "Model derivation" section below gives a detailed description of the model
 that follows mostly from the above reference, but succinctly, the model
 entails the following:
 
-The magnetostatic form of Ampere's law is used to calculated the total plasma
-current (:math:`\vec{J}`) from the magnetic field,
+The magnetic field is advanced in time using Faraday's law,
 
     .. math::
 
-        \mu_0\vec{J} = \vec{\nabla}\times\vec{B}.
+        \frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E},
 
-The total current, ion current (obtained from kinetic ion macro-particles), and
-any externally specified currents are combined to get the electron current,
-
-    .. math::
-
-        \vec{J}_e = \vec{J} - \sum_{s\neq e}\vec{J}_s - \vec{J}_{ext}.
-
-The currents, magnetic field, and electron pressure (for which an additional closure is required,
-see :ref:`here <theory-hybrid-model-elec-temp>`) are then used to calculate the electric field using Ohm's law:
+where the electric field is calculated from Ohm's law which involves the currents,
+the magnetic field, and the electron pressure (for which an additional closure is required,
+see :ref:`here <theory-hybrid-model-elec-temp>`),
 
     .. math::
 
         \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
 
-Finally, the magnetic field is advanced in time using Faraday's law:
+The electron current is in turn obtained by subtracting the ion current (obtained from
+kinetic ion macro-particles) from the total current (obtained from Ampere's law):
 
     .. math::
 
-        \frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E}.
+        \vec{J}_e = \vec{J} - \sum_{s\neq e}\vec{J}_s - \vec{J}_{ext}
+
+where
+
+    .. math::
+
+        \mu_0\vec{J} = \vec{\nabla}\times\vec{B}.
 
 Algorithm details
 -----------------
