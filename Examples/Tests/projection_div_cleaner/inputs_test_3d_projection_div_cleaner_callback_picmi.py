@@ -7,7 +7,7 @@ import scipy.constants as con
 from mpi4py import MPI as mpi
 from scipy.special import ellipe, ellipk
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 constants = picmi.constants
 
@@ -199,9 +199,9 @@ class ProjectionDivCleanerTest(object):
 def load_current_ring():
     curr_loop = CurrentLoop(radius=0.75)
 
-    Bx = fields.BxFPExternalWrapper()
-    By = fields.ByFPExternalWrapper()
-    Bz = fields.BzFPExternalWrapper()
+    Bx = simulation.fields.get("Bfield_fp_external", dir="x", level=0)
+    By = simulation.fields.get("Bfield_fp_external", dir="y", level=0)
+    Bz = simulation.fields.get("Bfield_fp_external", dir="z", level=0)
 
     Bx[(), (), ()] = curr_loop(Bx, coord="x")
 
@@ -218,9 +218,9 @@ simulation.step()
 ##############################################
 # Post load image generation and error check #
 ##############################################
-Bxg = fields.BxWrapper()
-Byg = fields.ByWrapper()
-Bzg = fields.BzWrapper()
+Bxg = simulation.fields.get("Bfield_aux", dir="x", level=0)
+Byg = simulation.fields.get("Bfield_aux", dir="y", level=0)
+Bzg = simulation.fields.get("Bfield_aux", dir="z", level=0)
 
 Bx_local = Bxg[(), (), ()]
 By_local = Byg[(), (), ()]

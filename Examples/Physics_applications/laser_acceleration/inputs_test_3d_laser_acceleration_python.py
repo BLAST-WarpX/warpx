@@ -13,10 +13,12 @@ sim.load_inputs_file("./inputs_test_3d_laser_acceleration")
 # Optional: Define callbacks, e.g., after every step
 @callfromafterstep
 def my_simple_callback():
-    """This simple callback uses high-level wrappers in WarpX.
-    https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#high-level-field-wrapper
+    """This simple callback uses particle container and MultiFab objects,
+    https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#particles
+    and
+    https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#fields
     """
-    from pywarpx import fields, particle_containers
+    from pywarpx import particle_containers
 
     print("  my_simple_callback")
 
@@ -25,7 +27,7 @@ def my_simple_callback():
     print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)
-    Ex = fields.ExWrapper(level=0)
+    Ex = sim.fields.get("Efield_fp", dir="x", level=0)
     print(f"    {Ex}")
 
 
@@ -50,8 +52,7 @@ def my_advanced_callback():
     print(f"    {electrons_pc}")
 
     # electric field: access (and potentially manipulate)
-    multifab_register = warpx.multifab_register()
-    Ex_mf = multifab_register.get("Efield_fp", dir="x", level=0)
+    Ex_mf = sim.fields.get("Efield_fp", dir="x", level=0)
     print(f"    {Ex_mf}")
 
 

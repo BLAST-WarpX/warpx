@@ -16,7 +16,7 @@ import numpy as np
 import scipy.constants as scc
 from mpi4py import MPI as mpi
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 from pywarpx.callbacks import installafterEsolve, installafterInitEsolve
 from pywarpx.particle_containers import ParticleBoundaryBufferWrapper
 
@@ -49,15 +49,14 @@ class SpaceChargeFieldCorrector(object):
 
         # Correct fields so as to recover the actual charge
         warpx = sim.extension.warpx
-        multifab_register = warpx.multifab_register()
-        Er = multifab_register.get("Efield_fp", dir="r", level=0)
-        normalized_Er = multifab_register.get("normalized_Er", level=0)
+        Er = sim.fields.get("Efield_fp", dir="r", level=0)
+        normalized_Er = sim.fields.get("normalized_Er", level=0)
         Er.saxpy(q - q_v, normalized_Er, 0, 0, 1, 0)
-        Ez = multifab_register.get("Efield_fp", dir="z", level=0)
-        normalized_Ez = multifab_register.get("normalized_Ez", level=0)
+        Ez = sim.fields.get("Efield_fp", dir="z", level=0)
+        normalized_Ez = sim.fields.get("normalized_Ez", level=0)
         Ez.saxpy(q - q_v, normalized_Ez, 0, 0, 1, 0)
-        phi = multifab_register.get("phi_fp", level=0)
-        normalized_phi = multifab_register.get("normalized_phi", level=0)
+        phi = sim.fields.get("phi_fp", level=0)
+        normalized_phi = sim.fields.get("normalized_phi", level=0)
         phi.saxpy(q - q_v, normalized_phi, 0, 0, 1, 0)
 
         self.spacecraft_potential += (q - q_v) * self.spacecraft_capacitance
@@ -75,35 +74,47 @@ class SpaceChargeFieldCorrector(object):
         q_v = compute_virtual_charge_on_spacecraft()
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
-        warpx = sim.extension.warpx
-        multifab_register = warpx.multifab_register()
-
-        phi = multifab_register.get("phi_fp", level=0)
-        Er = multifab_register.get("Efield_fp", dir="r", level=0)
-        Ez = multifab_register.get("Efield_fp", dir="z", level=0)
+        phi = sim.fields.get("phi_fp", level=0)
+        Er = sim.fields.get("Efield_fp", dir="r", level=0)
+        Ez = sim.fields.get("Efield_fp", dir="z", level=0)
         # Allocate the fields `normalized_Er`, `normalized_Ez`, and `normalized_phi
         # in WarpX's multifab register. This allows to get these fields at later
-        # iterations with multifab_register.get( ... ).
+        # iterations with sim.fields.get( ... ).
         # These new fields are automatically redistributed when doing load balancing.
-        normalized_Er = fields.MultiFabWrapper(
-            create_new=True,
-            mf_name="normalized_Er",
+        normalized_Er = sim.fields.alloc_init(
+            name="normalized_Er",
+            level=0,
             ba=Er.box_array(),
+            dm=Er.dm(),
+            ncomp=Er.n_comp,
             ngrow=Er.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
         )
 
-        normalized_Ez = fields.MultiFabWrapper(
-            create_new=True,
-            mf_name="normalized_Ez",
+        normalized_Ez = sim.fields.alloc_init(
+            name="normalized_Ez",
+            level=0,
             ba=Ez.box_array(),
+            dm=Ez.dm(),
+            ncomp=Ez.n_comp,
             ngrow=Ez.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
         )
 
-        normalized_phi = fields.MultiFabWrapper(
-            create_new=True,
-            mf_name="normalized_phi",
+        normalized_phi = sim.fields.alloc_init(
+            name="normalized_phi",
+            level=0,
             ba=phi.box_array(),
+            dm=phi.dm(),
+            ncomp=phi.n_comp,
             ngrow=phi.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
         )
 
         # Record fields
@@ -127,9 +138,8 @@ def compute_virtual_charge_on_spacecraft():
     that WarpX thinks there should be on the spacecraft.
     """
     warpx = sim.extension.warpx
-    multifab_register = warpx.multifab_register()
-    rho = multifab_register.get("rho_fp", level=0)
-    phi = multifab_register.get("phi_fp", level=0)
+    rho = sim.fields.get("rho_fp", level=0)
+    phi = sim.fields.get("phi_fp", level=0)
 
     dr, dz = warpx.Geom(lev=0).data().CellSize()
 
