@@ -7,7 +7,7 @@ WarpX is an advanced **Particle-In-Cell** code.
 
 It supports many features including:
 
-    - Multiple types of field solvers (incl. for `Maxwell's equations <https://warpx.readthedocs.io/en/latest/theory/pic.html#field-solve>`__, Poisson's equation, and `Maxwell-Ampere coupled with Ohm's law <https://warpx.readthedocs.io/en/latest/theory/kinetic_fluid_hybrid_model.html>`__)
+    - Multiple types of field solvers (incl. for :ref:`Maxwell's equations <theory-em-pic>`, Poisson's equation, and :ref:`Ampere's law coupled with Ohm's law <theory-kinetic-fluid-hybrid-model>`)
     - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic, fusion and collisional physics, as well as quantum electrodynamics)
     - Advanced numerical methods (incl. explicit and implicit time advance, mesh refinement, boosted-frame simulations, embedded boundaries, pseudo-spectral solvers)
@@ -27,13 +27,11 @@ In addition, WarpX is a *highly-parallel and highly-optimized code*:
 Contact us
 ^^^^^^^^^^
 
-If you are starting using WarpX, or if you have a user question, please pop in our `discussions page <https://github.com/BLAST-WarpX/warpx/discussions>`__ and get in touch with the community.
+The `WarpX GitHub repository <https://github.com/BLAST-WarpX/warpx>`__ is the main communication platform:
 
-The `WarpX GitHub repo <https://github.com/BLAST-WarpX/warpx>`__ is the main communication platform.
-Have a look at the action icons on the top right of the web page: feel free to watch the repo if you want to receive updates, or to star the repo to support the project.
-For bug reports or to request new features, you can also open a new `issue <https://github.com/BLAST-WarpX/warpx/issues>`__.
-
-We also have a `discussion page <https://github.com/BLAST-WarpX/warpx/discussions>`__ on which you can find already answered questions, add new questions, get help with installation procedures, discuss ideas or share comments.
+   - If you are new to WarpX or have a question, we encourage you to visit our `discussions page <https://github.com/BLAST-WarpX/warpx/discussions>`__ and connect with the community. This page is also a great place to browse answers to previously asked questions, post new ones, get help with installation, exchange ideas, and share feedback.
+   - You can also explore the icons in the upper right corner of the `WarpX GitHub repository <https://github.com/BLAST-WarpX/warpx>`__ (e.g., ``Watch``, ``Star``, etc.): feel free to watch the repository if you want to receive updates, or to star the repository to support the project.
+   - For bug reports, feature requests, or installation issues, you can also open a new `issue <https://github.com/BLAST-WarpX/warpx/issues>`__.
 
 .. raw:: html
 
@@ -82,8 +80,8 @@ Usage
 
    usage/how_to_run
    usage/examples
-   usage/python
    usage/parameters
+   usage/python
    usage/workflows
    usage/faq
 
@@ -104,14 +102,10 @@ Data Analysis
    :hidden:
 
    dataanalysis/formats
+   dataanalysis/openpmd
    dataanalysis/yt
-   dataanalysis/openpmdviewer
-   dataanalysis/openpmdapi
-   dataanalysis/paraview
-   dataanalysis/visit
-   dataanalysis/visualpic
-   dataanalysis/picviewer
-   dataanalysis/reduced_diags
+   dataanalysis/3dvisualizations
+   dataanalysis/insitu
    dataanalysis/workflows
 
 Theory
@@ -120,15 +114,9 @@ Theory
    :caption: THEORY
    :maxdepth: 1
    :hidden:
+   :titlesonly:
 
    theory/intro
-   theory/pic
-   theory/amr
-   theory/boundary_conditions
-   theory/boosted_frame
-   theory/multiphysics_extensions
-   theory/kinetic_fluid_hybrid_model
-   theory/cold_fluid_model
 
 Development
 -----------

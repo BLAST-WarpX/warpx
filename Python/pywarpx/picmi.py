@@ -905,6 +905,17 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
             )
 
 
+class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
+    def init(self, kw):
+        pass
+
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        species.add_new_group_attr(source_name, "injection_style", "external_file")
+        species.add_new_group_attr(source_name, "injection_file", self.file_path)
+
+
 class ParticleDistributionPlanarInjector(
     picmistandard.PICMI_ParticleDistributionPlanarInjector
 ):
@@ -1862,10 +1873,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Minimum density used in Ohm's law calculation.
 
     plasma_resistivity: float or str
-        Value or expression to use for the plasma resistivity.
+        Value or expression to use for the plasma resistivity in Ohm*m.
+        Can be a constant value or an expression depending on ``rho`` (charge density)
+        and ``J`` (current density magnitude).
 
     plasma_hyper_resistivity: float or str
-        Value or expression to use for the plasma hyper-resistivity.
+        Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
+        Can be a constant value or an expression depending on ``rho`` (charge density)
+        and ``B`` (magnetic field magnitude).
 
     substeps: int, default=100
         Number of substeps to take when updating the B-field.
@@ -1879,32 +1894,37 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     A_external: dict
         Function of space and time specifying external (non-plasma) vector potential fields.
-        It is expected that a nested dicitonary will be passed
-        into picmi for each field that has different timings
-        e.g.
-        A_external = {
-            '<field_name1>': {
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ay_external_function': <implicit function with (x,y,z) dependence>,
-                'Az_external_function': <implicit function with (x,y,z) dependence>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
-
-        or if fields are to be loaded from an OpenPMD file
-        A_external = {
-            '<field_name1>': {
-                'load_from_file': True,
-                'path': <path to OpenPMD file>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
+        It is expected that a nested dictionary will be passed in for each separate vector potential that may have
+        different spatial configuration or time dependence. Each field entry should contain either implicit functions
+        with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function',
+        'Az_external_function', plus 'A_time_external_function' with (t) dependence, or
+        alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with
+        'A_time_external_function'.
 
     do_external_diva_cleaning: bool (default=True)
         This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
         external A with periodic field boundary conditions.
+
+    Notes
+    -----
+    **Required Parameters:**
+
+    - ``Te`` must be specified when using the hybrid solver.
+    - ``n0`` should be specified if ``gamma != 1``.
+
+    **Best Practices:**
+
+    - *Grid type:* Setting ``warpx_grid_type='collocated'`` is recommended.
+    - *Particle shape:* Linear particles (``algo.particle_shape = 1``) are recommended.
+
+    **Constraints and Limitations:**
+
+    - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if more than one level is used.
+    - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
+    - *External vector potential:* If ``A_external`` is provided, it must be non-empty.
+    - *Time-dependent A fields:* When using expressions for external vector potentials, time variation must be specified via ``A_time_external_function``, not directly in the ``A[x,y,z]_external_function`` expressions.
+
+    For complete parameter documentation, see the `Input Parameters section <https://warpx.readthedocs.io/en/latest/usage/parameters.html#maxwell-solver-kinetic-fluid-hybrid>`_.
     """
 
     def __init__(
@@ -3391,6 +3411,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.warpx_initialized:
             self.warpx_initialized = False
             pywarpx.warpx.finalize()
+
+    @property
+    def fields(self):
+        """
+        This is a convenience property that returns the MultiFab registry, allowing
+        easy fetching of the MultiFabs.
+        """
+        return self.extension.warpx.multifab_register()
 
 
 # ----------------------------
