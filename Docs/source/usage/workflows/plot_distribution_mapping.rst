@@ -1,7 +1,7 @@
 Visualizing a distribution mapping
 ==================================
 
-WarpX provides via :ref:`reduced diagnostics <dataanalysis-reduced-diagnostics>` an output
+WarpX provides via :ref:`reduced diagnostics <dataanalysis-formats-reduced>` an output
 :ref:`LoadBalanceCosts <running-cpp-parameters-diagnostics>`, which
 allows for visualization of a simulation's distribution mapping and computational
 costs. Here we demonstrate the workflow for generating this data and using it to
