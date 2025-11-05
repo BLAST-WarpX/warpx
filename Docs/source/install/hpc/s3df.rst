@@ -39,6 +39,114 @@ Use the following command to download the WarpX source code:
 
 .. _building-s3df-init:
 
+On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CPU nodes.
+
+.. tab-set::
+
+   .. tab-item:: A100 GPUs
+
+      We use system software modules, add environment hints and further dependencies via the file ``$HOME/s3df_gpu_warpx.profile``.
+      Create it now:
+
+      .. code-block:: bash
+
+         cp $HOME/src/warpx/Tools/machines/s3df-slac/s3df_gpu_warpx.profile.example $HOME/s3df_gpu_warpx.profile
+
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
+
+         .. literalinclude:: ../../../../Tools/machines/s3df-slac/s3df_gpu_warpx.profile.example
+            :language: bash
+
+      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+      Perlmutter GPU projects must end in ``..._g``.
+      For example, if you are member of the project ``m3239``, then run ``nano $HOME/perlmutter_gpu_warpx.profile`` and edit line 2 to read:
+
+      .. code-block:: bash
+
+         export proj="m3239_g"
+
+      Exit the ``nano`` editor with ``Ctrl`` + ``O`` (save) and then ``Ctrl`` + ``X`` (exit).
+
+      .. important::
+
+         Now, and as the first step on future logins to Perlmutter, activate these environment settings:
+
+         .. code-block:: bash
+
+            source $HOME/perlmutter_gpu_warpx.profile
+
+      Finally, since Perlmutter does not yet provide software modules for some of our dependencies, install them once:
+
+      .. code-block:: bash
+
+         bash $HOME/src/warpx/Tools/machines/perlmutter-nersc/install_gpu_dependencies.sh
+         source ${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx/bin/activate
+
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
+
+         .. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/install_gpu_dependencies.sh
+            :language: bash
+
+
+   .. tab-item:: CPU Nodes
+
+      We use system software modules, add environment hints and further dependencies via the file ``$HOME/s3df_cpu_warpx.profile``.
+      Create it now:
+
+      .. code-block:: bash
+
+         cp $HOME/src/warpx/Tools/machines/s3df-slac/s3df_cpu_warpx.profile.example $HOME/s3df_cpu_warpx.profile
+
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
+
+         .. literalinclude:: ../../../../Tools/machines/s3df-slac/s3df_cpu_warpx.profile.example
+            :language: bash
+
+      Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
+      For example, if you are member of the project ``m3239``, then run ``nano $HOME/perlmutter_cpu_warpx.profile`` and edit line 2 to read:
+
+      .. code-block:: bash
+
+         export proj="m3239"
+
+      Exit the ``nano`` editor with ``Ctrl`` + ``O`` (save) and then ``Ctrl`` + ``X`` (exit).
+
+      .. important::
+
+         Now, and as the first step on future logins to Perlmutter, activate these environment settings:
+
+         .. code-block:: bash
+
+            source $HOME/perlmutter_cpu_warpx.profile
+
+      Finally, since Perlmutter does not yet provide software modules for some of our dependencies, install them once:
+
+      .. code-block:: bash
+
+         bash $HOME/src/warpx/Tools/machines/perlmutter-nersc/install_cpu_dependencies.sh
+         source ${CFS}/${proj}/${USER}/sw/perlmutter/cpu/venvs/warpx/bin/activate
+
+      .. dropdown:: Script Details
+         :color: light
+         :icon: info
+         :animate: fade-in-slide-down
+
+         .. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/install_cpu_dependencies.sh
+            :language: bash
+
+
+.. _building-perlmutter-compilation:
+
+
 Compilation
 -----------
 
