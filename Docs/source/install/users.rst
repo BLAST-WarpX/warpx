@@ -102,7 +102,7 @@ See ``spack info warpx`` and `the official Spack tutorial <https://spack-tutoria
 Using the PyPI Package
 ----------------------
 
-If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX (with PICMI) from source :ref:`from source <install-build-cmake>`:
+If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you can use ``pip`` to install WarpX (with PICMI) :ref:`from source <install-build-cmake>`:
 
 .. code-block:: bash
 

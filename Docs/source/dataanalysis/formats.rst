@@ -42,6 +42,8 @@ A simple and quick way to read the data using Python is
 
 where ``data`` is a two-dimensional array and ``data[i][j]`` gives the value in the i-th row and j-th column.
 
+Note that, while this applies to most reduced diagnostics, there are a few that require openPMD, such as ``ParticleHistogram2D`` and ``DifferentialLuminosity2D``.
+
 
 Asynchronous IO
 ^^^^^^^^^^^^^^^
@@ -86,4 +88,4 @@ Space
 
 .. warning::
 
-   Field quantities (see `<diag_name>.fields_to_plot` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged at cell centers.
+   Field quantities (see ``<diag_name>.fields_to_plot`` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged at cell centers.
