@@ -58,7 +58,7 @@ pyAMReX
 -------
 
 The Python interface to WarpX is provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
-After the simulation is initialized, the pyAMReX module if needed can be accessed via
+After the simulation is initialized, the pyAMReX module can be accessed (if needed) via
 
 .. code-block:: python
 
