@@ -134,9 +134,13 @@ class LibWarpX:
         from .extensions.MultiFabRegister import (
             register_warpx_MultiFabRegister_extension,
         )
+        from .extensions.WarpXParticleContainer import (
+            register_warpx_WarpXParticleContainer_extension,
+        )
 
         register_warpx_MultiFab_extension(self.amr)
         register_warpx_MultiFabRegister_extension(self.libwarpx_so)
+        register_warpx_WarpXParticleContainer_extension(self.libwarpx_so)
 
     def amrex_init(self, argv, mpi_comm=None):
         if mpi_comm is None:  # or MPI is None:
