@@ -18,12 +18,10 @@ def my_simple_callback():
     and
     https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#fields
     """
-    from pywarpx import particle_containers
-
     print("  my_simple_callback")
 
     # electrons: access (and potentially manipulate)
-    electrons = particle_containers.ParticleContainerWrapper("electrons")
+    electrons = sim.particles.get("electrons")
     print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)
@@ -46,10 +44,10 @@ def my_advanced_callback():
     warpx = sim.extension.warpx
 
     # electrons: access (and potentially manipulate)
-    electrons_pc = warpx.multi_particle_container().get_particle_container_from_name(
+    electrons = warpx.multi_particle_container().get_particle_container_from_name(
         "electrons"
     )
-    print(f"    {electrons_pc}")
+    print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)
     Ex_mf = sim.fields.get("Efield_fp", dir="x", level=0)

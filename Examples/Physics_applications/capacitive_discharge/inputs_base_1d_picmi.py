@@ -11,7 +11,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
-from pywarpx import callbacks, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
@@ -410,13 +410,11 @@ class CapacitiveDischargeExample(object):
             return
 
         if not hasattr(self, "neutral_cont"):
-            self.neutral_cont = particle_containers.ParticleContainerWrapper(
-                self.neutrals.name
-            )
+            self.neutral_particles = self.sim.particles.get(self.neutrals.name)
 
-        ux_arrays = self.neutral_cont.uxp
-        uy_arrays = self.neutral_cont.uyp
-        uz_arrays = self.neutral_cont.uzp
+        ux_arrays = self.neutral_particles.uxp
+        uy_arrays = self.neutral_particles.uyp
+        uz_arrays = self.neutral_particles.uzp
 
         xp, _ = load_cupy()
 
@@ -429,8 +427,8 @@ class CapacitiveDischargeExample(object):
 
     def _get_rho_ions(self):
         # deposit the ion density in rho_fp
-        he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-        he_ions_wrapper.deposit_charge_density(level=0)
+        he_ions = self.sim.particles.get("he_ions")
+        he_ions.deposit_charge_density(level=0)
 
         rho_data = self.rho_wrapper[...]
         self.ion_density_array += rho_data / constants.q_e / self.diag_steps
@@ -453,9 +451,9 @@ class CapacitiveDischargeExample(object):
         # query the particle z-coordinates if this is run during CI testing
         # to cover that functionality
         if self.test:
-            he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-            nparts = he_ions_wrapper.get_particle_count(local=True)
-            z_coords = np.concatenate(he_ions_wrapper.zp)
+            he_ions = self.sim.particles.get("he_ions")
+            nparts = he_ions.get_particle_count(local=True)
+            z_coords = np.concatenate(he_ions.zp)
             assert len(z_coords) == nparts
             assert np.all(z_coords >= 0.0) and np.all(z_coords <= self.gap)
 

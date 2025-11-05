@@ -15,7 +15,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 constants = picmi.constants
 
@@ -315,12 +315,8 @@ class HybridPICBeamInstability(object):
 
         # create particle container wrapper for the ion species to access
         # particle data
-        self.ion_container_wrapper = particle_containers.ParticleContainerWrapper(
-            self.ions.name
-        )
-        self.beam_ion_container_wrapper = particle_containers.ParticleContainerWrapper(
-            self.beam_ions.name
-        )
+        self.ion_container = self.sim.particles.get(self.ions.name)
+        self.beam_ion_container = self.sim.particles.get(self.beam_ions.name)
 
     def _create_data_arrays(self):
         self.prev_time = time.time()
@@ -347,8 +343,8 @@ class HybridPICBeamInstability(object):
 
         status_dict = {
             "step": step,
-            "nplive beam ions": self.ion_container_wrapper.nps,
-            "nplive ions": self.beam_ion_container_wrapper.nps,
+            "nplive beam ions": self.ion_container.size,
+            "nplive ions": self.beam_ion_container.size,
             "wall_time": wall_time,
             "step_rate": step_rate,
             "diag_steps": self.diag_steps,
@@ -383,8 +379,8 @@ class HybridPICBeamInstability(object):
             self._create_data_arrays()
 
         # get the simulation energies
-        Ec_par, Ec_perp = self._get_kinetic_energy(self.ion_container_wrapper)
-        Eb_par, Eb_perp = self._get_kinetic_energy(self.beam_ion_container_wrapper)
+        Ec_par, Ec_perp = self._get_kinetic_energy(self.ion_container)
+        Eb_par, Eb_perp = self._get_kinetic_energy(self.beam_ion_container)
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return
