@@ -28,10 +28,8 @@ void UpdateMomentumVay(
     // Constants
     const amrex::ParticleReal econst = q*dt/m;
     const amrex::ParticleReal bconst = 0.5_prt*q*dt/m;
-    constexpr amrex::ParticleReal invclight = 1._prt/PhysConst::c;
-    constexpr amrex::ParticleReal invclightsq = 1._prt/(PhysConst::c*PhysConst::c);
     // Compute initial gamma
-    const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*invclightsq);
+    const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*PhysConst::inv_c2_v<amrex::ParticleReal>);
     // Get tau
     const amrex::ParticleReal taux = bconst*Bx;
     const amrex::ParticleReal tauy = bconst*By;
@@ -41,9 +39,9 @@ void UpdateMomentumVay(
     const amrex::ParticleReal uxpr = ux + econst*Ex + (uy*tauz-uz*tauy)*inv_gamma;
     const amrex::ParticleReal uypr = uy + econst*Ey + (uz*taux-ux*tauz)*inv_gamma;
     const amrex::ParticleReal uzpr = uz + econst*Ez + (ux*tauy-uy*taux)*inv_gamma;
-    const amrex::ParticleReal gprsq = (1._prt + (uxpr*uxpr + uypr*uypr + uzpr*uzpr)*invclightsq);
+    const amrex::ParticleReal gprsq = (1._prt + (uxpr*uxpr + uypr*uypr + uzpr*uzpr)*PhysConst::inv_c2_v<amrex::ParticleReal>);
     // Get u*
-    const amrex::ParticleReal ust = (uxpr*taux + uypr*tauy + uzpr*tauz)*invclight;
+    const amrex::ParticleReal ust = (uxpr*taux + uypr*tauy + uzpr*tauz)*PhysConst::inv_c_v<amrex::ParticleReal>;
     // Get new gamma
     const amrex::ParticleReal sigma = gprsq-tausq;
     const amrex::ParticleReal gisq = 2._prt/(sigma + std::sqrt(sigma*sigma + 4._prt*(tausq + ust*ust)) );

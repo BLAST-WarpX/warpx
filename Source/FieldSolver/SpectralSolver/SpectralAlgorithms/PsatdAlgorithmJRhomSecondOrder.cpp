@@ -191,7 +191,7 @@ PsatdAlgorithmJRhomSecondOrder::pushSpectralFields (SpectralFieldData& f) const
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 
             // These coefficients are initialized in the function InitializeSpectralCoefficients
@@ -388,7 +388,7 @@ void PsatdAlgorithmJRhomSecondOrder::InitializeSpectralCoefficients (
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
 
             const amrex::Real dt2 = amrex::Math::powi<2>(dt);
 
@@ -500,7 +500,7 @@ void PsatdAlgorithmJRhomSecondOrder::InitializeSpectralCoefficientsAveraging (
 #endif
             // Physical constants and imaginary unit
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
 
             // Auxiliary coefficients
             const amrex::Real dt2 = dt * dt;

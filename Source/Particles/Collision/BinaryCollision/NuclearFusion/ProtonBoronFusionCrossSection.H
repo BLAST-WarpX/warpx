@@ -44,9 +44,9 @@ amrex::ParticleReal ProtonBoronFusionCrossSectionTentori (const amrex::ParticleR
     constexpr amrex::ParticleReal m_reduced = m_boron / (one_pr + m_boron/m_hydrogen);
     constexpr amrex::ParticleReal gamow_factor = m_reduced / 2._prt *
                         (PhysConst::q_e*PhysConst::q_e * Z_boron /
-                           (2._prt*PhysConst::ep0*PhysConst::hbar)) *
+                           (2._prt*PhysConst::epsilon_0*PhysConst::hbar)) *
                         (PhysConst::q_e*PhysConst::q_e * Z_boron /
-                           (2._prt*PhysConst::ep0*PhysConst::hbar)) *
+                           (2._prt*PhysConst::epsilon_0*PhysConst::hbar)) *
                         joule_to_MeV;
 
     // Compute astrophysical factor, in MeV barn, using the fits
