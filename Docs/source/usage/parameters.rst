@@ -17,6 +17,488 @@ Examples of input files can be found in the :ref:`Examples <usage-examples>` sec
 
 .. _running-cpp-parameters-overall:
 
+
+Geometry
+--------
+
+* ``geometry.dims`` (`string`)
+    The dimensions of the simulation geometry.
+    Supported values are ``1``, ``2``, ``3``, ``RZ``, ``RCYLINDER``, and ``RSPHERE``.
+
+    * For ``3``, a cartesian geometry of ``x``, ``y``, ``z`` is modeled.
+    * For ``2``, a cartesian geometry with the axes ``x`` and ``z`` and all physics in ``y`` is assumed to be translation symmetric.
+    * For ``1``, a cartesian geometry with the axis ``z`` and the dimensions ``x`` and ``y`` are translation symmetric.
+    * For ``RZ``, a cylindrical geometry with the axis ``r`` and ``z``, with an azimuthal mode decomposition, with ``warpx.n_rz_azimuthal_modes`` providing further control.
+    * For ``RCYLINDER``, a cylindrical geometry with the axis ``r``, invariant in ``theta`` and ``z``.
+    * For ``RSPHERE``, a spherical geometry with the axis ``r``, invariant in ``theta`` and ``phi``. The polar angle ``phi`` is relative to the ``x-y`` plane.
+
+    Note that this value must be consistent with the :ref:`WarpX_DIMS <install-build-options>` compile-time option.
+    If you installed WarpX from a :ref:`package manager <install-methods>`, then pick the right executable by name.
+
+* ``geometry.prob_lo`` and ``geometry.prob_hi`` (`2 floats in 2D`, `3 floats in 3D`; in meters)
+    The extent of the full simulation box. This box is rectangular, and thus its
+    extent is given here by the coordinates of the lower corner (``geometry.prob_lo``) and
+    upper corner (``geometry.prob_hi``). The first axis of the coordinates is x
+    (or r with cylindrical) and the last is z.
+
+* ``warpx.n_rz_azimuthal_modes`` (`integer`; 1 by default)
+    When using the RZ version, this is the number of azimuthal modes.
+    The default is ``1``, which corresponds to a perfectly axisymmetric simulation.
+
+
+Mesh
+----
+
+* ``amr.n_cell`` (`2 integers in 2D`, `3 integers in 3D`)
+    The number of grid points along each direction (on the **coarsest level**)
+
+
+Domain decomposition
+--------------------
+
+* ``warpx.numprocs`` (`2 ints` for 2D, `3 ints` for 3D) optional (default `none`)
+    This optional parameter can be used to control the domain decomposition on the
+    coarsest level. The domain will be chopped into the exact number of pieces in each
+    dimension as specified by this parameter. If it's not specified, the domain
+    decomposition will be determined by the parameters that will be discussed below.  If
+    specified, the product of the numbers must be equal to the number of MPI processes.
+
+* ``amr.max_grid_size`` (`integer`) optional (default `128`)
+    Maximum allowable size of each **subdomain**
+    (expressed in number of grid points, in each direction).
+    Each subdomain has its own ghost cells, and can be handled by a
+    different MPI rank ; several OpenMP threads can work simultaneously on the
+    same subdomain.
+
+    If ``max_grid_size`` is such that the total number of subdomains is
+    **larger** that the number of MPI ranks used, than some MPI ranks
+    will handle several subdomains, thereby providing additional flexibility
+    for **load balancing**.
+
+    When using mesh refinement, this number applies to the subdomains
+    of the coarsest level, but also to any of the finer level.
+
+Load balancing
+--------------
+
+* ``algo.load_balance_intervals`` (`string`) optional (default `0`)
+    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
+    WarpX should try to redistribute the work across MPI ranks, in order to have
+    better load balancing.
+    Use 0 to disable load_balancing.
+
+    When performing load balancing, WarpX measures the wall time for
+    computational parts of the PIC cycle. It then uses this data to decide
+    how to redistribute the subdomains across MPI ranks. (Each subdomain
+    is unchanged, but its owner is changed in order to have better performance.)
+    This relies on each MPI rank handling several (in fact many) subdomains
+    (see ``max_grid_size``).
+
+* ``algo.load_balance_efficiency_ratio_threshold`` (`float`) optional (default `1.1`)
+    Controls whether to adopt a proposed distribution mapping computed during a load balance.
+    If the the ratio of the proposed to current distribution mapping *efficiency* (i.e.,
+    average cost per MPI process; efficiency is a number in the range [0, 1]) is greater
+    than the threshold value, the proposed distribution mapping is adopted.  The suggested
+    range of values is ``algo.load_balance_efficiency_ratio_threshold >= 1``, which ensures
+    that the new distribution mapping is adopted only if doing so would improve the load
+    balance efficiency. The higher the threshold value, the more conservative is the criterion
+    for adoption of a proposed distribution; for example, with
+    ``algo.load_balance_efficiency_ratio_threshold = 1``, the proposed distribution is
+    adopted *any* time the proposed distribution improves load balancing; if instead
+    ``algo.load_balance_efficiency_ratio_threshold = 2``, the proposed distribution is
+    adopted only if doing so would yield a 100% to the load balance efficiency (with this
+    threshold value, if the  current efficiency is ``0.45``, the new distribution would only be
+    adopted if the proposed efficiency were greater than ``0.9``).
+
+* ``algo.load_balance_with_sfc`` (`0` or `1`) optional (default `0`)
+    If this is `1`: use a Space-Filling Curve (SFC) algorithm in order to
+    perform load-balancing of the simulation.
+    If this is `0`: the Knapsack algorithm is used instead.
+
+* ``algo.load_balance_knapsack_factor`` (`float`) optional (default `1.24`)
+    Controls the maximum number of boxes that can be assigned to a rank during
+    load balance when using the 'knapsack' policy for update of the distribution
+    mapping; the maximum is
+    `load_balance_knapsack_factor*(average number of boxes per rank)`.
+    For example, if there are 4 boxes per rank and `load_balance_knapsack_factor=2`,
+    no more than 8 boxes can be assigned to any rank.
+
+* ``algo.load_balance_costs_update`` (``heuristic`` or ``timers``) optional (default ``timers``)
+    If this is `heuristic`: load balance costs are updated according to a measure of
+    particles and cells assigned to each box of the domain.  The cost :math:`c` is
+    computed as
+
+    .. math::
+
+       c = n_{\text{particle}} \cdot w_{\text{particle}} + n_{\text{cell}} \cdot w_{\text{cell}},
+
+    where
+    :math:`n_{\text{particle}}` is the number of particles on the box,
+    :math:`w_{\text{particle}}` is the particle cost weight factor (controlled by ``algo.costs_heuristic_particles_wt``),
+    :math:`n_{\text{cell}}` is the number of cells on the box, and
+    :math:`w_{\text{cell}}` is the cell cost weight factor (controlled by ``algo.costs_heuristic_cells_wt``).
+
+    If this is `timers`: costs are updated according to in-code timers.
+
+* ``algo.costs_heuristic_particles_wt`` (`float`) optional
+    Particle weight factor used in `Heuristic` strategy for costs update; if running on GPU,
+    the particle weight is set to a value determined from single-GPU tests on Summit,
+    depending on the choice of solver (FDTD or PSATD) and order of the particle shape.
+    If running on CPU, the default value is `0.9`. If running on GPU, the default value is
+
+    +----------+-----------------------+
+    |          | Particle shape factor |
+    +----------+-------+-------+-------+
+    |          | 1     | 2     | 3     |
+    +==========+=======+=======+=======+
+    | FDTD/CKC | 0.599 | 0.732 | 0.855 |
+    +----------+-------+-------+-------+
+    | PSATD    | 0.425 | 0.595 | 0.75  |
+    +----------+-------+-------+-------+
+
+* ``algo.costs_heuristic_cells_wt`` (`float`) optional
+    Cell weight factor used in `Heuristic` strategy for costs update; if running on GPU,
+    the cell weight is set to a value determined from single-GPU tests on Summit,
+    depending on the choice of solver (FDTD or PSATD) and order of the particle shape.
+    If running on CPU, the default value is `0.1`. If running on GPU, the default value is
+
+    +----------+-----------------------+
+    |          | Particle shape factor |
+    +----------+-------+-------+-------+
+    |          | 1     | 2     | 3     |
+    +==========+=======+=======+=======+
+    | FDTD/CKC | 0.401 | 0.268 | 0.145 |
+    +----------+-------+-------+-------+
+    | PSATD    | 0.575 | 0.405 | 0.25  |
+    +----------+-------+-------+-------+
+
+* ``warpx.do_dynamic_scheduling`` (`0` or `1`) optional (default `1`)
+    Whether to activate OpenMP dynamic scheduling.
+
+* ``warpx.roundrobin_sfc`` (`0` or `1`) optional (default `0`)
+    Whether to use AMReX's RRSFS strategy for making DistributionMapping to
+    override the default space filling curve (SFC) strategy. If this is
+    enabled, the round robin method is used to distribute Boxes ordered by
+    SFC. This could potentially mitigate the load imbalance issue during
+    initialization by avoiding putting neighboring boxes on the same
+    process.
+
+* ``warpx.split_high_density_boxes`` (`bool`) optional (default: false)
+    Whether to split high density boxes during initialization. This can
+    improve the potential for load balancing.
+
+* ``warpx.split_high_density_boxes_threshold`` (`float`) optional (default: 1.1)
+    Threshold used in splitting high density boxes. If a Box has more
+    particles than the average number of particles per MPI process
+    multiplied by this factor, we try to split this Box into smaller ones.
+
+* ``warpx.split_high_density_boxes_min_box_size`` (`integer`) optional (default: 8)
+    During splitting high density boxes, if a Box's longest side is already
+    less than or equal to this number, it will not be split.
+
+
+
+Mesh refinement
+---------------
+* ``amr.max_level`` (`integer`, default: ``0``)
+    When using mesh refinement, the number of refinement levels that will be used.
+
+    Use 0 in order to disable mesh refinement.
+    Note: currently, ``0`` and ``1`` are supported.
+
+* ``amr.ref_ratio`` (`integer` per refined level, default: ``2``)
+    When using mesh refinement, this is the refinement ratio per level.
+    With this option, all directions are fined by the same ratio.
+
+* ``amr.ref_ratio_vect`` (`3 integers for x,y,z per refined level`)
+    When using mesh refinement, this can be used to set the refinement ratio per direction and level, relative to the previous level.
+
+    Example: for three levels, a value of ``2 2 4 8 8 16`` refines the first level by 2-fold in x and y and 4-fold in z compared to the coarsest level (level 0/mother grid); compared to the first level, the second level is refined 8-fold in x and y and 16-fold in z.
+
+* ``warpx.fine_tag_lo`` and ``warpx.fine_tag_hi`` (`2 floats in 2D`, `3 floats in 3D`; in meters) optional
+    **When using static mesh refinement with 1 level**, the extent of the refined patch.
+    This patch is rectangular, and thus its extent is given here by the coordinates
+    of the lower corner (``warpx.fine_tag_lo``) and upper corner (``warpx.fine_tag_hi``).
+
+* ``warpx.ref_patch_function(x,y,z)`` (`string`) optional
+    A function of `x`, `y`, `z` that defines the extent of the refined patch when
+    using static mesh refinement with ``amr.max_level``>0. Note that the function can be used
+    to define distinct regions for refinement, however, the refined regions should be such that
+    the pml layer surrounding the patches should not overlap. For this reason, when defining
+    distinct patches, please ensure that they are sufficiently separated.
+
+* ``warpx.refine_plasma`` (`integer`) optional (default `0`)
+    Increase the number of macro-particles that are injected "ahead" of a mesh
+    refinement patch in a moving window simulation.
+
+    Note: in development; only works with static mesh-refinement, specific
+    to moving window plasma injection, and requires a single refined level.
+
+* ``warpx.n_current_deposition_buffer`` (`integer`)
+    When using mesh refinement: the particles that are located inside
+    a refinement patch, but within ``n_current_deposition_buffer`` cells of
+    the edge of this patch, will deposit their charge and current to the
+    lower refinement level, instead of depositing to the refinement patch
+    itself. See the :ref:`mesh-refinement section <theory-amr>` for more details.
+    If this variable is not explicitly set in the input script,
+    ``n_current_deposition_buffer`` is automatically set so as to be large
+    enough to hold the particle shape, on the fine grid
+
+* ``warpx.n_field_gather_buffer`` (`integer`, optional)
+    Default: ``warpx.n_field_gather_buffer = n_current_deposition_buffer + 1`` (one cell larger than ``n_current_deposition_buffer`` on the fine grid).
+
+    When using mesh refinement, particles that are located inside a refinement patch, but within ``n_field_gather_buffer`` cells of the edge of the patch, gather the fields from the lower refinement level, instead of gathering the fields from the refinement patch itself.
+    This avoids some of the spurious effects that can occur inside the refinement patch, close to its edge.
+    See the section :ref:`Mesh refinement <theory-amr>` for more details.
+
+* ``particles.deposit_on_main_grid`` (`list of strings`)
+    When using mesh refinement: the particle species whose name are included
+    in the list will deposit their charge/current directly on the main grid
+    (i.e. the coarsest level), even if they are inside a refinement patch.
+
+* ``particles.gather_from_main_grid`` (`list of strings`)
+    When using mesh refinement: the particle species whose name are included
+    in the list will gather their fields from the main grid
+    (i.e. the coarsest level), even if they are inside a refinement patch.
+
+
+Moving window
+-------------
+
+* ``warpx.do_moving_window`` (`integer`; 0 by default)
+    Whether to use a moving window for the simulation
+
+* ``warpx.moving_window_dir`` (either ``x``, ``y`` or ``z``)
+    The direction of the moving window.
+
+* ``warpx.moving_window_v`` (`float`)
+    The speed of moving window, in units of the speed of light
+    (i.e. use ``1.0`` for a moving window that moves exactly at the speed of light)
+
+* ``warpx.start_moving_window_step`` (`integer`; 0 by default)
+    The timestep at which the moving window starts.
+
+* ``warpx.end_moving_window_step`` (`integer`; default is ``-1`` for false)
+    The timestep at which the moving window ends.
+
+
+Boosted frame
+-------------
+
+* ``warpx.gamma_boost`` (`float`)
+    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
+
+    When using this parameter, the input parameters are interpreted as in the
+    lab-frame and automatically converted to the boosted frame.
+    (See the corresponding documentation of each input parameters for exceptions.)
+
+* ``warpx.boost_direction`` (string: ``x``, ``y`` or ``z``)
+    The direction of the Lorentz-transform for boosted-frame simulations
+    (The direction ``y`` cannot be used in 2D simulations.)
+
+
+.. _running-cpp-parameters-parser:
+
+Math parser and constants
+-------------------------
+
+WarpX uses AMReX's math parser that reads expressions in the input file.
+It can be used in all input parameters that consist of one or more integers or floats.
+Integer input expecting boolean, 0 or 1, are not parsed.
+Note that when multiple values are expected, the expressions are space delimited.
+For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
+See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
+
+WarpX constants
+^^^^^^^^^^^^^^^
+
+WarpX provides a few pre-defined constants, that can be used for any parameter that consists of one or more floats.
+
+======== ===================
+q_e      elementary charge
+m_e      electron mass
+m_p      proton mass
+m_u      unified atomic mass unit (Dalton)
+epsilon0 vacuum permittivity
+mu0      vacuum permeability
+clight   speed of light
+kb       Boltzmann's constant (J/K)
+pi       math constant pi
+======== ===================
+
+See ``Source/Utils/WarpXConst.H`` for the values.
+
+User-defined constants
+^^^^^^^^^^^^^^^^^^^^^^
+
+Users can define their own constants in the input file.
+These constants can be used for any parameter that consists of one or more integers or floats.
+User-defined constant names can contain only letters, numbers and the character ``_``.
+The name of each constant has to begin with a letter. The following names are used
+by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
+The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
+For example:
+
+* ``my_constants.a0 = 3.0``
+* ``my_constants.z_plateau = 150.e-6``
+* ``my_constants.n0 = 1.e22``
+* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
+
+Coordinates
+^^^^^^^^^^^
+
+Besides, for profiles that depend on spatial coordinates (the plasma momentum distribution or the laser field, see below `Particle initialization` and `Laser initialization`), the parser will interpret some variables as spatial coordinates. These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
+
+The parser reads python-style expressions between double quotes, for instance
+``"a0*x**2 * (1-y*1.e2) * (x>0)"`` is a valid expression where ``a0`` is a
+user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates. The names are case sensitive. The factor
+``(x>0)`` is ``1`` where ``x>0`` and ``0`` where ``x<=0``. It allows the user to
+define functions by intervals.
+Alternatively the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
+
+
+
+QED
+---
+
+Lookup tables and other settings for QED modules
+------------------------------------------------
+
+Lookup tables store pre-computed values for functions used by the QED modules.
+**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
+
+* ``qed_bw.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Breit-Wheeler module:
+
+    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated. This option requires Boost math library
+      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
+      the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the photons, while table 2 is used for pair generation):
+
+        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of the photons)
+
+        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for pair generation)
+
+        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
+          quantum parameter of the photon).
+
+        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
+
+      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
+      must be specified:
+
+        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
+
+* ``qed_qs.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
+
+    * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated. This option requires Boost math library
+      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
+      the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the particles, while table 2 is used for photon emission):
+
+        * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of electrons and positrons)
+
+        * ``qed_qs.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_qs.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_qs.tab_em_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for photon emission)
+
+        * ``qed_qs.tab_em_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_qs.tab_em_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_qs.tab_em_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the photon and the
+          quantum parameter of the charged particle).
+
+        * ``qed_qs.tab_em_frac_min`` (`float`): minimum value to be considered for the second axis of lookup table 2
+
+        * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
+
+      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
+      must be specified:
+
+        * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
+
+* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
+    (suggested value : 0.01)
+
+* ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
+    (suggested value : 0.001)
+
+* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
+    Energy threshold for photon particle creation in `*me*c^2` units.
+
+* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
+    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
+    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
+    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
+    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
+    Schwinger process requires either ``warpx.grid_type = collocated`` or
+    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
+    at the same location in the grid) and does not currently support mesh refinement, cylindrical
+    coordinates or single precision.
+
+* ``qed_schwinger.ele_product_species`` (`string`)
+    If Schwinger process is activated, an electron product species must be specified
+    (the name of an existing electron species must be provided).
+
+* ``qed_schwinger.pos_product_species`` (`string`)
+    If Schwinger process is activated, a positron product species must be specified
+    (the name of an existing positron species must be provided).
+
+* ``qed_schwinger.y_size`` (`float`; in meters)
+    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
+    It is used to convert the pair production rate per unit volume into an actual number of created particles.
+    This value should correspond to the typical transverse extent for which the EM field has a very high value
+    (e.g. the beam waist for a focused laser beam).
+
+* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
+    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
+    which Schwinger pairs can be created.
+    The same is applicable in the other directions.
+
+* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
+    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
+    a Poisson distribution is used to draw the actual number of physical pairs created.
+    Otherwise a Gaussian distribution is used.
+    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
+    per timestep per species (with a weight corresponding to the number of physical pairs created).
+
+
+
+Ionization
+----------
+
+
+
+
+==============================================================================================
+
 Overall simulation parameters
 -----------------------------
 
@@ -38,17 +520,6 @@ Overall simulation parameters
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
 
-* ``warpx.gamma_boost`` (`float`)
-    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
-    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
-
-    When using this parameter, the input parameters are interpreted as in the
-    lab-frame and automatically converted to the boosted frame.
-    (See the corresponding documentation of each input parameters for exceptions.)
-
-* ``warpx.boost_direction`` (string: ``x``, ``y`` or ``z``)
-    The direction of the Lorentz-transform for boosted-frame simulations
-    (The direction ``y`` cannot be used in 2D simulations.)
 
 * ``warpx.zmax_plasma_to_compute_max_step`` (`float`) optional
     Can be useful when running in a boosted frame. If specified, automatically
@@ -367,116 +838,13 @@ We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal
 
 .. _running-cpp-parameters-box:
 
-Setting up the field mesh
--------------------------
+??????????????????
+------------------
 
-* ``amr.n_cell`` (`2 integers in 2D`, `3 integers in 3D`)
-    The number of grid points along each direction (on the **coarsest level**)
-
-* ``amr.max_level`` (`integer`, default: ``0``)
-    When using mesh refinement, the number of refinement levels that will be used.
-
-    Use 0 in order to disable mesh refinement.
-    Note: currently, ``0`` and ``1`` are supported.
-
-* ``amr.ref_ratio`` (`integer` per refined level, default: ``2``)
-    When using mesh refinement, this is the refinement ratio per level.
-    With this option, all directions are fined by the same ratio.
-
-* ``amr.ref_ratio_vect`` (`3 integers for x,y,z per refined level`)
-    When using mesh refinement, this can be used to set the refinement ratio per direction and level, relative to the previous level.
-
-    Example: for three levels, a value of ``2 2 4 8 8 16`` refines the first level by 2-fold in x and y and 4-fold in z compared to the coarsest level (level 0/mother grid); compared to the first level, the second level is refined 8-fold in x and y and 16-fold in z.
-
-* ``geometry.dims`` (`string`)
-    The dimensions of the simulation geometry.
-    Supported values are ``1``, ``2``, ``3``, ``RZ``, ``RCYLINDER``, and ``RSPHERE``.
-
-    * For ``3``, a cartesian geometry of ``x``, ``y``, ``z`` is modeled.
-    * For ``2``, a cartesian geometry with the axes ``x`` and ``z`` and all physics in ``y`` is assumed to be translation symmetric.
-    * For ``1``, a cartesian geometry with the axis ``z`` and the dimensions ``x`` and ``y`` are translation symmetric.
-    * For ``RZ``, a cylindrical geometry with the axis ``r`` and ``z``, with an azimuthal mode decomposition, with ``warpx.n_rz_azimuthal_modes`` providing further control.
-    * For ``RCYLINDER``, a cylindrical geometry with the axis ``r``, invariant in ``theta`` and ``z``.
-    * For ``RSPHERE``, a spherical geometry with the axis ``r``, invariant in ``theta`` and ``phi``. The polar angle ``phi`` is relative to the ``x-y`` plane.
-
-    Note that this value must be consistent with the :ref:`WarpX_DIMS <install-build-options>` compile-time option.
-    If you installed WarpX from a :ref:`package manager <install-methods>`, then pick the right executable by name.
-
-* ``warpx.n_rz_azimuthal_modes`` (`integer`; 1 by default)
-    When using the RZ version, this is the number of azimuthal modes.
-    The default is ``1``, which corresponds to a perfectly axisymmetric simulation.
-
-* ``geometry.prob_lo`` and ``geometry.prob_hi`` (`2 floats in 2D`, `3 floats in 3D`; in meters)
-    The extent of the full simulation box. This box is rectangular, and thus its
-    extent is given here by the coordinates of the lower corner (``geometry.prob_lo``) and
-    upper corner (``geometry.prob_hi``). The first axis of the coordinates is x
-    (or r with cylindrical) and the last is z.
-
-* ``warpx.do_moving_window`` (`integer`; 0 by default)
-    Whether to use a moving window for the simulation
-
-* ``warpx.moving_window_dir`` (either ``x``, ``y`` or ``z``)
-    The direction of the moving window.
-
-* ``warpx.moving_window_v`` (`float`)
-    The speed of moving window, in units of the speed of light
-    (i.e. use ``1.0`` for a moving window that moves exactly at the speed of light)
-
-* ``warpx.start_moving_window_step`` (`integer`; 0 by default)
-    The timestep at which the moving window starts.
-
-* ``warpx.end_moving_window_step`` (`integer`; default is ``-1`` for false)
-    The timestep at which the moving window ends.
-
-* ``warpx.fine_tag_lo`` and ``warpx.fine_tag_hi`` (`2 floats in 2D`, `3 floats in 3D`; in meters) optional
-    **When using static mesh refinement with 1 level**, the extent of the refined patch.
-    This patch is rectangular, and thus its extent is given here by the coordinates
-    of the lower corner (``warpx.fine_tag_lo``) and upper corner (``warpx.fine_tag_hi``).
-
-* ``warpx.ref_patch_function(x,y,z)`` (`string`) optional
-    A function of `x`, `y`, `z` that defines the extent of the refined patch when
-    using static mesh refinement with ``amr.max_level``>0. Note that the function can be used
-    to define distinct regions for refinement, however, the refined regions should be such that
-    the pml layer surrounding the patches should not overlap. For this reason, when defining
-    distinct patches, please ensure that they are sufficiently separated.
-
-* ``warpx.refine_plasma`` (`integer`) optional (default `0`)
-    Increase the number of macro-particles that are injected "ahead" of a mesh
-    refinement patch in a moving window simulation.
-
-    Note: in development; only works with static mesh-refinement, specific
-    to moving window plasma injection, and requires a single refined level.
-
-* ``warpx.n_current_deposition_buffer`` (`integer`)
-    When using mesh refinement: the particles that are located inside
-    a refinement patch, but within ``n_current_deposition_buffer`` cells of
-    the edge of this patch, will deposit their charge and current to the
-    lower refinement level, instead of depositing to the refinement patch
-    itself. See the :ref:`mesh-refinement section <theory-amr>` for more details.
-    If this variable is not explicitly set in the input script,
-    ``n_current_deposition_buffer`` is automatically set so as to be large
-    enough to hold the particle shape, on the fine grid
-
-* ``warpx.n_field_gather_buffer`` (`integer`, optional)
-    Default: ``warpx.n_field_gather_buffer = n_current_deposition_buffer + 1`` (one cell larger than ``n_current_deposition_buffer`` on the fine grid).
-
-    When using mesh refinement, particles that are located inside a refinement patch, but within ``n_field_gather_buffer`` cells of the edge of the patch, gather the fields from the lower refinement level, instead of gathering the fields from the refinement patch itself.
-    This avoids some of the spurious effects that can occur inside the refinement patch, close to its edge.
-    See the section :ref:`Mesh refinement <theory-amr>` for more details.
 
 * ``warpx.do_single_precision_comms`` (`integer`; 0 by default)
     Perform MPI communications for field guard regions in single precision.
     Only meaningful for ``WarpX_PRECISION=DOUBLE``.
-
-* ``particles.deposit_on_main_grid`` (`list of strings`)
-    When using mesh refinement: the particle species whose name are included
-    in the list will deposit their charge/current directly on the main grid
-    (i.e. the coarsest level), even if they are inside a refinement patch.
-
-* ``particles.gather_from_main_grid`` (`list of strings`)
-    When using mesh refinement: the particle species whose name are included
-    in the list will gather their fields from the main grid
-    (i.e. the coarsest level), even if they are inside a refinement patch.
 
 .. _running-cpp-parameters-bc:
 
@@ -657,201 +1025,8 @@ additionally define the electric potential at the embedded boundary with an anal
 Distribution across MPI ranks and parallelization
 -------------------------------------------------
 
-* ``warpx.numprocs`` (`2 ints` for 2D, `3 ints` for 3D) optional (default `none`)
-    This optional parameter can be used to control the domain decomposition on the
-    coarsest level. The domain will be chopped into the exact number of pieces in each
-    dimension as specified by this parameter. If it's not specified, the domain
-    decomposition will be determined by the parameters that will be discussed below.  If
-    specified, the product of the numbers must be equal to the number of MPI processes.
 
-* ``amr.max_grid_size`` (`integer`) optional (default `128`)
-    Maximum allowable size of each **subdomain**
-    (expressed in number of grid points, in each direction).
-    Each subdomain has its own ghost cells, and can be handled by a
-    different MPI rank ; several OpenMP threads can work simultaneously on the
-    same subdomain.
 
-    If ``max_grid_size`` is such that the total number of subdomains is
-    **larger** that the number of MPI ranks used, than some MPI ranks
-    will handle several subdomains, thereby providing additional flexibility
-    for **load balancing**.
-
-    When using mesh refinement, this number applies to the subdomains
-    of the coarsest level, but also to any of the finer level.
-
-* ``algo.load_balance_intervals`` (`string`) optional (default `0`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
-    WarpX should try to redistribute the work across MPI ranks, in order to have
-    better load balancing.
-    Use 0 to disable load_balancing.
-
-    When performing load balancing, WarpX measures the wall time for
-    computational parts of the PIC cycle. It then uses this data to decide
-    how to redistribute the subdomains across MPI ranks. (Each subdomain
-    is unchanged, but its owner is changed in order to have better performance.)
-    This relies on each MPI rank handling several (in fact many) subdomains
-    (see ``max_grid_size``).
-
-* ``algo.load_balance_efficiency_ratio_threshold`` (`float`) optional (default `1.1`)
-    Controls whether to adopt a proposed distribution mapping computed during a load balance.
-    If the the ratio of the proposed to current distribution mapping *efficiency* (i.e.,
-    average cost per MPI process; efficiency is a number in the range [0, 1]) is greater
-    than the threshold value, the proposed distribution mapping is adopted.  The suggested
-    range of values is ``algo.load_balance_efficiency_ratio_threshold >= 1``, which ensures
-    that the new distribution mapping is adopted only if doing so would improve the load
-    balance efficiency. The higher the threshold value, the more conservative is the criterion
-    for adoption of a proposed distribution; for example, with
-    ``algo.load_balance_efficiency_ratio_threshold = 1``, the proposed distribution is
-    adopted *any* time the proposed distribution improves load balancing; if instead
-    ``algo.load_balance_efficiency_ratio_threshold = 2``, the proposed distribution is
-    adopted only if doing so would yield a 100% to the load balance efficiency (with this
-    threshold value, if the  current efficiency is ``0.45``, the new distribution would only be
-    adopted if the proposed efficiency were greater than ``0.9``).
-
-* ``algo.load_balance_with_sfc`` (`0` or `1`) optional (default `0`)
-    If this is `1`: use a Space-Filling Curve (SFC) algorithm in order to
-    perform load-balancing of the simulation.
-    If this is `0`: the Knapsack algorithm is used instead.
-
-* ``algo.load_balance_knapsack_factor`` (`float`) optional (default `1.24`)
-    Controls the maximum number of boxes that can be assigned to a rank during
-    load balance when using the 'knapsack' policy for update of the distribution
-    mapping; the maximum is
-    `load_balance_knapsack_factor*(average number of boxes per rank)`.
-    For example, if there are 4 boxes per rank and `load_balance_knapsack_factor=2`,
-    no more than 8 boxes can be assigned to any rank.
-
-* ``algo.load_balance_costs_update`` (``heuristic`` or ``timers``) optional (default ``timers``)
-    If this is `heuristic`: load balance costs are updated according to a measure of
-    particles and cells assigned to each box of the domain.  The cost :math:`c` is
-    computed as
-
-    .. math::
-
-       c = n_{\text{particle}} \cdot w_{\text{particle}} + n_{\text{cell}} \cdot w_{\text{cell}},
-
-    where
-    :math:`n_{\text{particle}}` is the number of particles on the box,
-    :math:`w_{\text{particle}}` is the particle cost weight factor (controlled by ``algo.costs_heuristic_particles_wt``),
-    :math:`n_{\text{cell}}` is the number of cells on the box, and
-    :math:`w_{\text{cell}}` is the cell cost weight factor (controlled by ``algo.costs_heuristic_cells_wt``).
-
-    If this is `timers`: costs are updated according to in-code timers.
-
-* ``algo.costs_heuristic_particles_wt`` (`float`) optional
-    Particle weight factor used in `Heuristic` strategy for costs update; if running on GPU,
-    the particle weight is set to a value determined from single-GPU tests on Summit,
-    depending on the choice of solver (FDTD or PSATD) and order of the particle shape.
-    If running on CPU, the default value is `0.9`. If running on GPU, the default value is
-
-    +----------+-----------------------+
-    |          | Particle shape factor |
-    +----------+-------+-------+-------+
-    |          | 1     | 2     | 3     |
-    +==========+=======+=======+=======+
-    | FDTD/CKC | 0.599 | 0.732 | 0.855 |
-    +----------+-------+-------+-------+
-    | PSATD    | 0.425 | 0.595 | 0.75  |
-    +----------+-------+-------+-------+
-
-* ``algo.costs_heuristic_cells_wt`` (`float`) optional
-    Cell weight factor used in `Heuristic` strategy for costs update; if running on GPU,
-    the cell weight is set to a value determined from single-GPU tests on Summit,
-    depending on the choice of solver (FDTD or PSATD) and order of the particle shape.
-    If running on CPU, the default value is `0.1`. If running on GPU, the default value is
-
-    +----------+-----------------------+
-    |          | Particle shape factor |
-    +----------+-------+-------+-------+
-    |          | 1     | 2     | 3     |
-    +==========+=======+=======+=======+
-    | FDTD/CKC | 0.401 | 0.268 | 0.145 |
-    +----------+-------+-------+-------+
-    | PSATD    | 0.575 | 0.405 | 0.25  |
-    +----------+-------+-------+-------+
-
-* ``warpx.do_dynamic_scheduling`` (`0` or `1`) optional (default `1`)
-    Whether to activate OpenMP dynamic scheduling.
-
-* ``warpx.roundrobin_sfc`` (`0` or `1`) optional (default `0`)
-    Whether to use AMReX's RRSFS strategy for making DistributionMapping to
-    override the default space filling curve (SFC) strategy. If this is
-    enabled, the round robin method is used to distribute Boxes ordered by
-    SFC. This could potentially mitigate the load imbalance issue during
-    initialization by avoiding putting neighboring boxes on the same
-    process.
-
-* ``warpx.split_high_density_boxes`` (`bool`) optional (default: false)
-    Whether to split high density boxes during initialization. This can
-    improve the potential for load balancing.
-
-* ``warpx.split_high_density_boxes_threshold`` (`float`) optional (default: 1.1)
-    Threshold used in splitting high density boxes. If a Box has more
-    particles than the average number of particles per MPI process
-    multiplied by this factor, we try to split this Box into smaller ones.
-
-* ``warpx.split_high_density_boxes_min_box_size`` (`integer`) optional (default: 8)
-    During splitting high density boxes, if a Box's longest side is already
-    less than or equal to this number, it will not be split.
-
-.. _running-cpp-parameters-parser:
-
-Math parser and user-defined constants
---------------------------------------
-
-WarpX uses AMReX's math parser that reads expressions in the input file.
-It can be used in all input parameters that consist of one or more integers or floats.
-Integer input expecting boolean, 0 or 1, are not parsed.
-Note that when multiple values are expected, the expressions are space delimited.
-For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
-See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
-
-WarpX constants
-^^^^^^^^^^^^^^^
-
-WarpX provides a few pre-defined constants, that can be used for any parameter that consists of one or more floats.
-
-======== ===================
-q_e      elementary charge
-m_e      electron mass
-m_p      proton mass
-m_u      unified atomic mass unit (Dalton)
-epsilon0 vacuum permittivity
-mu0      vacuum permeability
-clight   speed of light
-kb       Boltzmann's constant (J/K)
-pi       math constant pi
-======== ===================
-
-See ``Source/Utils/WarpXConst.H`` for the values.
-
-User-defined constants
-^^^^^^^^^^^^^^^^^^^^^^
-
-Users can define their own constants in the input file.
-These constants can be used for any parameter that consists of one or more integers or floats.
-User-defined constant names can contain only letters, numbers and the character ``_``.
-The name of each constant has to begin with a letter. The following names are used
-by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
-The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
-For example:
-
-* ``my_constants.a0 = 3.0``
-* ``my_constants.z_plateau = 150.e-6``
-* ``my_constants.n0 = 1.e22``
-* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
-
-Coordinates
-^^^^^^^^^^^
-
-Besides, for profiles that depend on spatial coordinates (the plasma momentum distribution or the laser field, see below `Particle initialization` and `Laser initialization`), the parser will interpret some variables as spatial coordinates. These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
-
-The parser reads python-style expressions between double quotes, for instance
-``"a0*x**2 * (1-y*1.e2) * (x>0)"`` is a valid expression where ``a0`` is a
-user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates. The names are case sensitive. The factor
-``(x>0)`` is ``1`` where ``x>0`` and ``0`` where ``x<=0``. It allows the user to
-define functions by intervals.
-Alternatively the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
 
 .. _running-cpp-parameters-particle:
 
@@ -1514,8 +1689,8 @@ Particle initialization
 
 .. _running-cpp-parameters-fluids:
 
-Cold Relativistic Fluid initialization
---------------------------------------
+Fluids
+------
 
 * ``fluids.species_names`` (`strings`, separated by spaces)
     Defines the names of each fluid species. It is a required input to create and evolve fluid species using the cold relativistic fluid equations.
@@ -1525,8 +1700,8 @@ Cold Relativistic Fluid initialization
 
 .. _running-cpp-parameters-laser:
 
-Laser initialization
---------------------
+Lasers
+------
 
 * ``lasers.names`` (list of `string`)
     Name of each laser. This is then used in the rest of the input deck ;
@@ -1749,6 +1924,9 @@ Laser initialization
     deposits charge/current only on the main grid (i.e. level 0), or also
     on the higher mesh-refinement levels.
 
+Mirrors
+-------
+
 * ``warpx.num_mirrors`` (`int`) optional (default `0`)
     Users can input perfect mirror condition inside the simulation domain.
     The number of mirrors is given by ``warpx.num_mirrors``. The mirrors are
@@ -1767,6 +1945,7 @@ Laser initialization
     parameter is the minimum number of points for the mirror. If
     ``mirror_z_width < dz/cell_size``, the upper bound of the mirror is increased
     so that it contains at least ``mirror_z_npoints``.
+
 
 External fields
 ---------------
@@ -3880,132 +4059,6 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     The precision used when writing out the data to the text files.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.precision``.
 
-Lookup tables and other settings for QED modules
-------------------------------------------------
-
-Lookup tables store pre-computed values for functions used by the QED modules.
-**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
-
-* ``qed_bw.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Breit-Wheeler module:
-
-    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
-
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the photons, while table 2 is used for pair generation):
-
-        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of the photons)
-
-        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
-
-        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
-
-        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for pair generation)
-
-        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
-
-        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
-
-        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
-          quantum parameter of the photon).
-
-        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
-
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
-
-        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
-
-* ``qed_qs.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
-
-    * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
-
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the particles, while table 2 is used for photon emission):
-
-        * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of electrons and positrons)
-
-        * ``qed_qs.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
-
-        * ``qed_qs.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
-
-        * ``qed_qs.tab_em_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for photon emission)
-
-        * ``qed_qs.tab_em_chi_max`` (`float`): maximum chi parameter for lookup table 2
-
-        * ``qed_qs.tab_em_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
-
-        * ``qed_qs.tab_em_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the photon and the
-          quantum parameter of the charged particle).
-
-        * ``qed_qs.tab_em_frac_min`` (`float`): minimum value to be considered for the second axis of lookup table 2
-
-        * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
-
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
-
-        * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
-
-* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
-    (suggested value : 0.01)
-
-* ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
-    (suggested value : 0.001)
-
-* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
-    Energy threshold for photon particle creation in `*me*c^2` units.
-
-* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
-    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
-    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
-    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
-    Schwinger process requires either ``warpx.grid_type = collocated`` or
-    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
-    at the same location in the grid) and does not currently support mesh refinement, cylindrical
-    coordinates or single precision.
-
-* ``qed_schwinger.ele_product_species`` (`string`)
-    If Schwinger process is activated, an electron product species must be specified
-    (the name of an existing electron species must be provided).
-
-* ``qed_schwinger.pos_product_species`` (`string`)
-    If Schwinger process is activated, a positron product species must be specified
-    (the name of an existing positron species must be provided).
-
-* ``qed_schwinger.y_size`` (`float`; in meters)
-    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
-    It is used to convert the pair production rate per unit volume into an actual number of created particles.
-    This value should correspond to the typical transverse extent for which the EM field has a very high value
-    (e.g. the beam waist for a focused laser beam).
-
-* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
-    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
-    which Schwinger pairs can be created.
-    The same is applicable in the other directions.
-
-* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
-    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
-    a Poisson distribution is used to draw the actual number of physical pairs created.
-    Otherwise a Gaussian distribution is used.
-    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
-    per timestep per species (with a weight corresponding to the number of physical pairs created).
 
 Checkpoints and restart
 -----------------------
