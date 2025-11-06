@@ -1,48 +1,7 @@
-.. _theory-maxwell-solvers:
+.. _theory-explicit-em-pic:
 
-Maxwell solvers
-===============
-
-In the *electromagnetic particle-in-cell method* :cite:p:`pt-Birdsalllangdon,pt-HockneyEastwoodBook`,
-the electromagnetic fields are solved on a grid, usually using Maxwell’s
-equations
-
-.. math::
-   \frac{\mathbf{\partial B}}{\partial t} = -\nabla\times\mathbf{E}
-   :label: Faraday-1
-
-.. math::
-   \frac{\mathbf{\partial E}}{\partial t} = \nabla\times\mathbf{B}-\mathbf{J}
-   :label: Ampere-1
-
-.. math::
-   \nabla\cdot\mathbf{E} = \rho
-   :label: Gauss-1
-
-.. math::
-   \nabla\cdot\mathbf{B} = 0
-   :label: divb-1
-
-given here in natural units (:math:`\epsilon_0=\mu_0=c=1`), where :math:`t` is time, :math:`\mathbf{E}` and
-:math:`\mathbf{B}` are the electric and magnetic field components, and
-:math:`\rho` and :math:`\mathbf{J}` are the charge and current densities. The
-charged particles are advanced in time using the Newton-Lorentz equations
-of motion
-
-.. math::
-   \frac{d\mathbf{x}}{dt} = \mathbf{v},
-   :label: Lorentz_x-1
-
-.. math::
-   \frac{d\left(\gamma\mathbf{v}\right)}{dt} = \frac{q}{m}\left(\mathbf{E}+\mathbf{v}\times\mathbf{B}\right),
-   :label: Lorentz_v-1
-
-where :math:`m`, :math:`q`, :math:`\mathbf{x}`, :math:`\mathbf{v}` and :math:`\gamma=1/\sqrt{1-v^{2}}`
-are respectively the mass, charge, position, velocity and relativistic
-factor of the particle given in natural units (:math:`c=1`). The charge and current densities are interpolated
-on the grid from the particles’ positions and velocities, while the
-electric and magnetic field components are interpolated from the grid
-to the particles’ positions for the velocity update.
+Explicit electromagnetic PIC
+============================
 
 .. _theory-mwsolve:
 
