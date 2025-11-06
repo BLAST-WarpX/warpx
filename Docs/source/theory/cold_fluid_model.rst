@@ -1,7 +1,7 @@
 .. _theory-cold-fluid-model:
 
-Cold Relativistic Fluid Model
-=============================
+Fluid Representation
+====================
 
 An alternate to the representation of the plasma as macroparticles, is the cold relativistic fluid model.
 The cold relativistic fluid model is typically faster to compute than

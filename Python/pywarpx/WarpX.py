@@ -164,8 +164,16 @@ class WarpX(Bucket):
     def fields(self):
         return libwarpx.warpx.multifab_register()
 
+    @property
+    def particles(self):
+        return libwarpx.warpx.multi_particle_container()
+
     def evolve(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
+
+    def step(self, nsteps=-1):
+        """An alias of evolve, to be consistent with the PICMI Simulation class"""
+        self.evolve(nsteps)
 
     def finalize(self, finalize_mpi=1):
         libwarpx.finalize(finalize_mpi)

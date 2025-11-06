@@ -18,12 +18,10 @@ def my_simple_callback():
     and
     https://warpx.readthedocs.io/en/latest/usage/workflows/python_extend.html#fields
     """
-    from pywarpx import particle_containers
-
     print("  my_simple_callback")
 
     # electrons: access (and potentially manipulate)
-    electrons = particle_containers.ParticleContainerWrapper("electrons")
+    electrons = sim.particles.get("electrons")
     print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)
@@ -42,14 +40,9 @@ def my_advanced_callback():
     amr = sim.extension.amr
     amr.Print(f"    {amr.ParallelDescriptor.NProcs()} MPI process(es) active")
 
-    # the active simulation
-    warpx = sim.extension.warpx
-
     # electrons: access (and potentially manipulate)
-    electrons_pc = warpx.multi_particle_container().get_particle_container_from_name(
-        "electrons"
-    )
-    print(f"    {electrons_pc}")
+    electrons = sim.particles.get("electrons")
+    print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)
     Ex_mf = sim.fields.get("Efield_fp", dir="x", level=0)
@@ -57,4 +50,4 @@ def my_advanced_callback():
 
 
 # Advance simulation until the last time step
-sim.evolve()
+sim.step()
