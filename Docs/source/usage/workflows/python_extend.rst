@@ -21,7 +21,34 @@ Note that WarpX's Python bindings provide direct access to particle and field da
 How to run a simulation with Python extensions
 ----------------------------------------------
 
+- **Install WarpX with support for the Python interface**: for instance, if you :ref:`compile WarpX from source <install-build-code>`, this involves using ``-DWarpX_PYTHON=ON``.
+
+- **Write a Python script that extends the simulation**: this can be done starting from a simulation defined either with a :ref:`parameter list <running-cpp-parameters>` or with the :ref:`PICMI Python interface <usage-picmi>`.
+  The Python code typically contains :ref:`callback functions <usage-python-extend-callbacks>` that :ref:`access/modify <usage-python-extend-data-access>` the simulation data (see the sections below for more details).
+
 .. tab-set::
+
+   .. tab-item:: Parameter List
+
+      When starting from an :ref:`inputs file <running-cpp-parameters>`, one can transition to WarpX Python by loading it:
+
+      .. code-block:: python3
+
+         from pywarpx import warpx
+
+         sim = warpx
+         sim.load_inputs_file("./inputs_test_3d_laser_acceleration")
+
+         # register callbacks ...
+
+         # advance simulation until the last time step
+         sim.evolve()
+
+      .. dropdown:: Full Example
+
+         .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
+            :language: python3
+            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
 
    .. tab-item:: PICMI
 
@@ -43,27 +70,16 @@ How to run a simulation with Python extensions
 
              # do something custom with the sim object
 
-   .. tab-item:: Inputs File
+- **Run the simulation by executing the Python script**: for instance using `mpirun` or `srun` on an HPC system.
 
-      When starting from an :ref:`inputs file <running-cpp-parameters>`, one can transition to WarpX Python by loading it:
+.. code-block:: bash
 
-      .. code-block:: python3
+   mpirun -np <n_ranks> python <python_script>
 
-         from pywarpx import warpx
+.. _usage-python-extend-callbacks:
 
-         sim = warpx
-         sim.load_inputs_file("./inputs_test_3d_laser_acceleration")
-
-         # register callbacks ...
-
-         # advance simulation until the last time step
-         sim.evolve()
-
-      .. dropdown:: Full Example
-
-         .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
-            :language: python3
-            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
+Callback Functions
+------------------
 
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.
@@ -98,6 +114,8 @@ Important APIs include:
 * `amr.MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__: MPI-parallel field data
 * `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
 
+
+.. _usage-python-extend-data-access:
 
 Data Access
 -----------
