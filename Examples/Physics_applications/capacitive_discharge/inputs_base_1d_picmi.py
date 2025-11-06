@@ -409,7 +409,7 @@ class CapacitiveDischargeExample(object):
         if step % 1000 != 10:
             return
 
-        if not hasattr(self, "neutral_cont"):
+        if not hasattr(self, "neutral_particles"):
             self.neutral_particles = self.sim.particles.get(self.neutrals.name)
 
         ux_arrays = self.neutral_particles.uxp
