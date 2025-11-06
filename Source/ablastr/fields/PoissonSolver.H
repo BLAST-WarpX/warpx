@@ -408,10 +408,6 @@ computePhi (
         mlmg.setMaxIter(max_iters);
         mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
-        amrex::ParmParse pp2("mlmg");
-        int solver_type = 0; // 0 = MLMG, 1 = GMRES
-        pp2.get("solver_type",solver_type);
-
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
             // In this case, computeE needs to use ghost nodes data. So we
@@ -420,7 +416,7 @@ computePhi (
         }
 
         // Solve Poisson equation at lev
-        if (solver_type == 0) {
+        if (WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid) {
             mlmg.solve( {phi[lev]}, {rho[lev]},
                         relative_tolerance, absolute_tolerance );
         } else {
@@ -447,7 +443,7 @@ computePhi (
                                         ng);
         }
 
-        if (solver_type == 0) {
+        if (WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid) {
             // Run additional operations, such as calculation of the E field for embedded boundaries
             if constexpr (!std::is_same_v<T_PostPhiCalculationFunctor, std::nullopt_t>) {
                 if (post_phi_calculation.has_value()) {
@@ -456,7 +452,7 @@ computePhi (
             }
         }
 
-        if (solver_type == 1 && eb_enabled) {
+        if (WarpX::poisson_solver_id == PoissonSolverAlgo::GMRES && eb_enabled) {
 
             // create an alieas to the WarpX Efield
             auto & warpx = WarpX::GetInstance();

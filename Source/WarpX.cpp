@@ -1120,7 +1120,7 @@ WarpX::ReadParameters ()
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid)))
+                && (WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid || WarpX::poisson_solver_id == PoissonSolverAlgo::GMRES))))
         {
             m_do_initial_div_cleaning = true;
         }

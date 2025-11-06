@@ -241,6 +241,8 @@ Overall simulation parameters
         non-zero value is specified by the user via
         ``warpx.self_fields_absolute_tolerance``).
 
+    * ``gmres``: Poisson's equation is solved using an MLMG-preconditioned GMRES solver.
+
     * ``fft``: Poisson's equation is solved using an Integrated Green Function method (which requires FFT calculations).
         See these references for more details :cite:t:`param-QiangPhysRevSTAB2006`, :cite:t:`param-QiangPhysRevSTAB2006err`.
         It only works in 3D and it requires the compilation flag ``-DWarpX_FFT=ON``.

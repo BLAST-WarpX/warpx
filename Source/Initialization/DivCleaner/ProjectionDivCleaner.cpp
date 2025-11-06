@@ -401,7 +401,7 @@ WarpX::ProjectionCleanDivB() {
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
             ||  ( (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame
                 || WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)
-                && WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid))
+                && (WarpX::poisson_solver_id == PoissonSolverAlgo::Multigrid || WarpX::poisson_solver_id == PoissonSolverAlgo::GMRES)))
 #if defined(WARPX_DIM_RZ)
                 && WarpX::grid_type == GridType::Staggered
 #endif
