@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
@@ -50,14 +52,9 @@ public:
 
     virtual void PrintParameters () const = 0;
 
-    void GetParticleSolverParams (int&  a_max_particle_iter,
-                                  amrex::ParticleReal&  a_particle_tol ) const
-    {
-        a_max_particle_iter = m_max_particle_iterations;
-        a_particle_tol = m_particle_tolerance;
-    }
-
     void CreateParticleAttributes () const;
+
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
@@ -100,11 +97,16 @@ public:
      * \brief Return pointer to MultiFab array for mass matrix
      */
     [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
-        if (m_use_mass_matrices) { return &m_mmpc_mfarrvec; }
+        if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
 
-    [[nodiscard]] amrex::Real  GetTheta () const { return m_theta; }
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
+
+    void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
 protected:
 
@@ -140,7 +142,7 @@ protected:
      * \brief tolerance used by the iterative method used to obtain a self-consistent
      *  update of the particle positions and velocities for given E and B on the grid
      */
-    amrex::ParticleReal m_particle_tolerance = 1.0e-10;
+    amrex::ParticleReal m_particle_tolerance = amrex::ParticleReal(1.0e-10);
 
     /**
      * \brief maximum iterations for the iterative method used to obtain a self-consistent
@@ -149,9 +151,49 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
+
+    /**
+     * \brief whether to skip the full Picard update of particles on the initial newton step
+     */
+    bool m_skip_particle_picard_init = false;
+
+    /**
      * \brief Whether to use mass matrices for the implicit solver
      */
     bool m_use_mass_matrices = false;
+
+    /**
+     * \brief Whether to use mass matrices to compute J during linear stage of JFNK
+     */
+    bool m_use_mass_matrices_jacobian = false;
+
+    /**
+     * \brief Whether to use mass matrices in the preconditioner
+     */
+    bool m_use_mass_matrices_pc = false;
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     */
+    amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_xz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_yz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
 
     /**
      * \brief Array of multifab pointers to mass matrix preconditioner
@@ -161,36 +203,14 @@ protected:
     /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
-    void parseNonlinearSolverParams( const amrex::ParmParse&  pp )
-    {
-
-        std::string nlsolver_type_str;
-        pp.get("nonlinear_solver", nlsolver_type_str);
-
-        if (nlsolver_type_str=="picard") {
-            m_nlsolver_type = NonlinearSolverType::Picard;
-            m_nlsolver = std::make_unique<PicardSolver<WarpXSolverVec,ImplicitSolver>>();
-            m_max_particle_iterations = 1;
-            m_particle_tolerance = 0.0;
-        }
-        else if (nlsolver_type_str=="newton") {
-            m_nlsolver_type = NonlinearSolverType::Newton;
-            m_nlsolver = std::make_unique<NewtonSolver<WarpXSolverVec,ImplicitSolver>>();
-            pp.query("max_particle_iterations", m_max_particle_iterations);
-            pp.query("particle_tolerance", m_particle_tolerance);
-            pp.query("use_mass_matrices", m_use_mass_matrices);
-        }
-        else {
-            WARPX_ABORT_WITH_MESSAGE(
-                "invalid nonlinear_solver specified. Valid options are picard and newton.");
-        }
-
-    }
+    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
     void InitializeMassMatrices ();
+
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
@@ -208,6 +228,16 @@ protected:
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+
+    /**
+     * \brief Add J from particles included in mass matrices at start of each Newton step
+     */
+    void CumulateJ ();
+
+    /**
+     * \brief Save E at start of each Newton step
+     */
+    void SaveE ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

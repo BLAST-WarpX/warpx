@@ -18,7 +18,7 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 * `Leonardo website <https://leonardo-supercomputer.cineca.eu/>`_
-* `Leonardo user guide <https://wiki.u-gov.it/confluence/display/SCAIUS/UG3.2%3A+LEONARDO+UserGuide>`_
+* `Leonardo user guide <https://docs.hpc.cineca.it/hpc/leonardo.html>`_
 
 Storage organization:
 
@@ -82,7 +82,7 @@ Finally, since Leonardo does not yet provide software modules for some of our de
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 

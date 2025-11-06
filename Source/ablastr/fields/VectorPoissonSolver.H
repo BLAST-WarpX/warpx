@@ -205,7 +205,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
             mlmg[adim]->setVerbose(verbosity);
             mlmg[adim]->setMaxIter(max_iters);
-            mlmg[adim]->setAlwaysUseBNorm(always_use_bnorm);
+            mlmg[adim]->setConvergenceNormType(always_use_bnorm ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
             // Solve Poisson equation at lev
             mlmg[adim]->solve( {A[lev][adim]}, {curr[lev][adim]},

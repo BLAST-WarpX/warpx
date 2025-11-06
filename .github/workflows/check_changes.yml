@@ -20,8 +20,9 @@ jobs:
           filters: |
             non_docs:
               - '!Docs/**'
-              - '!**.md'
+              - '!Tools/machines/**'
               - '!**.rst'
+              - '!**.md'
           predicate-quantifier: 'every'
       - id: set-output
         run: |

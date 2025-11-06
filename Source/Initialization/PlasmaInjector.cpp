@@ -35,6 +35,10 @@
 #include <AMReX_RandomEngine.H>
 #include <AMReX_REAL.H>
 
+#ifdef WARPX_USE_OPENPMD
+#   include <openPMD/openPMD.hpp>
+#endif
+
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -62,8 +66,13 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 
     const amrex::ParmParse pp_species(species_name);
 
-    utils::parser::queryWithParser(pp_species, source_name, "radially_weighted", radially_weighted);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radially_weighted, "ERROR: Only radially_weighted=true is supported");
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Default radial_numpercell_power is uniform number of particles per cell
+    radial_numpercell_power = 0._rt;
+    utils::parser::queryWithParser(pp_species, source_name, "radial_numpercell_power", radial_numpercell_power);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radial_numpercell_power > -1.,
+        "The radial_numpercell_power must be greater than -1");
+#endif
 
     // Unlimited boundaries
     xmin = std::numeric_limits<amrex::Real>::lowest();
@@ -234,6 +243,14 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
     const bool focusing_is_specified = pp_species.contains("focal_distance");
+    utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
+    utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
+
+    if(do_rotation){
+        utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
+        utils::parser::getArrWithParser(pp_species, source_name, "gaussian_beam_rotation_axis", rotation_axis, 0, 3);
+    }
+
     if(focusing_is_specified){
         do_focusing = true;
         utils::parser::queryWithParser(pp_species, source_name, "focal_distance", focal_distance);
@@ -262,6 +279,11 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( z_rms > 0._rt,
         "Error: Gaussian beam z_rms must be strictly greater than 0 with RCYLINDER "
         "(it is used when computing the particles' weights from the total beam charge)");
+#endif
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !do_rotation && !do_rotation_momenta,
+        "Error: Gaussian beam cannot be rotated in 1D, RCYLINDER, RSPHERE, and RZ geometries.");
 #endif
 }
 
@@ -464,13 +486,13 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
     const bool species_is_specified = pp_species.contains("species_type");
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
-        m_openpmd_input_series = std::make_unique<openPMD::Series>(
+        auto series = openPMD::Series(
             str_injection_file, openPMD::Access::READ_ONLY);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_openpmd_input_series->iterations.size() == 1u,
+            series.iterations.size() == 1u,
             "External file should contain only 1 iteration\n");
-        openPMD::Iteration it = m_openpmd_input_series->iterations.begin()->second;
+        openPMD::Iteration it = series.iterations.begin()->second;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             it.particles.size() == 1u,
             "External file should contain only 1 species\n");
@@ -497,7 +519,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
                 // TODO: Add ASSERT_WITH_MESSAGE to test if charge is a constant record
                 auto p_q_ptr =
                     ps["charge"][openPMD::RecordComponent::SCALAR].loadChunk<amrex::ParticleReal>();
-                m_openpmd_input_series->flush();
+                series.flush();
                 amrex::ParticleReal const p_q = p_q_ptr.get()[0];
                 auto const charge_unit = static_cast<amrex::Real>(ps["charge"][openPMD::RecordComponent::SCALAR].unitSI());
                 charge = p_q * charge_unit;
@@ -520,12 +542,13 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
                 // TODO: Add ASSERT_WITH_MESSAGE to test if mass is a constant record
                 auto p_m_ptr =
                     ps["mass"][openPMD::RecordComponent::SCALAR].loadChunk<amrex::ParticleReal>();
-                m_openpmd_input_series->flush();
+                series.flush();
                 amrex::ParticleReal const p_m = p_m_ptr.get()[0];
                 auto const mass_unit = static_cast<amrex::Real>(ps["mass"][openPMD::RecordComponent::SCALAR].unitSI());
                 mass = p_m * mass_unit;
             }
         }
+        m_openpmd_input_series = series;
     } // IOProcessor
 
     // Broadcast charge and mass to non-IO processors if read in from the file

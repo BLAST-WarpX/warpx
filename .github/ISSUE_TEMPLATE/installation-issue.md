@@ -1,5 +1,5 @@
 ---
-name: Installation issue
+name: 🔧 Installation issue
 about: Report an issue with installing or setting up WarpX.
 labels: [install]
 ---

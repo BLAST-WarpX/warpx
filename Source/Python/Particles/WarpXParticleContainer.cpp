@@ -29,10 +29,6 @@ void init_WarpXParticleContainer (py::module& m)
         amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>
     > wpc (m, "WarpXParticleContainer");
     wpc
-        .def("add_real_comp",
-            [](WarpXParticleContainer& pc, const std::string& name, bool comm) { pc.AddRealComp(name, comm); },
-            py::arg("name"), py::arg("comm")
-        )
         .def("add_n_particles",
             [](WarpXParticleContainer& pc, int lev,
                 int n, py::array_t<double> &x,
@@ -101,20 +97,16 @@ void init_WarpXParticleContainer (py::module& m)
             },
             py::arg("comp_name")
         )
-        .def("num_local_tiles_at_level",
-            &WarpXParticleContainer::numLocalTilesAtLevel,
-            py::arg("level")
-        )
-        .def("total_number_of_particles",
-            &WarpXParticleContainer::TotalNumberOfParticles,
-            py::arg("valid_particles_only"), py::arg("local")
-        )
         .def("sum_particle_weight",
             &WarpXParticleContainer::sumParticleWeight,
             py::arg("local")
         )
         .def("sum_particle_charge",
             &WarpXParticleContainer::sumParticleCharge,
+            py::arg("local")
+        )
+        .def("sum_particle_energy",
+            &WarpXParticleContainer::sumParticleEnergy,
             py::arg("local")
         )
         .def("deposit_charge",
@@ -139,6 +131,14 @@ void init_WarpXParticleContainer (py::module& m)
         )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_gather",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotGather(flag); },
+            py::arg("flag")
+        )
+        .def("set_do_not_deposit",
+            [](WarpXParticleContainer& pc, int flag) { pc.setDoNotDeposit(flag); },
             py::arg("flag")
         )
     ;

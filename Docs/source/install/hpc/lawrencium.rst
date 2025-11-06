@@ -105,13 +105,13 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cmake -S . -B build -DWarpX_DIMS="1;2;RZ;3" -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON
    cmake --build build -j 12
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The general :ref:`cmake compile-time options <install-build-cmake>` apply as usual.
 
 **That's it!**
 A 3D WarpX executable is now in ``build/bin/`` and :ref:`can be run <running-cpp-lawrencium>` with a :ref:`3D example inputs file <usage-examples>`.
 Most people execute the binary directly or copy it out to a location in ``/global/scratch/users/$USER/``.
 
-For a *full PICMI install*, follow the :ref:`instructions for Python (PICMI) bindings <building-cmake-python>`:
+For a *full PICMI install*, follow the :ref:`instructions for Python (PICMI) bindings <install-build-python-cmake>`:
 
 .. code-block:: bash
 
@@ -124,7 +124,7 @@ For a *full PICMI install*, follow the :ref:`instructions for Python (PICMI) bin
    # compile parallel PICMI interfaces in 3D, 2D, 1D and RZ
    WARPX_MPI=ON WARPX_COMPUTE=CUDA WARPX_FFT=ON BUILD_PARALLEL=12 python3 -m pip install --force-reinstall --no-deps -v .
 
-Or, if you are *developing*, do a quick PICMI install of a *single geometry* (see: :ref:`WarpX_DIMS <building-cmake-options>`) using:
+Or, if you are *developing*, do a quick PICMI install of a *single geometry* (see: :ref:`WarpX_DIMS <install-build-options>`) using:
 
 .. code-block:: bash
 

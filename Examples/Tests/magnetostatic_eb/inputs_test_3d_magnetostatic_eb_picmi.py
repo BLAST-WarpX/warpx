@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as con
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 ##########################
 # physics parameters
@@ -176,8 +176,8 @@ sim.step(max_steps)
 # Testing
 ##########################
 
-Ex = fields.ExWrapper()
-Ey = fields.EyWrapper()
+Ex = sim.fields.get("Efield_aux", dir="x", level=0)
+Ey = sim.fields.get("Efield_aux", dir="y", level=0)
 
 x_vec = Ex.mesh("x")
 y_vec = Ex.mesh("y")
@@ -237,8 +237,8 @@ assert er_err < 0.05, "Er Max Error increased above 5%"
 # Check B field
 ########################
 
-Bx = fields.BxWrapper()
-By = fields.ByWrapper()
+Bx = sim.fields.get("Bfield_aux", dir="x", level=0)
+By = sim.fields.get("Bfield_aux", dir="y", level=0)
 
 x_vec = Bx.mesh("x")
 y_vec = Bx.mesh("y")

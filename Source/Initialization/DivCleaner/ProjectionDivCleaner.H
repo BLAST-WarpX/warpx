@@ -97,7 +97,7 @@ private:
         mlmg.setBottomSolver(m_bottom_solver);
         mlmg.setVerbose(m_verbose);
         mlmg.setBottomVerbose(m_bottom_verbose);
-        mlmg.setAlwaysUseBNorm(false);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.solve({m_solution[lev].get()}, {m_source[lev].get()}, m_rtol, m_atol);
     }
 

@@ -84,7 +84,9 @@ namespace ablastr::fields {
  * \param[in] geom the geometry per level (e.g., from AmrMesh)
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
+ * \param[in] grid_type grid type (e.g., collocated, staggered, hybrid)
  * \param[in] is_solver_igf_on_lev0 boolean to select the Poisson solver: 1 for FFT on level 0 & Multigrid on other levels, 0 for Multigrid on all levels
+ * \param[in] eb_enabled whether embedded boundaries are enabled
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
@@ -158,7 +160,7 @@ computeEffectivePotentialPhi (
 
         // Use the Multigrid (MLMG) solver but first scale rho appropriately
         using namespace ablastr::constant::SI;
-        rho[lev]->mult(-1._rt/ep0);
+        rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
         // In the presence of EB or RZ the EB enabled linear solver is used
@@ -229,7 +231,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setAlwaysUseBNorm((max_norm_b > 0));
+        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -265,7 +267,7 @@ computeEffectivePotentialPhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-epsilon_0);  // Multiply rho by epsilon again
     } // loop over lev(els)
 }
 

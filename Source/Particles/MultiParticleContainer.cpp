@@ -33,6 +33,7 @@
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SpeciesPhysicalProperties.H"
+#include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -73,6 +74,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <string>
@@ -118,8 +120,6 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
         allcontainers[i] = std::make_unique<LaserParticleContainer>(amr_core, i, lasers_names[i-nspecies]);
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
     }
-
-    pc_tmp = std::make_unique<PhysicalParticleContainer>(amr_core);
 
     // Setup particle collisions
     collisionhandler = std::make_unique<CollisionHandler>(this);
@@ -202,6 +202,43 @@ MultiParticleContainer::ReadParameters ()
                utils::parser::makeParser(str_Ey_ext_particle_function,{"x","y","z","t"}));
            m_Ez_particle_parser = std::make_unique<amrex::Parser>(
                utils::parser::makeParser(str_Ez_ext_particle_function,{"x","y","z","t"}));
+
+        }
+
+        // if the input string for B_ext_particle_s is
+        // "read_from_file" then the mathematical expression
+        // for the time dependency read_fields_B_dependency(t)
+        // can be provided in the input file. If not provided, it defaults to '1.0'
+        if (m_B_ext_particle_s == "read_from_file") {
+            // store the mathematical expression as string
+            std::string str_B_ext_time_function = "1.0";
+            utils::parser::Query_parserString(
+                pp_particles, "read_fields_B_dependency(t)",
+                str_B_ext_time_function);
+
+            // Parser for B_external on the particle
+            m_B_particle_from_file_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_B_ext_time_function,{"t"}));
+
+            m_Bfield_time_partparser = m_B_particle_from_file_parser->compile<1>();
+        }
+
+        // if the input string for E_ext_particle_s is
+        // "read_from_file" then the mathematical expression
+        // for the time dependency read_fields_E_dependency(t)
+        // can be provided in the input file. If not provided, it defaults to '1.0'
+        if (m_E_ext_particle_s == "read_from_file") {
+            // store the mathematical expression as string
+            std::string str_E_ext_time_function = "1.0";
+            utils::parser::Query_parserString(
+                pp_particles, "read_fields_E_dependency(t)",
+                str_E_ext_time_function);
+
+            // Parser for B_external on the particle
+            m_E_particle_from_file_parser = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(str_E_ext_time_function,{"t"}));
+
+            m_Efield_time_partparser = m_E_particle_from_file_parser->compile<1>();
 
         }
 
@@ -307,21 +344,32 @@ MultiParticleContainer::ReadParameters ()
                     species_types[i] = PCTypes::RigidInjected;
                 }
             }
+
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            if (!photon_species.empty()) {
-                for (auto const& name : photon_species) {
-                    auto it = std::find(species_names.begin(), species_names.end(), name);
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        it != species_names.end(),
-                        "species '" + name
-                        + "' in particles.photon_species must be part of particles.species_names");
-                    const auto i = static_cast<int>(std::distance(species_names.begin(), it));
-                    species_types[i] = PCTypes::Photon;
+            const int spec_size = species_names.size();
+            for (int spec_index = 0; spec_index < spec_size; ++spec_index){
+
+                const auto name = species_names[spec_index];
+
+                bool species_type_is_photon = false;
+                const ParmParse pp_species(name);
+                if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
+                    const auto physical_species =
+                        species::from_string(type_string);
+                    species_type_is_photon =
+                        (physical_species.value() == PhysicalSpecies::photon);
+                }
+
+                //deprecated
+                const bool name_is_in_photon_species =
+                    utils::algorithms::is_in(photon_species, name);
+
+                if (name_is_in_photon_species || species_type_is_photon  ){
+                    species_types[spec_index] = PCTypes::Photon;
                 }
             }
-
         }
         pp_particles.query("use_fdtd_nci_corr", WarpX::use_fdtd_nci_corr);
 #ifdef WARPX_DIM_RZ
@@ -412,7 +460,6 @@ MultiParticleContainer::AllocData ()
     for (auto& pc : allcontainers) {
         pc->AllocData();
     }
-    pc_tmp->AllocData();
 }
 
 void
@@ -423,8 +470,6 @@ MultiParticleContainer::InitData ()
     for (auto& pc : allcontainers) {
         pc->InitData();
     }
-    pc_tmp->InitData();
-
 }
 
 void
@@ -435,7 +480,6 @@ MultiParticleContainer::PostRestart ()
     for (auto& pc : allcontainers) {
         pc->PostRestart();
     }
-    pc_tmp->PostRestart();
 }
 
 void
@@ -460,8 +504,10 @@ void
 MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
-                                Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                bool deposit_mass_matrices, PushType push_type)
+                                Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                PositionPushType position_push_type,
+                                MomentumPushType momentum_push_type,
+                                ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
@@ -474,14 +520,28 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
-        if (deposit_mass_matrices) {
-            fields.get(FieldType::MassMatrices, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices, Direction{2}, lev)->setVal(0.0);
+        if (implicit_options && implicit_options->deposit_mass_matrices) {
+            fields.get(FieldType::current_fp_MM, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{2}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Y, Direction{2}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
+            if (implicit_options->use_mass_matrices_pc) {
+                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
+            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, deposit_mass_matrices, push_type);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
     }
 }
 
@@ -593,6 +653,36 @@ MultiParticleContainer::DepositCharge (
 #endif
 }
 
+void
+MultiParticleContainer::DepositTemperatures (
+    ablastr::fields::MultiFabRegister & fields,
+    const amrex::Real relative_time)
+{
+    using ablastr::fields::Direction;
+
+    // Call the deposition kernel for each species
+    for (auto& pc : allcontainers)
+    {
+        // If this species does not use temperature deposition then skip to next one
+        if (!pc->getTemperatureDepositionFlag()) { continue; }
+
+        // Generate Name to look up temperature MF in the register
+        const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
+        ablastr::fields::MultiLevelVectorField T_vf =
+            fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
+
+        // Clear temperature MF for this species
+        for (int idim = 0; idim < 3; ++idim) {
+            for (int lev = 0; lev <= WarpX::GetInstance().finestLevel(); ++lev) {
+                T_vf[lev][Direction{idim}]->setVal(0.0_rt);
+            }
+        }
+
+        // Accumulate velocities for this species
+        pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+    }
+}
+
 std::unique_ptr<MultiFab>
 MultiParticleContainer::GetChargeDensity (int lev, bool local)
 {
@@ -668,7 +758,6 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                         }
                     });
             }
-
         }
 
 #ifdef AMREX_USE_OMP
@@ -688,9 +777,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                     }
                 });
         }
-
     }
-
 }
 
 void
@@ -701,6 +788,7 @@ MultiParticleContainer::SortParticlesByBin (
 {
     for (auto& pc : allcontainers) {
         if (sort_particles_for_deposition) {
+            if (pc->do_not_deposit) { continue; }
             pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
@@ -1125,7 +1213,7 @@ void MultiParticleContainer::InitQuantumSync ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
 
@@ -1247,7 +1335,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
     // qs_minimum_chi_part is the minimum chi parameter to be
     // considered for Synchrotron emission. If a lepton has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real qs_minimum_chi_part;
+    amrex::Real qs_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){
@@ -1307,8 +1395,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1337,7 +1424,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
     // bw_minimum_chi_phot is the minimum chi parameter to be
     // considered for pair production. If a photon has chi < chi_min,
     // the optical depth is not evolved and photon generation is ignored
-    amrex::Real bw_minimum_chi_part;
+    amrex::Real bw_minimum_chi_part = 0;
     utils::parser::getWithParser(pp_qed_bw, "chi_min", bw_minimum_chi_part);
 
     if(ParallelDescriptor::IOProcessor()){
@@ -1392,8 +1479,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();

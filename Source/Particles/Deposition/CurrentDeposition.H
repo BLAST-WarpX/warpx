@@ -9,8 +9,8 @@
 #define WARPX_CURRENTDEPOSITION_H_
 
 #include "Particles/Deposition/SharedDepositionUtils.H"
-#include "ablastr/parallelization/KernelTimer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -148,7 +148,7 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
     int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
     int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
-#endif //AMREX_SPACEDIM >= 2
+#endif //!defined(WARPX_DIM_1D_Z)
 
 #if defined(WARPX_DIM_3D)
     // y direction
@@ -366,7 +366,7 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time n.
- * \param uxp,uyp,uzp  Pointer to arrays of particle momentum at time n+1/2.
+ * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time n+1/2.
  * \param ion_lev      Pointer to array of particle ionization level. This is
                          required to have the charge of each macroparticle
                          since q is a scalar. For non-ionizable species,
@@ -385,9 +385,9 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
                                 const amrex::ParticleReal * const uxp_n,
                                 const amrex::ParticleReal * const uyp_n,
                                 const amrex::ParticleReal * const uzp_n,
-                                const amrex::ParticleReal * const uxp,
-                                const amrex::ParticleReal * const uyp,
-                                const amrex::ParticleReal * const uzp,
+                                const amrex::ParticleReal * const uxp_nph,
+                                const amrex::ParticleReal * const uyp_nph,
+                                const amrex::ParticleReal * const uzp_nph,
                                 const int * const ion_lev,
                                 amrex::FArrayBox& jx_fab,
                                 amrex::FArrayBox& jy_fab,
@@ -421,20 +421,13 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
             amrex::ParticleReal xp, yp, zp;
             GetPosition(ip, xp, yp, zp);
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
-
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp,uyp,uzp are the velocities at time level n+1/2
-            const amrex::ParticleReal uxp_np1 = 2._prt*uxp[ip] - uxp_n[ip];
-            const amrex::ParticleReal uyp_np1 = 2._prt*uyp[ip] - uyp_n[ip];
-            const amrex::ParticleReal uzp_np1 = 2._prt*uzp[ip] - uzp_n[ip];
-            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
-            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
-            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
+                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
 
-            const amrex::Real vx  = uxp[ip]*gaminv;
-            const amrex::Real vy  = uyp[ip]*gaminv;
-            const amrex::Real vz  = uzp[ip]*gaminv;
+            const amrex::Real vx  = uxp_nph[ip]*gaminv;
+            const amrex::Real vy  = uyp_nph[ip]*gaminv;
+            const amrex::Real vz  = uzp_nph[ip]*gaminv;
 
             amrex::Real wq  = q*wp[ip];
             if (do_ionization){
@@ -463,7 +456,6 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
                          ion_lev is a null pointer.
  * \param jx_fab,jy_fab,jz_fab FArrayBox of current density, either full array or tile.
  * \param np_to_deposit Number of particles for which current is deposited.
- * \param dt           Time step for particle level
  * \param relative_time Time at which to deposit J, relative to the time of the
  *                      current positions of the particles. When different than 0,
  *                      the particle position will be temporarily modified to match
@@ -506,7 +498,8 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 {
     using namespace amrex::literals;
 
-#if defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
     using namespace amrex;
 
     auto permutation = a_bins.permutationPtr();
@@ -1164,17 +1157,11 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
-#if !defined(WARPX_DIM_3D)
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
+#if !defined(WARPX_DIM_3D)
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp,uyp,uzp are the velocities at time level n+1/2
-            const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph[ip] - uxp_n[ip];
-            const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph[ip] - uyp_n[ip];
-            const amrex::ParticleReal uzp_np1 = 2._prt*uzp_nph[ip] - uzp_n[ip];
-            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
-            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
-            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
+                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
 #endif
 
             Real wq = q*wp[ip];
@@ -1465,10 +1452,10 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
+ * \tparam depos_order  deposition order
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param wp           Pointer to array of particle weights.
+ * \param wq           Pointer to array of particle weights.
  * \param uxp_mid,uyp_mid,uzp_mid  Particle momentum at middle of step
  * \param gaminv       One over gamma for particle at middle of step
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile
@@ -1477,7 +1464,6 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param xyzmin                Physical lower bounds of domain
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
- * \param q                     Species charge
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
@@ -2128,12 +2114,10 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \tparam depos_order  deposition order
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
- * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
- * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
  * \param ion_lev      Pointer to array of particle ionization level. This is
                        required to have the charge of each macroparticle
                        since q is a scalar. For non-ionizable species,
@@ -2141,6 +2125,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density, either full array or tile.
  * \param np_to_deposit         Number of particles for which current is deposited.
  * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
  * \param lo                    Index lower bounds of domain.
@@ -2215,8 +2200,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  *        by segment, where the segments are determined by cell crossings. In general, this results
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
- * \param depos_order  deposition order
- * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
+ * \tparam depos_order  deposition order
+ * \param xp_n_data,yp_n_data,zp_n_data  Pointer to arrays of particle position at time level n.
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time level n.
@@ -2271,17 +2256,15 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
+            // Skip particles with zero weight.
+            // This should only be the case for particles that will be suborbited.
+            if (wp[ip] == 0.) { return; }
+
 #if !defined(WARPX_DIM_3D)
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            // The uxp_nhp, uyp_nhp, uzp_nhp are the velocities at time level n+1/2
-            const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph[ip] - uxp_n[ip];
-            const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph[ip] - uyp_n[ip];
-            const amrex::ParticleReal uzp_np1 = 2._prt*uzp_nph[ip] - uzp_n[ip];
-            const amrex::ParticleReal gamma_n = std::sqrt(1._prt + (uxp_n[ip]*uxp_n[ip] + uyp_n[ip]*uyp_n[ip] + uzp_n[ip]*uzp_n[ip])*inv_c2);
-            const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
-            const amrex::ParticleReal gaminv = 2.0_prt/(gamma_n + gamma_np1);
+            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
+                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
 #else
             // gaminv is unused in 3D
             const amrex::ParticleReal gaminv = 1.;
@@ -2393,9 +2376,6 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     temp_fab.setVal<amrex::RunOn::Device>(0._rt);
     amrex::Array4<amrex::Real> const& temp_arr = temp_fab.array();
 
-    // Inverse of light speed squared
-    const amrex::Real invcsq = 1._rt / (PhysConst::c * PhysConst::c);
-
     // Arrays where D will be stored
     amrex::Array4<amrex::Real> const& Dx_arr = Dx_fab.array();
     amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
@@ -2405,9 +2385,9 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::ParallelFor(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
     {
         // Inverse of Lorentz factor gamma
-        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * invcsq
-                                                           + uyp[ip] * uyp[ip] * invcsq
-                                                           + uzp[ip] * uzp[ip] * invcsq);
+        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * PhysConst::inv_c2
+                                                           + uyp[ip] * uyp[ip] * PhysConst::inv_c2
+                                                           + uzp[ip] * uzp[ip] * PhysConst::inv_c2);
         // Product of particle charges and weights
         amrex::Real wq = q * wp[ip];
         if (do_ionization) { wq *= ion_lev[ip]; }

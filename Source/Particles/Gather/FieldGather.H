@@ -24,6 +24,7 @@
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle
  * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
+ * \param Fx_type,Fy_type,Fz_type Index type of the vector fields
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
  * \param lo                      Index lower bounds of domain
@@ -402,8 +403,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // sx_[eb][xyz] shape factor along x for the centering of each current
     // There are only two possible centerings, node or cell centered, so at most only two shape factor
     // arrays will be needed.
-    amrex::Real sx_node[depos_order + 1];
-    amrex::Real sx_cell[depos_order + 1];
+    amrex::Real sx_node[depos_order + 1] = {0._rt};
+    amrex::Real sx_cell[depos_order + 1] = {0._rt};
     amrex::Real sx_node_galerkin[depos_order + 1 - galerkin_interpolation] = {0._rt};
     amrex::Real sx_cell_galerkin[depos_order + 1 - galerkin_interpolation] = {0._rt};
 
@@ -440,10 +441,10 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #if defined(WARPX_DIM_3D)
     // y direction
     const amrex::Real y = (yp-xyzmin.y)*dinv.y;
-    amrex::Real sy_node[depos_order + 1];
-    amrex::Real sy_cell[depos_order + 1];
-    amrex::Real sy_node_v[depos_order + 1 - galerkin_interpolation];
-    amrex::Real sy_cell_v[depos_order + 1 - galerkin_interpolation];
+    amrex::Real sy_node[depos_order + 1] = {0._rt};
+    amrex::Real sy_cell[depos_order + 1] = {0._rt};
+    amrex::Real sy_node_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
+    amrex::Real sy_cell_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
     int k_node = 0;
     int k_cell = 0;
     int k_node_v = 0;
@@ -478,10 +479,10 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // z direction
     const amrex::Real z = (zp-xyzmin.z)*dinv.z;
-    amrex::Real sz_node[depos_order + 1];
-    amrex::Real sz_cell[depos_order + 1];
-    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation];
-    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation];
+    amrex::Real sz_node[depos_order + 1] = {0._rt};
+    amrex::Real sz_cell[depos_order + 1] = {0._rt};
+    amrex::Real sz_node_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
+    amrex::Real sz_cell_v[depos_order + 1 - galerkin_interpolation] = {0._rt};
     int l_node = 0;
     int l_cell = 0;
     int l_node_v = 0;
@@ -2145,8 +2146,7 @@ void doGatherShapeN (const amrex::ParticleReal xp,
  * \param lo                      Index lower bounds of domain.
  * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  * \param nox                     order of the particle shape function
- * \param gather_type             integer identifier for which algorithm to use
- * \param galerkin_interpolation  whether to use lower order in v
+ * \param depos_type              current deposition algorithm (e.g., direct, Esirkepov, Vay, Villasenor, etc.)
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doGatherShapeNImplicit (

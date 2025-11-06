@@ -5,6 +5,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
@@ -71,11 +72,12 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
-        mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
+
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+
+        ctest --test-dir build/Examples/Physics_applications/ -R ".*\.run" --output-on-failure
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
