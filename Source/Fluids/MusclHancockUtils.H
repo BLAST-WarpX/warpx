@@ -12,6 +12,8 @@
 #include <AMReX_Gpu.H>
 #include <AMReX_REAL.H>
 
+#include <tuple>
+
 
 // Euler push for momentum source (r-direction)
 // Note: assumes U normalized by c
@@ -163,9 +165,12 @@ amrex::Real ave_stage2 (amrex::Real dQ, amrex::Real a, amrex::Real b, amrex::Rea
 }
 // Returns the offset indices for the "plus" grid
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void plus_index_offsets (int i, int j, int k, int& ip, int& jp, int& kp, int comp)
+std::tuple<int,int,int> plus_index_offsets (int i, int j, int k, int comp)
 {
-    using namespace amrex::literals;
+    int ip = 0;
+    int jp = 0;
+    int kp = 0;
+
     // Find the correct offsets
 #if defined(WARPX_DIM_3D)
     if (comp == 0) { //x
@@ -190,7 +195,10 @@ void plus_index_offsets (int i, int j, int k, int& ip, int& jp, int& kp, int com
         ip =  i - 1; jp =  j; kp = k;
     }
 #endif
+
+    return {ip, jp, kp};
 }
+
 // Compute the zero edges
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void compute_U_edges (const amrex::Array4<amrex::Real>& Um, const amrex::Array4<amrex::Real>& Up, int i, int j, int k, amrex::Box box,
@@ -199,8 +207,7 @@ amrex::Real dU0x, amrex::Real dU1x, amrex::Real dU2x, amrex::Real dU3x, int comp
 {
     using namespace amrex::literals;
     // comp -> x, y, z -> 0, 1, 2
-    int ip, jp, kp;
-    plus_index_offsets(i, j, k, ip, jp, kp, comp);
+    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, comp);
 
     if ( box.contains(i,j,k) ) {
         Um(i,j,k,0) = U_tilde0 + dU0x/2.0_rt;
@@ -223,8 +230,7 @@ const amrex::Array4<amrex::Real>& Up, int i, int j, int k, amrex::Box box, int c
 {
     using namespace amrex::literals;
     // comp -> x, y, z -> 0, 1, 2
-    int ip, jp, kp;
-    plus_index_offsets(i, j, k, ip, jp, kp, comp);
+    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, comp);
 
     if ( box.contains(i,j,k) ) {
         Um(i,j,k,0) = 0.0_rt;
@@ -251,8 +257,7 @@ int comp)
 
     using namespace amrex::literals;
     // comp -> x, y, z -> 0, 1, 2
-    int ip, jp, kp;
-    plus_index_offsets(i, j, k, ip, jp, kp, comp);
+    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, comp);
 
     // Set the edges to zero. If one edge in a cell is zero, we must self-consistently
     // set the slope to zero (hence why we have the three cases, the first is when
@@ -500,8 +505,7 @@ const amrex::Array4<amrex::Real>& U_plus,int i,int j,int k,amrex::Real clight, i
 {
     using namespace amrex::literals;
     // dir -> x, y, z -> 0, 1, 2
-    int ip, jp, kp;
-    plus_index_offsets(i, j, k, ip, jp, kp, dir);
+    const auto [ip, jp, kp] = plus_index_offsets(i, j, k, dir);
 
     const amrex::Real V_L_minus = V_calc(U_minus,ip,jp,kp,dir,clight);
     const amrex::Real V_I_minus = V_calc(U_minus,i,j,k,dir,clight);

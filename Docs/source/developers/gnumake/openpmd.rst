@@ -114,7 +114,7 @@ Finally, compile WarpX:
 
 .. note::
 
-   If you compile with :ref:`CMake <install-developers>`, all you need to add is the ``-DWarpX_OPENPMD=ON`` option (on by default), and we will download and build openPMD-api on-the-fly.
+   If you compile with :ref:`CMake <install-build-cmake>`, all you need to add is the ``-DWarpX_OPENPMD=ON`` option (on by default), and we will download and build openPMD-api on-the-fly.
 
 When running WarpX, we will recall where you installed openPMD-api via RPATHs, so you just need to load the same module environment as used for building (same MPI, HDF5, ADIOS2, for instance).
 
