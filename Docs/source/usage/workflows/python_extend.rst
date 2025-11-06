@@ -24,13 +24,13 @@ How to run a simulation with Python extensions
 - **Install WarpX with support for the Python interface**: for instance, if you :ref:`compile WarpX from source <install-build-code>`, this involves using ``-DWarpX_PYTHON=ON``.
 
 - **Write a Python script that extends the simulation**: this can be done starting from a simulation defined either with a :ref:`parameter list <running-cpp-parameters>` or with the :ref:`PICMI Python interface <usage-picmi>`.
-  The Python code typically contains :ref:`callback functions <usage-python-extend-callbacks>` that :ref:`access/modify <usage-python-extend-data-access>` the simulation data (see the sections below for more details).
+  The Python script typically contains :ref:`callback functions <usage-python-extend-callbacks>` that :ref:`access/modify <usage-python-extend-data-access>` the simulation data (see the sections below for more details).
 
 .. tab-set::
 
    .. tab-item:: Parameter List
 
-      When starting from an :ref:`inputs file <running-cpp-parameters>`, one can transition to WarpX Python by loading it:
+      When starting from a :ref:`parameter list <running-cpp-parameters>`, write a Python script that loads the parameter list file using the :py:meth:`~pywarpx.picmi.Simulation.load_inputs_file` method:
 
       .. code-block:: python3
 
@@ -52,9 +52,7 @@ How to run a simulation with Python extensions
 
    .. tab-item:: PICMI
 
-      When running WarpX directly :ref:`from PICMI Python <usage-picmi>` it is possible to interact with the simulation.
-
-      For instance, with the :py:meth:`~pywarpx.picmi.Simulation.step` method of the simulation class, one could run ``sim.step(nsteps=1)`` in a loop:
+      When starting from a :ref:`PICMI Python script <usage-picmi>`, simply add the Python code that extends the simulation to this script, before the call to :py:meth:`~pywarpx.picmi.Simulation.step`.
 
       .. code-block:: python3
 
@@ -64,13 +62,10 @@ How to run a simulation with Python extensions
 
          # register callbacks ...
 
-         steps = 1000
-         for _ in range(steps):
-             sim.step(nsteps=1)
+         sim.step(nsteps=1000)
 
-             # do something custom with the sim object
 
-- **Run the simulation by executing the Python script**: for instance using `mpirun` or `srun` on an HPC system.
+- **Then, run the simulation by executing the Python script**: for instance using ``mpirun`` or ``srun`` on an HPC system.
 
 .. code-block:: bash
 
