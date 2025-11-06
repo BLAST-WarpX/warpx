@@ -17,11 +17,6 @@
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Antoun, Thierry",
-        "orcid": "0000-0002-1003-0698"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Amorim, L\u00edgia Diana",
         "orcid": "0000-0002-1445-0032"
       },
@@ -34,6 +29,11 @@
         "affiliation": "Lawrence Livermore National Laboratory",
         "name": "Angus, Justin Ray",
         "orcid": "0000-0003-1474-0002"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Antoun, Thierry",
+        "orcid": "0000-0002-1003-0698"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -79,14 +79,14 @@
         "orcid": "0000-0002-1442-0706"
       },
       {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Gott, Kevin",
-        "orcid": "0000-0003-3244-5525"
-      },
-      {
         "affiliation": "CERN",
         "name": "Giacomel, Lorenzo",
         "orcid": "0000-0002-1750-9757"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Gott, Kevin",
+        "orcid": "0000-0003-3244-5525"
       },
       {
         "affiliation": "TAE Technologies Inc.",
