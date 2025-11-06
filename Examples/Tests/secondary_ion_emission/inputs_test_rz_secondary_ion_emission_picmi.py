@@ -8,6 +8,7 @@
 # electrons will be emitted.
 # Simulation is initialized with four ions with i_dist distribution and spherical
 # embedded boundary given by implicit function.
+import numpy as np
 from scipy.constants import e, elementary_charge, m_e, proton_mass
 
 from pywarpx import callbacks, particle_containers, picmi
@@ -15,11 +16,13 @@ from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # numerics parameters
+##########################
 
 dt = 0.000000075
 
 # --- Nb time steps
 Te = 0.0259  # in eV
+dist_th = np.sqrt(Te * elementary_charge / m_e)
 
 max_steps = 3
 diagnostic_interval = 1
@@ -34,6 +37,7 @@ zmin = -2
 zmax = 2
 delta_H = 0.4
 E_HMax = 250
+
 ##########################
 # numerics components
 ##########################
@@ -135,14 +139,14 @@ sim.add_diagnostic(field_diag)
 sim.initialize_inputs()
 sim.initialize_warpx()
 
-xp, _ = load_cupy()
-dist_th = xp.sqrt(Te * elementary_charge / m_e)
-xp.random.seed(10025015)
-
-
 ##########################
 # python particle data access
 ##########################
+xp, _ = load_cupy()
+
+np.random.seed(10025015)
+
+
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
@@ -156,27 +160,31 @@ def sigma_nascap(energy_kEv, delta_H, E_HMax):
     Compute sigma_nascap for each element in the energy array using a loop.
 
     Parameters:
-    - energy: ndarray or list, energy values in KeV
+    - energy_kEv: ndarray or list, energy values in KeV
     - delta_H: float, parameter for the formula
     - E_HMax: float, parameter for the formula in KeV
 
     Returns:
-    - numpy array, computed probability sigma_nascap
+    - numpy or cupy array, computed probability sigma_nascap
     """
-    sigma_nascap = xp.array([])
+    energy_kEv = xp.asarray(energy_kEv)
     # Loop through each energy value
-    for energy in energy_kEv:
-        if energy > 0.0:
-            sigma = (
-                delta_H
-                * (E_HMax + 1.0)
-                / (E_HMax * 1.0 + energy)
-                * xp.sqrt(energy / 1.0)
-            )
-        else:
-            sigma = 0.0
-        sigma_nascap = xp.append(sigma_nascap, sigma)
+    sigma_nascap = xp.where(
+        energy_kEv > 0.0,
+        delta_H
+        * (E_HMax + 1.0)
+        / (E_HMax * 1.0 + energy_kEv)
+        * xp.sqrt(energy_kEv / 1.0),
+        0.0,
+    )
     return sigma_nascap
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return np.asarray(arr)
 
 
 def secondary_emission():
@@ -208,25 +216,36 @@ def secondary_emission():
         energy_ions = 0.5 * proton_mass * w * (ux**2 + uy**2 + uz**2)
         energy_ions_in_kEv = energy_ions / (e * 1000)
         sigma_nascap_ions = sigma_nascap(energy_ions_in_kEv, delta_H, E_HMax)
+
+        x = to_numpy(x)
+        y = to_numpy(y)
+        z = to_numpy(z)
+        w = to_numpy(w)
+        nx = to_numpy(nx)
+        ny = to_numpy(ny)
+        nz = to_numpy(nz)
+        delta_t = to_numpy(delta_t)
+        sigma_nascap_ions = to_numpy(sigma_nascap_ions)
+
+        xe = np.array([])
+        ye = np.array([])
+        ze = np.array([])
+        we = np.array([])
+        delta_te = np.array([])
+        uxe = np.array([])
+        uye = np.array([])
+        uze = np.array([])
+
         # Loop over all ions that have been scraped in the last timestep
         for i in range(0, len(w)):
             sigma = sigma_nascap_ions[i]
             # Ne_sec is number of the secondary electrons to be emitted
-            Ne_sec = int(sigma + xp.random.uniform())
+            Ne_sec = int(sigma + np.random.uniform())
             for _ in range(Ne_sec):
-                xe = xp.array([])
-                ye = xp.array([])
-                ze = xp.array([])
-                we = xp.array([])
-                delta_te = xp.array([])
-                uxe = xp.array([])
-                uye = xp.array([])
-                uze = xp.array([])
-
                 # Random thermal momenta distribution
-                ux_th = xp.random.normal(0, dist_th)
-                uy_th = xp.random.normal(0, dist_th)
-                uz_th = xp.random.normal(0, dist_th)
+                ux_th = np.random.normal(0, dist_th)
+                uy_th = np.random.normal(0, dist_th)
+                uz_th = np.random.normal(0, dist_th)
 
                 un_th = nx[i] * ux_th + ny[i] * uy_th + nz[i] * uz_th
 
@@ -237,29 +256,30 @@ def secondary_emission():
                     uy_th_reflect = -2 * un_th * ny[i] + uy_th
                     uz_th_reflect = -2 * un_th * nz[i] + uz_th
 
-                    uxe = xp.append(uxe, ux_th_reflect)
-                    uye = xp.append(uye, uy_th_reflect)
-                    uze = xp.append(uze, uz_th_reflect)
+                    uxe = np.append(uxe, ux_th_reflect)
+                    uye = np.append(uye, uy_th_reflect)
+                    uze = np.append(uze, uz_th_reflect)
                 else:
-                    uxe = xp.append(uxe, ux_th)
-                    uye = xp.append(uye, uy_th)
-                    uze = xp.append(uze, uz_th)
+                    uxe = np.append(uxe, ux_th)
+                    uye = np.append(uye, uy_th)
+                    uze = np.append(uze, uz_th)
 
-                xe = xp.append(xe, x[i])
-                ye = xp.append(ye, y[i])
-                ze = xp.append(ze, z[i])
-                we = xp.append(we, w[i])
-                delta_te = xp.append(delta_te, delta_t[i])
+                # Also convert the position and weight arrays
+                xe = np.append(xe, x[i])
+                ye = np.append(ye, y[i])
+                ze = np.append(ze, z[i])
+                we = np.append(we, w[i])
+                delta_te = np.append(delta_te, delta_t[i])
 
-                elect_pc.add_particles(
-                    x=(xe + (dt - delta_te) * uxe).get(),
-                    y=(ye + (dt - delta_te) * uye).get(),
-                    z=(ze + (dt - delta_te) * uze).get(),
-                    ux=uxe.get(),
-                    uy=uye.get(),
-                    uz=uze.get(),
-                    w=we.get(),
-                )
+        elect_pc.add_particles(
+            x=xe + (dt - delta_te) * uxe,
+            y=ye + (dt - delta_te) * uye,
+            z=ze + (dt - delta_te) * uze,
+            ux=uxe,
+            uy=uye,
+            uz=uze,
+            w=we,
+        )
 
 
 # using the new particle container modified at the last step
