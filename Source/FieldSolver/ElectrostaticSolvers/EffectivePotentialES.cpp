@@ -130,7 +130,7 @@ void EffectivePotentialES::ComputeSigma (MultiFab& sigma) const
     // Note the use of the plasma frequency in rad/s (not Hz) and the factor of 1/4,
     // these choices make it so that C_SI = 1 is the marginal stability threshold.
     auto mult_factor = (
-        C_SI * warpx.getdt(lev) * warpx.getdt(lev) / (4._rt * PhysConst::ep0)
+        C_SI * warpx.getdt(lev) * warpx.getdt(lev) / (4._rt * PhysConst::epsilon_0)
     );
 
     // Loop over each species to calculate the Poisson equation dressing

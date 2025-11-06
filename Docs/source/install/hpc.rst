@@ -1,7 +1,7 @@
 .. _install-hpc:
 
-HPC
-===
+HPC Systems
+===========
 
 On selected high-performance computing (HPC) systems, WarpX has documented or even pre-build installation routines.
 Follow the guide here instead of the generic installation routines for optimal stability and best performance.

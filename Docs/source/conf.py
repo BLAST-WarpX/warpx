@@ -81,7 +81,7 @@ googleanalytics_enabled = True
 templates_path = ["_templates"]
 
 # Relative path to bibliography file, bibliography style
-bibtex_bibfiles = ["latex_theory/allbibs.bib", "refs.bib"]
+bibtex_bibfiles = ["refs.bib"]
 
 
 # An brief introduction to custom BibTex formatting can be found in the Sphinx documentation:

@@ -5,46 +5,200 @@ Acknowledge WarpX
 
 Please acknowledge the role that WarpX played in your research.
 
+.. _acknowledge_warpx_presentation:
+
 In presentations
 ****************
 
 For your presentations, you can find a WarpX acknowledgment slide `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
 Feel free to use it to acknowledge WarpX in your presentation.
 
-In publications
-***************
+.. _acknowledge_warpx_generic:
 
-Please add the following sentence to your publications, it helps contributors keep in touch with the community and promote the project.
+Acknowledgement Sentence
+************************
 
-**Plain text:**
+Please add the following acknowledgement sentence to your publications, it helps contributors keep in touch with the community and promote the project.
 
-  This research used the open-source particle-in-cell code WarpX https://github.com/BLAST-WarpX/warpx. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies. We acknowledge all WarpX contributors.
+.. tab-set::
 
-**LaTeX:**
+   .. tab-item:: Plain text
 
-.. code-block:: latex
+      This research used the open-source `particle-in-cell code WarpX <https://blast-warpx.github.io>`__. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies. We acknowledge all WarpX contributors.
 
-  \usepackage{hyperref}
-  This research used the open-source particle-in-cell code WarpX \url{https://github.com/BLAST-WarpX/warpx}.
-  Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies.
-  We acknowledge all WarpX contributors.
+   .. tab-item:: LaTeX
+
+      .. code-block:: latex
+
+        \usepackage{hyperref}
+        This research used the open-source \href{https://blast-warpx.github.io}{particle-in-cell code WarpX}.
+        Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies.
+        We acknowledge all WarpX contributors.
 
 .. _acknowledge_warpx_ref:
 
-Latest WarpX reference
-**********************
+Citation
+********
 
-If your project leads to a scientific publication, please consider citing the paper below.
+If your project leads to a scientific publication, please consider citing all WarpX authors via our *persistent Zenodo DOI*:
 
-- Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
-  **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
-  *SC22: International Conference for High Performance Computing, Networking, Storage and Analysis (SC)*. ISSN:2167-4337, pp. 25-36, Dallas, TX, US, 2022.
-  `DOI:10.1109/SC41404.2022.00008 <https://doi.org/10.1109/SC41404.2022.00008>`__ (`preprint here <https://www.computer.org/csdl/proceedings-article/sc/2022/544400a025/1I0bSKaoECc>`__)
+.. tab-set::
+
+   .. tab-item:: Plain Text
+
+      J.-L. Vay et al., **WarpX: An advanced Particle-In-Cell code**.
+      `DOI:10.5281/zenodo.4571577 <https://doi.org/10.5281/zenodo.4571577>`__,
+      `https://blast-warpx.github.io <https://blast-warpx.github.io>`__ (2018)
+
+   .. tab-item:: LateX: Bibtex
+
+      .. code-block:: bibtex
+
+          @misc{WarpX,
+            author = {Vay, Jean-Luc and
+                      Acciarri, Marco and
+                      Almgren, Ann and
+                      Amorim, Lígia Diana and
+                      Andriyash, Igor and
+                      Angus, Justin Ray and
+                      Antoun, Thierry and
+                      Belkin, Daniel and
+                      Bizzozero, David and
+                      Blelly, Aurore and
+                      Clark, Stephen Eric and
+                      Dammak, Eya and
+                      Fedeli, Luca and
+                      Formenti, Arianna and
+                      Garten, Marco and
+                      Ge, Lixin and
+                      Giacomel, Lorenzo and
+                      Gott, Kevin and
+                      Giacomel, Lorenzo and
+                      Groenewald, Roelof E. and
+                      Grote, David and
+                      Gu, Junmin and
+                      Harrison, Cyrus and
+                      Haseeb, Muhammad and
+                      Huebl, Axel and
+                      Jambunathan, Revathi and
+                      Kara-Mostefa, Ilian and
+                      Klion, Hannah and
+                      Kumar, Prabhat and
+                      Lehe, Remi and
+                      Loring, Burlen and
+                      Marks, Thomas and
+                      Miller, Phil and
+                      Myers, Andrew and
+                      Pech, Juliette and
+                      Rheaume, Elisa and
+                      Richardson, Glenn and
+                      Rheaume, Elisa and
+                      Rowan, Michael E. and
+                      Sandberg, Ryan Thor and
+                      Scherpelz, Peter and
+                      Sinn, Alexander and
+                      Shapoval, Olga and
+                      Terzani, Davide and
+                      Th{\'e}venet, Maxence and
+                      Weichman, Kale and
+                      Yang, Eloise and
+                      Zaim, Ne{\"i}l and
+                      Zhang, Weiqun and
+                      Zhao, Yinjian and
+                      Zhu, Kevin Z. and
+                      Zoni, Edoardo},
+              title     = {{WarpX: An advanced Particle-In-Cell code}},
+              year      = 2018,
+              publisher = {Zenodo},
+              doi       = {10.5281/zenodo.4571577},
+              url       = {https://doi.org/10.5281/zenodo.4571577},
+              note      = {\url{https://doi.org/10.5281/zenodo.4571577}},
+              howpublished = {https://blast-warpx.github.io}
+           }
+
+Since the WarpX is an actively evolving project, a specific version might be used in your work to ensure reproducibility. You can select a *version-specific DOI* from the `release page <https://github.com/BLAST-WarpX/warpx/releases>`__ and add the version number to the cited title, e.g. for version ``25.10``:
+
+.. tab-set::
+
+   .. tab-item:: Plain Text
+
+      J.-L. Vay et al., **WarpX: An advanced Particle-In-Cell code**.
+      version 25.10,
+      `DOI:10.5281/zenodo.17261711 <https://doi.org/10.5281/zenodo.17261711>`__
+      `https://blast-warpx.github.io <https://blast-warpx.github.io>`__ (2025)
+
+   .. tab-item:: LateX: Bibtex
+
+      .. code-block:: bibtex
+
+          @misc{WarpXv25.10,
+            author = {Vay, Jean-Luc and
+                      Acciarri, Marco and
+                      Almgren, Ann and
+                      Amorim, Lígia Diana and
+                      Andriyash, Igor and
+                      Angus, Justin Ray and
+                      Antoun, Thierry and
+                      Belkin, Daniel and
+                      Bizzozero, David and
+                      Blelly, Aurore and
+                      Clark, Stephen Eric and
+                      Dammak, Eya and
+                      Fedeli, Luca and
+                      Formenti, Arianna and
+                      Garten, Marco and
+                      Ge, Lixin and
+                      Giacomel, Lorenzo and
+                      Gott, Kevin and
+                      Giacomel, Lorenzo and
+                      Groenewald, Roelof E. and
+                      Grote, David and
+                      Gu, Junmin and
+                      Harrison, Cyrus and
+                      Haseeb, Muhammad and
+                      Huebl, Axel and
+                      Jambunathan, Revathi and
+                      Kara-Mostefa, Ilian and
+                      Klion, Hannah and
+                      Kumar, Prabhat and
+                      Lehe, Remi and
+                      Loring, Burlen and
+                      Marks, Thomas and
+                      Miller, Phil and
+                      Myers, Andrew and
+                      Pech, Juliette and
+                      Rheaume, Elisa and
+                      Richardson, Glenn and
+                      Rheaume, Elisa and
+                      Rowan, Michael E. and
+                      Sandberg, Ryan Thor and
+                      Scherpelz, Peter and
+                      Sinn, Alexander and
+                      Shapoval, Olga and
+                      Terzani, Davide and
+                      Th{\'e}venet, Maxence and
+                      Weichman, Kale and
+                      Yang, Eloise and
+                      Zaim, Ne{\"i}l and
+                      Zhang, Weiqun and
+                      Zhao, Yinjian and
+                      Zhu, Kevin Z. and
+                      Zoni, Edoardo},
+              title     = {{WarpX: An advanced Particle-In-Cell code}},
+              year      = 2025,
+              publisher = {Zenodo},
+              version   = {25.10},
+              doi       = {10.5281/zenodo.17261711},
+              url       = {https://doi.org/10.5281/zenodo.17261711},
+              note      = {\url{https://doi.org/10.5281/zenodo.17261711}},
+              howpublished = {https://blast-warpx.github.io}
+           }
+
 
 .. _acknowledge_warpx_all_refs:
 
-Prior WarpX references
-----------------------
+Detailed WarpX references
+-------------------------
 
 If your project uses a specific algorithm or component, please consider citing the respective publications in addition.
 
@@ -72,6 +226,12 @@ If your project uses a specific algorithm or component, please consider citing t
   **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
   14th International Particle Accelerator Conference (IPAC'23), WEPA101, 2023.
   `DOI:10.18429/JACoW-IPAC2023-WEPA101 <https://doi.org/10.18429/JACoW-IPAC2023-WEPA101>`__
+
+- Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
+  **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
+  *SC22: International Conference for High Performance Computing, Networking, Storage and Analysis (SC)*. ISSN:2167-4337, pp. 25-36, Dallas, TX, US, 2022.
+  **2022 ACM Gordon Bell Prize Winner**,
+  `DOI:10.1109/SC41404.2022.00008 <https://doi.org/10.1109/SC41404.2022.00008>`__ (`preprint here <https://www.computer.org/csdl/proceedings-article/sc/2022/544400a025/1I0bSKaoECc>`__)
 
 - Huebl A, Lehe R, Zoni E, Shapoval O, Sandberg R T, Garten M, Formenti A, Jambunathan R, Kumar P, Gott K, Myers A, Zhang W, Almgren A, Mitchell C E, Qiang J, Sinn A, Diederichs S, Thevenet M, Grote D, Fedeli L, Clark T, Zaim N, Vincenti H, Vay JL.
   **From Compact Plasma Particle Sources to Advanced Accelerators with Modeling at Exascale**.
