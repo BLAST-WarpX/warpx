@@ -3,6 +3,7 @@
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
+import numpy as np
 
 from pywarpx import callbacks, particle_containers, picmi
 from pywarpx.LoadThirdParty import load_cupy
@@ -123,6 +124,13 @@ def concat(list_of_arrays):
         return xp.concatenate(list_of_arrays)
 
 
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return np.asarray(arr)
+
+
 def mirror_reflection():
     buffer = particle_containers.ParticleBoundaryBufferWrapper()  # boundary buffer
 
@@ -159,14 +167,24 @@ def mirror_reflection():
     ux_reflect = -2 * un * nx + ux  # for a "mirror reflection" u(sym)=-2(u.n)n+u
     uy_reflect = -2 * un * ny + uy
     uz_reflect = -2 * un * nz + uz
+
+    x = to_numpy(x)
+    y = to_numpy(y)
+    z = to_numpy(z)
+    w = to_numpy(w)
+    delta_t = to_numpy(delta_t)
+    ux_reflect = to_numpy(ux_reflect)
+    uy_reflect = to_numpy(uy_reflect)
+    uz_reflect = to_numpy(uz_reflect)
+
     elect_pc.add_particles(
-        x=(x + (dt - delta_t) * ux_reflect).get(),
-        y=(y + (dt - delta_t) * uy_reflect).get(),
-        z=(z + (dt - delta_t) * uz_reflect).get(),
-        ux=ux_reflect.get(),
-        uy=uy_reflect.get(),
-        uz=uz_reflect.get(),
-        w=w.get(),
+        x=x + (dt - delta_t) * ux_reflect,
+        y=y + (dt - delta_t) * uy_reflect,
+        z=z + (dt - delta_t) * uz_reflect,
+        ux=ux_reflect,
+        uy=uy_reflect,
+        uz=uz_reflect,
+        w=w,
     )  # adds the particle in the general particle container at the next step
     #### Can be modified depending on the model of interaction.
 
