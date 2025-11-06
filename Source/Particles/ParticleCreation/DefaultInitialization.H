@@ -43,12 +43,15 @@ enum struct InitializationPolicy {Zero=0, One, RandomExp};
  * used in WarpX.
  */
 static std::map<std::string, InitializationPolicy> initialization_policies = {
-    {"w",     InitializationPolicy::Zero },
-    {"ux",    InitializationPolicy::Zero },
-    {"uy",    InitializationPolicy::Zero },
-    {"uz",    InitializationPolicy::Zero },
+    {"w",      InitializationPolicy::Zero},
+    {"ux",     InitializationPolicy::Zero},
+    {"uy",     InitializationPolicy::Zero},
+    {"uz",     InitializationPolicy::Zero},
+    {"ux_avg", InitializationPolicy::Zero},
+    {"uy_avg", InitializationPolicy::Zero},
+    {"uz_avg", InitializationPolicy::Zero},
 #ifdef WARPX_DIM_RZ
-    {"theta", InitializationPolicy::Zero},
+    {"theta",  InitializationPolicy::Zero},
 #endif
 
 #ifdef WARPX_QED
