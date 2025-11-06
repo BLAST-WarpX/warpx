@@ -7,7 +7,7 @@ WarpX is an advanced **Particle-In-Cell** code.
 
 It supports many features including:
 
-    - Multiple types of field solvers (incl. for :ref:`Maxwell's equations <theory-em-pic>`, Poisson's equation, and :ref:`Maxwell-Ampere coupled with Ohm's law <theory-kinetic-fluid-hybrid-model>`)
+    - Multiple types of field solvers (incl. for :ref:`Maxwell's equations <theory-em-pic>`, Poisson's equation, and :ref:`Ampere's law coupled with Ohm's law <theory-kinetic-fluid-hybrid-model>`)
     - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic, fusion and collisional physics, as well as quantum electrodynamics)
     - Advanced numerical methods (incl. explicit and implicit time advance, mesh refinement, boosted-frame simulations, embedded boundaries, pseudo-spectral solvers)
@@ -20,7 +20,7 @@ In addition, WarpX is a *highly-parallel and highly-optimized code*:
     - Can run on multi-core CPUs as well as NVIDIA, AMD or Intel GPUs
     - Scales to the world's largest supercomputers and includes load balancing capabilities. WarpX was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
     - Multi-platform code that can run on Linux, macOS and Windows.
-    - Can be run and extended via its Python interface, e.g., to couple to other codes or AI/ML frameworks.
+    - Can be run and :ref:`extended via its Python interface <usage-python-extend>`, e.g., to couple to other codes or AI/ML frameworks.
 
 .. _contact:
 

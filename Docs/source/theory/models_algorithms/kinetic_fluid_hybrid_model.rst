@@ -1,7 +1,7 @@
 .. _theory-kinetic-fluid-hybrid-model:
 
-Maxwell-Ampere coupled with Ohm's law (a.k.a. "hybrid PIC")
-===========================================================
+Ampere's law coupled with Ohm's law (a.k.a. "hybrid PIC")
+=========================================================
 
 Many problems in plasma physics fall in a class where both electron kinetics and electromagnetic waves do not
 play a critical role in the solution. Examples of such situations include the
@@ -20,73 +20,39 @@ of light.
 Many authors have described variations of the kinetic ion & fluid electron model,
 generally referred to as particle-fluid hybrid or just hybrid-PIC models. The
 implementation in WarpX is described in detail in :cite:t:`kfhm-Groenewald2023`.
-This description follows mostly from that reference.
+The "Model derivation" section below gives a detailed description of the model
+that follows mostly from the above reference, but succinctly, the model
+entails the following:
 
-Model
------
-
-The basic justification for the hybrid model is that the system to which it is
-applied is dominated by ion kinetics, with ions moving much slower than electrons
-and photons. In this scenario two critical approximations can be made, namely,
-neutrality (:math:`n_e=n_i`) and the Maxwell-Ampere equation can be simplified by
-neglecting the displacement current term :cite:p:`kfhm-Nielson1976`, giving,
+The magnetic field is advanced in time using Faraday's law,
 
     .. math::
 
-        \mu_0\vec{J} = \vec{\nabla}\times\vec{B},
+        \frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E},
 
-where :math:`\vec{J} = \sum_{s\neq e}\vec{J}_s + \vec{J}_e + \vec{J}_{ext}` is the total electrical current,
-i.e. the sum of electron and ion currents as well as any external current (not captured through plasma
-particles). Since ions are treated in the regular
-PIC manner, the ion current, :math:`\sum_{s\neq e}\vec{J}_s`, is known during a simulation. Therefore,
-given the magnetic field, the electron current can be calculated.
-
-The electron momentum transport equation (obtained from multiplying the Vlasov equation by mass and
-integrating over velocity), also called the generalized Ohm's law, is given by:
-
-    .. math::
-
-        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
-
-where :math:`\vec{U}_e = \vec{J}_e/(en_e)` is the electron fluid velocity,
-:math:`{\overleftrightarrow P}_e` is the electron pressure tensor and
-:math:`\vec{R}_e` is the drag force due to collisions between electrons and ions.
-Applying the above momentum equation to the Maxwell-Faraday equation (:math:`\frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E}`)
-and substituting in :math:`\vec{J}` calculated from the Maxwell-Ampere equation, gives,
-
-    .. math::
-
-        \frac{\partial\vec{J}_e}{\partial t} = -\frac{1}{\mu_0}\nabla\times\left(\nabla\times\vec{E}\right) - \frac{\partial\vec{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t}.
-
-Plugging this back into the generalized Ohm's law gives:
-
-    .. math::
-
-        \left(en_e +\frac{m}{e\mu_0}\nabla\times\nabla\times\right)\vec{E} =&
-        - \frac{m}{e}\left( \frac{\partial\vec{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t} \right) \\
-        &+ \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
-
-If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above equation simplifies to,
-
-    .. math::
-
-        en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
-
-Making the further simplifying assumptions that the electron pressure is isotropic and that
-the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
-i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
-Ohm's law:
+where the electric field is calculated from Ohm's law which involves the currents,
+the magnetic field, and the electron pressure (for which an additional closure is required,
+see :ref:`here <theory-hybrid-model-elec-temp>`),
 
     .. math::
 
         \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
 
-Lastly, if an electron temperature is given from which the electron pressure can
-be calculated, the model is fully constrained and can be evolved given initial
-conditions.
+The electron current is in turn obtained by subtracting the ion current (obtained from
+kinetic ion macro-particles) from the total current (obtained from Ampere's law):
 
-Implementation details
-----------------------
+    .. math::
+
+        \vec{J}_e = \vec{J} - \sum_{s\neq e}\vec{J}_s - \vec{J}_{ext}
+
+where
+
+    .. math::
+
+        \mu_0\vec{J} = \vec{\nabla}\times\vec{B}.
+
+Algorithm details
+-----------------
 
 .. note::
 
@@ -94,12 +60,10 @@ Implementation details
     the :ref:`examples section <examples-hybrid-model>`.
 
 The kinetic-fluid hybrid extension mostly uses the same routines as the standard electromagnetic
-PIC algorithm with the only exception that the E-field is calculated from the
-above equation rather than it being updated from the full Maxwell-Ampere equation. The
-function ``WarpX::HybridPICEvolveFields()`` handles the logic to update the E&M fields
-when ``algo.maxwell_solver = hybrid`` is set. This function is executed after particle pushing
-and deposition (charge and current density) has been completed. Therefore, based
-on the usual time-staggering in the PIC algorithm, when ``HybridPICEvolveFields()`` is called
+PIC algorithm with the only exception that the E-field is calculated from Ohm's law
+rather than it being updated from the full Maxwell-Ampere equation. The E-field update occurs
+after particle pushing and deposition (charge and current density) has been completed. Therefore, based
+on the usual time-staggering in the PIC algorithm, when the E-field is updated
 at timestep :math:`t=t_n`, the quantities :math:`\rho^n`, :math:`\rho^{n+1}`, :math:`\vec{J}_i^{n-1/2}`
 and  :math:`\vec{J}_i^{n+1/2}` are all known.
 
@@ -174,6 +138,69 @@ WarpX's displacement current diagnostic can be used to output the electron curre
 the kinetic-fluid hybrid model since in the absence of kinetic electrons, and under
 the assumption of zero displacement current, that diagnostic simply calculates the
 hybrid model's electron current.
+
+Model derivation
+----------------
+
+The basic justification for the hybrid model is that the system to which it is
+applied is dominated by ion kinetics, with ions moving much slower than electrons
+and photons. In this scenario two critical approximations can be made, namely,
+neutrality (:math:`n_e=n_i`) and the Maxwell-Ampere equation can be simplified by
+neglecting the displacement current term :cite:p:`kfhm-Nielson1976`, giving,
+
+    .. math::
+
+        \mu_0\vec{J} = \vec{\nabla}\times\vec{B},
+
+where :math:`\vec{J} = \sum_{s\neq e}\vec{J}_s + \vec{J}_e + \vec{J}_{ext}` is the total electrical current,
+i.e. the sum of electron and ion currents as well as any external current (not captured through plasma
+particles). Since ions are treated in the regular
+PIC manner, the ion current, :math:`\sum_{s\neq e}\vec{J}_s`, is known during a simulation. Therefore,
+given the magnetic field, the electron current can be calculated.
+
+The electron momentum transport equation (obtained from multiplying the Vlasov equation by mass and
+integrating over velocity), also called the generalized Ohm's law, is given by:
+
+    .. math::
+
+        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
+
+where :math:`\vec{U}_e = \vec{J}_e/(en_e)` is the electron fluid velocity,
+:math:`{\overleftrightarrow P}_e` is the electron pressure tensor and
+:math:`\vec{R}_e` is the drag force due to collisions between electrons and ions.
+Applying the above momentum equation to the Maxwell-Faraday equation (:math:`\frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E}`)
+and substituting in :math:`\vec{J}` calculated from the Maxwell-Ampere equation, gives,
+
+    .. math::
+
+        \frac{\partial\vec{J}_e}{\partial t} = -\frac{1}{\mu_0}\nabla\times\left(\nabla\times\vec{E}\right) - \frac{\partial\vec{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t}.
+
+Plugging this back into the generalized Ohm's law gives:
+
+    .. math::
+
+        \left(en_e +\frac{m}{e\mu_0}\nabla\times\nabla\times\right)\vec{E} =&
+        - \frac{m}{e}\left( \frac{\partial\vec{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t} \right) \\
+        &+ \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
+
+If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above equation simplifies to,
+
+    .. math::
+
+        en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
+
+Making the further simplifying assumptions that the electron pressure is isotropic and that
+the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
+i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
+Ohm's law:
+
+    .. math::
+
+        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
+
+Lastly, if an electron temperature is given from which the electron pressure can
+be calculated, the model is fully constrained and can be evolved given initial
+conditions.
 
 .. bibliography::
     :keyprefix: kfhm-
