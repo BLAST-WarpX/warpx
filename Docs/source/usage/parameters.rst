@@ -1,3 +1,92 @@
+
+
+
+
+
+.. _running-cpp-parameters-overall:
+
+Overall simulation parameters
+-----------------------------
+
+* ``authors`` (`string`: e.g. ``"Jane Doe <jane@example.com>, Jimmy Joe <jimmy@example.com>"``)
+    Authors of an input file / simulation setup.
+    When provided, this information is added as metadata to (openPMD) output files.
+
+
+* ``warpx.used_inputs_file`` (`string`; default: ``warpx_used_inputs``)
+    Name of a file that WarpX writes to archive the used inputs.
+    The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+
+
+* ``warpx.random_seed`` (`string` or `int` > 0) optional
+    If provided ``warpx.random_seed = random``, the random seed will be determined
+    using `std::random_device` and `std::clock()`,
+    thus every simulation run produces different random numbers.
+    If provided ``warpx.random_seed = n``, and it is required that `n > 0`,
+    the random seed for each MPI rank is `(mpi_rank+1) * n`,
+    where `mpi_rank` starts from 0.
+    `n = 1` and ``warpx.random_seed = default``
+    produce the default random seed.
+    Note that when GPU threading is used,
+    one should not expect to obtain the same random numbers,
+    even if a fixed ``warpx.random_seed`` is provided.
+
+
+* ``amrex.abort_on_out_of_gpu_memory``  (``0`` or ``1``; default is ``1`` for true)
+    When running on GPUs, memory that does not fit on the device will be automatically swapped to host memory when this option is set to ``0``.
+    This will cause severe performance drops.
+    Note that even with this set to ``1`` WarpX will not catch all out-of-memory events yet when operating close to maximum device memory.
+    `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__.
+
+* ``amrex.the_arena_is_managed``  (``0`` or ``1``; default is ``0`` for false)
+    When running on GPUs, device memory that is accessed from the host will automatically be transferred with managed memory.
+    This is useful for convenience during development, but has sometimes severe performance and memory footprint implications if relied on (and sometimes vendor bugs).
+    For all regular WarpX operations, we therefore do explicit memory transfers without the need for managed memory and thus changed the AMReX default to false.
+    `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__.
+
+* ``amrex.omp_threads``  (``system``, ``nosmt`` or positive integer; default is ``nosmt``)
+    An integer number can be set in lieu of the ``OMP_NUM_THREADS`` environment variable to control the number of OpenMP threads to use for the ``OMP`` compute backend on CPUs.
+    By default, we use the ``nosmt`` option, which overwrites the OpenMP default of spawning one thread per logical CPU core, and instead only spawns a number of threads equal to the number of physical CPU cores on the machine.
+    If set, the environment variable ``OMP_NUM_THREADS`` takes precedence over ``system`` and ``nosmt``, but not over integer numbers set in this option.
+
+
+
+
+
+
+.. _running-cpp-parameters-box:
+
+??????????????????
+------------------
+
+
+* ``warpx.do_single_precision_comms`` (`integer`; 0 by default)
+    Perform MPI communications for field guard regions in single precision.
+    Only meaningful for ``WarpX_PRECISION=DOUBLE``.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 .. _running-cpp-parameters:
 
 
@@ -15,6 +104,115 @@ Examples of input files can be found in the :ref:`Examples <usage-examples>` sec
 .. note::
 
    The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand-side of all input parameters that consist of one or more integers or floats, so expressions like ``<species_name>.density_max = "2.+1."`` and/or using user-defined constants are accepted.
+
+
+.. _running-cpp-parameters-parser:
+
+Math parser and constants
+=========================
+
+WarpX uses AMReX's math parser that reads expressions in the input file.
+It can be used in all input parameters that consist of one or more integers or floats.
+Integer input expecting boolean, 0 or 1, are not parsed.
+Note that when multiple values are expected, the expressions are space delimited.
+For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
+See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
+
+WarpX constants
+---------------
+
+WarpX provides a few pre-defined constants, that can be used for any parameter that consists of one or more floats.
+
+======== ===================
+q_e      elementary charge
+m_e      electron mass
+m_p      proton mass
+m_u      unified atomic mass unit (Dalton)
+epsilon0 vacuum permittivity
+mu0      vacuum permeability
+clight   speed of light
+kb       Boltzmann's constant (J/K)
+pi       math constant pi
+======== ===================
+
+See ``Source/Utils/WarpXConst.H`` for the values.
+
+User-defined constants
+----------------------
+
+Users can define their own constants in the input file.
+These constants can be used for any parameter that consists of one or more integers or floats.
+User-defined constant names can contain only letters, numbers and the character ``_``.
+The name of each constant has to begin with a letter. The following names are used
+by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
+The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
+For example:
+
+* ``my_constants.a0 = 3.0``
+* ``my_constants.z_plateau = 150.e-6``
+* ``my_constants.n0 = 1.e22``
+* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
+
+Coordinates
+-----------
+
+Besides, for profiles that depend on spatial coordinates (the plasma momentum distribution or the laser field, see below `Particle initialization` and `Laser initialization`), the parser will interpret some variables as spatial coordinates. These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
+
+The parser reads python-style expressions between double quotes, for instance
+``"a0*x**2 * (1-y*1.e2) * (x>0)"`` is a valid expression where ``a0`` is a
+user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates. The names are case sensitive. The factor
+``(x>0)`` is ``1`` where ``x>0`` and ``0`` where ``x<=0``. It allows the user to
+define functions by intervals.
+Alternatively the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
+
+
+Intervals parser
+================
+
+WarpX can parse time step interval expressions of the form ``start:stop:period``, e.g.
+``1:2:3, 4::, 5:6, :, ::10``.
+A comma is used as a separator between groups of intervals, which we call slices.
+The resulting time steps are the `union set <https://en.wikipedia.org/wiki/Union_(set_theory)>`_ of all given slices.
+White spaces are ignored.
+A single slice can have 0, 1 or 2 colons ``:``, just as `numpy slices <https://numpy.org/doc/stable/reference/generated/numpy.s_.html>`_, but with inclusive upper bound for ``stop``.
+
+* For 0 colon the given value is the period
+
+* For 1 colon the given string is of the type ``start:stop``
+
+* For 2 colons the given string is of the type ``start:stop:period``
+
+Any value that is not given is set to default.
+Default is ``0`` for the start, ``std::numeric_limits<int>::max()`` for the stop and ``1`` for the
+period.
+For the 1 and 2 colon syntax, actually having values in the string is optional
+(this means that ``::5``, ``100 ::10`` and ``100 :`` are all valid syntaxes).
+
+All values can be expressions that will be parsed in the same way as other integer input parameters.
+
+**Examples**
+
+* ``something_intervals = 50`` -> do something at timesteps 0, 50, 100, 150, etc.
+  (equivalent to ``something_intervals = ::50``)
+
+* ``something_intervals = 300:600:100`` -> do something at timesteps 300, 400, 500 and 600.
+
+* ``something_intervals = 300::50`` -> do something at timesteps 300, 350, 400, 450, etc.
+
+* ``something_intervals = 105:108,205:208`` -> do something at timesteps 105, 106, 107, 108,
+  205, 206, 207 and 208. (equivalent to ``something_intervals = 105 : 108 : , 205 : 208 :``)
+
+* ``something_intervals = :`` or  ``something_intervals = ::`` -> do something at every timestep.
+
+* ``something_intervals = 167:167,253:253,275:425:50`` do something at timesteps 167, 253, 275,
+  325, 375 and 425.
+
+This is essentially the python slicing syntax except that the stop is inclusive
+(``0:100`` contains 100) and that no colon means that the given value is the period.
+
+Note that if a given period is zero or negative, the corresponding slice is disregarded.
+For example, ``something_intervals = -1`` deactivates ``something`` and
+``something_intervals = ::-1,100:1000:25`` is equivalent to ``something_intervals = 100:1000:25``.
 
 
 .. _running-cpp-parameters-time:
@@ -51,6 +249,8 @@ Simulation time
     overwritten with the new values and printed to standard output.
 
 
+.. _running-cpp-parameters-timestep:
+
 Time step
 =========
 
@@ -75,7 +275,6 @@ Time step
 * ``warpx.max_dt`` (`float`) optional
     The maximum timestep permitted for the electrostatic solver, when using adaptive timestepping.
     If supplied, also sets the initial timestep for these simulations, before the first timestep update.
-
 
 
 .. _running-cpp-parameters-geometry:
@@ -143,6 +342,7 @@ Mesh
     Default: ``warpx.do_current_centering = 0`` with collocated or staggered grids, ``warpx.do_current_centering = 1`` with hybrid grids.
 
 
+.. _running-cpp-parameters-parallelization:
 .. _running-cpp-parameters-domain-decomposition:
 
 Domain decomposition
@@ -170,12 +370,188 @@ Domain decomposition
     When using mesh refinement, this number applies to the subdomains
     of the coarsest level, but also to any of the finer level.
 
+
+.. _running-cpp-parameters-bc:
+
+Domain Boundary Conditions
+==========================
+
+* ``boundary.field_lo`` and ``boundary.field_hi`` (`2 strings` for 2D, `3 strings` for 3D, `pml` by default)
+    Boundary conditions applied to fields at the lower and upper domain boundaries.
+    Options are:
+
+    * ``Periodic``: This option can be used to set periodic domain boundaries. Note that if the fields for lo in a certain dimension are set to periodic, then the corresponding upper boundary must also be set to periodic. If particle boundaries are not specified in the input file, then particles boundaries by default will be set to periodic. If particles boundaries are specified, then they must be set to periodic corresponding to the periodic field boundaries.
+
+    * ``pml`` (default): This option can be used to add Perfectly Matched Layers (PML) around the simulation domain. See the :ref:`PML theory section <theory-bc-PML>` for more details.
+      Additional pml algorithms can be explored using the parameters ``warpx.do_pml_in_domain``, ``warpx.pml_has_particles``, and ``warpx.do_pml_j_damping``.
+
+    * ``absorbing_silver_mueller``: This option can be used to set the Silver-Mueller absorbing boundary conditions. These boundary conditions are simpler and less computationally expensive than the pml, but are also less effective at absorbing the field. They only work with the Yee Maxwell solver.
+
+    * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
+
+    * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for RZ, RCYLINDER, and RSPHERE. Please use ``none`` option. This boundary condition does not work with the spectral solver.
+
+    * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
+
+    * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
+      boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
+      are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
+      The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
+      expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
+      magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
+
+      * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_x_hi(y,z)``: For the upper x (or r) boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_lo(x,z)``: For the lower y boundary, expression specifying the insulator location
+
+      * ``insulator.area_y_hi(x,z)``: For the upper y boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_lo(x,y)``: For the lower z boundary, expression specifying the insulator location
+
+      * ``insulator.area_z_hi(x,y)``: For the upper z boundary, expression specifying the insulator location
+
+      * ``insulator.Ey_x_lo(y,z,t)``, ``insulator.Ez_x_lo(y,z,t)``, ``insulator.By_x_lo(y,z,t)``, ``insulator.Bz_x_lo(y,z,t)``: expressions of the tangential field values for the lower x (or r) boundary
+
+      * ``insulator.Ey_x_hi(y,z,t)``, ``insulator.Ez_x_hi(y,z,t)``, ``insulator.By_x_hi(y,z,t)``, ``insulator.Bz_x_hi(y,z,t)``: expressions of the tangential field values for the upper x (or r) boundary
+
+      * ``insulator.Ex_y_lo(x,z,t)``, ``insulator.Ez_y_lo(x,z,t)``, ``insulator.Bx_y_lo(x,z,t)``, ``insulator.Bz_y_lo(x,z,t)``: expressions of the tangential field values for the lower y boundary
+
+      * ``insulator.Ex_y_hi(x,z,t)``, ``insulator.Ez_y_hi(x,z,t)``, ``insulator.Bx_y_hi(x,z,t)``, ``insulator.Bz_y_hi(x,z,t)``: expressions of the tangential field values for the upper y boundary
+
+      * ``insulator.Ex_z_lo(x,y,t)``, ``insulator.Ey_z_lo(x,y,t)``, ``insulator.Bx_z_lo(x,y,t)``, ``insulator.By_z_lo(x,y,t)``: expressions of the tangential field values for the lower z boundary
+
+      * ``insulator.Ex_z_hi(x,y,t)``, ``insulator.Ey_z_hi(x,y,t)``, ``insulator.Bx_z_hi(x,y,t)``, ``insulator.By_z_hi(x,y,t)``: expressions of the tangential field values for the upper z boundary
+
+    * ``none``: No boundary condition is applied to the fields with the electromagnetic solver. This option must be used for the lower boundary, `r=0`, with RZ, RCYLINDER, and RSPHERE.
+
+    * ``neumann``: For the electrostatic multigrid solver, a Neumann boundary condition (with gradient of the potential equal to 0) will be applied on the specified boundary.
+
+    * ``open``: For the electrostatic Poisson solver based on a Integrated Green Function method.
+
+* ``boundary.potential_lo_x/y/z`` and ``boundary.potential_hi_x/y/z`` (default `0`)
+    Gives the value of the electric potential, in Volts, at the boundaries, for ``pec`` boundaries. With electrostatic solvers
+    (i.e., with ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
+    in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
+    setting these variables will trigger an electrostatic solve at ``t=0``, to compute the initial
+    electric field produced by the boundaries.
+
+* ``boundary.particle_lo`` and ``boundary.particle_hi`` (`2 strings` for 2D, `3 strings` for 3D, `absorbing` by default)
+    Options are:
+
+    * ``Absorbing``: Particles leaving the boundary will be deleted.
+
+    * ``Periodic``: Particles leaving the boundary will re-enter from the opposite boundary. The field boundary condition must be consistently set to periodic and both lower and upper boundaries must be periodic.
+
+    * ``Reflecting``: Particles leaving the boundary are reflected from the boundary back into the domain.
+      When ``boundary.reflect_all_velocities`` is false, the sign of only the normal velocity is changed, otherwise the sign of all velocities are changed.
+
+    * ``Thermal``: Particles leaving the boundary are reflected from the boundary back into the domain
+      and their velocities are thermalized. The tangential velocity components are sampled from ``gaussian`` distribution
+      and the component normal to the boundary is sampled from ``gaussian flux`` distribution.
+      The standard deviation for these distributions should be provided for each species using
+      ``boundary.<species>.u_th``. The same standard deviation is used to sample all components.
+
+    * ``None``: No boundary conditions are applied to the particles.
+      When using RZ, RCYLINDER, and RSPHERE, this option must be used for the lower radial boundary, the first value of ``boundary.particle_lo``.
+      This should not be used in any other cases.
+
+* ``boundary.reflect_all_velocities`` (`bool`) optional (default `false`)
+    For a reflecting boundary condition, this flags whether the sign of only the normal velocity is changed or all velocities.
+
+* ``boundary.verboncoeur_axis_correction`` (`bool`) optional (default `true`)
+    Whether to apply the Verboncoeur correction on the charge and current density on axis when using RZ, RCYLINDER, or RSPHERE.
+    For nodal values (rho and Jz), the cell volume for values on axis is :math:`\pi*\Delta dr^2/4` RZ and RCYLINDER, and :math:`\pi*\Delta dr^3/8` for RSPHERE.
+    In :cite:t:`param-VerboncoeurJCP2001`, it is shown that for cylindrical coordinates, using
+    :math:`\pi*\Delta dr^2/3` instead will give a uniform density if the particle density is uniform.
+    For spherical coordinates, using :math:`\pi*\Delta dr^3/4` similarly gives a uniform density.
+
+Additional PML parameters
+-------------------------
+
+* ``warpx.pml_ncell`` (`int`; default: 10)
+    The depth of the PML, in number of cells.
+
+* ``do_similar_dm_pml`` (`int`; default: 1)
+    Whether or not to use an amrex::DistributionMapping for the PML grids that is `similar` to the mother grids, meaning that the
+    mapping will be computed to minimize the communication costs between the PML and the mother grids.
+
+* ``warpx.pml_delta`` (`int`; default: 10)
+    The characteristic depth, in number of cells, over which
+    the absorption coefficients of the PML increases.
+
+* ``warpx.do_pml_in_domain`` (`int`; default: 0)
+    Whether to create the PML inside the simulation area or outside. If inside,
+    it allows the user to propagate particles in PML and to use extended PML
+
+* ``warpx.pml_has_particles`` (`int`; default: 0)
+    Whether to propagate particles in PML or not. Can only be done if PML are in simulation domain,
+    i.e. if `warpx.do_pml_in_domain = 1`.
+
+* ``warpx.do_pml_j_damping`` (`int`; default: 0)
+    Whether to damp current in PML. Can only be used if particles are propagated in PML,
+    i.e. if `warpx.pml_has_particles = 1`.
+
+* ``warpx.v_particle_pml`` (`float`; default: 1)
+    When ``warpx.do_pml_j_damping = 1``, the assumed velocity of the particles to be absorbed in the PML, in units of the speed of light `c`.
+
+* ``warpx.do_pml_dive_cleaning`` (`bool`)
+    Whether to use divergence cleaning for E in the PML region.
+    The value must match ``warpx.do_pml_divb_cleaning`` (either both false or both true).
+    This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
+    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
+
+* ``warpx.do_pml_divb_cleaning`` (`bool`)
+    Whether to use divergence cleaning for B in the PML region.
+    The value must match ``warpx.do_pml_dive_cleaning`` (either both false or both true).
+    This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
+    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
+
+.. _running-cpp-parameters-eb:
+
+Embedded Boundary Conditions
+----------------------------
+
+In WarpX, the embedded boundary can be defined in either of two ways:
+
+    - **From an analytical function:**
+        In that case, you will need to set the following parameter in the input file.
+
+        * ``warpx.eb_implicit_function`` (`string`)
+            A function of `x`, `y`, `z` that defines the surface of the embedded
+            boundary. That surface lies where the function value is 0 ;
+            the physics simulation area is where the function value is negative ;
+            the interior of the embedded boundary is where the function value is positive.
+
+    - **From an STL file:**
+        In that case, you will need to set the following parameters in the input file.
+
+        * ``eb2.stl_file`` (`string`)
+            The path to an `STL file <https://en.wikipedia.org/wiki/STL_(file_format)>`__.
+            In addition, you also need to set ``eb2.geom_type = stl``, in order for the file to be read by WarpX.
+            `See the AMReX documentation for more details <https://amrex-codes.github.io/amrex/docs_html/EB.html>`__.
+
+Whether the embedded boundary is defined with an analytical function or an STL file, you can
+additionally define the electric potential at the embedded boundary with an analytical function:
+
+* ``warpx.eb_potential(x,y,z,t)`` (`string`)
+    Gives the value of the electric potential, in Volts, at the surface of the embedded boundary,
+    as a function of  `x`, `y`, `z` and `t`. With electrostatic solvers (i.e., with
+    ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
+    in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
+    setting this variable will trigger an electrostatic solve at ``t=0``, to compute the initial
+    electric field produced by the boundaries. Note that this function is also evaluated
+    inside the embedded boundary. For this reason, it is important to define
+    this function in such a way that it is constant inside the embedded boundary.
+
+
+
 .. _running-cpp-parameters-numerics:
 .. _running-cpp-parameters-algorithms:
 
 Algorithms
 ==========
-
 
 Basic PIC
 ---------
@@ -313,12 +689,9 @@ Basic PIC
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
-
 * ``particles.max_grid_crossings`` (`integer`) optional (default `1`)
     Maximum number of grid crossings the particles can do per time step.
     This is only used with the Strang and theta-implicit schemes since they allow the speed of light Courant limit to be violated.
-
-
 
 
 * ``algo.current_deposition`` (`string`, optional)
@@ -387,7 +760,6 @@ Basic PIC
     High-order shape factors are computationally more expensive, but may increase the overall accuracy of the results. For production runs it is generally safer to use high-order shape factors, such as cubic order.
 
     Note that this input parameter is not optional and must always be set in all input files provided that there is at least one particle species (set in input as ``particles.species_names``) or one laser species (set in input as ``lasers.names``) in the simulation. No default value is provided automatically.
-
 
 
 Advanced PIC
@@ -1111,7 +1483,7 @@ Moving window
 .. _running-cpp-parameters-boosted-frame:
 
 Boosted frame
--------------
+=============
 
 * ``warpx.gamma_boost`` (`float`)
     The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
@@ -1126,519 +1498,10 @@ Boosted frame
     (The direction ``y`` cannot be used in 2D simulations.)
 
 
-.. _running-cpp-parameters-parser:
-
-Math parser and constants
--------------------------
-
-WarpX uses AMReX's math parser that reads expressions in the input file.
-It can be used in all input parameters that consist of one or more integers or floats.
-Integer input expecting boolean, 0 or 1, are not parsed.
-Note that when multiple values are expected, the expressions are space delimited.
-For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
-See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
-
-WarpX constants
-^^^^^^^^^^^^^^^
-
-WarpX provides a few pre-defined constants, that can be used for any parameter that consists of one or more floats.
-
-======== ===================
-q_e      elementary charge
-m_e      electron mass
-m_p      proton mass
-m_u      unified atomic mass unit (Dalton)
-epsilon0 vacuum permittivity
-mu0      vacuum permeability
-clight   speed of light
-kb       Boltzmann's constant (J/K)
-pi       math constant pi
-======== ===================
-
-See ``Source/Utils/WarpXConst.H`` for the values.
-
-User-defined constants
-^^^^^^^^^^^^^^^^^^^^^^
-
-Users can define their own constants in the input file.
-These constants can be used for any parameter that consists of one or more integers or floats.
-User-defined constant names can contain only letters, numbers and the character ``_``.
-The name of each constant has to begin with a letter. The following names are used
-by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
-The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
-For example:
-
-* ``my_constants.a0 = 3.0``
-* ``my_constants.z_plateau = 150.e-6``
-* ``my_constants.n0 = 1.e22``
-* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
-
-Coordinates
-^^^^^^^^^^^
-
-Besides, for profiles that depend on spatial coordinates (the plasma momentum distribution or the laser field, see below `Particle initialization` and `Laser initialization`), the parser will interpret some variables as spatial coordinates. These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
-
-The parser reads python-style expressions between double quotes, for instance
-``"a0*x**2 * (1-y*1.e2) * (x>0)"`` is a valid expression where ``a0`` is a
-user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates. The names are case sensitive. The factor
-``(x>0)`` is ``1`` where ``x>0`` and ``0`` where ``x<=0``. It allows the user to
-define functions by intervals.
-Alternatively the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
-
-.. _running-cpp-parameters-qed:
-
-QED
----
-
-Lookup tables
-^^^^^^^^^^^^^
-
-Lookup tables store pre-computed values for functions used by the QED modules.
-**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
-
-* ``qed_bw.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Breit-Wheeler module:
-
-    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
-
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the photons, while table 2 is used for pair generation):
-
-        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of the photons)
-
-        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
-
-        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
-
-        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for pair generation)
-
-        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
-
-        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
-
-        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
-          quantum parameter of the photon).
-
-        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
-
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
-
-        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
-
-* ``qed_qs.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
-
-    * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
-
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the particles, while table 2 is used for photon emission):
-
-        * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of electrons and positrons)
-
-        * ``qed_qs.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
-
-        * ``qed_qs.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
-
-        * ``qed_qs.tab_em_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for photon emission)
-
-        * ``qed_qs.tab_em_chi_max`` (`float`): maximum chi parameter for lookup table 2
-
-        * ``qed_qs.tab_em_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
-
-        * ``qed_qs.tab_em_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the photon and the
-          quantum parameter of the charged particle).
-
-        * ``qed_qs.tab_em_frac_min`` (`float`): minimum value to be considered for the second axis of lookup table 2
-
-        * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
-
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
-
-        * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
-
-* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
-    (suggested value : 0.01)
-
-* ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
-    (suggested value : 0.001)
-
-* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
-    Energy threshold for photon particle creation in `*me*c^2` units.
-
-.. _running-cpp-parameters-qed-schwinger:
-Schwinger process
-^^^^^^^^^^^^^^^^^
-
-* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
-    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
-    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
-    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
-    Schwinger process requires either ``warpx.grid_type = collocated`` or
-    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
-    at the same location in the grid) and does not currently support mesh refinement, cylindrical
-    coordinates or single precision.
-
-* ``qed_schwinger.ele_product_species`` (`string`)
-    If Schwinger process is activated, an electron product species must be specified
-    (the name of an existing electron species must be provided).
-
-* ``qed_schwinger.pos_product_species`` (`string`)
-    If Schwinger process is activated, a positron product species must be specified
-    (the name of an existing positron species must be provided).
-
-* ``qed_schwinger.y_size`` (`float`; in meters)
-    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
-    It is used to convert the pair production rate per unit volume into an actual number of created particles.
-    This value should correspond to the typical transverse extent for which the EM field has a very high value
-    (e.g. the beam waist for a focused laser beam).
-
-* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
-    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
-    which Schwinger pairs can be created.
-    The same is applicable in the other directions.
-
-* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
-    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
-    a Poisson distribution is used to draw the actual number of physical pairs created.
-    Otherwise a Gaussian distribution is used.
-    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
-    per timestep per species (with a weight corresponding to the number of physical pairs created).
-
-* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
-    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
-    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
-    Note that this option can only be used with the PSATD build. Furthermore, one must set
-    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
-
-* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
-     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
-     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
-     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
-
-
-Ionization
-----------
-
-
-
-
-==============================================================================================
-.. _running-cpp-parameters-overall:
-
-Overall simulation parameters
------------------------------
-
-* ``authors`` (`string`: e.g. ``"Jane Doe <jane@example.com>, Jimmy Joe <jimmy@example.com>"``)
-    Authors of an input file / simulation setup.
-    When provided, this information is added as metadata to (openPMD) output files.
-
-
-* ``warpx.used_inputs_file`` (`string`; default: ``warpx_used_inputs``)
-    Name of a file that WarpX writes to archive the used inputs.
-    The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
-
-
-* ``warpx.random_seed`` (`string` or `int` > 0) optional
-    If provided ``warpx.random_seed = random``, the random seed will be determined
-    using `std::random_device` and `std::clock()`,
-    thus every simulation run produces different random numbers.
-    If provided ``warpx.random_seed = n``, and it is required that `n > 0`,
-    the random seed for each MPI rank is `(mpi_rank+1) * n`,
-    where `mpi_rank` starts from 0.
-    `n = 1` and ``warpx.random_seed = default``
-    produce the default random seed.
-    Note that when GPU threading is used,
-    one should not expect to obtain the same random numbers,
-    even if a fixed ``warpx.random_seed`` is provided.
-
-
-
-
-* ``amrex.abort_on_out_of_gpu_memory``  (``0`` or ``1``; default is ``1`` for true)
-    When running on GPUs, memory that does not fit on the device will be automatically swapped to host memory when this option is set to ``0``.
-    This will cause severe performance drops.
-    Note that even with this set to ``1`` WarpX will not catch all out-of-memory events yet when operating close to maximum device memory.
-    `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__.
-
-* ``amrex.the_arena_is_managed``  (``0`` or ``1``; default is ``0`` for false)
-    When running on GPUs, device memory that is accessed from the host will automatically be transferred with managed memory.
-    This is useful for convenience during development, but has sometimes severe performance and memory footprint implications if relied on (and sometimes vendor bugs).
-    For all regular WarpX operations, we therefore do explicit memory transfers without the need for managed memory and thus changed the AMReX default to false.
-    `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__.
-
-* ``amrex.omp_threads``  (``system``, ``nosmt`` or positive integer; default is ``nosmt``)
-    An integer number can be set in lieu of the ``OMP_NUM_THREADS`` environment variable to control the number of OpenMP threads to use for the ``OMP`` compute backend on CPUs.
-    By default, we use the ``nosmt`` option, which overwrites the OpenMP default of spawning one thread per logical CPU core, and instead only spawns a number of threads equal to the number of physical CPU cores on the machine.
-    If set, the environment variable ``OMP_NUM_THREADS`` takes precedence over ``system`` and ``nosmt``, but not over integer numbers set in this option.
-
-
-.. _running-cpp-parameters-signal:
-
-Signal Handling
-^^^^^^^^^^^^^^^
-
-WarpX can handle Unix (Linux/macOS) `process signals <https://en.wikipedia.org/wiki/Signal_(IPC)>`__.
-This can be useful to configure jobs on HPC and cloud systems to shut down cleanly when they are close to reaching their allocated walltime or to steer the simulation behavior interactively.
-
-Allowed signal names are documented in the `C++ standard <https://en.cppreference.com/w/cpp/utility/program/SIG_types>`__ and `POSIX <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html>`__.
-We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal configuration name for ``SIGINT`` is ``INT``.
-
-* ``warpx.break_signals`` (array of `string`, separated by spaces) optional
-    A list of signal names or numbers that the simulation should
-    handle by cleanly terminating at the next timestep
-
-* ``warpx.checkpoint_signals`` (array of `string`, separated by spaces) optional
-    A list of signal names or numbers that the simulation should
-    handle by outputting a checkpoint at the next timestep. A
-    diagnostic of type `checkpoint` must be configured.
-
-.. note::
-
-   Certain signals are only available on specific platforms, please see the links above for details.
-   Typically supported on Linux and macOS are ``HUP``, ``INT``, ``QUIT``, ``ABRT``, ``USR1``, ``USR2``, ``TERM``, ``TSTP``, ``URG``, and ``IO`` among others.
-
-   Signals to think about twice before overwriting in *interactive simulations*:
-   Note that ``INT`` (interupt) is the signal that ``Ctrl+C`` sends on the terminal, which most people use to abort a process; once overwritten you need to abort interactive jobs with, e.g., ``Ctrl+\`` (``QUIT``) or sending the ``KILL`` signal.
-   The ``TSTP`` (terminal stop) command is sent interactively from ``Ctrl+Z`` to temporarily send a process to sleep (until send in the background with commands such as ``bg`` or continued with ``fg``), overwriting it would thus disable that functionality.
-   The signals ``KILL`` and ``STOP`` cannot be used.
-
-   The ``FPE`` and ``ILL`` signals should not be overwritten in WarpX, as they are `controlled by AMReX <https://amrex-codes.github.io/amrex/docs_html/Debugging.html#breaking-into-debuggers>`__ for :ref:`debug workflows that catch invalid floating-point operations <debugging_warpx>`.
-.. tip::
-
-   For example, the following logic can be added to `Slurm batch scripts <https://docs.gwdg.de/doku.php?id=en:services:application_services:high_performance_computing:running_jobs_slurm:signals>`__ (`signal name to number mapping here <https://en.wikipedia.org/wiki/Signal_(IPC)#Default_action>`__) to gracefully shut down 6 min prior to walltime.
-   If you have a checkpoint diagnostics in your inputs file, this automatically will write a checkpoint due to the default ``<diag_name>.dump_last_timestep = 1`` option in WarpX.
-
-   .. code-block:: bash
-
-      #SBATCH --signal=1@360
-
-      srun ...                   \
-        warpx.break_signals=HUP  \
-        > output.txt
-
-   For `LSF batch systems <https://www.ibm.com/docs/en/spectrum-lsf/10.1.0?topic=options-wa>`__, the equivalent job script lines are:
-
-   .. code-block:: bash
-
-      #BSUB -wa 'HUP' -wt '6'
-
-      jsrun ...                  \
-        warpx.break_signals=HUP  \
-        > output.txt
-
-.. _running-cpp-parameters-box:
-
-??????????????????
-------------------
-
-
-* ``warpx.do_single_precision_comms`` (`integer`; 0 by default)
-    Perform MPI communications for field guard regions in single precision.
-    Only meaningful for ``WarpX_PRECISION=DOUBLE``.
-
-.. _running-cpp-parameters-bc:
-
-Domain Boundary Conditions
---------------------------
-
-* ``boundary.field_lo`` and ``boundary.field_hi`` (`2 strings` for 2D, `3 strings` for 3D, `pml` by default)
-    Boundary conditions applied to fields at the lower and upper domain boundaries.
-    Options are:
-
-    * ``Periodic``: This option can be used to set periodic domain boundaries. Note that if the fields for lo in a certain dimension are set to periodic, then the corresponding upper boundary must also be set to periodic. If particle boundaries are not specified in the input file, then particles boundaries by default will be set to periodic. If particles boundaries are specified, then they must be set to periodic corresponding to the periodic field boundaries.
-
-    * ``pml`` (default): This option can be used to add Perfectly Matched Layers (PML) around the simulation domain. See the :ref:`PML theory section <theory-bc-PML>` for more details.
-      Additional pml algorithms can be explored using the parameters ``warpx.do_pml_in_domain``, ``warpx.pml_has_particles``, and ``warpx.do_pml_j_damping``.
-
-    * ``absorbing_silver_mueller``: This option can be used to set the Silver-Mueller absorbing boundary conditions. These boundary conditions are simpler and less computationally expensive than the pml, but are also less effective at absorbing the field. They only work with the Yee Maxwell solver.
-
-    * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
-
-    * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for RZ, RCYLINDER, and RSPHERE. Please use ``none`` option. This boundary condition does not work with the spectral solver.
-
-    * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
-
-    * ``pec_insulator``: This option specifies a mixed perfect electric conductor and insulator boundary, where some part of the
-      boundary is PEC and some is insulator. In the insulator portion, the normal fields are extrapolated and the tangential fields
-      are either set to the specified value or extrapolated. The region that is insulator is specified using a spatially dependent expression with the insulator being in the area where the value of the expression is greater than zero.
-      The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
-      expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
-      magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
-
-      * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
-
-      * ``insulator.area_x_hi(y,z)``: For the upper x (or r) boundary, expression specifying the insulator location
-
-      * ``insulator.area_y_lo(x,z)``: For the lower y boundary, expression specifying the insulator location
-
-      * ``insulator.area_y_hi(x,z)``: For the upper y boundary, expression specifying the insulator location
-
-      * ``insulator.area_z_lo(x,y)``: For the lower z boundary, expression specifying the insulator location
-
-      * ``insulator.area_z_hi(x,y)``: For the upper z boundary, expression specifying the insulator location
-
-      * ``insulator.Ey_x_lo(y,z,t)``, ``insulator.Ez_x_lo(y,z,t)``, ``insulator.By_x_lo(y,z,t)``, ``insulator.Bz_x_lo(y,z,t)``: expressions of the tangential field values for the lower x (or r) boundary
-
-      * ``insulator.Ey_x_hi(y,z,t)``, ``insulator.Ez_x_hi(y,z,t)``, ``insulator.By_x_hi(y,z,t)``, ``insulator.Bz_x_hi(y,z,t)``: expressions of the tangential field values for the upper x (or r) boundary
-
-      * ``insulator.Ex_y_lo(x,z,t)``, ``insulator.Ez_y_lo(x,z,t)``, ``insulator.Bx_y_lo(x,z,t)``, ``insulator.Bz_y_lo(x,z,t)``: expressions of the tangential field values for the lower y boundary
-
-      * ``insulator.Ex_y_hi(x,z,t)``, ``insulator.Ez_y_hi(x,z,t)``, ``insulator.Bx_y_hi(x,z,t)``, ``insulator.Bz_y_hi(x,z,t)``: expressions of the tangential field values for the upper y boundary
-
-      * ``insulator.Ex_z_lo(x,y,t)``, ``insulator.Ey_z_lo(x,y,t)``, ``insulator.Bx_z_lo(x,y,t)``, ``insulator.By_z_lo(x,y,t)``: expressions of the tangential field values for the lower z boundary
-
-      * ``insulator.Ex_z_hi(x,y,t)``, ``insulator.Ey_z_hi(x,y,t)``, ``insulator.Bx_z_hi(x,y,t)``, ``insulator.By_z_hi(x,y,t)``: expressions of the tangential field values for the upper z boundary
-
-    * ``none``: No boundary condition is applied to the fields with the electromagnetic solver. This option must be used for the lower boundary, `r=0`, with RZ, RCYLINDER, and RSPHERE.
-
-    * ``neumann``: For the electrostatic multigrid solver, a Neumann boundary condition (with gradient of the potential equal to 0) will be applied on the specified boundary.
-
-    * ``open``: For the electrostatic Poisson solver based on a Integrated Green Function method.
-
-* ``boundary.potential_lo_x/y/z`` and ``boundary.potential_hi_x/y/z`` (default `0`)
-    Gives the value of the electric potential, in Volts, at the boundaries, for ``pec`` boundaries. With electrostatic solvers
-    (i.e., with ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
-    in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
-    setting these variables will trigger an electrostatic solve at ``t=0``, to compute the initial
-    electric field produced by the boundaries.
-
-* ``boundary.particle_lo`` and ``boundary.particle_hi`` (`2 strings` for 2D, `3 strings` for 3D, `absorbing` by default)
-    Options are:
-
-    * ``Absorbing``: Particles leaving the boundary will be deleted.
-
-    * ``Periodic``: Particles leaving the boundary will re-enter from the opposite boundary. The field boundary condition must be consistently set to periodic and both lower and upper boundaries must be periodic.
-
-    * ``Reflecting``: Particles leaving the boundary are reflected from the boundary back into the domain.
-      When ``boundary.reflect_all_velocities`` is false, the sign of only the normal velocity is changed, otherwise the sign of all velocities are changed.
-
-    * ``Thermal``: Particles leaving the boundary are reflected from the boundary back into the domain
-      and their velocities are thermalized. The tangential velocity components are sampled from ``gaussian`` distribution
-      and the component normal to the boundary is sampled from ``gaussian flux`` distribution.
-      The standard deviation for these distributions should be provided for each species using
-      ``boundary.<species>.u_th``. The same standard deviation is used to sample all components.
-
-    * ``None``: No boundary conditions are applied to the particles.
-      When using RZ, RCYLINDER, and RSPHERE, this option must be used for the lower radial boundary, the first value of ``boundary.particle_lo``.
-      This should not be used in any other cases.
-
-* ``boundary.reflect_all_velocities`` (`bool`) optional (default `false`)
-    For a reflecting boundary condition, this flags whether the sign of only the normal velocity is changed or all velocities.
-
-* ``boundary.verboncoeur_axis_correction`` (`bool`) optional (default `true`)
-    Whether to apply the Verboncoeur correction on the charge and current density on axis when using RZ, RCYLINDER, or RSPHERE.
-    For nodal values (rho and Jz), the cell volume for values on axis is :math:`\pi*\Delta dr^2/4` RZ and RCYLINDER, and :math:`\pi*\Delta dr^3/8` for RSPHERE.
-    In :cite:t:`param-VerboncoeurJCP2001`, it is shown that for cylindrical coordinates, using
-    :math:`\pi*\Delta dr^2/3` instead will give a uniform density if the particle density is uniform.
-    For spherical coordinates, using :math:`\pi*\Delta dr^3/4` similarly gives a uniform density.
-
-Additional PML parameters
--------------------------
-
-* ``warpx.pml_ncell`` (`int`; default: 10)
-    The depth of the PML, in number of cells.
-
-* ``do_similar_dm_pml`` (`int`; default: 1)
-    Whether or not to use an amrex::DistributionMapping for the PML grids that is `similar` to the mother grids, meaning that the
-    mapping will be computed to minimize the communication costs between the PML and the mother grids.
-
-* ``warpx.pml_delta`` (`int`; default: 10)
-    The characteristic depth, in number of cells, over which
-    the absorption coefficients of the PML increases.
-
-* ``warpx.do_pml_in_domain`` (`int`; default: 0)
-    Whether to create the PML inside the simulation area or outside. If inside,
-    it allows the user to propagate particles in PML and to use extended PML
-
-* ``warpx.pml_has_particles`` (`int`; default: 0)
-    Whether to propagate particles in PML or not. Can only be done if PML are in simulation domain,
-    i.e. if `warpx.do_pml_in_domain = 1`.
-
-* ``warpx.do_pml_j_damping`` (`int`; default: 0)
-    Whether to damp current in PML. Can only be used if particles are propagated in PML,
-    i.e. if `warpx.pml_has_particles = 1`.
-
-* ``warpx.v_particle_pml`` (`float`; default: 1)
-    When ``warpx.do_pml_j_damping = 1``, the assumed velocity of the particles to be absorbed in the PML, in units of the speed of light `c`.
-
-* ``warpx.do_pml_dive_cleaning`` (`bool`)
-    Whether to use divergence cleaning for E in the PML region.
-    The value must match ``warpx.do_pml_divb_cleaning`` (either both false or both true).
-    This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
-    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
-
-* ``warpx.do_pml_divb_cleaning`` (`bool`)
-    Whether to use divergence cleaning for B in the PML region.
-    The value must match ``warpx.do_pml_dive_cleaning`` (either both false or both true).
-    This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
-    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
-
-.. _running-cpp-parameters-eb:
-
-Embedded Boundary Conditions
-----------------------------
-
-In WarpX, the embedded boundary can be defined in either of two ways:
-
-    - **From an analytical function:**
-        In that case, you will need to set the following parameter in the input file.
-
-        * ``warpx.eb_implicit_function`` (`string`)
-            A function of `x`, `y`, `z` that defines the surface of the embedded
-            boundary. That surface lies where the function value is 0 ;
-            the physics simulation area is where the function value is negative ;
-            the interior of the embedded boundary is where the function value is positive.
-
-    - **From an STL file:**
-        In that case, you will need to set the following parameters in the input file.
-
-        * ``eb2.stl_file`` (`string`)
-            The path to an `STL file <https://en.wikipedia.org/wiki/STL_(file_format)>`__.
-            In addition, you also need to set ``eb2.geom_type = stl``, in order for the file to be read by WarpX.
-            `See the AMReX documentation for more details <https://amrex-codes.github.io/amrex/docs_html/EB.html>`__.
-
-Whether the embedded boundary is defined with an analytical function or an STL file, you can
-additionally define the electric potential at the embedded boundary with an analytical function:
-
-* ``warpx.eb_potential(x,y,z,t)`` (`string`)
-    Gives the value of the electric potential, in Volts, at the surface of the embedded boundary,
-    as a function of  `x`, `y`, `z` and `t`. With electrostatic solvers (i.e., with
-    ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
-    in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
-    setting this variable will trigger an electrostatic solve at ``t=0``, to compute the initial
-    electric field produced by the boundaries. Note that this function is also evaluated
-    inside the embedded boundary. For this reason, it is important to define
-    this function in such a way that it is constant inside the embedded boundary.
-
-.. _running-cpp-parameters-parallelization:
-
-Distribution across MPI ranks and parallelization
--------------------------------------------------
-
-
-
-
 .. _running-cpp-parameters-particle:
 
-Particle initialization
------------------------
+Particles
+=========
 
 * ``particles.species_names`` (`strings`, separated by spaces)
     The name of each species. This is then used in the rest of the input deck ;
@@ -2294,21 +2157,162 @@ Particle initialization
     in each dimension with a matched shape function and filtering used for current deposition.
     This is required when using the electron energy solver with electron-ion temperature relaxation.
 
-.. _running-cpp-parameters-fluids:
 
-Fluids
-------
 
-* ``fluids.species_names`` (`strings`, separated by spaces)
-    Defines the names of each fluid species. It is a required input to create and evolve fluid species using the cold relativistic fluid equations.
-    Most of the parameters described in the section "Particle initialization" can also be used to initialize fluid properties (e.g. initial density distribution).
-    For fluid-specific inputs we use `<fluid_species_name>` as a placeholder. Also see external fields
-    for how to specify these for fluids as the function names differ.
+.. _running-cpp-parameters-qed:
+
+QED
+===
+
+Lookup tables
+-------------
+
+Lookup tables store pre-computed values for functions used by the QED modules.
+**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
+
+* ``qed_bw.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Breit-Wheeler module:
+
+    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated. This option requires Boost math library
+      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
+      the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the photons, while table 2 is used for pair generation):
+
+        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of the photons)
+
+        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for pair generation)
+
+        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
+          quantum parameter of the photon).
+
+        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
+
+      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
+      must be specified:
+
+        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
+
+* ``qed_qs.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
+
+    * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated. This option requires Boost math library
+      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
+      the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the particles, while table 2 is used for photon emission):
+
+        * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of electrons and positrons)
+
+        * ``qed_qs.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_qs.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_qs.tab_em_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for photon emission)
+
+        * ``qed_qs.tab_em_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_qs.tab_em_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_qs.tab_em_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the photon and the
+          quantum parameter of the charged particle).
+
+        * ``qed_qs.tab_em_frac_min`` (`float`): minimum value to be considered for the second axis of lookup table 2
+
+        * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
+
+      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
+      must be specified:
+
+        * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
+
+* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
+    (suggested value : 0.01)
+
+* ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
+    (suggested value : 0.001)
+
+* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
+    Energy threshold for photon particle creation in `*me*c^2` units.
+
+
+.. _running-cpp-parameters-qed-schwinger:
+
+Schwinger process
+-----------------
+
+* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
+    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
+    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
+    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
+    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
+    Schwinger process requires either ``warpx.grid_type = collocated`` or
+    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
+    at the same location in the grid) and does not currently support mesh refinement, cylindrical
+    coordinates or single precision.
+
+* ``qed_schwinger.ele_product_species`` (`string`)
+    If Schwinger process is activated, an electron product species must be specified
+    (the name of an existing electron species must be provided).
+
+* ``qed_schwinger.pos_product_species`` (`string`)
+    If Schwinger process is activated, a positron product species must be specified
+    (the name of an existing positron species must be provided).
+
+* ``qed_schwinger.y_size`` (`float`; in meters)
+    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
+    It is used to convert the pair production rate per unit volume into an actual number of created particles.
+    This value should correspond to the typical transverse extent for which the EM field has a very high value
+    (e.g. the beam waist for a focused laser beam).
+
+* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
+    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
+    which Schwinger pairs can be created.
+    The same is applicable in the other directions.
+
+* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
+    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
+    a Poisson distribution is used to draw the actual number of physical pairs created.
+    Otherwise a Gaussian distribution is used.
+    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
+    per timestep per species (with a weight corresponding to the number of physical pairs created).
+
+* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
+    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
+    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
+    Note that this option can only be used with the PSATD build. Furthermore, one must set
+    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
+
+* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
+     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
+     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
+     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
+
 
 .. _running-cpp-parameters-laser:
 
 Lasers
-------
+======
 
 * ``lasers.names`` (list of `string`)
     Name of each laser. This is then used in the rest of the input deck ;
@@ -2554,11 +2558,24 @@ Mirrors
     so that it contains at least ``mirror_z_npoints``.
 
 
+.. _running-cpp-parameters-fluids:
+
+Fluids
+======
+
+* ``fluids.species_names`` (`strings`, separated by spaces)
+    Defines the names of each fluid species. It is a required input to create and evolve fluid species using the cold relativistic fluid equations.
+    Most of the parameters described in the section "Particle initialization" can also be used to initialize fluid properties (e.g. initial density distribution).
+    For fluid-specific inputs we use `<fluid_species_name>` as a placeholder. Also see external fields
+    for how to specify these for fluids as the function names differ.
+
+
+
 External fields
----------------
+===============
 
 Applied to the grid
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 The external fields defined with input parameters that start with ``warpx.B_ext_grid_init_`` or ``warpx.E_ext_grid_init_``
 are applied to the grid directly. In particular, these fields can be seen in the diagnostics that output the fields on the grid.
@@ -2649,8 +2666,9 @@ are applied to the grid directly. In particular, these fields can be seen in the
     ``warpx.maxlevel_extEMfield_init`` can be set to 0.
     In that case, the other levels have external field values of 0.
 
+
 Applied to Particles
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 The external fields defined with input parameters that start with ``warpx.B_ext_particle_init_`` or ``warpx.E_ext_particle_init_``
 are applied to the particles directly, at each timestep. As a results, these fields **cannot** be seen in the diagnostics that output the fields on the grid.
@@ -2737,7 +2755,7 @@ are applied to the particles directly, at each timestep. As a results, these fie
 
 
 Applied to Cold Relativistic Fluids
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------------
 
 The external fields defined with input parameters that start with ``warpx.B_ext_init_`` or ``warpx.E_ext_init_``
 are applied to the fluids directly, at each timestep. As a results, these fields **cannot** be seen in the diagnostics that output the fields on the grid.
@@ -2770,7 +2788,7 @@ are applied to the fluids directly, at each timestep. As a results, these fields
       Note that the position is defined in Cartesian coordinates, as a function of (x,y,z), even for RZ, RCYLINDER, and RSPHERE.
 
 Accelerator Lattice
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 Several accelerator lattice elements can be defined as described below.
 The elements are defined relative to the `z` axis and in the lab frame, starting at `z = 0`.
@@ -2831,8 +2849,8 @@ Note that elements of the same type cannot overlap each other.
 
 .. _running-cpp-parameters-collision:
 
-Collision models
-----------------
+Collisions
+==========
 
 WarpX provides several particle collision models, using varying degrees of approximation.
 Details about the collision models can be found in the :ref:`theory section <multiphysics-collisions>`.
@@ -3091,13 +3109,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 .. _running-cpp-parameters-diagnostics:
 
-Diagnostics and output
-----------------------
+Diagnostics
+===========
 
 .. _running-cpp-parameters-diagnostics-insitu:
 
 In-situ visualization
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 WarpX has five types of diagnostics:
 ``Full`` diagnostics consist in dumps of fields and particles at given iterations,
@@ -3117,7 +3135,7 @@ This currently applies to standard diagnostics, but should be extended to back-t
 .. _running-cpp-parameters-diagnostics-full:
 
 Full Diagnostics
-^^^^^^^^^^^^^^^^
+----------------
 
 ``FullDiagnostics`` consist in dumps of fields and particles at given iterations.
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
@@ -3374,7 +3392,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 .. _running-cpp-parameters-diagnostics-timeavg:
 
 Time-Averaged Diagnostics
-^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------
 
 ``TimeAveraged`` diagnostics are a special type of ``Full`` diagnostics that allows for the output of time-averaged field data.
 This type of diagnostics can be created using ``<diag_name>.diag_type = TimeAveraged``.
@@ -3418,7 +3436,7 @@ In addition, ``TimeAveraged`` diagnostic options include:
 .. _running-cpp-parameters-diagnostics-btd:
 
 BackTransformed Diagnostics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 
 ``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. For more details on back-transformed diagnostics (BTD), see :ref:`FAQ: What about Back-transformed diagnostics (BTD)? <faq_btd>`. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
 
@@ -3483,7 +3501,7 @@ BackTransformed Diagnostics
     to 0 in the simulation and particles will not be backtransformed.
 
 Boundary Scraping Diagnostics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------
 
 ``BoundaryScrapingDiagnostics`` are used to collect the particles that are absorbed at the boundaries, throughout the simulation.
 This diagnostic type is specified by setting ``<diag_name>.diag_type`` = ``BoundaryScraping``.
@@ -3507,7 +3525,7 @@ In addition to their usual attributes, the saved particles have
 .. _running-cpp-parameters-diagnostics-reduced:
 
 Reduced Diagnostics
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 ``ReducedDiags`` enable users to compute specific reduced quantities, such as particle temperature, energy histograms, or maximum field values, and efficiently save this in-situ analyzed data to files.
 This shifts analysis from post-processing to runtime calculation of reduction operations (average, maximum, ...) and can greatly save disk space when "raw" particle and field outputs from `FullDiagnostics` can be avoided in favor of single values, 1D or 2D data at possibly even higher time resolution.
@@ -4109,8 +4127,9 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.precision``.
 
 
-Checkpoints and restart
------------------------
+Restart
+=======
+
 WarpX supports checkpoints/restart via AMReX.
 The checkpoint capability can be turned with regular diagnostics: ``<diag_name>.format = checkpoint``.
 
@@ -4121,59 +4140,11 @@ The checkpoint capability can be turned with regular diagnostics: ``<diag_name>.
 * ``warpx.write_diagnostics_on_restart`` (`bool`) optional (default `false`)
     When `true`, write the diagnostics after restart at the time of the restart.
 
-Intervals parser
-----------------
-
-WarpX can parse time step interval expressions of the form ``start:stop:period``, e.g.
-``1:2:3, 4::, 5:6, :, ::10``.
-A comma is used as a separator between groups of intervals, which we call slices.
-The resulting time steps are the `union set <https://en.wikipedia.org/wiki/Union_(set_theory)>`_ of all given slices.
-White spaces are ignored.
-A single slice can have 0, 1 or 2 colons ``:``, just as `numpy slices <https://numpy.org/doc/stable/reference/generated/numpy.s_.html>`_, but with inclusive upper bound for ``stop``.
-
-* For 0 colon the given value is the period
-
-* For 1 colon the given string is of the type ``start:stop``
-
-* For 2 colons the given string is of the type ``start:stop:period``
-
-Any value that is not given is set to default.
-Default is ``0`` for the start, ``std::numeric_limits<int>::max()`` for the stop and ``1`` for the
-period.
-For the 1 and 2 colon syntax, actually having values in the string is optional
-(this means that ``::5``, ``100 ::10`` and ``100 :`` are all valid syntaxes).
-
-All values can be expressions that will be parsed in the same way as other integer input parameters.
-
-**Examples**
-
-* ``something_intervals = 50`` -> do something at timesteps 0, 50, 100, 150, etc.
-  (equivalent to ``something_intervals = ::50``)
-
-* ``something_intervals = 300:600:100`` -> do something at timesteps 300, 400, 500 and 600.
-
-* ``something_intervals = 300::50`` -> do something at timesteps 300, 350, 400, 450, etc.
-
-* ``something_intervals = 105:108,205:208`` -> do something at timesteps 105, 106, 107, 108,
-  205, 206, 207 and 208. (equivalent to ``something_intervals = 105 : 108 : , 205 : 208 :``)
-
-* ``something_intervals = :`` or  ``something_intervals = ::`` -> do something at every timestep.
-
-* ``something_intervals = 167:167,253:253,275:425:50`` do something at timesteps 167, 253, 275,
-  325, 375 and 425.
-
-This is essentially the python slicing syntax except that the stop is inclusive
-(``0:100`` contains 100) and that no colon means that the given value is the period.
-
-Note that if a given period is zero or negative, the corresponding slice is disregarded.
-For example, ``something_intervals = -1`` deactivates ``something`` and
-``something_intervals = ::-1,100:1000:25`` is equivalent to ``something_intervals = 100:1000:25``.
-
 
 .. _running-cpp-parameters-test-debug:
 
-Testing and Debugging
----------------------
+Debugging
+=========
 
 When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the following options can be considered.
 
@@ -4215,6 +4186,60 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
 * ``ablastr.fillboundary_always_sync`` (`0` or `1`) optional (default `0`)
     Run all ``FillBoundary`` operations on ``MultiFab`` to force-synchronize shared nodal points.
     This slightly increases communication cost and can help to spot missing ``nodal_sync`` flags in these operations.
+
+.. _running-cpp-parameters-signal:
+
+Signal Handling
+---------------
+
+WarpX can handle Unix (Linux/macOS) `process signals <https://en.wikipedia.org/wiki/Signal_(IPC)>`__.
+This can be useful to configure jobs on HPC and cloud systems to shut down cleanly when they are close to reaching their allocated walltime or to steer the simulation behavior interactively.
+
+Allowed signal names are documented in the `C++ standard <https://en.cppreference.com/w/cpp/utility/program/SIG_types>`__ and `POSIX <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html>`__.
+We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal configuration name for ``SIGINT`` is ``INT``.
+
+* ``warpx.break_signals`` (array of `string`, separated by spaces) optional
+    A list of signal names or numbers that the simulation should
+    handle by cleanly terminating at the next timestep
+
+* ``warpx.checkpoint_signals`` (array of `string`, separated by spaces) optional
+    A list of signal names or numbers that the simulation should
+    handle by outputting a checkpoint at the next timestep. A
+    diagnostic of type `checkpoint` must be configured.
+
+.. note::
+
+   Certain signals are only available on specific platforms, please see the links above for details.
+   Typically supported on Linux and macOS are ``HUP``, ``INT``, ``QUIT``, ``ABRT``, ``USR1``, ``USR2``, ``TERM``, ``TSTP``, ``URG``, and ``IO`` among others.
+
+   Signals to think about twice before overwriting in *interactive simulations*:
+   Note that ``INT`` (interupt) is the signal that ``Ctrl+C`` sends on the terminal, which most people use to abort a process; once overwritten you need to abort interactive jobs with, e.g., ``Ctrl+\`` (``QUIT``) or sending the ``KILL`` signal.
+   The ``TSTP`` (terminal stop) command is sent interactively from ``Ctrl+Z`` to temporarily send a process to sleep (until send in the background with commands such as ``bg`` or continued with ``fg``), overwriting it would thus disable that functionality.
+   The signals ``KILL`` and ``STOP`` cannot be used.
+
+   The ``FPE`` and ``ILL`` signals should not be overwritten in WarpX, as they are `controlled by AMReX <https://amrex-codes.github.io/amrex/docs_html/Debugging.html#breaking-into-debuggers>`__ for :ref:`debug workflows that catch invalid floating-point operations <debugging_warpx>`.
+.. tip::
+
+   For example, the following logic can be added to `Slurm batch scripts <https://docs.gwdg.de/doku.php?id=en:services:application_services:high_performance_computing:running_jobs_slurm:signals>`__ (`signal name to number mapping here <https://en.wikipedia.org/wiki/Signal_(IPC)#Default_action>`__) to gracefully shut down 6 min prior to walltime.
+   If you have a checkpoint diagnostics in your inputs file, this automatically will write a checkpoint due to the default ``<diag_name>.dump_last_timestep = 1`` option in WarpX.
+
+   .. code-block:: bash
+
+      #SBATCH --signal=1@360
+
+      srun ...                   \
+        warpx.break_signals=HUP  \
+        > output.txt
+
+   For `LSF batch systems <https://www.ibm.com/docs/en/spectrum-lsf/10.1.0?topic=options-wa>`__, the equivalent job script lines are:
+
+   .. code-block:: bash
+
+      #BSUB -wa 'HUP' -wt '6'
+
+      jsrun ...                  \
+        warpx.break_signals=HUP  \
+        > output.txt
 
 .. bibliography::
     :keyprefix: param-
