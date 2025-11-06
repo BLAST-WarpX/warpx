@@ -3405,7 +3405,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 nsteps = self.max_steps
             else:
                 nsteps = -1
-        pywarpx.warpx.evolve(nsteps)
+        pywarpx.warpx.step(nsteps)
 
     def finalize(self):
         if self.warpx_initialized:
@@ -3419,6 +3419,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         easy fetching of the MultiFabs.
         """
         return self.extension.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        """
+        This is a convenience property that returns the MultiParticleContainer, allowing
+        easy fetching of the WarpXParticleContainer instances.
+        """
+        return self.extension.warpx.multi_particle_container()
 
 
 # ----------------------------

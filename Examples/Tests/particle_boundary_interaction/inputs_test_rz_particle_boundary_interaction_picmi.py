@@ -158,9 +158,7 @@ def mirror_reflection():
     nz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nz", lev))
 
     # STEP 2: use these parameters to inject particle from the same position in the plasma
-    elect_pc = particle_containers.ParticleContainerWrapper(
-        "electrons"
-    )  # general particle container
+    electrons = sim.particles.get("electrons")  # general particle container
 
     ####this part is specific to the case of simple reflection.
     un = ux * nx + uy * ny + uz * nz
@@ -177,7 +175,7 @@ def mirror_reflection():
     uy_reflect = to_numpy(uy_reflect)
     uz_reflect = to_numpy(uz_reflect)
 
-    elect_pc.add_particles(
+    electrons.add_particles(
         x=x + (dt - delta_t) * ux_reflect,
         y=y + (dt - delta_t) * uy_reflect,
         z=z + (dt - delta_t) * uz_reflect,
