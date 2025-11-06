@@ -144,7 +144,7 @@ sim.initialize_warpx()
 ##########################
 xp, _ = load_cupy()
 
-np.random.seed(10025015)
+xp.random.seed(10025015)
 
 
 def concat(list_of_arrays):
