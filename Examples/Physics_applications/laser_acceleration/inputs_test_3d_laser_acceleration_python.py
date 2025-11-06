@@ -40,13 +40,8 @@ def my_advanced_callback():
     amr = sim.extension.amr
     amr.Print(f"    {amr.ParallelDescriptor.NProcs()} MPI process(es) active")
 
-    # the active simulation
-    warpx = sim.extension.warpx
-
     # electrons: access (and potentially manipulate)
-    electrons = warpx.multi_particle_container().get_particle_container_from_name(
-        "electrons"
-    )
+    electrons = sim.particles.get("electrons")
     print(f"    {electrons}")
 
     # electric field: access (and potentially manipulate)

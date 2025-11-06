@@ -315,8 +315,8 @@ class HybridPICBeamInstability(object):
 
         # create particle container wrapper for the ion species to access
         # particle data
-        self.ion_container = self.sim.particles.get(self.ions.name)
-        self.beam_ion_container = self.sim.particles.get(self.beam_ions.name)
+        self.ion_container = simulation.particles.get(self.ions.name)
+        self.beam_ion_container = simulation.particles.get(self.beam_ions.name)
 
     def _create_data_arrays(self):
         self.prev_time = time.time()
@@ -396,18 +396,17 @@ class HybridPICBeamInstability(object):
     def _get_kinetic_energy(self, container_wrapper):
         """Utility function to retrieve the total kinetic energy in the
         simulation."""
-        try:
-            ux = np.concatenate(container_wrapper.get_particle_ux())
-            uy = np.concatenate(container_wrapper.get_particle_uy())
-            uz = np.concatenate(container_wrapper.get_particle_uz())
-            w = np.concatenate(container_wrapper.get_particle_weight())
-        except ValueError:
-            return 0.0, 0.0
+        my_E_perp = 0
+        my_E_par = 0
+        for pti in container_wrapper.iterator(level=0):
+            ux = pti["ux"]
+            uy = pti["uy"]
+            uz = pti["uz"]
+            w = pti["w"]
+            my_E_perp += 0.5 * self.M * np.sum(w * (ux**2 + uy**2))
+            my_E_par += 0.5 * self.M * np.sum(w * uz**2)
 
-        my_E_perp = 0.5 * self.M * np.sum(w * (ux**2 + uy**2))
         E_perp = comm.allreduce(my_E_perp, op=mpi.SUM)
-
-        my_E_par = 0.5 * self.M * np.sum(w * uz**2)
         E_par = comm.allreduce(my_E_par, op=mpi.SUM)
 
         return E_par, E_perp

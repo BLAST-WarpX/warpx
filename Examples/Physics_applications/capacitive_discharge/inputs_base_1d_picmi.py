@@ -412,31 +412,29 @@ class CapacitiveDischargeExample(object):
         if not hasattr(self, "neutral_particles"):
             self.neutral_particles = self.sim.particles.get(self.neutrals.name)
 
-        ux_arrays = self.neutral_particles.uxp
-        uy_arrays = self.neutral_particles.uyp
-        uz_arrays = self.neutral_particles.uzp
-
         xp, _ = load_cupy()
 
         vel_std = np.sqrt(constants.kb * self.gas_temp / self.m_ion)
-        for ii in range(len(ux_arrays)):
-            nps = len(ux_arrays[ii])
-            ux_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uy_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uz_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
+        for pti in self.neutral_particles.iterator(level=0):
+            nps = pti.size
+            pti["ux"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uy"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uz"][:] = xp.array(vel_std * self.rng.normal(size=nps))
 
     def _get_rho_ions(self):
         # deposit the ion density in rho_fp
+        self.rho.set_val(0.0)
         he_ions = self.sim.particles.get("he_ions")
-        he_ions.deposit_charge_density(level=0)
+        he_ions.deposit_charge(self.rho, lev=0)
+        libwarpx.warpx.sync_rho()
 
-        rho_data = self.rho_wrapper[...]
+        rho_data = self.rho[...]
         self.ion_density_array += rho_data / constants.q_e / self.diag_steps
 
     def run_sim(self):
         self.sim.step(self.max_steps - self.diag_steps)
 
-        self.rho_wrapper = self.sim.fields.get("rho_fp", level=0)
+        self.rho = self.sim.fields.get("rho_fp", level=0)
         callbacks.installafterstep(self._get_rho_ions)
 
         self.sim.step(self.diag_steps)
@@ -452,8 +450,10 @@ class CapacitiveDischargeExample(object):
         # to cover that functionality
         if self.test:
             he_ions = self.sim.particles.get("he_ions")
-            nparts = he_ions.get_particle_count(local=True)
-            z_coords = np.concatenate(he_ions.zp)
+            nparts = he_ions.number_of_particles(only_local=True)
+            z_coords = np.concatenate(
+                list(pti["z"] for pti in he_ions.iterator(level=0))
+            )
             assert len(z_coords) == nparts
             assert np.all(z_coords >= 0.0) and np.all(z_coords <= self.gap)
 
