@@ -70,6 +70,7 @@ void FiniteDifferenceSolver::ComputeLaplacianCylindrical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeLaplacianCylindrical not fully implemented");
 }
 
@@ -81,6 +82,7 @@ void FiniteDifferenceSolver::ComputeLaplacianSpherical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeLaplacianSpherical not fully implemented");
 }
 
@@ -210,6 +212,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCylindrical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianCylindrical not fully implemented");
 }
 
@@ -221,6 +224,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianSpherical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianSpherical not fully implemented");
 }
 
