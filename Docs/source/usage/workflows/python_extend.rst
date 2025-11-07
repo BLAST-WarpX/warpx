@@ -82,6 +82,9 @@ specific location in the WarpX simulation loop.
 .. automodule:: pywarpx.callbacks
    :members: installcallback, uninstallcallback, isinstalled
 
+Accessing and manipulating simulation data through Python
+---------------------------------------------------------
+
 
 pyAMReX
 -------
@@ -116,6 +119,13 @@ Data Access
 -----------
 
 While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
+
+.. toctree::
+   :maxdepth: 1
+
+   python_field_data
+   python_particle_data
+   python_particle_boundary_data
 
 An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
 This object is the Python equivalent to the C++ ``WarpX`` simulation class.
