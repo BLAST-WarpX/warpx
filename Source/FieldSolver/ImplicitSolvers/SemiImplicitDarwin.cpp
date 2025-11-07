@@ -164,26 +164,6 @@ void SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Solve MS equation
     m_linear_solver->solve(m_dA, m_source, m_linsol_rtol, m_linsol_atol);
 
-    {
-        // TEMPORARY HACK TO TEST SOLVER - THIS CALLBACK IS NOT OTHERWISE USED
-        if (IsPythonCallbackInstalled("particlescraper")) {
-            auto dA_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, 0);
-            const auto& source_vec = m_source.getArrayVec();
-
-            // copy test values from m_dA to dA_fp
-            amrex::MultiFab::Copy(*dA_fp[0][0], *source_vec[0][0], 0, 0, 1, source_vec[0][0]->nGrowVect());
-            amrex::MultiFab::Copy(*dA_fp[0][1], *source_vec[0][1], 0, 0, 1, source_vec[0][1]->nGrowVect());
-            amrex::MultiFab::Copy(*dA_fp[0][2], *source_vec[0][2], 0, 0, 1, source_vec[0][2]->nGrowVect());
-
-            ExecutePythonCallback("particlescraper");
-
-            // Copy solution calculated in Python to the dA vector
-            m_dA.Copy( FieldType::dA_fp, FieldType::xi_fp );
-
-            amrex::Print() << "MS solve overwritten from Python." << std::endl;
-        }
-    }
-
     // Update E to E = -dA/dt and A to A += dA (recall that B is updated after Poisson solve)
     UpdateEandAfromdA(a_step);
 
@@ -299,33 +279,6 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
         *rhs_scalar[lev], -PhysConst::mu0, *rhs_scalar[lev], 0, 1.0, *xi_fp[lev], 0, 0, ncomps, 0
     );
 
-    // ------- HACK TO JUST TEST SOLVER -------
-    if (IsPythonCallbackInstalled("beforedeposition")) {
-        // copy test values from a_dA to dA_fp and xi_fp
-        amrex::MultiFab::Copy(*dA_fp[lev][0], *dAvec[lev][0], 0, 0, ncomps, dAvec[lev][0]->nGrowVect());
-        amrex::MultiFab::Copy(*dA_fp[lev][1], *dAvec[lev][1], 0, 0, ncomps, dAvec[lev][1]->nGrowVect());
-        amrex::MultiFab::Copy(*dA_fp[lev][2], *dAvec[lev][2], 0, 0, ncomps, dAvec[lev][2]->nGrowVect());
-        amrex::MultiFab::Copy(*xi_fp[lev], *xivec[lev], 0, 0, ncomps, xivec[lev]->nGrowVect());
-
-        /* ----------------------------------------------------------  */
-        // copy C++ calculated RHS values from a_RHS to Efield_fp and rho_fp
-        // -- this is just to compare to expected values in Python and is okay
-        // since the E-field and rho are overwritten later.
-        auto E_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, lev);
-        auto rho_fp = m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, 0);
-        amrex::MultiFab::Copy(*E_fp[lev][0], *rhs_vec[lev][0], 0, 0, 1, rhs_vec[lev][0]->nGrowVect());
-        amrex::MultiFab::Copy(*E_fp[lev][1], *rhs_vec[lev][1], 0, 0, 1, rhs_vec[lev][1]->nGrowVect());
-        amrex::MultiFab::Copy(*E_fp[lev][2], *rhs_vec[lev][2], 0, 0, 1, rhs_vec[lev][2]->nGrowVect());
-        amrex::MultiFab::Copy(*rho_fp[lev], *rhs_scalar[lev], 0, 0, 1, rhs_scalar[lev]->nGrowVect());
-        /* ----------------------------------------------------------  */
-
-        // Use the Python code to apply the MS operator to the dA_fp and xi_fp
-        // vectors, writing the new RHS values in their place
-        ExecutePythonCallback("beforedeposition");
-
-        // Copy new RHS values calculated in Python to the a_RHS vector
-        a_RHS.Copy( FieldType::dA_fp, FieldType::xi_fp );
-    }
 }
 
 void SemiImplicitDarwin::PrepareCurrentDeposition ()
