@@ -59,7 +59,7 @@ void FiniteDifferenceSolver::ComputeLaplacian (
      *
      * \param[out] out_field  output MultiFab at a given level
      * \param[in] in_field   input MultiFab at a given level
-     * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
+     * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
      * \param[in] lev  level number for the calculation
      */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
