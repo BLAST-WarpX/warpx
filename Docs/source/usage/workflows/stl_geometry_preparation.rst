@@ -66,13 +66,13 @@ Using MeshLab
 To check and repair a mesh in MeshLab:
 
 1. **Check for issues:**
-   
+
    * ``Filters -> Quality Measure and Computations -> Compute Topological Measures``
    * Look for holes in the output
    * Look for non-manifold edges and vertices in the output
-   
+
 2. **Repair the mesh:**
-   
+
    * When loading in the mesh, there is an option to ``Unify Duplicated Vertices in STL files``, this will perform the next steps automatically, but gives the user less control.
    * ``Filters -> Cleaning and Repairing -> Remove Duplicate Faces``
    * ``Filters -> Cleaning and Repairing -> Remove Duplicate Vertices``
@@ -84,11 +84,11 @@ To check and repair a mesh in MeshLab:
    .. * ``Filters -> Remeshing, Simplification and Reconstruction -> Close Holes``
 
 3. **Verify the mesh is watertight:**
-   
+
    * Run ``Filters -> Quality Measure and Computations -> Compute Topological Measures`` again
    * Check that the mesh has no holes
    * Check that the mesh is manifold (no warnings about non-manifold edges)
-   
+
       * An STL file with non-manifold edges won't necessarily crash a simulation, but may present other numerical issues.
 
 .. Using Python with trimesh
@@ -126,7 +126,7 @@ Once you have a single, watertight STL file, you can use it in WarpX by setting 
 
    # Specify that the embedded boundary comes from an STL file
    eb2.geom_type = stl
-   
+
    # Path to your STL file
    eb2.stl_file = path/to/device_watertight.stl
 
@@ -161,7 +161,7 @@ Examples
 .. note::
 
    **TODO**: WarpX does not yet have examples that use STL files for embedded boundaries.
-   
+
    Current embedded boundary examples in ``Examples/Tests/embedded_boundary_*`` use analytical
    functions to define geometries. A complete example demonstrating STL file usage will be
    added in the future.
