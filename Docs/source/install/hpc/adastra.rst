@@ -113,6 +113,10 @@ Additionally, the following commands will install WarpX as a Python module:
    cmake -S . -B build_adastra_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3" -DWarpX_QED_TABLES_GEN_OMP=OFF
    cmake --build build_adastra_py -j 16 --target pip_install
 
+.. note::
+
+   Enabling openMP support for QED lookup tables generation in WarpX while compiling WarpX for GPUs on Adastra does not work. It is recommended to generate QED lookup tables locally (e.g., with the standalone tool) and then transfer them to Adastra. The usage of the standalone tool for QED lookup tables generation is documented in the usage/workflows section of the documentation.
+
 Now, you can :ref:`submit Adstra compute jobs <running-cpp-adastra>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
 Or, you can use the WarpX executables to submit Adastra jobs (:ref:`example inputs <usage-examples>`).
 For executables, you can reference their location in your :ref:`job script <running-cpp-adastra>` .
