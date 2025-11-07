@@ -376,19 +376,6 @@ by several utility functions of the form ``get_particle_{comp_name}`` where
 ``comp_name`` is one of ``x``, ``y``, ``z``, ``r``, ``theta``, ``id``, ``cpu``,
 ``weight``, ``ux``, ``uy`` or ``uz``.
 
-
-Diagnostics
------------
-
-Various diagnostics are also accessible from Python.
-This includes getting the deposited or total charge density from a given species as well as accessing the scraped particle buffer.
-See the example in ``Examples/Tests/ParticleBoundaryScrape`` for a reference on how to interact with scraped particle data.
-
-
-.. autoclass:: pywarpx.particle_containers.ParticleBoundaryBufferWrapper
-   :members:
-
-
 Modify Solvers
 --------------
 
