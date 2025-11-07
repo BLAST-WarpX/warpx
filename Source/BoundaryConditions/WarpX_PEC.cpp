@@ -418,7 +418,7 @@ namespace
                         if (idim == 0 && iside == 1) {
                             rscale = (rvalid + ig + 1)/rvalid;
 #if defined(WARPX_DIM_RSPHERE)
-                            rscale *= rmirror/rvalid;
+                            rscale *= (rvalid + ig + 1)/rvalid;
 #endif
                         }
 #endif
