@@ -143,6 +143,19 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 ParticleTileType& ptile_vp = vphotons.ParticlesAt(lev, mfi);
                 ptile_vp.resize(total_num_vp);
 
+                // Get the starting particle ID on CPU and reserve IDs for all virtual photons
+                // This must be done on CPU because NextID() is not thread-safe and cannot be called from GPU
+                amrex::Long pid;
+#ifdef AMREX_USE_OMP
+#pragma omp critical (virtual_photon_nextid)
+#endif
+                {
+                    pid = ParticleTileType::ParticleType::NextID();
+                    ParticleTileType::ParticleType::NextID(pid + total_num_vp);
+                }
+
+                const int cpuid = amrex::ParallelDescriptor::MyProc();
+
                 // SoA that will contain the virtual photons data
                 auto &soa_vp = ptile_vp.GetStructOfArrays();
 
@@ -154,6 +167,9 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 for (int ia = 0; ia < PIdx::nattribs; ++ia) {
                     pa_vp[ia] = soa_vp.GetRealData(ia).data();
                 }
+
+                // Capture the starting PID for use in the GPU kernel
+                const amrex::Long pid_start = pid;
 
                 // Second pass: populate the virtual photon species
                 amrex::ParallelForRNG (num,
@@ -244,7 +260,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         pa_vp[PIdx::phi][ip] = phi;
 #endif
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
-                        pid_vp[ip] = amrex::SetParticleIDandCPU(ParticleType::NextID(), amrex::ParallelDescriptor::MyProc());
+                        pid_vp[ip] = amrex::SetParticleIDandCPU(pid_start + ip, cpuid);
                     }
                 });
             } // mfi
