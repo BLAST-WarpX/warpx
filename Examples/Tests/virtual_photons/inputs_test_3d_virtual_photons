@@ -87,8 +87,8 @@ virtual_photons.injection_style = none
 virtual_photons.do_not_push = 1
 virtual_photons.do_not_gather = 1
 virtual_photons.do_not_deposit = 1
-virtual_photons.virtual_photons_min_energy = hwmin
-virtual_photons.sampling_factor = 10000000
+virtual_photons.qed_virtual_photons_min_energy = hwmin
+virtual_photons.qed_virtual_photons_multiplier = 10000000
 
 #################################
 ######### DIAGNOSTICS ###########

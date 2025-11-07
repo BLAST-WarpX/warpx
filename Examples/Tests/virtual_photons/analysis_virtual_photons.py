@@ -6,6 +6,7 @@
 # compared to the theoretical prediction.
 # Checks that the photons are in the same position of the electron.
 
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy import log
 from openpmd_viewer import OpenPMDTimeSeries
@@ -65,13 +66,32 @@ dN_dy_theory = alpha / pi / y * (-2 * log(y))
 # number of virtual photons for one electron from theory
 N_theory = alpha / pi * log(ymin) ** 2
 
+############
+### Plot ###
+############
+
+fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(5, 4), dpi=200)
+ax.plot(y, dN_dy_theory, color="black", lw=6, label="theory")
+ax.plot(y, dN_dy_warpx, color="dodgerblue", lw=4, label="WarpX")
+ax.legend()
+ax.set_yscale("log")
+ax.set_xscale("log")
+ax.set_xlabel("Fractional photon energy")
+ax.set_ylabel("dN/dy")
+ax.set_title("Virtual photons spectrum")
+fig.savefig("spectrum_virtual_photons.png")
+
+#############
+### Error ###
+#############
+
 number_rel_error = np.abs(N_warpx - N_theory) / N_theory
 spectrum_rel_error = np.abs(dN_dy_warpx - dN_dy_theory) / dN_dy_theory
 
 print("Number of virtual photons per electron:")
 print(f"From simulation : {N_warpx}")
 print(f"From theory     : {N_theory}")
-print(f"Relative error  : {number_rel_error:.2%}")
+print(f"Relative error  : {number_rel_error:.4%}")
 
 print("Spectrum of virtual photons per electron:")
 print(f"Max relative error: {spectrum_rel_error.max()}")
@@ -80,7 +100,7 @@ assert number_rel_error < 0.02
 assert (spectrum_rel_error < 0.04).all()
 
 ################
-### POSITION ###
+### Position ###
 ################
 
 x, y, z = series.get_particle(["x", "y", "z"], species="virtual_photons", iteration=1)
