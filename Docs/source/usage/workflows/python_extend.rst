@@ -82,9 +82,19 @@ specific location in the WarpX simulation loop.
 .. automodule:: pywarpx.callbacks
    :members: installcallback, uninstallcallback, isinstalled
 
-Accessing and manipulating simulation data through Python
----------------------------------------------------------
+.. _usage-python-extend-data-access:
 
+Accessing simulation data through Python
+----------------------------------------
+
+While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
+
+.. toctree::
+   :maxdepth: 1
+
+   python_field_data
+   python_particle_data
+   python_particle_boundary_data
 
 pyAMReX
 -------
@@ -112,20 +122,8 @@ Important APIs include:
 * `amr.MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__: MPI-parallel field data
 * `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
 
-
-.. _usage-python-extend-data-access:
-
 Data Access
 -----------
-
-While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
-
-.. toctree::
-   :maxdepth: 1
-
-   python_field_data
-   python_particle_data
-   python_particle_boundary_data
 
 An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
 This object is the Python equivalent to the C++ ``WarpX`` simulation class.
@@ -375,11 +373,3 @@ The ``get_particle_real_arrays()``, ``get_particle_int_arrays()`` and
 by several utility functions of the form ``get_particle_{comp_name}`` where
 ``comp_name`` is one of ``x``, ``y``, ``z``, ``r``, ``theta``, ``id``, ``cpu``,
 ``weight``, ``ux``, ``uy`` or ``uz``.
-
-Modify Solvers
---------------
-
-From Python, one can also replace numerical solvers in the PIC loop or add new physical processes into the time step loop.
-Examples:
-
-* :ref:`Capacitive Discharge <examples-capacitive-discharge>`: replaces the Poisson solver of an electrostatic simulation (default: MLMG) with a python function that uses `superLU <https://portal.nersc.gov/project/sparse/superlu/>`__ to directly solve the Poisson equation.
