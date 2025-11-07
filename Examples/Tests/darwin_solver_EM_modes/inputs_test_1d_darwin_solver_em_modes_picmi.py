@@ -10,8 +10,6 @@ import argparse
 import os
 import sys
 
-# import prototype solvers
-import darwin_pic_model
 import dill
 import numpy as np
 from mpi4py import MPI as mpi
@@ -23,6 +21,25 @@ constants = picmi.constants
 comm = mpi.COMM_WORLD
 
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+
+
+class DummyES_Solver(picmi.ElectrostaticSolver):
+    def __init__(self, grid):
+        super(DummyES_Solver, self).__init__(
+            grid=grid, method="Multigrid", required_precision=1
+        )
+
+    def solver_initialize_inputs(self):
+        """Grab geometrical quantities from the grid."""
+        super(DummyES_Solver, self).solver_initialize_inputs()
+
+        print("Skipping ES evolution.")
+        callbacks.installpoissonsolver(self.skip_poisson_solve)
+
+    def skip_poisson_solve(self):
+        """Function run on every step to perform a null solve of Poisson's
+        equation."""
+        pass
 
 
 class EMModes(object):
@@ -265,16 +282,16 @@ class EMModes(object):
         # Field solver and external field                                     #
         #######################################################################
 
-        self.solver = darwin_pic_model.OneD_DarwinSolver(
-            simulation=simulation,
-            grid=self.grid,
-            dt=self.dt,
-            Csi=self.C_SI,
-            skip_es=(self.B_dir == "z"),
-            python_ms_solve=(
-                simulation.evolve_scheme.linear_solver.max_iterations == 0
-            ),
-        )
+        if self.B_dir != "z":
+            self.solver = picmi.ElectrostaticSolver(
+                grid=self.grid,
+                required_precision=1e-6,
+                warpx_effective_potential=True,
+                warpx_effective_potential_factor=self.C_SI,
+                warpx_self_fields_verbosity=0,
+            )
+        else:
+            self.solver = DummyES_Solver(self.grid)
         simulation.solver = self.solver
 
         B_ext = picmi.AnalyticInitialField(
