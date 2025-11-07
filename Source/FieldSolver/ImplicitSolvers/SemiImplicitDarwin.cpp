@@ -464,9 +464,9 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
     m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev), lev, period);
 
     // TODO: Handle boundary conditions for mass matrices...
-    // m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_X, lev), lev, period);
-    // m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Y, lev), lev, period);
-    // m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Y, lev), lev, period);
+    m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_X, lev), lev, period);
+    m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Y, lev), lev, period);
+    m_WarpX->SumBoundaryJ(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Z, lev), lev, period);
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()
