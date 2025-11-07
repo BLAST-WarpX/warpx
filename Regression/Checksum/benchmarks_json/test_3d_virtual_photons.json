@@ -20,10 +20,10 @@
     "particle_weight": 12000000000.0
   },
   "virtual_photons": {
-    "particle_position_x": 10.235352202681076,
-    "particle_position_y": 0.5893638838471777,
-    "particle_position_z": 41806400.47003099,
+    "particle_position_x": 10.23535247755454,
+    "particle_position_y": 0.5893638996747153,
+    "particle_position_z": 41806401.59275659,
     "particle_momentum_z": 0.0,
-    "particle_weight": 44683976400.0
+    "particle_weight": 44683977600.0
   }
 }

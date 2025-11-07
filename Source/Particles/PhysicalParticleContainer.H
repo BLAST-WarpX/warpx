@@ -379,7 +379,7 @@ public:
     /**
      * Gets the index of the PhysicalParticleContainer
      * that corresponds to the virtual photons
-     * @return index of the
+     * @return index of the virtual photon species
      */
     int getVirtualPhotonSpeciesIndex () const override;
 #endif
