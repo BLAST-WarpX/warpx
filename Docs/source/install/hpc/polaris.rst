@@ -90,7 +90,7 @@ On Polaris, you can run either on GPU nodes with fast A100 GPUs (recommended) or
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 

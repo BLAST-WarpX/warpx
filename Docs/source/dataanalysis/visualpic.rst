@@ -32,7 +32,7 @@ Example: ``vpic3d -s beam -rho -Ez diags/diag1/`` could be used to visualize the
 Example: ``vpic3d -Ex diags/diag1/`` could be used to visualize the transverse focusing field :math:`E_x` in a plasma wake behind a laser pulse (linearly polarized in :math:`E_y`), see below:
 
 .. figure:: https://user-images.githubusercontent.com/1353258/233236692-4d75b12f-de44-43dc-97bd-c96b04ee68ac.png
-   :alt: Figure not found
+   :alt: 3D visualization of plasma wake fields in VisualPIC
    :width: 100%
 
    Example view of a 3D rendering with VisualPIC.
