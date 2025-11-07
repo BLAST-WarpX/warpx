@@ -6,14 +6,14 @@
 One dimension
 -------------
 
-For a Cartesian geometry in one dimension, the Z-coordinate is the in-plane direction and the X- and Y-coordinates are the out-of-plane directions.
+Right-handed Cartesian geometry in one dimension with Z as the in-line direction.
 
 Two dimensions
 --------------
 
-For a Cartesian geometry in two dimensions, the X- and Z-coordinates are the in-plane directions and the Y-coordinate is the out-of-plane direction.
+Right-handed Cartesian geometry in two dimensions with Y as the out-of-plane direction.
 
 Three dimensions
 ----------------
 
-No explaination is required for a Cartesian geometry in three dimensions.
+Right-handed Cartesian geometry in three dimensions with coordinates X, Y, and Z.
