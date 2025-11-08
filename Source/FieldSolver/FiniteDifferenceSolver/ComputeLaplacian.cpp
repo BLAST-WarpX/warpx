@@ -59,7 +59,7 @@ void FiniteDifferenceSolver::ComputeLaplacian (
      *
      * \param[out] out_field  output MultiFab at a given level
      * \param[in] in_field   input MultiFab at a given level
-     * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
+     * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
      * \param[in] lev  level number for the calculation
      */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -70,6 +70,7 @@ void FiniteDifferenceSolver::ComputeLaplacianCylindrical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeLaplacianCylindrical not fully implemented");
 }
 
@@ -81,6 +82,7 @@ void FiniteDifferenceSolver::ComputeLaplacianSpherical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeLaplacianSpherical not fully implemented");
 }
 
@@ -199,7 +201,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacian (
      *
      * \param[out] out_field  vector of output MultiFabs at a given level
      * \param[in] in_field   vector of input MultiFabs at a given level
-     * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
+     * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
      * \param[in] lev  level number for the calculation
      */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -210,6 +212,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCylindrical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianCylindrical not fully implemented");
 }
 
@@ -221,6 +224,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianSpherical (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianSpherical not fully implemented");
 }
 
