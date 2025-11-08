@@ -563,16 +563,6 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
             amrex::Box tez = (split_pml_field) ? mfi.tilebox(field[2]->ixType().toIntVect())
                                                : mfi.tilebox(field[2]->ixType().toIntVect(), ng_fieldgather);
 
-            // Grow the boxes to include guard cells in directions transverse
-            // to this boundary. This is required to correctly reflect the fields at domain
-            // corners that touch multiple PECInsulator boundaries.
-            for (int jdim = 0; jdim < AMREX_SPACEDIM; ++jdim) {
-                if (jdim == idim) { continue; }
-                tex.grow(jdim, field[0]->nGrow(jdim));
-                tey.grow(jdim, field[1]->nGrow(jdim));
-                tez.grow(jdim, field[2]->nGrow(jdim));
-            }
-
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
 
