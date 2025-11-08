@@ -76,20 +76,18 @@ It allows the user to define functions by intervals.
 Alternatively, the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
 
 
-.. _running-cpp-parameters-overall:
+.. _running-cpp-parameters-miscellaneous:
 
-Overall simulation parameters
------------------------------
+Miscellaneous parameters
+------------------------
 
 * ``authors`` (`string`: e.g. ``"Jane Doe <jane@example.com>, Jimmy Joe <jimmy@example.com>"``)
     Authors of an input file / simulation setup.
     When provided, this information is added as metadata to (openPMD) output files.
 
-
 * ``warpx.used_inputs_file`` (`string`; default: ``warpx_used_inputs``)
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
-
 
 * ``warpx.random_seed`` (`string` or `int` > 0) optional
     If provided ``warpx.random_seed = random``, the random seed will be determined
@@ -103,7 +101,6 @@ Overall simulation parameters
     Note that when GPU threading is used,
     one should not expect to obtain the same random numbers,
     even if a fixed ``warpx.random_seed`` is provided.
-
 
 * ``amrex.abort_on_out_of_gpu_memory``  (``0`` or ``1``; default is ``1`` for true)
     When running on GPUs, memory that does not fit on the device will be automatically swapped to host memory when this option is set to ``0``.
