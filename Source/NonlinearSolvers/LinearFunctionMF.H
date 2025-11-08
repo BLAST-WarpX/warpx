@@ -57,6 +57,16 @@ class LinearFunctionMF : public LinearFunction<T,Ops>
         if (m_usePreCond) { m_preCond->Update(a_X); }
     }
 
+    inline
+    void getPCMatrix( amrex::Gpu::DeviceVector<int>& a_ridx_g,
+                      amrex::Gpu::DeviceVector<int>& a_nnz,
+                      amrex::Gpu::DeviceVector<int>& a_cidx_g,
+                      amrex::Gpu::DeviceVector<RT>&  a_aij,
+                      int& a_n, int& a_ncols_max ) override
+    {
+        amrex::ignore_unused(a_ridx_g, a_nnz, a_cidx_g, a_aij, a_n, a_ncols_max);
+    }
+
     T makeVecLHS () const override;
     T makeVecRHS () const override;
 
@@ -77,6 +87,7 @@ class LinearFunctionMF : public LinearFunction<T,Ops>
     inline
     void setBaseRHS ( const T&  a_R )
     {
+        amrex::ignore_unused(a_R);
         // m_R0.Copy(a_R);
     }
 

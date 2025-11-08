@@ -59,7 +59,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX )
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
-    m_nlsolver_type = NonlinearSolverType::None;
+    m_nlsolver_type = NonlinearSolverType::none;
     m_max_particle_iterations = 1;
     m_particle_tolerance = 0.0;
 
@@ -278,7 +278,6 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
     amrex::MultiFab::LinComb(
         *rhs_scalar[lev], -PhysConst::mu0, *rhs_scalar[lev], 0, 1.0, *xi_fp[lev], 0, 0, ncomps, 0
     );
-
 }
 
 void SemiImplicitDarwin::PrepareCurrentDeposition ()
