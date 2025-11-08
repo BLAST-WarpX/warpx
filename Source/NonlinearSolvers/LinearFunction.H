@@ -43,6 +43,13 @@ class LinearFunction
         //! update preconditioner
         virtual void updatePreCondMat ( const T&  a_X ) = 0;
 
+        //! get sparse matrix representation of preconditioner
+        virtual void getPCMatrix( amrex::Gpu::DeviceVector<int>&,
+                                  amrex::Gpu::DeviceVector<int>&,
+                                  amrex::Gpu::DeviceVector<int>&,
+                                  amrex::Gpu::DeviceVector<RT>&,
+                                  int&, int& ) = 0;
+
         //! create a new vector given a defined vector
         inline void create ( T& a_Z, const T& a_U )
         {

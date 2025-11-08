@@ -21,7 +21,7 @@ The main WarpX class is WarpX, implemented in ``Source/WarpX.cpp``.
 Build System
 ------------
 
-WarpX uses the :ref:`CMake build system generator <building-cmake>`.
+WarpX uses the :ref:`CMake build system generator <install-build-cmake>`.
 Each sub-folder contains a file ``CMakeLists.txt`` with the names of the source files (``.cpp``) that are added to the build.
 Do not list header files (``.H``) here.
 

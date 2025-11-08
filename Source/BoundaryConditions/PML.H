@@ -227,28 +227,6 @@ private:
     }
 #endif
 
-    static amrex::BoxArray MakeBoxArray (bool single_box_domain,
-                                         const amrex::Box& regular_domain,
-                                         const amrex::Geometry& geom,
-                                         const amrex::BoxArray& grid_ba,
-                                         const amrex::IntVect& ncell,
-                                         int do_pml_in_domain,
-                                         const amrex::IntVect& do_pml_Lo,
-                                         const amrex::IntVect& do_pml_Hi);
-
-    static amrex::BoxArray MakeBoxArray_single (const amrex::Box& regular_domain,
-                                                const amrex::BoxArray& grid_ba,
-                                                const amrex::IntVect& ncell,
-                                                const amrex::IntVect& do_pml_Lo,
-                                                const amrex::IntVect& do_pml_Hi);
-
-    static amrex::BoxArray MakeBoxArray_multiple (const amrex::Geometry& geom,
-                                                  const amrex::BoxArray& grid_ba,
-                                                  const amrex::IntVect& ncell,
-                                                  int do_pml_in_domain,
-                                                  const amrex::IntVect& do_pml_Lo,
-                                                  const amrex::IntVect& do_pml_Hi);
-
     static void CopyToPML (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom);
 };
 

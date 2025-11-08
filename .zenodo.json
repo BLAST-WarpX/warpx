@@ -6,6 +6,11 @@
         "orcid": "0000-0002-0040-799X"
       },
       {
+        "affiliation": "Helion Energy, Inc.",
+        "name": "Acciarri, Marco",
+        "orcid": "0000-0003-2768-1259"
+      },
+      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Almgren, Ann",
         "orcid": "0000-0003-2103-312X"
@@ -27,6 +32,11 @@
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Antoun, Thierry",
+        "orcid": "0000-0002-1003-0698"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Belkin, Daniel",
         "orcid": "0000-0002-3936-6419"
       },
@@ -42,6 +52,11 @@
         "affiliation": "Helion Energy, Inc.",
         "name": "Clark, Stephen Eric",
         "orcid": "0000-0002-0117-776X"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Dammak, Eya",
+        "orcid": "0009-0003-7821-3508"
       },
       {
         "affiliation": "LIDYL, CEA-Universit\u00e9 Paris-Saclay, CEA Saclay",
@@ -64,24 +79,14 @@
         "orcid": "0000-0002-1442-0706"
       },
       {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Gott, Kevin",
-        "orcid": "0000-0003-3244-5525"
-      },
-      {
-        "affiliation": "Lawrence Livermore National Laboratory",
-        "name": "Harrison, Cyrus",
-        "orcid": "0000-0001-8985-0906"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Huebl, Axel",
-        "orcid": "0000-0003-1943-7141"
-      },
-      {
         "affiliation": "CERN",
         "name": "Giacomel, Lorenzo",
         "orcid": "0000-0002-1750-9757"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Gott, Kevin",
+        "orcid": "0000-0003-3244-5525"
       },
       {
         "affiliation": "TAE Technologies Inc.",
@@ -99,14 +104,29 @@
         "orcid": "0000-0002-1521-8534"
       },
       {
+        "affiliation": "Lawrence Livermore National Laboratory",
+        "name": "Harrison, Cyrus",
+        "orcid": "0000-0001-8985-0906"
+      },
+      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Haseeb, Muhammad",
         "orcid": "0000-0002-0697-6894"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Huebl, Axel",
+        "orcid": "0000-0003-1943-7141"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Jambunathan, Revathi",
         "orcid": "0000-0001-9432-2091"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Kara-Mostefa, Ilian",
+        "orcid": "0009-0002-2736-5942"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -119,21 +139,6 @@
         "orcid": "0000-0002-8454-7497"
       },
       {
-        "affiliation": "Lawrence Berkeley National Laboratory, now DESY",
-        "name": "Th\u00e9venet, Maxence",
-        "orcid": "0000-0001-7216-2277"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Richardson, Glenn",
-        "orcid": "0000-0003-0313-4496"
-      },
-      {
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Shapoval, Olga",
-        "orcid": "0000-0003-4003-4507"
-      },
-      {
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Lehe, Remi",
         "orcid": "0000-0002-3656-9659"
@@ -142,6 +147,11 @@
         "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Loring, Burlen",
         "orcid": "0000-0002-4678-8142"
+      },
+      {
+        "affiliation": "University of Michigan",
+        "name": "Marks, Thomas",
+        "orcid": "0000-0003-3614-6127"
       },
       {
         "affiliation": "Intense Computing",
@@ -155,8 +165,18 @@
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Pech, Juliette",
+        "orcid": "0009-0008-6165-0708"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
         "name": "Rheaume, Elisa",
         "orcid": "0000-0002-6710-0650"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Richardson, Glenn",
+        "orcid": "0000-0003-0313-4496"
       },
       {
         "affiliation": "Lawrence Berkeley National Laboratory",
@@ -172,6 +192,26 @@
         "affiliation": "Modern Electron",
         "name": "Scherpelz, Peter",
         "orcid": "0000-0001-8185-3387"
+      },
+      {
+        "affiliation": "Deutsches Elektronen-Synchrotron DESY",
+        "name": "Sinn, Alexander",
+        "orcid": "0000-0002-4485-971X"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Shapoval, Olga",
+        "orcid": "0000-0003-4003-4507"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory",
+        "name": "Terzani, Davide",
+        "orcid": "0000-0002-0105-5420"
+      },
+      {
+        "affiliation": "Lawrence Berkeley National Laboratory, now DESY",
+        "name": "Th\u00e9venet, Maxence",
+        "orcid": "0000-0001-7216-2277"
       },
       {
         "affiliation": "Laboratory for Laser Energetics, University of Rochester",
@@ -209,53 +249,6 @@
         "orcid": "0000-0001-5662-4646"
       }
     ],
-    "contributors": [
-      {
-        "type": "Other",
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Weber, Gunther H.",
-        "orcid": "0000-0002-1794-1398"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Intel",
-        "name": "Cohn, Robert"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Modern Electron",
-        "name": "Kieburtz, Michael",
-        "orcid": "0000-0001-6161-3669"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Bloomberg LP",
-        "name": "Levine, Michael"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Helmholtz Institute Jena",
-        "name": "Liu, Bin",
-        "orcid": "0000-0002-8066-184X"
-      },
-      {
-        "type": "Other",
-        "affiliation": "SLAC National Accelerator Laboratory",
-        "name": "Ng, Cho-Kuen",
-        "orcid": "0000-0002-1903-904X"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Lawrence Berkeley National Laboratory",
-        "name": "Park, Jaehong"
-      },
-      {
-        "type": "Other",
-        "affiliation": "Modern Electron",
-        "name": "Ruof, Nicholas W.",
-        "orcid": "0000-0001-9665-6722"
-      }
-    ],
     "license": {
       "id": "BSD-3-Clause-LBNL"
     },
@@ -272,12 +265,62 @@
     ],
     "access_right": "open",
     "references": [
-      "Myers A, Almgren A, Amorim LD, Bell J, Fedeli L, Ge L, Gott K, Grote DP, Hogan M, Huebl A, Jambunathan R, Lehe R, Ng C, Rowan M, Shapoval O, Thevenet M, Vay JL, Vincenti H, Yang E, Zaim N, Zhang W, Zhao Y, Zoni E. Porting WarpX to GPU-accelerated platforms. Parallel Computing. 2021 Sep, 108:102833. https://doi.org/10.1016/j.parco.2021.102833",
-      "Fedeli L, Zaim N, Sainte-Marie A, Thevenet M, Huebl A, Myers A, Vay J-L, Vincenti H. PICSAR-QED: a Monte Carlo module to simulate Strong-Field Quantum Electrodynamics in Particle-In-Cell codes for exascale architectures. New Journal of Physics. in-press, 2022. https://arxiv.org/abs/2110.00256",
-      "Zoni E, Lehe R, Shapoval O, Belkin D, Zaim N, Fedeli L, Vincenti H, Vay J-L. A Hybrid Nodal-Staggered Pseudo-Spectral Electromagnetic Particle-In-Cell Method with Finite-Order Centering. under review, 2022. https://arxiv.org/abs/2106.12919",
-      "Shapoval O, Lehe R, Thevenet M, Zoni E, Zhao Y, Vay J-L. Overcoming timestep limitations in boosted-frame Particle-In-Cell simulations of plasma-based acceleration. Phys. Rev. E. Nov 2021, 104:055311. https://doi.org/10.1103/PhysRevE.104.055311",
-      "Vay JL, Huebl A, Almgren A, Amorim LD, Bell J, Fedeli L, Ge L, Gott K, Grote DP, Hogan M, Jambunathan R, Lehe R, Myers A, Ng C, Rowan M, Shapoval O, Thevenet M, Vincenti H, Yang E, Zaim N, Zhang W, Zhao Y, Zoni E. Modeling of a chain of three plasma accelerator stages with the WarpX electromagnetic PIC code on GPUs. Physics of Plasmas. 2021 Feb 9, 28(2):023105. https://doi.org/10.1063/5.0028512",
-      "Rowan ME, Gott KN, Deslippe J, Huebl A, Thevenet M, Lehe R, Vay JL. In-situ assessment of device-side compute work for dynamic load balancing in a GPU-accelerated PIC code. PASC '21: Proceedings of the Platform for Advanced Scientific Computing Conference. 2021 July, 10, pages 1-11. https://doi.org/10.1145/3468267.3470614",
-      "Vay JL, Almgren A, Bell J, Ge L, Grote DPHogan M, Kononenko O, Lehe R, Myers A, Ng C, Park J, Ryne R, Shapovala O, Thevene M, Zhang W. Warp-X: A new exascale computing platform for beam–plasma simulations. Nuclear Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment. 2018 Nov, 909(12) Pages 476-479. https://doi.org/10.1016/j.nima.2018.01.035"
+      "Please see https://warpx.readthedocs.io/en/latest/acknowledge_us.html#acknowledge-warpx-all-refs"
+    ],
+    "related_identifiers": [
+    {
+      "identifier": "https://warpx.readthedocs.io",
+      "relation_type": {
+        "id": "isdocumentedby",
+        "title": {
+          "en": "Is documented by"
+        }
+      },
+      "resource_type": {
+        "id": "publication-softwaredocumentation",
+        "title": {
+          "en": "Software documentation"
+        }
+      },
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://blast-warpx.github.io",
+      "relation_type": {
+        "id": "isdescribedby",
+        "title": {
+          "en": "Is described by"
+        }
+      },
+      "resource_type": {
+        "id": "other",
+        "title": {
+          "en": "Other"
+        }
+      },
+      "scheme": "url"
+    }
+  ],
+  "custom_fields": {
+    "code:developmentStatus": {
+      "id": "active",
+      "title": {
+        "en": "Active"
+      }
+    },
+    "code:programmingLanguage": [
+      {
+        "id": "c++",
+        "title": {
+          "en": "C++"
+        }
+      },
+      {
+        "id": "python",
+        "title": {
+          "en": "Python"
+        }
+      }
     ]
+  }
 }

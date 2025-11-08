@@ -350,8 +350,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
     auto const M = m_background_mass;
 
     // precalculate often used value
-    constexpr auto c2 = PhysConst::c * PhysConst::c;
-    auto const mc2 = m*c2;
+    auto const mc2 = m*PhysConst::c2;
 
     // we need particle positions in order to calculate the local density
     // and temperature
@@ -439,7 +438,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                       constexpr auto eV = PhysConst::q_e;
                                       E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
                                       const auto scale_fac = static_cast<amrex::ParticleReal>(
-                                        std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) / c2) / m / v_coll);
+                                        std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) * PhysConst::inv_c2) / m / v_coll);
                                       vx *= scale_fac;
                                       vy *= scale_fac;
                                       vz *= scale_fac;

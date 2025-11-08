@@ -280,16 +280,6 @@ void NullifyMF (
     NullifyMFinstance ( mf, lev, zmin, zmax);
 }
 
-namespace WarpXUtilIO{
-    bool WriteBinaryDataOnFile(const std::string& filename, const amrex::Vector<char>& data)
-    {
-        std::ofstream of{filename, std::ios::binary};
-        of.write(data.data(), data.size());
-        of.close();
-        return  of.good();
-    }
-}
-
 void CheckGriddingForRZSpectral ()
 {
 #ifdef WARPX_DIM_RZ

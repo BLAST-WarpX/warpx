@@ -2376,9 +2376,6 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     temp_fab.setVal<amrex::RunOn::Device>(0._rt);
     amrex::Array4<amrex::Real> const& temp_arr = temp_fab.array();
 
-    // Inverse of light speed squared
-    const amrex::Real invcsq = 1._rt / (PhysConst::c * PhysConst::c);
-
     // Arrays where D will be stored
     amrex::Array4<amrex::Real> const& Dx_arr = Dx_fab.array();
     amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
@@ -2388,9 +2385,9 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::ParallelFor(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
     {
         // Inverse of Lorentz factor gamma
-        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * invcsq
-                                                           + uyp[ip] * uyp[ip] * invcsq
-                                                           + uzp[ip] * uzp[ip] * invcsq);
+        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * PhysConst::inv_c2
+                                                           + uyp[ip] * uyp[ip] * PhysConst::inv_c2
+                                                           + uzp[ip] * uzp[ip] * PhysConst::inv_c2);
         // Product of particle charges and weights
         amrex::Real wq = q * wp[ip];
         if (do_ionization) { wq *= ion_lev[ip]; }
