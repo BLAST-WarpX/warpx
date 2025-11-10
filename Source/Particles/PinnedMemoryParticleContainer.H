@@ -3,6 +3,6 @@
 
 #include "WarpXParticleContainer.H"
 
-using PinnedMemoryParticleContainer = amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+using PinnedMemoryParticleContainer = amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
 #endif //WARPX_PinnedMemoryParticleContainer_H_

@@ -389,7 +389,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
 {
     WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles");
 
-    using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
+    using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
     const auto& warpx_instance = WarpX::GetInstance();
     const amrex::Geometry& geom = warpx_instance.Geom(0);
     auto plo = geom.ProbLoArray();
@@ -406,7 +406,8 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                 const WarpXParticleContainer& pc = mypc.GetParticleContainer(i);
                 if (!buffer[i].isDefined())
                 {
-                    buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
+                    buffer[i] = pc.make_alike<amrex::PolymorphicArenaAllocator>();
+                    buffer[i].SetArena(amrex::The_Pinned_Arena());
                     buffer[i].AddIntComp("stepScraped", true);
                     buffer[i].AddRealComp("deltaTimeScraped", true);
                     buffer[i].AddRealComp("timeScraped", true);
@@ -503,7 +504,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB");
 
 
-        using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
+        using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
         const auto &warpx_instance = WarpX::GetInstance();
         const amrex::Geometry &geom = warpx_instance.Geom(0);
         auto plo = geom.ProbLoArray();
@@ -515,7 +516,8 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
             const auto& pc = mypc.GetParticleContainer(i);
             if (!buffer[i].isDefined())
             {
-                buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
+                buffer[i] = pc.make_alike<amrex::PolymorphicArenaAllocator>();
+                buffer[i].SetArena(amrex::The_Pinned_Arena());
                 buffer[i].AddIntComp("stepScraped", true);
                 buffer[i].AddRealComp("deltaTimeScraped", true);
                 buffer[i].AddRealComp("timeScraped", true);

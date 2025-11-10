@@ -559,8 +559,9 @@ for (const auto & particle_diag : particle_diags) {
     }
 
     PinnedMemoryParticleContainer tmp = (isBTD || use_pinned_pc) ?
-        pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-        pc->make_alike<amrex::PinnedArenaAllocator>();
+        pinned_pc->make_alike<amrex::PolymorphicArenaAllocator>() :
+        pc->make_alike<amrex::PolymorphicArenaAllocator>();
+    tmp.SetArena(amrex::The_Pinned_Arena());
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
     RandomFilter const random_filter(particle_diag.m_do_random_filter,

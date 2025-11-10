@@ -1469,7 +1469,8 @@ BTDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
         for (int isp = 0; isp < m_particles_buffer[i].size(); ++isp) {
             m_totalParticles_in_buffer[i][isp] = 0;
             const int idx = mpc.getSpeciesID(m_output_species_names[isp]);
-            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(mpc.GetParticleContainer(idx).make_alike<amrex::PinnedArenaAllocator>());
+            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(mpc.GetParticleContainer(idx).make_alike<amrex::PolymorphicArenaAllocator>());
+            m_particles_buffer[i][isp]->SetArena(amrex::The_Pinned_Arena());
 
             // SoA component names
             {
