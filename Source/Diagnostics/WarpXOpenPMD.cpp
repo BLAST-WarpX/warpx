@@ -551,14 +551,14 @@ WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
 for (const auto & particle_diag : particle_diags) {
     WarpXParticleContainer* pc = particle_diag.getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
+    WarpXParticleContainer::Base* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
         }
     }
 
-    PinnedMemoryParticleContainer tmp = (isBTD || use_pinned_pc) ?
+    WarpXParticleContainer::Base tmp = (isBTD || use_pinned_pc) ?
         pinned_pc->make_alike<amrex::PolymorphicArenaAllocator>() :
         pc->make_alike<amrex::PolymorphicArenaAllocator>();
     tmp.SetArena(amrex::The_Pinned_Arena());

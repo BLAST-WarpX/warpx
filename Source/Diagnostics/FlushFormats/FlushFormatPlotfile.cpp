@@ -6,7 +6,7 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleIO.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -359,7 +359,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 {
     for (const auto& part_diag : particle_diags) {
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
-        PinnedMemoryParticleContainer* pinned_pc = part_diag.getPinnedParticleContainer();
+        WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
             pinned_pc->make_alike<amrex::PolymorphicArenaAllocator>() :
             pc->make_alike<amrex::PolymorphicArenaAllocator>();
