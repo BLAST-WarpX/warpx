@@ -435,21 +435,21 @@ public:
                 // After C is determined the momentum vectors are arranged
                 // such that the net linear momentum is zero.
 
-                const amrex::ParticleReal n_2 = std::min(E2 / E_coll, 0.5_prt * static_cast<amrex::ParticleReal>(amrex::Random(engine)));
+                const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
 
                 // find ellipse semi-major and minor axis
-                const amrex::ParticleReal a = 0.5_prt * (1.0_prt - n_2);
-                const amrex::ParticleReal b = 0.5_prt * std::sqrt(1.0_prt - 2.0_prt * n_2);
+                const double a = 0.5 * (1.0 - n_2);
+                const double b = 0.5 * std::sqrt(1.0 - 2.0 * n_2);
 
                 // sample random x value and calculate y
-                const amrex::ParticleReal x = (2._prt * amrex::Random(engine) - 1.0_prt) * a;
-                const amrex::ParticleReal y2 = b*b - b*b/(a*a) * x*x;
-                const amrex::ParticleReal n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25_prt*n_2*n_2);
-                const amrex::ParticleReal n_1 = 1.0_prt - n_0 - n_2;
+                const double x = (2.0 * amrex::Random(engine) - 1.0) * a;
+                const double y2 = b*b - b*b/(a*a) * x*x;
+                const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25*n_2*n_2);
+                const double n_1 = 1.0 - n_0 - n_2;
 
                 // calculate the value of C
-                const amrex::ParticleReal C = std::sqrt(E_out / (
-                    n_0*n_0 / (2.0_prt * m1) + n_1*n_1 / (2.0_prt * mass_product1) + n_2*n_2 / (2.0_prt * mass_product2)
+                const double C = std::sqrt(E_out / (
+                    n_0*n_0 / (2.0 * m1) + n_1*n_1 / (2.0 * mass_product1) + n_2*n_2 / (2.0 * mass_product2)
                 ));
 
                 // Now that appropriate momenta are set for each outgoing species
@@ -457,32 +457,32 @@ public:
                 // that the net linear momentum in the current frame is 0.
                 // This is achieved by arranging the momentum vectors in
                 // a triangle and finding the required angles between the vectors.
-                const amrex::ParticleReal cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0_prt * n_0 * n_1);
-                const amrex::ParticleReal sin_alpha = std::sqrt(1.0_prt - cos_alpha*cos_alpha);
-                const amrex::ParticleReal cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0_prt * n_0 * n_2);
-                const amrex::ParticleReal sin_gamma = std::sqrt(1.0_prt - cos_gamma*cos_gamma);
+                const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0 * n_0 * n_1);
+                const double sin_alpha = std::sqrt(1.0 - cos_alpha*cos_alpha);
+                const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0 * n_0 * n_2);
+                const double sin_gamma = std::sqrt(1.0 - cos_gamma*cos_gamma);
 
                 // choose random theta and phi values (orientation of the triangle)
-                const amrex::ParticleReal Theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-                const amrex::ParticleReal phi = amrex::Random(engine) * MathConst::pi;
+                const double Theta = amrex::Random(engine) * 2.0 * MathConst::pi;
+                const double phi = amrex::Random(engine) * MathConst::pi;
 
-                const amrex::ParticleReal cos_theta = std::cos(Theta);
-                const amrex::ParticleReal sin_theta = std::sin(Theta);
-                const amrex::ParticleReal cos_phi = std::cos(phi);
-                const amrex::ParticleReal sin_phi = std::sin(phi);
+                const double cos_theta = std::cos(Theta);
+                const double sin_theta = std::sin(Theta);
+                const double cos_phi = std::cos(phi);
+                const double sin_phi = std::sin(phi);
 
                 // calculate the velocity components for each particle
-                ux1 = C * n_0 / m1 * cos_theta * cos_phi;
-                uy1 = C * n_0 / m1 * cos_theta * sin_phi;
-                uz1 = -C * n_0 / m1 * sin_theta;
+                ux1 = static_cast<amrex::ParticleReal>(C * n_0 / m1 * cos_theta * cos_phi);
+                uy1 = static_cast<amrex::ParticleReal>(C * n_0 / m1 * cos_theta * sin_phi);
+                uz1 = static_cast<amrex::ParticleReal>(-C * n_0 / m1 * sin_theta);
 
-                ux_p1 = C * n_1 / mass_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi);
-                uy_p1 = C * n_1 / mass_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi);
-                uz_p1 = C * n_1 / mass_product1 * (cos_alpha * sin_theta);
+                ux_p1 = static_cast<amrex::ParticleReal>(C * n_1 / mass_product1 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi));
+                uy_p1 = static_cast<amrex::ParticleReal>(C * n_1 / mass_product1 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi));
+                uz_p1 = static_cast<amrex::ParticleReal>(C * n_1 / mass_product1 * (cos_alpha * sin_theta));
 
-                ux_p2 = C * n_2 / mass_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi);
-                uy_p2 = C * n_2 / mass_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi);
-                uz_p2 = C * n_2 / mass_product2 * (cos_gamma * sin_theta);
+                ux_p2 = static_cast<amrex::ParticleReal>(C * n_2 / mass_product2 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi));
+                uy_p2 = static_cast<amrex::ParticleReal>(C * n_2 / mass_product2 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi));
+                uz_p2 = static_cast<amrex::ParticleReal>(C * n_2 / mass_product2 * (cos_gamma * sin_theta));
 
                 // transform back to labframe
                 ux1 += uCOM_x;

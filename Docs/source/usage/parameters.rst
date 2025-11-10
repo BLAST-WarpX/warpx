@@ -1,7 +1,7 @@
 .. _running-cpp-parameters:
 
-Parameters: Inputs File
-=======================
+Inputs: Parameter List
+======================
 
 This documents on how to use WarpX with an inputs file (e.g., ``warpx.3d input_3d``).
 
@@ -39,8 +39,8 @@ Overall simulation parameters
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
 
 * ``warpx.gamma_boost`` (`float`)
-    The Lorentz factor of the boosted frame in which the simulation is run.
-    (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
 
     When using this parameter, the input parameters are interpreted as in the
     lab-frame and automatically converted to the boosted frame.
@@ -214,61 +214,18 @@ Overall simulation parameters
       the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
+.. _param-electrostatic-pic:
+
 * ``warpx.do_electrostatic`` (`string`) optional (default `none`)
     Specifies the electrostatic mode. When turned on, instead of updating
     the fields at each iteration with the full Maxwell equations, the fields
     are recomputed at each iteration from the Poisson equation.
     There is no limitation on the timestep in this case, but
     electromagnetic effects (e.g. propagation of radiation, lasers, etc.)
-    are not captured. There are several options:
-
-    * ``labframe``: Poisson's equation is solved in the lab frame with
-      the charge density of all species combined. More specifically, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
-
-    * ``labframe-electromagnetostatic``: Poisson's equation is solved in the lab frame with
-      the charge density of all species combined.  Additionally the 3-component vector potential
-      is solved in the Coulomb Gauge with the current density of all species combined
-      to include self magnetic fields. More specifically, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi \\
-        \boldsymbol{\nabla}^2 \boldsymbol{A} = - \mu_0 \boldsymbol{j} \qquad \boldsymbol{B} = \boldsymbol{\nabla}\times\boldsymbol{A}
-
-    * ``labframe-effective-potential``: Poisson's equation is solved with a modified dielectric function
-      (resulting in an "effective potential") to create a semi-implicit scheme which is robust to the
-      numerical instability seen in explicit electrostatic PIC when :math:`\Delta t \omega_{pe} > 2`.
-      If this option is used the additional parameter ``warpx.effective_potential_factor`` can also be
-      specified to set the value of :math:`C_{EP}` (default 4). The method is stable for :math:`C_{EP} \geq 1`
-      regardless of :math:`\Delta t`, however, the larger :math:`C_{EP}` is set, the lower the numerical plasma
-      frequency will be and therefore care must be taken to not set it so high that the plasma mode
-      hybridizes with other modes of interest.
-      Details of the method can be found in Appendix A of :cite:t:`param-Barnes2021` (note that in that paper
-      the method is referred to as "semi-implicit electrostatic" but here it has been renamed to "effective potential"
-      to avoid confusion with the semi-implicit method of Chen et al.).
-      In short, the code solves:
-
-      .. math::
-
-        \boldsymbol{\nabla}\cdot\left(1+\frac{C_{EP}}{4}\sum_{s \in \text{species}}(\omega_{ps}\Delta t)^2 \right)\boldsymbol{\nabla} \phi = - \rho/\epsilon_0 \qquad \boldsymbol{E} = - \boldsymbol{\nabla}\phi
-
-    * ``relativistic``: Poisson's equation is solved **for each species**
-      in their respective rest frame. The corresponding field
-      is mapped back to the simulation frame and will produce both E and B
-      fields. More specifically, in the simulation frame, this is equivalent to solving **for each species**
-
-      .. math::
-
-        \boldsymbol{\nabla}^2 - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2\phi = - \rho/\epsilon_0 \qquad
-        \boldsymbol{E} = -\boldsymbol{\nabla}\phi + \boldsymbol{\beta}(\boldsymbol{\beta} \cdot \boldsymbol{\nabla}\phi)
-        \qquad \boldsymbol{B} = -\frac{1}{c}\boldsymbol{\beta}\times\boldsymbol{\nabla}\phi
-
-      where :math:`\boldsymbol{\beta}` is the average (normalized) velocity of the considered species (which can be relativistic).
-      See, e.g., :cite:t:`param-Vaypop2008` for more information.
+    are not captured. Several options for the electrostatic scheme are available,
+    including, ``labframe``, ``labframe-electromagnetostatic``, ``labframe-effective-potential``,
+    and ``relativistic``. See :ref:`here <theory-electrostatic-pic>` for details
+    of each scheme.
 
 * ``warpx.poisson_solver`` (`string`) optional (default `multigrid`)
 
@@ -442,8 +399,8 @@ Setting up the field mesh
     * For ``RCYLINDER``, a cylindrical geometry with the axis ``r``, invariant in ``theta`` and ``z``.
     * For ``RSPHERE``, a spherical geometry with the axis ``r``, invariant in ``theta`` and ``phi``. The polar angle ``phi`` is relative to the ``x-y`` plane.
 
-    Note that this value must be consistent with the :ref:`WarpX_DIMS <building-cmake-options>` compile-time option.
-    If you installed WarpX from a :ref:`package manager <install-users>`, then pick the right executable by name.
+    Note that this value must be consistent with the :ref:`WarpX_DIMS <install-build-options>` compile-time option.
+    If you installed WarpX from a :ref:`package manager <install-methods>`, then pick the right executable by name.
 
 * ``warpx.n_rz_azimuthal_modes`` (`integer`; 1 by default)
     When using the RZ version, this is the number of azimuthal modes.
@@ -1073,7 +1030,7 @@ Particle initialization
       The external file must include the species ``openPMD::Record`` labeled ``position`` and ``momentum`` (`double` arrays), with dimensionality and units set via ``openPMD::setUnitDimension`` and ``setUnitSI``.
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant `double` scalars) then the species will use these, unless overwritten in the input file (see ``<species_name>.mass``, ``<species_name>.charge`` or ``<species_name>.species_type``).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
-      For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-developers>`.
+      For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-build-cmake>`.
       See `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
       for an example of how to prepare the openPMD data file.
 
@@ -2385,7 +2342,7 @@ Filtering
     With the implicit evolve schemes, the filtering is turned off by default.
     The filtering smoothes the charge and currents on the mesh, after depositing them from the macro-particles.
     With implicit schemes, the electric field is also filtered (to maintain consistency for energy conservation).
-    This uses a bilinear filter (see the :ref:`filtering section <theory-pic-filter>`).
+    This uses a bilinear filter (see the :ref:`filtering section <theory-filter>`).
     With the RZ PSATD solver, the filtering is done in :math:`k`-space.
 
     .. warning::
@@ -2486,7 +2443,7 @@ Two families of Maxwell solvers are implemented in WarpX, based on the Finite-Di
      - ``yee``: Yee FDTD solver.
      - ``ckc``: (not available in ``RZ``, ``RCYLINDER``, and ``RSPHERE`` geometries) Cole-Karkkainen solver with Cowan
        coefficients (see :cite:t:`param-CowanPRSTAB13`).
-     - ``psatd``: Pseudo-spectral solver (see :ref:`theory <theory-pic-mwsolve-psatd>`).
+     - ``psatd``: Pseudo-spectral solver (see :ref:`theory <theory-mwsolve-psatd>`).
      - ``ect``: Enlarged cell technique (conformal finite difference solver. See :cite:t:`param-XiaoIEEE2005`).
      - ``hybrid``: The E-field will be solved using Ohm's law and a kinetic-fluid hybrid model (see :ref:`theory <theory-kinetic-fluid-hybrid-model>`).
      - ``none``: No field solve will be performed.
@@ -2668,6 +2625,27 @@ Maxwell solver: macroscopic media
 Maxwell solver: kinetic-fluid hybrid
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. note::
+
+    **Required Parameters:**
+
+    - ``hybrid_pic_model.elec_temp`` must be specified when using the hybrid solver.
+    - ``hybrid_pic_model.n0_ref`` should be specified if ``hybrid_pic_model.gamma != 1``.
+
+    **Best Practices**
+
+    - *Grid type:* Setting `warpx.grid_type = collocated` is recommended
+    - *Particle shape:* Linear particles (``algo.particle_shape = 1``) are recommended based on :cite:t:`param-Stanier2020`.
+
+.. warning::
+
+    **Constraints and Limitations:**
+
+    - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if ``lev > 0``.
+    - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
+    - *External vector potential:* If using ``hybrid_pic_model.add_external_fields = true``, then ``external_vector_potential.fields`` must be non-empty.
+    - *Time-dependent A fields:* When using expressions for external vector potentials, time variation must be specified via ``A_time_external_function(t)``, not directly in the ``A[x,y,z]_external_grid_function(x,y,z)`` expressions.
+
 * ``hybrid_pic_model.elec_temp`` (`float`)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the electron temperature, in eV, used to calculate
     the electron pressure (see :ref:`here <theory-hybrid-model-elec-temp>`).
@@ -2683,7 +2661,7 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybrid_pic_model.plasma_resistivity(rho,J)`` (`float` or `str`) optional (default ``0``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the plasma resistivity in :math:`\Omega m`.
 
-* ``hybrid_pic_model.plasma_hyper_resistivity`` (`float` or `str`) optional (default ``0``)
+* ``hybrid_pic_model.plasma_hyper_resistivity(rho,B)`` (`float` or `str`) optional (default ``0``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
 * ``hybrid_pic_model.J[x/y/z]_external_grid_function(x, y, z, t)`` (`float` or `str`) optional (default ``0``)
@@ -2698,17 +2676,17 @@ Maxwell solver: kinetic-fluid hybrid
 * ``hybrid_pic_model.holmstrom_vacuum_region`` (`bool`) optional (default ``false``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
 
-* ``hybid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
+* ``hybrid_pic_model.add_external_fields`` (`bool`) optional (default ``false``)
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the hybrid solver to use split external fields defined in external_vector_potential inputs.
 
 * ``external_vector_potential.do_diva_cleaning`` (`bool`) optional (default ``true``)
     This enables or disables the divergence cleaner application to the external A fields.
 
 * ``external_vector_potential.fields`` (list of `str`) optional (default ``empty``)
-    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this adds a list names for external time varying vector potentials to be added to hybrid solver.
+    If ``hybrid_pic_model.add_external_fields`` is set to ``true``, this adds a list of names for external time varying vector potentials to be added to hybrid solver.
 
 * ``external_vector_potential.<field name>.read_from_file`` (`bool`) optional (default ``false``)
-    If ``hybid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implcit function to evaluate the time varying field.
+    If ``hybrid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implicit function to evaluate the time varying field.
 
 * ``external_vector_potential.<field name>.path`` (`str`) optional (default ``""``)
     If ``external_vector_potential.<field name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
@@ -2719,10 +2697,6 @@ Maxwell solver: kinetic-fluid hybrid
 * ``external_vector_potential.<field name>.A_time_external_grid_function(t)`` (`str`) optional (default ``"1"``)
     This sets the relative strength of the external vector potential by a dimensionless implicit time function, which can compute the external B fields and E fields based on the value and first time derivative of the function.
 
-.. note::
-
-    Based on results from :cite:t:`param-Stanier2020` it is recommended to use
-    linear particles when using the hybrid-PIC model.
 
 Grid types (collocated, staggered, hybrid)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -3150,15 +3124,17 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     will be dumped.
 
 * ``amrex.async_out`` (`0` or `1`) optional (default `0`)
-    Whether to use asynchronous IO when writing plotfiles. This only has an effect
-    when using the AMReX plotfile format.
-    Please see the :ref:`data analysis section <dataanalysis-formats>` for more information.
+    Enable asynchronous I/O for AMReX ``plotfile`` output.
+    When set to ``1``, writing is handled by a background I/O
+    thread so the simulation can continue while data are written to disk, which can reduce
+    total time spent in I/O for large HPC runs. Actual benefits depend on the MPI
+    implementation and may be negligible on a workstation.
 
 * ``amrex.async_out_nfiles`` (`int`) optional (default `64`)
-    The maximum number of files to write to when using asynchronous IO.
-    To use asynchronous IO with more than ``amrex.async_out_nfiles`` MPI ranks,
-    WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
-    Please see the :ref:`data analysis section <dataanalysis-formats>` for more information.
+    Maximum number of files to use for asynchronous I/O (default: 64).
+    When enabled, each MPI rank writes its own file up to this limit. If you
+    run with more MPI ranks than ``amrex.async_out_nfiles``, build WarpX with
+    ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
 
 * ``warpx.field_io_nfiles`` and ``warpx.particle_io_nfiles`` (`int`) optional (default `1024`)
     The maximum number of files to use when writing field and particle data to plotfile directories.
@@ -3216,7 +3192,7 @@ In addition, ``TimeAveraged`` diagnostic options include:
 BackTransformed Diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
+``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. For more details on back-transformed diagnostics (BTD), see :ref:`FAQ: What about Back-transformed diagnostics (BTD)? <faq_btd>`. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
 
     ``<diag_name>.format``, ``<diag_name>.openpmd_backend``, ``<diag_name>.dump_rz_modes``, ``<diag_name>.file_prefix``, ``<diag_name>.diag_lo``, ``<diag_name>.diag_hi``, ``<diag_name>.write_species``, ``<diag_name>.species``.
 

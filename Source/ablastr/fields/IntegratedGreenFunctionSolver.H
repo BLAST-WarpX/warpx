@@ -82,7 +82,7 @@ namespace ablastr::fields
     amrex::Real
     SumOfIntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz)
     {
-        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
                   IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
                 - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
                 - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
@@ -108,7 +108,7 @@ namespace ablastr::fields
     amrex::Real
     SumOfIntegratedPotential2D (amrex::Real x, amrex::Real y, amrex::Real dx, amrex::Real dy)
     {
-        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
                   IntegratedPotential2D( x+0.5_rt*dx, y+0.5_rt*dy )
                 - IntegratedPotential2D( x+0.5_rt*dx, y-0.5_rt*dy )
                 - IntegratedPotential2D( x-0.5_rt*dx, y+0.5_rt*dy )

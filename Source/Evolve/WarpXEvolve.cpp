@@ -696,7 +696,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     }
 
     if (sort_intervals.contains(step+1)) {
-        if (verbose) {
+        if (verbose && !m_limit_verbose_step) {
             amrex::Print() << Utils::TextMsg::Info("re-sorting particles");
         }
         mypc->SortParticlesByBin(

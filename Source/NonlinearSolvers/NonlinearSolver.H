@@ -81,7 +81,7 @@ public:
      * \brief Allow caller to dynamically change the verbosity flag. For
      * example, one may want to only print solver information every 100 steps.
      */
-    void Verbose ( bool  a_verbose ) { m_verbose = a_verbose; }
+    virtual void Verbose ( bool  a_verbose ) { m_verbose = a_verbose; }
 
 protected:
 

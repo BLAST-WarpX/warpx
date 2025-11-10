@@ -42,6 +42,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_photoneutralization_dsmc  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_photoneutralization_dsmc  # inputs
+    "analysis_photoneutralization_dsmc_1d.py"  # analysis
+    "analysis_default_regression.py --path diags/diag"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_two_product_reaction_dsmc  # name
     1  # dims
     2  # nprocs

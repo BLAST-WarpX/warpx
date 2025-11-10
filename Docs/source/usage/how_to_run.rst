@@ -3,44 +3,44 @@
 Run WarpX
 =========
 
-In order to run a new simulation:
+To run a new simulation, please follow these steps:
 
-#. create a **new directory**, where the simulation will be run
-#. make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__
-#. add an **inputs file** and on :ref:`HPC systems <install-hpc>` a **submission script** to the directory
-#. run
+#. Create a **new directory**, where the simulation will run.
+#. Make sure the WarpX **executable** is either copied into this directory or in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__.
+#. Add an **inputs file** in the same directory. On :ref:`HPC systems <install-hpc>`, add also a **job submission script**.
+#. Run the executable.
 
-1. Run Directory
-----------------
+Simulation Directory
+--------------------
 
-On Linux/macOS, this is as easy as this
+On Linux/macOS, this is as easy as:
 
 .. code-block:: bash
 
    mkdir -p <run_directory>
 
-Where ``<run_directory>`` by the actual path to the run directory.
+Where ``<run_directory>`` is the actual path to the run directory.
 
-2. Executable
--------------
+Executable File
+---------------
 
-If you installed warpX with a :ref:`package manager <install-users>`, a ``warpx``-prefixed executable will be available as a regular system command to you.
-Depending on the chosen build options, the name is suffixed with more details.
+If you installed WarpX with a :ref:`package manager <install-methods>`, a ``warpx``-prefixed executable will be available as a regular system command.
+Depending on build options, the executable name includes additional suffixes.
 Try it like this:
 
 .. code-block:: bash
 
    warpx<TAB>
 
-Hitting the ``<TAB>`` key will suggest available WarpX executables as found in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__.
+Pressing the ``<TAB>`` key will suggest available WarpX executables found in your ``PATH`` `environment variable <https://en.wikipedia.org/wiki/PATH_(variable)>`__.
 
 .. note::
 
-   WarpX needs a separate binary to run in each dimensionality, 1D, 2D, 3D, RZ, RCYLINDER, and RSPHERE.
-   We encode the supported dimensionality in the binary file name.
+      WarpX provides a separate binary for each dimensionality: 1D, 2D, 3D, RZ, RCYLINDER, and RSPHERE.
+      We encode the supported dimensionality in the binary file name.
 
-If you :ref:`compiled the code yourself <install-developers>`, the WarpX executable is stored in the source folder under ``build/bin``.
-We also create a symbolic link that is just called ``warpx`` that points to the last executable you built, which can be copied, too.
+If you :ref:`compiled the code yourself <install-build-cmake>`, the WarpX executable is located in the source tree under ``build/bin``.
+A symbolic link named ``warpx`` pointing to the most recently built executable is also created; you can copy either that link or the binary into your run directory.
 Copy the **executable** to this directory:
 
 .. code-block:: bash
@@ -49,58 +49,78 @@ Copy the **executable** to this directory:
 
 where ``<warpx_executable>`` should be replaced by the actual name of the executable (see above) and ``<run_directory>`` by the actual path to the run directory.
 
-3. Inputs
----------
-
-Add an **input file** in the directory (see :ref:`examples <usage-examples>` and :ref:`parameters <running-cpp-parameters>`).
-This file contains the numerical and physical parameters that define the situation to be simulated.
-
-On :ref:`HPC systems <install-hpc>`, also copy and adjust a submission script that allocated computing nodes for you.
-Please :ref:`reach out to us <contact>` if you need help setting up a template that runs with ideal performance.
-
-4. Run
-------
-
-**Run** the executable, e.g. with MPI:
-
-.. code-block:: bash
-
-   cd <run_directory>
-
-   # run with an inputs file:
-   mpirun -np <n_ranks> ./warpx <input_file>
-
-or
-
-.. code-block:: bash
-
-   # run with a PICMI input script:
-   mpirun -np <n_ranks> python <python_script>
-
-Here, ``<n_ranks>`` is the number of MPI ranks used, and ``<input_file>`` is the name of the input file (``<python_script>`` is the name of the :ref:`PICMI <usage-picmi>` script).
-Note that the actual executable might have a longer name, depending on build options.
-
-We used the copied executable in the current directory (``./``); if you installed with a package manager, skip the ``./`` because WarpX is in your ``PATH``.
-
-On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job script <install-hpc>` at this point, e.g. ``sbatch <submission_script>`` (SLURM on Cori/NERSC) or ``bsub <submission_script>`` (LSF on Summit/OLCF).
-
-.. tip::
-
-   In the :ref:`next sections <running-cpp-parameters>`, we will explain parameters of the ``<input_file>``.
-   You can overwrite all parameters inside this file also from the command line, e.g.:
-
-   .. code-block:: bash
-
-      mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
-
-5. Outputs
+Input File
 ----------
 
-By default, WarpX will write a status update to the terminal (``stdout``).
-On :ref:`HPC systems <install-hpc>`, we usually store a copy of this in a file called ``outputs.txt``.
+You need to provide WarpX with an input file that configures the simulation.
+This can either be a parameter list or a Python script, depending on how you wish to run WarpX.
 
-We also store by default an exact copy of all explicitly and implicitly used inputs parameters in a file called ``warpx_used_inputs`` (this file name can be changed).
-This is important for reproducibility, since as we wrote in the previous paragraph, the options in the input file can be extended and overwritten from the command line.
+To run the WarpX executable, add a **parameter list** file in the directory (see :ref:`examples <usage-examples>` and :ref:`parameters <running-cpp-parameters>`).
+This is a text file containing the numerical and physical parameters that define the simulation.
+
+To run WarpX through the Python interface, add a **PICMI Python script** (see :ref:`examples <usage-examples>` and :ref:`PICMI parameters <usage-picmi-parameters>`).
+This is a Python script that defines the numerical and physical parameters using the `PICMI standard <https://picmi-standard.org/>`__.
+
+On :ref:`HPC systems <install-hpc>`, also copy and adjust a submission script that allocates computing nodes for you.
+Please :ref:`reach out to us <contact>` if you need help setting up a template that runs with ideal performance.
+
+Run Simulation
+--------------
+
+.. tab-set::
+
+   .. tab-item:: WarpX Executable
+
+      Run the executable directly, e.g. with MPI:
+
+      .. code-block:: bash
+
+         cd <run_directory>
+
+         # run with an inputs file:
+         mpirun -np <n_ranks> ./warpx <input_file>
+
+      Here, ``<n_ranks>`` is the number of MPI ranks used, and ``<input_file>`` is the name of the parameter list.
+      Note that the actual executable might have a longer name, depending on build options.
+
+      The example above uses the copied executable in the current directory (``./``). If you installed WarpX with a package manager, omit the ``./`` because WarpX will be found in your ``PATH``.
+
+
+   .. tab-item:: Python Script
+
+      Run via the Python interface:
+
+      .. code-block:: bash
+
+         # run with a PICMI input script:
+         mpirun -np <n_ranks> python <python_script>
+
+      Here, ``<n_ranks>`` is the number of MPI ranks used, ``<python_script>`` is the name of the :ref:`PICMI <usage-picmi>` script.
+
+
+   .. tab-item:: Job Script
+
+      On an :ref:`HPC system <install-hpc>`, you would instead submit the :ref:`job script <install-hpc>` at this point, e.g. ``sbatch <submission_script>`` (SLURM) or ``bsub <submission_script>`` (LSF).
+
+
+      .. tip::
+
+         In the :ref:`next sections <running-cpp-parameters>`, we explain the parameters in the ``<input_file>``.
+         You can also overwrite parameters from the command line, for example:
+
+         .. code-block:: bash
+
+            mpirun -np 4 ./warpx <input_file> max_step=10 warpx.numprocs=1 2 2
+
+
+Outputs and Diagnostics
+-----------------------
+
+By default, WarpX writes status updates to the terminal (``stdout``).
+On :ref:`HPC systems <install-hpc>`, it is common to store a copy of this in a file called ``outputs.txt``.
+
+By default, WarpX also writes an exact copy of all explicitly and implicitly used input parameters to a file named ``warpx_used_inputs`` (this filename can be changed).
+This is important for reproducibility, since, as noted above, options from the input file can be extended or overridden from the command line.
 
 :ref:`Further configured diagnostics <running-cpp-parameters-diagnostics>` are explained in the next sections.
 By default, they are written to a subdirectory in ``diags/`` and can use various :ref:`output formats <dataanalysis-formats>`.
