@@ -1,7 +1,7 @@
 .. _workflows-stl-geometry-preparation:
 
 STL Geometry Preparation for WarpX
-===================================
+==================================
 
 WarpX has the ability to define the embedded boundary (EB) in a simulation using externally provided STL (STereoLithography) files.
 STL files are a common format for representing 3D geometries and can be used to define complex embedded boundaries in WarpX simulations, without having to define extensive EB implicit functions.
@@ -14,7 +14,7 @@ However, there are some limitations to using STL files which must be resolved, i
 .. 2. The STL file shouldn't have duplicate faces or vertices, and overlapping vertices should be merged. (issues with vertices can cause the MLMG solver to crash)
 
 Step 1: Combining Multiple STL Files
--------------------------------------
+------------------------------------
 
 If your device consists of multiple parts stored in separate STL files, you'll need to combine them into a single STL file.
 
@@ -33,7 +33,7 @@ Using MeshLab
 7. Choose STL format and save
 
 Using Python with trimesh
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can also use Python with the ``trimesh`` library:
 
@@ -52,7 +52,7 @@ You can also use Python with the ``trimesh`` library:
    combined.export('device_combined.stl')
 
 Step 2: Making the Geometry Watertight and Removing and Merging Duplicate Faces and Vertices
----------------------------------------
+---------------------------------------------------------------------------------------------------
 
 
 WarpX requires that STL geometries be "watertight" (manifold), meaning the mesh has no holes, gaps, or open edges.
@@ -92,7 +92,7 @@ To check and repair a mesh in MeshLab:
       * An STL file with non-manifold edges won't necessarily crash a simulation, but may present other numerical issues.
 
 .. Using Python with trimesh
-.. ^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. .. code-block:: python
 
@@ -118,7 +118,7 @@ To check and repair a mesh in MeshLab:
 
 
 Step 3: Using STL Files in WarpX
----------------------------------
+--------------------------------
 
 Once you have a single, watertight STL file, you can use it in WarpX by setting the following parameters in your input file:
 
@@ -143,7 +143,7 @@ For more details on embedded boundary parameters, see:
 * `Embedded Boundary PICMI Input Parameters <https://warpx.readthedocs.io/en/latest/usage/python.html#pywarpx.picmi.EmbeddedBoundary:~:text=Custom%20class%20to,translated%20and%20inverted.>`__
 
 Tips and Best Practices
-------------------------
+-----------------------
 
 * *Units:* Ensure your STL file uses the same unit system as your WarpX simulation
 * *Scale:* If needed, scale your geometry in your CAD software or mesh editor before exporting
