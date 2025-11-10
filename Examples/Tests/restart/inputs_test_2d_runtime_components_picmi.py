@@ -8,7 +8,7 @@ import sys
 
 import numpy as np
 
-from pywarpx import callbacks, particle_containers, picmi
+from pywarpx import callbacks, picmi
 
 ##########################
 # physics parameters
@@ -23,21 +23,21 @@ dt = 7.5e-10
 max_steps = 10
 
 nx = 64
-ny = 64
+nz = 64
 
 xmin = 0
 xmax = 0.03
-ymin = 0
-ymax = 0.03
+zmin = 0
+zmax = 0.03
 
 ##########################
 # numerics components
 ##########################
 
 grid = picmi.Cartesian2DGrid(
-    number_of_cells=[nx, ny],
-    lower_bound=[xmin, ymin],
-    upper_bound=[xmax, ymax],
+    number_of_cells=[nx, nz],
+    lower_bound=[xmin, zmin],
+    upper_bound=[xmax, zmax],
     lower_boundary_conditions=["dirichlet", "periodic"],
     upper_boundary_conditions=["dirichlet", "periodic"],
     lower_boundary_conditions_particles=["absorbing", "periodic"],
@@ -106,9 +106,9 @@ sim.initialize_warpx()
 # below will be reproducible from run to run
 np.random.seed(30025025)
 
-electron_wrapper = particle_containers.ParticleContainerWrapper("electrons")
+electrons = sim.particles.get("electrons")
 if not sim.amr_restart:
-    electron_wrapper.add_real_comp("newPid")
+    electrons.add_real_comp("newPid")
 
 
 def add_particles():
@@ -122,9 +122,7 @@ def add_particles():
     w = np.ones(nps) * 2.0
     newPid = 5.0
 
-    electron_wrapper.add_particles(
-        x=x, y=y, z=z, ux=ux, uy=uy, uz=uz, w=w, newPid=newPid
-    )
+    electrons.add_particles(x=x, y=y, z=z, ux=ux, uy=uy, uz=uz, w=w, newPid=newPid)
 
 
 callbacks.installbeforestep(add_particles)
@@ -140,12 +138,12 @@ sim.step(max_steps - 1 - step_number)
 # check that the new PIDs are properly set
 ##########################
 
-assert electron_wrapper.nps == 90
-assert electron_wrapper.particle_container.get_real_comp_index("w") == 2
-assert electron_wrapper.particle_container.get_real_comp_index("newPid") == 6
+assert electrons.size == 90
+assert electrons.get_real_comp_index("w") == 2
+assert electrons.get_real_comp_index("newPid") == 6
 
-new_pid_vals = electron_wrapper.get_particle_real_arrays("newPid", 0)
-for vals in new_pid_vals:
+for pti in electrons.iterator(level=0):
+    vals = pti["newPid"]
     assert np.allclose(vals, 5)
 
 ##########################

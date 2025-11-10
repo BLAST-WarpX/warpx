@@ -39,13 +39,12 @@ namespace Algorithms{
         using namespace amrex;
 
         constexpr auto one = static_cast<T>(1.0);
-        constexpr auto inv_c2 = one/Math::powi<2>(static_cast<T>(PhysConst::c));
 
         // The expression used is derived by reducing the expression
         // (gamma - 1)*(gamma + 1)/(gamma + 1)
 
         const auto u2 = static_cast<T>(ux*ux + uy*uy + uz*uz);
-        const auto gamma = std::sqrt(one + u2*inv_c2);
+        const auto gamma = std::sqrt(one + u2*PhysConst::inv_c2_v<T>);
         return one/(one + gamma)*static_cast<T>(mass)*u2;
     }
 

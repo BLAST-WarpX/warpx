@@ -32,7 +32,8 @@ void FiniteDifferenceSolver::ComputeCurlA (
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-    if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         ComputeCurlACylindrical <CylindricalYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev
@@ -66,8 +67,11 @@ void FiniteDifferenceSolver::ComputeCurlA (
 //   * \brief Calculate B from the curl of A
 //   * i.e. B = curl(A) output field on B field mesh staggering
 //   *
-//   * \param[out] curlField  output of curl operation
-//   * \param[in] field   input staggered field, should be on E/J/A mesh staggering
+//   * \param[out] Bfield  output of curl operation
+//   * \param[in] Afield   input staggered field, should be on E/J/A mesh staggering
+//   * \param[in] eb_update_B specifies where the plasma current should be calculated.
+//   * \param[in] lev refinement level
+
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>

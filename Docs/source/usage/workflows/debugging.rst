@@ -30,7 +30,7 @@ Try the following steps to debug a simulation:
    Reduce number of cells, particles and MPI processes to something as small and as quick to execute as possible.
    The next steps in debugging will increase runtime, so you will benefit from a fast reproducer.
 #. Consider adding :ref:`runtime debug options <running-cpp-parameters-test-debug>` that can narrow down typical causes in numerical implementations.
-#. In case of a crash, Backtraces can be more detailed if you :ref:`re-compile <install-developers>` with debug flags: for example, try compiling with ``-DCMAKE_BUILD_TYPE=RelWithDebInfo`` (some slowdown) or even ``-DCMAKE_BUILD_TYPE=Debug`` (this will make the simulation way slower) and rerun.
+#. In case of a crash, Backtraces can be more detailed if you :ref:`re-compile <install-build-cmake>` with debug flags: for example, try compiling with ``-DCMAKE_BUILD_TYPE=RelWithDebInfo`` (some slowdown) or even ``-DCMAKE_BUILD_TYPE=Debug`` (this will make the simulation way slower) and rerun.
 #. If debug builds are too costly, try instead compiling with ``-DAMReX_ASSERTIONS=ON`` to activate more checks and rerun.
 #. If the problem looks like a memory violation, this could be from an invalid field or particle index access.
    Try compiling with ``-DAMReX_BOUND_CHECK=ON`` (this will make the simulation very slow), and rerun.
@@ -62,7 +62,7 @@ You will need to set those runtime options to work directly with debuggers.
 Typical Error Messages
 ----------------------
 
-By default, the code is run in *Release* mode (see :ref:`compilation options <building-cmake-options>`).
+By default, the code is run in *Release* mode (see :ref:`compilation options <install-build-options>`).
 That means, code errors will likely show up as symptoms of earlier errors in the code instead of directly showing the underlying line that caused the error.
 
 For instance, we have `these <https://github.com/BLAST-WarpX/warpx/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/ablastr/particles/DepositCharge.H#L139>`__ `checks <https://github.com/BLAST-WarpX/warpx/blob/23fa23209879cbdf5ef829530def162c2b343c72/Source/Particles/WarpXParticleContainer.cpp#L364>`__ in release mode

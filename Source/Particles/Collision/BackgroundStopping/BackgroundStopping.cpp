@@ -179,7 +179,7 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
             // give V(t+dt) = V(t)*exp(-alpha*dt)
 
             amrex::ParticleReal constexpr pi = MathConst::pi;
-            amrex::ParticleReal constexpr ep0 = PhysConst::ep0;
+            amrex::ParticleReal constexpr ep0 = PhysConst::epsilon_0;
             amrex::ParticleReal constexpr q_e = PhysConst::q_e;
             amrex::ParticleReal constexpr q_e2 = q_e*q_e;
             amrex::ParticleReal constexpr ep02 = ep0*ep0;
@@ -256,7 +256,7 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
             amrex::ParticleReal constexpr pi = MathConst::pi;
             amrex::ParticleReal constexpr q_e = PhysConst::q_e;
             amrex::ParticleReal constexpr q_e2 = q_e*q_e;
-            amrex::ParticleReal constexpr ep0 = PhysConst::ep0;
+            amrex::ParticleReal constexpr ep0 = PhysConst::epsilon_0;
             amrex::ParticleReal constexpr ep02 = ep0*ep0;
 
             amrex::ParticleReal const qi2 = charge_state_i*charge_state_i*q_e2;

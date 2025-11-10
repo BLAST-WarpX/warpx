@@ -12,7 +12,6 @@
 #include <AMReX_IParser.H>
 
 #include <cctype>
-#include <stdexcept>
 
 // For sigaction() et al.
 #if defined(__linux__) || defined(__APPLE__)

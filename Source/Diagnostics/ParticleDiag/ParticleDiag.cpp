@@ -4,7 +4,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -39,6 +38,7 @@ ParticleDiag::ParticleDiag (
             for (auto& var : variables){
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 // we reconstruct to Cartesian x,y,z for RZ particle output
+                if (var == "x") { var = "r"; }
                 if (var == "y") { var = "theta"; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)

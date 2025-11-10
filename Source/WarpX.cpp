@@ -53,6 +53,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
 #include <ablastr/math/FiniteDifference.H>
+#include <ablastr/math/RandomSeed.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -88,6 +89,7 @@
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_TagBox.H>
+#include <AMReX_VisMF.H>
 
 #include <algorithm>
 #include <cmath>
@@ -118,8 +120,6 @@ Vector<int> WarpX::boost_direction = {0,0,0};
 bool WarpX::compute_max_step_from_btd = false;
 Real WarpX::zmin_domain_boost_step_0 = 0._rt;
 
-int WarpX::max_particle_its_in_implicit_scheme = 21;
-ParticleReal WarpX::particle_tol_in_implicit_scheme = 1.e-10;
 bool WarpX::do_dive_cleaning = false;
 bool WarpX::do_divb_cleaning = false;
 bool WarpX::do_single_precision_comms = false;
@@ -321,6 +321,9 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    m_instance = this; // This guarantees that GetInstance() can be
+                       // indirectly used in WarpX constructor.
+
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
@@ -664,25 +667,7 @@ WarpX::ReadParameters ()
         // set random seed
         std::string random_seed = "default";
         pp_warpx.query("random_seed", random_seed);
-        if ( random_seed != "default" ) {
-            const unsigned long myproc_1 = ParallelDescriptor::MyProc() + 1;
-            if ( random_seed == "random" ) {
-                std::random_device rd;
-                std::uniform_int_distribution<int> dist(2, INT_MAX);
-                const unsigned long cpu_seed = myproc_1 * dist(rd);
-                const unsigned long gpu_seed = myproc_1 * dist(rd);
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else if ( std::stoi(random_seed) > 0 ) {
-                const unsigned long nprocs = ParallelDescriptor::NProcs();
-                const unsigned long seed_long = std::stoul(random_seed);
-                const unsigned long cpu_seed = myproc_1 * seed_long;
-                const unsigned long gpu_seed = (myproc_1 + nprocs) * seed_long;
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(
-                    "warpx.random_seed must be \"default\", \"random\" or an integer > 0.");
-            }
-        }
+        ablastr::math::set_random_seed(random_seed);
 
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);
@@ -878,9 +863,13 @@ WarpX::ReadParameters ()
 #endif
         pp_warpx.query("do_shared_mem_charge_deposition", do_shared_mem_charge_deposition);
         pp_warpx.query("do_shared_mem_current_deposition", do_shared_mem_current_deposition);
-#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA))
+#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) || \
+    (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_shared_mem_current_deposition,
-                "requested shared memory for current deposition, but shared memory is only available for CUDA or HIP");
+            "requested shared memory for current deposition,\
+            but shared memory is only available for CUDA or HIP,\
+            and for geometries other than 1D cylindrical and 1D spherical."
+        );
 #endif
         pp_warpx.query("shared_mem_current_tpb", shared_mem_current_tpb);
 
@@ -1022,13 +1011,6 @@ WarpX::ReadParameters ()
 
         {
             // Parameters below control all plotfile diagnostics
-            bool plotfile_min_max = true;
-            pp_warpx.query("plotfile_min_max", plotfile_min_max);
-            if (plotfile_min_max) {
-                plotfile_headerversion = amrex::VisMF::Header::Version_v1;
-            } else {
-                plotfile_headerversion = amrex::VisMF::Header::NoFabHeader_v1;
-            }
             pp_warpx.query("usesingleread", use_single_read);
             pp_warpx.query("usesinglewrite", use_single_write);
             ParmParse pp_vismf("vismf");
@@ -1343,7 +1325,7 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
             pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      macroscopic_solver_algo, "-_");
+                                      m_macroscopic_solver_algo, "-_");
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
@@ -1447,6 +1429,7 @@ WarpX::ReadParameters ()
                     "We recommend setting algo.particle_shape = 1 in order to avoid this issue");
             }
 
+            // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
                 evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
@@ -1892,6 +1875,43 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    // Set the default value of m_collisions_split_position_push
+    m_collisions_split_position_push = false;
+    const amrex::ParmParse pp_collisions("collisions");
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    if (collisions) {
+        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+            m_collisions_split_position_push = true;
+        }
+
+        // Override m_collisions_split_position_push if the corresponding input
+        // parameter collisions.split_position_push is set in the input file
+        pp_collisions.query("split_position_push", m_collisions_split_position_push);
+
+        // Warn the user if collisions with split position push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_position_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (EB::enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with embedded\
+                    boundaries, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+        }
+    }
 }
 
 void
@@ -2109,6 +2129,14 @@ WarpX::BackwardCompatibility ()
     if (pp_particles.query("nspecies", nspecies)){
         ablastr::warn_manager::WMRecordWarning("Species",
             "particles.nspecies is ignored. Just use particles.species_names please.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future. "
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
             ablastr::warn_manager::WarnPriority::low);
     }
 
@@ -3061,8 +3089,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,

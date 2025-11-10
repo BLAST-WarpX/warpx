@@ -5,6 +5,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
@@ -70,6 +71,9 @@ jobs:
 
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
+
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
 
         git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
 

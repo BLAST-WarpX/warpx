@@ -3,23 +3,80 @@
 Extend a Simulation with Python
 ===============================
 
-When running WarpX directly :ref:`from Python <usage-picmi>` it is possible to interact with the simulation.
+Overview
+--------
 
-For instance, with the :py:meth:`~pywarpx.picmi.Simulation.step` method of the simulation class, one could run ``sim.step(nsteps=1)`` in a loop:
+WarpX's Python bindings let you integrate Python code directly into a WarpX simulation.
+Through this interface, you can **access and modify simulation data** -- such as particle properties, field values -- as the simulation runs.
+This versatility opens the door to a wide range of workflows, including:
 
-.. code-block:: python3
+   - **Adding a custom physics module** (for instance, a specific collision model) that may not yet be available in WarpX's C++ implementation, and that can be quickly implemented in Python.
+   - **Coupling WarpX with another simulation tool** that has a Python interface, enabling both codes to operate on the same particle or field data.
+   - **Incorporating AI-based surrogate models** built in Python (e.g., with PyTorch or TensorFlow) to emulate complex physical processes.
 
-   # Preparation: set up the simulation
-   #   sim = picmi.Simulation(...)
-   #   ...
+If your custom Python code uses high-performance, GPU-accelerated libraries -- such as `cupy <https://cupy.dev/>`__, `pytorch <https://pytorch.org/>`__,
+or `numba <https://numba.pydata.org/>`__ -- the extra computations are unlikely to significantly impact simulation speed.
+Note that WarpX's Python bindings provide direct access to particle and field data without creating copies, resulting in very low overhead.
 
-   steps = 1000
-   for _ in range(steps):
-       sim.step(nsteps=1)
+How to run a simulation with Python extensions
+----------------------------------------------
 
-       # do something custom with the sim object
+- **Install WarpX with support for the Python interface**: for instance, if you :ref:`compile WarpX from source <install-build-code>`, this involves using ``-DWarpX_PYTHON=ON``.
 
-As a more flexible alternative, one can install `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__, which will execute a given Python function at a
+- **Write a Python script that extends the simulation**: this can be done starting from a simulation defined either with a :ref:`parameter list <running-cpp-parameters>` or with the :ref:`PICMI Python interface <usage-picmi>`.
+  The Python script typically contains :ref:`callback functions <usage-python-extend-callbacks>` that :ref:`access/modify <usage-python-extend-data-access>` the simulation data (see the sections below for more details).
+
+.. tab-set::
+
+   .. tab-item:: Parameter List
+
+      When starting from a :ref:`parameter list <running-cpp-parameters>`, write a Python script that loads the parameter list file using the :py:meth:`~pywarpx.picmi.Simulation.load_inputs_file` method:
+
+      .. code-block:: python3
+
+         from pywarpx import warpx
+
+         sim = warpx
+         sim.load_inputs_file("./inputs_test_3d_laser_acceleration")
+
+         # register callbacks ...
+
+         # advance simulation until the last time step
+         sim.step()
+
+      .. dropdown:: Full Example
+
+         .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
+            :language: python3
+            :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
+
+   .. tab-item:: PICMI
+
+      When starting from a :ref:`PICMI Python script <usage-picmi>`, simply add the Python code that extends the simulation to this script, before the call to :py:meth:`~pywarpx.picmi.Simulation.step`.
+
+      .. code-block:: python3
+
+         # Preparation: set up the simulation
+         #   sim = picmi.Simulation(...)
+         #   ...
+
+         # register callbacks ...
+
+         sim.step(nsteps=1000)
+
+
+- **Then, run the simulation by executing the Python script**: for instance using ``mpirun`` or ``srun`` on an HPC system.
+
+.. code-block:: bash
+
+   mpirun -np <n_ranks> python <python_script>
+
+.. _usage-python-extend-callbacks:
+
+Callback Functions
+------------------
+
+Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.
 
 .. automodule:: pywarpx.callbacks
@@ -29,8 +86,8 @@ specific location in the WarpX simulation loop.
 pyAMReX
 -------
 
-Many of the following classes are provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
-After the simulation is initialized, the pyAMReX module can be accessed via
+The Python interface to WarpX is provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
+After the simulation is initialized, the pyAMReX module can be accessed (if needed) via
 
 .. code-block:: python
 
@@ -45,6 +102,7 @@ After the simulation is initialized, the pyAMReX module can be accessed via
 
 
 Full details for pyAMReX APIs are `documented here <https://pyamrex.readthedocs.io/en/latest/usage/api.html>`__.
+The major objects used in the WarpX interface will be of types defined by pyAMReX.
 Important APIs include:
 
 * `amr.ParallelDescriptor <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParallelDescriptor.IOProcessor>`__: MPI-parallel rank information
@@ -52,10 +110,12 @@ Important APIs include:
 * `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
 
 
+.. _usage-python-extend-data-access:
+
 Data Access
 -----------
 
-While the simulation is running, callbacks can have read and write access the WarpX simulation data *in situ*.
+While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
 
 An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
 This object is the Python equivalent to the C++ ``WarpX`` simulation class.
@@ -73,18 +133,6 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
    .. py:method:: getdt(lev: int)
 
       Get the current physical time step size on mesh-refinement level ``lev``.
-
-   .. py:method:: multifab(multifab_name: str)
-
-      Return MultiFabs by name, e.g., ``"Efield_aux[x][level=0]"``, ``"Efield_cp[x][level=0]"``, ...
-
-      The physical fields in WarpX have the following naming:
-
-      - ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
-      - ``_aux`` are temporary (auxiliar) patches at the same resolution as ``_fp``.
-        They usually include contributions from other levels and can be interpolated for gather routines of particles.
-      - ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
-        (only for level 1 and higher).
 
    .. py:method:: multi_particle_container
 
@@ -105,6 +153,10 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
 
       Evolve the simulation the specified number of steps.
 
+   .. py:method:: step(numsteps=-1)
+
+      An alias to the evolve method.
+
    .. autofunction:: pywarpx.picmi.Simulation.extension.finalize
 
 .. py::def:: pywarpx.picmi.Simulation.extension.get_instance
@@ -117,7 +169,9 @@ The :py:class:`WarpX` also provides read and write access to field ``MultiFab`` 
 Fields
 ^^^^^^
 
-This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time step and calculate the largest value in it.
+All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
+This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
+This shows how to loop over levels and grid blocks.
 
 .. code-block:: python3
 
@@ -130,64 +184,56 @@ This example accesses the :math:`E_x(x,y,z)` field at level 0 after every time s
 
 
    @callfromafterstep
-   def set_E_x():
+   def set_Ex():
        warpx = sim.extension.warpx
-       multifab_register = warpx.multifab_register()
 
        # data access
        #   vector field E, component x, on the fine patch of MR level 0
-       E_x_mf = multifab_register.get("Efield_fp", dir=0, level=0)
+       Ex_mf = sim.fields.get("Efield_fp", dir=0, level=0)
        #   scalar field rho, on the fine patch of MR level 0
-       rho_mf = multifab_register.get("rho_fp", level=0)
+       rho_mf = sim.fields.get("rho_fp", level=0)
 
-       # compute on E_x_mf
+       # compute on Ex_mf
        # iterate over mesh-refinement levels
        for lev in range(warpx.finest_level + 1):
            # grow (aka guard/ghost/halo) regions
-           ngv = E_x_mf.n_grow_vect
+           ngv = Ex_mf.n_grow_vect
 
            # get every local block of the field
-           for mfi in E_x_mf:
+           for mfi in Ex_mf:
                # global index space box, including guards
                bx = mfi.tilebox().grow(ngv)
                print(bx)  # note: global index space of this block
 
-               # numpy representation: non-copying view, including the
-               # guard/ghost region;     .to_cupy() for GPU!
-               E_x_np = E_x_mf.array(mfi).to_numpy()
+               # numpy/cupy representation: non-copying view, including
+               # the guard/ghost region
+               Ex = Ex_mf.array(mfi).to_xp()
 
-               # notes on indexing in E_x_np:
-               # - numpy uses locally zero-based indexing
+               # notes on indexing in Ex:
+               # - numpy/cupy use locally zero-based indexing
                # - layout is F_CONTIGUOUS by default, just like AMReX
 
                # notes:
                # Only the next lines are the "HOT LOOP" of the computation.
-               # For efficiency, use numpy array operation for speed on CPUs.
-               # For GPUs use .to_cupy() above and compute with cupy or numba.
-               E_x_np[()] = 42.0
+               # For efficiency, we use array operation for speed.
+               Ex[()] = 42.0
 
 
    sim.step(nsteps=100)
 
-For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``E_x``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
+The physical fields in WarpX have the following :ref:`naming convention <developers-fields>`:
 
-A warning is that it is recommended that the reference to the MultiFab returned by multifab_register.get should not be saved across time steps. If there is load balancing, the MultiFabs will be regenerated and that reference will become invalid.
+- ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
+- ``_aux`` are temporary (auxiliary) patches at the same resolution as ``_fp``.
+  Depending on the algorithms being used, they can be averaged spatially or include contributions from other levels. This will be the fields that will be interpolated to the particles.
+- ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
+  (only for level 1 and higher).
 
-High-Level Field Wrapper
-^^^^^^^^^^^^^^^^^^^^^^^^
+For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
-The ``fields`` module provides wrappers around the MultiFabs that are defined in the WarpX class, those that are added to the MultiFab registry.
-For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
-For each MultiFab, there is a function that will return a wrapper around the data.
-The wrappers provide a convenient interface to the MultiFabs, which have the advantage that they can be used when load balancing is done.
-For example, the function ``ExWrapper`` returns a wrapper around the ``x`` component of the MultiFab vector ``Efield_aux`` at level 0.
+Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
 
-.. code-block:: python
-
-   from pywarpx import fields
-   Ex = fields.ExWrapper(level=0)
-
-The wrapper provides access to the data via global indexing.
+The field ``MultiFab`` object provides access to the data via global indexing.
 Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
 When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
 For indices within the domain, values from valid cells are always returned.
@@ -196,8 +242,7 @@ This example will return the ``Bz`` field at all valid interior points along ``x
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Bz = fields.BzWrapper()
+   Bz = sim.fields.get("Bfield_fp", dir=2, level=0)
    Bz_along_x = Bz[:,5,6]
 
 The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
@@ -205,8 +250,7 @@ specified ``x``. The data will be scattered appropriately to the underlying FABs
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Jy = fields.JyFPWrapper()
+   Jy = sim.fields.get("current_fp", dir=1, level=0)
    Jy[5,6:20,8:30] = 7.
 
 In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
@@ -214,31 +258,29 @@ Note that the ``+=`` will be a global operation.
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Jx = fields.JxFPWrapper()
+   Jx = sim.fields.get("current_fp", dir=0, level=0)
    Jx[(),-1j,-1:2j] += 7.
 
 To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
 Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
 The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
-The wrapper allows new MultiFabs to be created at the Python level and added to the registry.
+New MultiFabs can be created at the Python level and added to the registry. Using this method, the new MultiFabs will be handled in the same way as internal MultiFabs, for example that data can be redistributed during load balancing (when the flags are set as shpwn in the example).
 In this example, a new MultiFab is added with the same properties as `Ex`.
 
 .. code-block:: python
 
-   from pywarpx import fields
-   Ex = fields.ExWrapper()
-   normalized_Ex = fields.MultiFabWrapper(create_new=True,
-                                          mf_name="normalized_Ex",
-                                          idir=0,
-                                          ba=Ex.box_array(),
-                                          ngrow=Ex.n_grow_vect)
-
-Under the covers, the wrapper object is using the Python wrapper of a MultiFab, relying on its global array indexing capability.
-The wrappers are always up to date since whenever an access is done (either a get or a set), the wrapper fetches the underlying MultiFab object.
-
-Through the wrapper, all of the operations available on the underlying MultiFab can be done. For example, to find the max value, use ``Jx.max()``, and to multiply the data by a factor, ``Jx.mult(2.)``.
+   Ex = sim.fields.get("Efield_fp", dir=0, level=0)
+   normalized_Ex = sim.fields.alloc_init(name="normalized_Ex",
+                                         dir=0,
+                                         level=0,
+                                         ba=Ex.box_array(),
+                                         dm=Ex.dm(),
+                                         ncomp=Ex.n_comp,
+                                         ngrow=Ex.n_grow_vect,
+                                         initial_value=0.,
+                                         redistribute=True,
+                                         redistribute_on_remake=True)
 
 Particles
 ^^^^^^^^^

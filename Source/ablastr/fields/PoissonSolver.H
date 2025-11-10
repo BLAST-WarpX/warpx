@@ -279,14 +279,14 @@ computePhi (
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d);
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, is_igf_2d);
             }
             continue;
         }
 #endif
         // Use the Multigrid (MLMG) solver if selected or on refined patches
         // but first scale rho appropriately
-        rho[lev]->mult(-1._rt / ablastr::constant::SI::ep0);
+        rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);
 
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
@@ -441,7 +441,7 @@ computePhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ablastr::constant::SI::ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
 } // computePhi

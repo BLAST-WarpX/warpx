@@ -111,6 +111,17 @@ class MultiFabWrapper(object):
         remake=True,
         redistribute_on_remake=True,
     ):
+        import warnings
+
+        warnings.warn(
+            """The fields wrapper is now obsolete and should not be used. The
+            recommended way of obtaining the MultiFabs is directly from the register.
+            This is done using the 'sim.fields.get' routine where 'sim' is a PICMI
+            Simulation instance or the 'warpx' instance of pywarpx.WarpX.""",
+            UserWarning,
+            stacklevel=2,
+        )
+
         self._mf = mf
         self.mf_name = mf_name
         self.idir = idir
@@ -202,9 +213,9 @@ class MultiFabWrapper(object):
             fields = warpx.multifab_register()
             if self.idir is not None:
                 direction = libwarpx.libwarpx_so.Direction(self.idir)
-                return fields.get(self.mf_name, direction, self.level)
+                return fields.get(self.mf_name, dir=direction, level=self.level)
             else:
-                return fields.get(self.mf_name, self.level)
+                return fields.get(self.mf_name, level=self.level)
 
     def create_new_MultiFab(self):
         warpx = libwarpx.libwarpx_so.get_instance()
@@ -235,40 +246,6 @@ class MultiFabWrapper(object):
                 self.remake,
                 self.redistribute_on_remake,
             )
-
-    def mesh(self, direction, include_ghosts=False):
-        """Returns the mesh along the specified direction with the appropriate centering.
-
-        Parameters
-        ----------
-        direction: string
-            In 3d, one of 'x', 'y', or 'z'.
-            In 2d, Cartesian, one of 'x', or 'z'.
-            In RZ, one of 'r', or 'z'
-            In Z, 'z'.
-
-        include_ghosts: bool, default = False
-            Whether the ghosts cells are included in the mesh
-        """
-
-        try:
-            if libwarpx.geometry_dim == "3d":
-                idir = ["x", "y", "z"].index(direction)
-            elif libwarpx.geometry_dim == "2d":
-                idir = ["x", "z"].index(direction)
-            elif libwarpx.geometry_dim == "rz":
-                idir = ["r", "z"].index(direction)
-            elif libwarpx.geometry_dim == "1d":
-                idir = ["z"].index(direction)
-        except ValueError:
-            raise Exception("Inappropriate direction given")
-
-        # Cell size and lo are obtained from warpx, the imesh from the MultiFab
-        warpx = libwarpx.libwarpx_so.get_instance()
-        dd = warpx.Geom(self.level).data().CellSize(idir)
-        lo = warpx.Geom(self.level).ProbLo(idir)
-        imesh = self.mf.imesh(idir, include_ghosts)
-        return lo + imesh * dd
 
 
 def CustomNamedxWrapper(mf_name, level=0):

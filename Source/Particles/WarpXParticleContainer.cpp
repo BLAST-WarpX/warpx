@@ -1009,7 +1009,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
     const amrex::ParticleReal qs = this->charge;
-    const amrex::ParticleReal ms = this->mass;
+    const amrex::ParticleReal mass = this->m_mass;
 
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::FindMaxTilesize",
@@ -1173,50 +1173,106 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 #else
         const ParticleReal* zp_n_data = nullptr;
 #endif
-        if (WarpX::nox == 1){
-            doVillasenorJandSigmaDeposition<1>(
+
+        bool full_mass_matrices = false;
+        if (Szz_nComp>1) { full_mass_matrices = true; }
+
+        if (WarpX::nox == 1 && !full_mass_matrices){
+            doVillasenorJandSigmaDeposition<1,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                jx_arr, jy_arr, jz_arr,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
-                Sxx_arr, Syy_arr, Szz_arr,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
-        } else if (WarpX::nox == 2){
-            doVillasenorJandSigmaDeposition<2>(
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 1 && full_mass_matrices){
+            doVillasenorJandSigmaDeposition<1,true>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                jx_arr, jy_arr, jz_arr,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
-                Sxx_arr, Syy_arr, Szz_arr,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
-        } else if (WarpX::nox == 3){
-            doVillasenorJandSigmaDeposition<3>(
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 2 && !full_mass_matrices){
+            doVillasenorJandSigmaDeposition<2,false>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                jx_arr, jy_arr, jz_arr,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
-                Sxx_arr, Syy_arr, Szz_arr,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
-        } else if (WarpX::nox == 4){
-            doVillasenorJandSigmaDeposition<4>(
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 2 && full_mass_matrices){
+            doVillasenorJandSigmaDeposition<2,true>(
                 xp_n_data, yp_n_data, zp_n_data,
                 GetPosition, wp.dataPtr() + offset,
                 uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                 uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                jx_arr, jy_arr, jz_arr,
-                Sxx_nComp, Syy_nComp, Szz_nComp,
-                Sxx_arr, Syy_arr, Szz_arr,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 3 && !full_mass_matrices){
+            doVillasenorJandSigmaDeposition<3,false>(
+                xp_n_data, yp_n_data, zp_n_data,
+                GetPosition, wp.dataPtr() + offset,
+                uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 3 && full_mass_matrices){
+            doVillasenorJandSigmaDeposition<3,true>(
+                xp_n_data, yp_n_data, zp_n_data,
+                GetPosition, wp.dataPtr() + offset,
+                uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 4 && !full_mass_matrices){
+            doVillasenorJandSigmaDeposition<4,false>(
+                xp_n_data, yp_n_data, zp_n_data,
+                GetPosition, wp.dataPtr() + offset,
+                uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+        } else if (WarpX::nox == 4 && full_mass_matrices){
+            doVillasenorJandSigmaDeposition<4,true>(
+                xp_n_data, yp_n_data, zp_n_data,
+                GetPosition, wp.dataPtr() + offset,
+                uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                Sxx_arr, Sxy_arr, Sxz_arr,
+                Syx_arr, Syy_arr, Syz_arr,
+                Szx_arr, Szy_arr, Szz_arr,
+                Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         }
     } else { // Direct deposition
         if        (WarpX::nox == 1){
@@ -1230,7 +1286,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2){
             doDirectJandSigmaDeposition<2>(
                 GetPosition, wp.dataPtr() + offset,
@@ -1242,7 +1298,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3){
             doDirectJandSigmaDeposition<3>(
                 GetPosition, wp.dataPtr() + offset,
@@ -1254,7 +1310,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4){
             doDirectJandSigmaDeposition<4>(
                 GetPosition, wp.dataPtr() + offset,
@@ -1266,7 +1322,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, ms);
+                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         }
     }
     WARPX_PROFILE_VAR_STOP(blp_deposit);
@@ -1784,7 +1840,7 @@ void
 WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev)
 {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass > 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass > 0.,
         "The temperature can not be calculated for a massless species.");
 
     // Temporary cell-centered, multi-component MultiFab for storing particles sums
@@ -1869,7 +1925,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
     }
 
     // Divide the squares by number of particles for average and calculate the temperature
-    amrex::ParticleReal mass_local = mass;
+    amrex::ParticleReal mass = m_mass;
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1882,7 +1938,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if (sum_array(i,j,k,0) > 0) {
                     const amrex::Real invsum = 1._rt/sum_array(i,j,k,0);
-                    temp_array(i,j,k) *= mass_local*invsum/(3._rt*PhysConst::q_e);
+                    temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
                 }
             });
     }
@@ -1902,7 +1958,7 @@ WarpXParticleContainer::GetAverageNGPTemperature (int lev)
     temperature->setVal(0., 0, ncomps, temperature->nGrowVect());
 
     // Thermodynamic temperature is not defined for massless particles
-    if (mass > 0.) {
+    if (m_mass > 0.) {
         DepositTotalNGPTemperature(temperature.get(), lev);
     }
 
@@ -1969,7 +2025,6 @@ WarpXParticleContainer::DepositNumberDensity (amrex::MultiFab* number_density, c
                 num_array(i,j,k) /= dV*volume_factor;
             });
     }
-
 }
 
 std::unique_ptr<amrex::MultiFab>
@@ -1992,7 +2047,7 @@ std::unique_ptr<amrex::MultiFab>
 WarpXParticleContainer::GetDebyeLength (int lev)
 {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(mass*charge != 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
     std::unique_ptr<amrex::MultiFab> temperature = GetAverageNGPTemperature(lev);
@@ -2004,9 +2059,9 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     int const ng = 0;
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
-    amrex::Real const rmass = (amrex::Real)(mass);
+    amrex::Real const rmass = (amrex::Real)(m_mass);
     amrex::Real const rcharge = (amrex::Real)(charge);
-    amrex::Real const Aconst = PhysConst::ep0/(rcharge*rcharge);
+    amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -2047,7 +2102,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
 std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumParticleWeightAndEnergy (bool local) const {
 
     // Get mass (used only for particles other than photons, see below)
-    const amrex::Real m = this->mass;
+    const amrex::Real mass = this->m_mass;
 
     using PType = typename WarpXParticleContainer::SuperParticleType;
 
@@ -2086,7 +2141,7 @@ std::pair<amrex::ParticleReal, amrex::ParticleReal> WarpXParticleContainer::sumP
                 const amrex::ParticleReal uy = p.rdata(PIdx::uy);
                 const amrex::ParticleReal uz = p.rdata(PIdx::uz);
 
-                return {w*Algorithms::KineticEnergy(ux,uy,uz,m), w};
+                return {w*Algorithms::KineticEnergy(ux,uy,uz,mass), w};
             },
             reduce_ops);
 
@@ -2252,6 +2307,9 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
     amrex::LayoutData<amrex::Real>* costs = WarpX::getCosts(lev);
 
+    // local copy for device lambda capture
+    amrex::ParticleReal const mass = this->m_mass;
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2283,7 +2341,7 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
                 [=] AMREX_GPU_DEVICE (long i) {
                                     ParticleReal x, y, z;
                                     GetPosition(i, x, y, z);
-                                    UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt);
+                                    UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
                                     SetPosition(i, x, y, z);
                 }
             );
