@@ -16,7 +16,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 constants = picmi.constants
 
@@ -306,12 +306,15 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = fields.RhoFPWrapper()[...]
-        Jiy = fields.JyFPWrapper()[...] / self.J0
-        Jy = fields.JyFPPlasmaWrapper()[...] / self.J0
-        Bx = fields.BxFPWrapper()[...] / self.B0
-        By = fields.ByFPWrapper()[...] / self.B0
-        Bz = fields.BzFPWrapper()[...] / self.B0
+        rho = simulation.fields.get("rho_fp", level=0)[...]
+        Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
+        Jy = (
+            simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
+            / self.J0
+        )
+        Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
+        By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
+        Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

@@ -174,7 +174,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
             // but presumably should be all electrons?)
             amrex::ParticleReal const cell_ne = N_e_data[i_cell]/(dV*volume_factor(i_cell));
 
-            amrex::ParticleReal const cell_wpe = PhysConst::q_e*std::sqrt(cell_ne/PhysConst::m_e/PhysConst::ep0);
+            amrex::ParticleReal const cell_wpe = PhysConst::q_e*std::sqrt(cell_ne/PhysConst::m_e/PhysConst::epsilon_0);
             amrex::ParticleReal const cell_Ewpe_J = PhysConst::hbar*cell_wpe;
 
             amrex::ParticleReal const cell_nuei = nuei_data[i_cell];

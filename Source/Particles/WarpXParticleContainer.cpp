@@ -2018,7 +2018,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
 
     amrex::Real const rmass = (amrex::Real)(m_mass);
     amrex::Real const rcharge = (amrex::Real)(charge);
-    amrex::Real const Aconst = PhysConst::ep0/(rcharge*rcharge);
+    amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 
@@ -2191,7 +2191,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
                                           + std::pow(vze_array(i,j,k) - vzi_array(i,j,k), 2);
                 amrex::Real const g12sq_norm = g12sq/(PhysConst::c*PhysConst::c);
                 amrex::Real constexpr b0_factor = PhysConst::q_e/(PhysConst::c*PhysConst::c)/
-                                                  (2.0_rt*MathConst::pi*PhysConst::ep0*PhysConst::m_e)*PhysConst::q_e; // [m]
+                                                  (2.0_rt*MathConst::pi*PhysConst::epsilon_0*PhysConst::m_e)*PhysConst::q_e; // [m]
                 amrex::Real const mu = PhysConst::m_e*rimass/(PhysConst::m_e + rimass);
                 amrex::Real const b0 = b0_factor*Zi/(mu*g12sq_norm + 2.0_rt*EF/(PhysConst::m_e*PhysConst::c*PhysConst::c)); // [m]
 
@@ -2203,7 +2203,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
 
                 // compute nuei in this cell for this ion species and add to the total
                 amrex::Real const nuei_factor = std::sqrt(2.0_rt)*std::pow(PhysConst::q_e, 4)/
-                                                (12.0_rt*std::pow(MathConst::pi, 1.5_rt)*std::pow(PhysConst::ep0*PhysConst::m_e, 2));
+                                                (12.0_rt*std::pow(MathConst::pi, 1.5_rt)*std::pow(PhysConst::epsilon_0*PhysConst::m_e, 2));
 
                 amrex::Real const nuei_local = nuei_factor*ni*Zi*Zi*Clog/std::pow(VTe, 3); // [Hz]
                 nuei_array(i,j,k) += nuei_local;

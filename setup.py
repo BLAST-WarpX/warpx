@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 
@@ -288,8 +288,8 @@ setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
     version=warpx_version,
-    packages=["pywarpx"],
-    package_dir={"pywarpx": "Python/pywarpx"},
+    packages=find_packages(where="Python"),
+    package_dir={"": "Python"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",
     author_email="jlvay@lbl.gov, grote1@llnl.gov, maxence.thevenet@desy.de, rlehe@lbl.gov, atmyers@lbl.gov, WeiqunZhang@lbl.gov, axelhuebl@lbl.gov",
     maintainer="Axel Huebl, David P. Grote, Rémi Lehe",  # wheel/pypi packages

@@ -9,7 +9,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
-from pywarpx import callbacks, fields, picmi
+from pywarpx import callbacks, picmi
 
 constants = picmi.constants
 
@@ -161,13 +161,13 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
 
         # get rho from WarpX
         if self.rho_wrapper is None:
-            self.rho_wrapper = fields.RhoFPWrapper(0)
+            self.rho_wrapper = sim.fields.get("rho_fp", level=0)
         self.rho_data = self.rho_wrapper[(), ()]
 
         self.solve()
 
         if self.phi_wrapper is None:
-            self.phi_wrapper = fields.PhiFPWrapper(0)
+            self.phi_wrapper = sim.fields.get("phi_fp", level=0)
         self.phi_wrapper[(), ()] = self.phi
 
     def solve(self):
@@ -328,6 +328,7 @@ sim = picmi.Simulation(
     time_step_size=DT,
     max_steps=max_steps,
     warpx_collisions=[mcc_electrons, mcc_ions],
+    warpx_collisions_split_position_push=0,
 )
 
 sim.add_species(
