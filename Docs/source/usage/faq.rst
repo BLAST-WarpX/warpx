@@ -45,6 +45,7 @@ Leave a cushion between lasers, particles, and the edge of computational domain.
 The laser antenna and plasma species ``zmin`` can be less than or greater than  the ``geometry.prob_hi``,
 but not exactly equal.
 
+.. _faq_boosted_frame:
 
 What do I need to know about using the boosted frame?
 -----------------------------------------------------
@@ -60,6 +61,8 @@ Here are a few practical items to assist in designing boosted frame simulations:
 - Numerics and algorithms need to be adjusted, as there are numerical instabilities that arise in the boosted frame. For example, setting ``particles.use_fdtd_nci_corr=1`` for an FDTD simulation or setting ``psatd.use_default_v_galilean=1`` for a PSATD simulation. Be careful as this is overly simplistic and these options will not work in all cases.  Please see the :ref:`input parameters documentation <running-cpp-parameters>` and the :ref:`examples <usage-examples>` for more information
 
 An in-depth discussion of the boosted frame is provided in the :ref:`moving window and optimal Lorentz boosted frame <theory-boostedframe>` section.
+
+.. _faq_btd:
 
 What about Back-transformed diagnostics (BTD)?
 ----------------------------------------------
@@ -77,7 +80,8 @@ In the following discussion, we will use a subscript input (e.g. :math:`\Delta z
 - The first back-transformed diagnostic (BTD) snapshot may not occur at :math:`t=0`. Rather, it occurs at :math:`t_0=\frac{z_{max}}c \beta/(1 - \beta \beta_{mw})`, where :math:`\beta_{mw}` represents the speed of the moving window. This is the first time when the boosted frame can complete the snapshot.
 - The grid spacing of the BTD snapshot is different from the grid spacing indicated in the input script. It is given by :math:`\Delta z_{\rm grid,snapshot}=\frac{c\Delta t_{\rm boost}}{\gamma\beta}`.  For a CFL-limited time step, :math:`\Delta z_{\rm grid,snapshot}\approx \frac{1+\beta}{\beta} \Delta z_{\rm input}\approx 2 \Delta z_{\rm input}`. Hence in many common use cases at large boost, it is expected that the BTD snapshot has a grid spacing twice what is expressed in the input script.
 - The effective length of the BTD snapshot may be longer than anticipated from the input script because the grid spacing is different. Additionally, the number of grid points in the BTD snapshot is a multiple of ``<BTD>.buffer_size`` whereas the number of grid cells specified in the input deck may not be.
-- The code may require longer than anticipated to complete a BTD snapshot. The code starts filling the :math:`i^{th}` snapshot around step :math:`j_{\rm BTD start}={\rm ceil}\left( i\gamma(1-\beta\beta_{mw})\frac{\Delta t_{\rm snapshot}}{\Delta t_{\rm boost}}\right)`. The code then saves information for one BTD cell every time step in the boosted frame simulation. The :math:`i^{th}` snapshot is completed and saved :math:`n_{z,{\rm snapshot}}=n_{\rm buffers}\cdot ({\rm buffer\ size})` time steps after it begins, which is when the effective snapshot length is covered by the simulation.
+- The code may require longer than anticipated to complete a BTD snapshot. The code starts filling the :math:`i^{th}` snapshot around step :math:`j_{\rm BTD start}={\rm ceil}\left( i\gamma(1-\beta\beta_{mw})\frac{\Delta t_{\rm snapshot}}{\Delta t_{\rm boost}}\right)`. The code then saves information for one BTD cell every time step in the boosted frame simulation. The :math:`i^{th}` snapshot is completed and saved :math:`n_{z,{\rm snapshot}}=n_{\rm buffers}\cdot ({\rm buffer\ size})` time steps after it begins, which is when the effective snapshot length is covered by the simulation. As a result, if the simulations terminates early or crashes, BTD output for one or more snapshots may be incomplete.
+- Checkpoint/restart functionality cannot be used with BTD.
 
 What kinds of RZ output do you support?
 ---------------------------------------

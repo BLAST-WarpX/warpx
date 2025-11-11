@@ -185,7 +185,7 @@ def secondary_emission():
     # STEP 1: extract the different parameters of the boundary buffer (normal, time, position)
     lev = 0  # level 0 (no mesh refinement here)
     n = buffer.get_particle_boundary_buffer_size("ions", "eb")
-    elect_pc = particle_containers.ParticleContainerWrapper("electrons")
+    electrons = sim.particles.get("electrons")
 
     if n != 0:
         r = concat(buffer.get_particle_scraped_this_step("ions", "eb", "r", lev))
@@ -252,7 +252,7 @@ def secondary_emission():
                 we = np.append(we, w[i])
                 delta_te = np.append(delta_te, delta_t[i])
 
-                elect_pc.add_particles(
+                electrons.add_particles(
                     x=xe + (dt - delta_te) * uxe,
                     y=ye + (dt - delta_te) * uye,
                     z=ze + (dt - delta_te) * uze,

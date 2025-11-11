@@ -25,6 +25,15 @@ class ParticleContainerWrapper(object):
         self.name = species_name
         self._particle_container = None
 
+        import warnings
+
+        warnings.warn(
+            f'ParticleContainerWrapper("{species_name}") is deprecated. '
+            f'Use sim.particles.get("{species_name}") instead.',
+            UserWarning,
+            stacklevel=2,
+        )
+
     @property
     def particle_container(self):
         if self._particle_container is None:

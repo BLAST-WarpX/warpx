@@ -3,31 +3,34 @@
 Extend a Simulation with Python
 ===============================
 
+Overview
+--------
+
+WarpX's Python bindings let you integrate Python code directly into a WarpX simulation.
+Through this interface, you can **access and modify simulation data** -- such as particle properties, field values -- as the simulation runs.
+This versatility opens the door to a wide range of workflows, including:
+
+   - **Adding a custom physics module** (for instance, a specific collision model) that may not yet be available in WarpX's C++ implementation, and that can be quickly implemented in Python.
+   - **Coupling WarpX with another simulation tool** that has a Python interface, enabling both codes to operate on the same particle or field data.
+   - **Incorporating AI-based surrogate models** built in Python (e.g., with PyTorch or TensorFlow) to emulate complex physical processes.
+
+If your custom Python code uses high-performance, GPU-accelerated libraries -- such as `cupy <https://cupy.dev/>`__, `pytorch <https://pytorch.org/>`__,
+or `numba <https://numba.pydata.org/>`__ -- the extra computations are unlikely to significantly impact simulation speed.
+Note that WarpX's Python bindings provide direct access to particle and field data without creating copies, resulting in very low overhead.
+
+How to run a simulation with Python extensions
+----------------------------------------------
+
+- **Install WarpX with support for the Python interface**: for instance, if you :ref:`compile WarpX from source <install-build-code>`, this involves using ``-DWarpX_PYTHON=ON``.
+
+- **Write a Python script that extends the simulation**: this can be done starting from a simulation defined either with a :ref:`parameter list <running-cpp-parameters>` or with the :ref:`PICMI Python interface <usage-picmi>`.
+  The Python script typically contains :ref:`callback functions <usage-python-extend-callbacks>` that :ref:`access/modify <usage-python-extend-data-access>` the simulation data (see the sections below for more details).
+
 .. tab-set::
 
-   .. tab-item:: PICMI
+   .. tab-item:: Parameter List
 
-      When running WarpX directly :ref:`from PICMI Python <usage-picmi>` it is possible to interact with the simulation.
-
-      For instance, with the :py:meth:`~pywarpx.picmi.Simulation.step` method of the simulation class, one could run ``sim.step(nsteps=1)`` in a loop:
-
-      .. code-block:: python3
-
-         # Preparation: set up the simulation
-         #   sim = picmi.Simulation(...)
-         #   ...
-
-         # register callbacks ...
-
-         steps = 1000
-         for _ in range(steps):
-             sim.step(nsteps=1)
-
-             # do something custom with the sim object
-
-   .. tab-item:: Inputs File
-
-      When starting from an :ref:`inputs file <running-cpp-parameters>`, one can transition to WarpX Python by loading it:
+      When starting from a :ref:`parameter list <running-cpp-parameters>`, write a Python script that loads the parameter list file using the :py:meth:`~pywarpx.picmi.Simulation.load_inputs_file` method:
 
       .. code-block:: python3
 
@@ -39,13 +42,39 @@ Extend a Simulation with Python
          # register callbacks ...
 
          # advance simulation until the last time step
-         sim.evolve()
+         sim.step()
 
       .. dropdown:: Full Example
 
          .. literalinclude:: inputs_test_3d_laser_acceleration_python.py
             :language: python3
             :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_python.py`` and it requires the files ``inputs_test_3d_laser_acceleration`` and ``inputs_base_3d`` from the same folder.
+
+   .. tab-item:: PICMI
+
+      When starting from a :ref:`PICMI Python script <usage-picmi>`, simply add the Python code that extends the simulation to this script, before the call to :py:meth:`~pywarpx.picmi.Simulation.step`.
+
+      .. code-block:: python3
+
+         # Preparation: set up the simulation
+         #   sim = picmi.Simulation(...)
+         #   ...
+
+         # register callbacks ...
+
+         sim.step(nsteps=1000)
+
+
+- **Then, run the simulation by executing the Python script**: for instance using ``mpirun`` or ``srun`` on an HPC system.
+
+.. code-block:: bash
+
+   mpirun -np <n_ranks> python <python_script>
+
+.. _usage-python-extend-callbacks:
+
+Callback Functions
+------------------
 
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.
@@ -80,6 +109,8 @@ Important APIs include:
 * `amr.MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__: MPI-parallel field data
 * `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
 
+
+.. _usage-python-extend-data-access:
 
 Data Access
 -----------
@@ -121,6 +152,10 @@ This object is the Python equivalent to the C++ ``WarpX`` simulation class.
    .. py:method:: evolve(numsteps=-1)
 
       Evolve the simulation the specified number of steps.
+
+   .. py:method:: step(numsteps=-1)
+
+      An alias to the evolve method.
 
    .. autofunction:: pywarpx.picmi.Simulation.extension.finalize
 

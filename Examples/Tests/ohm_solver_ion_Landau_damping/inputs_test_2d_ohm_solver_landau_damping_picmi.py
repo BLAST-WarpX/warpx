@@ -14,7 +14,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 constants = picmi.constants
 
@@ -254,7 +254,7 @@ class IonLandauDamping(object):
         simulation.initialize_warpx()
 
         # get ion particle container wrapper
-        self.ion_part_container = particle_containers.ParticleContainerWrapper("ions")
+        self.ions = simulation.particles.get("ions")
 
     def text_diag(self):
         """Diagnostic function to print out timing data and particle numbers."""
@@ -269,7 +269,7 @@ class IonLandauDamping(object):
 
         status_dict = {
             "step": step,
-            "nplive ions": self.ion_part_container.nps,
+            "nplive ions": self.ions.size,
             "wall_time": wall_time,
             "step_rate": step_rate,
             "diag_steps": self.diag_steps,

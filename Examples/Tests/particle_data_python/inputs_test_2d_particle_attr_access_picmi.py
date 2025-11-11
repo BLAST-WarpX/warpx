@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 
-from pywarpx import callbacks, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 # Create the parser and add the argument
 parser = argparse.ArgumentParser()
@@ -106,8 +106,8 @@ sim.initialize_warpx()
 # below will be reproducible from run to run
 np.random.seed(30025025)
 
-elec_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-elec_wrapper.add_real_comp("newPid")
+electrons = sim.particles.get("electrons")
+electrons.add_real_comp("newPid")
 
 my_id = libwarpx.amr.ParallelDescriptor.MyProc()
 
@@ -123,7 +123,7 @@ def add_particles():
     w = np.ones(nps) * 2.0
     newPid = 5.0
 
-    elec_wrapper.add_particles(
+    electrons.add_particles(
         x=x,
         y=y,
         z=z,
@@ -149,12 +149,12 @@ sim.step(max_steps - 1)
 # are properly set
 ##########################
 
-assert elec_wrapper.nps == 270 / (2 - args.unique)
-assert elec_wrapper.particle_container.get_real_comp_index("w") == 2
-assert elec_wrapper.particle_container.get_real_comp_index("newPid") == 6
+assert electrons.size == 270 / (2 - args.unique)
+assert electrons.get_real_comp_index("w") == 2
+assert electrons.get_real_comp_index("newPid") == 6
 
-new_pid_vals = elec_wrapper.get_particle_real_arrays("newPid", 0)
-for vals in new_pid_vals:
+for pti in electrons.iterator(level=0):
+    vals = pti["newPid"]
     assert np.allclose(vals, 5)
 
 ##########################

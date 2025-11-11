@@ -1,9 +1,9 @@
 .. _theory-em-pic:
 
-Fully electromagnetic PIC
-=========================
+Electromagnetic PIC
+===================
 
-In the *fully electromagnetic Particle-In-Cell method* :cite:p:`pt-Birdsalllangdon,pt-HockneyEastwoodBook`,
+In the *electromagnetic Particle-In-Cell method* :cite:p:`pt-Birdsalllangdon,pt-HockneyEastwoodBook`,
 the fields are updated using Maxwell's equations:
 
 .. math::
