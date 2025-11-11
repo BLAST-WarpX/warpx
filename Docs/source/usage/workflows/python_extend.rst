@@ -95,85 +95,12 @@ While the simulation is running, the user will have read and write access the Wa
    python_field_data
    python_particle_data
    python_particle_boundary_data
+   python_warpx
    pyamrex_api
-
-pyAMReX
--------
-
-The Python interface to WarpX is provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
-After the simulation is initialized, the pyAMReX module can be accessed (if needed) via
-
-.. code-block:: python
-
-   from pywarpx import picmi, libwarpx
-
-   # ... simulation definition ...
-
-   # equivalent to
-   #   import amrex.space3d as amr
-   # for a 3D simulation
-   amr = libwarpx.amr  # picks the right 1d, 2d or 3d variant
-
-
-Full details for pyAMReX APIs are `documented here <https://pyamrex.readthedocs.io/en/latest/usage/api.html>`__.
-The major objects used in the WarpX interface will be of types defined by pyAMReX.
-Important APIs include:
-
-* `amr.ParallelDescriptor <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParallelDescriptor.IOProcessor>`__: MPI-parallel rank information
-* `amr.MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__: MPI-parallel field data
-* `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
 
 Data Access
 -----------
 
-An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
-This object is the Python equivalent to the C++ ``WarpX`` simulation class.
-
-.. py:class:: WarpX
-
-   .. py:method:: getistep(lev: int)
-
-      Get the current step on mesh-refinement level ``lev``.
-
-   .. py:method:: gett_new(lev: int)
-
-      Get the current physical time on mesh-refinement level ``lev``.
-
-   .. py:method:: getdt(lev: int)
-
-      Get the current physical time step size on mesh-refinement level ``lev``.
-
-   .. py:method:: multi_particle_container
-
-   .. py:method:: get_particle_boundary_buffer
-
-   .. py:method:: set_potential_on_domain_boundary(potential_[lo/hi]_[x/y/z]: str)
-
-      The potential on the domain boundaries can be modified when using the electrostatic solver.
-      This function updates the strings and function parsers which set the domain
-      boundary potentials during the Poisson solve.
-
-   .. py:method:: set_potential_on_eb(potential: str)
-
-      The embedded boundary (EB) conditions can be modified when using the electrostatic solver.
-      This set the EB potential string and updates the function parser.
-
-   .. py:method:: evolve(numsteps=-1)
-
-      Evolve the simulation the specified number of steps.
-
-   .. py:method:: step(numsteps=-1)
-
-      An alias to the evolve method.
-
-   .. autofunction:: pywarpx.picmi.Simulation.extension.finalize
-
-.. py::def:: pywarpx.picmi.Simulation.extension.get_instance
-
-   Return a reference to the WarpX object.
-
-
-The :py:class:`WarpX` also provides read and write access to field ``MultiFab`` and ``ParticleContainer`` data, shown in the following examples.
 
 Fields
 ^^^^^^
