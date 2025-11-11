@@ -824,6 +824,11 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                         comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
                         break;
                     }
+                    case openPMD::Datatype::INT : {
+                        auto empty_data = std::make_shared<int>();
+                        comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
+                        break;
+                    }
                     case openPMD::Datatype::UINT : {
                         auto empty_data = std::make_shared<unsigned int>();
                         comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
