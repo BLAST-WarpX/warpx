@@ -95,6 +95,7 @@ While the simulation is running, the user will have read and write access the Wa
    python_field_data
    python_particle_data
    python_particle_boundary_data
+   pyamrex_api
 
 pyAMReX
 -------
