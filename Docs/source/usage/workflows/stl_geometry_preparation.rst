@@ -91,30 +91,7 @@ To check and repair a mesh in MeshLab:
 
       * An STL file with non-manifold edges won't necessarily crash a simulation, but may present other numerical issues.
 
-.. Using Python with trimesh
-.. ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. .. code-block:: python
-
-..    import trimesh
-
-..    # Load the mesh
-..    mesh = trimesh.load('device_combined.stl')
-
-..    # Check if watertight
-..    print(f"Is watertight: {mesh.is_watertight}")
-..    print(f"Is manifold: {mesh.is_winding_consistent}")
-
-..    # Attempt to repair
-..    trimesh.repair.fix_normals(mesh)
-..    trimesh.repair.fill_holes(mesh)
-..    trimesh.repair.fix_inversion(mesh)
-
-..    # Check again
-..    print(f"After repair - Is watertight: {mesh.is_watertight}")
-
-..    # Export repaired mesh
-..    mesh.export('device_watertight.stl')
 
 
 Step 3: Using STL Files in WarpX
