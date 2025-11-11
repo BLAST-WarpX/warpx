@@ -79,8 +79,10 @@ Callback Functions
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
 specific location in the WarpX simulation loop.
 
-.. automodule:: pywarpx.callbacks
-   :members: installcallback, uninstallcallback, isinstalled
+.. toctree::
+   :maxdepth: 1
+
+   python_callbacks
 
 .. _usage-python-extend-data-access:
 
