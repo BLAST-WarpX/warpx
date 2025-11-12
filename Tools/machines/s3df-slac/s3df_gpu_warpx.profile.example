@@ -1,0 +1,72 @@
+# please set your project account
+export proj=""  # change me! GPU projects must end in "..._g"
+
+# remembers the location of this script
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
+
+# required dependencies
+module load gpu
+module load PrgEnv-gnu
+module load craype
+module load craype-x86-milan
+module load craype-accel-nvidia80
+module load cudatoolkit
+module load cmake/3.30.2
+
+# missing modules installed here
+export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
+
+# optional: for QED support with detailed tables
+export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:${LD_LIBRARY_PATH}
+
+# optional: for openPMD and PSATD+RZ support
+module load cray-hdf5-parallel/1.12.2.9
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:${CMAKE_PREFIX_PATH}
+
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:${LD_LIBRARY_PATH}
+
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
+
+# optional: CCache
+export PATH=${SW_DIR}/ccache-4.10.2:$PATH
+
+# optional: for Python bindings or libEnsemble
+module load cray-python/3.11.5
+
+if [ -d "${SW_DIR}/venvs/warpx-gpu" ]
+then
+  source ${SW_DIR}/venvs/warpx-gpu/bin/activate
+fi
+
+# an alias to request an interactive batch node for one hour
+#   for parallel execution, start on the batch node: srun <command>
+alias getNode="salloc -N 1 --ntasks-per-node=4 -t 1:00:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+# an alias to run a command on a batch node for up to 30min
+#   usage: runNode <command>
+alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+
+# necessary to use CUDA-Aware MPI and run a job
+export CRAY_ACCEL_TARGET=nvidia80
+
+# optimize CUDA compilation for A100
+export AMREX_CUDA_ARCH=8.0
+
+# optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
+# note: the cc/CC/ftn wrappers below add those
+export CXXFLAGS="-march=znver3"
+export CFLAGS="-march=znver3"
+
+# compiler environment hints
+export CC=cc
+export CXX=CC
+export FC=ftn
+export CUDACXX=$(which nvcc)
+export CUDAHOSTCXX=CC
