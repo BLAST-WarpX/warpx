@@ -123,6 +123,11 @@ private:
      */
     void FinishFieldUpdate ( amrex::Real end_time );
 
+    /**
+     * \brief Inititialize the BC masks for the curl curl operator
+     */
+    void InitializeCurlCurlBCMasks ();
+
 };
 
 #endif
