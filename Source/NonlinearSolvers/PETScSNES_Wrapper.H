@@ -110,7 +110,7 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
 
         PreconditionerType GetPreconditionerType () const override
         {
-            return m_solver->pcType();
+            return m_solver->getPreconditionerType();
         }
 
     private:
