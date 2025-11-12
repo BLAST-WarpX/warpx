@@ -72,6 +72,11 @@ public:
         m_linear_function->curTimeStep( a_dt );
     }
 
+    PreconditionerType GetPreconditionerType () const override
+    {
+        return m_linear_function->pcType();
+    }
+
     void PrintParams () const override
     {
         amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";

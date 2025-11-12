@@ -108,6 +108,11 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
             m_solver->setVerbose(a_verbose);
         }
 
+        PreconditionerType GetPreconditionerType () const override
+        {
+            return m_solver->pcType();
+        }
+
     private:
 
         std::unique_ptr<warpx_petsc::SNES_impl> m_solver = nullptr;

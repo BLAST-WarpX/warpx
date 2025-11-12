@@ -530,7 +530,8 @@ void ImplicitSolver::InitializeMassMatrices ()
 
     // check that PC is being used by nonlinear solver
     if (m_use_mass_matrices_pc) {
-        if (!m_nlsolver->UsePreconditioner()) {
+        const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+        if (pc_type == PreconditionerType::none) {
             m_use_mass_matrices_pc = false;
         }
     }
