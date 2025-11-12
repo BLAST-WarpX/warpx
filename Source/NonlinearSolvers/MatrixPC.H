@@ -398,9 +398,15 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
         for (int dir = 0; dir < 3; dir++) {
 
+            const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
+
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 auto bx = mfi.tilebox();
+
+                // BC mask values for in-plane components of curl curl E operator for 2D
+                auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
+
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
 
 #if defined(WARPX_DIM_RCYLINDER)

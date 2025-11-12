@@ -57,6 +57,9 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+    if (pc_type == PreconditionerType::pc_petsc) { InitializeCurlCurlBCMasks(); }
+
     m_is_defined = true;
 
 }
@@ -173,5 +176,198 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, end_time );
     ablastr::fields::MultiLevelVectorField const & B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
+
+}
+
+void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
+{
+
+    // Need to explain how the masks are used.
+    // 1D: comp = 0 is the mask for the diagonal term of the 2nd derivative operator
+    //     comp = 1 is the mask for the off-diagonal term of the 2nd derivative operator
+
+    using ablastr::fields::Direction;
+    m_curl2_BC_mask.resize(m_num_amr_levels);
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const amrex::IntVect ghosts = amrex::IntVect{0};
+        const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->DistributionMap();
+        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
+#if defined(WARPX_DIM_1D_Z)
+        const int ncomps_Ex = 2;
+        const int ncomps_Ey = 2;
+        const int ncomps_Ez = 0;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const int ncomps_Ex = 3;
+        const int ncomps_Ey = 4;
+        const int ncomps_Ez = 3;
+#elif defined(WARPX_DIM_3D)
+        const int ncomps_Ex = 6;
+        const int ncomps_Ey = 6;
+        const int ncomps_Ez = 6;
+#endif
+        m_curl2_BC_mask[lev][0] = std::make_unique<amrex::MultiFab>(ba_Ex, dm, ncomps_Ex, ghosts);
+        m_curl2_BC_mask[lev][1] = std::make_unique<amrex::MultiFab>(ba_Ey, dm, ncomps_Ey, ghosts);
+        m_curl2_BC_mask[lev][2] = std::make_unique<amrex::MultiFab>(ba_Ez, dm, ncomps_Ez, ghosts);
+        m_curl2_BC_mask[lev][0]->setVal(1.0);
+        m_curl2_BC_mask[lev][1]->setVal(1.0);
+        m_curl2_BC_mask[lev][2]->setVal(1.0);
+    }
+
+    const amrex::Geometry& geom = GetGeometry(0);
+    amrex::Box domain_box = geom.Domain();
+    domain_box.convert(amrex::IntVect::TheNodeVector());
+    const amrex::IntVect domain_lo = domain_box.smallEnd();
+    const amrex::IntVect domain_hi = domain_box.bigEnd();
+
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_lo = GetFieldBoundaryLo();
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_hi = GetFieldBoundaryHi();
+
+    const int lev = 0;
+#if AMREX_SPACEDIM < 3
+    // Set the BC masks for the out-of-plane components of the curl curl E operator
+    for (amrex::MFIter mfi(*m_curl2_BC_mask[lev][1], false); mfi.isValid(); ++mfi) {
+
+        // Get nodal box that does not include ghost cells
+        const amrex::Box node_box = amrex::convert(mfi.validbox(),amrex::IntVect::TheNodeVector());
+
+        for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
+
+            if (bc_type_lo[bdry_dir] == FieldBoundaryType::Periodic) { continue; }
+
+            for (int bdry_side = 0; bdry_side < 2; ++bdry_side) {
+
+                // Check if the box touches the boundary
+                if (bdry_side == 0 && node_box.smallEnd()[bdry_dir] != domain_lo[bdry_dir]) {
+                    continue;
+                }
+                if (bdry_side == 1 && node_box.bigEnd()[bdry_dir] != domain_hi[bdry_dir]) {
+                    continue;
+                }
+
+                // Create a node box that only contains locations right on the boundary
+                amrex::Box bdry_box = node_box;
+                if (bdry_side == 0) { bdry_box.setBig(bdry_dir,domain_lo[bdry_dir]); }
+                if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
+
+                // Set the BC-dependent mask values
+                amrex::Real val0 = 1.0;
+                amrex::Real val1 = 1.0;
+                const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
+                if (bc_type == FieldBoundaryType::PEC){
+                    val0 = 0.0;
+                    val1 = 0.0;
+                }
+                if (bc_type == FieldBoundaryType::PMC){
+                    val0 = 1.0;
+                    val1 = 2.0;
+                }
+                if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
+                    val0 = 0.5;
+                    val1 = 1.0;
+                }
+                if (bc_type == FieldBoundaryType::PECInsulator) {
+                    val0 = 0.5;
+                    val1 = 1.0;
+                }
+
+                // Set mask values on the boundary cells (same for Ex and Ey for 1D_Z)
+#if defined(WARPX_DIM_1D_Z)
+                amrex::Array4<amrex::Real> const& maskEx_arr = m_curl2_BC_mask[lev][0]->array(mfi);
+#endif
+                amrex::Array4<amrex::Real> const& maskEy_arr = m_curl2_BC_mask[lev][1]->array(mfi);
+                amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#if defined(WARPX_DIM_1D_Z)
+                    maskEx_arr(i,j,k,2*bdry_dir  ) = val0;
+                    maskEx_arr(i,j,k,2*bdry_dir+1) = val1;
+#endif
+                    maskEy_arr(i,j,k,2*bdry_dir  ) = val0;
+                    maskEy_arr(i,j,k,2*bdry_dir+1) = val1;
+                });
+
+            } // end loop over boundary sides
+
+        } // end loop over boundary dirs
+
+    } // end loop over boxes
+#endif
+
+#if AMREX_SPACEDIM > 1
+    // Set the BC masks for the in-plane components of the curl curl E operator
+    for (amrex::MFIter mfi(*m_curl2_BC_mask[lev][0], false); mfi.isValid(); ++mfi) {
+
+        for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
+
+            if (bc_type_lo[bdry_dir] == FieldBoundaryType::Periodic) { continue; }
+
+            for (int field_dir = 0; field_dir < 3; ++field_dir) {
+
+#if AMREX_SPACEDIM == 3
+                if (field_dir == bdry_dir) { continue; }
+                const int tdir1 = field_dir + 1 % 3; // next direction after field_dir
+#else
+                if (field_dir == 1) { continue; } // this is out-of-plane E in 2D
+                if (bdry_dir == 0 && field_dir == 0) { continue; } // Ex is centered in bdry_dir = 0
+                if (bdry_dir == 1 && field_dir == 2) { continue; } // Ez is centered in bdry_dir = 1
+                const int tdir1 = bdry_dir;
+#endif
+                // Get edge box for Ecomp (nodal in bdry-direction) that does not include ghost cells
+                const amrex::IntVect Edir_nodal = m_curl2_BC_mask[lev][field_dir]->ixType().toIntVect();
+                const amrex::Box edge_box = amrex::convert(mfi.validbox(),Edir_nodal);
+
+                for (int bdry_side = 0; bdry_side < 2; ++bdry_side) {
+
+                    // Check if the box touches the boundary
+                    if (bdry_side == 0 && edge_box.smallEnd()[bdry_dir] != domain_lo[bdry_dir]) {
+                        continue;
+                    }
+                    if (bdry_side == 1 && edge_box.bigEnd()[bdry_dir] != domain_hi[bdry_dir]) {
+                        continue;
+                    }
+
+                    // Create a edge box that only contains locations right on the boundary
+                    amrex::Box bdry_box = edge_box;
+                    if (bdry_side == 0) { bdry_box.setBig(bdry_dir,domain_lo[bdry_dir]); }
+                    if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
+
+                    // Set the BC-dependent mask values
+                    amrex::Real val0 = 1.0;
+                    amrex::Real val1 = 1.0;
+                    amrex::Real val2 = 1.0;
+                    const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
+                    if (bc_type == FieldBoundaryType::PEC){
+                        val0 = 0.0;
+                        val1 = 0.0;
+                        val2 = 0.0;
+                    }
+                    if (bc_type == FieldBoundaryType::PMC){
+                        val0 = 1.0;
+                        val1 = 2.0;
+                        val2 = 2.0;
+                    }
+                    if (bc_type == FieldBoundaryType::PECInsulator) {
+                        val0 = 0.5;
+                        val1 = 1.0;
+                        val2 = 1.0;
+                    }
+
+                    // Set mask values on the boundary cells
+                    const int comp_shift = (tdir1 == bdry_dir) ? 0:3;
+                    amrex::Array4<amrex::Real> const& mask_arr = m_curl2_BC_mask[lev][field_dir]->array(mfi);
+                    amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        mask_arr(i,j,k,comp_shift+0) = val0;
+                        mask_arr(i,j,k,comp_shift+1) = val1;
+                        mask_arr(i,j,k,comp_shift+2) = val2;
+                    });
+
+                } // end loop over boundary sides
+
+            } // end loop over field dirs
+
+        } // end loop over boundary dirs
+
+    } // end loop over boxes
+#endif
 
 }
