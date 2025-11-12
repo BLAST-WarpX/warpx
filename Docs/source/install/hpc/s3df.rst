@@ -156,63 +156,67 @@ The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
-CPU Nodes
+.. tab-set::
 
-.. code-block:: bash
+   .. tab-item:: A100 GPUs
 
-   cd $HOME/src/warpx
-   rm -rf build
+      .. code-block:: bash
 
-In ``CMakeLists.txt`` you can either toggle the relevant options ON/OFF:
+         cd $HOME/src/warpx
+         rm -rf build_pm_gpu
 
-.. code-block:: python
+         cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_pm_gpu -j 16
+         cmake --build build_pm_gpu -j 16 --target pip_install
 
-  # Options and Variants ########################################################
-  #
-  include(CMakeDependentOption)
-  option(WarpX_APP           "Build the WarpX executable application"     ON)
-  option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
-  option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
-  option(WarpX_EB            "Embedded boundary support"                  ON)
-  option(WarpX_LIB           "Build WarpX as a library"                   OFF)
-  option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
-  option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
-  option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
-  option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
-  option(WarpX_FFT           "FFT-based solvers"                          ON)
-  option(WarpX_PYTHON        "Python bindings"                            OFF)
-  option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
-  option(WarpX_QED           "QED support (requires PICSAR)"              ON)
-  option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
-                                                                          OFF)
-  option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
-                                                                          OFF)
-  
-  # Advanced option to run tests
-  option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
-  option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
-  option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
+      **That's it!**
+      The WarpX application executables are now in ``$HOME/src/warpx/build_pm_gpu/bin/`` and we installed the ``pywarpx`` Python module.
 
-or append the desired options in the format ``cmake -S . -B build -DWarpX_FFT=ON -WarpX_QED=ON`` when calling the build command.
+   .. tab-item:: CPU Nodes
 
-Build and compile WarpX:
+    In ``CMakeLists.txt`` you can either toggle the relevant options ON/OFF:
+        
+    .. code-block:: python
+        
+          # Options and Variants ########################################################
+          #
+          include(CMakeDependentOption)
+          option(WarpX_APP           "Build the WarpX executable application"     ON)
+          option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
+          option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
+          option(WarpX_EB            "Embedded boundary support"                  ON)
+          option(WarpX_LIB           "Build WarpX as a library"                   OFF)
+          option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
+          option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
+          option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
+          option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
+          option(WarpX_FFT           "FFT-based solvers"                          ON)
+          option(WarpX_PYTHON        "Python bindings"                            OFF)
+          option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
+          option(WarpX_QED           "QED support (requires PICSAR)"              ON)
+          option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
+                                                                                  OFF)
+          option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
+                                                                                  OFF)
+          
+          # Advanced option to run tests
+          option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
+          option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
+          option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
+        
+        or append the desired options in the format ``cmake -S . -B build -DWarpX_FFT=ON -WarpX_QED=ON`` when calling the build command.
 
-.. code-block:: bash
+      .. code-block:: bash
 
-   cmake -S . -B build
-   cmake --build build -j$(nproc)
+         cd $HOME/src/warpx
+         rm -rf build_pm_cpu
 
-.. _building-s3df-compile:
+         cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
+         cmake --build build_pm_cpu -j 16
+         cmake --build build_pm_cpu -j 16 --target pip_install
 
-The WarpX application executables are now in ``$HOME/src/warpx/build/bin/``.
-Additionally, the following commands will install WarpX as a Python module:
-
-.. code-block:: bash
-
-    rm -rf build_py
-
-    cmake -S . -B build_pm_py -DWarpX_APP=OFF -DWarpX_PYTHON=ON
-    cmake --build build_pm_py -j$(nproc) --target pip_install
+      **That's it!**
+      The WarpX application executables are now in ``$HOME/src/warpx/build_pm_cpu/bin/`` and we installed the ``pywarpx`` Python module.
 
 .. _building-s3df-update:
 
