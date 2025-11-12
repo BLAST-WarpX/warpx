@@ -153,57 +153,6 @@ Compilation
 S3DF pools may miss some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under a new folder called ``opt``.
 The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer ``cmake`` manually:
 
-.. code-block:: bash
-
-   cd 
-   wget https://github.com/Kitware/CMake/releases/download/v4.1.2/cmake-4.1.2.tar.gz
-   tar -xzf cmake-4.1.2.tar.gz
-   cd cmake-4.1.2.tar.gz
-   ./bootstrap --prefix=$HOME/opt/cmake-4.1.2
-   make -j$(nproc)
-   make install
-   export PATH=$HOME/opt/cmake-4.1.2/bin:$PATH
-   cmake --version
-
-.. _building-s3df-cmake:
-
-the last command should print ``cmake version 4.1.2``.
-
-S3DF uses the `Lmod Module <https://lmod.readthedocs.io/en/latest/010_user.html>`__ system to administrate common software packages not found in the usual software repositories. You can find more information `here <https://s3df.slac.stanford.edu/#/software?id=s3df-centrally-installed-software>`__. WarpX relies on MPI for communicating between compute nodes. We can use the distribution preinstalled on S3DF:
-
-.. code-block:: bash
-
-    module avail openmpi
-    module load openmpi/v4.1.6
-
-.. _building-s3df-mpi:
-
-**Make sure you have this MPI loaded whenever you want to (re)compile or run WarpX.** There are additional packages required to successfully compile WarpX such as ``fftw`` which is used for the FFT based EM solver and ``ADIOS2`` which is required for the ``openPMD`` data format WarpX uses. The general recipe to locally install such packages manually with ``cmake``, under ``~/opt`` is:
-
-.. code-block:: bash
-
-    cd 
-    wget <url-to-package>
-    tar -xzf <package.gz>
-    cd <package>
-    mkdir build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name> -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_THREADS=ON
-    make -j$(nproc)
-    make install
-
-.. _building-s3df-packages:
-
-It is necessary to provide the option ``-DCMAKE_INSTALL_PREFIX=$HOME/opt/<package-name>`` to cmake, otherwise ``make install`` will try to install the package into ``/usr/local/lib64/cmake/`` which will fail if you don't have sudo rights. When the option is provided ``make install`` will create the directory ``opt`` in your home directory and install the packages there. It is conventional to use the package name in lowercase letters and the version number, e.g.: ``ADIOS2-2.10.1``-> ``<package-name>=adios2-2.10.1`` or ``fftw-3.3.10``-> ``<package-name>=fftw-3.3.10``. After this we have to add the path of these installed packages to environment variables so that WarpX finds them during installation. The commands below append the necessary lines into the ``~/.bashrc`` file so that we don't have to manually add them every time we login to the ``iana`` cluster.
-
-.. code-block:: bash
-
-    echo 'export ADIOS2_DIR=$HOME/opt/adios2-2.10.1' >> ~/.bashrc
-    echo 'export FFTW_ROOT=$HOME/opt/fftw-3.3.10' >> ~/.bashrc
-    echo 'export PATH=$HOME/opt/adios2-2.10.1/bin:$HOME/opt/fftw-3.3.10/bin:$PATH' >> ~/.bashrc
-    echo 'export LD_LIBRARY_PATH=$HOME/opt/adios2-2.10.1/lib64:$HOME/opt/adios2-2.10.1/lib:$HOME/opt/fftw-3.3.10/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
-    source ~/.bashrc
-
-.. _building-s3df-paths:
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
