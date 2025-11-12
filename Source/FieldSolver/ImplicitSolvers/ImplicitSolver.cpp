@@ -836,16 +836,21 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
+    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt.
+    // Add one to diagonal terms when using the curl_curl_mlmg pc_type.
+    // The pc_type petsc already has the one from the curl curl operator
     // Note: This should be done after Sync/communication has been called
 
     const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     const int diag_comp = 0;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         for (int dir = 0 ; dir < 3 ; dir++) {
             amrex::MultiFab* MM_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{dir}, lev);
             MM_PC->mult(pc_factor, 0, MM_PC->nComp());
-            MM_PC->plus(1.0_rt, diag_comp, 1, 0);
+            if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+                MM_PC->plus(1.0_rt, diag_comp, 1, 0);
+            }
         }
     }
 
