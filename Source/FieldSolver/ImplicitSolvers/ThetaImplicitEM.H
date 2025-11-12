@@ -99,6 +99,11 @@ public:
      */
     void InitializeCurlCurlBCMasks ();
 
+    /**
+     * \brief Inititialize the BC masks for the curl curl operator
+     */
+    void InitializeCurlCurlBCMasks ();
+
 private:
 
     /**
@@ -122,11 +127,6 @@ private:
      * the solver, need to use m_E and m_Eold to compute E^{n+1}
      */
     void FinishFieldUpdate ( amrex::Real end_time );
-
-    /**
-     * \brief Inititialize the BC masks for the curl curl operator
-     */
-    void InitializeCurlCurlBCMasks ();
 
 };
 
