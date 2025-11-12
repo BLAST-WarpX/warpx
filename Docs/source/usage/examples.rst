@@ -8,7 +8,7 @@ This section allows you to **download input files** that correspond to different
 We provide two kinds of inputs:
 
 * PICMI python input files, `with parameters described here <https://picmi-standard.github.io>`__.
-* AMReX ``inputs`` files, :ref:`with parameters described here <running-cpp-parameters>`,
+* AMReX ``inputs`` parameter lists, :ref:`with parameters described here <running-cpp-parameters>`.
 
 For a complete list of all example input files, also have a look at our `Examples/ <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory.
 It contains folders and subfolders with self-describing names that you can try.
@@ -18,10 +18,12 @@ All these input files are automatically tested, so they should always be up-to-d
 Plasma-Based Acceleration
 -------------------------
 
+* :ref:`Laser-Wakefield Acceleration of Electrons in a Lab Frame <examples-lwfa>`
+* :ref:`Laser-Wakefield Acceleration of Electrons in a Boosted Frame <examples-lwfa-boosted>`
+
 .. toctree::
    :maxdepth: 1
 
-   examples/lwfa/README.rst
    examples/pwfa/README.rst
    pwfa.rst
 
@@ -109,7 +111,7 @@ Manipulating fields via Python
 
    TODO: The section needs to be sorted into either science cases (above) or later sections (:ref:`workflows and Python API details <usage-python-extend>`).
 
-An example of using Python to access the simulation charge density, solve the Poisson equation (using ``superLU``) and write the resulting electrostatic potential back to the simulation is given in the input file below. This example uses the ``fields.py`` module included in the ``pywarpx`` library.
+An example of using Python to access the simulation charge density, solve the Poisson equation (using ``superLU``) and write the resulting electrostatic potential back to the simulation is given in the input parameterfile below. This example uses the ``fields.py`` module included in the ``pywarpx`` library.
 
 * :download:`Direct Poisson solver example <../../../Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc_picmi.py>`
 
