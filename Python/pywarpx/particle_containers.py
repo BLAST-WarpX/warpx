@@ -25,6 +25,15 @@ class ParticleContainerWrapper(object):
         self.name = species_name
         self._particle_container = None
 
+        import warnings
+
+        warnings.warn(
+            f'ParticleContainerWrapper("{species_name}") is deprecated. '
+            f'Use sim.particles.get("{species_name}") instead.',
+            UserWarning,
+            stacklevel=2,
+        )
+
     @property
     def particle_container(self):
         if self._particle_container is None:
@@ -645,7 +654,8 @@ class ParticleContainerWrapper(object):
         sync_rho       : bool
             If True, perform MPI exchange and properly set boundary cells for rho_fp.
         """
-        rho_fp = libwarpx.warpx.multifab("rho_fp", level)
+        fields = libwarpx.warpx.multifab_register()
+        rho_fp = fields.get("rho_fp", level=level)
 
         if rho_fp is None:
             raise RuntimeError("Multifab `rho_fp` is not allocated.")

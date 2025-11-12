@@ -183,7 +183,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         const IntVect& ng = mf->nGrowVect();
         auto pmf = std::remove_reference_t<decltype(mf)>{};
         AllocInitMultiFab(pmf, mf->boxArray(), dm, mf->nComp(), ng, lev, mf->tags()[0]);
-        mf = std::move(pmf);
+        *mf = std::move(*pmf);
     };
 
     bool const eb_enabled = EB::enabled();

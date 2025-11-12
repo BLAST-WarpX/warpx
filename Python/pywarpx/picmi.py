@@ -1845,12 +1845,12 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
         self.max_iterations = max_iterations
 
     def linear_solver_initialize_inputs(self):
-        gmres = pywarpx.warpx.get_bucket("gmres")
-        gmres.verbose_int = self.verbose_int
-        gmres.restart_length = self.restart_length
-        gmres.absolute_tolerance = self.absolute_tolerance
-        gmres.relative_tolerance = self.relative_tolerance
-        gmres.max_iterations = self.max_iterations
+        amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
+        amrex_gmres.verbose_int = self.verbose_int
+        amrex_gmres.restart_length = self.restart_length
+        amrex_gmres.absolute_tolerance = self.absolute_tolerance
+        amrex_gmres.relative_tolerance = self.relative_tolerance
+        amrex_gmres.max_iterations = self.max_iterations
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
@@ -3405,7 +3405,7 @@ class Simulation(picmistandard.PICMI_Simulation):
                 nsteps = self.max_steps
             else:
                 nsteps = -1
-        pywarpx.warpx.evolve(nsteps)
+        pywarpx.warpx.step(nsteps)
 
     def finalize(self):
         if self.warpx_initialized:
@@ -3419,6 +3419,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         easy fetching of the MultiFabs.
         """
         return self.extension.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        """
+        This is a convenience property that returns the MultiParticleContainer, allowing
+        easy fetching of the WarpXParticleContainer instances.
+        """
+        return self.extension.warpx.multi_particle_container()
 
 
 # ----------------------------
