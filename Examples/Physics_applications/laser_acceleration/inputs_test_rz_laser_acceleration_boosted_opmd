@@ -1,0 +1,132 @@
+# Iterations
+max_step = 5
+
+# Domain
+amr.n_cell = 64 512
+amr.max_level = 0
+
+# Geometry
+geometry.dims = RZ
+my_constants.xmax = 50.e-6
+my_constants.zmin = -50.e-6
+geometry.prob_lo = 0     zmin
+geometry.prob_hi = xmax  0
+boundary.field_lo = none damped
+boundary.field_hi = none damped
+
+# Algorithms
+algo.current_deposition = direct
+algo.charge_deposition = standard
+algo.field_gathering = energy-conserving
+algo.maxwell_solver = psatd
+algo.particle_pusher = vay
+algo.particle_shape = 3
+warpx.use_filter_compensation = 1
+
+# Numerics
+warpx.verbose = 1
+warpx.use_filter = 1
+warpx.filter_npass_each_dir =1 4
+warpx.cfl = 1.
+warpx.n_rz_azimuthal_modes = 2
+warpx.random_seed = random
+warpx.abort_on_warning_threshold = medium
+
+#Boosted frame
+warpx.gamma_boost = 30.
+warpx.boost_direction = z
+
+# Moving window
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # in units of the speed of light
+warpx.serialize_initial_conditions = 1
+
+# Set up spectral solver
+psatd.update_with_rho = 1
+psatd.do_time_averaging = 0
+warpx.cfl = 0.99
+psatd.nox = 8
+psatd.noz = 16
+psatd.nx_guard = 16
+psatd.nz_guard = 16
+
+# Galilean PSATD solver
+psatd.use_default_v_galilean = 1
+psatd.do_time_averaging = 0
+warpx.do_dive_cleaning = 0
+psatd.current_correction = 1
+
+# Grid type
+warpx.grid_type = collocated
+#interpolation.field_centering_nox = 8
+#interpolation.field_centering_noy = 8
+#interpolation.field_centering_noz = 8
+#warpx.do_current_centering = 1
+#interpolation.current_centering_nox = 8
+#interpolation.current_centering_noy = 8
+#interpolation.current_centering_noz = 8
+
+# Plasma
+particles.species_names = electrons ions
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 1 4 1
+electrons.momentum_distribution_type = "gaussian"
+electrons.xmin = 0
+electrons.xmax =  40.e-6
+electrons.zmin = -0.08289214668121057
+electrons.zmax = 0.08289214668121057
+electrons.profile                 = "predefined"
+electrons.predefined_profile_name = "parabolic_channel"
+#         predefined_profile_params = z_start   ramp_up   plateau   ramp_down   rc       n0
+electrons.predefined_profile_params = 0.e-3      0.5e-3      50.e-3      0.5e-3      15.e-6     1.e24
+electrons.do_continuous_injection = 1
+
+ions.charge = q_e
+ions.mass = m_p
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 1 4 1
+ions.momentum_distribution_type = "gaussian"
+ions.xmin = 0
+ions.xmax =  40.e-6
+ions.zmin = -0.08289214668121057
+ions.zmax = 0.08289214668121057
+ions.profile                 = "predefined"
+ions.predefined_profile_name = "parabolic_channel"
+#         predefined_profile_params = z_start   ramp_up   plateau   ramp_down   rc       n0
+ions.predefined_profile_params = 0.e-3      0.5e-3      50.e-3      0.5e-3      15.e-6     1.e24
+ions.do_continuous_injection = 1
+
+# laser
+lasers.names        = laser1
+laser1.profile      = Gaussian
+laser1.position     = 0. 0. -0.10e-6 # This point is on the laser plane
+laser1.direction    = 0. 0. 1.      # The plane normal direction
+laser1.polarization = 0. 1. 0.      # The main polarization vector
+laser1.e_max        = 4.e12       # Maximum amplitude of the laser field (in V/m)
+laser1.profile_waist = 15.075567228888182e-06      # The waist of the laser (in meters)
+laser1.profile_duration = 2.1105794120443454e-14   # The duration of the laser (in seconds)
+laser1.profile_t_peak = 3.748643375171326e-15   # The time at which the laser reaches its peak (in seconds)
+laser1.profile_focal_distance = 0.5e-4  # Focal distance from the antenna (in meters)
+laser1.wavelength = 0.81e-6         # The wavelength of the laser (in meters)
+
+# Diagnostics
+diagnostics.diags_names =  diag1 #diag_lab
+
+diag_lab.diag_type = BackTransformed
+diag_lab.do_back_transformed_fields = 1
+diag_lab.num_snapshots_lab = 21
+diag_lab.dt_snapshots_lab = 2.380952380952381e-12
+diag_lab.fields_to_plot =  Er Et Ez Br Bt Bz jr jt jz rho
+diag_lab.format = openpmd
+diag_lab.buffer_size = 64
+diag_lab.write_species = 1
+
+# Diagnostics
+diag1.intervals = 100
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Et Ez Br Bt Bz jr jt jz rho
+diag1.format = openpmd
