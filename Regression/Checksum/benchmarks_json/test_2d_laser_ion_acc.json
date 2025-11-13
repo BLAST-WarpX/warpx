@@ -1,0 +1,36 @@
+{
+  "lev=0": {
+    "Bx": 0.0,
+    "By": 11411047.914246438,
+    "Bz": 0.0,
+    "Ex": 2031641078383576.5,
+    "Ey": 0.0,
+    "Ez": 334777107390366.7,
+    "jx": 1.6602050300612688e+19,
+    "jy": 0.0,
+    "jz": 9.545451455528505e+18,
+    "rho": 67237998840.77108,
+    "rho_electrons": 17449705825966.99,
+    "rho_hydrogen": 17441792654743.553
+  },
+  "electrons": {
+    "particle_position_x": 0.008139313907519062,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.030860516419015875,
+    "particle_momentum_x": 3.846351865475076e-19,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.6287398590922684e-18,
+    "particle_weight": 2.6479834364281488e+17
+  },
+  "hydrogen": {
+    "particle_origX": 0.007763427734375002,
+    "particle_origZ": 0.0351975439453125,
+    "particle_position_x": 0.007763034484095326,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.035195761508116846,
+    "particle_momentum_x": 2.2575255330847247e-18,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.0773391042128286e-18,
+    "particle_weight": 2.6792730619156992e+17
+  }
+}

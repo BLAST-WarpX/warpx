@@ -29,21 +29,21 @@ extern WARPX_EXPORT std::map< std::string, std::function<void()> > warpx_callbac
 /**
  * \brief Function to install the given name and function in warpx_callback_py_map
  */
-void InstallPythonCallback ( std::string name, std::function<void()> callback );
+void InstallPythonCallback ( const std::string& name, std::function<void()> callback );
 
 /**
  * \brief Function to check if the given name is a key in warpx_callback_py_map
  */
-bool IsPythonCallbackInstalled ( std::string name );
+bool IsPythonCallbackInstalled ( const std::string& name );
 
 /**
  * \brief Function to look for and execute Python callbacks
  */
-void ExecutePythonCallback ( std::string name );
+void ExecutePythonCallback ( const std::string& name );
 
 /**
  * \brief Function to clear the given callback name from warpx_callback_py_map
  */
-void ClearPythonCallback ( std::string name );
+void ClearPythonCallback ( const std::string& name );
 
 #endif // WARPX_PY_CALLBACKS_H_

@@ -12,6 +12,10 @@
 #include "SpectralAlgorithms/SpectralBaseAlgorithmRZ.H"
 #include "SpectralFieldDataRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Enums.H>
+
+
 /* \brief Top-level class for the electromagnetic spectral solver
  *
  * Stores the field in spectral space, and has member functions
@@ -31,14 +35,15 @@ class SpectralSolverRZ
                           amrex::BoxArray const & realspace_ba,
                           amrex::DistributionMapping const & dm,
                           int n_rz_azimuthal_modes,
-                          int norder_z, short grid_type,
+                          int norder_z,
+                          ablastr::utils::enums::GridType grid_type,
                           const amrex::Vector<amrex::Real>& v_galilean,
                           amrex::RealVect dx, amrex::Real dt,
                           bool with_pml,
                           bool update_with_rho,
                           bool fft_do_time_averaging,
-                          int J_in_time,
-                          int rho_in_time,
+                          TimeDependencyJ time_dependency_J,
+                          TimeDependencyRho time_dependency_rho,
                           bool dive_cleaning,
                           bool divb_cleaning);
 
@@ -69,29 +74,21 @@ class SpectralSolverRZ
 
         /* \brief Initialize K space filtering arrays */
         void InitFilter (amrex::IntVect const & filter_npass_each_dir,
-                         bool const compensation)
-        {
-            field_data.InitFilter(filter_npass_each_dir, compensation, k_space);
-        }
+                         bool compensation);
 
         /* \brief Apply K space filtering for a scalar */
-        void ApplyFilter (const int lev, int const field_index)
-        {
-            field_data.ApplyFilter(lev, field_index);
-        }
+        void ApplyFilter (int lev, int field_index);
 
         /* \brief Apply K space filtering for a vector */
-        void ApplyFilter (const int lev, int const field_index1,
-                          int const field_index2, int const field_index3)
-        {
-            field_data.ApplyFilter(lev, field_index1, field_index2, field_index3);
-        }
+        void ApplyFilter (int lev, int field_index1,
+                          int field_index2, int field_index3);
 
         /**
           * \brief Public interface to call the member function ComputeSpectralDivE
           * of the base class SpectralBaseAlgorithmRZ from objects of class SpectralSolverRZ
           */
-        void ComputeSpectralDivE (int lev, const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+        void ComputeSpectralDivE (int lev,
+                                  ablastr::fields::VectorField const & Efield,
                                   amrex::MultiFab& divE);
 
         /**
@@ -117,20 +114,14 @@ class SpectralSolverRZ
          * \param[in] src_comp  component of the source FabArray from which the data are copied
          * \param[in] dest_comp component of the destination FabArray where the data are copied
          */
-        void CopySpectralDataComp (const int src_comp, const int dest_comp)
-        {
-            field_data.CopySpectralDataComp(src_comp, dest_comp);
-        }
+        void CopySpectralDataComp (int src_comp, int dest_comp);
 
         /**
          * \brief Set to zero the data on component \c icomp of \c field_data.fields
          *
          * \param[in] icomp component of the FabArray where the data are set to zero
          */
-        void ZeroOutDataComp (const int icomp)
-        {
-            field_data.ZeroOutDataComp(icomp);
-        }
+        void ZeroOutDataComp (int icomp);
 
         /**
          * \brief Scale the data on component \c icomp of \c field_data.fields
@@ -139,12 +130,12 @@ class SpectralSolverRZ
          * \param[in] icomp component of the FabArray where the data are scaled
          * \param[in] scale_factor scale factor to use for scaling
          */
-        void ScaleDataComp (const int icomp, const amrex::Real scale_factor)
-        {
-            field_data.ScaleDataComp(icomp, scale_factor);
-        }
+        void ScaleDataComp (int icomp, amrex::Real scale_factor);
 
         SpectralFieldIndex m_spectral_index;
+
+        // Solve time step size
+        amrex::Real m_dt;
 
     private:
 

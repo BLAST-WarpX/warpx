@@ -5,10 +5,7 @@ foreach(D IN LISTS WarpX_DIMS)
         Interpolate.cpp
         ParticleUtils.cpp
         SpeciesUtils.cpp
-        RelativeCellPosition.cpp
-        WarpXAlgorithmSelection.cpp
         WarpXMovingWindow.cpp
-        WarpXTagging.cpp
         WarpXUtil.cpp
         WarpXVersion.cpp
     )

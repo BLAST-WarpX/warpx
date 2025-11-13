@@ -1,7 +1,7 @@
-#CEXE_sources += ParticleBoundaries.cpp
 
 include $(WARPX_HOME)/Source/ablastr/coarsen/Make.package
 include $(WARPX_HOME)/Source/ablastr/math/Make.package
+include $(WARPX_HOME)/Source/ablastr/fields/Make.package
 include $(WARPX_HOME)/Source/ablastr/parallelization/Make.package
 include $(WARPX_HOME)/Source/ablastr/particles/Make.package
 include $(WARPX_HOME)/Source/ablastr/utils/Make.package

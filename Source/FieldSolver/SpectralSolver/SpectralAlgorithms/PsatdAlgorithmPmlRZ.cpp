@@ -19,8 +19,10 @@ using namespace amrex::literals;
 PsatdAlgorithmPmlRZ::PsatdAlgorithmPmlRZ (SpectralKSpaceRZ const & spectral_kspace,
                                           amrex::DistributionMapping const & dm,
                                           const SpectralFieldIndex& spectral_index,
-                                          int const n_rz_azimuthal_modes, int const norder_z,
-                                          short const grid_type, amrex::Real const dt):
+                                          int const n_rz_azimuthal_modes,
+                                          int const norder_z,
+                                          ablastr::utils::enums::GridType grid_type,
+                                          amrex::Real const dt):
     // Initialize members of base class and member variables
     SpectralBaseAlgorithmRZ{spectral_kspace, dm, spectral_index, norder_z, grid_type},
     m_dt{dt}

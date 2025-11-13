@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef GET_VELOCITY_H_
-#define GET_VELOCITY_H_
+#ifndef WARPX_GET_VELOCITY_H_
+#define WARPX_GET_VELOCITY_H_
 
 #include "VelocityProperties.H"
 
@@ -86,4 +86,4 @@ struct GetVelocity
         return m_dir;
     }
 };
-#endif
+#endif //WARPX_GET_VELOCITY_H_

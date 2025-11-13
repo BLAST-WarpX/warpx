@@ -22,6 +22,10 @@
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, 2d)
 #elif defined(WARPX_DIM_RZ)
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rz)
+#elif defined(WARPX_DIM_RCYLINDER)
+#  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rcylinder)
+#elif defined(WARPX_DIM_RSPHERE)
+#  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, rsphere)
 #elif defined(WARPX_DIM_3D)
 #  define PYWARPX_MODULE_NAME CONCAT_NAME(warpx_pybind_, 3d)
 #endif
@@ -32,8 +36,8 @@
 // forward declarations of exposed classes
 void init_BoundaryBufferParIter (py::module&);
 void init_MultiParticleContainer (py::module&);
+void init_MultiFabRegister (py::module&);
 void init_ParticleBoundaryBuffer (py::module&);
-void init_PinnedMemoryParticleContainer (py::module&);
 void init_WarpXParIter (py::module&);
 void init_WarpXParticleContainer (py::module&);
 void init_WarpX(py::module&);
@@ -42,7 +46,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // make sure AMReX types are known
 #if defined(WARPX_DIM_3D)
     auto amr = py::module::import("amrex.space3d");
-#elif defined(WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     auto amr = py::module::import("amrex.space1d");
 #else
     auto amr = py::module::import("amrex.space2d");
@@ -51,7 +55,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     m.doc() = R"pbdoc(
             warpx_pybind
             --------------
-            .. currentmodule:: warpx_pybind_(1d|2d|3d|rz)
+            .. currentmodule:: warpx_pybind_(1d|2d|3d|rz|rcylinder|rsphere)
 
             .. autosummary::
                :toctree: _generate
@@ -59,7 +63,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     )pbdoc";
 
     // note: order from parent to child classes
-    init_PinnedMemoryParticleContainer(m);
+    init_MultiFabRegister(m);
     init_WarpXParticleContainer(m);
     init_WarpXParIter(m);
     init_BoundaryBufferParIter(m);
@@ -93,7 +97,7 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // TODO broken numpy if not at least v1.15.0: raise warning
     // auto numpy = py::module::import("numpy");
     // auto npversion = numpy.attr("__version__");
-    // std::cout << "numpy version: " << py::str(npversion) << std::endl;
+    // std::cout << "numpy version: " << py::str(npversion) << "\n";
 
     m.def("amrex_init",
         [](const py::list args) {

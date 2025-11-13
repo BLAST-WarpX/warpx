@@ -17,7 +17,7 @@
 # - Specify commit
 #   ./compare_guard_cells.sh commit <commit hash>
 # - specify branch
-#   ./compare_guard_cells.sh branch https://github.com/ECP-WarpX/WarpX.git dev
+#   ./compare_guard_cells.sh branch https://github.com/BLAST-WarpX/warpx.git dev
 # - Just use the current git head. Typically if you want
 #   to explore a few commits manually.
 #   ./compare_guard_cells.sh manual
@@ -71,7 +71,7 @@ fi
 if [ $DO_GIT_CLONE == true ]; then
     # Clone all three repos
     rm -rf WarpX picsar amrex
-    git clone https://github.com/ECP-WarpX/WarpX.git
+    git clone https://github.com/BLAST-WarpX/warpx.git
     git clone https://github.com/ECP-WarpX/picsar.git
     git clone --branch development https://github.com/AMReX-Codes/amrex.git
 fi

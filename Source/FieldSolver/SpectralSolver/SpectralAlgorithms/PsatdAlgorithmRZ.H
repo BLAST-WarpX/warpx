@@ -9,6 +9,9 @@
 
 #include "SpectralBaseAlgorithmRZ.H"
 
+#include <ablastr/utils/Enums.H>
+
+
 /* \brief Class that updates the field in spectral space
  * and stores the coefficients of the corresponding update equation.
  */
@@ -20,11 +23,12 @@ class PsatdAlgorithmRZ : public SpectralBaseAlgorithmRZ
                          amrex::DistributionMapping const & dm,
                          const SpectralFieldIndex& spectral_index,
                          int n_rz_azimuthal_modes, int norder_z,
-                         short grid_type, amrex::Real dt_step,
+                         ablastr::utils::enums::GridType grid_type,
+                         amrex::Real dt_step,
                          bool update_with_rho,
                          bool time_averaging,
-                         int J_in_time,
-                         int rho_in_time,
+                         TimeDependencyJ time_dependency_J,
+                         TimeDependencyRho time_dependency_rho,
                          bool dive_cleaning,
                          bool divb_cleaning);
         // Redefine functions from base class
@@ -56,12 +60,12 @@ class PsatdAlgorithmRZ : public SpectralBaseAlgorithmRZ
 
     private:
 
-        bool coefficients_initialized;
+        bool coefficients_initialized = false;
         // Note that dt is saved to use in InitializeSpectralCoefficients
         amrex::Real m_dt;
         bool m_update_with_rho;
         bool m_time_averaging;
-        int m_J_in_time;
+        TimeDependencyJ m_time_dependency_J;
         bool m_dive_cleaning;
         bool m_divb_cleaning;
         SpectralRealCoefficients C_coef, S_ck_coef, X1_coef, X2_coef, X3_coef;

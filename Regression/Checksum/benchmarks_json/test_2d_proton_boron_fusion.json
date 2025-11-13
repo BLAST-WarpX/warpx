@@ -1,0 +1,117 @@
+{
+  "lev=0": {
+    "rho": 0.0
+  },
+  "alpha2": {
+    "particle_momentum_x": 4.147096553384428e-15,
+    "particle_momentum_y": 4.148386888716703e-15,
+    "particle_momentum_z": 4.2355859956063956e-15,
+    "particle_position_x": 408986.2616589582,
+    "particle_position_y": 861114.611579138,
+    "particle_weight": 5.078688651140289e+18
+  },
+  "alpha5": {
+    "particle_momentum_x": 2.391554393265755e-14,
+    "particle_momentum_y": 2.380624197547813e-14,
+    "particle_momentum_z": 2.4011350203323685e-14,
+    "particle_position_x": 2457556.857163842,
+    "particle_position_y": 4914659.635379324,
+    "particle_weight": 3.84e-19
+  },
+  "boron3": {
+    "particle_momentum_x": 9.277692678068949e-15,
+    "particle_momentum_y": 9.268409643440313e-15,
+    "particle_momentum_z": 9.27944661419188e-15,
+    "particle_position_x": 4096178.1664224654,
+    "particle_position_y": 8192499.7060386725,
+    "particle_weight": 6.399498360474527e+30
+  },
+  "proton2": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.3723248150262614e-14,
+    "particle_position_x": 4095630.6981353564,
+    "particle_position_y": 8192073.551798363,
+    "particle_weight": 1.2885512788807104e+28
+  },
+  "proton3": {
+    "particle_momentum_x": 1.6842187942655533e-15,
+    "particle_momentum_y": 1.682187895915998e-15,
+    "particle_momentum_z": 1.6796813545870554e-15,
+    "particle_position_x": 2456897.9096408677,
+    "particle_position_y": 4913630.163026287,
+    "particle_weight": 1.2794983604745311e+30
+  },
+  "proton5": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.758606263721587e-15,
+    "particle_position_x": 409638.28776185703,
+    "particle_position_y": 819101.3225783394,
+    "particle_weight": 1.2800000000000002e+37
+  },
+  "boron5": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 409547.33129275695,
+    "particle_position_y": 819118.5558814353,
+    "particle_weight": 127.99999999999997
+  },
+  "boron1": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.5248724688771355e-13,
+    "particle_position_x": 40958301.59165428,
+    "particle_position_y": 81921136.14476717,
+    "particle_weight": 128.00000000000003
+  },
+  "alpha1": {
+    "particle_momentum_x": 4.717160343752064e-15,
+    "particle_momentum_y": 4.702467901833037e-15,
+    "particle_momentum_z": 4.719843828838534e-15,
+    "particle_position_x": 458277.0784719371,
+    "particle_position_y": 971933.2928012874,
+    "particle_weight": 4.915501429891572e-28
+  },
+  "alpha4": {
+    "particle_momentum_x": 2.3841307270519193e-14,
+    "particle_momentum_y": 2.387802104505006e-14,
+    "particle_momentum_z": 2.4020226339447442e-14,
+    "particle_position_x": 2457367.458278153,
+    "particle_position_y": 4915112.044373057,
+    "particle_weight": 384.0
+  },
+  "boron2": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 409798.015821768,
+    "particle_position_y": 819270.9858143467,
+    "particle_weight": 1.2799999998307105e+28
+  },
+  "alpha3": {
+    "particle_momentum_x": 4.810121676839753e-16,
+    "particle_momentum_y": 4.711495880557285e-16,
+    "particle_momentum_z": 4.786749078532465e-16,
+    "particle_position_x": 50772.032800115674,
+    "particle_position_y": 98363.93464422387,
+    "particle_weight": 1.504918576407999e+27
+  },
+  "proton1": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.5248724688771355e-13,
+    "particle_position_x": 40960140.729837954,
+    "particle_position_y": 81919772.69310111,
+    "particle_weight": 128.00000000000003
+  },
+  "proton4": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.758606263721587e-15,
+    "particle_position_x": 409630.87894829054,
+    "particle_position_y": 819198.7077771134,
+    "particle_weight": 1.2800000000000002e+37
+  }
+}

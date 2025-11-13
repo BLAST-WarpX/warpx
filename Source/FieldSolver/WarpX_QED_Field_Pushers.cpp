@@ -6,6 +6,7 @@
  */
 #include "WarpX.H"
 
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXProfilerWrapper.H"
@@ -69,36 +70,41 @@ WarpX::Hybrid_QED_Push (int lev, amrex::Real a_dt)
 void
 WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
 {
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     const int patch_level = (patch_type == PatchType::fine) ? lev : lev-1;
     const std::array<Real,3>& dx_vec= WarpX::CellSize(patch_level);
     const Real dx = dx_vec[0];
     const Real dy = dx_vec[1];
     const Real dz = dx_vec[2];
 
+    using ablastr::fields::Direction;
+
     MultiFab *Ex, *Ey, *Ez, *Bx, *By, *Bz, *Jx, *Jy, *Jz;
     if (patch_type == PatchType::fine)
     {
-        Ex = Efield_fp[lev][0].get();
-        Ey = Efield_fp[lev][1].get();
-        Ez = Efield_fp[lev][2].get();
-        Bx = Bfield_fp[lev][0].get();
-        By = Bfield_fp[lev][1].get();
-        Bz = Bfield_fp[lev][2].get();
-        Jx = current_fp[lev][0].get();
-        Jy = current_fp[lev][1].get();
-        Jz = current_fp[lev][2].get();
+        Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
+        Ey = m_fields.get(FieldType::Efield_fp, Direction{1}, lev);
+        Ez = m_fields.get(FieldType::Efield_fp, Direction{2}, lev);
+        Bx = m_fields.get(FieldType::Bfield_fp, Direction{0}, lev);
+        By = m_fields.get(FieldType::Bfield_fp, Direction{1}, lev);
+        Bz = m_fields.get(FieldType::Bfield_fp, Direction{2}, lev);
+        Jx = m_fields.get(FieldType::current_fp, Direction{0}, lev);
+        Jy = m_fields.get(FieldType::current_fp, Direction{1}, lev);
+        Jz = m_fields.get(FieldType::current_fp, Direction{2}, lev);
     }
     else
     {
-        Ex = Efield_cp[lev][0].get();
-        Ey = Efield_cp[lev][1].get();
-        Ez = Efield_cp[lev][2].get();
-        Bx = Bfield_cp[lev][0].get();
-        By = Bfield_cp[lev][1].get();
-        Bz = Bfield_cp[lev][2].get();
-        Jx = current_cp[lev][0].get();
-        Jy = current_cp[lev][1].get();
-        Jz = current_cp[lev][2].get();
+        Ex = m_fields.get(FieldType::Efield_cp, Direction{0}, lev);
+        Ey = m_fields.get(FieldType::Efield_cp, Direction{1}, lev);
+        Ez = m_fields.get(FieldType::Efield_cp, Direction{2}, lev);
+        Bx = m_fields.get(FieldType::Bfield_cp, Direction{0}, lev);
+        By = m_fields.get(FieldType::Bfield_cp, Direction{1}, lev);
+        Bz = m_fields.get(FieldType::Bfield_cp, Direction{2}, lev);
+        Jx = m_fields.get(FieldType::current_cp, Direction{0}, lev);
+        Jy = m_fields.get(FieldType::current_cp, Direction{1}, lev);
+        Jz = m_fields.get(FieldType::current_cp, Direction{2}, lev);
     }
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
@@ -169,7 +175,7 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         );
 
         // Make local copy of xi, to use on device.
-        const Real xi_c2 = WarpX::quantum_xi_c2;
+        const Real xi_c2 = m_quantum_xi_c2;
 
         // Apply QED correction to electric field, using temporary arrays.
         amrex::ParallelFor(

@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef VELOCITY_PROPERTIES_H_
-#define VELOCITY_PROPERTIES_H_
+#ifndef WARPX_VELOCITY_PROPERTIES_H_
+#define WARPX_VELOCITY_PROPERTIES_H_
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -50,4 +50,4 @@ struct VelocityProperties
     std::unique_ptr<amrex::Parser> m_ptr_velocity_parser;
 };
 
-#endif
+#endif //WARPX_VELOCITY_PROPERTIES_H_

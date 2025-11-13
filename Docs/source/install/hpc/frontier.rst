@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/frontier_warpx.profile``.
 Create it now:
@@ -92,14 +92,14 @@ Finally, since Frontier does not yet provide software modules for some of our de
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
    rm -rf build_frontier
 
-   cmake -S . -B build_frontier -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_frontier -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_frontier -j 16
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_frontier/bin/``.
@@ -109,7 +109,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_frontier_py
 
-   cmake -S . -B build_frontier_py -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_frontier_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_frontier_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Frontier compute jobs <running-cpp-frontier>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
@@ -231,10 +231,25 @@ Known System Issues
 
 .. warning::
 
-   Checkpoints and I/O at scale seem to be slow with the default Lustre filesystem configuration.
+   Checkpoints and AMReX plotfile I/O at scale is very slow with the default Lustre filesystem configuration.
+   Using openPMD with ADIOS2 is the best performing output for regular diagnostics.
+
+   For checkpoint-restart, you have no choice and need to use AMReX plotfiles.
    Please test checkpointing and I/O with short ``#SBATCH -q debug`` runs before running the full simulation.
+   Set `the following options for performance of plotfiles/checkpoints <https://github.com/AMReX-Codes/amrex/pull/4426>`__:
+
+   .. code-block:: ini
+
+      warpx.field_io_nfiles = <1-per-node>
+      warpx.particle_io_nfiles = <1-per-node>
+
+      # These parameters are for a workaround needed for simulations on FRONTIER
+      # and enable checkpointing
+      vismf.noflushafterwrite = true
+      vismf.barrierafterlevel = true
+
    Execute ``lfs getstripe -d <dir>`` to show the default progressive file layout.
-   Consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
+   For further tuning, consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
 
    .. code-block:: bash
 
@@ -244,12 +259,4 @@ Known System Issues
       mkdir diags
       # change striping for new files before you submit the simulation
       #   this is an example, striping 10 MB blocks onto 32 nodes
-      lfs setstripe -S 10M -c 32 diags
-
-   Additionally, other AMReX users reported good performance for plotfile checkpoint/restart when using
-
-   .. code-block:: ini
-
-      amr.plot_nfiles = -1
-      amr.checkpoint_nfiles = -1
-      amrex.async_out_nfiles = 4096  # set to number of GPUs used
+      lfs setstripe -S 16M -c 1 $SLURM_SUBMIT_DIR  # or diags only or checkpoints only

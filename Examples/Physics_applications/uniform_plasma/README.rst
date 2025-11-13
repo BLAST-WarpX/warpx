@@ -17,49 +17,22 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. tab-set::
 
-         .. tab-item:: Python: Script
+         .. tab-item:: Inputs: Parameter List
 
-            .. note::
+            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``
 
-               TODO: This input file should be created following the ``inputs_3d`` file.
-
-         .. tab-item:: Executable: Input File
-
-            This example can be run **either** as WarpX **executable** using an input file: ``warpx.3d inputs_3d``
-
-             .. literalinclude:: inputs_3d
-                :language: ini
-                :caption: You can copy this file from ``usage/examples/lwfa/inputs_3d``.
+             .. literalinclude:: inputs_base_3d
+                :language: none
+                :caption: You can copy this file from ``Examples/Physics_applications/uniform_plasma/inputs_base_3d``.
 
    .. tab-item:: 2D
 
       .. tab-set::
 
-         .. tab-item:: Python: Script
+         .. tab-item:: Inputs: Parameter List
 
-            .. note::
+            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_test_2d_uniform_plasma``
 
-               TODO: This input file should be created following the ``inputs_2d`` file.
-
-         .. tab-item:: Executable: Input File
-
-            This example can be run **either** as WarpX **executable** using an input file: ``warpx.2d inputs_2d``
-
-             .. literalinclude:: inputs_2d
-                :language: ini
-                :caption: You can copy this file from ``usage/examples/lwfa/inputs_2d``.
-
-Analyze
--------
-
-.. note::
-
-   This section is TODO.
-
-
-Visualize
----------
-
-.. note::
-
-   This section is TODO.
+             .. literalinclude:: inputs_test_2d_uniform_plasma
+                :language: none
+                :caption: You can copy this file from ``Examples/Physics_applications/uniform_plasma/inputs_test_2d_uniform_plasma``.

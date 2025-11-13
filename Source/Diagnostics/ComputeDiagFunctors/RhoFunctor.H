@@ -19,6 +19,7 @@ public:
      * \param[in] lev level of MultiFab
      * \param[in] crse_ratio coarsening ratio for interpolation of field values
      *                       from simulation MultiFabs to the output MultiFab mf_dst
+     * \param[in] apply_rz_psatd_filter if true, apply RZ filter in spectral space
      * \param[in] species_index Index of species to dump rho per species. This argument
      *                          is optional and defaults to -1 (dump total rho)
      * \param[in] convertRZmodes2cartesian if true, all RZ modes are averaged into one component
@@ -27,6 +28,7 @@ public:
      */
     RhoFunctor (int lev,
                 amrex::IntVect crse_ratio,
+                bool apply_rz_psatd_filter = false,
                 int species_index = -1,
                 bool convertRZmodes2cartesian = true,
                 int ncomp = 1);
@@ -42,10 +44,13 @@ public:
 private:
 
     // Level on which source MultiFab mf_src is defined in RZ geometry
-    int const m_lev;
+    int m_lev;
+
+    // Whether to apply k-space filtering of charge density in the diagnostics output in RZ PSATD
+    bool m_apply_rz_psatd_filter;
 
     // Species index to dump rho per species
-    const int m_species_index;
+    int m_species_index;
 
     // Whether to average all modes into one component in RZ geometry
     bool m_convertRZmodes2cartesian;

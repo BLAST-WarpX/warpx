@@ -17,7 +17,7 @@ RZ geometry with spectral solver
 
 Additional steps are needed to build the spectral solver. Some of the steps
 are the same as is done for the Cartesian spectral solver, setting up the FFTW
-package and setting ``USE_PSATD=TRUE``.
+package and setting ``USE_FFT=TRUE``.
 
       - Install (or load) an MPI-enabled version of FFTW.
         For instance, for Debian, this can be done with
@@ -54,7 +54,7 @@ package and setting ``USE_PSATD=TRUE``.
 
            export BLAS_LIB=-lblas
 
-      - Set ``USE_PSATD=TRUE`` when compiling:
+      - Set ``USE_FFT=TRUE`` when compiling:
         ::
 
-           make -j 4 USE_RZ=TRUE USE_PSATD=TRUE
+           make -j 4 USE_RZ=TRUE USE_FFT=TRUE

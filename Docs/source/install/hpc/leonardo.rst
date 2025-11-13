@@ -18,7 +18,7 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 * `Leonardo website <https://leonardo-supercomputer.cineca.eu/>`_
-* `Leonardo user guide <https://wiki.u-gov.it/confluence/display/SCAIUS/UG3.2%3A+LEONARDO+UserGuide>`_
+* `Leonardo user guide <https://docs.hpc.cineca.it/hpc/leonardo.html>`_
 
 Storage organization:
 
@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/leonardo_gpu_warpx.profile``.
 Create it now:
@@ -65,7 +65,7 @@ Finally, since Leonardo does not yet provide software modules for some of our de
 
 .. code-block:: bash
 
-   bash $HOME/src/warpx/Tools/machines/leonardo_cineca/install_gpu_dependencies.sh
+   bash $HOME/src/warpx/Tools/machines/leonardo-cineca/install_gpu_dependencies.sh
    source $HOME/sw/venvs/warpx/bin/activate
 
 .. dropdown:: Script Details
@@ -82,14 +82,14 @@ Finally, since Leonardo does not yet provide software modules for some of our de
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
    rm -rf build_gpu
 
-   cmake -S . -B build_gpu -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_gpu -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_gpu -j 16
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_gpu/bin/``.
@@ -100,7 +100,7 @@ Additionally, the following commands will install WarpX as a Python module:
    cd $HOME/src/warpx
    rm -rf build_gpu_py
 
-   cmake -S . -B build_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_PYTHON=ON -DWarpX_APP=OFF -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_gpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_PYTHON=ON -DWarpX_APP=OFF -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_gpu_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Leonardo compute jobs <running-leonardo>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).

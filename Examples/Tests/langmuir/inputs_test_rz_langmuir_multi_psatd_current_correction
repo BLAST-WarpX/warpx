@@ -1,0 +1,16 @@
+# base input parameters
+FILE = inputs_base_rz
+
+# test input parameters
+algo.current_deposition = direct
+algo.maxwell_solver = psatd
+amr.max_grid_size = 128
+diag1.dump_rz_modes = 0
+diag1.electrons.variables = x y z w ux uy uz
+diag1.fields_to_plot = jr jz Er Ez Bt rho divE
+diag1.ions.variables = x y z w ux uy uz
+electrons.random_theta = 0
+ions.random_theta = 0
+psatd.current_correction = 1
+psatd.periodic_single_box_fft = 1
+warpx.do_dive_cleaning = 0

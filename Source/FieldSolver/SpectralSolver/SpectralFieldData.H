@@ -11,6 +11,7 @@
 #include "SpectralFieldData_fwd.H"
 
 #include "SpectralKSpace.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpX_Complex.H"
 
 #include <ablastr/math/fft/AnyFFT.H>
@@ -42,10 +43,10 @@ class SpectralFieldIndex
          *
          * \param[in] update_with_rho whether rho is used in the field update equations
          * \param[in] time_averaging  whether the time averaging algorithm is used
-         * \param[in] J_in_time       the multi-J algorithm used (hence two currents
+         * \param[in] time_dependency_J       the PSATD-JRhom algorithm used (hence two currents
          *                            computed at the beginning and the end of the time interval
          *                            instead of one current computed at half time)
-         * \param[in] rho_in_time     the multi-rho algorithm used (hence two densities
+         * \param[in] time_dependency_rho     the multi-rho algorithm used (hence two densities
          *                            computed at the beginning and the end of the time interval
          *                            instead of one density computed at half time)
          * \param[in] dive_cleaning   whether to use div(E) cleaning to account for errors in
@@ -59,8 +60,8 @@ class SpectralFieldIndex
          */
         SpectralFieldIndex (bool update_with_rho,
                             bool time_averaging,
-                            int J_in_time,
-                            int rho_in_time,
+                            TimeDependencyJ time_dependency_J,
+                            TimeDependencyRho time_dependency_rho,
                             bool dive_cleaning,
                             bool divb_cleaning,
                             bool pml,
@@ -143,8 +144,7 @@ class SpectralFieldData
 {
 
     public:
-        SpectralFieldData( int lev,
-                           const amrex::BoxArray& realspace_ba,
+        SpectralFieldData( const amrex::BoxArray& realspace_ba,
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
                            int n_field_required,
@@ -176,11 +176,10 @@ class SpectralFieldData
         ablastr::math::anyfft::FFTplans forward_plan, backward_plan;
         // Correcting "shift" factors when performing FFT from/to
         // a cell-centered grid in real space, instead of a nodal grid
-        SpectralShiftFactor xshift_FFTfromCell, xshift_FFTtoCell,
-                            zshift_FFTfromCell, zshift_FFTtoCell;
-#if defined(WARPX_DIM_3D)
-        SpectralShiftFactor yshift_FFTfromCell, yshift_FFTtoCell;
-#endif
+        // (0,1,2) is the dimension number
+        SpectralShiftFactor shift0_FFTfromCell, shift0_FFTtoCell,
+                            shift1_FFTfromCell, shift1_FFTtoCell,
+                            shift2_FFTfromCell, shift2_FFTtoCell;
 
         bool m_periodic_single_box;
 };

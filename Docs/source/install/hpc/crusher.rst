@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/crusher_warpx.profile``.
 Create it now:
@@ -92,14 +92,14 @@ Finally, since Crusher does not yet provide software modules for some of our dep
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
    rm -rf build_crusher
 
-   cmake -S . -B build_crusher -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_crusher -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_crusher -j 16
 
 The WarpX application executables are now in ``$HOME/src/warpx/build_crusher/bin/``.
@@ -109,7 +109,7 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_crusher_py
 
-   cmake -S . -B build_crusher_py -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_crusher_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_crusher_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Crusher compute jobs <running-cpp-crusher>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).

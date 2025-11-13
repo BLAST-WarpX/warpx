@@ -1,0 +1,17 @@
+{
+  "lev=0": {
+    "Ez": 148800000.0,
+    "jz": 4933.8481550181405,
+    "phi": 5107658.310329586,
+    "rho": 0.01782971152247851
+  },
+  "ions": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 286.7335800209615,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.1038703499471635e-16,
+    "particle_weight": 77895621238774.94
+  }
+}

@@ -47,12 +47,7 @@ function(find_pyamrex)
                 GIT_TAG        ${WarpX_pyamrex_branch}
                 BUILD_IN_SOURCE 0
             )
-            FetchContent_GetProperties(fetchedpyamrex)
-
-            if(NOT fetchedpyamrex_POPULATED)
-                FetchContent_Populate(fetchedpyamrex)
-                add_subdirectory(${fetchedpyamrex_SOURCE_DIR} ${fetchedpyamrex_BINARY_DIR})
-            endif()
+            FetchContent_MakeAvailable(fetchedpyamrex)
 
             # advanced fetch options
             mark_as_advanced(FETCHCONTENT_BASE_DIR)
@@ -64,7 +59,7 @@ function(find_pyamrex)
         endif()
     elseif(NOT WarpX_pyamrex_internal)
         # TODO: MPI control
-        find_package(pyAMReX 23.12 CONFIG REQUIRED)
+        find_package(pyAMReX ${pyamrex_version} CONFIG REQUIRED)
         message(STATUS "pyAMReX: Found version '${pyAMReX_VERSION}'")
     endif()
 endfunction()
@@ -79,7 +74,13 @@ option(WarpX_pyamrex_internal "Download & build pyAMReX" ON)
 set(WarpX_pyamrex_repo "https://github.com/AMReX-Codes/pyamrex.git"
     CACHE STRING
     "Repository URI to pull and build pyamrex from if(WarpX_pyamrex_internal)")
-set(WarpX_pyamrex_branch "eb24d03fac522d36fb27d20c6e026d8b59dfa908"
+
+# Parse pyAMReX version and commit information
+file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON pyamrex_version GET "${dependencies_data}" version_pyamrex)
+string(JSON pyamrex_commit GET "${dependencies_data}" commit_pyamrex)
+
+set(WarpX_pyamrex_branch ${pyamrex_commit}
     CACHE STRING
     "Repository branch for WarpX_pyamrex_repo if(WarpX_pyamrex_internal)")
 

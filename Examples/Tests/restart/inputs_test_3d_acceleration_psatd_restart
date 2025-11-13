@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_3d_acceleration_psatd
+
+# test input parameters
+amr.restart = "../test_3d_acceleration_psatd/diags/chk000005"

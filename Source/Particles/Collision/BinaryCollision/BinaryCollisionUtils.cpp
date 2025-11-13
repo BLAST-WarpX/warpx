@@ -15,125 +15,192 @@
 
 #include <string>
 
+#include "Utils/TextMsg.H"
+
 namespace BinaryCollisionUtils{
 
-    NuclearFusionType get_nuclear_fusion_type (const std::string collision_name,
-                                               MultiParticleContainer const * const mypc)
-        {
-            const amrex::ParmParse pp_collision_name(collision_name);
-            amrex::Vector<std::string> species_names;
-            pp_collision_name.getarr("species", species_names);
-            auto& species1 = mypc->GetParticleContainerFromName(species_names[0]);
-            auto& species2 = mypc->GetParticleContainerFromName(species_names[1]);
+    CollisionType get_collision_type (const std::string& collision_name,
+                                      MultiParticleContainer const * const mypc)
+    {
+        const amrex::ParmParse pp_collision_name(collision_name);
+        // For legacy, pairwisecoulomb is the default
+        std::string type = "pairwisecoulomb";
+        pp_collision_name.query("type", type);
+        if (type == "pairwisecoulomb") {
+            return CollisionType::PairwiseCoulomb;
+        }
+        else if (type == "nuclearfusion") {
+            const NuclearFusionType fusion_type = get_nuclear_fusion_type(collision_name, mypc);
+            return nuclear_fusion_type_to_collision_type(fusion_type);
+        }
+        else if (type == "bremsstrahlung") {
+            return CollisionType::Bremsstrahlung;
+        }
+        else if (type == "dsmc") {
+            return CollisionType::DSMC;
+        }
+        else if (type == "linear_breit_wheeler") {
+            amrex::Vector<std::string> species_name;
+            // Check that incoming species are photons
+            pp_collision_name.getarr("species", species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species_name.size() == 2u,
+                "Linear Breit-Wheeler collisions must involve exactly two species");
+            auto& species1 = mypc->GetParticleContainerFromName(species_name[0]);
+            auto& species2 = mypc->GetParticleContainerFromName(species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species1.AmIA<PhysicalSpecies::photon>() && species2.AmIA<PhysicalSpecies::photon>(),
+                "Species involved in linear Breit-Wheeler collisions must be of type photon.");
+            // Check that product species are electron and positron
             amrex::Vector<std::string> product_species_name;
             pp_collision_name.getarr("product_species", product_species_name);
-
-            if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::hydrogen3>())
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "Linear Breit-Wheeler collisions must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (product_species1.AmIA<PhysicalSpecies::electron>() && product_species2.AmIA<PhysicalSpecies::positron>())
                 ||
-                (species1.AmIA<PhysicalSpecies::hydrogen3>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
-                )
-            {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    product_species_name.size() == 2u,
-                    "ERROR: Deuterium-tritium fusion must contain exactly two product species");
-                auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
-                auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    (product_species1.AmIA<PhysicalSpecies::helium4>() && product_species2.AmIA<PhysicalSpecies::neutron>())
-                    ||
-                    (product_species1.AmIA<PhysicalSpecies::neutron>() && product_species2.AmIA<PhysicalSpecies::helium4>()),
-                    "ERROR: Product species of deuterium-tritium fusion must be of type neutron and helium4");
-                return NuclearFusionType::DeuteriumTritiumToNeutronHelium;
-            }
-            else if (species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
-            {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    product_species_name.size() == 2u,
-                    "ERROR: Deuterium-deuterium fusion must contain exactly two product species");
-                auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
-                auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
-                if (
-                    (product_species1.AmIA<PhysicalSpecies::helium3>() && product_species2.AmIA<PhysicalSpecies::neutron>())
-                  ||(product_species1.AmIA<PhysicalSpecies::neutron>() && product_species2.AmIA<PhysicalSpecies::helium3>())){
-                    return NuclearFusionType::DeuteriumDeuteriumToNeutronHelium;
-                } else if (
-                    (product_species1.AmIA<PhysicalSpecies::hydrogen3>() && product_species2.AmIA<PhysicalSpecies::hydrogen1>())
-                  ||(product_species1.AmIA<PhysicalSpecies::hydrogen1>() && product_species2.AmIA<PhysicalSpecies::hydrogen3>())){
-                    return NuclearFusionType::DeuteriumDeuteriumToProtonTritium;
-                } else {
-                    WARPX_ABORT_WITH_MESSAGE("ERROR: Product species of deuterium-deuterium fusion must be of type helium3 and neutron, or hydrogen3 and hydrogen1");
-                }
-            }
-            else if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::helium3>())
-                ||
-                (species1.AmIA<PhysicalSpecies::helium3>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
-                )
-            {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    product_species_name.size() == 2u,
-                    "ERROR: Deuterium-helium fusion must contain exactly two product species");
-                auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
-                auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    (product_species1.AmIA<PhysicalSpecies::helium4>() && product_species2.AmIA<PhysicalSpecies::hydrogen1>())
-                    ||
-                    (product_species1.AmIA<PhysicalSpecies::hydrogen1>() && product_species2.AmIA<PhysicalSpecies::helium4>()),
-                    "ERROR: Product species of deuterium-helium fusion must be of type hydrogen1 and helium4");
-                return NuclearFusionType::DeuteriumHeliumToProtonHelium;
-            }
-            else if ((species1.AmIA<PhysicalSpecies::hydrogen1>() && species2.AmIA<PhysicalSpecies::boron11>())
-                ||
-                (species1.AmIA<PhysicalSpecies::boron11>() && species2.AmIA<PhysicalSpecies::hydrogen1>())
-                )
-            {
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    product_species_name.size() == 1,
-                    "ERROR: Proton-boron must contain exactly one product species");
-                auto& product_species = mypc->GetParticleContainerFromName(product_species_name[0]);
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    product_species.AmIA<PhysicalSpecies::helium4>(),
-                    "ERROR: Product species of proton-boron fusion must be of type helium4");
-                return NuclearFusionType::ProtonBoronToAlphas;
-            }
-            WARPX_ABORT_WITH_MESSAGE("Binary nuclear fusion not implemented between species " +
-                         species_names[0] + " of type " + species1.getSpeciesTypeName() +
-                         " and species " + species_names[1] + " of type " +
-                         species2.getSpeciesTypeName());
-            return NuclearFusionType::Undefined;
+                (product_species1.AmIA<PhysicalSpecies::positron>() && product_species2.AmIA<PhysicalSpecies::electron>()),
+                "Product species of linear Breit-Wheeler collisions must be of type electron and positron");
+            return CollisionType::LinearBreitWheeler;
         }
+        else if (type == "linear_compton") {
+            amrex::Vector<std::string> species_name;
+            // Check that the first incoming species is a photon and the second is an electron/positron
+            pp_collision_name.getarr("species", species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species_name.size() == 2u,
+                "Linear Compton collisions must involve exactly two species");
+            auto& species1 = mypc->GetParticleContainerFromName(species_name[0]);
+            auto& species2 = mypc->GetParticleContainerFromName(species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species1.AmIA<PhysicalSpecies::photon>(),
+                "The first species in linear Compton collisions must be a photon");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.AmIA<PhysicalSpecies::electron>() || species2.AmIA<PhysicalSpecies::positron>(),
+                "The second species in linear Compton collisions must be an electron or positron");
+            // Check that first product species is photon and second is electron/positron
+            amrex::Vector<std::string> product_species_name;
+            pp_collision_name.getarr("product_species", product_species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "Linear Compton collisions must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species1.AmIA<PhysicalSpecies::photon>(),
+                "The first product species in linear Compton collisions must be a photon");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( product_species2.AmIA<PhysicalSpecies::electron>() || product_species2.AmIA<PhysicalSpecies::positron>(),
+                "The second product species in linear Compton collisions must be an electron or positron");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( species2.getSpeciesTypeName() == product_species2.getSpeciesTypeName(),
+                "The second incident species and the second product species in linear Compton collisions must be of the same type");
+            return CollisionType::LinearCompton;
+        }
+        return CollisionType::Undefined;
+    }
 
-    CollisionType get_collision_type (const std::string collision_name,
-                                      MultiParticleContainer const * const mypc)
+    NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
+                                               MultiParticleContainer const * const mypc)
+    {
+        const amrex::ParmParse pp_collision_name(collision_name);
+        amrex::Vector<std::string> species_names;
+        pp_collision_name.getarr("species", species_names);
+        auto& species1 = mypc->GetParticleContainerFromName(species_names[0]);
+        auto& species2 = mypc->GetParticleContainerFromName(species_names[1]);
+        amrex::Vector<std::string> product_species_name;
+        pp_collision_name.getarr("product_species", product_species_name);
+
+        if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::hydrogen3>())
+            ||
+            (species1.AmIA<PhysicalSpecies::hydrogen3>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
+            )
         {
-            const amrex::ParmParse pp_collision_name(collision_name);
-            std::string type;
-            pp_collision_name.get("type", type);
-            if (type == "nuclearfusion") {
-                const NuclearFusionType fusion_type = get_nuclear_fusion_type(collision_name, mypc);
-                return nuclear_fusion_type_to_collision_type(fusion_type);
-            }
-            WARPX_ABORT_WITH_MESSAGE(type + " is not a valid type of collision that creates new particles");
-            return CollisionType::Undefined;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "ERROR: Deuterium-tritium fusion must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (product_species1.AmIA<PhysicalSpecies::helium4>() && product_species2.AmIA<PhysicalSpecies::neutron>())
+                ||
+                (product_species1.AmIA<PhysicalSpecies::neutron>() && product_species2.AmIA<PhysicalSpecies::helium4>()),
+                "ERROR: Product species of deuterium-tritium fusion must be of type neutron and helium4");
+            return NuclearFusionType::DeuteriumTritiumToNeutronHelium;
         }
+        else if (species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "ERROR: Deuterium-deuterium fusion must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            if (
+                (product_species1.AmIA<PhysicalSpecies::helium3>() && product_species2.AmIA<PhysicalSpecies::neutron>())
+                ||(product_species1.AmIA<PhysicalSpecies::neutron>() && product_species2.AmIA<PhysicalSpecies::helium3>())){
+                return NuclearFusionType::DeuteriumDeuteriumToNeutronHelium;
+            } else if (
+                (product_species1.AmIA<PhysicalSpecies::hydrogen3>() && product_species2.AmIA<PhysicalSpecies::hydrogen1>())
+                ||(product_species1.AmIA<PhysicalSpecies::hydrogen1>() && product_species2.AmIA<PhysicalSpecies::hydrogen3>())){
+                return NuclearFusionType::DeuteriumDeuteriumToProtonTritium;
+            } else {
+                WARPX_ABORT_WITH_MESSAGE("ERROR: Product species of deuterium-deuterium fusion must be of type helium3 and neutron, or hydrogen3 and hydrogen1");
+            }
+        }
+        else if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::helium3>())
+            ||
+            (species1.AmIA<PhysicalSpecies::helium3>() && species2.AmIA<PhysicalSpecies::hydrogen2>())
+            )
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 2u,
+                "ERROR: Deuterium-helium fusion must contain exactly two product species");
+            auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
+            auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (product_species1.AmIA<PhysicalSpecies::helium4>() && product_species2.AmIA<PhysicalSpecies::hydrogen1>())
+                ||
+                (product_species1.AmIA<PhysicalSpecies::hydrogen1>() && product_species2.AmIA<PhysicalSpecies::helium4>()),
+                "ERROR: Product species of deuterium-helium fusion must be of type hydrogen1 and helium4");
+            return NuclearFusionType::DeuteriumHeliumToProtonHelium;
+        }
+        else if ((species1.AmIA<PhysicalSpecies::hydrogen1>() && species2.AmIA<PhysicalSpecies::boron11>())
+            ||
+            (species1.AmIA<PhysicalSpecies::boron11>() && species2.AmIA<PhysicalSpecies::hydrogen1>())
+            )
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species_name.size() == 1,
+                "ERROR: Proton-boron must contain exactly one product species");
+            auto& product_species = mypc->GetParticleContainerFromName(product_species_name[0]);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product_species.AmIA<PhysicalSpecies::helium4>(),
+                "ERROR: Product species of proton-boron fusion must be of type helium4");
+            return NuclearFusionType::ProtonBoronToAlphas;
+        }
+        WARPX_ABORT_WITH_MESSAGE("Binary nuclear fusion not implemented between species " +
+                        species_names[0] + " of type " + species1.getSpeciesTypeName() +
+                        " and species " + species_names[1] + " of type " +
+                        species2.getSpeciesTypeName());
+        return NuclearFusionType::Undefined;
+    }
 
     CollisionType nuclear_fusion_type_to_collision_type (const NuclearFusionType fusion_type)
-        {
-            if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
-                return CollisionType::DeuteriumTritiumToNeutronHeliumFusion;
-            }
-            if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
-                return CollisionType::DeuteriumDeuteriumToProtonTritiumFusion;
-            }
-            if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
-                return CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion;
-            }
-            if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
-                return CollisionType::DeuteriumHeliumToProtonHeliumFusion;
-            }
-            if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
-                return CollisionType::ProtonBoronToAlphasFusion;
-            }
-            WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
-            return CollisionType::Undefined;
+    {
+        if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
+            return CollisionType::DeuteriumTritiumToNeutronHeliumFusion;
         }
+        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
+            return CollisionType::DeuteriumDeuteriumToProtonTritiumFusion;
+        }
+        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
+            return CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion;
+        }
+        if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
+            return CollisionType::DeuteriumHeliumToProtonHeliumFusion;
+        }
+        if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
+            return CollisionType::ProtonBoronToAlphasFusion;
+        }
+        WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
+        return CollisionType::Undefined;
+    }
 }

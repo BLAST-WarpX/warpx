@@ -6,8 +6,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PLASMA_INJECTOR_H_
-#define PLASMA_INJECTOR_H_
+#ifndef WARPX_PLASMA_INJECTOR_H_
+#define WARPX_PLASMA_INJECTOR_H_
 
 #include "InjectorDensity.H"
 #include "InjectorFlux.H"
@@ -25,10 +25,7 @@
 
 #include <AMReX_BaseFwd.H>
 
-#ifdef WARPX_USE_OPENPMD
-#   include <openPMD/openPMD.hpp>
-#endif
-
+#include <any>
 #include <limits>
 #include <memory>
 #include <string>
@@ -112,12 +109,18 @@ public:
     long npart;
     int do_symmetrize = 0;
     int symmetrization_order = 4;
+    bool do_focusing = false;
+    amrex::Real focal_distance;
+    bool do_rotation = false;
+    bool do_rotation_momenta = false;
+    amrex::Real rotation_angle;
+    amrex::Vector<amrex::Real> rotation_axis;
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
 #ifdef WARPX_USE_OPENPMD
     //! openPMD::Series to load from in external_file injection
-    std::unique_ptr<openPMD::Series> m_openpmd_input_series;
+    std::any m_openpmd_input_series;
 #endif
 
     amrex::Real surface_flux_pos; // surface location
@@ -130,7 +133,10 @@ public:
     int flux_direction; // -1 for left, +1 for right
     bool fixed_ppc_is_specified = false;
 
-    bool radially_weighted = true;
+    // With radial geometry, the number of particles per cell will be proportional to r**radial_numpercell_power
+    amrex::Real radial_numpercell_power;
+
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
 
     std::string str_flux_function;
 
@@ -201,4 +207,4 @@ protected:
     void parseFlux (amrex::ParmParse const& pp_species);
 };
 
-#endif
+#endif //WARPX_PLASMA_INJECTOR_H_

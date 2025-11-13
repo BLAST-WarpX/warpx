@@ -19,7 +19,7 @@ mkdir -p WORK
 # you can also clone your own fork here, eg git@github.com:<user>/WarpX.git
 if [ ! -d "$WORK/src/warpx" ]
 then
-    git clone https://github.com/ECP-WarpX/WarpX.git $WORK/src/warpx
+    git clone https://github.com/BLAST-WarpX/warpx.git $WORK/src/warpx
 fi
 
 # load required modules

@@ -17,12 +17,11 @@
 
 #include <string>
 
-ParticleCreationFunc::ParticleCreationFunc (const std::string collision_name,
-                                            MultiParticleContainer const * const mypc)
+ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
+                                            MultiParticleContainer const * const mypc):
+    m_collision_type{BinaryCollisionUtils::get_collision_type(collision_name, mypc)}
 {
     const amrex::ParmParse pp_collision_name(collision_name);
-
-    m_collision_type = BinaryCollisionUtils::get_collision_type(collision_name, mypc);
 
     if (m_collision_type == CollisionType::ProtonBoronToAlphasFusion)
     {
@@ -37,7 +36,9 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string collision_name,
     }
     else if ((m_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion)
              || (m_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
-             || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion))
+             || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
+             || (m_collision_type == CollisionType::LinearBreitWheeler)
+             || (m_collision_type == CollisionType::LinearCompton))
     {
         m_num_product_species = 2;
         m_num_products_host.push_back(1);

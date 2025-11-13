@@ -4,8 +4,11 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef GUARDCELLMANAGER_H_
-#define GUARDCELLMANAGER_H_
+#ifndef WARPX_GUARDCELLMANAGER_H_
+#define WARPX_GUARDCELLMANAGER_H_
+
+#include <Utils/WarpXAlgorithmSelection.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_IntVect.H>
@@ -31,17 +34,19 @@ public:
      * \param grid_type integer, whether the grid is collocated or staggered
      * \param do_moving_window bool, whether to use moving window
      * \param moving_window_dir direction of moving window
+     * \param particle_max_grid_crossings maximum number of grid crossings for particles
      * \param nox order of current deposition
      * \param nox_fft order of PSATD in x direction
      * \param noy_fft order of PSATD in y direction
      * \param noz_fft order of PSATD in z direction
      * \param nci_corr_stencil stencil of NCI corrector
      * \param electromagnetic_solver_id Integer corresponding to the type of Maxwell solver
+     * \param evolve_scheme The evolve scheme, whether it's explicit or implicit
      * \param max_level max level of the simulation
      * \param v_galilean Velocity used in the Galilean PSATD scheme
      * \param v_comoving Velocity used in the comoving PSATD scheme
      * \param safe_guard_cells Run in safe mode, exchanging more guard cells, and more often in the PIC loop (for debugging).
-     * \param do_multi_J Whether to use the multi-J PSATD scheme
+     * \param do_psatd_JRhom Whether to use the PSATD-JRhom scheme
      * \param fft_do_time_averaging Whether to average the E and B field in time (with PSATD) before interpolating them onto the macro-particles
      * \param do_pml whether pml is turned on (only used by RZ PSATD)
      * \param do_pml_in_domain whether pml is done in the domain (only used by RZ PSATD)
@@ -52,21 +57,23 @@ public:
      */
     void Init(
         amrex::Real dt,
-        amrex::RealVect dx,
+        const amrex::Real * dx,
         bool do_subcycling,
         bool do_fdtd_nci_corr,
-        short grid_type,
+        ablastr::utils::enums::GridType grid_type,
         bool do_moving_window,
         int moving_window_dir,
+        int particle_max_grid_crossings,
         int nox,
         int nox_fft, int noy_fft, int noz_fft,
         int nci_corr_stencil,
-        int electromagnetic_solver_id,
+        ElectromagneticSolverAlgo electromagnetic_solver_id,
+        EvolveScheme evolve_scheme,
         int max_level,
-        amrex::Vector<amrex::Real> v_galilean,
-        amrex::Vector<amrex::Real> v_comoving,
+        const amrex::Vector<amrex::Real>& v_galilean,
+        const amrex::Vector<amrex::Real>& v_comoving,
         bool safe_guard_cells,
-        int do_multi_J,
+        int do_psatd_JRhom,
         bool fft_do_time_averaging,
         bool do_pml,
         int do_pml_in_domain,
@@ -108,4 +115,4 @@ public:
     amrex::IntVect ng_depos_rho = amrex::IntVect::TheZeroVector();
 };
 
-#endif // GUARDCELLMANAGER_H_
+#endif // WARPX_GUARDCELLMANAGER_H_

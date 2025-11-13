@@ -24,7 +24,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleNumber(std::string rd_name);
+    ParticleNumber(const std::string& rd_name);
 
     /**
      * This function computes the total number of macroparticles and physical particles of each

@@ -21,10 +21,10 @@ module load ninja
 module load nano
 
 # optional: for PSATD in RZ geometry support
-export CMAKE_PREFIX_PATH=${HOME}/sw/crusher/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${HOME}/sw/crusher/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/crusher/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${HOME}/sw/crusher/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/crusher/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${HOME}/sw/crusher/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/crusher/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${HOME}/sw/crusher/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
 module load boost/1.79.0-cxx17

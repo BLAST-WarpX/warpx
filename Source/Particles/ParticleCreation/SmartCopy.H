@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef SMART_COPY_H_
-#define SMART_COPY_H_
+#ifndef WARPX_SMART_COPY_H_
+#define WARPX_SMART_COPY_H_
 
 #include "DefaultInitialization.H"
 #include "SmartUtils.H"
@@ -26,7 +26,7 @@
  * type. Second, if a given component name is found in both the src
  * and the dst, then the src value is copied.
  *
- * Particle structs - positions and id numbers  - are always copied.
+ * Particle positions and id numbers are always copied.
  *
  * You don't create this directly - use the SmartCopyFactory object below.
  */
@@ -48,9 +48,6 @@ struct SmartCopy
     void operator() (DstData& dst, const SrcData& src, int i_src, int i_dst,
                      amrex::RandomEngine const& engine) const noexcept
     {
-        // the particle struct is always copied over
-        dst.m_aos[i_dst] = src.m_aos[i_src];
-
         // initialize the real components
         for (int j = 0; j < DstData::NAR; ++j) {
             dst.m_rdata[j][i_dst] = initializeRealValue(m_policy_real[j], engine);
@@ -143,10 +140,10 @@ class SmartCopyFactory
 public:
     template <class SrcPC, class DstPC>
     SmartCopyFactory (const SrcPC& src, const DstPC& dst) noexcept :
-        m_tag_real{getSmartCopyTag(src.getParticleComps(), dst.getParticleComps())},
-        m_tag_int{getSmartCopyTag(src.getParticleiComps(), dst.getParticleiComps())},
-        m_policy_real{getPolicies(dst.getParticleComps())},
-        m_policy_int{getPolicies(dst.getParticleiComps())},
+        m_tag_real{getSmartCopyTag(src.GetRealSoANames(), dst.GetRealSoANames())},
+        m_tag_int{getSmartCopyTag(src.GetIntSoANames(), dst.GetIntSoANames())},
+        m_policy_real{getPolicies(dst.GetRealSoANames())},
+        m_policy_int{getPolicies(dst.GetIntSoANames())},
         m_defined{true}
     {}
 
@@ -166,4 +163,4 @@ public:
     [[nodiscard]] bool isDefined () const noexcept { return m_defined; }
 };
 
-#endif
+#endif //WARPX_SMART_COPY_H_

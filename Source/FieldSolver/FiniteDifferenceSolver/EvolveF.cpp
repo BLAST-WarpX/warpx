@@ -6,17 +6,19 @@
  */
 #include "FiniteDifferenceSolver.H"
 
-#ifndef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#elif defined(WARPX_DIM_RSPHERE)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
+#else
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 #   include "WarpX.H"
 #endif
 
@@ -44,31 +46,36 @@ using namespace amrex;
  * \brief Update the F field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveF (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    int const rhocomp,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const& Efield,
+    amrex::MultiFab* const rhofield,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
 
-        EvolveFCylindrical <CylindricalYeeAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCylindrical <CylindricalYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
+
+#elif defined(WARPX_DIM_RSPHERE)
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
+
+        EvolveFSpherical <SphericalYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
 #else
     if (m_grid_type == GridType::Collocated) {
 
-        EvolveFCartesian <CartesianNodalAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianNodalAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
 
-        EvolveFCartesian <CartesianYeeAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianYeeAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
-        EvolveFCartesian <CartesianCKCAlgorithm> ( Ffield, Efield, rhofield, rhocomp, dt );
+        EvolveFCartesian <CartesianCKCAlgorithm> ( Ffield, Efield, rhofield, rho_comp, dt );
 
 #endif
     } else {
@@ -78,14 +85,14 @@ void FiniteDifferenceSolver::EvolveF (
 }
 
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCartesian (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    int const rhocomp,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const Efield,
+    amrex::MultiFab* const rhofield,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -112,14 +119,14 @@ void FiniteDifferenceSolver::EvolveFCartesian (
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
 
-        Real constexpr inv_epsilon0 = 1._rt/PhysConst::ep0;
+        Real constexpr inv_epsilon0 = 1._rt/PhysConst::epsilon_0;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(tf,
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 F(i, j, k) += dt * (
-                    - rho(i, j, k, rhocomp) * inv_epsilon0
+                    - rho(i, j, k, rho_comp) * inv_epsilon0
                     + T_Algo::DownwardDx(Ex, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDy(Ey, coefs_y, n_coefs_y, i, j, k)
                     + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, k) );
@@ -131,14 +138,14 @@ void FiniteDifferenceSolver::EvolveFCartesian (
 
 }
 
-#else // corresponds to ifndef WARPX_DIM_RZ
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveFCylindrical (
-    std::unique_ptr<amrex::MultiFab>& Ffield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::unique_ptr<amrex::MultiFab> const& rhofield,
-    int const rhocomp,
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab* const rhofield,
+    int const rho_comp,
     amrex::Real const dt ) {
 
     // Loop through the grids, and over the tiles within each grid
@@ -148,7 +155,7 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
     for ( MFIter mfi(*Ffield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
         // Extract field data for this grid/tile
-        Array4<Real> F = Ffield->array(mfi);
+        const Array4<Real> F = Ffield->array(mfi);
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Et = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);
@@ -168,13 +175,13 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
 
-        Real constexpr inv_epsilon0 = 1./PhysConst::ep0;
+        Real constexpr inv_epsilon0 = 1./PhysConst::epsilon_0;
 
         // Use the right shift in components:
-        // - the first WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho old (i.e. rhocomp=0)
-        // - the next WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho new (i.e. rhocomp=1)
+        // - the first WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho old (i.e. rho_comp=0)
+        // - the next WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho new (i.e. rho_comp=1)
         int rho_shift = 0;
-        if (rhocomp == 1) {
+        if (rho_comp == 1) {
             rho_shift = WarpX::ncomps;
         }
 
@@ -221,4 +228,70 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
 
 }
 
-#endif // corresponds to ifndef WARPX_DIM_RZ
+#elif defined(WARPX_DIM_RSPHERE)
+
+template<typename T_Algo>
+void FiniteDifferenceSolver::EvolveFSpherical (
+    amrex::MultiFab* Ffield,
+    ablastr::fields::VectorField const & Efield,
+    amrex::MultiFab* const rhofield,
+    int const rho_comp,
+    amrex::Real const dt ) {
+
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Ffield, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+
+        // Extract field data for this grid/tile
+        const Array4<Real> F = Ffield->array(mfi);
+        Array4<Real> const& Er = Efield[0]->array(mfi);
+        Array4<Real> const& rho = rhofield->array(mfi);
+
+        // Extract stencil coefficients
+        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
+        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
+
+        // Extract spherical specific parameters
+        Real const dr = m_dr;
+        Real const rmin = m_rmin;
+
+        // Extract tileboxes for which to loop
+        Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
+
+        Real constexpr inv_epsilon0 = 1./PhysConst::epsilon_0;
+
+        // Use the right shift in components:
+        // - the first component corresponds to rho old (i.e. rho_comp=0)
+        // - the next component corresponds to rho new (i.e. rho_comp=1)
+        int rho_shift = 0;
+        if (rho_comp == 1) {
+            rho_shift = WarpX::ncomps;
+        }
+
+        // Loop over the cells and update the fields
+        amrex::ParallelFor(tf,
+
+            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                Real const r = rmin + i*dr; // r on a nodal grid (F is nodal in r)
+                if (r != 0) { // Off-axis, regular equations
+                    F(i, j, 0, 0) += dt * (
+                        - rho(i, j, 0, rho_shift) * inv_epsilon0
+                        + T_Algo::DownwardDrr2_over_r2(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 0) );
+                } else { // r==0: on-axis corrections
+                    // Er is linear in r, for small r
+                    // Therefore, the formula below regularizes the singularity
+                    F(i, j, 0, 0) += dt * (
+                        - rho(i, j, 0, rho_shift) * inv_epsilon0
+                         + 6._rt*Er(i, j, 0, 0)/dr); // regularization
+                }
+            }
+
+        ); // end of loop over cells
+
+    } // end of loop over grid/tiles
+
+}
+
+#endif

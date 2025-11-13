@@ -1,0 +1,83 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+## With these parameters, each cell has a size of exactly 1 by 1 by 1
+max_step = 1
+amr.n_cell = 8 8 16
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo     = 0.    0.    0.
+geometry.prob_hi     = 8.    8.   16.
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.cfl = 1.0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = deuterium_1 hydrogen2_1 helium3_1 neutron_1
+my_constants.m_deuterium = 2.01410177812*m_u
+my_constants.keV_to_J = 1.e3*q_e
+my_constants.Energy_step = 22. * keV_to_J
+
+deuterium_1.species_type = deuterium
+deuterium_1.injection_style = "NRandomPerCell"
+deuterium_1.num_particles_per_cell = 10000
+deuterium_1.profile = constant
+deuterium_1.density = 1.
+deuterium_1.momentum_distribution_type = "parse_momentum_function"
+deuterium_1.momentum_function_ux(x,y,z) = 0.
+deuterium_1.momentum_function_uy(x,y,z) = 0.
+deuterium_1.momentum_function_uz(x,y,z) = sqrt(m_deuterium*Energy_step*(floor(z)**2))/(m_deuterium*clight)
+deuterium_1.do_not_push = 1
+deuterium_1.do_not_deposit = 1
+
+hydrogen2_1.species_type = deuterium
+hydrogen2_1.injection_style = "NRandomPerCell"
+hydrogen2_1.num_particles_per_cell = 10000
+hydrogen2_1.profile = constant
+hydrogen2_1.density = 1.
+hydrogen2_1.momentum_distribution_type = "parse_momentum_function"
+hydrogen2_1.momentum_function_ux(x,y,z) = 0.
+hydrogen2_1.momentum_function_uy(x,y,z) = 0.
+hydrogen2_1.momentum_function_uz(x,y,z) = -sqrt(m_deuterium*Energy_step*(floor(z)**2))/(m_deuterium*clight)
+hydrogen2_1.do_not_push = 1
+hydrogen2_1.do_not_deposit = 1
+
+helium3_1.species_type = helium3
+helium3_1.do_not_push = 1
+helium3_1.do_not_deposit = 1
+
+neutron_1.species_type = neutron
+neutron_1.do_not_push = 1
+neutron_1.do_not_deposit = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = DDNHeF1
+
+DDNHeF1.species = deuterium_1 hydrogen2_1
+DDNHeF1.product_species = helium3_1 neutron_1
+DDNHeF1.type = nuclearfusion
+DDNHeF1.event_multiplier = 1.e50
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = rho

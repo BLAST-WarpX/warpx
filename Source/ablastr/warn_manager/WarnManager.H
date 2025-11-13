@@ -84,9 +84,9 @@ namespace ablastr::warn_manager
         * @param[in] priority priority of the warning message ("medium" by default)
          */
         void RecordWarning(
-            std::string topic,
-            std::string text,
-            WarnPriority priority = WarnPriority::medium);
+            const std::string& topic,
+            const std::string& text,
+            const WarnPriority& priority = WarnPriority::medium);
 
         /**
         * \brief This function prints all the warning messages collected on the present MPI rank
@@ -225,9 +225,9 @@ namespace ablastr::warn_manager
     * @param[in] priority priority of the warning message ("medium" by default)
     */
     void WMRecordWarning(
-        std::string topic,
-        std::string text,
-        WarnPriority priority = WarnPriority::medium);
+        const std::string& topic,
+        const std::string& text,
+        const WarnPriority& priority = WarnPriority::medium);
 }
 
 #endif //ABLASTR_WARN_MANAGER_H_

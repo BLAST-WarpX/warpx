@@ -5,6 +5,8 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #include "SpectralBaseAlgorithm.H"
 
+#include <ablastr/utils/Enums.H>
+
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -14,7 +16,7 @@
 #include <array>
 #include <memory>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
 /* \brief Class that updates the field in spectral space and stores the coefficients
  * of the corresponding update equation, according to the comoving spectral scheme.
@@ -32,7 +34,7 @@ class PsatdAlgorithmComoving : public SpectralBaseAlgorithm
                                 int norder_x,
                                 int norder_y,
                                 int norder_z,
-                                short grid_type,
+                                ablastr::utils::enums::GridType grid_type,
                                 const amrex::Vector<amrex::Real>& v_comoving,
                                 amrex::Real dt,
                                 bool update_with_rho);
@@ -86,5 +88,5 @@ class PsatdAlgorithmComoving : public SpectralBaseAlgorithm
         amrex::Real m_dt;
 };
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_PSATD_ALGORITHM_COMOVING_H_

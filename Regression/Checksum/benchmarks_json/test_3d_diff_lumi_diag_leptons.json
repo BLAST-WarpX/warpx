@@ -1,0 +1,24 @@
+{
+  "lev=0": {
+    "rho_beam1": 656097730.398061,
+    "rho_beam2": 656073566.2600528
+  },
+  "beam2": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.3357156607472946e-11,
+    "particle_position_x": 0.07980004798883583,
+    "particle_position_y": 0.0015964156825818534,
+    "particle_position_z": 240184.81987149065,
+    "particle_weight": 11997240000.0
+  },
+  "beam1": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.3357730733347833e-11,
+    "particle_position_x": 0.0796200211671279,
+    "particle_position_y": 0.001592794429510446,
+    "particle_position_z": 239913.37896451252,
+    "particle_weight": 11997780000.0
+  }
+}

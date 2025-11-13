@@ -15,7 +15,7 @@
 void init_MultiParticleContainer (py::module& m)
 {
     py::class_<MultiParticleContainer>(m, "MultiParticleContainer")
-        .def("get_particle_container_from_name",
+        .def("get",
             &MultiParticleContainer::GetParticleContainerFromName,
             py::arg("name"),
             py::return_value_policy::reference_internal
@@ -41,6 +41,13 @@ i_lens: int
   Index of the lens to be modified
 strength_E, strength_B: floats
   The electric and magnetic focusing strength of the lens)pbdoc"
+        )
+
+        .def("get_charge_density",
+            [](MultiParticleContainer& mpc, int lev, bool local) {
+                return mpc.GetChargeDensity(lev, local);
+            },
+            py::arg("lev"), py::arg("local")
         )
     ;
 }

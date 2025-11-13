@@ -26,7 +26,7 @@
 
 #include <cmath>
 
-#if WARPX_USE_PSATD
+#if WARPX_USE_FFT
 
 using namespace amrex;
 
@@ -37,7 +37,7 @@ PsatdAlgorithmPml::PsatdAlgorithmPml(
         int norder_x,
         int norder_y,
         int norder_z,
-        short grid_type,
+        ablastr::utils::enums::GridType grid_type,
         const amrex::Vector<amrex::Real>& v_galilean,
         Real dt,
         bool dive_cleaning,
@@ -410,11 +410,11 @@ void PsatdAlgorithmPml::InitializeSpectralCoefficients (
         }
 
         // Extract Galilean velocity
-        amrex::Real vg_x = m_v_galilean[0];
+        const amrex::Real vg_x = m_v_galilean[0];
 #if defined(WARPX_DIM_3D)
-        amrex::Real vg_y = m_v_galilean[1];
+        const amrex::Real vg_y = m_v_galilean[1];
 #endif
-        amrex::Real vg_z = m_v_galilean[2];
+        const amrex::Real vg_z = m_v_galilean[2];
 
         // Loop over indices within one box
         ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
@@ -466,4 +466,4 @@ void PsatdAlgorithmPml::VayDeposition (SpectralFieldData& /*field_data*/)
     WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented for PML PSATD");
 }
 
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT

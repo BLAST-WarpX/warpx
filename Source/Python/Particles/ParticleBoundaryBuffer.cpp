@@ -10,13 +10,13 @@
 
 namespace warpx {
     class BoundaryBufferParIter
-        : public amrex::ParIter<0,0,PIdx::nattribs,0,amrex::PinnedArenaAllocator>
+        : public amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>
     {
     public:
-        using amrex::ParIter<0,0,PIdx::nattribs,0,amrex::PinnedArenaAllocator>::ParIter;
+        using amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>::ParIterSoA;
 
         BoundaryBufferParIter(ContainerType& pc, int level) :
-            amrex::ParIter<0,0,PIdx::nattribs,0,amrex::PinnedArenaAllocator>(pc, level) {}
+            amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>(pc, level) {}
     };
 }
 
@@ -24,9 +24,9 @@ void init_BoundaryBufferParIter (py::module& m)
 {
     py::class_<
         warpx::BoundaryBufferParIter,
-        amrex::ParIter<0,0,PIdx::nattribs,0,amrex::PinnedArenaAllocator>
+        amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>
     >(m, "BoundaryBufferParIter")
-        .def(py::init<amrex::ParIter<0,0,PIdx::nattribs,0,amrex::PinnedArenaAllocator>::ContainerType&, int>(),
+        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>::ContainerType&, int>(),
             py::arg("particle_container"), py::arg("level")
         )
     ;

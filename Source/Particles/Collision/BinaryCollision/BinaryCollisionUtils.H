@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef BINARY_COLLISION_UTILS_H_
-#define BINARY_COLLISION_UTILS_H_
+#ifndef WARPX_BINARY_COLLISION_UTILS_H_
+#define WARPX_BINARY_COLLISION_UTILS_H_
 
 #include <string>
 
@@ -19,6 +19,11 @@ enum struct CollisionType { DeuteriumTritiumToNeutronHeliumFusion,
                             DeuteriumDeuteriumToNeutronHeliumFusion,
                             DeuteriumHeliumToProtonHeliumFusion,
                             ProtonBoronToAlphasFusion,
+                            Bremsstrahlung,
+                            DSMC,
+                            PairwiseCoulomb,
+                            LinearBreitWheeler,
+                            LinearCompton,
                             Undefined };
 
 enum struct NuclearFusionType {
@@ -31,10 +36,10 @@ enum struct NuclearFusionType {
 
 namespace BinaryCollisionUtils{
 
-    NuclearFusionType get_nuclear_fusion_type (std::string collision_name,
+    NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
                                                MultiParticleContainer const * mypc);
 
-    CollisionType get_collision_type (std::string collision_name,
+    CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
 
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type);
@@ -46,9 +51,9 @@ namespace BinaryCollisionUtils{
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void get_collision_parameters (
-        const amrex::ParticleReal& u1x, const amrex::ParticleReal& u1y,
-        const amrex::ParticleReal& u1z, const amrex::ParticleReal& u2x,
-        const amrex::ParticleReal& u2y, const amrex::ParticleReal& u2z,
+        const amrex::ParticleReal& p1x, const amrex::ParticleReal& p1y,
+        const amrex::ParticleReal& p1z, const amrex::ParticleReal& p2x,
+        const amrex::ParticleReal& p2y, const amrex::ParticleReal& p2z,
         const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
         amrex::ParticleReal& E_kin_COM, amrex::ParticleReal& v_rel_COM,
         amrex::ParticleReal& lab_to_COM_lorentz_factor )
@@ -60,70 +65,108 @@ namespace BinaryCollisionUtils{
         using namespace amrex::literals;
         using namespace amrex::Math;
 
-        constexpr auto one_pr = amrex::ParticleReal(1.);
-        constexpr auto inv_four_pr = amrex::ParticleReal(1./4.);
+        constexpr double c = PhysConst::c;
         constexpr double c_sq = PhysConst::c * PhysConst::c;
-        constexpr double inv_csq = 1.0 / c_sq;
+        constexpr double inv_c = 1./PhysConst::c;
 
-        const amrex::ParticleReal m1_sq = m1*m1;
-        const amrex::ParticleReal m2_sq = m2*m2;
-
-        // Compute Lorentz factor gamma in the lab frame
-        const double g1 = std::sqrt( 1.0 + static_cast<double>(u1x*u1x+u1y*u1y+u1z*u1z)*inv_csq );
-        const double g2 = std::sqrt( 1.0 + static_cast<double>(u2x*u2x+u2y*u2y+u2z*u2z)*inv_csq );
-
-        // Compute momenta
-        const amrex::ParticleReal p1x = u1x * m1;
-        const amrex::ParticleReal p1y = u1y * m1;
-        const amrex::ParticleReal p1z = u1z * m1;
-        const amrex::ParticleReal p2x = u2x * m2;
-        const amrex::ParticleReal p2y = u2y * m2;
-        const amrex::ParticleReal p2z = u2z * m2;
-        // Square norm of the total (sum between the two particles) momenta in the lab frame
-        const auto p_total_sq = static_cast<double>(
-            powi<2>(p1x + p2x) + powi<2>(p1y + p2y) + powi<2>(p1z + p2z)
-        );
-
-        // Total energy in the lab frame
-        // Note the use of `double` for energy since this calculation is
-        // prone to error with single precision.
+        // Cast input parameters to double before computing collision properties
+        // This is needed to avoid errors when using single-precision particles
         const auto m1_dbl = static_cast<double>(m1);
         const auto m2_dbl = static_cast<double>(m2);
-        const double E_lab = (m1_dbl * g1 + m2_dbl * g2) * c_sq;
+        const auto p1x_dbl = static_cast<double>(p1x);
+        const auto p1y_dbl = static_cast<double>(p1y);
+        const auto p1z_dbl = static_cast<double>(p1z);
+        const auto p2x_dbl = static_cast<double>(p2x);
+        const auto p2y_dbl = static_cast<double>(p2y);
+        const auto p2z_dbl = static_cast<double>(p2z);
+
+        const double m1_sq = m1_dbl*m1_dbl;
+        const double m2_sq = m2_dbl*m2_dbl;
+
+        // Square norm of the total (sum between the two particles) momenta in the lab frame
+        const double p_total_sq = powi<2>(p1x_dbl + p2x_dbl) + powi<2>(p1y_dbl + p2y_dbl) + powi<2>(p1z_dbl + p2z_dbl);
+
+        // Total energy in the lab frame
+        // Note the use of `double` for energy since this calculation is prone to error with single precision.
+        const double E1_lab = std::sqrt( m1_sq * c_sq + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * c;
+        const double E2_lab = std::sqrt( m2_sq * c_sq + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * c;
+        const double E_lab = E1_lab + E2_lab;
         // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
         // of the four-momentum norm
         const double E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
 
         // Kinetic energy in the center of mass frame
         const double E_star = std::sqrt(E_star_sq);
+
+        // Cast back to chosen precision for output
         E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c_sq);
 
-        // Square of the norm of the momentum of one of the particles in the center of mass frame
-        // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
-        // The expression below is specifically written in a form that avoids returning
-        // small negative numbers due to machine precision errors, for low-energy particles
-        const auto E_ratio = static_cast<amrex::ParticleReal>(E_star/((m1 + m2)*c_sq));
-        const auto p_star_sq = static_cast<amrex::ParticleReal>(
-            m1*m2*c_sq * ( powi<2>(E_ratio) - one_pr )
-            + powi<2>(m1 - m2)*c_sq*inv_four_pr * powi<2>( E_ratio - 1._prt/E_ratio)
-        );
+        // Find the norm of the momentum of each particles in the center of mass frame
+        // This is done by solving the following system (in the COM frame)
+        // E_1^2 = p^2 c^2 + m_1^2 c^4  (for the first particle)
+        // E_2^2 = p^2 c^2 + m_2^2 c^4  (for the second particle ; same p since we are in the COM frame)
+        // to find the expression of the p as a function of E = E_1 + E_2.
+        // Here is an abbreviation derivation:
+        // - By summing the above equations
+        // E^2 = E_1^2 + E_2^2 + 2 E_1 E_2 = 2 p^2 c^2 + (m_1^2 + m_2^2) c^4 + 2 E_1 E_2
+        // - Rearranging and squaring
+        // ( E^2 - 2 p^2 c^2 - (m_1^2 + m_2^2) c^4 )^2 = 4 E_1^2 E_2^2 = 4 (p^2 c^2 + m_1^2 c^4) (p^2 c^2 + m_2^2 c^4)
+        // - By rearranging, we get:
+        // p^2 = E^2/4c^2 - (m_1^2 + m_2^2)c^2/2 + (m_1^2-m_2^2)^2 c^6/4E^2
+        double p_star_sq;
+        if (m1_dbl + m2_dbl == 0) {
+            p_star_sq = powi<2>( 0.5 * E_star * inv_c );
+        } else {
+            // The expression below is specifically written in a form that avoids returning
+            // small negative numbers due to machine precision errors, for low-energy particles
+            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c_sq);
+            p_star_sq = m1_dbl*m2_dbl*c_sq * ( powi<2>(E_ratio) - 1.0 )
+                + powi<2>(m1_dbl - m2_dbl)*c_sq/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
+        }
 
-        // Lorentz factors in the center of mass frame
-        const auto g1_star = std::sqrt(one_pr + p_star_sq / static_cast<amrex::ParticleReal>(m1_sq*c_sq));
-        const auto g2_star = std::sqrt(one_pr + p_star_sq / static_cast<amrex::ParticleReal>(m2_sq*c_sq));
+        // Energy of each particle in the center of mass frame
+        const double E1_star = std::sqrt(m1_sq*c_sq + p_star_sq) * c;
+        const double E2_star = std::sqrt(m2_sq*c_sq + p_star_sq) * c;
 
-        // relative velocity in the center of mass frame
-        v_rel_COM = std::sqrt(p_star_sq) * (one_pr/(m1*g1_star) + one_pr/(m2*g2_star));
+        // relative velocity in the center of mass frame, cast back to chosen precision
+        v_rel_COM = PhysConst::c * static_cast<amrex::ParticleReal>(std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
 
         // Cross sections and relative velocity are computed in the center of mass frame.
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.
-        // To take this disrepancy into account, it is needed to multiply the
+        // To take this discrepancy into account, it is needed to multiply the
         // collision probability by the ratio between the Lorentz factors in the
-        // COM frame and the Lorentz factors in the lab frame (see
-        // Perez et al., Phys.Plasmas.19.083104 (2012)). The correction factor
-        // is calculated here.
-        lab_to_COM_lorentz_factor = g1_star*g2_star/static_cast<amrex::ParticleReal>(g1*g2);
+        // COM frame and the Lorentz factors in the lab frame (see Perez et al.,
+        // Phys.Plasmas.19.083104 (2012)). The correction factor is calculated here.
+        lab_to_COM_lorentz_factor = static_cast<amrex::ParticleReal>(E1_star*E2_star/(E1_lab*E2_lab));
+    }
+
+    /**
+     * \brief Subtract given weight from particle and set its ID to invalid
+     * if the weight reaches zero.
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void remove_weight_from_colliding_particle (
+        amrex::ParticleReal& weight, uint64_t& idcpu,
+        const amrex::ParticleReal reaction_weight )
+    {
+        // Remove weight from given particle
+        amrex::Gpu::Atomic::AddNoRet(&weight, -reaction_weight);
+
+        // If the colliding particle weight decreases to zero, remove particle by
+        // setting its id to invalid
+        if (weight <= std::numeric_limits<amrex::ParticleReal>::min())
+        {
+#if defined(AMREX_USE_OMP)
+#pragma omp atomic write
+            idcpu = amrex::ParticleIdCpus::Invalid;
+#else
+            amrex::Gpu::Atomic::Exch(
+                (unsigned long long *)&idcpu,
+                (unsigned long long)amrex::ParticleIdCpus::Invalid
+            );
+#endif
+        }
     }
 }
 
-#endif // BINARY_COLLISION_UTILS_H_
+#endif // WARPX_BINARY_COLLISION_UTILS_H_

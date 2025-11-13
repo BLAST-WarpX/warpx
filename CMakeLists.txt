@@ -1,7 +1,11 @@
+# Parse WarpX version information
+file(READ "${CMAKE_CURRENT_LIST_DIR}/dependencies.json" dependencies_data)
+string(JSON warpx_version GET "${dependencies_data}" version_warpx)
+
 # Preamble ####################################################################
 #
-cmake_minimum_required(VERSION 3.20.0)
-project(WarpX VERSION 23.12)
+cmake_minimum_required(VERSION 3.24.0)
+project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -16,18 +20,17 @@ endif()
 
 # CMake policies ##############################################################
 #
+# Setting a cmake_policy to OLD is deprecated by definition and will raise a
+# verbose warning
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+endif()
+
 # AMReX 21.06+ supports CUDA_ARCHITECTURES with CMake 3.20+
 # CMake 3.18+: CMAKE_CUDA_ARCHITECTURES
 # https://cmake.org/cmake/help/latest/policy/CMP0104.html
 if(POLICY CMP0104)
     cmake_policy(SET CMP0104 OLD)
-endif()
-
-# We use simple syntax in cmake_dependent_option, so we are compatible with the
-# extended syntax in CMake 3.22+
-# https://cmake.org/cmake/help/v3.22/policy/CMP0127.html
-if(POLICY CMP0127)
-    cmake_policy(SET CMP0127 NEW)
 endif()
 
 
@@ -43,7 +46,15 @@ set_cxx17_superbuild()
 # this is an optional tool that stores compiled object files; allows fast
 # re-builds even with "make clean" in between. Mainly used to store AMReX
 # objects
-set_ccache()
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(WarpX_CCACHE_DEFAULT ON)
+else()
+    set(WarpX_CCACHE_DEFAULT OFF)  # we are a subproject in a superbuild
+endif()
+option(WarpX_CCACHE "Enable ccache for faster rebuilds" ${WarpX_CCACHE_DEFAULT})
+if(WarpX_CCACHE)
+    set_ccache()
+endif()
 
 
 # Output Directories ##########################################################
@@ -60,21 +71,40 @@ set_default_install_dirs()
 include(CMakeDependentOption)
 option(WarpX_APP           "Build the WarpX executable application"     ON)
 option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
-option(WarpX_EB            "Embedded boundary support"                  OFF)
-cmake_dependent_option(WarpX_GPUCLOCK
-                           "Add GPU kernel timers (cost function)"      ON
-                           "WarpX_COMPUTE STREQUAL CUDA OR WarpX_COMPUTE STREQUAL HIP" OFF)
+option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
+option(WarpX_EB            "Embedded boundary support"                  ON)
 option(WarpX_LIB           "Build WarpX as a library"                   OFF)
 option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
+option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
 option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
-option(WarpX_PSATD         "spectral solver support"                    OFF)
+option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
+option(WarpX_FFT           "FFT-based solvers"                          OFF)
 option(WarpX_PYTHON        "Python bindings"                            OFF)
 option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
-option(WarpX_QED           "QED support (requires PICSAR)"                    ON)
-option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)" OFF)
+option(WarpX_QED           "QED support (requires PICSAR)"              ON)
+option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
+                                                                        OFF)
+option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
+                                                                        OFF)
 
-set(WarpX_DIMS_VALUES 1 2 3 RZ)
-set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ>")
+# Advanced option to run tests
+option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
+option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
+option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
+mark_as_advanced(WarpX_TEST_CLEANUP)
+mark_as_advanced(WarpX_TEST_DEBUGGER)
+mark_as_advanced(WarpX_TEST_FPETRAP)
+
+# Advanced option to compile with the -g1 option for minimal debug symbols
+# (useful to see, e.g., line numbers in backtraces)
+option(WarpX_BACKTRACE_INFO "Compile with -g1 for minimal debug symbols (currently used in CI tests)" OFF)
+mark_as_advanced(WarpX_BACKTRACE_INFO)
+if(WarpX_BACKTRACE_INFO)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
+endif()
+
+set(WarpX_DIMS_VALUES 1 2 3 RZ RCYLINDER RSPHERE)
+set(WarpX_DIMS 3 CACHE STRING "Simulation dimensionality <1;2;3;RZ;RCYLINDER;RSPHERE>")
 list(REMOVE_DUPLICATES WarpX_DIMS)
 foreach(D IN LISTS WarpX_DIMS)
     if(NOT D IN_LIST WarpX_DIMS_VALUES)
@@ -103,6 +133,13 @@ if(NOT WarpX_PARTICLE_PRECISION IN_LIST WarpX_PARTICLE_PRECISION_VALUES)
     message(FATAL_ERROR "WarpX_PARTICLE_PRECISION (${WarpX_PARTICLE_PRECISION}) must be one of ${WarpX_PARTICLE_PRECISION_VALUES}")
 endif()
 
+set(WarpX_QED_TABLES_GEN_OMP_VALUES AUTO ON OFF)
+set(WarpX_QED_TABLES_GEN_OMP AUTO CACHE STRING "Enables OpenMP support for QED lookup tables generation (AUTO/ON/OFF)")
+set_property(CACHE WarpX_QED_TABLES_GEN_OMP PROPERTY STRINGS ${WarpX_QED_TABLES_GEN_OMP_VALUES})
+if(NOT WarpX_QED_TABLES_GEN_OMP IN_LIST WarpX_QED_TABLES_GEN_OMP_VALUES)
+    message(FATAL_ERROR "WarpX_QED_TABLES_GEN_OMP (${WarpX_QED_TABLES_GEN_OMP}) must be one of ${WarpX_QED_TABLES_GEN_OMP_VALUES}")
+endif()
+
 set(WarpX_COMPUTE_VALUES NOACC OMP CUDA SYCL HIP)
 set(WarpX_COMPUTE OMP CACHE STRING "On-node, accelerated computing backend (NOACC/OMP/CUDA/SYCL/HIP)")
 set_property(CACHE WarpX_COMPUTE PROPERTY STRINGS ${WarpX_COMPUTE_VALUES})
@@ -120,11 +157,24 @@ set_default_build_type("Release")
 
 # Option to enable interprocedural optimization
 # (also know as "link-time optimization" or "whole program optimization")
-option(WarpX_IPO                                "Compile WarpX with interprocedural optimization (will take more time)" OFF)
+set(_WarpX_IPO_DEFAULT OFF)
+set(_WarpX_PYTHON_IPO_DEFAULT ON)
+if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+    set(_WarpX_IPO_DEFAULT ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
+    set(_WarpX_PYTHON_IPO_DEFAULT ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
+endif()
+option(WarpX_IPO
+    "Compile WarpX with interprocedural optimization (will take more time)"
+    ${_WarpX_IPO_DEFAULT}
+)
 option(WarpX_PYTHON_IPO
     "Compile Python bindings with interprocedural optimization (IPO) / link-time optimization (LTO)"
-    ON
+    ${_WarpX_PYTHON_IPO_DEFAULT}
 )
+
+# Unity builds combine all .cpp files into a single one (a single translation
+# unit, TU).
+option(WarpX_UNITY_BUILD          "WarpX library as unity build" OFF)
 
 set(pyWarpX_VERSION_INFO "" CACHE STRING
     "PEP-440 conformant version (set by setup.py)")
@@ -134,6 +184,14 @@ if(WarpX_APP OR WarpX_PYTHON)
     set(WarpX_LIB ON CACHE STRING "Build WarpX as a library" FORCE)
 endif()
 
+# deprecated options: transition phase
+
+if(DEFINED WarpX_PSATD)
+    message(WARNING "CMake option WarpX_PSATD is deprecated. Use WarpX_FFT instead.\n"
+                    "Overwriting WarpX_FFT with '${WarpX_PSATD}' because WarpX_PSATD was set.")
+    set(WarpX_FFT ${WarpX_PSATD} CACHE STRING "FFT-based solvers" FORCE)
+endif()
+
 # note: we could skip this if we solely build WarpX_APP, but if we build a
 # shared WarpX library or a third party, like ImpactX, uses ablastr in a
 # shared library (e.g., for Python bindings), then we need relocatable code.
@@ -141,21 +199,41 @@ option(ABLASTR_POSITION_INDEPENDENT_CODE
        "Build ABLASTR with position independent code" ON)
 mark_as_advanced(ABLASTR_POSITION_INDEPENDENT_CODE)
 
-option(ABLASTR_FFT "compile AnyFFT wrappers" ${WarpX_PSATD})
-if(WarpX_PSATD)
-    set(ABLASTR_FFT ON CACHE STRING "compile AnyFFT wrappers" FORCE)
+option(ABLASTR_FASTMATH "Enable fast-math optimizations" ${WarpX_FASTMATH})
+if(WarpX_FASTMATH)
+    set(ABLASTR_FASTMATH ON CACHE STRING "Enable fast-math optimizations" FORCE)
 endif()
 
-# this defined the variable BUILD_TESTING which is ON by default
-#include(CTest)
+option(ABLASTR_FFT "compile AnyFFT wrappers" ${WarpX_FFT})
+if(WarpX_FFT)
+    set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
+endif()
+
+# Define the variable BUILD_TESTING (ON by default),
+# include CDash dashboard testing module
+include(CTest)
+
 
 # Dependencies ################################################################
 #
+
+# Old GCCs: std::filesystem as a separate library
+try_compile(CXX_HAS_STD_FS "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+)
+try_compile(CXX_HAS_STD_FS_WITH_LINK "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    LINK_LIBRARIES stdc++fs
+)
 
 # AMReX
 #   builds AMReX from source (default) or finds an existing install
 set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
 list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
 list(REMOVE_DUPLICATES WarpX_amrex_dim)
 
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/AMReX.cmake)
@@ -176,7 +254,7 @@ include(${WarpX_SOURCE_DIR}/cmake/dependencies/openPMD.cmake)
 
 # PSATD
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/FFT.cmake)
-if(WarpX_PSATD)
+if(WarpX_FFT)
     # BLASPP and LAPACKPP
     if(RZ IN_LIST WarpX_DIMS)
         find_package(blaspp CONFIG REQUIRED)
@@ -187,7 +265,7 @@ endif()
 
 # Python
 if(WarpX_PYTHON)
-    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
     # default installation directories: Python
     warpx_set_default_install_dirs_python()
@@ -215,6 +293,21 @@ foreach(D IN LISTS WarpX_DIMS)
     list(APPEND _ALL_TARGETS ablastr_${SD})
     add_library(WarpX::ablastr_${SD} ALIAS ablastr_${SD})
 
+    # Fast-Math
+    if(ABLASTR_FASTMATH)
+        target_link_libraries(ablastr_${SD} PUBLIC AMReX::Flags_FASTMATH)
+    endif()
+
+    # GCC < 9 need to manually link std::filesystem
+    if(NOT CXX_HAS_STD_FS)
+        if(CXX_HAS_STD_FS_WITH_LINK)
+            target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
+        else()
+            message(FATAL_ERROR "Your compiler does not support C++17 "
+                    "<filesystem> Please use a newer C++ compiler.")
+        endif()
+    endif()
+
     # link into a library (default: static)
     if(WarpX_LIB)
         add_library(lib_${SD})
@@ -227,6 +320,22 @@ foreach(D IN LISTS WarpX_DIMS)
             POSITION_INDEPENDENT_CODE ON
             WINDOWS_EXPORT_ALL_SYMBOLS ON
         )
+
+        # Optional: build only a single TU
+        if(WarpX_UNITY_BUILD)
+            set_target_properties(lib_${SD} PROPERTIES
+                UNITY_BUILD ON
+                UNITY_BUILD_MODE BATCH
+                UNITY_BUILD_UNIQUE_ID "WARPX_UNITY_ID"
+                # Number must be more than the number of .cpp files in WarpX
+                UNITY_BUILD_BATCH_SIZE 10000
+            )
+        endif()
+
+        # Fast-Math
+        if(WarpX_FASTMATH)
+            target_link_libraries(lib_${SD} PUBLIC AMReX::Flags_FASTMATH)
+        endif()
     endif()
 
     # executable application
@@ -388,15 +497,19 @@ if(WarpX_LIB)
     add_subdirectory(Source/Fluids)
     add_subdirectory(Source/Initialization)
     add_subdirectory(Source/Laser)
+    add_subdirectory(Source/NonlinearSolvers)
     add_subdirectory(Source/Parallelization)
     add_subdirectory(Source/Particles)
     add_subdirectory(Source/Python)
     add_subdirectory(Source/Utils)
 endif()
+if(WarpX_QED_TOOLS)
+    add_subdirectory(Tools/QedTablesUtils)
+endif()
 
 # Interprocedural optimization (IPO) / Link-Time Optimization (LTO)
 if(WarpX_IPO)
-    enable_IPO("${_ALL_TARGETS}")
+    warpx_enable_IPO("${_ALL_TARGETS}")
 endif()
 
 # link dependencies
@@ -404,8 +517,16 @@ foreach(D IN LISTS WarpX_DIMS)
     warpx_set_suffix_dims(SD ${D})
     if(D STREQUAL "RZ")
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_2d)
+    elseif(D STREQUAL "RCYLINDER")
+        target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_1d)
+    elseif(D STREQUAL "RSPHERE")
+        target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_1d)
     else()
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_${D}d)
+    endif()
+
+    if(ABLASTR_FASTMATH)
+        target_link_libraries(ablastr_${SD} PUBLIC AMReX::Flags_FASTMATH)
     endif()
 
     if(ABLASTR_FFT)
@@ -425,7 +546,13 @@ foreach(D IN LISTS WarpX_DIMS)
     if(WarpX_PYTHON)
         target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::module pybind11::windows_extras)
         if(WarpX_PYTHON_IPO)
-            target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
+            if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+                warpx_enable_IPO(pyWarpX_${SD})
+            else()
+                # conditionally defined target in pybind11
+                # https://github.com/pybind/pybind11/blob/v3.0.0/tools/pybind11Common.cmake#L420-L426
+                target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
+            endif()
         endif()
     endif()
 
@@ -457,7 +584,13 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        if(WarpX_SIMD)
+            # vir::cvt
+            # https://github.com/mattkretz/vir-simd/issues/45
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
+        else()
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        endif()
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF
@@ -485,10 +618,10 @@ foreach(D IN LISTS WarpX_DIMS)
         target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_1D_Z WARPX_ZINDEX=0)
     elseif(D STREQUAL "RZ")
         target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RZ WARPX_ZINDEX=1)
-    endif()
-
-    if(WarpX_GPUCLOCK)
-        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_USE_GPUCLOCK)
+    elseif(D STREQUAL "RCYLINDER")
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RCYLINDER)
+    elseif(D STREQUAL "RSPHERE")
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_DIM_RSPHERE)
     endif()
 
     if(WarpX_OPENPMD)
@@ -502,8 +635,8 @@ foreach(D IN LISTS WarpX_DIMS)
         endif()
     endif()
 
-    if(WarpX_PSATD)
-        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_USE_PSATD)
+    if(WarpX_FFT)
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_USE_FFT)
     endif()
     if(ABLASTR_FFT)
         # We need to enable FFT support in ABLASTR for PSATD solver
@@ -537,11 +670,6 @@ foreach(D IN LISTS WarpX_DIMS)
         target_compile_definitions(pyWarpX_${SD} PRIVATE ABLASTR_IS_DLL_BUILDING)
     endif()
 endforeach()
-
-
-# Warnings ####################################################################
-#
-set_cxx_warnings()
 
 
 # Generate Configuration and .pc Files ########################################
@@ -630,8 +758,10 @@ endforeach()
 # pip helpers for the pywarpx package #########################################
 #
 if(WarpX_PYTHON)
-    set(PYINSTALLOPTIONS "" CACHE STRING
-        "Additional parameters to pass to `pip install`")
+    set(PY_PIP_OPTIONS "-v" CACHE STRING
+        "Additional parameters to pass to `pip` as ; separated list")
+    set(PY_PIP_INSTALL_OPTIONS "" CACHE STRING
+        "Additional parameters to pass to `pip install` as ; separated list")
 
     # ensure all targets are built before we package them in a wheel
     set(pyWarpX_INSTALL_TARGET_NAMES)
@@ -654,7 +784,8 @@ if(WarpX_PYTHON)
         ${CMAKE_COMMAND} -E rm -f -r warpx-whl
         COMMAND
             ${CMAKE_COMMAND} -E env PYWARPX_LIB_DIR=$<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>
-                ${Python_EXECUTABLE} -m pip wheel -v --no-build-isolation --no-deps --wheel-dir=warpx-whl ${WarpX_SOURCE_DIR}
+                ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} wheel --no-build-isolation --no-deps --wheel-dir=warpx-whl "${WarpX_SOURCE_DIR}"
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS
@@ -668,7 +799,8 @@ if(WarpX_PYTHON)
         set(pyWarpX_REQUIREMENT_FILE "requirements.txt")
     endif()
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install_requirements
-        ${Python_EXECUTABLE} -m pip install ${PYINSTALLOPTIONS} -r "${WarpX_SOURCE_DIR}/${pyWarpX_REQUIREMENT_FILE}"
+        ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install ${PY_PIP_INSTALL_OPTIONS} -r "${WarpX_SOURCE_DIR}/${pyWarpX_REQUIREMENT_FILE}"
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
     )
@@ -685,7 +817,8 @@ if(WarpX_PYTHON)
     # because otherwise pip would also force reinstall all dependencies.
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install
         ${CMAKE_COMMAND} -E env WARPX_MPI=${WarpX_MPI}
-            ${Python_EXECUTABLE} -m pip install --force-reinstall --no-index --no-deps ${PYINSTALLOPTIONS} --find-links=warpx-whl pywarpx
+            ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install --force-reinstall --no-index --no-deps ${PY_PIP_INSTALL_OPTIONS} --find-links=warpx-whl pywarpx
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS
@@ -698,7 +831,8 @@ if(WarpX_PYTHON)
     # this is for package managers only
     add_custom_target(${WarpX_CUSTOM_TARGET_PREFIX}pip_install_nodeps
         ${CMAKE_COMMAND} -E env WARPX_MPI=${WarpX_MPI}
-            ${Python_EXECUTABLE} -m pip install --force-reinstall --no-index --no-deps ${PYINSTALLOPTIONS} --find-links=warpx-whl pywarpx
+            ${Python_EXECUTABLE} -m pip ${PY_PIP_OPTIONS} install --force-reinstall --no-index --no-deps ${PY_PIP_INSTALL_OPTIONS} --find-links=warpx-whl pywarpx
+        COMMAND_EXPAND_LISTS VERBATIM
         WORKING_DIRECTORY
             ${WarpX_BINARY_DIR}
         DEPENDS
@@ -710,12 +844,19 @@ endif()
 
 # Tests #######################################################################
 #
+if(BUILD_TESTING)
+    enable_testing()
+    if(WarpX_APP OR WarpX_PYTHON)
+        add_subdirectory(Examples)
+    endif()
+endif()
 
-#if(BUILD_TESTING)
-#    enable_testing()
+
+# Warnings ####################################################################
 #
-#    add_test(...)
-#endif()
+foreach(warpx_tgt IN LISTS _ALL_TARGETS)
+    warpx_set_compile_warnings(${warpx_tgt})
+endforeach()
 
 
 # Status Summary for Build Options ############################################

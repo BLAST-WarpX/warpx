@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef INJECTOR_FLUX_H_
-#define INJECTOR_FLUX_H_
+#ifndef WARPX_INJECTOR_FLUX_H_
+#define WARPX_INJECTOR_FLUX_H_
 
 #include "Utils/WarpXConst.H"
 
@@ -149,4 +149,4 @@ struct InjectorFluxDeleter {
     }
 };
 
-#endif
+#endif //WARPX_INJECTOR_FLUX_H_

@@ -16,10 +16,10 @@ In order to run the code with a spectral solver, you need to:
 
            export FFTW_HOME=/usr/
 
-      - Set ``USE_PSATD=TRUE`` when compiling:
+      - Set ``USE_FFT=TRUE`` when compiling:
         ::
 
-           make -j 4 USE_PSATD=TRUE
+           make -j 4 USE_FFT=TRUE
 
 See :doc:`rzgeometry` for using the spectral solver with USE_RZ. Additional steps are needed.
 PSATD is compatible with single precision, but please note that, on CPU, FFTW needs to be compiled with option ``--enable-float``.

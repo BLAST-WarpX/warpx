@@ -7,6 +7,7 @@
 #include "BackgroundMCCCollision.H"
 
 #include "ImpactIonization.H"
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -21,7 +22,7 @@
 
 #include <string>
 
-BackgroundMCCCollision::BackgroundMCCCollision (std::string const collision_name)
+BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_name)
     : CollisionBase(collision_name)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
@@ -40,7 +41,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const collision_name
     }
     else {
         std::string background_density_str;
-        pp_collision_name.get("background_density(x,y,z,t)", background_density_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_density(x,y,z,t)", background_density_str);
         m_background_density_parser =
             utils::parser::makeParser(background_density_str, {"x", "y", "z", "t"});
     }
@@ -55,7 +56,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const collision_name
     }
     else {
         std::string background_temperature_str;
-        pp_collision_name.get("background_temperature(x,y,z,t)", background_temperature_str);
+        utils::parser::Store_parserString(pp_collision_name, "background_temperature(x,y,z,t)", background_temperature_str);
         m_background_temperature_parser =
             utils::parser::makeParser(background_temperature_str, {"x", "y", "z", "t"});
     }
@@ -104,6 +105,14 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const collision_name
             scattering_process.find("ionization") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
+                pp_collision_name, kw_energy.c_str(), energy);
+        }
+        // if the scattering process is forward scattering get the energy
+        // associated with the process if it is given (this allows forward
+        // scattering to be used both with and without a fixed energy loss)
+        else if (scattering_process.find("forward") != std::string::npos) {
+            const std::string kw_energy = scattering_process + "_energy";
+            utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
@@ -162,7 +171,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const collision_name
  *  ranges from 1e-4 to 5000 eV in 0.2 eV increments
  */
 amrex::ParticleReal
-BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_processes)
+BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_processes) const
 {
     using namespace amrex::literals;
     amrex::ParticleReal nu, nu_max = 0.0;
@@ -234,9 +243,12 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         // dt has to be small enough that a linear expansion of the collision
         // probability is sufficiently accurately, otherwise the MCC results
         // will be very heavily affected by small changes in the timestep
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(coll_n < 0.1_prt,
-            "dt is too large to ensure accurate MCC results"
-        );
+        if (coll_n > 0.1_prt) {
+            ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                     "dt is too large to ensure accurate MCC results , coll_n: " +
+                      std::to_string(coll_n) + " is > 0.1 and collision probability is = " +
+                      std::to_string(m_total_collision_prob) + "\n");
+        }
 
         if (ionization_flag) {
             // calculate maximum collision frequency for ionization
@@ -246,9 +258,12 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
             auto coll_n_ioniz = m_nu_max_ioniz * dt;
             m_total_collision_prob_ioniz = 1.0_prt - std::exp(-coll_n_ioniz);
 
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(coll_n_ioniz < 0.1_prt,
-                "dt is too large to ensure accurate MCC results"
-            );
+            if (coll_n_ioniz > 0.1_prt) {
+                ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                         "dt is too large to ensure accurate MCC ionization , coll_n_ionization: " +
+                          std::to_string(coll_n_ioniz) + " is > 0.1 and ionization probability is = " +
+                          std::to_string(m_total_collision_prob_ioniz) + "\n");
+            }
 
             // if an ionization process is included the secondary species mass
             // is taken as the background mass
@@ -262,7 +277,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
         }
 
         amrex::Print() << Utils::TextMsg::Info(
-            "Setting up collisions for " + m_species_names[0] + " with:\n"
+            "Setting up Monte-Carlo collisions for " + m_species_names[0] + " with:\n"
             + "     total non-ionization collision probability: "
             + std::to_string(m_total_collision_prob)
             + "\n     total ionization collision probability: "
@@ -335,8 +350,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
     auto const M = m_background_mass;
 
     // precalculate often used value
-    constexpr auto c2 = PhysConst::c * PhysConst::c;
-    auto const mc2 = m*c2;
+    auto const mc2 = m*PhysConst::c2;
 
     // we need particle positions in order to calculate the local density
     // and temperature
@@ -404,7 +418,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // and target velocities which doesn't require any of the Lorentz
                                   // transformations below; note that if the projectile and target
                                   // have the same mass this is identical to back scattering
-                                  if (scattering_process.m_type == ScatteringProcessType::CHARGE_EXCHANGE) {
+                                  if (scattering_process.m_type == ScatteringProcessType::TWOPRODUCT_REACTION) {
                                       ux[ip] = ua_x;
                                       uy[ip] = ua_y;
                                       uz[ip] = ua_z;
@@ -421,10 +435,10 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // subtract any energy penalty of the collision from the
                                   // projectile energy
                                   if (scattering_process.m_energy_penalty > 0.0_prt) {
-                                      ParticleUtils::getEnergy(v_coll2, m, E_coll);
-                                      E_coll = (E_coll - scattering_process.m_energy_penalty) * PhysConst::q_e;
+                                      constexpr auto eV = PhysConst::q_e;
+                                      E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
                                       const auto scale_fac = static_cast<amrex::ParticleReal>(
-                                        std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) / c2) / m / v_coll);
+                                        std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) * PhysConst::inv_c2) / m / v_coll);
                                       vx *= scale_fac;
                                       vy *= scale_fac;
                                       vz *= scale_fac;
@@ -501,7 +515,7 @@ void BackgroundMCCCollision::doBackgroundIonization
                                                        m_mass1, sqrt_kb_m, m_background_temperature_func, t
                                                        );
 
-        const auto num_added = filterCopyTransformParticles<1>(
+        const auto num_added = filterCopyTransformParticles<1>(species1, species2,
                                                                elec_tile, ion_tile, elec_tile, np_elec, np_ion,
                                                                Filter, CopyElec, CopyIon, Transform
                                                                );

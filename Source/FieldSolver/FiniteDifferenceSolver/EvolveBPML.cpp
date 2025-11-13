@@ -7,13 +7,12 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 
 #include "BoundaryConditions/PMLComponent.H"
+#include "Fields.H"
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -41,19 +40,28 @@ using namespace amrex;
  * \brief Update the B field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveBPML (
-    std::array< amrex::MultiFab*, 3 > Bfield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::MultiFabRegister& fields,
+    PatchType patch_type,
+    int level,
     amrex::Real const dt,
-    const bool dive_cleaning) {
+    const bool dive_cleaning
+)
+{
+    using warpx::fields::FieldType;
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#ifdef WARPX_DIM_RZ
-    amrex::ignore_unused(Bfield, Efield, dt, dive_cleaning);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(fields, patch_type, level, dt, dive_cleaning);
     WARPX_ABORT_WITH_MESSAGE(
-        "PML are not implemented in cylindrical geometry.");
+        "PML only implemented in Cartesian geometry.");
 #else
-    if (m_grid_type == GridType::Collocated) {
+    const ablastr::fields::VectorField Bfield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_B_fp, level) : fields.get_alldirs(FieldType::pml_B_cp, level);
+    const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
+        fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
+
+    if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         EvolveBPMLCartesian <CartesianNodalAlgorithm> (Bfield, Efield, dt, dive_cleaning);
 
@@ -73,12 +81,12 @@ void FiniteDifferenceSolver::EvolveBPML (
 }
 
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveBPMLCartesian (
     std::array< amrex::MultiFab*, 3 > Bfield,
-    std::array< amrex::MultiFab*, 3 > const Efield,
+    ablastr::fields::VectorField const Efield,
     amrex::Real const dt,
     const bool dive_cleaning) {
 
@@ -181,4 +189,4 @@ void FiniteDifferenceSolver::EvolveBPMLCartesian (
 
 }
 
-#endif // corresponds to ifndef WARPX_DIM_RZ
+#endif // corresponds to if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)

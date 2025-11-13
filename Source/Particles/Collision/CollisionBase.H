@@ -18,7 +18,7 @@ class CollisionBase
 {
 public:
 
-    CollisionBase (std::string collision_name);
+    CollisionBase (const std::string& collision_name);
 
     virtual void doCollisions (amrex::Real /*cur_time*/, amrex::Real /*dt*/, MultiParticleContainer* /*mypc*/ ){}
 
@@ -29,12 +29,16 @@ public:
 
     virtual ~CollisionBase() = default;
 
-    int get_ndt() {return m_ndt;}
+    [[nodiscard]] int get_ndt() const {return m_ndt;}
+
+    [[nodiscard]] bool use_global_debye_length() const {return m_use_global_debye_length;}
 
 protected:
 
     amrex::Vector<std::string> m_species_names;
     int m_ndt;
+
+    bool m_use_global_debye_length = false;
 
 };
 

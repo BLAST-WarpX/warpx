@@ -1,0 +1,31 @@
+{
+  "lev=0": {
+    "Bx": 3439183579241.8213,
+    "By": 3467279488651116.0,
+    "Bz": 1160277365682812.8,
+    "Ex": 8.069079812484185e+25,
+    "Ey": 5.505248263716122e+24,
+    "Ez": 1.7842194874822184e+25,
+    "jx": 7.269891860762689e+30,
+    "jy": 4.959896126185605e+29,
+    "jz": 1.6074739776139274e+30
+  },
+  "ele_schwinger": {
+    "particle_momentum_x": 5.389208141538669e-10,
+    "particle_momentum_y": 3.8275577338164975e-11,
+    "particle_momentum_z": 1.3074334157781563e-10,
+    "particle_position_x": 0.00014143017084167805,
+    "particle_position_y": 0.00025599999999999993,
+    "particle_position_z": 0.000256,
+    "particle_weight": 4.150487309972089e+19
+  },
+  "pos_schwinger": {
+    "particle_momentum_x": 5.389208141461398e-10,
+    "particle_momentum_y": 3.670495882192179e-11,
+    "particle_momentum_z": 1.3119293877652662e-10,
+    "particle_position_x": 0.00012800000000000002,
+    "particle_position_y": 0.000256,
+    "particle_position_z": 0.000256,
+    "particle_weight": 4.150487309972089e+19
+  }
+}

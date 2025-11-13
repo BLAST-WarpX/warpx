@@ -1,0 +1,35 @@
+max_step = 128
+amr.n_cell =  64 64 64
+amr.max_grid_size = 32
+amr.max_level = 0
+
+geometry.prob_lo     = -50.e-6   -50.e-6  -50.e-6
+geometry.prob_hi     =  50.e-6    50.e-6   50.e-6
+geometry.dims = 3
+
+boundary.field_lo = pml pml pml
+boundary.field_hi = pml pml pml
+
+warpx.do_dive_cleaning = 1
+warpx.use_filter = 0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+particles.species_names = beam
+beam.charge = -q_e
+beam.mass = 1.e30
+beam.injection_style = "gaussian_beam"
+beam.x_rms = 2.e-6
+beam.y_rms = 2.e-6
+beam.z_rms = 2.e-6
+beam.x_m = 0.
+beam.y_m = 0.
+beam.z_m = 0.e-6
+beam.npart = 20000
+beam.q_tot = -1.e-20
+beam.momentum_distribution_type = "at_rest"
+
+diagnostics.diags_names = diag1
+diag1.intervals = 8
+diag1.diag_type = Full

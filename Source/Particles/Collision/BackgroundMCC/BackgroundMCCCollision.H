@@ -23,7 +23,7 @@ class BackgroundMCCCollision final
     : public CollisionBase
 {
 public:
-    BackgroundMCCCollision (std::string collision_name);
+    BackgroundMCCCollision (std::string const& collision_name);
 
     ~BackgroundMCCCollision () override = default;
 
@@ -32,7 +32,7 @@ public:
     BackgroundMCCCollision ( BackgroundMCCCollision&& )                  = delete;
     BackgroundMCCCollision& operator= ( BackgroundMCCCollision&& )       = delete;
 
-    amrex::ParticleReal get_nu_max (amrex::Vector<ScatteringProcess> const& mcc_processes);
+    [[nodiscard]] amrex::ParticleReal get_nu_max (amrex::Vector<ScatteringProcess> const& mcc_processes) const;
 
     /** Perform the collisions
      *

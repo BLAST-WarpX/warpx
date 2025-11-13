@@ -9,6 +9,7 @@
 
 #include "Particles/Collision/ScatteringProcess.H"
 
+#include "Particles/Algorithms/KineticEnergy.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -94,13 +95,14 @@ public:
         const ParticleReal uz = ptd.m_rdata[PIdx::uz][i];
 
         // calculate kinetic energy
-        const ParticleReal u_coll2 = ux*ux + uy*uy + uz*uz;
-        ParticleUtils::getEnergy(u_coll2, m_mass, E_coll);
+        constexpr auto eV = PhysConst::q_e;
+        E_coll = Algorithms::KineticEnergy<double>(ux, uy, uz, m_mass)/eV;
 
         // get collision cross-section
         const ParticleReal sigma_E = m_mcc_process.getCrossSection(static_cast<amrex::ParticleReal>(E_coll));
 
         // calculate normalized collision frequency
+        const ParticleReal u_coll2 = ux*ux + uy*uy + uz*uz;
         const ParticleReal nu_i = n_a * sigma_E * sqrt(u_coll2) / m_nu_max;
 
         // check if this collision should be performed
@@ -198,11 +200,11 @@ public:
         auto& i_uz = dst2.m_rdata[PIdx::uz][i_dst2];
 
         // calculate kinetic energy
-        const ParticleReal u_coll2 = ux*ux + uy*uy + uz*uz;
-        ParticleUtils::getEnergy(u_coll2, m_mass1, E_coll);
+        constexpr auto eV = PhysConst::q_e;
+        E_coll = Algorithms::KineticEnergy<double>(ux, uy, uz, m_mass1)/eV;
 
         // each electron gets half the energy (could change this later)
-        const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * PhysConst::q_e);
+        const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * eV);
 
         // precalculate often used value
         constexpr auto c2 = PhysConst::c * PhysConst::c;

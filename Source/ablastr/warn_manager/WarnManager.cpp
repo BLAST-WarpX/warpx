@@ -55,9 +55,9 @@ WarnManager::WarnManager():
 {}
 
 void WarnManager::RecordWarning(
-            std::string topic,
-            std::string text,
-            WarnPriority priority)
+            const std::string& topic,
+            const std::string& text,
+            const WarnPriority& priority)
 {
     auto msg_priority = abl_msg_logger::Priority::high;
     if(priority == WarnPriority::low) {
@@ -93,12 +93,14 @@ void WarnManager::RecordWarning(
         } else if(m_abort_on_warning_threshold == WarnPriority::medium) {
             abort_priority = abl_msg_logger::Priority::medium;
         }
+        std::string abort_msg = "A warning with priority '"
+            + abl_msg_logger::PriorityToString(abort_priority)
+            + "' has been raised";
+        abort_msg += ((m_always_warn_immediately) ? "." : (":\n[" + topic + "] " + text));
 
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
             msg_priority < abort_priority,
-            "A warning with priority '"
-            + abl_msg_logger::PriorityToString(msg_priority)
-            + "' has been raised."
+            abort_msg
         );
     }
 }
@@ -316,9 +318,9 @@ WarnManager& ablastr::warn_manager::GetWMInstance()
 }
 
 void ablastr::warn_manager::WMRecordWarning(
-    std::string topic,
-    std::string text,
-    WarnPriority priority)
+    const std::string& topic,
+    const std::string& text,
+    const WarnPriority& priority)
 {
     WarnManager::GetInstance().RecordWarning(
         topic, text, priority);

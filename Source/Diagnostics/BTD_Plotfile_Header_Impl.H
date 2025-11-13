@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef BTD_PLOTFILE_HEADER_IMPL_H
-#define BTD_PLOTFILE_HEADER_IMPL_H
+#ifndef WARPX_BTD_PLOTFILE_HEADER_IMPL_H
+#define WARPX_BTD_PLOTFILE_HEADER_IMPL_H
 
 #include <AMReX_Array.H>
 #include <AMReX_Box.H>
@@ -144,9 +144,9 @@ private:
     /** Number of Fabs in the plotfile. */
     int m_numFabs;
     /** Lower corner physical coordinates of each fab in the plotfile. */
-    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_glo {{AMREX_D_DECL(0.,0.,0.)}};
+    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_glo;
     /** Upper corner physical coordinates of each fab in the plotfile. */
-    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_ghi {{AMREX_D_DECL(1.,1.,1.)}};
+    amrex::Vector<amrex::Array<amrex::Real, AMREX_SPACEDIM> > m_ghi;
     std::string m_CellPath;
 
 };
@@ -171,11 +171,11 @@ class BTDMultiFabHeaderImpl
     void WriteMultiFabHeader ();
 
     /** Returns size, m_ba_size, of the Box Array, m_ba.*/
-    int ba_size () {return m_ba_size;}
+    [[nodiscard]] int ba_size () const {return m_ba_size;}
     /** Returns box corresponding to the ith box in the BoxArray, m_ba.
      *  \param[in] ibox index of the box in the BoxArray.
      */
-    amrex::Box ba_box (int ibox) {return m_ba[ibox]; }
+    [[nodiscard]] amrex::Box ba_box (int ibox) const {return m_ba[ibox]; }
     /** Returns prefix of the ith-fab on disk, i.e., ith fab of the MultiFab data.
      *  \param[in] ifab index of the ith fab in the MultiFab data.
      */
@@ -200,12 +200,12 @@ class BTDMultiFabHeaderImpl
      */
     void SetBox (int ibox, amrex::Box ba_box) { m_ba.set(ibox, ba_box); }
     /** Set Fab name of the ith fab to be written in the multifab Header file.*/
-    void SetFabName (int ifab, std::string fodPrefix, std::string FabName,
+    void SetFabName (int ifab, const std::string& fodPrefix, const std::string& FabName,
                      int FabHead);
     /** Set minimum value of all the components for the ith fab. */
-    void SetMinVal (int ifab, amrex::Vector<amrex::Real> minval);
+    void SetMinVal (int ifab, const amrex::Vector<amrex::Real>& minval);
     /** Set maximum value of all the components for the ith fab. */
-    void SetMaxVal (int ifab, amrex::Vector<amrex::Real> maxval);
+    void SetMaxVal (int ifab, const amrex::Vector<amrex::Real>& maxval);
     private:
     /** Header file path */
     std::string m_Header_path;
@@ -316,9 +316,9 @@ public:
     /** Reads the particle header file at m_Header_path and stores its data*/
     void ReadHeader ();
     /** Writes the meta-data of particle box array in header file, with path, m_Header_path*/
-    void WriteHeader ();
+    void WriteHeader () const;
     /** Returns the size of the box array, m_ba_size */
-    int ba_size () {return m_ba_size; }
+    [[nodiscard]] int ba_size () const {return m_ba_size; }
     /** Increases Box array size, m_ba_size, by add_size
      *  \param[in] add_size
      */
@@ -326,7 +326,7 @@ public:
     /** Returns box corresponding to the ith box in the BoxArray, m_ba.
      *  \param[in] ibox index of the box in the BoxArray.
      */
-    amrex::Box ba_box (int ibox) {return m_ba[ibox]; }
+    [[nodiscard]] amrex::Box ba_box (int ibox) const {return m_ba[ibox]; }
     /** Resize boxArray, m_ba, to size, m_ba_size. */
     void ResizeBoxArray () { m_ba.resize(m_ba_size); }
     /** Set Box indices of the ith-box in Box Array, m_ba, to the new Box, ba_box.
@@ -342,4 +342,4 @@ public:
     std::string m_Header_path;
 };
 
-#endif
+#endif //WARPX_BTD_PLOTFILE_HEADER_IMPL_H

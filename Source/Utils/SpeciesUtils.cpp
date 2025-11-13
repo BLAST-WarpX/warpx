@@ -81,7 +81,7 @@ namespace SpeciesUtils {
         std::unique_ptr<InjectorDensity,InjectorDensityDeleter>& h_inj_rho,
         std::unique_ptr<amrex::Parser>& density_parser)
     {
-        amrex::ParmParse pp_species(species_name);
+        const amrex::ParmParse pp_species(species_name);
 
         // parse density information
         std::string rho_prof_s;
@@ -89,7 +89,7 @@ namespace SpeciesUtils {
         std::transform(rho_prof_s.begin(), rho_prof_s.end(),
                     rho_prof_s.begin(), ::tolower);
         if (rho_prof_s == "constant") {
-            amrex::Real density;
+            amrex::Real density = 0;
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));
@@ -104,6 +104,10 @@ namespace SpeciesUtils {
                 utils::parser::makeParser(str_density_function,{"x","y","z"}));
             h_inj_rho.reset(new InjectorDensity((InjectorDensityParser*)nullptr,
                 density_parser->compile<3>()));
+        } else if (rho_prof_s == "read_from_file") {
+            std::string density_file;
+            utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
@@ -126,7 +130,7 @@ namespace SpeciesUtils {
     {
         using namespace amrex::literals;
 
-        amrex::ParmParse pp_species(species_name);
+        const amrex::ParmParse pp_species(species_name);
 
         // parse momentum information
         std::string mom_dist_s;

@@ -1,3 +1,4 @@
-CEXE_sources += DSMC.cpp
+CEXE_sources += DSMCFunc.cpp
+CEXE_sources += SplitAndScatterFunc.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/DSMC

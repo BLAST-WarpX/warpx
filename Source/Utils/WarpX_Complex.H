@@ -8,7 +8,7 @@
 #ifndef WARPX_COMPLEX_H_
 #define WARPX_COMPLEX_H_
 
-#ifdef WARPX_USE_PSATD
+#ifdef WARPX_USE_FFT
 #  include <ablastr/math/fft/AnyFFT.H>
 #endif
 
@@ -21,7 +21,7 @@
 // Defines a complex type on GPU & CPU
 using Complex = amrex::GpuComplex<amrex::Real>;
 
-#ifdef WARPX_USE_PSATD
+#ifdef WARPX_USE_FFT
 static_assert(sizeof(Complex) == sizeof(ablastr::math::anyfft::Complex),
     "The complex type in WarpX and the FFT library do not match.");
 #endif

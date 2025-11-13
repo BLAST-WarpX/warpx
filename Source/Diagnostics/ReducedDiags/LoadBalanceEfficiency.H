@@ -24,7 +24,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    LoadBalanceEfficiency(std::string rd_name);
+    LoadBalanceEfficiency(const std::string& rd_name);
 
     /**
      * This function gets the current load balance efficiency

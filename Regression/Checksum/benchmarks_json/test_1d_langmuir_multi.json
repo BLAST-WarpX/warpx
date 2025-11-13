@@ -1,0 +1,27 @@
+{
+  "lev=0": {
+    "Bx": 0.0,
+    "By": 0.0,
+    "Bz": 0.0,
+    "Ex": 0.0,
+    "Ey": 0.0,
+    "Ez": 124153671741.73833,
+    "jx": 0.0,
+    "jy": 0.0,
+    "jz": 47458674066991.58
+  },
+  "positrons": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.1865318612190037e-22,
+    "particle_position_x": 0.0025600000000000006,
+    "particle_weight": 8e+19
+  },
+  "electrons": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 1.1865318612190037e-22,
+    "particle_position_x": 0.00256,
+    "particle_weight": 8e+19
+  }
+}

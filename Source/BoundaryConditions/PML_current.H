@@ -5,8 +5,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PML_CURRENT_H_
-#define PML_CURRENT_H_
+#ifndef WARPX_PML_CURRENT_H_
+#define WARPX_PML_CURRENT_H_
 
 #include "BoundaryConditions/PMLComponent.H"
 
@@ -143,4 +143,4 @@ void damp_jz_pml (int j, int k, int l,
 #endif
 }
 
-#endif
+#endif //WARPX_PML_CURRENT_H_

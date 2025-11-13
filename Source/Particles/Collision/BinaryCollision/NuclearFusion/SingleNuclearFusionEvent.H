@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef SINGLE_NUCLEAR_FUSION_EVENT_H_
-#define SINGLE_NUCLEAR_FUSION_EVENT_H_
+#ifndef WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
+#define WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_
 
 #include "BoschHaleFusionCrossSection.H"
 #include "ProtonBoronFusionCrossSection.H"
@@ -69,7 +69,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
     BinaryCollisionUtils::get_collision_parameters(
-        u1x, u1y, u1z, u2x, u2y, u2z, m1, m2,
+        m1*u1x, m1*u1y, m1*u1z, m2*u2x, m2*u2y, m2*u2z, m1, m2,
         E_coll, v_coll, lab_to_COM_factor);
 
     using namespace amrex::literals;
@@ -113,18 +113,8 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     // In principle this is obtained by computing 1 - exp(-probability_estimate)
     // However, the computation of this quantity can fail numerically when probability_estimate is
     // too small (e.g. exp(-probability_estimate) returns 1 and the computation returns 0).
-    // In this case, we simply use "probability_estimate" instead of 1 - exp(-probability_estimate)
-    // The threshold exp_threshold at which we switch between the two formulas is determined by the
-    // fact that computing the exponential is only useful if it can resolve the x^2/2 term of its
-    // Taylor expansion, i.e. the square of probability_estimate should be greater than the
-    // machine epsilon.
-#ifdef AMREX_SINGLE_PRECISION_PARTICLES
-    constexpr auto exp_threshold = amrex::ParticleReal(1.e-3);
-#else
-    constexpr auto exp_threshold = amrex::ParticleReal(5.e-8);
-#endif
-    const amrex::ParticleReal probability = (probability_estimate < exp_threshold) ?
-                                    probability_estimate: 1._prt - std::exp(-probability_estimate);
+    // std::expm1 is used since it maintains correctness for small exponent.
+    const amrex::ParticleReal probability = -std::expm1(-probability_estimate);
 
     // Get a random number
     const amrex::ParticleReal random_number = amrex::Random(engine);
@@ -141,4 +131,4 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     }
 
 }
-#endif // SINGLE_NUCLEAR_FUSION_EVENT_H_
+#endif // WARPX_SINGLE_NUCLEAR_FUSION_EVENT_H_

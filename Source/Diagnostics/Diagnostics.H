@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+/** All types of diagnostics. */
+enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
 /**
  * \brief base class for diagnostics.
  * Contains main routines to filter, compute and flush diagnostics.
@@ -34,8 +36,9 @@ public:
      *
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
+     * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
-    Diagnostics (int i, std::string name);
+    Diagnostics (int i, std::string name, DiagTypes diag_type);
 
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~Diagnostics ();
@@ -45,6 +48,8 @@ public:
     Diagnostics(Diagnostics&& )                    = default;
     Diagnostics& operator=(Diagnostics&& )         = default;
 
+    /** Stores the diag type */
+    DiagTypes m_diag_type;
     /** Pack (stack) all fields in the cell-centered output MultiFab m_mf_output.
      *
      * Fields are computed (e.g., cell-centered or back-transformed)
@@ -67,10 +72,12 @@ public:
      * (including metadata listing the total number of particles) even if the snapshot is incomplete
      */
     virtual void Flush (int i_buffer, bool force_flush) = 0;
+
     /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
-    void InitData ();
+    void InitData (const MultiParticleContainer& mpc);
     void InitDataBeforeRestart ();
-    void InitDataAfterRestart ();
+    void InitDataAfterRestart (const MultiParticleContainer& mpc);
+
     /** Initialize functors that store pointers to the fields requested by the user.
      *
      * Derived classes MUST implement this function, and it must allocate m_all_field_functors
@@ -114,7 +121,7 @@ public:
     /** Whether the last timestep is always dumped */
     [[nodiscard]] bool DoDumpLastTimestep () const {return  m_dump_last_timestep;}
     /** Returns the number of snapshots used in BTD. For Full-Diagnostics, the value is 1*/
-    int getnumbuffers() {return m_num_buffers;}
+    [[nodiscard]] int getnumbuffers() const {return m_num_buffers;}
     /** Time in lab-frame associated with the ith snapshot
      * \param[in] i_buffer index of the buffer
      */
@@ -186,19 +193,26 @@ public:
 protected:
     /** Read Parameters of the base Diagnostics class */
     bool BaseReadParameters ();
+    /** Whether to output a message when diagnostics are output */
+    int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
     void InitBaseData ();
     /** Initialize m_mf_output vectors and data required to construct the buffers
      * \param[in] i_buffer index of buffer for which the output MultiFab is defined.
      * \param[in] lev level on which the output MultiFab is defined
+     * \param[in] restart whether this is called upon restarting a previous simulation
      */
     virtual void InitializeBufferData (int i_buffer, int lev, bool restart=false) = 0;
     /** Initialize member variables and arrays specific to the diagnostics in the
      *  derived classes.(FullDiagnostics, BTDiagnostics)
      */
     virtual void DerivedInitData () {}
-    /** This function initialized particle buffers (not implemented in diagnostics, yet) */
-    virtual void InitializeParticleBuffer () = 0;
+
+    /** This function initialized particle buffers (not implemented in diagnostics, yet)
+     *  \param[in] mpc a constant reference to the multi-particle container.
+     */
+    virtual void InitializeParticleBuffer (const MultiParticleContainer& mpc) = 0;
+
     /** This function prepares buffer data as required for fields and particles. For back-transformed diagnostics,
      *  this function prepares the z coordinate in the boosted-frame and lab-frame.
      */
@@ -266,6 +280,12 @@ protected:
      *  The second vector is loops over the total number of levels.
      */
     amrex::Vector< amrex::Vector< amrex::MultiFab > >  m_mf_output;
+    /** summation multifab, where all fields (computed, cell-centered, and stacked)
+     *  are summed for every step in a time averaging period.
+     *  The first vector is for total number of snapshots. (=1 for FullDiagnostics)
+     *  The second vector is loops over the total number of levels.
+     */
+    amrex::Vector< amrex::Vector <amrex::MultiFab > > m_sum_mf_output;
 
     /** Geometry that defines the domain attributes corresponding to output multifab.
      *  Specifically, the user-defined physical co-ordinates for the diagnostics
@@ -304,16 +324,13 @@ protected:
     int m_num_buffers;
     /** Array of species indices that dump rho per species */
     amrex::Vector<int> m_rho_per_species_index;
+    /** Array of species indices that dump temperature per species */
+    amrex::Vector<int> m_T_per_species_index;
     /** Vector of particle buffer vectors for each snapshot */
     amrex::Vector< amrex::Vector<std::unique_ptr<PinnedMemoryParticleContainer> > > m_particles_buffer;
     /** Vector of pointers to functors to compute particle output per species*/
     amrex::Vector< std::unique_ptr<ComputeParticleDiagFunctor> > m_all_particle_functors;
 
-    /** Vector of total number of particles previously flushed, per species, per snapshot.
-     *  The first vector is for total number of snapshots and second vector loops
-     *  over the total number of species selected for diagnostics.
-     */
-    amrex::Vector< amrex::Vector <int> > m_totalParticles_flushed_already;
     /** Vector of total number of particles in the buffer, per species, per snapshot.
      *  The first vector is for total number of snapshots and second vector loops
      *  over the total number of species selected for diagnostics.

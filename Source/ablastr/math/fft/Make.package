@@ -1,8 +1,10 @@
-ifeq ($(USE_PSATD),TRUE)
+ifeq ($(USE_FFT),TRUE)
   ifeq ($(USE_CUDA),TRUE)
     CEXE_sources += WrapCuFFT.cpp
   else ifeq ($(USE_HIP),TRUE)
     CEXE_sources += WrapRocFFT.cpp
+  else ifeq ($(USE_SYCL),TRUE)
+    CEXE_sources += WrapMklFFT.cpp
   else
     CEXE_sources += WrapFFTW.cpp
   endif

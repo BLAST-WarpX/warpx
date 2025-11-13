@@ -10,7 +10,6 @@
 #ifndef WARPX_PhysicalParticleContainer_H_
 #define WARPX_PhysicalParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
@@ -22,6 +21,10 @@
 #include "Particles/Gather/ScaleFields.H"
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
+#include "Particles/Deposition/TemperatureDepositionTypes.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
@@ -63,6 +66,8 @@ public:
     PhysicalParticleContainer(PhysicalParticleContainer&& )                    = default;
     PhysicalParticleContainer& operator=(PhysicalParticleContainer&& )         = default;
 
+    virtual void AllocData () override;
+
     void InitData () override;
 
     void ReadHeader (std::istream& is) override;
@@ -77,65 +82,38 @@ public:
     PlasmaInjector* GetPlasmaInjector (int i) override;
 
     /**
-     * \brief Evolve is the central function PhysicalParticleContainer that
+     * \brief Evolve is the central function in PhysicalParticleContainer that
      * advances plasma particles for a time dt (typically one timestep).
      *
-     * \param lev level on which particles are living
-     * \param Ex MultiFab from which field Ex is gathered
-     * \param Ey MultiFab from which field Ey is gathered
-     * \param Ez MultiFab from which field Ez is gathered
-     * \param Bx MultiFab from which field Bx is gathered
-     * \param By MultiFab from which field By is gathered
-     * \param Bz MultiFab from which field Bz is gathered
-     * \param jx MultiFab to which the particles' current jx is deposited
-     * \param jy MultiFab to which the particles' current jy is deposited
-     * \param jz MultiFab to which the particles' current jz is deposited
-     * \param cjx Same as jx (coarser, from lev-1), when using deposition buffers
-     * \param cjy Same as jy (coarser, from lev-1), when using deposition buffers
-     * \param cjz Same as jz (coarser, from lev-1), when using deposition buffers
-     * \param rho MultiFab to which the particles' charge is deposited
-     * \param crho Same as rho (coarser, from lev-1), when using deposition buffers
-     * \param cEx Same as Ex (coarser, from lev-1), when using gather buffers
-     * \param cEy Same as Ey (coarser, from lev-1), when using gather buffers
-     * \param cEz Same as Ez (coarser, from lev-1), when using gather buffers
-     * \param cBx Same as Bx (coarser, from lev-1), when using gather buffers
-     * \param cBy Same as By (coarser, from lev-1), when using gather buffers
-     * \param cBz Same as Bz (coarser, from lev-1), when using gather buffers
-     * \param t current physical time
-     * \param dt time step by which particles are advanced
-     * \param a_dt_type type of time step (used for sub-cycling)
-     * \param skip_deposition Skip the charge and current deposition.
+     * \param fields The WarpX field register
+     * \param lev Level on which particles are living
+     * \param current_fp_string Current (coarse or fine patch) identifier in fields
+     * \param t Current physical time
+     * \param dt Time Step by which particles are advanced
+     * \param subcycling_half Type of time step (used for sub-cycling)
+     * \param skip_deposition Skip the charge and current deposition
+     * \param position_push_type Type of time advance for particle position (full, first half, second half, none)
+     * \param momentum_push_type Type of time advance for particle momentum (full, first half, second half, none)
+     * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
      * field gather, particle push and current deposition for all particles
      * in the box.
      */
-    void Evolve (int lev,
-                         const amrex::MultiFab& Ex,
-                         const amrex::MultiFab& Ey,
-                         const amrex::MultiFab& Ez,
-                         const amrex::MultiFab& Bx,
-                         const amrex::MultiFab& By,
-                         const amrex::MultiFab& Bz,
-                         amrex::MultiFab& jx,
-                         amrex::MultiFab& jy,
-                         amrex::MultiFab& jz,
-                         amrex::MultiFab* cjx,
-                         amrex::MultiFab* cjy,
-                         amrex::MultiFab* cjz,
-                         amrex::MultiFab* rho,
-                         amrex::MultiFab* crho,
-                         const amrex::MultiFab* cEx,
-                         const amrex::MultiFab* cEy,
-                         const amrex::MultiFab* cEz,
-                         const amrex::MultiFab* cBx,
-                         const amrex::MultiFab* cBy,
-                         const amrex::MultiFab* cBz,
-                         amrex::Real t,
-                         amrex::Real dt,
-                         DtType a_dt_type=DtType::Full,
-                         bool skip_deposition=false ) override;
+    void Evolve (ablastr::fields::MultiFabRegister& fields,
+                 int lev,
+                 const std::string& current_fp_string,
+                 amrex::Real t,
+                 amrex::Real dt,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                 bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
+    /**
+     * \brief Gather fields and push particles in one fused kernel.
+     */
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
@@ -148,7 +126,61 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
+
+    void FindSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void SetupSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void ImplicitPushXP (WarpXParIter& pti,
+                         amrex::FArrayBox const * exfab,
+                         amrex::FArrayBox const * eyfab,
+                         amrex::FArrayBox const * ezfab,
+                         amrex::FArrayBox const * bxfab,
+                         amrex::FArrayBox const * byfab,
+                         amrex::FArrayBox const * bzfab,
+                         ImplicitOptions const * implicit_options,
+                         amrex::IntVect const & ngEB,
+                         long offset,
+                         long np_to_push,
+                         int lev, int gather_lev,
+                         amrex::Real dt,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  ablastr::fields::MultiFabRegister& fields,
+                                  amrex::FArrayBox const * exfab,
+                                  amrex::FArrayBox const * eyfab,
+                                  amrex::FArrayBox const * ezfab,
+                                  amrex::FArrayBox const * bxfab,
+                                  amrex::FArrayBox const * byfab,
+                                  amrex::FArrayBox const * bzfab,
+                                  ImplicitOptions const * implicit_options,
+                                  amrex::IntVect ngEB,
+                                  amrex::MultiFab * const jx,
+                                  amrex::MultiFab * const jy,
+                                  amrex::MultiFab * const jz,
+                                  long offset,
+                                  int lev, int gather_lev,
+                                  amrex::Real dt,
+                                  bool skip_deposition,
+                                  long num_unconverged_particles,
+                                  amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -164,6 +196,8 @@ public:
                         long np,
                         WarpXParIter& pti,
                         int lev,
+                        int n_field_gather_buffer,
+                        int n_current_deposition_buffer,
                         amrex::iMultiFab const* current_masks,
                         amrex::iMultiFab const* gather_masks );
 
@@ -189,7 +223,7 @@ public:
      * number of particles per cell (in the cells of `part_realbox`).
      * The new particles are only created inside the intersection of `part_realbox`
      * with the local grid for the current proc.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] lev the index of the refinement level
      * @param[in] part_realbox the box in which new particles should be created
      * (this box should correspond to an integer number of cells in each direction,
@@ -200,24 +234,19 @@ public:
     /**
      * Create new macroparticles for this species, with a fixed
      * number of particles per cell in a plane.
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] dt time step size, used to partially advance the particles
     */
     void AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt);
 
     void MapParticletoBoostedFrame (amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::ParticleReal& z,
                                     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
-                                    amrex::Real t_lab = 0.);
+                                    amrex::Real t_lab = 0.) const;
 
-    void AddGaussianBeam (
-        PlasmaInjector const& plasma_injector,
-        amrex::Real x_m, amrex::Real y_m, amrex::Real z_m,
-        amrex::Real x_rms, amrex::Real y_rms, amrex::Real z_rms,
-        amrex::Real x_cut, amrex::Real y_cut, amrex::Real z_cut,
-        amrex::Real q_tot, long npart, int do_symmetrize, int symmetrization_order);
+    void AddGaussianBeam (PlasmaInjector const& plasma_injector);
 
     /** Load a particle beam from an external file
-     * @param[in] the PlasmaInjector instance holding the input parameters
+     * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] q_tot total charge of the particle species to be initialized
      * @param[in] z_shift optional shift to the z position of particles (useful for boosted frame runs)
      */
@@ -236,7 +265,7 @@ public:
         amrex::Gpu::HostVector<amrex::ParticleReal>& particle_uy,
         amrex::Gpu::HostVector<amrex::ParticleReal>& particle_uz,
         amrex::Gpu::HostVector<amrex::ParticleReal>& particle_w,
-        amrex::Real t_lab= 0.);
+        amrex::Real t_lab= 0.) const;
 
     /**
      * \brief Default initialize runtime attributes in a tile. This routine does not initialize the
@@ -248,15 +277,11 @@ public:
      * These are NOT initialized by this function.
      * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
      * These are NOT initialized by this function.
-     * @param[in] engine the random engine, used in initialization of QED optical depths
      */
     void DefaultInitializeRuntimeAttributes (
-                    amrex::ParticleTile<amrex::Particle<NStructReal, NStructInt>,
-                                        NArrayReal, NArrayInt,
-                                        amrex::PinnedArenaAllocator>& pinned_tile,
-                    int n_external_attr_real,
-                    int n_external_attr_int,
-                    const amrex::RandomEngine& engine) final;
+        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        int n_external_attr_real,
+        int n_external_attr_int) final;
 
 /**
  * \brief Apply NCI Godfrey filter to all components of E and B before gather
@@ -315,9 +340,12 @@ public:
     * \brief This function determines if resampling should be done for the current species, and
     * if so, performs the resampling.
     *
+    * @param[in] geom the geometry of all refinement levels
     * @param[in] timestep the current timestep.
+    * @param[in] verbose flag to control if information on the resampling process is printed out.
     */
-    void resample (int timestep, bool verbose=true) final;
+    void resample (
+        const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose=true) final;
 
 #ifdef WARPX_QED
     //Functions decleared in WarpXParticleContainer.H
@@ -343,22 +371,72 @@ public:
      * @param[in] ptr the pointer
      */
     void set_breit_wheeler_engine_ptr
-        (std::shared_ptr<BreitWheelerEngine> ptr) override;
+        (const std::shared_ptr<BreitWheelerEngine>& ptr) override;
 
     /**
      * Acquires a shared smart pointer to a QuantumSynchrotronEngine
      * @param[in] ptr the pointer
      */
     void set_quantum_sync_engine_ptr
-        (std::shared_ptr<QuantumSynchrotronEngine> ptr) override;
+        (const std::shared_ptr<QuantumSynchrotronEngine>& ptr) override;
     //__________
+
+    BreitWheelerEngine* get_breit_wheeler_engine_ptr () const override {
+        return m_shr_p_bw_engine.get();
+    }
+
+    QuantumSynchrotronEngine* get_quantum_sync_engine_ptr () const override {
+        return m_shr_p_qs_engine.get();
+    }
 
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
     PairGenerationFilterFunc getPairGenerationFilterFunc ();
 #endif
 
+    std::vector<std::string> getUserIntAttribs () const override {
+        return m_user_int_attribs;
+    }
+
+    std::vector<std::string> getUserRealAttribs () const override {
+        return m_user_real_attribs;
+    }
+
+    amrex::Vector< amrex::Parser* > getUserIntAttribParser () const override {
+        return GetVecOfPtrs(m_user_int_attrib_parser);
+    }
+
+    amrex::Vector< amrex::Parser* > getUserRealAttribParser () const override {
+        return GetVecOfPtrs(m_user_real_attrib_parser);
+    }
+
+    // By default this returns false; overridden here to return runtime value
+    virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
+
+    virtual void AccumulateVelocitiesAndComputeTemperature (
+        ablastr::fields::MultiLevelVectorField const & T_vf,
+        amrex::Real relative_time) override;
+
+    virtual void DepositTemperature (
+        WarpXParIter& pti,
+        RealVector const & wp, RealVector const & uxp,
+        RealVector const & uyp, RealVector const & uzp,
+        amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
+        long const offset, long const np_to_deposit,
+        int const thread_num, const int lev, int const depos_lev,
+        amrex::Real const relative_time, PushType push_type,
+        const warpx::particles::deposition::TemperatureDepositionType type,
+        const warpx::particles::deposition::TemperatureDepositionPass pass) override;
+
 protected:
+
+    /*
+       Finds the box defining the region where refine injection should be used, if that
+       option is enabled. Currently this only works for numLevels() == 2 and static mesh
+       refinement.
+    */
+    bool findRefinedInjectionBox (amrex::Box& fine_injection_box, amrex::IntVect& rrfac);
+
     std::string species_name;
     std::vector<std::unique_ptr<PlasmaInjector>> plasma_injectors;
 
@@ -390,6 +468,11 @@ protected:
     // A flag to enable saving of the previous timestep positions
     bool m_save_previous_position = false;
 
+    // Flag controlling whether or not variance and then temperatures are computed per species
+    bool m_do_temperature_deposition = false;
+
+    std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
+
 #ifdef WARPX_QED
     // A flag to enable quantum_synchrotron process for leptons
     bool m_do_qed_quantum_sync = false;
@@ -408,9 +491,9 @@ protected:
     /* Vector of user-defined real attributes for species, species_name */
     std::vector<std::string> m_user_real_attribs;
     /* Vector of user-defined parser for initializing user-defined integer attributes */
-    std::vector< std::unique_ptr<amrex::Parser> > m_user_int_attrib_parser;
+    amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_int_attrib_parser;
     /* Vector of user-defined parser for initializing user-defined real attributes */
-    std::vector< std::unique_ptr<amrex::Parser> > m_user_real_attrib_parser;
+    amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_real_attrib_parser;
 
 };
 

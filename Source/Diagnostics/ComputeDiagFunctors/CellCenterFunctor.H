@@ -36,7 +36,7 @@ public:
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
     /** pointer to source multifab (can be multi-component) */
-    amrex::MultiFab const * const m_mf_src = nullptr;
+    const amrex::MultiFab* m_mf_src = nullptr;
     int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
     /**< (for cylindrical) whether to average all modes into 1 comp */
     bool m_convertRZmodes2cartesian;

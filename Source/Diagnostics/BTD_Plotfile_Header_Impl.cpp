@@ -22,7 +22,9 @@
 using namespace amrex::literals;
 
 BTDPlotfileHeaderImpl::BTDPlotfileHeaderImpl (std::string const & Headerfile_path)
-    : m_Header_path{Headerfile_path}
+    : m_Header_path{Headerfile_path},
+      m_glo{{AMREX_D_DECL(0., 0., 0.)}},
+      m_ghi{{AMREX_D_DECL(1., 1., 1.)}}
 {
 
 }
@@ -321,7 +323,7 @@ BTDMultiFabHeaderImpl::ResizeFabData ()
 }
 
 void
-BTDMultiFabHeaderImpl::SetFabName (int ifab, std::string fodPrefix, std::string FabName,
+BTDMultiFabHeaderImpl::SetFabName (int ifab, const std::string& fodPrefix, const std::string& FabName,
                                    int FabHead)
 {
     m_FabOnDiskPrefix[ifab] = fodPrefix;
@@ -331,13 +333,13 @@ BTDMultiFabHeaderImpl::SetFabName (int ifab, std::string fodPrefix, std::string 
 }
 
 void
-BTDMultiFabHeaderImpl::SetMinVal (int ifab, amrex::Vector<amrex::Real> minval)
+BTDMultiFabHeaderImpl::SetMinVal (int ifab, const amrex::Vector<amrex::Real>& minval)
 {
     CopyVec(m_minval[ifab], minval);
 }
 
 void
-BTDMultiFabHeaderImpl::SetMaxVal (int ifab, amrex::Vector<amrex::Real> maxval)
+BTDMultiFabHeaderImpl::SetMaxVal (int ifab, const amrex::Vector<amrex::Real>& maxval)
 {
     CopyVec(m_maxval[ifab], maxval);
 }
@@ -516,7 +518,7 @@ BTDParticleDataHeaderImpl::ReadHeader ()
 }
 
 void
-BTDParticleDataHeaderImpl::WriteHeader ()
+BTDParticleDataHeaderImpl::WriteHeader () const
 {
     if (amrex::FileExists(m_Header_path)) {
         amrex::FileSystem::Remove(m_Header_path);

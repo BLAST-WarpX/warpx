@@ -20,7 +20,7 @@ PsatdAlgorithmGalileanRZ::PsatdAlgorithmGalileanRZ (SpectralKSpaceRZ const & spe
                                                     amrex::DistributionMapping const & dm,
                                                     const SpectralFieldIndex& spectral_index,
                                                     int const n_rz_azimuthal_modes, int const norder_z,
-                                                    short const grid_type,
+                                                    ablastr::utils::enums::GridType grid_type,
                                                     const amrex::Vector<amrex::Real>& v_galilean,
                                                     amrex::Real const dt,
                                                     bool const update_with_rho):
@@ -142,7 +142,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                 Complex const divE = kr*(Ep_old - Em_old) + I*kz*Ez_old;
                 Complex const divJ = kr*(Jp - Jm) + I*kz*Jz;
 
-                auto const myeps0 = PhysConst::ep0;  // temporary for NVCC
+                auto const myeps0 = PhysConst::epsilon_0;  // temporary for NVCC
                 rho_diff = T2*(X2 - X3)*myeps0*divE + T_rho*X2*divJ;
             }
 
@@ -157,7 +157,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                         + T2*S_ck*(c2*I*kr*Bp_old + c2*I*kr*Bm_old)
                         + X4*Jz - I*kz*rho_diff;
             // Update B (see WarpX online documentation: theory section)
-            // Note: here X1 is T2*x1/(ep0*c*c*k_norm*k_norm), where
+            // Note: here X1 is T2*x1/(epsilon_0*c*c*k_norm*k_norm), where
             // x1 has the same definition as in the original paper
             fields(i,j,k,Bp_m) = T2*C*Bp_old
                         - T2*S_ck*(-I*kr/2._rt*Ez_old + kz*Ep_old)
@@ -196,7 +196,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         amrex::Array4<Complex> const& T_rho = T_rho_coef[mfi].array();
 
         // Extract real (for portability on GPU)
-        amrex::Real vz = m_v_galilean[2];
+        const amrex::Real vz = m_v_galilean[2];
 
         auto const & kr_modes = f.getKrArray(mfi);
         amrex::Real const* kr_arr = kr_modes.dataPtr();
@@ -209,7 +209,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int mode) noexcept
         {
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
 
             // Calculate norm of vector
@@ -247,7 +247,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
                     // update equation have been modified accordingly so that
                     // the expressions below (with the update equations)
                     // are mathematically equivalent to those of the paper.
-                    Complex x1 = 1._rt/(1._rt-nu*nu) *
+                    const Complex x1 = 1._rt/(1._rt-nu*nu) *
                         (theta_star - C(i,j,k,mode)*theta + I*kv*S_ck(i,j,k,mode)*theta);
                     // x1, above, is identical to the original paper
                     X1(i,j,k,mode) = theta*x1/(ep0*c*c*k_norm*k_norm);
@@ -300,7 +300,7 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         amrex::Box const & bx = field_data.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        amrex::Array4<Complex> fields = field_data.fields[mfi].array();
+        const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
         auto const & kr_modes = field_data.getKrArray(mfi);
@@ -309,8 +309,8 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         int const nr = bx.length(0);
 
         // Local copy of member variables before GPU loop
-        amrex::Real vz = m_v_galilean[2];
-        amrex::Real const dt = m_dt;
+        const amrex::Real vz = m_v_galilean[2];
+        const amrex::Real dt = m_dt;
 
         // Loop over indices within one box
         int const modes = field_data.n_rz_azimuthal_modes;

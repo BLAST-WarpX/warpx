@@ -1,0 +1,14 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.maxwell_solver = psatd
+amr.max_level = 1
+amr.ref_ratio = 4
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz
+psatd.current_correction = 0
+warpx.abort_on_warning_threshold = medium
+warpx.fine_tag_hi =  10.e-6  10.e-6
+warpx.fine_tag_lo = -10.e-6 -10.e-6
+warpx.use_filter = 1

@@ -14,17 +14,17 @@ Run
 The same input script can be used for 1d, 2d or 3d simulations and to sweep different
 temperature ratios.
 
-.. dropdown:: Script ``PICMI_inputs.py``
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_landau_damping_picmi.py``
 
-   .. literalinclude:: PICMI_inputs.py
+   .. literalinclude:: inputs_test_2d_ohm_solver_landau_damping_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_ion_Landau_damping/PICMI_inputs.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_ion_Landau_damping/inputs_test_2d_ohm_solver_landau_damping_picmi.py``.
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
    .. code-block:: bash
 
-      python3 PICMI_inputs.py -dim {1/2/3} --temp_ratio {value}
+      python3 inputs_test_2d_ohm_solver_landau_damping_picmi.py -dim {1/2/3} --temp_ratio {value}
 
 Analyze
 -------

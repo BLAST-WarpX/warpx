@@ -7,6 +7,11 @@ Checks: '
         -bugprone-unchecked-optional-access,
     cert-*,
         -cert-err58-cpp,
+    clang-analyzer-*,
+        -clang-analyzer-optin.performance.Padding,
+        -clang-analyzer-optin.mpi.MPI-Checker,
+        -clang-analyzer-osx.*,
+        -clang-analyzer-optin.osx.*,
     clang-diagnostic-*,
     cppcoreguidelines-*,
         -cppcoreguidelines-avoid-c-arrays,
@@ -14,24 +19,26 @@ Checks: '
         -cppcoreguidelines-avoid-non-const-global-variables,
         -cppcoreguidelines-init-variables,
         -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-missing-std-forward,
         -cppcoreguidelines-narrowing-conversions,
         -cppcoreguidelines-non-private-member-variables-in-classes,
         -cppcoreguidelines-owning-memory,
         -cppcoreguidelines-pro-*,
     google-build-explicit-make-pair,
     google-build-namespaces,
+    google-default-arguments,
+    google-explicit-constructor,
     google-global-names-in-headers,
     misc-*,
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
+        -misc-include-cleaner,
     modernize-*,
         -modernize-avoid-c-arrays,
         -modernize-return-braced-init-list,
         -modernize-use-trailing-return-type,
     mpi-*,
     performance-*,
-        -performance-unnecessary-copy-initialization,
-        -performance-unnecessary-value-param,
     portability-*,
     readability-*,
         -readability-convert-member-functions-to-static,
@@ -41,7 +48,6 @@ Checks: '
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
-        -readability-make-member-function-const,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix
     '
@@ -53,6 +59,9 @@ CheckOptions:
   value:        "H,"
 - key:          modernize-pass-by-value.ValuesOnly
   value:        "true"
-
+- key:          misc-use-anonymous-namespace.HeaderFileExtensions
+  value:        "H,"
+- key:          performance-move-const-arg.CheckTriviallyCopyableMove
+  value:        "false"
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'

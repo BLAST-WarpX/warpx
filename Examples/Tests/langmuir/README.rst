@@ -23,19 +23,20 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Python: Script
 
-            This example can be run as a **Python** script: ``python3 PICMI_inputs_3d.py``.
+            This example can be run as a **Python** script: ``python3 inputs_test_3d_langmuir_multi_picmi.py``.
 
-            .. literalinclude:: PICMI_inputs_3d.py
+            .. literalinclude:: inputs_test_3d_langmuir_multi_picmi.py
                :language: python3
-               :caption: You can copy this file from ``Examples/Tests/langmuir/PICMI_inputs_3d.py``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_3d_langmuir_multi_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_3d``
+            This example can be run as WarpX **executable** using an input file: ``warpx.3d inputs_base_3d``.
+            Check out ``Examples/Tests/langmuir/inputs_test_3d_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_3d
-               :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_3d``.
+            .. literalinclude:: inputs_base_3d
+               :language: none
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_3d``.
 
    .. tab-item:: 2D
 
@@ -43,19 +44,20 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Python: Script
 
-            This example can be run as a **Python** script: ``python3 PICMI_inputs_2d.py``.
+            This example can be run as a **Python** script: ``python3 inputs_test_2d_langmuir_multi_picmi.py``.
 
-            .. literalinclude:: PICMI_inputs_2d.py
+            .. literalinclude:: inputs_test_2d_langmuir_multi_picmi.py
                :language: python3
-               :caption: You can copy this file from ``Examples/Tests/langmuir/PICMI_inputs_2d.py``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_2d_langmuir_multi_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_2d``
+            This example can be run as WarpX **executable** using an input file: ``warpx.2d inputs_base_2d``
+            Check out ``Examples/Tests/langmuir/inputs_test_2d_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_2d
-               :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_2d``.
+            .. literalinclude:: inputs_base_2d
+               :language: none
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_2d``.
 
 
    .. tab-item:: RZ
@@ -64,19 +66,20 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
          .. tab-item:: Python: Script
 
-            This example can be run as a **Python** script: ``python3 PICMI_inputs_rz.py``.
+            This example can be run as a **Python** script: ``python3 inputs_test_rz_langmuir_multi_picmi.py``.
 
-            .. literalinclude:: PICMI_inputs_rz.py
+            .. literalinclude:: inputs_test_rz_langmuir_multi_picmi.py
                :language: python3
-               :caption: You can copy this file from ``Examples/Tests/langmuir/PICMI_inputs_rz.py``.
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_rz_langmuir_multi_picmi.py``.
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.rz inputs_rz``
+            This example can be run as WarpX **executable** using an input file: ``warpx.rz inputs_base_rz``
+            Check out ``Examples/Tests/langmuir/inputs_test_rz_langmuir_multi`` for additional input parameters.
 
-            .. literalinclude:: inputs_rz
-               :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_rz``.
+            .. literalinclude:: inputs_base_rz
+               :language: none
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_base_rz``.
 
 
    .. tab-item:: 1D
@@ -87,15 +90,15 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
             .. note::
 
-               TODO: This input file should be created, like the ``inputs_1d`` file.
+               TODO: This input file should be created, like the ``inputs_test_1d_langmuir_multi`` file.
 
          .. tab-item:: Executable: Input File
 
-            This example can be run as WarpX **executable** using an input file: ``warpx.1d inputs_1d``
+            This example can be run as WarpX **executable** using an input file: ``warpx.1d inputs_test_1d_langmuir_multi``
 
-            .. literalinclude:: inputs_1d
-               :language: ini
-               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_1d``.
+            .. literalinclude:: inputs_test_1d_langmuir_multi
+               :language: none
+               :caption: You can copy this file from ``Examples/Tests/langmuir/inputs_test_1d_langmuir_multi``.
 
 
 Analyze

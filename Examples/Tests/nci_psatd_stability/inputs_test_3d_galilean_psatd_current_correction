@@ -1,0 +1,10 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
+psatd.current_correction = 1
+psatd.periodic_single_box_fft = 0
+psatd.update_with_rho = 0
+psatd.v_galilean = 0. 0. 0.99498743710662
+warpx.numprocs = 1 1 2

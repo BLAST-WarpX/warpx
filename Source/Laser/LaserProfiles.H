@@ -286,7 +286,7 @@ private:
     /** \brief parse a field file in the HDF5 'lasy' format
     * \param lasy_file_name: name of the lasy file to parse
     */
-    void parse_lasy_file(std::string lasy_file_name);
+    void parse_lasy_file(const std::string& lasy_file_name);
 
     /** \brief parse a field file in the binary 'binary' format (whose details are given below).
     *
@@ -301,7 +301,7 @@ private:
     * The spatiotemporal grid must be rectangular and uniform.
     * \param binary_file_name: name of the binary file to parse
     */
-    void parse_binary_file(std::string binary_file_name);
+    void parse_binary_file(const std::string& binary_file_name);
 
     /** \brief Finds left and right time indices corresponding to time t
     *
