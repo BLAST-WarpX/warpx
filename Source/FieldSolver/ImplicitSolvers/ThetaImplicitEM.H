@@ -89,17 +89,10 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
 
-    // This container is used to apply the boundary conditions in the curl curl matrix
-    // when constructing the full matrix as used in the PETSc preconditioner
-    amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>,3>> m_curl2_BC_mask;
-
     /**
      * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
-    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override
-    {
-        return m_curl2_BC_mask[lev][field_dir].get();
-    }
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
 
     /**
      * \brief Inititialize the BC masks for the curl curl operator

@@ -179,6 +179,14 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 
 }
 
+const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int field_dir) const
+{
+    using ablastr::fields::Direction;
+    const amrex::MultiFab* mask = m_WarpX->m_fields.get(FieldType::curl2_BC_mask, Direction{field_dir}, lev);
+    //return m_WarpX->m_fields.get(FieldType::curl2_BC_mask, Direction{field_dir}, lev);
+    return mask;
+}
+
 void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 {
 
@@ -217,7 +225,6 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     */
 
     using ablastr::fields::Direction;
-    m_curl2_BC_mask.resize(m_num_amr_levels);
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const amrex::IntVect ghosts = amrex::IntVect{0};
         const auto& dm = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->DistributionMap();
@@ -237,15 +244,13 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         const int ncomps_Ey = 6;
         const int ncomps_Ez = 6;
 #endif
-        m_curl2_BC_mask[lev][0] = std::make_unique<amrex::MultiFab>(ba_Ex, dm, ncomps_Ex, ghosts);
-        m_curl2_BC_mask[lev][1] = std::make_unique<amrex::MultiFab>(ba_Ey, dm, ncomps_Ey, ghosts);
-        m_curl2_BC_mask[lev][2] = std::make_unique<amrex::MultiFab>(ba_Ez, dm, ncomps_Ez, ghosts);
-        m_curl2_BC_mask[lev][0]->setVal(1.0);
-        m_curl2_BC_mask[lev][1]->setVal(1.0);
-        m_curl2_BC_mask[lev][2]->setVal(1.0);
+        m_WarpX->m_fields.alloc_init(FieldType::curl2_BC_mask, Direction{0}, lev, ba_Ex, dm, ncomps_Ex, ghosts, 1.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::curl2_BC_mask, Direction{1}, lev, ba_Ey, dm, ncomps_Ey, ghosts, 1.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::curl2_BC_mask, Direction{2}, lev, ba_Ez, dm, ncomps_Ez, ghosts, 1.0_rt);
     }
 
-    const amrex::Geometry& geom = GetGeometry(0);
+    const int lev = 0;
+    const amrex::Geometry& geom = GetGeometry(lev);
     amrex::Box domain_box = geom.Domain();
     domain_box.convert(amrex::IntVect::TheNodeVector());
     const amrex::IntVect domain_lo = domain_box.smallEnd();
@@ -254,10 +259,10 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_lo = GetFieldBoundaryLo();
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_hi = GetFieldBoundaryHi();
 
-    const int lev = 0;
+    ablastr::fields::VectorField curl2_BC_mask = m_WarpX->m_fields.get_alldirs(FieldType::curl2_BC_mask, lev);
 #if AMREX_SPACEDIM < 3
     // Set the BC masks for the out-of-plane components of the curl curl E operator
-    for (amrex::MFIter mfi(*m_curl2_BC_mask[lev][1], false); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(*curl2_BC_mask[1], false); mfi.isValid(); ++mfi) {
 
         // Get nodal box that does not include ghost cells
         const amrex::Box node_box = amrex::convert(mfi.validbox(),amrex::IntVect::TheNodeVector());
@@ -304,9 +309,9 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
                 // Set mask values on the boundary cells (same for Ex and Ey for 1D_Z)
 #if defined(WARPX_DIM_1D_Z)
-                amrex::Array4<amrex::Real> const& maskEx_arr = m_curl2_BC_mask[lev][0]->array(mfi);
+                amrex::Array4<amrex::Real> const& maskEx_arr = curl2_BC_mask[0]->array(mfi);
 #endif
-                amrex::Array4<amrex::Real> const& maskEy_arr = m_curl2_BC_mask[lev][1]->array(mfi);
+                amrex::Array4<amrex::Real> const& maskEy_arr = curl2_BC_mask[1]->array(mfi);
                 amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 #if defined(WARPX_DIM_1D_Z)
                     maskEx_arr(i,j,k,2*bdry_dir  ) = val0;
@@ -325,7 +330,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
 #if AMREX_SPACEDIM > 1
     // Set the BC masks for the in-plane components of the curl curl E operator
-    for (amrex::MFIter mfi(*m_curl2_BC_mask[lev][0], false); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(*curl2_BC_mask[0], false); mfi.isValid(); ++mfi) {
 
         for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
 
@@ -343,7 +348,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                 const int tdir1 = bdry_dir;
 #endif
                 // Get edge box for Ecomp (nodal in bdry-direction) that does not include ghost cells
-                const amrex::IntVect Edir_nodal = m_curl2_BC_mask[lev][field_dir]->ixType().toIntVect();
+                const amrex::IntVect Edir_nodal = curl2_BC_mask[field_dir]->ixType().toIntVect();
                 const amrex::Box edge_box = amrex::convert(mfi.validbox(),Edir_nodal);
 
                 for (int bdry_side = 0; bdry_side < 2; ++bdry_side) {
@@ -384,7 +389,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
                     // Set mask values on the boundary cells
                     const int comp_shift = (tdir1 == bdry_dir) ? 0:3;
-                    amrex::Array4<amrex::Real> const& mask_arr = m_curl2_BC_mask[lev][field_dir]->array(mfi);
+                    amrex::Array4<amrex::Real> const& mask_arr = curl2_BC_mask[field_dir]->array(mfi);
                     amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         mask_arr(i,j,k,comp_shift+0) = val0;
                         mask_arr(i,j,k,comp_shift+1) = val1;
