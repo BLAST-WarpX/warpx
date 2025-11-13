@@ -3832,6 +3832,8 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     The precision used when writing out the data to the text files.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.precision``.
 
+.. _running-cpp-parameters-qed:
+
 QED
 ---
 
@@ -3848,6 +3850,11 @@ Nonlinear Compton scattering
     `<species>` must be either an electron or a positron species.
     **This feature requires to compile with QED=TRUE**
 
+* ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
+    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
+    (the name of an existing photon species must be provided)
+    **This feature requires to compile with QED=TRUE**
+
 * ``<species>.do_classical_radiation_reaction`` (`int`) optional (default `0`)
     Enables Radiation Reaction (or Radiation Friction) for the species. Species
     must be either electrons or positrons. Boris pusher must be used for the
@@ -3856,10 +3863,6 @@ Nonlinear Compton scattering
     will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
     the discrete quantum module otherwise.
 
-* ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
-    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
-    (the name of an existing photon species must be provided)
-    **This feature requires to compile with QED=TRUE**
 
 Nonlinear Breit-Wheeler
 ^^^^^^^^^^^^^^^^^^^^^^^
