@@ -3862,7 +3862,7 @@ Nonlinear Compton scattering
     **This feature requires to compile with QED=TRUE**
 
 Nonlinear Breit-Wheeler
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 * ``<species>.do_qed_breit_wheeler`` (`int`) optional (default `0`)
     Enables non-linear Breit-Wheeler process for this species.
