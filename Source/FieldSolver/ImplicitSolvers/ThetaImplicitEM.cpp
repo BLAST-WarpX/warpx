@@ -197,14 +197,14 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
     In general, one mask is needed for each derivative in each component of the operator.
     However, for a second order Yee grid where E lives on cell edges, no masks are
-    required for terms such as dEi/di with i = x, y, z.
+    required for terms that do not use ghost cell values, such as dEi/di for i = x, y, z.
     1D: The out-of-line x- and y-components have two masks. The first is for the diagonal term of
         the 2nd derivative operator and the second mask is for the off-diagonal term.
         No masks are needed for the in-line z-component of the curl curl operator.
     2D: There are three masks for each of the in-plane x- and z-components. The first two
         are for the diagonal, and off-diagonal terms of the 2nd derivative operator, respectively.
         The third term is for the cross term. The out-of-plane y-component requires four masks.
-        The first two are for the d2/dx2 operator, and the last two are for the d2/dy2 operator.
+        The first two are for the d2/dx2 operator, and the last two are for the d2/dz2 operator.
     3D: Six masks are required for each component of the curl-curl operator in 3D.
         For the x-component, the first two are for the d2/dy2 operator, the second two are for
         the d2/dz2 operator, the fifth term is for the d/dx[Ey] operator, and the sixth term
@@ -213,7 +213,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
     Example: Consider the second derivative operator at a symmetry boundary at the lower-boundary.
         In this case, the operator transforms as [1 -2 1] ==> [0 -2 2]. In terms of the masks,
-        the mask for the diagonal term (-2) is 1 and the mask for the off-diagonal term (1) is 2.
+        the mask for the diagonal term is 1 and the mask for the off-diagonal term is 2.
     */
 
     using ablastr::fields::Direction;
