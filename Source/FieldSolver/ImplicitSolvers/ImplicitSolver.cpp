@@ -722,7 +722,7 @@ void ImplicitSolver::InitializeMassMatrices ()
     // Set the pointer to mass matrix MultiFab
     if (m_use_mass_matrices_pc) {
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, 0));
+            m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev));
         }
     }
 
