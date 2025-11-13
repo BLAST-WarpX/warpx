@@ -74,7 +74,7 @@ check_interval=200  # check every 200 seconds
 while kill -0 "$srun_pid" 2>/dev/null
 do
     sleep ${check_interval}
-    
+
     # Check if output file has been modified recently
     if [[ -f ${WARPX_OUTPUT} ]]; then
         file_mtime=$(stat -c %Y ${WARPX_OUTPUT})
