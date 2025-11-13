@@ -1425,43 +1425,6 @@ Particle initialization
     species (must be smaller than the atomic number of chemical element given
     in `physical_element`).
 
-* ``<species>.do_classical_radiation_reaction`` (`int`) optional (default `0`)
-    Enables Radiation Reaction (or Radiation Friction) for the species. Species
-    must be either electrons or positrons. Boris pusher must be used for the
-    simulation. If both ``<species>.do_classical_radiation_reaction`` and
-    ``<species>.do_qed_quantum_sync`` are enabled, then the classical module
-    will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
-    the discrete quantum module otherwise.
-
-* ``<species>.do_qed_quantum_sync`` (`int`) optional (default `0`)
-    Enables Quantum synchrotron emission for this species.
-    Quantum synchrotron lookup table should be either generated or loaded from disk to enable
-    this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be either an electron or a positron species.
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.do_qed_breit_wheeler`` (`int`) optional (default `0`)
-    Enables non-linear Breit-Wheeler process for this species.
-    Breit-Wheeler lookup table should be either generated or loaded from disk to enable
-    this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
-    **This feature requires to compile with -DWarpX_QED=ON**
-
-* ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
-    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
-    (the name of an existing photon species must be provided)
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.qed_breit_wheeler_ele_product_species`` (`string`)
-    If a photon species has the Breit-Wheeler process, an electron product species must be specified
-    (the name of an existing electron species must be provided)
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.qed_breit_wheeler_pos_product_species`` (`string`)
-    If a photon species has the Breit-Wheeler process, a positron product species must be specified
-    (the name of an existing positron species must be provided).
-    **This feature requires to compile with QED=TRUE**
-
 * ``<species>.do_resampling`` (`0` or `1`) optional (default `0`)
     If `1` resampling is performed for this species. This means that the number of macroparticles
     will be reduced at specific timesteps while preserving the distribution function as much as
@@ -2783,17 +2746,6 @@ Additional parameters
     Note that if Perfectly Matched Layers (PML) are used, synchronization of the `E` and `B` fields
     is performed at every timestep regardless of this parameter.
 
-* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
-    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
-    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
-    Note that this option can only be used with the PSATD build. Furthermore, one must set
-    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
-
-* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
-     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
-     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
-     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
-
 * ``warpx.do_device_synchronize`` (`bool`) optional (default `1`)
     When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
@@ -3880,8 +3832,109 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     The precision used when writing out the data to the text files.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.precision``.
 
-Lookup tables and other settings for QED modules
-------------------------------------------------
+QED
+---
+
+Nonlinear Compton scattering
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
+    Energy threshold for photon particle creation in `*me*c^2` units.
+
+* ``<species>.do_qed_quantum_sync`` (`int`) optional (default `0`)
+    Enables Quantum synchrotron emission for this species.
+    Quantum synchrotron lookup table should be either generated or loaded from disk to enable
+    this process (see "Lookup tables for QED modules" section below).
+    `<species>` must be either an electron or a positron species.
+    **This feature requires to compile with QED=TRUE**
+
+* ``<species>.do_classical_radiation_reaction`` (`int`) optional (default `0`)
+    Enables Radiation Reaction (or Radiation Friction) for the species. Species
+    must be either electrons or positrons. Boris pusher must be used for the
+    simulation. If both ``<species>.do_classical_radiation_reaction`` and
+    ``<species>.do_qed_quantum_sync`` are enabled, then the classical module
+    will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
+    the discrete quantum module otherwise.
+
+* ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
+    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
+    (the name of an existing photon species must be provided)
+    **This feature requires to compile with QED=TRUE**
+
+Nonlinear Breit-Wheeler
+-----------------------
+
+* ``<species>.do_qed_breit_wheeler`` (`int`) optional (default `0`)
+    Enables non-linear Breit-Wheeler process for this species.
+    Breit-Wheeler lookup table should be either generated or loaded from disk to enable
+    this process (see "Lookup tables for QED modules" section below).
+    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
+    **This feature requires to compile with -DWarpX_QED=ON**
+
+* ``<species>.qed_breit_wheeler_ele_product_species`` (`string`)
+    If a photon species has the Breit-Wheeler process, an electron product species must be specified
+    (the name of an existing electron species must be provided)
+    **This feature requires to compile with QED=TRUE**
+
+* ``<species>.qed_breit_wheeler_pos_product_species`` (`string`)
+    If a photon species has the Breit-Wheeler process, a positron product species must be specified
+    (the name of an existing positron species must be provided).
+    **This feature requires to compile with QED=TRUE**
+
+
+Schwinger process
+^^^^^^^^^^^^^^^^^
+
+* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
+    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
+    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
+    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
+    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
+    Schwinger process requires either ``warpx.grid_type = collocated`` or
+    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
+    at the same location in the grid) and does not currently support mesh refinement, cylindrical
+    coordinates or single precision.
+
+* ``qed_schwinger.ele_product_species`` (`string`)
+    If Schwinger process is activated, an electron product species must be specified
+    (the name of an existing electron species must be provided).
+
+* ``qed_schwinger.pos_product_species`` (`string`)
+    If Schwinger process is activated, a positron product species must be specified
+    (the name of an existing positron species must be provided).
+
+* ``qed_schwinger.y_size`` (`float`; in meters)
+    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
+    It is used to convert the pair production rate per unit volume into an actual number of created particles.
+    This value should correspond to the typical transverse extent for which the EM field has a very high value
+    (e.g. the beam waist for a focused laser beam).
+
+* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
+    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
+    which Schwinger pairs can be created.
+    The same is applicable in the other directions.
+
+* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
+    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
+    a Poisson distribution is used to draw the actual number of physical pairs created.
+    Otherwise a Gaussian distribution is used.
+    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
+    per timestep per species (with a weight corresponding to the number of physical pairs created).
+
+* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
+    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
+    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
+    Note that this option can only be used with the PSATD build. Furthermore, one must set
+    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
+
+* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
+     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
+     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
+     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
+
+
+Lookup tables
+^^^^^^^^^^^^^
 
 Lookup tables store pre-computed values for functions used by the QED modules.
 **This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
@@ -3968,44 +4021,6 @@ Lookup tables store pre-computed values for functions used by the QED modules.
 * ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
     (suggested value : 0.001)
 
-* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
-    Energy threshold for photon particle creation in `*me*c^2` units.
-
-* ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
-    If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
-    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
-    ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
-    Schwinger process requires either ``warpx.grid_type = collocated`` or
-    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
-    at the same location in the grid) and does not currently support mesh refinement, cylindrical
-    coordinates or single precision.
-
-* ``qed_schwinger.ele_product_species`` (`string`)
-    If Schwinger process is activated, an electron product species must be specified
-    (the name of an existing electron species must be provided).
-
-* ``qed_schwinger.pos_product_species`` (`string`)
-    If Schwinger process is activated, a positron product species must be specified
-    (the name of an existing positron species must be provided).
-
-* ``qed_schwinger.y_size`` (`float`; in meters)
-    If Schwinger process is activated with ``DIM=2D``, a transverse size must be specified.
-    It is used to convert the pair production rate per unit volume into an actual number of created particles.
-    This value should correspond to the typical transverse extent for which the EM field has a very high value
-    (e.g. the beam waist for a focused laser beam).
-
-* ``qed_schwinger.xmin,ymin,zmin`` and ``qed_schwinger.xmax,ymax,zmax`` (`float`) optional (default unlimited)
-    When ``qed_schwinger.xmin`` and ``qed_schwinger.xmax`` are set, they delimit the region within
-    which Schwinger pairs can be created.
-    The same is applicable in the other directions.
-
-* ``qed_schwinger.threshold_poisson_gaussian`` (`integer`) optional (default `25`)
-    If the expected number of physical pairs created in a cell at a given timestep is smaller than this threshold,
-    a Poisson distribution is used to draw the actual number of physical pairs created.
-    Otherwise a Gaussian distribution is used.
-    Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
-    per timestep per species (with a weight corresponding to the number of physical pairs created).
 
 Checkpoints and restart
 -----------------------
