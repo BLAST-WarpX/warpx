@@ -764,13 +764,16 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
         // Coarsen and refine so that the new BoxArray is coarsenable.
         ba.coarsen(m_crse_ratio).refine(m_crse_ratio);
 
+        // Box covering the extent of the user-defined diagnostic domain
+        amrex::Box const domain = ba.minimalBox();
+
         // Update the physical co-ordinates m_lo and m_hi using the final index values
         // from the coarsenable, cell-centered BoxArray, ba.
         for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             diag_dom.setLo( idim, warpx.Geom(lev).ProbLo(idim) +
-                ba.getCellCenteredBox(0).smallEnd(idim) * warpx.Geom(lev).CellSize(idim));
+                domain.smallEnd(idim) * warpx.Geom(lev).CellSize(idim));
             diag_dom.setHi( idim, warpx.Geom(lev).ProbLo(idim) +
-                (ba.getCellCenteredBox( static_cast<int>(ba.size())-1 ).bigEnd(idim) + 1) * warpx.Geom(lev).CellSize(idim));
+                (domain.bigEnd(idim) + 1) * warpx.Geom(lev).CellSize(idim));
         }
 
     }
