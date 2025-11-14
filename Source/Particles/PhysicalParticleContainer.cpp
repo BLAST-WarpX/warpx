@@ -436,7 +436,7 @@ PhysicalParticleContainer::CheckInitialParticleVelocity () const
         const InjectorPosition* inj_pos = plasma_injector->getInjectorPosition();
         const InjectorDensity* inj_rho = plasma_injector->getInjectorDensity();
         const InjectorMomentum* inj_mom = plasma_injector->getInjectorMomentumDevice();
-        
+
         if (inj_mom == nullptr) {
             continue;  // No momentum specified
         }
@@ -562,7 +562,7 @@ PhysicalParticleContainer::CheckInitialParticleVelocity () const
 #endif
             warnMsg << ") m\n";
             if (moving_window_v != 0.0_rt) {
-                warnMsg << "  Moving window velocity: " << moving_window_v 
+                warnMsg << "  Moving window velocity: " << moving_window_v
                         << " (already subtracted from particle velocity)\n";
             }
             warnMsg << "\n"
@@ -592,7 +592,7 @@ PhysicalParticleContainer::CheckInitialParticleVelocity () const
                 warnMsg.str(), ablastr::warn_manager::WarnPriority::medium);
         } else if (max_displacement > 1.0_rt) {
             std::stringstream warnMsg;
-            warnMsg << "\nINFO: Particle velocity for species '" << species_name 
+            warnMsg << "\nINFO: Particle velocity for species '" << species_name
                     << "' exceeds 1 cell/timestep\n"
                     << "  Maximum displacement: " << max_displacement << " cells/timestep\n";
             ablastr::warn_manager::WMRecordWarning("Species: " + species_name,

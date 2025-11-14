@@ -72,7 +72,7 @@ public:
 
     /**
      * \brief Check particle velocity constraints before initialization
-     * 
+     *
      * Validates that particle velocities from injector momentum profiles
      * do not cause particles to cross more than one cell per timestep, which
      * could lead to unphysical artifacts.

@@ -1347,17 +1347,17 @@ Particle initialization
     could have velocities that would cause them to cross multiple cells per timestep.
     This check evaluates the momentum functions at all cell centers where particles will
     be initialized and issues warnings if the displacement exceeds safe limits:
-    
+
     * **CRITICAL** warning if displacement > sqrt(3) cells/timestep (3D diagonal)
     * **WARNING** if displacement > sqrt(2) cells/timestep (2D diagonal)
     * **INFO** if displacement > 1 cell/timestep
-    
+
     Excessive velocities lead to physically incorrect results because particles skip cells
     during the push, causing incorrect current deposition and field gathering.
     This check accounts for moving window velocities.
-    Combine this check with `warpx.always_warn_immediately = 1` and 
+    Combine this check with `warpx.always_warn_immediately = 1` and
     `warpx.abort_on_warning_threshold = high` to abort simulation runs when this warning is triggered.
-    
+
     Set to `0` to disable this check for special use cases (e.g., passive test particles).
 
 * ``<species_name>.addIntegerAttributes`` (list of `string`)
