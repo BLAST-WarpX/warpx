@@ -183,7 +183,6 @@ const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int
 {
     using ablastr::fields::Direction;
     const amrex::MultiFab* mask = m_WarpX->m_fields.get(FieldType::curl2_BC_mask, Direction{field_dir}, lev);
-    //return m_WarpX->m_fields.get(FieldType::curl2_BC_mask, Direction{field_dir}, lev);
     return mask;
 }
 
