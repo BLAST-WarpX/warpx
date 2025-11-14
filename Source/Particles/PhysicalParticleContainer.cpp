@@ -13,6 +13,7 @@
 #include "Fields.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/PlasmaInjector.H"
+#include "Initialization/InjectorPosition.H"
 #include "MultiParticleContainer.H"
 #include "Parallelization/WarpXSumGuardCells.H"
 #ifdef WARPX_QED
@@ -397,8 +398,207 @@ PhysicalParticleContainer::BackwardCompatibility ()
 
 void PhysicalParticleContainer::InitData ()
 {
+    CheckInitialParticleVelocity();  // Check velocity constraints
     AddParticles(0); // Note - add on level 0
     Redistribute();  // We then redistribute
+}
+
+void
+PhysicalParticleContainer::CheckInitialParticleVelocity () const
+{
+    using namespace amrex::literals;
+
+    // Allow users to opt-out of this check
+    bool do_velocity_check = true;
+    const ParmParse pp_species_name(species_name);
+    pp_species_name.query("do_initial_velocity_check", do_velocity_check);
+    if (!do_velocity_check) { return; }
+
+    // Get level 0 geometry and timestep
+    constexpr int lev0 = 0;
+    const auto& geom = Geom(lev0);
+    const auto dx = geom.CellSizeArray();
+    const auto problo = geom.ProbLoArray();
+    const amrex::Box domain = geom.Domain();
+    const amrex::Real dt = WarpX::GetInstance().getdt(lev0);
+    // Get moving window parameters
+    const bool moving_window_active = WarpX::moving_window_active(0);
+    const amrex::Real moving_window_v = moving_window_active ? WarpX::moving_window_v : 0.0_rt;
+    const int moving_window_dir = WarpX::moving_window_dir;
+
+    // Check each plasma injector for this species
+    for (auto const& plasma_injector : plasma_injectors) {
+        if (!plasma_injector->doInjection()) {
+            continue;  // Skip injectors that won't inject particles
+        }
+
+        // Get device-side injectors for parallel evaluation
+        const InjectorPosition* inj_pos = plasma_injector->getInjectorPosition();
+        const InjectorDensity* inj_rho = plasma_injector->getInjectorDensity();
+        const InjectorMomentum* inj_mom = plasma_injector->getInjectorMomentumDevice();
+        
+        if (inj_mom == nullptr) {
+            continue;  // No momentum specified
+        }
+
+        // Create a single-component MultiFab to store max displacement per cell
+        const amrex::BoxArray ba(domain);
+        const amrex::DistributionMapping dm(ba);
+        amrex::MultiFab max_disp_mf(ba, dm, 1, 0);
+        max_disp_mf.setVal(0.0_rt);
+
+        // Threshold values (crossing a cubic cell diagonal in 2D and 3D)
+        const amrex::Real sqrt3 = std::sqrt(3.0_rt);
+        const amrex::Real sqrt2 = std::sqrt(2.0_rt);
+
+        // Check all cells in parallel
+        for (amrex::MFIter mfi(max_disp_mf); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& box = mfi.validbox();
+            amrex::Array4<amrex::Real> const& disp_arr = max_disp_mf.array(mfi);
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+                // Get cell center coordinates
+#if defined(WARPX_DIM_3D)
+                const amrex::Real x = problo[0] + (i + 0.5_rt) * dx[0];
+                const amrex::Real y = problo[1] + (j + 0.5_rt) * dx[1];
+                const amrex::Real z = problo[2] + (k + 0.5_rt) * dx[2];
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                const amrex::Real x = problo[0] + (i + 0.5_rt) * dx[0];
+                const amrex::Real y = 0.0_rt;
+                const amrex::Real z = problo[1] + (j + 0.5_rt) * dx[1];
+#elif defined(WARPX_DIM_1D_Z)
+                const amrex::Real x = 0.0_rt;
+                const amrex::Real y = 0.0_rt;
+                const amrex::Real z = problo[0] + (i + 0.5_rt) * dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::Real x = problo[0] + (i + 0.5_rt) * dx[0];
+                const amrex::Real y = 0.0_rt;
+                const amrex::Real z = 0.0_rt;
+#endif
+
+                // Check if this cell would have particles
+                if (inj_pos != nullptr && !inj_pos->insideBounds(x, y, z)) {
+                    disp_arr(i,j,k) = 0.0_rt;
+                    return;
+                }
+                if (inj_rho != nullptr && inj_rho->getDensity(x, y, z) <= 0.0_rt) {
+                    disp_arr(i,j,k) = 0.0_rt;
+                    return;
+                }
+
+                // Get bulk momentum at cell center
+                const auto [ux, uy, uz] = inj_mom->getBulkMomentum(x, y, z);
+
+                // Convert momentum u = gamma*beta to velocity v = beta*c
+                // where u = gamma*v/c, so v = (u/gamma)*c
+                const amrex::Real u_mag_sq = ux*ux + uy*uy + uz*uz;
+                const amrex::Real gamma = std::sqrt(1.0_rt + u_mag_sq);
+                amrex::Real vx = (ux / gamma) * PhysConst::c;
+                amrex::Real vy = (uy / gamma) * PhysConst::c;
+                amrex::Real vz = (uz / gamma) * PhysConst::c;
+
+                // Subtract moving window velocity
+                if (moving_window_v != 0.0_rt) {
+                    if (moving_window_dir == 0) {
+                        vx -= moving_window_v;
+                    } else if (moving_window_dir == 1) {
+#if AMREX_SPACEDIM >= 2
+                        vy -= moving_window_v;
+#endif
+                    } else if (moving_window_dir == 2) {
+                        vz -= moving_window_v;
+                    }
+                }
+
+                // Calculate displacement: s = |v| * dt
+                const amrex::Real sx = std::abs(vx * dt);
+                const amrex::Real sy = std::abs(vy * dt);
+                const amrex::Real sz = std::abs(vz * dt);
+
+                // Check against cell size
+                const amrex::Real sx_over_dx = (dx[0] > 0.0_rt) ? sx / dx[0] : 0.0_rt;
+#if AMREX_SPACEDIM >= 2
+                const amrex::Real sy_over_dy = (dx[1] > 0.0_rt) ? sy / dx[1] : 0.0_rt;
+#else
+                const amrex::Real sy_over_dy = 0.0_rt;
+#endif
+#if AMREX_SPACEDIM == 3
+                const amrex::Real sz_over_dz = (dx[2] > 0.0_rt) ? sz / dx[2] : 0.0_rt;
+#elif AMREX_SPACEDIM == 2
+                const amrex::Real sz_over_dz = (dx[1] > 0.0_rt) ? sz / dx[1] : 0.0_rt;
+#else
+                const amrex::Real sz_over_dz = (dx[0] > 0.0_rt) ? sz / dx[0] : 0.0_rt;
+#endif
+
+                disp_arr(i,j,k) = amrex::max(sx_over_dx, sy_over_dy, sz_over_dz);
+            });
+        }
+
+        // Find maximum displacement across all cells
+        const amrex::Real max_displacement = max_disp_mf.max(0);
+
+        // Issue warnings based on severity
+        if (max_displacement > sqrt3) {
+            std::stringstream warnMsg;
+            warnMsg << "\n"
+                    << "===============================================================================\n"
+                    << "  Possibly CRITICAL: Excessive particle velocity for species '" << species_name << "'\n"
+                    << "===============================================================================\n"
+                    << "\n"
+                    << "  Particles will cross MANY cells per timestep!\n"
+                    << "\n"
+                    << "  Maximum displacement found: " << max_displacement << " cells per timestep\n"
+                    << "  Exceeds 3D diagonal limit of sqrt(3) = " << sqrt3 << " cells\n"
+                    << "\n"
+                    << "  dt = " << dt << " s\n"
+                    << "  dx = (" << dx[0];
+#if AMREX_SPACEDIM >= 2
+            warnMsg << ", " << dx[1];
+#endif
+#if AMREX_SPACEDIM == 3
+            warnMsg << ", " << dx[2];
+#endif
+            warnMsg << ") m\n";
+            if (moving_window_v != 0.0_rt) {
+                warnMsg << "  Moving window velocity: " << moving_window_v 
+                        << " (already subtracted from particle velocity)\n";
+            }
+            warnMsg << "\n"
+                    << "  CONSEQUENCES:\n"
+                    << "  - Particles skip many cells during push\n"
+                    << "  - Current deposition will be INCORRECT\n"
+                    << "  - Field gather will miss intermediate fields\n"
+                    << "  - Simulation results are PHYSICALLY WRONG\n"
+                    << "\n"
+                    << "  SOLUTIONS:\n"
+                    << "  1. Reduce timestep: warpx.max_dt or warpx.cfl\n"
+                    << "  2. Reduce particle momentum/velocity\n"
+                    << "  3. Increase resolution (smaller dx)\n"
+                    << "  4. Check momentum_function_ux/uy/uz values and units\n"
+                    << "     Reminder: u = p/(m*c) = gamma*beta, NOT velocity!\n"
+                    << "\n"
+                    << "===============================================================================\n";
+            ablastr::warn_manager::WMRecordWarning("Species: " + species_name,
+                warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
+        } else if (max_displacement > sqrt2) {
+            std::stringstream warnMsg;
+            warnMsg << "\nWARNING: Large particle velocity for species '" << species_name << "'\n"
+                    << "  Maximum displacement: " << max_displacement << " cells/timestep\n"
+                    << "  Exceeds 2D diagonal sqrt(2) = " << sqrt2 << "\n"
+                    << "  May cause unphysical artifacts. Consider reducing timestep or velocities.\n";
+            ablastr::warn_manager::WMRecordWarning("Species: " + species_name,
+                warnMsg.str(), ablastr::warn_manager::WarnPriority::medium);
+        } else if (max_displacement > 1.0_rt) {
+            std::stringstream warnMsg;
+            warnMsg << "\nINFO: Particle velocity for species '" << species_name 
+                    << "' exceeds 1 cell/timestep\n"
+                    << "  Maximum displacement: " << max_displacement << " cells/timestep\n";
+            ablastr::warn_manager::WMRecordWarning("Species: " + species_name,
+                warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
+        }
+    }
 }
 
 void

@@ -70,6 +70,15 @@ public:
 
     void InitData () override;
 
+    /**
+     * \brief Check particle velocity constraints before initialization
+     * 
+     * Validates that particle velocities from injector momentum profiles
+     * do not cause particles to cross more than one cell per timestep, which
+     * could lead to unphysical artifacts.
+     */
+    void CheckInitialParticleVelocity () const;
+
     void ReadHeader (std::istream& is) override;
 
     void WriteHeader (std::ostream& os) const override;
