@@ -515,6 +515,7 @@ PhysicalParticleContainer::CheckInitialParticleVelocity () const
                 // Calculate displacement: s = |v| * dt
                 const amrex::Real sx = std::abs(vx * dt);
                 const amrex::Real sy = std::abs(vy * dt);
+                amrex::ignore_unused(sy);
                 const amrex::Real sz = std::abs(vz * dt);
 
                 // Check against cell size
