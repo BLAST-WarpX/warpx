@@ -709,8 +709,8 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
     // Find if user-defined physical dimensions are different from the simulation domain.
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
          // To ensure that the diagnostic lo and hi are within the domain defined at level, lev.
-        diag_dom.setLo(idim, std::max(m_lo[idim],warpx.Geom(lev).ProbLo(idim)) );
-        diag_dom.setHi(idim, std::min(m_hi[idim],warpx.Geom(lev).ProbHi(idim)) );
+        diag_dom.setLo(idim, warpx.Geom(lev).ProbLo(idim) );
+        diag_dom.setHi(idim, warpx.Geom(lev).ProbHi(idim) );
         if ( std::fabs(warpx.Geom(lev).ProbLo(idim) - diag_dom.lo(idim))
                                >  warpx.Geom(lev).CellSize(idim) ) {
              use_warpxba = false;
