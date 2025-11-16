@@ -353,6 +353,46 @@ namespace
 
 }
 
+amrex::Real
+WarpX::CalculateMovingWindowShiftPerStep (amrex::Real dt)
+{
+    // Calculate the shift per step (same formula as used in MoveWindow)
+    return (moving_window_v - beta_boost * PhysConst::c)
+         / (1._rt - moving_window_v * beta_boost / PhysConst::c)
+         * dt;
+}
+
+amrex::Real
+WarpX::CalculateMovingWindowShift (int start_step, int end_step, amrex::Real dt)
+{
+    if (!do_moving_window || start_step > end_step) {
+        return 0.0_rt;
+    }
+
+    // Calculate how many steps the moving window was active between start_step and end_step
+    int active_steps = 0;
+    const int window_start = start_moving_window_step;
+    const int window_end = (end_moving_window_step < 0) ?
+        end_step : std::min(end_moving_window_step, end_step);
+
+    if (window_end >= window_start && end_step >= window_start) {
+        // Count steps from max(window_start, start_step) to min(window_end, end_step)
+        const int effective_start = std::max(window_start, start_step);
+        const int effective_end = std::min(window_end, end_step);
+        if (effective_end >= effective_start) {
+            active_steps = effective_end - effective_start + 1;
+        }
+    }
+
+    if (active_steps > 0) {
+        // Use the unified shift-per-step calculation
+        const amrex::Real shift_per_step = CalculateMovingWindowShiftPerStep(dt);
+        return active_steps * shift_per_step;
+    }
+
+    return 0.0_rt;
+}
+
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
@@ -363,17 +403,24 @@ WarpX::MoveWindow (const int step, bool move_j)
 
     bool const skip_lev0_coarse_patch = true;
 
+    // All logic for determining if the moving window should be active is centralized here.
+    // This includes checking start_moving_window_step, end_moving_window_step, and do_moving_window.
+    // Callers should not need to check these externally - just call MoveWindow and it will
+    // return 0 if the window is not active for this step.
+    if (!moving_window_active(step)) { return 0; }
+
+    // Print messages when starting/stopping the moving window
     if (step == start_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Starting moving window");
     }
     if (step == end_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Stopping moving window");
     }
-    if (!moving_window_active(step)) { return 0; }
 
     // Update the continuous position of the moving window,
     // and of the plasma injection
-    moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];
+    // Use the unified shift-per-step calculation
+    moving_window_x += CalculateMovingWindowShiftPerStep(dt[0]);
     const int dir = moving_window_dir;
 
     // Update current injection position for all containers

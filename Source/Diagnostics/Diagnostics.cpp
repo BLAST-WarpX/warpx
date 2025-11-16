@@ -535,30 +535,12 @@ Diagnostics::InitBaseData ()
         const int moving_dir = WarpX::moving_window_dir;
         const int current_step = warpx.getistep(0);
 
-        // Calculate how many steps the moving window has been active up to current_step
-        // This accounts for start_moving_window_step and end_moving_window_step
-        int active_steps = 0;
-        const int start_step = WarpX::start_moving_window_step;
-        const int end_step = (WarpX::end_moving_window_step < 0) ?
-            current_step : std::min(WarpX::end_moving_window_step, current_step);
+        // Note: current_step is the checkpoint step, but the replay loop goes from 0 to current_step - 1
+        // So we need to calculate the shift for steps 0 to current_step - 1
+        const int last_replayed_step = current_step - 1;
+        const amrex::Real total_shift = WarpX::CalculateMovingWindowShift(0, last_replayed_step, warpx.getdt(0));
 
-        if (end_step >= start_step && current_step >= start_step) {
-            // Count steps from start_step to min(end_step, current_step - 1)
-            // Note: current_step is the checkpoint step, but the replay loop goes from 0 to current_step - 1
-            // So we need to count steps up to current_step - 1, not current_step
-            const int last_replayed_step = current_step - 1;
-            const int effective_end_step = std::min(end_step, last_replayed_step);
-            if (effective_end_step >= start_step) {
-                active_steps = effective_end_step - start_step + 1;
-            }
-        }
-
-        if (active_steps > 0) {
-            // Calculate the shift based on the number of active steps
-            const amrex::Real shift_per_step = (WarpX::moving_window_v - WarpX::beta_boost * PhysConst::c)
-                                             / (1._rt - WarpX::moving_window_v * WarpX::beta_boost / PhysConst::c)
-                                             * warpx.getdt(0);
-            const amrex::Real total_shift = active_steps * shift_per_step;
+        if (total_shift > 0.0_rt) {
             const int shift_num_base = static_cast<int>
                 (total_shift / warpx.Geom(0).CellSize(moving_dir));
             m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
