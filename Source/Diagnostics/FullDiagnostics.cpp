@@ -765,7 +765,8 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
         ba.coarsen(m_crse_ratio).refine(m_crse_ratio);
 
         // Box covering the extent of the user-defined diagnostic domain
-        amrex::Box const domain = ba.minimalBox();
+        amrex::Box domain = diag_box;
+        domain.coarsen(m_crse_ratio).refine(m_crse_ratio);
 
         // Update the physical co-ordinates m_lo and m_hi using the final index values
         // from the coarsenable, cell-centered BoxArray, ba.
