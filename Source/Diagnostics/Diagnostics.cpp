@@ -541,10 +541,11 @@ Diagnostics::InitBaseData ()
         const amrex::Real total_shift = WarpX::CalculateMovingWindowShift(0, last_replayed_step, warpx.getdt(0));
 
         if (total_shift > 0.0_rt) {
-            const int shift_num_base = static_cast<int>
-                (total_shift / warpx.Geom(0).CellSize(moving_dir));
-            m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-            m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
+            // Use the unified helper function to calculate physical shift aligned to cell boundaries
+            const amrex::Real physical_shift = WarpX::CalculateMovingWindowAlignedShift(
+                total_shift, warpx.Geom(0).CellSize(moving_dir));
+            m_lo[moving_dir] += physical_shift;
+            m_hi[moving_dir] += physical_shift;
         }
     }
     // Construct Flush class.

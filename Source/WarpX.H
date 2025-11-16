@@ -766,6 +766,18 @@ public:
      */
     static amrex::Real CalculateMovingWindowShiftPerStep (amrex::Real dt);
 
+    /** Calculate physical shift aligned to cell boundaries for the moving window direction
+     *
+     * This function takes a total physical shift and returns the physical shift amount
+     * aligned to cell boundaries. It converts the shift to cell-based units and back
+     * to physical units, ensuring the result is aligned to cell boundaries.
+     *
+     * @param total_shift Total shift amount in physical units
+     * @param cell_size Cell size in the moving window direction
+     * @return Physical shift amount aligned to cell boundaries
+     */
+    static amrex::Real CalculateMovingWindowAlignedShift (amrex::Real total_shift, amrex::Real cell_size);
+
     /** Calculate the total shift for the moving window based on active steps
      *
      * This function calculates how many steps the moving window was active
