@@ -31,9 +31,9 @@ fi
 
 # Remove old dependencies #####################################################
 #
-#SW_DIR="${HOME}/sw/warpx/s3df/cpu"
-#rm -rf ${SW_DIR}
-#mkdir -p ${SW_DIR}
+SW_DIR="${HOME}/sw/warpx/s3df/cpu"
+rm -rf ${SW_DIR}
+mkdir -p ${SW_DIR}
 
 # remove common user mistakes in python, located in .local instead of a venv
 python3 -m pip uninstall -qq -y pywarpx
@@ -93,7 +93,7 @@ else
   git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $HOME/src/c-blosc
 fi
 rm -rf $HOME/src/c-blosc-pm-cpu-build
-cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-cpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
+cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-cpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build ${build_dir}/c-blosc-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/c-blosc-pm-cpu-build
 
@@ -142,7 +142,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-pm-cpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DBLAS_LIBRARIES=$HOME/sw/warpx/s3df/cpu/openblas-0.3.30/lib64/libopenblas.so -DBLAS_INCLUDE_DIR=$HOME/sw/warpx/s3df/cpu/openblas-0.3.30/include
 cmake --build ${build_dir}/blaspp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-cpu-build
 
