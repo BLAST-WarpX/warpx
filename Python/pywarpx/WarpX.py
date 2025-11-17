@@ -168,12 +168,19 @@ class WarpX(Bucket):
     def particles(self):
         return libwarpx.warpx.multi_particle_container()
 
-    def evolve(self, nsteps=-1):
+    def step(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
 
-    def step(self, nsteps=-1):
-        """An alias of evolve, to be consistent with the PICMI Simulation class"""
-        self.evolve(nsteps)
+    def evolve(self, nsteps=-1):
+        """An alias of step, used in legacy code"""
+        import warnings
+
+        warnings.warn(
+            "warpx.evolve is now obsolete and should not be used. Please use warpx.step.",
+            UserWarning,
+            stacklevel=2,
+        )
+        self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
         libwarpx.finalize(finalize_mpi)
