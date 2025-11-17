@@ -35,7 +35,7 @@ Using MeshLab
 Using Python with trimesh
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can also use Python with the ``trimesh`` library:
+You can also use Python with the `trimesh <https://github.com/mikedh/trimesh>`__ library:
 
 .. code-block:: python
 
