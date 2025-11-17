@@ -45,7 +45,7 @@ export ROCFFT_RTC_CACHE_PATH=/dev/null
 export OMP_NUM_THREADS=1
 export WARPX_NMPI_PER_NODE=8
 export TOTAL_NMPI=$(( ${SLURM_JOB_NUM_NODES} * ${WARPX_NMPI_PER_NODE} ))
-export WARPX_OUTPUT=output.txt
+export WARPX_OUTPUT=output_${SLURM_JOB_ID}.txt
 
 # For large-scale simulations, uncomment this line and manually set the lfs striping
 # Incorrect striping could result in very slow file writing and simulations hanging
