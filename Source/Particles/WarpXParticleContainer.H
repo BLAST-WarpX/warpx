@@ -533,7 +533,8 @@ public:
     //Species for which QED effects are relevant should override these methods
     virtual bool has_quantum_sync() const {return false;}
     virtual bool has_breit_wheeler() const {return false;}
-
+    virtual bool has_virtual_photons() const {return false;}
+    virtual int getVirtualPhotonSpeciesIndex() const { return -1; }
     int DoQED() const { return has_quantum_sync() || has_breit_wheeler(); }
 #else
     int DoQED() const { return false; }
@@ -650,7 +651,9 @@ protected:
     std::string m_qed_breit_wheeler_pos_product_name;
     int m_qed_quantum_sync_phot_product;
     std::string m_qed_quantum_sync_phot_product_name;
-
+    int m_qed_virtual_photon_species;
+    std::string m_qed_virtual_photon_species_name;
+    amrex::Real m_qed_virtual_photon_min_energy;
 #endif
     amrex::Vector<amrex::FArrayBox> local_rho;
     amrex::Vector<amrex::FArrayBox> local_jx;

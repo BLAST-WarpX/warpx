@@ -1845,12 +1845,12 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
         self.max_iterations = max_iterations
 
     def linear_solver_initialize_inputs(self):
-        gmres = pywarpx.warpx.get_bucket("gmres")
-        gmres.verbose_int = self.verbose_int
-        gmres.restart_length = self.restart_length
-        gmres.absolute_tolerance = self.absolute_tolerance
-        gmres.relative_tolerance = self.relative_tolerance
-        gmres.max_iterations = self.max_iterations
+        amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
+        amrex_gmres.verbose_int = self.verbose_int
+        amrex_gmres.restart_length = self.restart_length
+        amrex_gmres.absolute_tolerance = self.absolute_tolerance
+        amrex_gmres.relative_tolerance = self.relative_tolerance
+        amrex_gmres.max_iterations = self.max_iterations
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
