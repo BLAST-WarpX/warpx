@@ -968,14 +968,14 @@ void doGatherShapeNEsirkepovStencilImplicit (
                               + (z_new - z_old)*(z_new - z_old);
     double const len_ratio = (lensq_before > 0. ? std::sqrt(lensq_after/lensq_before) : 1.);
 #elif defined(WARPX_DIM_1D_Z)
-    double const len_before = (z_new - z_old);
+    double const len_before = std::abs(z_new - z_old);
     ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-    double const len_after  = (z_new - z_old);
+    double const len_after  = std::abs(z_new - z_old);
     double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    double const len_before = (x_new - x_old);
+    double const len_before = std::abs(x_new - x_old);
     ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-    double const len_after  = (x_new - x_old);
+    double const len_after  = std::abs(x_new - x_old);
     double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
 #endif
 

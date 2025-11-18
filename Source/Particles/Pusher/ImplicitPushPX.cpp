@@ -439,10 +439,12 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
+    const amrex::Dim3 lo = lbound(box);
 
     const WarpX& warpx = WarpX::GetInstance();
 
-    amrex::Box const& domain_box = warpx.Geom(0).Domain();
+    amrex::Box domain_box = warpx.Geom(0).Domain();
+    domain_box.surroundingNodes();
     auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
@@ -457,8 +459,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }
-
-    const amrex::Dim3 lo = lbound(box);
 
     const auto depos_type = WarpX::current_deposition_algo;
     const int depos_order = WarpX::nox;
@@ -758,10 +758,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0.0_rt);
+    const amrex::Dim3 lo = lbound(box);
 
     const WarpX& warpx = WarpX::GetInstance();
 
-    amrex::Box const& domain_box = warpx.Geom(0).Domain();
+    amrex::Box domain_box = warpx.Geom(0).Domain();
+    domain_box.surroundingNodes();
     auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
@@ -776,8 +778,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
     }
-
-    const amrex::Dim3 lo = lbound(box);
 
     const int depos_order = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
