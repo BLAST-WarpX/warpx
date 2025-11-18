@@ -516,7 +516,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // Take into account Galilean shift
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
 
-    amrex::Box const & domain_box = warpx.Geom(depos_lev).Domain();
+    amrex::Box domain_box = warpx.Geom(depos_lev).Domain();
+
+    // Make sure that domain_box includes the upper boundary node
+    domain_box.surroundingNodes();
 
     auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
