@@ -944,39 +944,21 @@ void doGatherShapeNEsirkepovStencilImplicit (
     // Calculate the change in the length of the trajectory
     // so that the time step size can be appropriately scaled.
 #if defined(WARPX_DIM_3D)
-    double const lensq_before = (x_new - x_old)*(x_new - x_old)
-                              + (y_new - y_old)*(y_new - y_old)
-                              + (z_new - z_old)*(z_new - z_old);
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
                                     domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
     ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
                                     domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
     ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
                                     domain.smallEnd(2) - lo.z, domain.bigEnd(2) - lo.z, is_absorbing[2]);
-    double const lensq_after  = (x_new - x_old)*(x_new - x_old)
-                              + (y_new - y_old)*(y_new - y_old)
-                              + (z_new - z_old)*(z_new - z_old);
-    double const len_ratio = (lensq_before > 0. ? std::sqrt(lensq_after/lensq_before) : 1.);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    double const lensq_before = (x_new - x_old)*(x_new - x_old)
-                              + (z_new - z_old)*(z_new - z_old);
     ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
                                     domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
     ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
                                     domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
-    double const lensq_after  = (x_new - x_old)*(x_new - x_old)
-                              + (z_new - z_old)*(z_new - z_old);
-    double const len_ratio = (lensq_before > 0. ? std::sqrt(lensq_after/lensq_before) : 1.);
 #elif defined(WARPX_DIM_1D_Z)
-    double const len_before = std::abs(z_new - z_old);
     ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-    double const len_after  = std::abs(z_new - z_old);
-    double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    double const len_before = std::abs(x_new - x_old);
     ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-    double const len_after  = std::abs(x_new - x_old);
-    double const len_ratio = (len_before > 0. ? len_after/len_before : 1.);
 #endif
 
     // Shape factor arrays
@@ -1098,7 +1080,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdxi = 0._rt;
             for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
                 sdxi += (sx_E_old[i] - sx_E_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
                 Exp += Ex_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdxiov*sdzjk;
             }
         }
@@ -1110,7 +1092,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdyj = 0._rt;
             for (int j=djl_E; j<=depos_order+1-dju_E; j++) {
                 sdyj += (sy_E_old[j] - sy_E_new[j]);
-                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj*len_ratio/(y_new - y_old));
+                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj/(y_new - y_old));
                 Eyp += Ey_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdyjov*sdyik;
             }
         }
@@ -1122,7 +1104,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdzk = 0._rt;
             for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
                 sdzk += (sz_E_old[k] - sz_E_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk*len_ratio/(z_new - z_old));
+                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
                 Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdzkov*sdzij;
             }
         }
@@ -1134,7 +1116,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdxi = 0._rt;
             for (int i=dil_B; i<=depos_order+1-diu_B; i++) {
                 sdxi += (sx_B_old[i] - sx_B_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
                 Bxp += Bx_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdxiov*sdzjk;
             }
         }
@@ -1146,7 +1128,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdyj = 0._rt;
             for (int j=djl_B; j<=depos_order+1-dju_B; j++) {
                 sdyj += (sy_B_old[j] - sy_B_new[j]);
-                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj*len_ratio/(y_new - y_old));
+                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj/(y_new - y_old));
                 Byp += By_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdyjov*sdyik;
             }
         }
@@ -1158,7 +1140,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdzk = 0._rt;
             for (int k=dkl_B; k<=depos_order+1-dku_B; k++) {
                 sdzk += (sz_B_old[k] - sz_B_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk*len_ratio/(z_new - z_old));
+                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
                 Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_E_new-1+k)*sdzkov*sdzij;
             }
         }
@@ -1171,7 +1153,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
         amrex::Real sdxi = 0._rt;
         for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
             sdxi += (sx_E_old[i] - sx_E_new[i]);
-            auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+            auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
             Exp += Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdxiov*sdzk;
             Bzp += Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdxiov*sdzk;
         }
@@ -1189,7 +1171,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
         amrex::Real sdzk = 0._rt;
         for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
             sdzk += (sz_E_old[k] - sz_E_new[k]);
-            auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk*len_ratio/(z_new - z_old));
+            auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
             Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdzkov*sdxi;
             Bxp += Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdzkov*sdxi;
         }
@@ -1221,7 +1203,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdxi = 0._rt;
             for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
                 sdxi += (sx_E_old[i] - sx_E_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
                 const amrex::Real dEx = (+ Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
                 const amrex::Real dBz = (+ Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
@@ -1248,7 +1230,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             amrex::Real sdzk = 0._rt;
             for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
                 sdzk += (sz_E_old[k] - sz_E_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk*len_ratio/(z_new - z_old));
+                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
                 const amrex::Real dEz = (+ Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
                 const amrex::Real dBx = (+ Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
@@ -1295,7 +1277,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real sdzk = 0._rt;
     for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
         sdzk += (sz_E_old[k] - sz_E_new[k]);
-        auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk*len_ratio/(z_new - z_old));
+        auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
         Bxp += Bx_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
         Byp += By_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
         Ezp += Ez_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
@@ -1323,7 +1305,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
         sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
         Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bzp += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
@@ -1363,7 +1345,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
         sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi*len_ratio/(x_new - x_old));
+        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
         Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
         Bphip += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
