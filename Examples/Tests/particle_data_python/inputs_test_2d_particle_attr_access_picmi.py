@@ -5,6 +5,7 @@ import sys
 import numpy as np
 
 from pywarpx import callbacks, libwarpx, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 # Create the parser and add the argument
 parser = argparse.ArgumentParser()
@@ -104,35 +105,48 @@ sim.initialize_warpx()
 
 # set numpy random seed so that the particle properties generated
 # below will be reproducible from run to run
-np.random.seed(30025025)
+xp, _ = load_cupy()
+xp.random.seed(30025025)
 
 electrons = sim.particles.get("electrons")
 electrons.add_real_comp("newPid")
 
 my_id = libwarpx.amr.ParallelDescriptor.MyProc()
+num_ranks = libwarpx.amr.ParallelDescriptor.NProcs()
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return np.asarray(arr)
+
+
+def nps_per_rank(rank):
+    return 10 * (rank + 1)
 
 
 def add_particles():
-    nps = 10 * (my_id + 1)
-    x = np.linspace(0.005, 0.025, nps)
-    y = np.zeros(nps)
-    z = np.linspace(0.005, 0.025, nps)
-    ux = np.random.normal(loc=0, scale=1e3, size=nps)
-    uy = np.random.normal(loc=0, scale=1e3, size=nps)
-    uz = np.random.normal(loc=0, scale=1e3, size=nps)
-    w = np.ones(nps) * 2.0
-    newPid = 5.0
+    nps = nps_per_rank(my_id)
+    x = xp.linspace(0.005, 0.025, nps)
+    y = xp.zeros(nps)
+    z = xp.linspace(0.005, 0.025, nps)
+    ux = xp.random.normal(loc=0, scale=1e3, size=nps)
+    uy = xp.random.normal(loc=0, scale=1e3, size=nps)
+    uz = xp.random.normal(loc=0, scale=1e3, size=nps)
+    w = xp.ones(nps) * 2.0
+    newPid = xp.ones(nps) * 5.0
 
     electrons.add_particles(
-        x=x,
-        y=y,
-        z=z,
-        ux=ux,
-        uy=uy,
-        uz=uz,
-        w=w,
-        newPid=newPid,
-        unique_particles=args.unique,
+        x=to_numpy(x),
+        y=to_numpy(y),
+        z=to_numpy(z),
+        ux=to_numpy(ux),
+        uy=to_numpy(uy),
+        uz=to_numpy(uz),
+        w=to_numpy(w),
+        newPid=to_numpy(newPid),
+        unique_particles=True,
     )
 
 
@@ -148,8 +162,11 @@ sim.step(max_steps - 1)
 # check that the new PIDs
 # are properly set
 ##########################
+total_expected_electrons_size = sum(
+    nps_per_rank(rank) * (max_steps - 1) for rank in range(num_ranks)
+)
 
-assert electrons.size == 270 / (2 - args.unique)
+assert electrons.size == total_expected_electrons_size
 assert electrons.get_real_comp_index("w") == 2
 assert electrons.get_real_comp_index("newPid") == 6
 
@@ -162,3 +179,6 @@ for pti in electrons.iterator(level=0):
 ##########################
 
 sim.step(1)
+
+if not sim.amr_restart:
+    del electrons
