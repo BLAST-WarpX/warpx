@@ -213,8 +213,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
          cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu -j 16
-         cmake --build build_pm_cpu -j 16 --target pip_install
-
+         
       **That's it!**
       The WarpX application executables are now in ``$HOME/src/warpx/build_pm_cpu/bin/`` and we installed the ``pywarpx`` Python module.
 
