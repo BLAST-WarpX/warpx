@@ -1,28 +1,33 @@
 # please set your project account
-export proj=""  # change me! GPU projects must end in "..._g"
+export proj=""  # change me!
 
 # remembers the location of this script
 export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load gpu
-module load PrgEnv-gnu
-module load craype
-module load craype-x86-milan
-module load craype-accel-nvidia80
-module load cudatoolkit
-module load cmake/3.30.2
+#module load gpu
+#module load PrgEnv-gnu
+#module load craype
+#module load craype-x86-milan
+#module load craype-accel-nvidia80
+#module load cudatoolkit
+#module load cmake/3.30.2
+module load openmpi/v4.1.6
 
 # missing modules installed here
-export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
+export SW_DIR=/sdf/group/${proj}/${USER}/sw/warpx/s3df/gpu
+#export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
+
+# cmake
+export PATH=${SW_DIR}/cmake-4.1.2/bin:$PATH
 
 # optional: for QED support with detailed tables
 export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
 export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:${LD_LIBRARY_PATH}
 
 # optional: for openPMD and PSATD+RZ support
-module load cray-hdf5-parallel/1.12.2.9
+#module load cray-hdf5-parallel/1.12.2.9
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
@@ -39,7 +44,7 @@ export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 export PATH=${SW_DIR}/ccache-4.10.2:$PATH
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.11.5
+#module load cray-python/3.11.5
 
 if [ -d "${SW_DIR}/venvs/warpx-gpu" ]
 then
@@ -61,12 +66,12 @@ export AMREX_CUDA_ARCH=8.0
 
 # optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
 # note: the cc/CC/ftn wrappers below add those
-export CXXFLAGS="-march=znver3"
-export CFLAGS="-march=znver3"
+#export CXXFLAGS="-march=znver3"
+#export CFLAGS="-march=znver3"
 
 # compiler environment hints
-export CC=cc
-export CXX=CC
-export FC=ftn
-export CUDACXX=$(which nvcc)
-export CUDAHOSTCXX=CC
+#export CC=cc
+#export CXX=CC
+#export FC=ftn
+#export CUDACXX=$(which nvcc)
+#export CUDAHOSTCXX=CC
