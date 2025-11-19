@@ -31,7 +31,8 @@ fi
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="${HOME}/sw/warpx/s3df/cpu"
+#SW_DIR="${HOME}/sw/warpx/s3df/cpu"
+SW_DIR="/sdf/group/${proj}/${USER}/sw/warpx/s3df/cpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -142,7 +143,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-pm-cpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DBLAS_LIBRARIES=$HOME/sw/warpx/s3df/cpu/openblas-0.3.30/lib64/libopenblas.so -DBLAS_INCLUDE_DIR=$HOME/sw/warpx/s3df/cpu/openblas-0.3.30/include
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DBLAS_LIBRARIES=${SW_DIR}/openblas-0.3.30/lib64/libopenblas.so -DBLAS_INCLUDE_DIR=${SW_DIR}/openblas-0.3.30/include
 cmake --build ${build_dir}/blaspp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-cpu-build
 

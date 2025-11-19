@@ -1,5 +1,5 @@
 # please set your project account
-export proj=""  # change me!
+export proj="facet"  # change me!
 
 # remembers the location of this script
 export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
@@ -12,7 +12,11 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 module load openmpi/v4.1.6
 
 # missing modules installed here
-export SW_DIR=${HOME}/sw/warpx/s3df/cpu
+export SW_DIR=/sdf/group/${proj}/${USER}/sw/warpx/s3df/cpu
+#export SW_DIR=${HOME}/sw/warpx/s3df/cpu
+
+# cmake
+export PATH=${SW_DIR}/cmake-4.1.2/bin:$PATH
 
 # optional: for QED support with detailed tables
 export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
@@ -52,10 +56,10 @@ alias runNode="srun --nodes 1 --qos interactive --time 01:00:00 --constraint cpu
 
 # optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
 # note: the cc/CC/ftn wrappers below add those
-export CXXFLAGS="-march=znver3"
-export CFLAGS="-march=znver3"
+#export CXXFLAGS="-march=znver3"
+#export CFLAGS="-march=znver3"
 
 # compiler environment hints
-export CC=cc
-export CXX=CC
-export FC=ftn
+#export CC=cc
+#export CXX=CC
+#export FC=ftn
