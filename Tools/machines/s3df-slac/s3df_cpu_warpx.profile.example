@@ -1,5 +1,5 @@
 # please set your project account
-export proj="facet"  # change me!
+export proj=""  # change me!
 
 # remembers the location of this script
 export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
