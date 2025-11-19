@@ -17,12 +17,28 @@ import numpy as np
 from mpi4py import MPI as mpi
 
 from pywarpx import callbacks, libwarpx, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+
+
+def get_xp():
+    xp, _ = load_cupy()
+    return xp
+
+
+def to_host(arr):
+    xp = get_xp()
+    if hasattr(arr, "get"):
+        return arr.get()
+    if hasattr(xp, "asnumpy") and isinstance(arr, xp.ndarray):
+        return xp.asnumpy(arr)
+    else:
+        return np.asarray(arr)
 
 
 class ForceFreeSheetReconnection(object):
@@ -306,15 +322,25 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = simulation.fields.get("rho_fp", level=0)[...]
-        Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
-        Jy = (
+        get_xp()
+
+        rho = to_host(simulation.fields.get("rho_fp", level=0)[...])
+
+        Jiy = to_host(simulation.fields.get("current_fp", dir="y", level=0)[...])
+        Jy = to_host(
             simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
-            / self.J0
         )
-        Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
-        By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
-        Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0
+
+        Jiy /= self.J0
+        Jy /= self.J0
+
+        Bx = to_host(simulation.fields.get("Bfield_fp", dir="x", level=0)[...])
+        By = to_host(simulation.fields.get("Bfield_fp", dir="y", level=0)[...])
+        Bz = to_host(simulation.fields.get("Bfield_fp", dir="z", level=0)[...])
+
+        Bx /= self.B0
+        By /= self.B0
+        Bz /= self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return
