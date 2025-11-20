@@ -421,7 +421,7 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
     ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile,
                                        n_external_attr_real, n_external_attr_int,
                                        m_user_real_attribs, m_user_int_attribs,
-                                       GetRealSoANames(), GetIntSoANames(),
+                                       //GetRealSoANames(), GetIntSoANames(),
                                        amrex::GetVecOfPtrs(m_user_real_attrib_parser),
                                        amrex::GetVecOfPtrs(m_user_int_attrib_parser),
 #ifdef WARPX_QED

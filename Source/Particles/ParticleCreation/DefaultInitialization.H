@@ -120,8 +120,8 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          const int n_external_attr_int,
                                          const std::vector<std::string>& user_real_attribs,
                                          const std::vector<std::string>& user_int_attribs,
-                                         const std::vector<std::string>& particle_comps,
-                                         const std::vector<std::string>& particle_icomps,
+                                         //const std::vector<std::string>& particle_comps,
+                                         //const std::vector<std::string>& particle_icomps,
                                          const std::vector<amrex::Parser*>& user_real_attrib_parser,
                                          const std::vector<amrex::Parser*>& user_int_attrib_parser,
 #ifdef WARPX_QED
@@ -133,6 +133,10 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          int start, int stop)
 {
         using namespace amrex::literals;
+
+        // Get particle component names from ParticleTile object
+        std::vector<std::string> particle_comps = ptile.GetStructOfArrays().GetRealNames();
+        std::vector<std::string> particle_icomps = ptile.GetStructOfArrays().GetIntNames();
 
         // Preparing data needed for user defined attributes
         const auto n_user_real_attribs = static_cast<int>(user_real_attribs.size());
