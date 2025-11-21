@@ -95,7 +95,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
       .. code-block:: bash
 
          bash $WORK/src/warpx/Tools/machines/s3df-slac/install_gpu_dependencies.sh
-         source ${CFS}/${proj%_g}/${USER}/sw/s3df/gpu/venvs/warpx/bin/activate
+         source $WORK/sw/s3df/gpu/venvs/warpx/bin/activate
 
       .. dropdown:: Script Details
          :color: light
@@ -145,7 +145,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
       .. code-block:: bash
 
          bash $WORK/src/warpx/Tools/machines/s3df-slac/install_cpu_dependencies.sh
-         source /sdf/group/${proj}/${USER}/sw/warpx/s3df/cpu/venvs/warpx-cpu/bin/activate
+         source $WORK/sw/warpx/s3df/cpu/venvs/warpx-cpu/bin/activate
 
       .. dropdown:: Script Details
          :color: light
