@@ -38,15 +38,17 @@ It is recommended that you install WarpX in your project directory instead of yo
 
    cd /sdf/group/projectname/username
 
-.. _building-s3df-init
+Here replace ``projectname`` with your project e.g. ``facet``, and ``username`` with your s3df user name. It makes sense to export this path for frequent use:
 
-Here replace ``projectname`` with your project e.g. ``facet``, and ``username`` with your s3df user name.
+.. code-block:: bash
+
+   export WORK="/sdf/group/projectname/username"
 
 Use the following command to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $WORK/src/warpx
 
 .. _building-s3df-init
 
@@ -56,12 +58,12 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
 
    .. tab-item:: A100 GPUs
 
-      We use system software modules, add environment hints and further dependencies via the file ``$HOME/s3df_gpu_warpx.profile``.
+      We use system software modules, add environment hints and further dependencies via the file ``$WORK/s3df_gpu_warpx.profile``.
       Create it now:
 
       .. code-block:: bash
 
-         cp $HOME/src/warpx/Tools/machines/s3df-slac/s3df_gpu_warpx.profile.example $HOME/s3df_gpu_warpx.profile
+         cp $WORK/src/warpx/Tools/machines/s3df-slac/s3df_gpu_warpx.profile.example $WORK/s3df_gpu_warpx.profile
 
       .. dropdown:: Script Details
          :color: light
@@ -72,7 +74,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
             :language: bash
 
       Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      For example, if you are member of the project ``facet``, then run ``nano $HOME/s3df_gpu_warpx.profile`` and edit line 2 to read:
+      For example, if you are member of the project ``facet``, then run ``nano $WORK/s3df_gpu_warpx.profile`` and edit line 2 to read:
 
       .. code-block:: bash
 
@@ -86,13 +88,13 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
 
          .. code-block:: bash
 
-            source $HOME/s3df_gpu_warpx.profile
+            source $WORK/s3df_gpu_warpx.profile
 
       Finally, since Perlmutter does not yet provide software modules for some of our dependencies, install them once:
 
       .. code-block:: bash
 
-         bash $HOME/src/warpx/Tools/machines/s3df-slac/install_gpu_dependencies.sh
+         bash $WORK/src/warpx/Tools/machines/s3df-slac/install_gpu_dependencies.sh
          source ${CFS}/${proj%_g}/${USER}/sw/s3df/gpu/venvs/warpx/bin/activate
 
       .. dropdown:: Script Details
@@ -106,12 +108,12 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
 
    .. tab-item:: CPU Nodes
 
-      We use system software modules, add environment hints and further dependencies via the file ``$HOME/s3df_cpu_warpx.profile``.
+      We use system software modules, add environment hints and further dependencies via the file ``$WORK/s3df_cpu_warpx.profile``.
       Create it now:
 
       .. code-block:: bash
 
-         cp $HOME/src/warpx/Tools/machines/s3df-slac/s3df_cpu_warpx.profile.example $HOME/s3df_cpu_warpx.profile
+         cp $WORK/src/warpx/Tools/machines/s3df-slac/s3df_cpu_warpx.profile.example $WORK/s3df_cpu_warpx.profile
 
       .. dropdown:: Script Details
          :color: light
@@ -122,7 +124,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
             :language: bash
 
       Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      For example, if you are member of the project ``facet``, then run ``nano $HOME/s3df_cpu_warpx.profile`` and edit line 2 to read:
+      For example, if you are member of the project ``facet``, then run ``nano $WORK/s3df_cpu_warpx.profile`` and edit line 2 to read:
 
       .. code-block:: bash
 
@@ -136,13 +138,13 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
 
          .. code-block:: bash
 
-            source $HOME/s3df_cpu_warpx.profile
+            source $WORK/s3df_cpu_warpx.profile
 
       Finally, since S3DF does not yet provide software modules for some of our dependencies, install them once:
 
       .. code-block:: bash
 
-         bash $HOME/src/warpx/Tools/machines/s3df-slac/install_cpu_dependencies.sh
+         bash $WORK/src/warpx/Tools/machines/s3df-slac/install_cpu_dependencies.sh
          source /sdf/group/${proj}/${USER}/sw/warpx/s3df/cpu/venvs/warpx-cpu/bin/activate
 
       .. dropdown:: Script Details
@@ -172,7 +174,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
       .. code-block:: bash
 
-         cd $HOME/src/warpx
+         cd $WORK/src/warpx
          rm -rf build_pm_gpu
 
          cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
@@ -180,7 +182,7 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
          cmake --build build_pm_gpu -j 16 --target pip_install
 
       **That's it!**
-      The WarpX application executables are now in ``$HOME/src/warpx/build_pm_gpu/bin/`` and we installed the ``pywarpx`` Python module.
+      The WarpX application executables are now in ``$WORK/src/warpx/build_pm_gpu/bin/`` and we installed the ``pywarpx`` Python module.
 
    .. tab-item:: CPU Nodes
 
@@ -218,13 +220,13 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
       .. code-block:: bash
 
-         cd $HOME/src/warpx
+         cd $WORK/src/warpx
          rm -rf build_pm_cpu
 
          cmake -S . -B build_pm_cpu -DWarpX_COMPUTE=OMP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_cpu -j 16
 
-    The WarpX application executables are now in $HOME/src/warpx/build_pm_cpu/bin/. Additionally, the following commands will install WarpX as a Python module:
+    The WarpX application executables are now in $WORK/src/warpx/build_pm_cpu/bin/. Additionally, the following commands will install WarpX as a Python module:
       
     .. code-block:: bash
         rm -rf build_pm_cpu_py
@@ -241,7 +243,7 @@ If you already installed WarpX in the past and want to update it, start by getti
 
 .. code-block:: bash
 
-   cd $HOME/src/warpx
+   cd $WORK/src/warpx
 
    # read the output of this command - does it look ok?
    git status
@@ -262,7 +264,7 @@ And, if needed,
 - log out and into the system, activate the now updated environment profile as usual,
 - :ref:`execute the dependency install scripts <building-s3df-preparation>`.
 
-As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_pm_*`` and rebuild WarpX.
+As a last step, clean the build directory ``rm -rf $WORK/src/warpx/build_pm_*`` and rebuild WarpX.
 
 Running
 -------
