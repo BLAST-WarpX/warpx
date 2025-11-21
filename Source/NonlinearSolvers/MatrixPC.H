@@ -401,10 +401,9 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 auto bx = mfi.tilebox();
-
-#if defined(WARPX_DIM_1D_Z)
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
-#elif defined(WARPX_DIM_RCYLINDER)
+
+#if defined(WARPX_DIM_RCYLINDER)
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
@@ -414,7 +413,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
 #elif defined(WARPX_DIM_XZ)
-                auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
                 int tdir = -1;
                 if  (dir == 0) { tdir = 2; }
                 else if (dir == 2) { tdir = 0; }
