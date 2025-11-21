@@ -32,7 +32,7 @@ After connecting to the S3DF log in to one of the pools. You can find a list of 
 
 .. _building-s3df-login:
 
-It is recommended that you install WarpX in your project directory instead of your $HOME directory. Navigate to your group directory:
+It is recommended that you install WarpX in your project directory instead of your ``$HOME`` directory. Navigate to your group directory:
 
 .. code-block:: bash
 
@@ -40,7 +40,7 @@ It is recommended that you install WarpX in your project directory instead of yo
 
 .. _building-s3df-init
 
-Here replace `projectname` with your project e.g. `facet`, and `username` with your s3df user name.
+Here replace ``projectname`` with your project e.g. ``facet``, and ``username`` with your s3df user name.
 
 Use the following command to download the WarpX source code:
 
