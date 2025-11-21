@@ -311,6 +311,12 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 
         if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
             if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
+                if (current_buffer_masks[lev]) {
+                    RemakeMultiFab( current_buffer_masks[lev] );
+                }
+                if (gather_buffer_masks[lev]) {
+                    RemakeMultiFab( gather_buffer_masks[lev] );
+                }
                 BuildBufferMasks();
             }
         }
