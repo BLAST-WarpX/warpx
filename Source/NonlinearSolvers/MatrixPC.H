@@ -638,7 +638,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         int icol = num_nz_ptr[ridx_l];
 
                         {
-                            int cidx_g_lhs = dof_lhs_arr(i,j,k,1);
+                            int cidx_g_lhs = dof_arr(i,j,k,1);
                             amrex::Real val = sigma_ii_arr(i,j,k,0) - 1.0;
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
