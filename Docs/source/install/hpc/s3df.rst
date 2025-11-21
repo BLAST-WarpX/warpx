@@ -17,6 +17,7 @@ If you are new to this system, **please see the following resources**:
 * `Filesystems <https://s3df.slac.stanford.edu/#/reference?id=backup>`__:
 
   * ``$HOME``: sdfhome, per-user directory, default `quota <https://s3df.slac.stanford.edu/#/reference?id=storagequota>`__: 30GB
+  * per-project directory, 10 TB
 
 .. _building-s3df-preparation:
 
@@ -31,13 +32,23 @@ After connecting to the S3DF log in to one of the pools. You can find a list of 
 
 .. _building-s3df-login:
 
+It is recommended that you install WarpX in your project directory instead of your $HOME directory. Navigate to your group directory:
+
+.. code-block:: bash
+
+   cd /sdf/group/projectname/username
+
+.. _building-s3df-init
+
+Here replace `projectname` with your project e.g. `facet`, and `username` with your s3df user name.
+
 Use the following command to download the WarpX source code:
 
 .. code-block:: bash
 
    git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
-.. _building-s3df-init:
+.. _building-s3df-init
 
 On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CPU nodes.
 
