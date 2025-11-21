@@ -61,7 +61,6 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
             :language: bash
 
       Edit the 2nd line of this script, which sets the ``export proj=""`` variable.
-      Perlmutter GPU projects must end in ``..._g``.
       For example, if you are member of the project ``facet``, then run ``nano $HOME/s3df_gpu_warpx.profile`` and edit line 2 to read:
 
       .. code-block:: bash
