@@ -351,6 +351,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     if (m_collisions_split_position_push) {
+        amrex::Print() << "Adding average momentum components for " << species_name << std::endl;
         // Add the average momentum components to deposit the current correctly
         // if the position push is split to perform collisions
         AddRealComp("ux_avg");
@@ -428,6 +429,8 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
     int n_external_attr_real,
     int n_external_attr_int)
 {
+    amrex::Print() << "Starting PhysicalParticleContainer::DefaultInitializeRuntimeAttributes for "
+                   << species_name << std::endl;
     ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile,
                                        n_external_attr_real, n_external_attr_int,
                                        m_user_real_attribs, m_user_int_attribs,
@@ -454,6 +457,15 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
+
+    amrex::Print() << "Starting PhysicalParticleContainer::Evolve for " << species_name << std::endl;
+    amrex::Print() << "NumRealComps() = " << NumRealComps() << std::endl;
+    amrex::Print() << "NumRuntimeRealComps() = " << NumRuntimeRealComps() << std::endl;
+    amrex::Print() << "NStructReal = " << NStructReal << std::endl;
+    amrex::Print() << "NArrayReal = " << NArrayReal << std::endl;
+    for (auto const & comp : GetRealSoANames()) {
+        amrex::Print() << "GetRealSoANames(): " << comp << std::endl;
+    }
 
     WARPX_PROFILE("PhysicalParticleContainer::Evolve()");
     WARPX_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);

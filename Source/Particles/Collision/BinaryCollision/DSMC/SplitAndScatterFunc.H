@@ -286,6 +286,7 @@ public:
                 // create a copy of the first product species at the location of species 1
                 const auto reactant1_index = static_cast<int>(p_pair_indices_1[i]);
                 const auto product1_index = products_np_data[2] + with_product_p_offsets[i];
+                amrex::Print() << "Creating " << pc_products[2]->getSpeciesTypeName() << " particle at index " << product1_index << " from reactant index " << reactant1_index << std::endl;
                 copy_species1[2](soa_products_data[2], soa_1, reactant1_index,
                                 static_cast<int>(product1_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
@@ -294,6 +295,7 @@ public:
                 // create a copy of the other product species at the location of species 2
                 const auto reactant2_index = static_cast<int>(p_pair_indices_2[i]);
                 const auto product2_index = products_np_data[3] + with_product_p_offsets[i];
+                amrex::Print() << "Creating " << pc_products[3]->getSpeciesTypeName() << " particle at index " << product2_index << " from reactant index " << reactant2_index << std::endl;
                 copy_species2[3](soa_products_data[3], soa_2, reactant2_index,
                                 static_cast<int>(product2_index), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
@@ -509,6 +511,7 @@ public:
         {
             const int start_index = int(products_np[i]);
             const int stop_index  = int(products_np[i] + num_added_vec[i]);
+            amrex::Print() << "Calling ParticleCreation::DefaultInitializeRuntimeAttributes for species " << pc_products[i]->getSpeciesTypeName() << std::endl;
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                        0, 0,
                                        pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),

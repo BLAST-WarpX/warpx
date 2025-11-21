@@ -181,7 +181,9 @@ public:
         auto& species2 = mypc->GetParticleContainerFromName(m_species_names[1]);
 
         // In case of particle creation, create the necessary vectors
+        amrex::Print() << "Starting binary collisions between " << m_species_names[0] << " and " << m_species_names[1] << std::endl;
         const int n_product_species = m_product_species.size();
+        amrex::Print() << "n_product_species = " << n_product_species << std::endl;
         amrex::Vector<WarpXParticleContainer*> product_species_vector;
         amrex::Vector<SmartCopyFactory> copy_factory_species1;
         amrex::Vector<SmartCopyFactory> copy_factory_species2;
@@ -192,6 +194,14 @@ public:
             auto& product = mypc->GetParticleContainerFromName(m_product_species[i]);
             product.defineAllParticleTiles();
             product_species_vector.push_back(&product);
+            amrex::Print() << "BinaryCollision::doCollisions: preparing to create " << m_product_species[i] << std::endl;
+            amrex::Print() << "product.NumRealComps() = " << product.NumRealComps() << std::endl;
+            amrex::Print() << "product.NumRuntimeRealComps() = " << product.NumRuntimeRealComps() << std::endl;
+            amrex::Print() << "product.NStructReal = " << product.NStructReal << std::endl;
+            amrex::Print() << "product.NArrayReal = " << product.NArrayReal << std::endl;
+            for (auto const & comp : product.GetRealSoANames()) {
+                amrex::Print() << "product.GetRealSoANames(): " << comp << std::endl;
+            }
             // Although the copy factories are not explicitly reused past this point, we need to
             // store them in vectors so that the data that they own, which is used by the smart
             // copy functors, does not go out of scope at the end of this for loop.

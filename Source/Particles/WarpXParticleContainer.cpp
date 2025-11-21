@@ -254,6 +254,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 #endif
     }
 
+    amrex::Print() << "Adding " << np << " particles to species " << species_id << std::endl;
     if (np > 0)
     {
 #if defined(WARPX_DIM_3D)
@@ -322,6 +323,10 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 
         pinned_tile.resize(np);
         // Default initialize the other real and integer runtime attributes
+        amrex::Print() << "Calling ParticleCreation::DefaultInitializeRuntimeAttributes from WarpXParticleContainer::AddNParticles" << std::endl;
+        for (auto const & comp: pinned_tile.GetStructOfArrays().GetRealNames()) {
+            amrex::Print() << "pinned_tile.GetStructOfArrays().GetRealNames(): " << comp << std::endl;
+        }
         DefaultInitializeRuntimeAttributes(pinned_tile, nattr_real - 1, nattr_int);
 
         auto old_np = particle_tile.numParticles();

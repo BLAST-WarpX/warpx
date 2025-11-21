@@ -137,6 +137,14 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
 {
         using namespace amrex::literals;
 
+        amrex::Print() << "Starting ParticleCreation::DefaultInitializeRuntimeAttributes" << std::endl;
+        for (auto const & comp : particle_comps) {
+            amrex::Print() << "particle_comps: " << comp << std::endl;
+        }
+        for (auto const & comp: ptile.GetStructOfArrays().GetRealNames()) {
+            amrex::Print() << "ptile.GetStructOfArrays().GetRealNames(): " << comp << std::endl;
+        }
+
         // Preparing data needed for user defined attributes
         const auto n_user_real_attribs = static_cast<int>(user_real_attribs.size());
         const auto n_user_int_attribs = static_cast<int>(user_int_attribs.size());

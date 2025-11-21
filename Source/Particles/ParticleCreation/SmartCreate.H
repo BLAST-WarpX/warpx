@@ -68,9 +68,11 @@ struct SmartCreate
 
         // initialize the real components after position
         for (int j = AMREX_SPACEDIM; j < PartData::NAR; ++j) {
+            amrex::Print() << "Initializing real component " << j << " with policy " << static_cast<int>(m_policy_real[j]) << std::endl;
             prt.m_rdata[j][i_prt] = initializeRealValue(m_policy_real[j], engine);
         }
         for (int j = 0; j < prt.m_num_runtime_real; ++j) {
+            amrex::Print() << "Initializing runtime real component " << j << " with policy " << static_cast<int>(m_policy_real[j+PartData::NAR]) << std::endl;
             prt.m_runtime_rdata[j][i_prt] = initializeRealValue(m_policy_real[j+PartData::NAR], engine);
         }
 
