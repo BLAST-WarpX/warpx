@@ -3,7 +3,6 @@
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
-import numpy as np
 
 from pywarpx import callbacks, particle_containers, picmi
 from pywarpx.LoadThirdParty import load_cupy
@@ -128,7 +127,7 @@ def to_numpy(arr):
     if hasattr(arr, "get"):
         return arr.get()
     else:
-        return np.asarray(arr)
+        return arr
 
 
 def mirror_reflection():

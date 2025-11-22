@@ -184,7 +184,7 @@ def to_numpy(arr):
     if hasattr(arr, "get"):
         return arr.get()
     else:
-        return np.asarray(arr)
+        return arr
 
 
 def secondary_emission():
