@@ -165,7 +165,7 @@ void WarpXSolverDOF::fill_local_dof (iMultiFab& dof, iMultiFab const& mask)
                 }
             });
         }
-        m_nDoFs_l += ndofs*ncomp;
+        m_nDoFs_l += Long(ndofs)*ncomp;
     }
 }
 
