@@ -165,6 +165,37 @@ Compilation
 S3DF pools may miss some of the packages needed for installing WarpX. The best practice is to install them manually into your user file system under a new folder called ``opt``.
 The version of ``cmake`` currently provided by S3DF on the ``iana`` pool is 3.20.2 but WarpX requires 3.24.0 or higher. We need to install a newer ``cmake`` manually:
 
+In ``CMakeLists.txt`` you can either toggle the relevant options ON/OFF:
+    
+.. code-block:: python
+    
+      # Options and Variants ########################################################
+      #
+      include(CMakeDependentOption)
+      option(WarpX_APP           "Build the WarpX executable application"     ON)
+      option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
+      option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
+      option(WarpX_EB            "Embedded boundary support"                  ON)
+      option(WarpX_LIB           "Build WarpX as a library"                   OFF)
+      option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
+      option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
+      option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
+      option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
+      option(WarpX_FFT           "FFT-based solvers"                          ON)
+      option(WarpX_PYTHON        "Python bindings"                            OFF)
+      option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
+      option(WarpX_QED           "QED support (requires PICSAR)"              ON)
+      option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
+                                                                              OFF)
+      option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
+                                                                              OFF)
+      
+      # Advanced option to run tests
+      option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
+      option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
+      option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
+    
+    or append the desired options in the format ``cmake -S . -B build -DWarpX_FFT=ON -WarpX_QED=ON`` when calling the build command.
 
 Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
 
@@ -189,38 +220,6 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
         cmake --build build_pm_gpu_py -j 16 --target pip_install
 
    .. tab-item:: CPU Nodes
-
-    In ``CMakeLists.txt`` you can either toggle the relevant options ON/OFF:
-        
-    .. code-block:: python
-        
-          # Options and Variants ########################################################
-          #
-          include(CMakeDependentOption)
-          option(WarpX_APP           "Build the WarpX executable application"     ON)
-          option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
-          option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
-          option(WarpX_EB            "Embedded boundary support"                  ON)
-          option(WarpX_LIB           "Build WarpX as a library"                   OFF)
-          option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
-          option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
-          option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
-          option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
-          option(WarpX_FFT           "FFT-based solvers"                          ON)
-          option(WarpX_PYTHON        "Python bindings"                            OFF)
-          option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
-          option(WarpX_QED           "QED support (requires PICSAR)"              ON)
-          option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
-                                                                                  OFF)
-          option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
-                                                                                  OFF)
-          
-          # Advanced option to run tests
-          option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
-          option(WarpX_TEST_DEBUGGER "Run automated tests without AMReX signal handling (to attach debuggers)" OFF)
-          option(WarpX_TEST_FPETRAP "Run automated tests with FPE-trapping runtime parameters" OFF)
-        
-        or append the desired options in the format ``cmake -S . -B build -DWarpX_FFT=ON -WarpX_QED=ON`` when calling the build command.
 
       .. code-block:: bash
 
