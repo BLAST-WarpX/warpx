@@ -128,24 +128,24 @@ def nps_per_rank(rank):
 
 def add_particles():
     nps = nps_per_rank(my_id)
-    x = xp.linspace(0.005, 0.025, nps)
-    y = xp.zeros(nps)
-    z = xp.linspace(0.005, 0.025, nps)
-    ux = xp.random.normal(loc=0, scale=1e3, size=nps)
-    uy = xp.random.normal(loc=0, scale=1e3, size=nps)
-    uz = xp.random.normal(loc=0, scale=1e3, size=nps)
-    w = xp.ones(nps) * 2.0
-    newPid = xp.ones(nps) * 5.0
+    x = np.linspace(0.005, 0.025, nps)
+    y = np.zeros(nps)
+    z = np.linspace(0.005, 0.025, nps)
+    ux = np.random.normal(loc=0, scale=1e3, size=nps)
+    uy = np.random.normal(loc=0, scale=1e3, size=nps)
+    uz = np.random.normal(loc=0, scale=1e3, size=nps)
+    w = np.ones(nps) * 2.0
+    newPid = np.ones(nps) * 5.0
 
     electrons.add_particles(
-        x=to_numpy(x),
-        y=to_numpy(y),
-        z=to_numpy(z),
-        ux=to_numpy(ux),
-        uy=to_numpy(uy),
-        uz=to_numpy(uz),
-        w=to_numpy(w),
-        newPid=to_numpy(newPid),
+        x=x,
+        y=y,
+        z=z,
+        ux=ux,
+        uy=uy,
+        uz=uz,
+        w=w,
+        newPid=newPid,
         unique_particles=True,
     )
 

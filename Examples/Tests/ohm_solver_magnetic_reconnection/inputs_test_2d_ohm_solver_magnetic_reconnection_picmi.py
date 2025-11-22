@@ -31,16 +31,6 @@ def get_xp():
     return xp
 
 
-def to_host(arr):
-    xp = get_xp()
-    if hasattr(arr, "get"):
-        return arr.get()
-    if hasattr(xp, "asnumpy") and isinstance(arr, xp.ndarray):
-        return xp.asnumpy(arr)
-    else:
-        return np.asarray(arr)
-
-
 class ForceFreeSheetReconnection(object):
     # B0 is chosen with all other quantities scaled by it
     B0 = 0.1  # Initial magnetic field strength (T)
@@ -324,23 +314,17 @@ class ForceFreeSheetReconnection(object):
 
         get_xp()
 
-        rho = to_host(simulation.fields.get("rho_fp", level=0)[...])
+        rho = simulation.fields.get("rho_fp", level=0)[...] / self.J0
 
-        Jiy = to_host(simulation.fields.get("current_fp", dir="y", level=0)[...])
-        Jy = to_host(
+        Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
+        Jy = (
             simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
+            / self.J0
         )
 
-        Jiy /= self.J0
-        Jy /= self.J0
-
-        Bx = to_host(simulation.fields.get("Bfield_fp", dir="x", level=0)[...])
-        By = to_host(simulation.fields.get("Bfield_fp", dir="y", level=0)[...])
-        Bz = to_host(simulation.fields.get("Bfield_fp", dir="z", level=0)[...])
-
-        Bx /= self.B0
-        By /= self.B0
-        Bz /= self.B0
+        Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
+        By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
+        Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return
