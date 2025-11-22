@@ -116,14 +116,14 @@ laser1.wavelength = 0.81e-6         # The wavelength of the laser (in meters)
 # Diagnostics
 diagnostics.diags_names =  diag1 #diag_lab
 
-diag_lab.diag_type = BackTransformed
-diag_lab.do_back_transformed_fields = 1
-diag_lab.num_snapshots_lab = 21
-diag_lab.dt_snapshots_lab = 2.380952380952381e-12
-diag_lab.fields_to_plot =  Er Et Ez Br Bt Bz jr jt jz rho
-diag_lab.format = openpmd
-diag_lab.buffer_size = 64
-diag_lab.write_species = 1
+#diag_lab.diag_type = BackTransformed
+#diag_lab.do_back_transformed_fields = 1
+#diag_lab.num_snapshots_lab = 21
+#diag_lab.dt_snapshots_lab = 2.380952380952381e-12
+#diag_lab.fields_to_plot =  Er Et Ez Br Bt Bz jr jt jz rho
+#diag_lab.format = openpmd
+#diag_lab.buffer_size = 64
+#diag_lab.write_species = 1
 
 # Diagnostics
 diag1.intervals = 100
