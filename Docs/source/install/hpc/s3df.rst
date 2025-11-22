@@ -179,10 +179,14 @@ Use the following :ref:`cmake commands <building-cmake>` to compile the applicat
 
          cmake -S . -B build_pm_gpu -DWarpX_COMPUTE=CUDA -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
          cmake --build build_pm_gpu -j 16
-         cmake --build build_pm_gpu -j 16 --target pip_install
 
-      **That's it!**
-      The WarpX application executables are now in ``$WORK/src/warpx/build_pm_gpu/bin/`` and we installed the ``pywarpx`` Python module.
+    The WarpX application executables are now in $WORK/src/warpx/build_pm_gpu/bin/. Additionally, the following commands will install WarpX as a Python module:
+
+    .. code-block:: bash
+        rm -rf build_pm_gpu_py
+
+        cmake -S . -B build_pm_cpu_py -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+        cmake --build build_pm_cpu_py -j 16 --target pip_install
 
    .. tab-item:: CPU Nodes
 
