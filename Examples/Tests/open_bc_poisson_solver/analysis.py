@@ -33,7 +33,7 @@ def evaluate_E(x, y, z):
     return E_complex.imag, E_complex.real
 
 
-path = os.path.join("diags", "diag2")
+path = os.path.join("diags", "diag1")
 ts = OpenPMDTimeSeries(path)
 
 Ex, info = ts.get_field(field="E", coord="x", iteration=0, plot=False)

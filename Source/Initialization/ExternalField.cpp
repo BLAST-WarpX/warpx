@@ -207,10 +207,24 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
     auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
     auto fileGeom = F.getAttribute("geometry").get<std::string>();
 
+    auto dOrder = F.getAttribute("dataOrder").get<std::string>();
+    int do_swap = 0;
+
+#if (AMREX_SPACEDIM > 1) && !defined(WARPX_DIM_3D)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(F.getAttribute("dataOrder").get<std::string>() == "C",
+                                     "Reading from files with non-C dataOrder is not implemented");
+#endif
+
 #if defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z",
-                                     "3D expects axisLabels {x, y, z}");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE((axisLabels.at(0) == "z" && axisLabels.at(1) == "y" && axisLabels.at(2) == "x") ||
+                                     (axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z"),
+                                    "3D expects axisLabels {x, y, z} or {z, y, x}");
+
+    if ((dOrder == "F" && axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z") ||
+        (dOrder == "C" && axisLabels.at(0) == "z" && axisLabels.at(1) == "y" && axisLabels.at(2) == "x") ){
+            do_swap = 2;
+    }
 #elif defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "z",
@@ -225,19 +239,19 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
 #endif
 
     const auto d = F.gridSpacing<long double>();
-    AMREX_D_TERM(m_external_field_view.dx[0] = amrex::Real(d.at(0));,
+    AMREX_D_TERM(m_external_field_view.dx[0] = amrex::Real(d.at(0+do_swap));,
                  m_external_field_view.dx[1] = amrex::Real(d.at(1));,
-                 m_external_field_view.dx[2] = amrex::Real(d.at(2)));
-
-    const auto offset = F.gridGlobalOffset();
-    AMREX_D_TERM(m_external_field_view.offset[0] = amrex::Real(offset.at(0));,
-                 m_external_field_view.offset[1] = amrex::Real(offset.at(1));,
-                 m_external_field_view.offset[2] = amrex::Real(offset.at(2)));
+                 m_external_field_view.dx[2] = amrex::Real(d.at(2-do_swap)));
 
     // Load the first component if F_component is empty
     auto FC = F_component.empty() ? F.begin()->second : F[F_component];
     const auto extent = FC.getExtent();
 
+    const auto offset = F.gridGlobalOffset();
+    const auto position = FC.getAttribute("position").get<std::vector<double>>();
+    AMREX_D_TERM(m_external_field_view.offset[0] = amrex::Real(offset.at(0+do_swap) + position.at(0+do_swap) * d.at(0+do_swap));,
+                 m_external_field_view.offset[1] = amrex::Real(offset.at(1) + position.at(1) * d.at(1));,
+                 m_external_field_view.offset[2] = amrex::Real(offset.at(2-do_swap) + position.at(2-do_swap) * d.at(2-do_swap)););
     // Determine the chunk data that will be loaded.
     // Now, the full range of data is loaded.
     // Loading chunk data can speed up the process.
@@ -248,10 +262,10 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
     m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
     series.flush();
 
-#if defined(AMREX_USE_GPU)
-    auto *FC_data_host = m_FC_data_cpu.get();
     auto const total_extent = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
                                               1, std::multiplies<std::size_t>());
+#if defined(AMREX_USE_GPU)
+    auto *FC_data_host = m_FC_data_cpu.get();
     m_FC_data_gpu.resize(total_extent);
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, FC_data_host, FC_data_host + total_extent, m_FC_data_gpu.begin());
     amrex::Gpu::streamSynchronize();
@@ -260,7 +274,23 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
 #else
     auto *FC_data = m_FC_data_cpu.get();
 #endif
+    if (do_swap){
+        m_FC_data_transposed.resize(total_extent);
+        auto *FC_data_transposed = m_FC_data_transposed.data();
+        amrex::ParallelFor(total_extent, [=] AMREX_GPU_DEVICE (int idx) {
+            // Original index in z,y,x order
+            int iz = idx / (extent.at(1) * extent.at(0));
+            int rem = idx % (extent.at(1) * extent.at(0));
+            int iy = rem / extent.at(0);
+            int ix = rem % extent.at(0);
 
+            // New index in x,y,z order
+            int new_idx = ix * (extent.at(1) * extent.at(2)) + iy * extent.at(2) + iz;
+
+            FC_data_transposed[new_idx] = FC_data[idx];
+        });
+        FC_data = FC_data_transposed;
+    }
 #if defined(WARPX_DIM_RZ)
     // extent[0] is for theta
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent[0] == 1,
@@ -268,11 +298,10 @@ ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_pa
     const auto extent0 = static_cast<int>(extent.at(1));
     const auto extent1 = static_cast<int>(extent.at(2));
 #else
-    AMREX_D_TERM(const auto extent0 = static_cast<int>(extent.at(0));,
+    AMREX_D_TERM(const auto extent0 = static_cast<int>(extent.at(0+do_swap));,
                  const auto extent1 = static_cast<int>(extent.at(1));,
-                 const auto extent2 = static_cast<int>(extent.at(2)));
+                 const auto extent2 = static_cast<int>(extent.at(2-do_swap)));
 #endif
-
     m_external_field_view.table = decltype(m_external_field_view.table)
 #if (AMREX_SPACEDIM == 1)
         (FC_data, 0, extent0);
