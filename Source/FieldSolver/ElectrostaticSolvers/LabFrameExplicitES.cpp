@@ -288,6 +288,13 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
 
         // The loops are always performed on the CPU
 
+        {
+
+        // This code is adapted from the Wikipedia page on the Tridiagonal matrix algorithm
+        // https://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm#Variants.
+        // Licensed under CC BY-SA 4.0
+        // Modifications: The a, b, and c inputs are replaced with the fixed values.
+
         const amrex::Real alpha = -1.0_rt;
         const amrex::Real beta = -1.0_rt;
 
@@ -322,6 +329,8 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
         /* loop from 0 to nx - 1 inclusive */
         for (int ix = 0; ix < nx; ix++)
             x(ix,0,0) -= fact * u(ix,0,0);
+
+        }
 
         x(nx,0,0) = x(0,0,0);
 
