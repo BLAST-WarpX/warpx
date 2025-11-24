@@ -50,11 +50,9 @@ struct SmartCopy
     {
         // initialize the real components
         for (int j = 0; j < DstData::NAR; ++j) {
-            amrex::Print() << "Initializing real component " << j << " for dst particle " << i_dst << " with policy " << static_cast<int>(m_policy_real[j]) << std::endl;
             dst.m_rdata[j][i_dst] = initializeRealValue(m_policy_real[j], engine);
         }
         for (int j = 0; j < dst.m_num_runtime_real; ++j) {
-            amrex::Print() << "Initializing runtime real component " << j << " for dst particle " << i_dst << " with policy " << static_cast<int>(m_policy_real[j+DstData::NAR]) << std::endl;
             dst.m_runtime_rdata[j][i_dst] = initializeRealValue(m_policy_real[j+DstData::NAR], engine);
         }
 
