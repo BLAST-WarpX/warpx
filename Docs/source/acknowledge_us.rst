@@ -116,7 +116,7 @@ If your project leads to a scientific publication, please consider citing all Wa
               howpublished = {https://blast-warpx.github.io}
            }
 
-Since the WarpX is an actively evolving project, a specific version might be used in your work to ensure reproducibility. You can select a *version-specific DOI* from the `release page <https://github.com/BLAST-WarpX/warpx/releases>`__ and add the version number to the cited title, e.g. for version ``25.10``:
+Since WarpX is an actively evolving project, a specific version might be used in your work to ensure reproducibility. You can select a *version-specific DOI* from the `release page <https://github.com/BLAST-WarpX/warpx/releases>`__ and add the version number to the cited title, e.g. for version ``25.10``:
 
 .. tab-set::
 

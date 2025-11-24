@@ -32,7 +32,8 @@ void FiniteDifferenceSolver::ComputeCurlA (
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-    if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         ComputeCurlACylindrical <CylindricalYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev
