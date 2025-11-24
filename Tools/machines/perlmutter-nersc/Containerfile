@@ -6,7 +6,7 @@
 # WarpX Python bindings are installed in /opt/venv
 #
 # On Perlmutter, run WarpX like this:
-#   podman run --rm --gpu --mpi --nccl -it warpx-perlmutter warpx.2d inputs_2d
+#   podman-hpc run --rm --gpu --cuda-mpi --nccl -v $PWD:/opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest warpx.2d /opt/pwd/inputs_base_2d
 # Prefix this line with "srun ..." in job scripts, as usual:
 #   srun --cpu-bind=cores bash -c "
 #     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
@@ -78,8 +78,12 @@ RUN apt-get update           && \
         zlib1g-dev           && \
     rm -rf /var/lib/apt/lists/*
 
-# Install MPICH 3.4 w/ GPUdirect support from source
+# Install MPICH 3.4 support from source
 #   after https://docs.nersc.gov/development/containers/shifter/how-to-use/#using-mpi-in-shifter
+# Note:
+#   w/o GPUdirect here, because we will swap out the MPI binaries on Perlmutter using a Podman-HPC
+#   plugin (--mpi/--cuda-mpi). This only works if we do NOT build GPUdirect here, this we skip:
+#     --with-ch4-shmmods=posix,gpudirect
 # Perlmutter MPICH: cray-mpich/8.1.30 based on MPICH 3.4a2
 # TODO: install libfabric from source and depend on it (or expose where embedded libfabric gets installed)
 ARG mpich=3.4.3
@@ -93,7 +97,6 @@ RUN \
       ./configure                                                              \
         --disable-fortran                                                      \
         --prefix=/opt/warpx                                                    \
-        --with-ch4-shmmods=posix,gpudirect                                     \
         --with-device=ch4:ofi                                               && \
     make -j ${NJOBS}                                                        && \
     make install                                                            && \
@@ -102,7 +105,7 @@ RUN \
     rm -rf ${mpich_prefix}*
 
 RUN /sbin/ldconfig
-ENV MPICH_GPU_SUPPORT_ENABLED=1
+# ENV MPICH_GPU_SUPPORT_ENABLED=1
 
 # Install c-blosc from source
 RUN git clone                               \

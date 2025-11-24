@@ -9,5 +9,7 @@ export LD_LIBRARY_PATH=${WARPX_ROOT}/lib:${LD_LIBRARY_PATH}
 # Activate python venv
 source /opt/venv/bin/activate
 
+# export MPICH_GPU_SUPPORT_ENABLED=1
+
 # Execute the provided command
 exec "$@"
