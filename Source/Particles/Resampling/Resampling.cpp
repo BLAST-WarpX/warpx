@@ -8,6 +8,7 @@
 
 #include "VelocityCoincidenceThinning.H"
 #include "LevelingThinning.H"
+#include "ParticleSplitting.H"
 #include "Utils/TextMsg.H"
 
 #include <AMReX.H>
@@ -26,6 +27,10 @@ Resampling::Resampling (const std::string& species_name)
     else if (resampling_algorithm_string == "velocity_coincidence_thinning")
     {
         m_resampling_algorithm = std::make_unique<VelocityCoincidenceThinning>(species_name);
+    }
+    else if (resampling_algorithm_string == "particle_splitting")
+    {
+        m_resampling_algorithm =  std::make_unique<ParticleSplitting>(species_name);
     }
     else
     { WARPX_ABORT_WITH_MESSAGE("Unknown resampling algorithm."); }
