@@ -400,7 +400,7 @@ public:
                 const amrex::ParticleReal p_non_target_in = m1 * std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1);
                 const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m1 + 1.0_prt/m2);
                 // subtract the energy cost for ionization (converted from eV to J)
-                const amrex::ParticleReal E_out = E_coll + reaction_energy * PhysConst::q_e;
+                const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
 
                 // Momentum and energy division after the ionization event is done as follows:
                 // we assume that, in the center of mass frame, the two products (the ion and the electron)
