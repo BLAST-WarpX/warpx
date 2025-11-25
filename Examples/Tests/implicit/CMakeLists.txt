@@ -31,7 +31,7 @@ add_warpx_test(
     OFF  # dependency
 )
 
-if(WarpX_PETSC)
+if(AMReX_PETSC)
     add_warpx_test(
         test_2d_curl_curl_petsc_pc  # name
         2  # dims
