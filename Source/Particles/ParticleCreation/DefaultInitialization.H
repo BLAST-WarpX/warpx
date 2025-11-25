@@ -157,15 +157,19 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             if (particle_comps[j] == "ux_avg" || particle_comps[j] == "uy_avg" || particle_comps[j] == "uz_avg")
             {
                 // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
-                    amrex::ParallelFor(stop - start,
-                                       [=] AMREX_GPU_DEVICE (int i) noexcept {
-                                           const int ip = i + start;
-                                           attr_ptr[ip] = 0.0_rt;
-                                       });
+                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value)
+                {
+                    amrex::ParallelFor(stop - start, [=] AMREX_GPU_DEVICE (int i) noexcept
+                    {
+                        const int ip = i + start;
+                        attr_ptr[ip] = 0.0_rt;
+                    });
+                }
                 // Otherwise (e.g., particle tile allocated in pinned memory), run on CPU
-                } else {
-                    for (int ip = start; ip < stop; ++ip) {
+                else
+                {
+                    for (int ip = start; ip < stop; ++ip)
+                    {
                         attr_ptr[ip] = 0.0_rt;
                     }
                 }
