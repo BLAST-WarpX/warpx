@@ -167,7 +167,7 @@ jobs:
       # display disk space usage
       df -h
       # configure
-      export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
+      export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON -DAMReX_PETSC=YES"
       export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
       cmake -S . -B build    \
         ${AMReX_CMAKE_FLAGS} \
