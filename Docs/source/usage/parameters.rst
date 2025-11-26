@@ -3886,7 +3886,7 @@ Lookup tables
 ^^^^^^^^^^^^^
 
 Lookup tables store pre-computed values for functions used by the QED modules.
-This feature requires with the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON`` for table generation.
+This feature requires with the extra build option ``-DWarpX_QED_TABLE_GEN=ON`` for table generation.
 
 * ``qed_bw.lookup_table_mode`` (`string`)
     There are three options to prepare the lookup table required by the Breit-Wheeler module:
