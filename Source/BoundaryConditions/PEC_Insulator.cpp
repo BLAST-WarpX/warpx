@@ -440,7 +440,7 @@ PEC_Insulator::PEC_Insulator ()
 }
 
 int
-PEC_Insulator::IsESet(int idim, int iside, int ifield) {
+PEC_Insulator::IsESet(int idim, int iside, int ifield) const {
     int result = 0;
     switch (ifield) {
         case 0:
@@ -459,7 +459,7 @@ PEC_Insulator::IsESet(int idim, int iside, int ifield) {
 }
 
 int
-PEC_Insulator::IsBSet(int idim, int iside, int ifield) {
+PEC_Insulator::IsBSet(int idim, int iside, int ifield) const {
     int result = 0;
     switch (ifield) {
         case 0:
