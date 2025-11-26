@@ -122,6 +122,20 @@ public:
                                amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
                                amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
 
+    /* \brief Returns whether the E field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \return whether the E field is set on the boundary
+     */
+    int IsESet(int idim, int iside) { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
+
+    /* \brief Returns whether the B field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \return whether the B field is set on the boundary
+     */
+    int IsBSet(int idim, int iside) { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
+
 private:
 
     /* \brief Read in the parsers for the tangential fields, returning whether
