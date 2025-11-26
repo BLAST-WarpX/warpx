@@ -8,6 +8,6 @@
     "commit_amrex": "c4fcda1fb2ea238c3e6fa273dc9cfcde54b4cc51",
     "commit_pyamrex": "5fc00b46b2a60b2c20b9067500c4b68f709ccb94",
     "commit_picsar": "0c329e66010267662a82219f7de7abbd231463f4",
-    "commit_pybind11": "af796d0a99f0cbd9aebb10591257c41a56811cf6",
+    "commit_pybind11": "v3.0.1",
     "commit_picmi": "e79dc49c58ad65b5e207ed40e4e6edc4b1482241"
 }
