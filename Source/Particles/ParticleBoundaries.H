@@ -10,7 +10,30 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_AmrCore.H>
+#include <AMReX_Array.H>
+#include <AMReX_Config.H>
 #include <AMReX_Parser.H>
+
+#include <utility>
+
+namespace warpx::particles
+{
+    /**
+     * \brief Reads the particle boundary conditions from the input file
+     *
+     * \param[in] is_field_boundary_periodic a bool array indicating if field boundary conditions are periodic in each direction
+     *
+     * \returns a pair of amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
+     *          containing the boundary conditions for the lower and the
+     *          upper boundary.
+     */
+    std::pair<
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>,
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM>
+    >
+    parse_particle_boundaries (
+        const amrex::Array<bool, AMREX_SPACEDIM>& is_field_boundary_periodic);
+}
 
 /**
  *  This allows a different boundary condition on each edge of the grid.

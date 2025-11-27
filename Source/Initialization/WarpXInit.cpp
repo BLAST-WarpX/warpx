@@ -17,6 +17,11 @@
 #include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
+#ifdef AMREX_USE_PETSC
+#include <petscsys.h>
+#endif
+
+
 #include <optional>
 #include <string>
 
@@ -25,10 +30,19 @@ void warpx::initialization::initialize_external_libraries(int argc, char* argv[]
     ablastr::parallelization::mpi_init(argc, argv);
     warpx::initialization::amrex_init(argc, argv);
     ablastr::math::anyfft::setup();
+#ifdef AMREX_USE_PETSC
+    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
+    PetscInitialize(&argc, &argv, nullptr, "WarpX with PETSc");
+    amrex::Print() << "Initialized PETSc.\n";
+#endif
 }
 
 void warpx::initialization::finalize_external_libraries ()
 {
+#ifdef AMREX_USE_PETSC
+    PetscFinalize();
+    amrex::Print() << "Finalized PETSc.\n";
+#endif
     ablastr::math::anyfft::cleanup();
     amrex::Finalize();
     ablastr::parallelization::mpi_finalize();
@@ -76,6 +90,10 @@ void warpx::initialization::check_dims()
     std::string const dims_compiled = "1";
 #elif defined(WARPX_DIM_RZ)
     std::string const dims_compiled = "RZ";
+#elif defined(WARPX_DIM_RCYLINDER)
+    std::string const dims_compiled = "RCYLINDER";
+#elif defined(WARPX_DIM_RSPHERE)
+    std::string const dims_compiled = "RSPHERE";
 #endif
     const amrex::ParmParse pp_geometry("geometry");
     std::string dims;

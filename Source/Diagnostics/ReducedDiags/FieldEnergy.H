@@ -44,7 +44,7 @@ public:
      *        account the fraction of the cell volume within the domain.
      *
      * \param field The MultiFab to be integrated
-     * \param lev   The refinement level
+     * \param lev The refinement level
      * \return The integral
      */
     amrex::Real ComputeNorm2(const amrex::MultiFab& field, int lev);

@@ -96,7 +96,7 @@ void ParticleEnergy::ComputeDiags (int step)
     // Get number of species
     const int nSpecies = mypc.nSpecies();
 
-    amrex::Real Wtot = 0.0_rt;
+    amrex::ParticleReal Wtot = 0.0_rt;
 
     // Loop over species
     for (int i_s = 0; i_s < nSpecies; ++i_s)
@@ -104,56 +104,7 @@ void ParticleEnergy::ComputeDiags (int step)
         // Get WarpXParticleContainer class object
         const auto & myspc = mypc.GetParticleContainer(i_s);
 
-        // Get mass (used only for particles other than photons, see below)
-        const amrex::Real m = myspc.getMass();
-
-        using PType = typename WarpXParticleContainer::SuperParticleType;
-
-        amrex::Real Etot = 0.0_rt;
-        amrex::Real Ws   = 0.0_rt;
-
-        // Use amrex::ParticleReduce to compute the sum of energies and weights of all particles
-        // held by the current MPI rank for this species (loop over all boxes held by this MPI rank):
-        // the result r is the tuple (Etot, Ws)
-        amrex::ReduceOps<ReduceOpSum, ReduceOpSum> reduce_ops;
-        if(myspc.AmIA<PhysicalSpecies::photon>())
-        {
-            auto r = amrex::ParticleReduce<amrex::ReduceData<Real, Real>>(
-                myspc,
-                [=] AMREX_GPU_DEVICE(const PType& p) noexcept -> amrex::GpuTuple<Real, Real>
-                {
-                    const amrex::Real w  = p.rdata(PIdx::w);
-                    const amrex::Real ux = p.rdata(PIdx::ux);
-                    const amrex::Real uy = p.rdata(PIdx::uy);
-                    const amrex::Real uz = p.rdata(PIdx::uz);
-                    return {w*Algorithms::KineticEnergyPhotons(ux,uy,uz),w};
-                },
-                reduce_ops);
-
-            Etot = amrex::get<0>(r);
-            Ws   = amrex::get<1>(r);
-        }
-        else // particle other than photons
-        {
-            auto r = amrex::ParticleReduce<amrex::ReduceData<Real, Real>>(
-                myspc,
-                [=] AMREX_GPU_DEVICE(const PType& p) noexcept -> amrex::GpuTuple<Real, Real>
-                {
-                    const amrex::Real w  = p.rdata(PIdx::w);
-                    const amrex::Real ux = p.rdata(PIdx::ux);
-                    const amrex::Real uy = p.rdata(PIdx::uy);
-                    const amrex::Real uz = p.rdata(PIdx::uz);
-
-                    return {w*Algorithms::KineticEnergy(ux,uy,uz,m), w};
-                },
-                reduce_ops);
-
-            Etot = amrex::get<0>(r);
-            Ws   = amrex::get<1>(r);
-        }
-
-        // Reduced sum over MPI ranks
-        ParallelDescriptor::ReduceRealSum({Etot,Ws}, ParallelDescriptor::IOProcessorNumber());
+        auto [Etot, Ws] = myspc.sumParticleWeightAndEnergy(false);
 
         // Accumulate sum of weights over all species (must come after MPI reduction of Ws)
         Wtot += Ws;

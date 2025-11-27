@@ -10,7 +10,7 @@
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/WarpXParticleContainer.H"
+#include "Particles/WarpXParticleContainer_fwd.H"
 
 #include <AMReX_REAL.H>
 #include <AMReX_GpuContainers.H>

@@ -9,8 +9,6 @@
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Parallelization/GuardCellManager.H"
@@ -46,89 +44,6 @@
 #include <vector>
 
 void
-WarpX::ImplicitPreRHSOp ( amrex::Real  a_cur_time,
-                          amrex::Real  a_theta,
-                          amrex::Real  a_full_dt,
-                          int          a_nl_iter,
-                          bool         a_from_jacobian,
-                          bool         a_use_mass_matrices )
-{
-    using warpx::fields::FieldType;
-    amrex::ignore_unused( a_full_dt, a_nl_iter, a_from_jacobian );
-
-    if (use_filter) { ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0); }
-
-    // Advance the particle positions by 1/2 dt,
-    // particle velocities by dt, then take average of old and new v,
-    // deposit currents, giving J at n+1/2
-    // This uses Efield_fp and Bfield_fp, the field at n+1/2 from the previous iteration.
-    const PushType push_type = PushType::Implicit;
-    const bool skip_current = false;
-    bool deposit_mass_matrices = false;
-    if (a_use_mass_matrices && !a_from_jacobian) { deposit_mass_matrices = true; }
-    PushParticlesandDeposit(a_cur_time, skip_current, deposit_mass_matrices, push_type);
-
-    SyncCurrentAndRho();
-    if (deposit_mass_matrices) {
-        SyncMassMatricesAndApplyBCs();
-        const amrex::Real theta_dt = a_theta*a_full_dt;
-        SetMassMatricesForPC( theta_dt );
-    }
-
-}
-
-void
-WarpX::SyncMassMatricesAndApplyBCs ()
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    // Copy mass matrices elements used for the preconditioner
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        ablastr::fields::VectorField MM = m_fields.get_alldirs(FieldType::MassMatrices, lev);
-        ablastr::fields::VectorField MM_PC = m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
-        amrex::MultiFab::Copy(*MM_PC[0], *MM[0], 0, 0, MM[0]->nComp(), MM[0]->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[1], *MM[1], 0, 0, MM[1]->nComp(), MM[1]->nGrowVect());
-        amrex::MultiFab::Copy(*MM_PC[2], *MM[2], 0, 0, MM[2]->nComp(), MM[2]->nGrowVect());
-    }
-
-    // Do addOp Exchange on MassMatrices_PC
-    SyncMassMatrices();
-
-    // Apply BCs to MassMatrices_PC
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        ApplyJfieldBoundary(lev,
-            m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
-            m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
-            m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
-    }
-}
-
-void
-WarpX::SetMassMatricesForPC ( amrex::Real a_theta_dt )
-{
-
-    using namespace amrex::literals;
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
-    // Note: This should be done after Sync/communication has been called
-
-    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
-    const int diag_comp = 0;
-    for (int lev = 0; lev <= finest_level; ++lev) {
-        for (int idir = 0 ; idir < 3 ; idir++) {
-            amrex::MultiFab* mass_matrix = m_fields.get(FieldType::MassMatrices_PC, Direction{idir}, lev);
-            mass_matrix->mult(pc_factor, 0, mass_matrix->nComp());
-            mass_matrix->plus(1.0_rt, diag_comp, 1, 0);
-        }
-    }
-
-}
-
-void
 WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time )
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -159,7 +74,7 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[1], *a_Bn[lev][1], 0, 0, ncomps, a_Bn[lev][1]->nGrowVect());
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
-    EvolveB(a_thetadt, DtType::Full, start_time);
+    EvolveB(a_thetadt, SubcyclingHalf::None, start_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -170,7 +85,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
     using warpx::fields::FieldType;
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
-    ApplyBfieldBoundary(0, PatchType::fine, DtType::Full, a_time);
+    ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -239,16 +154,21 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
                 amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+
+                // Check if nsuborbits is present, and if so it is set to 1
+                int *nsuborbits = (pc->HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
                 const long np = pti.numParticles();
 
@@ -257,17 +177,23 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                     amrex::ParticleReal xp, yp, zp;
                     getPosition(ip, xp, yp, zp);
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                     x_n[ip] = xp;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     y_n[ip] = yp;
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                     z_n[ip] = zp;
+#endif
 
                     ux_n[ip] = ux[ip];
                     uy_n[ip] = uy[ip];
                     uz_n[ip] = uz[ip];
+
+                    if (nsuborbits) {
+                        nsuborbits[ip] = 1;
+                    }
 
                 });
 
@@ -310,13 +236,15 @@ WarpX::FinishImplicitParticleUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                 amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
                 amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
@@ -328,13 +256,15 @@ WarpX::FinishImplicitParticleUpdate ()
                     amrex::ParticleReal xp, yp, zp;
                     getPosition(ip, xp, yp, zp);
 
-#if (AMREX_SPACEDIM >= 2)
+#if !defined(WARPX_DIM_1D_Z)
                     xp = 2._rt*xp - x_n[ip];
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     yp = 2._rt*yp - y_n[ip];
 #endif
+#if !defined(WARPX_DIM_RCYLINDER)
                     zp = 2._rt*zp - z_n[ip];
+#endif
 
                     ux[ip] = 2._rt*ux[ip] - ux_n[ip];
                     uy[ip] = 2._rt*uy[ip] - uy_n[ip];

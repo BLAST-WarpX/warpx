@@ -38,8 +38,6 @@
 #   endif
 #endif
 #include "AcceleratorLattice/AcceleratorLattice.H"
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
@@ -68,7 +66,6 @@
 #include <AMReX_RealBox.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_Vector.H>
-#include <AMReX_VisMF.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -130,22 +127,14 @@ public:
     void Evolve (int numsteps = -1);
 
     /** Push momentum one half step forward to synchronize with position.
-     *  Also sets is_synchronized to `true`.
+     *  Also sets m_is_synchronized to `true`.
      */
-    void Synchronize ();
+    void SynchronizeVelocityWithPosition ();
 
     //
     // Functions used by implicit solvers
     //
-    void ImplicitPreRHSOp ( amrex::Real cur_time,
-                            amrex::Real a_theta,
-                            amrex::Real a_full_dt,
-                            int         a_nl_iter,
-                            bool        a_from_jacobian,
-                            bool        a_use_mass_matrices );
-    void SyncMassMatricesAndApplyBCs ();
-    void SyncMassMatrices ();
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
@@ -197,48 +186,31 @@ public:
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
     EvolveScheme evolve_scheme = EvolveScheme::Default;
-    //! Maximum iterations used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static int max_particle_its_in_implicit_scheme;
-    //! Relative tolerance used for self-consistent particle update in implicit particle-suppressed evolve schemes
-    static amrex::ParticleReal particle_tol_in_implicit_scheme;
     /** Records a number corresponding to the load balance cost update strategy
      *  being used (0 or 1 corresponding to timers or heuristic).
      */
     static inline auto load_balance_costs_update_algo = LoadBalanceCostsUpdateAlgo::Default;
-    /** Integer that correspond to macroscopic Maxwell solver algorithm
-     *  (BackwardEuler - 0, Lax-Wendroff - 1)
-     */
-    static inline auto macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
     /** Boundary conditions applied to fields at the lower domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
-    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
-        field_boundary_lo {AMREX_D_DECL(FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default)};
+    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_lo;
+
     /** Boundary conditions applied to fields at the upper domain boundaries
      *  (Possible values PML, Periodic, PEC, PMC, Neumann, Damped, Absorbing Silver-Mueller, None)
      */
-    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>
-        field_boundary_hi {AMREX_D_DECL(FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default,
-                                        FieldBoundaryType::Default)};
+    static inline amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_hi;
+
     /** Integers that correspond to boundary condition applied to particles at the
      *  lower domain boundaries
      *  (0 to 4 correspond to Absorbing, Open, Reflecting, Periodic, Thermal)
      */
-    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>
-        particle_boundary_lo {AMREX_D_DECL(ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default)};
+    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_lo;
+
     /** Integers that correspond to boundary condition applied to particles at the
      *  upper domain boundaries
      *  (0 to 4 correspond to Absorbing, Open, Reflecting, Periodic, Thermal)
      */
-    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>
-        particle_boundary_hi {AMREX_D_DECL(ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default,
-                                           ParticleBoundaryType::Default)};
+    static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
@@ -246,8 +218,8 @@ public:
     static inline auto time_dependency_rho = TimeDependencyRho::Default;
 
     //! If true, the current is deposited on a nodal grid and then centered onto a staggered grid
-    //! using finite centering of order given by #current_centering_nox, #current_centering_noy,
-    //! and #current_centering_noz
+    //! using finite centering of order given by current_centering_nox, current_centering_noy,
+    //! and current_centering_noz
     bool do_current_centering = false;
 
     //! If true, a correction is applied to the current in Fourier space,
@@ -291,6 +263,9 @@ public:
     static int noy;
     //! Order of the particle shape factors (splines) along z
     static int noz;
+
+    //! Maximum number of allowed grid crossings for particles
+    static int particle_max_grid_crossings;
 
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
@@ -412,10 +387,6 @@ public:
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-    const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
-#endif
-
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
@@ -475,25 +446,19 @@ public:
      */
     void ShiftGalileanBoundary ();
 
-    /**
-     * \brief Update injection position for continuous injection of
-     *        particles and lasers (loops over species and lasers).
-     */
-    void UpdateInjectionPosition (amrex::Real dt);
-
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, DtType dt_type, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, DtType dt_type, amrex::Real start_time);
-    void EvolveF (         amrex::Real dt, DtType dt_type);
-    void EvolveF (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveG (         amrex::Real dt, DtType dt_type);
-    void EvolveG (int lev, amrex::Real dt, DtType dt_type);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type, amrex::Real start_time);
+    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveF (         amrex::Real dt, int const rho_comp);
+    void EvolveF (int lev, amrex::Real dt, int const rho_comp);
+    void EvolveG (         amrex::Real dt);
+    void EvolveG (int lev, amrex::Real dt);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
-    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
-    void EvolveG (int lev, PatchType patch_type, amrex::Real dt, DtType dt_type);
+    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
+    void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
 
     void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
     void MacroscopicEvolveE (int lev, amrex::Real dt, amrex::Real start_time);
@@ -513,7 +478,15 @@ public:
      * deposits the initial ion charge and current (before the first particle
      * push), to be used in the ``HybridPICEvolveFields()`` function.
      */
-    void HybridPICDepositInitialRhoAndJ ();
+    void HybridPICInitializeRhoJandB ();
+
+    /**
+     * \brief Hybrid-PIC deposition function.
+     * Helper function to contain all the needed logic to deposit charge and
+     * current densities for use in the Ohm's law solver. The deposition is
+     * done into the ``rho_fp`` and ``current_fp`` multifabs.
+     */
+    void HybridPICDepositRhoAndJ ();
 
     /** apply QED correction on electric field
      *
@@ -585,7 +558,7 @@ public:
      */
     void DampFieldsInGuards (int lev, amrex::MultiFab* mf);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
                                                    amrex::MultiFab* Jy,
                                                    amrex::MultiFab* Jz,
@@ -613,9 +586,9 @@ public:
                               PatchType patch_type);
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
-    void ApplyBfieldBoundary (int lev, PatchType patch_type, DtType dt_type, amrex::Real cur_time);
+    void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
     void ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex::MultiFab* Ez, int lev) const;
 #endif
@@ -657,10 +630,15 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, DtType a_dt_type=DtType::Full, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
-    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
-                                  bool deposit_mass_matrices=false, PushType push_type=PushType::Explicit);
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  ImplicitOptions const * implicit_options = nullptr);
+
+    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
@@ -727,7 +705,7 @@ public:
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
-    [[nodiscard]] bool getis_synchronized() const {return is_synchronized;}
+    [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}
 
     [[nodiscard]] int maxStep () const {return max_step;}
     void updateMaxStep (const int new_max_step) {max_step = new_max_step;}
@@ -890,6 +868,15 @@ public:
 
     void ApplyFilterandSumBoundaryRho (int lev, int glev, amrex::MultiFab& rho, int icomp, int ncomp);
 
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev,
+        int idim);
+
+    void ApplyFilterMF (
+        const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -923,22 +910,10 @@ public:
     */
     void ComputeDistanceToEB ();
     /**
-    * \brief Auxiliary function to count the amount of faces which still need to be extended
-    */
-    amrex::Array1D<int, 0, 2> CountExtFaces();
-    /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
     void ComputeFaceExtensions();
-    /**
-    * \brief Initialize the memory for the FaceInfoBoxes
-    */
-    void InitBorrowing();
-    /**
-    * \brief Shrink the vectors in the FaceInfoBoxes
-    */
-    void ShrinkBorrowing();
     /**
     * \brief Do the one-way extension
     */
@@ -956,6 +931,11 @@ public:
 
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
+    ablastr::fields::MultiFabRegister& GetMultiFabRegister() {return m_fields;}
+
+    //! Use this function to override the Level 0 grids made by AMReX.
+    //! This function is called in amrex::AmrCore::InitFromScratch.
+    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
 protected:
 
@@ -985,10 +965,6 @@ protected:
      *  can be used in the function used to define the E and B fields on the grid.
      */
     void InitLevelData (int lev, amrex::Real time);
-
-    //! Use this function to override the Level 0 grids made by AMReX.
-    //! This function is called in amrex::AmrCore::InitFromScratch.
-    void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
     //! Use this function to override how DistributionMapping is made.
     [[nodiscard]] amrex::DistributionMapping
@@ -1047,6 +1023,16 @@ private:
 
     void AddExternalFields (int lev);
 
+    /**
+     * \brief
+     * Perform collisions, particle injection, and advance fields and particles by one time step.
+    */
+    void OneStep (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_nosub (amrex::Real cur_time);
     void OneStep_sub1 (amrex::Real cur_time);
 
@@ -1063,13 +1049,6 @@ private:
         const ablastr::fields::MultiLevelVectorField& J_fp,
         const ablastr::fields::MultiLevelVectorField& J_cp,
         const ablastr::fields::MultiLevelVectorField& J_buffer,
-        int lev);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
-        int lev,
-        int idim);
-    void ApplyFilterMF (
-        const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
     void SumBoundaryJ (
         const ablastr::fields::MultiLevelVectorField& current,
@@ -1192,6 +1171,11 @@ private:
 
     //! Integer that corresponds to electromagnetic Maxwell solver (vacuum - 0, macroscopic - 1)
     MediumForEM m_em_solver_medium = MediumForEM::Default;
+
+    /** Integer that correspond to macroscopic Maxwell solver algorithm
+     *  (BackwardEuler - 0, Lax-Wendroff - 1)
+     */
+    MacroscopicSolverAlgo m_macroscopic_solver_algo = MacroscopicSolverAlgo::Default;
 
     //
     // Fields: First array for level, second for direction
@@ -1339,6 +1323,7 @@ private:
 
     // Other runtime parameters
     int verbose = 1;
+    bool m_limit_verbose_step = false;
 
     bool use_hybrid_QED = false;
 
@@ -1346,7 +1331,7 @@ private:
     amrex::Real stop_time = std::numeric_limits<amrex::Real>::max();
 
     //! If specified, the maximum number of iterations is computed automatically so that
-    //! the lower end of the simulation domain along z reaches #zmax_plasma_to_compute_max_step
+    //! the lower end of the simulation domain along z reaches zmax_plasma_to_compute_max_step
     //! in the boosted frame
     std::optional<amrex::Real> m_zmax_plasma_to_compute_max_step = std::nullopt;
 
@@ -1359,10 +1344,7 @@ private:
     /** When `true`, write the diagnostics after restart at the time of the restart. */
     bool write_diagnostics_on_restart = false;
 
-    amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-    amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-
-    bool synchronize_velocity_for_diagnostics = false;
+    bool synchronize_velocity_for_diagnostics = true;
 
     bool use_single_read = true;
     bool use_single_write = true;
@@ -1375,7 +1357,7 @@ private:
     //! User-defined parser to define refinement patches
     std::unique_ptr<amrex::Parser> ref_patch_parser;
 
-    bool is_synchronized = true;
+    bool m_is_synchronized = true;
 
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;
@@ -1407,7 +1389,7 @@ private:
 
     //! Solve Poisson equation when loading an external magnetic field to clean divergence
     //! This is useful to remove errors that could lead to non-zero B field divergence
-    bool m_do_divb_cleaning_external = false;
+    bool m_do_initial_div_cleaning = false;
 
     //! Domain decomposition on Level 0
     amrex::IntVect numprocs{0};
@@ -1493,10 +1475,8 @@ private:
      * \brief Forward FFT of J on all mesh refinement levels,
      *        with k-space filtering (if needed)
      *
-     * \param J_fp Vector of three-dimensional arrays (for each level)
-     *             storing the fine patch current to be transformed
-     * \param J_cp Vector of three-dimensional arrays (for each level)
-     *             storing the coarse patch current to be transformed
+     * \param J_fp_string String representing the fine patch current to be transformed
+     * \param J_cp_string String representing the coarse patch current to be transformed
      * \param[in] apply_kspace_filter Control whether to apply filtering
      *                                (only used in RZ geometry to avoid double filtering)
      */
@@ -1508,10 +1488,8 @@ private:
     /**
      * \brief Backward FFT of J on all mesh refinement levels
      *
-     * \param J_fp Vector of three-dimensional arrays (for each level)
-     *             storing the fine patch current to be transformed
-     * \param J_cp Vector of three-dimensional arrays (for each level)
-     *             storing the coarse patch current to be transformed
+     * \param J_fp_string String representing the fine patch current to be transformed
+     * \param J_cp_string String representing the coarse patch current to be transformed
      */
     void PSATDBackwardTransformJ (
         std::string const & J_fp_string,
@@ -1521,8 +1499,8 @@ private:
      * \brief Forward FFT of rho on all mesh refinement levels,
      *        with k-space filtering (if needed)
      *
-     * \param charge_fp Vector (for each level) storing the fine patch charge to be transformed
-     * \param charge_cp Vector (for each level) storing the coarse patch charge to be transformed
+     * \param charge_fp_string String representing the fine patch charge to be transformed
+     * \param charge_cp_string String representing the coarse patch charge to be transformed
      * \param[in] icomp index of fourth component (0 for rho_old, 1 for rho_new)
      * \param[in] dcomp index of spectral component (0 for rho_old, 1 for rho_new)
      * \param[in] apply_kspace_filter Control whether to apply filtering
@@ -1610,6 +1588,13 @@ private:
     bool m_JRhom = false;
     int m_JRhom_subintervals;
 
+    /**
+     * \brief WarpX class attribute that controls whether collisions are placed
+     *        in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_position_push;
 };
 
 #endif

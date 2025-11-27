@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import re
@@ -5,7 +6,7 @@ import shutil
 import subprocess
 import sys
 
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 
@@ -275,14 +276,20 @@ with open("./requirements.txt") as f:
     if WARPX_MPI == "ON":
         install_requires.append("mpi4py>=2.1.0")
 
+# Parse WarpX version information
+dependencies_file = "dependencies.json"
+with open(dependencies_file, "r") as file:
+    dependencies_data = json.load(file)
+warpx_version = dependencies_data.get("version_warpx")
+
 # keyword reference:
 #   https://packaging.python.org/guides/distributing-packages-using-setuptools
 setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
-    version="25.04",
-    packages=["pywarpx"],
-    package_dir={"pywarpx": "Python/pywarpx"},
+    version=warpx_version,
+    packages=find_packages(where="Python"),
+    package_dir={"": "Python"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",
     author_email="jlvay@lbl.gov, grote1@llnl.gov, maxence.thevenet@desy.de, rlehe@lbl.gov, atmyers@lbl.gov, WeiqunZhang@lbl.gov, axelhuebl@lbl.gov",
     maintainer="Axel Huebl, David P. Grote, Rémi Lehe",  # wheel/pypi packages

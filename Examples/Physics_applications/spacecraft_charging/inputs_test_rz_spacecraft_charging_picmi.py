@@ -16,7 +16,7 @@ import numpy as np
 import scipy.constants as scc
 from mpi4py import MPI as mpi
 
-from pywarpx import libwarpx, picmi
+from pywarpx import picmi
 from pywarpx.callbacks import installafterEsolve, installafterInitEsolve
 from pywarpx.particle_containers import ParticleBoundaryBufferWrapper
 
@@ -34,17 +34,12 @@ class SpaceChargeFieldCorrector(object):
         self.spacecraft_potential = 1.0  # Initial voltage: 1V
         self.spacecraft_capacitance = None
 
-        # shortcuts
-        self.Direction = libwarpx.libwarpx_so.Direction
-        self.dir_r, self.dir_z = self.Direction(0), self.Direction(1)
-
     def correct_space_charge_fields(self, q=None):
         """
         Function that will be called at each iteration,
         after each electrostatic solve in WarpX
         """
         assert self.saved_first_iteration_fields
-        warpx = sim.extension.warpx
 
         # Compute the charge that WarpX thinks there is on the spacecraft
         # from phi and rho after the Poisson solver
@@ -53,12 +48,16 @@ class SpaceChargeFieldCorrector(object):
             q = compute_actual_charge_on_spacecraft()
 
         # Correct fields so as to recover the actual charge
-        Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0)
-        Er.saxpy(q - q_v, self.normalized_Er, 0, 0, 1, 0)
-        Ez = warpx.multifab("Efield_fp", dir=self.dir_z, level=0)
-        Ez.saxpy(q - q_v, self.normalized_Ez, 0, 0, 1, 0)
-        phi = warpx.multifab("phi_fp", level=0)
-        phi.saxpy(q - q_v, self.normalized_phi, 0, 0, 1, 0)
+        warpx = sim.extension.warpx
+        Er = sim.fields.get("Efield_fp", dir="r", level=0)
+        normalized_Er = sim.fields.get("normalized_Er", level=0)
+        Er.saxpy(q - q_v, normalized_Er, 0, 0, 1, 0)
+        Ez = sim.fields.get("Efield_fp", dir="z", level=0)
+        normalized_Ez = sim.fields.get("normalized_Ez", level=0)
+        Ez.saxpy(q - q_v, normalized_Ez, 0, 0, 1, 0)
+        phi = sim.fields.get("phi_fp", level=0)
+        normalized_phi = sim.fields.get("normalized_phi", level=0)
+        phi.saxpy(q - q_v, normalized_phi, 0, 0, 1, 0)
 
         self.spacecraft_potential += (q - q_v) * self.spacecraft_capacitance
         warpx.set_potential_on_eb("%f" % self.spacecraft_potential)
@@ -70,20 +69,62 @@ class SpaceChargeFieldCorrector(object):
     def save_normalized_vacuum_Efields(
         self,
     ):
-        warpx = sim.extension.warpx
-
         # Compute the charge that WarpX thinks there is on the spacecraft
         # from phi and rho after the Poisson solver
         q_v = compute_virtual_charge_on_spacecraft()
         self.spacecraft_capacitance = 1.0 / q_v  # the potential was set to 1V
 
+        phi = sim.fields.get("phi_fp", level=0)
+        Er = sim.fields.get("Efield_fp", dir="r", level=0)
+        Ez = sim.fields.get("Efield_fp", dir="z", level=0)
+        # Allocate the fields `normalized_Er`, `normalized_Ez`, and `normalized_phi
+        # in WarpX's multifab register. This allows to get these fields at later
+        # iterations with sim.fields.get( ... ).
+        # These new fields are automatically redistributed when doing load balancing.
+        normalized_Er = sim.fields.alloc_init(
+            name="normalized_Er",
+            level=0,
+            ba=Er.box_array(),
+            dm=Er.dm(),
+            ncomp=Er.n_comp,
+            ngrow=Er.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
+
+        normalized_Ez = sim.fields.alloc_init(
+            name="normalized_Ez",
+            level=0,
+            ba=Ez.box_array(),
+            dm=Ez.dm(),
+            ncomp=Ez.n_comp,
+            ngrow=Ez.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
+
+        normalized_phi = sim.fields.alloc_init(
+            name="normalized_phi",
+            level=0,
+            ba=phi.box_array(),
+            dm=phi.dm(),
+            ncomp=phi.n_comp,
+            ngrow=phi.n_grow_vect,
+            initial_value=0.0,
+            redistribute=True,
+            redistribute_on_remake=True,
+        )
+
         # Record fields
-        self.normalized_Er = warpx.multifab("Efield_fp", dir=self.dir_r, level=0).copy()
-        self.normalized_Er.mult(1 / q_v, 0)
-        self.normalized_Ez = warpx.multifab("Efield_fp", dir=self.dir_z, level=0).copy()
-        self.normalized_Ez.mult(1 / q_v, 0)
-        self.normalized_phi = warpx.multifab("phi_fp", level=0).copy()
-        self.normalized_phi.mult(1 / q_v, 0)
+
+        normalized_Er.copymf(Er, 0, 0, 1, Er.n_grow_vect)
+        normalized_Er.mult(1 / q_v, 0)
+        normalized_Ez.copymf(Ez, 0, 0, 1, Ez.n_grow_vect)
+        normalized_Ez.mult(1 / q_v, 0)
+        normalized_phi.copymf(phi, 0, 0, 1, phi.n_grow_vect)
+        normalized_phi.mult(1 / q_v, 0)
 
         self.saved_first_iteration_fields = True
         self.correct_space_charge_fields(q=0)
@@ -97,8 +138,8 @@ def compute_virtual_charge_on_spacecraft():
     that WarpX thinks there should be on the spacecraft.
     """
     warpx = sim.extension.warpx
-    rho = warpx.multifab("rho_fp", level=0)
-    phi = warpx.multifab("phi_fp", level=0)
+    rho = sim.fields.get("rho_fp", level=0)
+    phi = sim.fields.get("phi_fp", level=0)
 
     dr, dz = warpx.Geom(lev=0).data().CellSize()
 

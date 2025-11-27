@@ -58,6 +58,7 @@ struct FindEmbeddedBoundaryIntersection {
     amrex::Array4<const amrex::Real> m_phiarr;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_dxi;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
+    amrex::ParticleReal m_mass;
 
     template <typename DstData, typename SrcData>
     AMREX_GPU_HOST_DEVICE
@@ -92,6 +93,7 @@ struct FindEmbeddedBoundaryIntersection {
         amrex::Array4<amrex::Real const> const phiarr = m_phiarr;
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dxi = m_dxi;
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const plo = m_plo;
+        amrex::ParticleReal const mass = m_mass;
 
         // Bisection algorithm to find the point where phi(x,y,z)=0 (i.e. on the embedded boundary)
         amrex::Real const dt_fraction = amrex::bisect( 0.0, 1.0,
@@ -99,7 +101,7 @@ struct FindEmbeddedBoundaryIntersection {
                 int i, j, k;
                 amrex::Real W[AMREX_SPACEDIM][2];
                 amrex::ParticleReal x_temp=xp, y_temp=yp, z_temp=zp;
-                UpdatePosition(x_temp, y_temp, z_temp, ux, uy, uz, -dt_frac*dt);
+                UpdatePosition(x_temp, y_temp, z_temp, ux, uy, uz, -dt_frac*dt, mass);
                 ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                     x_temp, y_temp, z_temp, plo, dxi, i, j, k, W);
                 amrex::Real const phi_value = ablastr::particles::interp_field_nodal(i, j, k, W, phiarr);
@@ -113,7 +115,7 @@ struct FindEmbeddedBoundaryIntersection {
         // Now that dt_fraction has be obtained (with bisect)
         // Save the corresponding position of the particle at the boundary
         amrex::ParticleReal x_temp=xp, y_temp=yp, z_temp=zp;
-        UpdatePosition(x_temp, y_temp, z_temp, ux, uy, uz, -dt_fraction*m_dt);
+        UpdatePosition(x_temp, y_temp, z_temp, ux, uy, uz, -dt_fraction*m_dt, m_mass);
 
         // record the components of the normal on the destination
         int i, j, k;
@@ -155,6 +157,13 @@ struct FindEmbeddedBoundaryIntersection {
 #elif (defined WARPX_DIM_1D_Z)
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
         amrex::ignore_unused(x_temp, y_temp);
+        //normal not defined
+        dst.m_runtime_rdata[m_normal_index][dst_i] = 0.0;
+        dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
+        dst.m_runtime_rdata[m_normal_index+2][dst_i] = 0.0;
+#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+        dst.m_rdata[PIdx::x][dst_i] = x_temp;
+        amrex::ignore_unused(y_temp, z_temp);
         //normal not defined
         dst.m_runtime_rdata[m_normal_index][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
@@ -226,6 +235,9 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
     constexpr auto idx_zlo = 0;
     constexpr auto idx_zhi = 1;
+#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+    constexpr auto idx_xlo = 0;
+    constexpr auto idx_xhi = 1;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     constexpr auto idx_xlo = 0;
     constexpr auto idx_xhi = 1;
@@ -248,6 +260,9 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
         pp_species.query("save_particles_at_zlo", m_do_boundary_buffer[idx_zlo][ispecies]);
         pp_species.query("save_particles_at_zhi", m_do_boundary_buffer[idx_zhi][ispecies]);
+#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+        pp_species.query("save_particles_at_xlo", m_do_boundary_buffer[idx_xlo][ispecies]);
+        pp_species.query("save_particles_at_xhi", m_do_boundary_buffer[idx_xhi][ispecies]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         pp_species.query("save_particles_at_xlo", m_do_boundary_buffer[idx_xlo][ispecies]);
         pp_species.query("save_particles_at_xhi", m_do_boundary_buffer[idx_xhi][ispecies]);
@@ -273,6 +288,9 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
     m_boundary_names[idx_zlo] = "zlo";
     m_boundary_names[idx_zhi] = "zhi";
+#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+    m_boundary_names[idx_xlo] = "xlo";
+    m_boundary_names[idx_xhi] = "xhi";
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     m_boundary_names[idx_xlo] = "xlo";
     m_boundary_names[idx_xhi] = "xhi";
@@ -429,7 +447,11 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         amrex::ReduceData<int> reduce_data(reduce_op);
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::count_out_of_bounds");
+#ifdef AMREX_USE_GPU
+                          const amrex::RandomEngine rng{nullptr};
+#else
                           const amrex::RandomEngine rng{};
+#endif
                           reduce_op.eval(np, reduce_data, [=] AMREX_GPU_HOST_DEVICE (int ip)
                                          { return predicate(ptile_data, ip, rng) ? 1 : 0; });
                         }
@@ -437,7 +459,13 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         auto dst_index = ptile_buffer.numParticles();
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
-                          ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
+                          auto np_to_add = amrex::get<0>(reduce_data.value());
+                          auto new_np = dst_index + np_to_add;
+                          amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                          // reserve space to avoid many small resize operations for performance reasons
+                          // the resize below will not shrink the capacity
+                          if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
+                          ptile_buffer.resize(new_np);
                         }
                         {
                           WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
@@ -541,7 +569,13 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     auto dst_index = ptile_buffer.numParticles();
                     {
                         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
-                        ptile_buffer.resize(dst_index + amrex::get<0>(reduce_data.value()));
+                        auto np_to_add = amrex::get<0>(reduce_data.value());
+                        auto new_np = dst_index + np_to_add;
+                        amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                        // reserve space to avoid many small resize operations for performance reasons
+                          // the resize below will not shrink the capacity
+                        if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
+                        ptile_buffer.resize(new_np);
                     }
                     auto &warpx = WarpX::GetInstance();
                     const auto dt = warpx.getdt(pti.GetLevel());
@@ -556,7 +590,8 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                         amrex::filterAndTransformParticles(ptile_buffer, ptile, predicate,
                                                            FindEmbeddedBoundaryIntersection{step_scraped_index,
                                                                                             delta_index, normal_index,
-                                                                                            step, dt, phiarr, dxi, plo},
+                                                                                            step, dt, phiarr, dxi, plo,
+                                                                                            pc.getMass()},
                                                            0, dst_index);
 
                     }

@@ -93,14 +93,14 @@ Finally, since Adastra does not yet provide software modules for some of our dep
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $SHAREDHOMEDIR/src/warpx
    rm -rf build_adastra
 
-   cmake -S . -B build_adastra -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_adastra -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3" -DWarpX_QED_TABLES_GEN_OMP=OFF
    cmake --build build_adastra -j 16
 
 The WarpX application executables are now in ``$SHAREDHOMEDIR/src/warpx/build_adastra/bin/``.
@@ -110,8 +110,12 @@ Additionally, the following commands will install WarpX as a Python module:
 
    rm -rf build_adastra_py
 
-   cmake -S . -B build_adastra_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_adastra_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3" -DWarpX_QED_TABLES_GEN_OMP=OFF
    cmake --build build_adastra_py -j 16 --target pip_install
+
+.. note::
+
+   Enabling openMP support for QED lookup tables generation in WarpX while compiling WarpX for GPUs on Adastra does not work. It is recommended to generate QED lookup tables locally (e.g., with the standalone tool) and then transfer them to Adastra. The usage of the standalone tool for QED lookup tables generation is documented in the usage/workflows section of the documentation.
 
 Now, you can :ref:`submit Adstra compute jobs <running-cpp-adastra>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
 Or, you can use the WarpX executables to submit Adastra jobs (:ref:`example inputs <usage-examples>`).
@@ -210,3 +214,18 @@ Known System Issues
    Reported to AMD and fixed for the next release of ROCm.
 
    Stay with the ROCm 5.2 module to avoid.
+
+.. warning::
+
+   April 30th, 2025:
+   We observed several issues that can cause WarpX simulations to hang or crash on releases ``25.02`` and ``25.03``.
+
+   Releases ``<=25.01`` and ``>=25.04`` are currently working.
+
+.. warning::
+
+   August 2025:
+   We observed a heavy node memory increase over time when using module ``cray-mpich`` versions ``8.1.28`` and ``8.1.30``, which
+   causes simulations to slow down and eventually crash.
+
+   While no ``cray-mpich`` version ``>8.1.30`` is available on Adastra, stay with version ``8.1.26`` to avoid this issue.

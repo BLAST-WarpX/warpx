@@ -77,7 +77,7 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
         computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
                    self_fields_absolute_tolerance, self_fields_max_iters,
-                   self_fields_verbosity, is_igf_2d_slices);
+                   self_fields_verbosity, is_igf_2d_slices, Efield_fp);
 #endif
 
     }
@@ -149,7 +149,7 @@ void LabFrameExplicitES::computePhiTriDiagonal (
     rho1d_mf.ParallelCopy(*rho[lev], 0, 0, 1);
 
     // Multiplier on the charge density
-    const amrex::Real norm = dx[0]*dx[0]/PhysConst::ep0;
+    const amrex::Real norm = dx[0]*dx[0]/PhysConst::epsilon_0;
     rho1d_mf.mult(norm);
 
     // Use the MFIter loop since when parallel, only process zero has a FAB.

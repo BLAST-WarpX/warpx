@@ -1,0 +1,104 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.mc2_eV = m_e*clight*clight/q_e
+
+# BEAMS
+my_constants.beam_energy_eV = 125.e9
+my_constants.beam_gamma = beam_energy_eV/(mc2_eV)
+my_constants.beam_N = 1.2e10
+my_constants.sigmax = 500e-9
+my_constants.sigmay = 10e-9
+my_constants.sigmaz = 300e-3
+my_constants.muz = 4*sigmaz
+my_constants.nmacropart = 1
+
+# VIRTUAL PHOTONS
+# minimum energy
+my_constants.hwmin = 1e-12*m_e*clight*clight
+
+# BOX
+my_constants.Lx = 8*sigmax
+my_constants.Ly = 8*sigmay
+my_constants.Lz = 16*sigmaz
+my_constants.nx = 32
+my_constants.ny = 32
+my_constants.nz = 32
+
+# TIME
+my_constants.dt = sigmaz/clight/10.
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 1
+amr.n_cell = nx ny nz
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
+geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
+warpx.numprocs = 1 1 1
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.particle_lo = Absorbing Absorbing Absorbing
+boundary.particle_hi = Absorbing Absorbing Absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+algo.maxwell_solver = none
+warpx.const_dt = dt
+algo.particle_shape = 3
+algo.particle_pusher = vay
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = beam virtual_photons
+particles.photon_species = virtual_photons
+
+beam.species_type = electron
+beam.injection_style = gaussian_beam
+beam.x_rms = sigmax
+beam.y_rms = sigmay
+beam.z_rms = sigmaz
+beam.x_m = 0
+beam.y_m = 0
+beam.z_m = -muz
+beam.npart = nmacropart
+beam.q_tot = -beam_N*q_e
+beam.z_cut = 4
+beam.momentum_distribution_type = gaussian
+beam.uz_m = beam_gamma
+beam.uy_m = 0.0
+beam.ux_m = 0.0
+beam.ux_th = 0.0
+beam.uy_th = 0.0
+beam.uz_th = 0
+beam.do_not_deposit = 1
+beam.do_not_push = 1
+beam.do_qed_virtual_photons = 1
+beam.qed_virtual_photon_species_name = virtual_photons
+
+virtual_photons.species_type = photon
+virtual_photons.injection_style = none
+virtual_photons.do_not_push = 1
+virtual_photons.do_not_gather = 1
+virtual_photons.do_not_deposit = 1
+virtual_photons.qed_virtual_photons_min_energy = hwmin
+virtual_photons.qed_virtual_photons_multiplier = 10000000
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+# FULL
+diagnostics.diags_names = diag1
+
+diag1.intervals = -1
+diag1.diag_type = Full
+diag1.write_species = 1
+diag1.species = beam virtual_photons
+diag1.format = openpmd
+diag1.virtual_photons.variables = uz w x y z

@@ -41,7 +41,7 @@ How to configure the automated tests
 
 Our regression tests are run with `CTest <https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html#>`__, an executable that comes with CMake.
 
-The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-methods-cmake>` or :ref:`Developers <install-build-cmake>` sections.
 
 A test that requires a build option that was not configured and built will be skipped automatically. For example, if you configure and build WarpX in 1D only, any test of dimensionality other than 1D, which would require WarpX to be configured and built in the corresponding dimensionality, will be skipped automatically.
 
@@ -145,7 +145,7 @@ A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLis
      function(add_warpx_test
          name        # unique test name:
                      # test_1d_example, test_2d_example_picmi, etc.
-         dims        # dimensionality: 1, 2, 3, RZ
+         dims        # dimensionality: 1, 2, 3, RZ, RCYLINDER, RSPHERE
          nprocs      # number of processes: 1, 2
          inputs      # inputs file or PICMI script:
                      # inputs_test_1d_example, inputs_test_2d_example_picmi.py, "inputs_test_2d_example_picmi.py arg1 arg2", etc.

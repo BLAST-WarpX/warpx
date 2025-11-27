@@ -3,7 +3,7 @@
 GNUmake Build System (Legacy)
 =============================
 
-:ref:`CMake <install-developers>` is our primary build system.
+:ref:`CMake <install-build-cmake>` is our primary build system.
 In this section, we describe our legacy build scripts - do not use them unless you used them before.
 
 WarpX is built on `AMReX <https://amrex-codes.github.io>`__, which also provides support for a Linux-centric set of build scripts implemented in GNUmake.
@@ -12,7 +12,7 @@ Since we sometimes need to move fast and test highly experimental compilers and 
 .. warning::
 
    On the long-term, these scripts do not scale to the full feature set of WarpX and its dependencies.
-   Please see the CMake-based :ref:`developer section <install-developers>` instead.
+   Please see the CMake-based :ref:`developer section <install-build-cmake>` instead.
 
 This page describes the most basic build with GNUmake files and points to instructions for more advanced builds.
 
@@ -58,6 +58,8 @@ options are:
     * ``DEBUG=FALSE`` or ``TRUE``: Compiling in ``DEBUG`` mode can help tremendously during code development.
     * ``USE_FFT=FALSE`` or ``TRUE``: Compile the Pseudo-Spectral Analytical Time Domain Maxwell solver. Requires an FFT library.
     * ``USE_RZ=FALSE`` or ``TRUE``: Compile for 2D axisymmetric geometry.
+    * ``USE_RCYLINDER=FALSE`` or ``TRUE``: Compile for 1D cylindrical geometry.
+    * ``USE_RSPHERE=FALSE`` or ``TRUE``: Compile for 1D spherical geometry.
     * ``COMP=gcc`` or ``intel``: Compiler.
     * ``USE_MPI=TRUE`` or ``FALSE``: Whether to compile with MPI support.
     * ``USE_OMP=TRUE`` or ``FALSE``: Whether to compile with OpenMP support.

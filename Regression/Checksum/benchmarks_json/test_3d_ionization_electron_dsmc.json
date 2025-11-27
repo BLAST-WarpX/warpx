@@ -1,4 +1,21 @@
 {
+  "electrons": {
+    "particle_momentum_x": 6.006555854387021e-20,
+    "particle_momentum_y": 5.999524543943293e-20,
+    "particle_momentum_z": 6.478304567056172e-20,
+    "particle_position_x": 3547.467291056305,
+    "particle_position_y": 3525.376526408209,
+    "particle_position_z": 3544.7952357672284
+  },
+  "ions": {
+    "particle_momentum_x": 1.9237712868824864e-17,
+    "particle_momentum_y": 1.92652226803626e-17,
+    "particle_momentum_z": 1.9149091576245258e-17,
+    "particle_position_x": 1971.5194325303933,
+    "particle_position_y": 1975.3327303971494,
+    "particle_position_z": 1968.809878422697,
+    "particle_weight": 110489062500.00002
+  },
   "lev=0": {
     "Bx": 0.0,
     "By": 0.0,
@@ -6,33 +23,16 @@
     "Ex": 0.0,
     "Ey": 0.0,
     "Ez": 0.0,
-    "jx": 262.69676579676036,
-    "jy": 238.61147596503167,
-    "jz": 277.7636585959383
-  },
-  "ions": {
-    "particle_momentum_x": 1.923764583199394e-17,
-    "particle_momentum_y": 1.926491412162562e-17,
-    "particle_momentum_z": 1.9148958959011412e-17,
-    "particle_position_x": 1970.0516960137275,
-    "particle_position_y": 1976.2240415856522,
-    "particle_position_z": 1967.3009034520421,
-    "particle_weight": 110378125000.00002
-  },
-  "electrons": {
-    "particle_momentum_x": 6.007985194513655e-20,
-    "particle_momentum_y": 6.007745129786711e-20,
-    "particle_momentum_z": 6.48138231560205e-20,
-    "particle_position_x": 3554.3668029830255,
-    "particle_position_y": 3524.0530547941175,
-    "particle_position_z": 3542.129880775918
+    "jx": 235.58454908054742,
+    "jy": 232.04270302972964,
+    "jz": 265.96936266153944
   },
   "neutrals": {
     "particle_momentum_x": 5.4389766765137435e-21,
     "particle_momentum_y": 5.3392800140221124e-21,
     "particle_momentum_z": 5.468098399016169e-21,
     "particle_position_x": 204.79007033290338,
-    "particle_position_y": 204.78996321270571,
-    "particle_position_z": 204.80385576892024
+    "particle_position_y": 204.78996321270557,
+    "particle_position_z": 204.8038557689202
   }
 }
