@@ -205,7 +205,6 @@ public:
     */
     void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
 
-#ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every
      * timestep in Evolve and is used to create Schwinger electron-positron pairs.
      * Within this function we loop over all cells to calculate the number of
@@ -220,7 +219,6 @@ public:
      * object (to make the link between Real and int quantities).
      */
     [[nodiscard]] amrex::Box ComputeSchwingerGlobalBox () const;
-#endif
 
     void Restart (const std::string& dir);
 
@@ -498,33 +496,6 @@ protected:
      */
     void BreitWheelerGenerateTable();
 
-    /** Whether or not to activate Schwinger process */
-    bool m_do_qed_schwinger = false;
-    /** Name of Schwinger electron product species */
-    std::string m_qed_schwinger_ele_product_name;
-    /** Name of Schwinger positron product species */
-    std::string m_qed_schwinger_pos_product_name;
-    /** Index for Schwinger electron product species in allcontainers */
-    int m_qed_schwinger_ele_product;
-    /** Index for Schwinger positron product species in allcontainers */
-    int m_qed_schwinger_pos_product;
-    /** Transverse size used in 2D Schwinger pair production rate calculations */
-    amrex::Real m_qed_schwinger_y_size;
-    /** If the number of physical Schwinger pairs created within a cell is
-     * higher than this threshold we use a Gaussian distribution rather than
-     * a Poisson distribution for the pair production rate calculations
-     */
-    int m_qed_schwinger_threshold_poisson_gaussian = 25;
-    /** The 6 following variables are spatial boundaries beyond which Schwinger process is
-     *  deactivated
-     */
-    amrex::Real m_qed_schwinger_xmin = std::numeric_limits<amrex::Real>::lowest();
-    amrex::Real m_qed_schwinger_xmax = std::numeric_limits<amrex::Real>::max();
-    amrex::Real m_qed_schwinger_ymin = std::numeric_limits<amrex::Real>::lowest();
-    amrex::Real m_qed_schwinger_ymax = std::numeric_limits<amrex::Real>::max();
-    amrex::Real m_qed_schwinger_zmin = std::numeric_limits<amrex::Real>::lowest();
-    amrex::Real m_qed_schwinger_zmax = std::numeric_limits<amrex::Real>::max();
-
 #endif
 
 private:
@@ -561,14 +532,40 @@ private:
     */
     void CheckIonizationProductSpecies();
 
-#ifdef WARPX_QED
     /**
     * Should be called right after mapSpeciesProduct in InitData.
     * It checks the physical correctness of product particle species
     * selected by the user for QED processes.
     */
     void CheckQEDProductSpecies();
-#endif
+
+    /** Whether or not to activate Schwinger process */
+    bool m_do_qed_schwinger = false;
+    /** Name of Schwinger electron product species */
+    std::string m_qed_schwinger_ele_product_name;
+    /** Name of Schwinger positron product species */
+    std::string m_qed_schwinger_pos_product_name;
+    /** Index for Schwinger electron product species in allcontainers */
+    int m_qed_schwinger_ele_product;
+    /** Index for Schwinger positron product species in allcontainers */
+    int m_qed_schwinger_pos_product;
+    /** Transverse size used in 2D Schwinger pair production rate calculations */
+    amrex::Real m_qed_schwinger_y_size;
+    /** If the number of physical Schwinger pairs created within a cell is
+     * higher than this threshold we use a Gaussian distribution rather than
+     * a Poisson distribution for the pair production rate calculations
+     */
+    int m_qed_schwinger_threshold_poisson_gaussian = 25;
+    /** The 6 following variables are spatial boundaries beyond which Schwinger process is
+     *  deactivated
+     */
+    amrex::Real m_qed_schwinger_xmin = std::numeric_limits<amrex::Real>::lowest();
+    amrex::Real m_qed_schwinger_xmax = std::numeric_limits<amrex::Real>::max();
+    amrex::Real m_qed_schwinger_ymin = std::numeric_limits<amrex::Real>::lowest();
+    amrex::Real m_qed_schwinger_ymax = std::numeric_limits<amrex::Real>::max();
+    amrex::Real m_qed_schwinger_zmin = std::numeric_limits<amrex::Real>::lowest();
+    amrex::Real m_qed_schwinger_zmax = std::numeric_limits<amrex::Real>::max();
+
 
 
 };
