@@ -40,7 +40,7 @@ namespace ablastr::math
     * This function returns the norm of a 3-vector
     *
     * @tparam RealType the floating point type to be used
-    * @param[in] the vector for which the norm has to be calculated
+    * @param[in] vec vector for which the norm has to be calculated
     * @return the norm
     */
     template <typename RealType>
