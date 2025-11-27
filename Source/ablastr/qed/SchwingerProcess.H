@@ -23,7 +23,6 @@
 #include "ablastr/math/Vec3.H"
 #include "ablastr/qed/UnitConversion.H"
 
-#include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Math.H>
 #include <AMReX_Random.H>
@@ -75,7 +74,8 @@ namespace ablastr::qed::schwinger
 
         constexpr auto zero = RealType(0.0);
         constexpr auto rtp  = ablastr::constant::math::pi_v<RealType>;
-        if(epsi != zero && eta != zero) AMREX_LIKELY
+
+        if(epsi != zero && eta != zero)
         {
             return coeff*rate_conv*epsi*eta*std::exp(-rtp/epsi)/std::tanh(rtp*eta/epsi);
         }
