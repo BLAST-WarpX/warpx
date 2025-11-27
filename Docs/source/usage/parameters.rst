@@ -3902,7 +3902,7 @@ Lookup tables and other settings for QED modules
 ------------------------------------------------
 
 Lookup tables store pre-computed values for functions used by the QED modules.
-**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
+Unless otherwise specified, **these feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
 
 * ``qed_bw.lookup_table_mode`` (`string`)
     There are three options to prepare the lookup table required by the Breit-Wheeler module:
@@ -3991,7 +3991,7 @@ Lookup tables store pre-computed values for functions used by the QED modules.
 
 * ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
     If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
+    Activating the Schwinger process does not require the code to be compiled with ``QED=TRUE``.
     If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
     ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
     Schwinger process requires either ``warpx.grid_type = collocated`` or
