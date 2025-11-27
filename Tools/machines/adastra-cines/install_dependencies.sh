@@ -121,3 +121,5 @@ python3 -m pip install --upgrade adios2
 python3 -m pip install --upgrade -r ${SRC_DIR}/warpx/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 python3 -m pip install 'optimas[all]'
+# optional: for lasy
+python3 -m pip install --upgrade lasy
