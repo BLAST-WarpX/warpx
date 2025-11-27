@@ -26,7 +26,7 @@ namespace ablastr::math
     * This function returns the squared norm of a 3-vector
     *
     * @tparam RealType the floating point type to be used
-    * @param[in] the vector for which the squared norm has to be calculated
+    * @param[in] vec the vector for which the squared norm has to be calculated
     * @return the squared norm
     */
     template <typename RealType>
