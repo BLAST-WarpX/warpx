@@ -65,9 +65,8 @@ namespace ablastr::qed::schwinger
 
         constexpr const auto coeff = static_cast<RealType>(
             amrex::Math::powi<2>(
-                heaviside_lorentz_elementary_charge<double>*
-                heaviside_lorentz_schwinger_field<double>*
-                2.0*ablastr::constant::math::pi_v<double>));
+                (heaviside_lorentz_elementary_charge<double>*heaviside_lorentz_schwinger_field<double>)/
+                (2.0*ablastr::constant::math::pi_v<double>)));
 
         constexpr auto rate_conv =
             convert_from_to<unit_system::heaviside_lorentz, UnitSystem, quantity::rate>(RealType(1.0));
