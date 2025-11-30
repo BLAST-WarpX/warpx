@@ -192,7 +192,8 @@ WarpX::Evolve (int numsteps)
 
         // Update timestep for electrostatic solver if a constant dt is not provided
         // This first synchronizes the position and velocity before setting the new timestep
-        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
+        if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+            evolve_scheme == EvolveScheme::ThetaImplicitEM) &&
             !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
             if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
@@ -384,13 +385,13 @@ void WarpX::OneStep (
 
     // implicit solver
     if (m_implicit_solver) {
+        // advance fields and particles by one time step
+        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+
         // perform particle collisions
         ExecutePythonCallback("beforecollisions");
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
-
-        // advance fields and particles by one time step
-        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
     // explicit solver
     else {
