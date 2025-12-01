@@ -15,6 +15,8 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <ablastr/qed/ChiFunctions.H>
+
 #include <AMReX_REAL.H>
 
 #include <limits>
@@ -63,9 +65,10 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
 #ifdef WARPX_QED
         amrex::ignore_unused(t_chi_max);
         if constexpr (do_sync) {
-            auto chi = QedUtils::chi_ele_pos(m*ux, m*uy, m*uz,
-                                            Ex, Ey, Ez,
-                                            Bx, By, Bz);
+            auto chi = ablastr::qed::chi_ele_pos(
+                m*ux, m*uy, m*uz,
+                Ex, Ey, Ez,
+                Bx, By, Bz);
             if (chi < t_chi_max) {
                 UpdateMomentumBorisWithRadiationReaction(ux, uy, uz,
                                                          Ex, Ey, Ez, Bx,

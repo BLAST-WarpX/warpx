@@ -20,7 +20,8 @@ namespace ablastr::math
     //This file contains functions to perform operations on 3-vectors
     // (norm, scalar multiplication, vector and cross product...)
     template <typename RealType>
-    using vec3 = amrex::GpuArray<RealType, 3>;
+    struct vec3 : amrex::GpuArray<RealType, 3>
+    {};
 
     /**
     * This function returns the squared norm of a 3-vector
