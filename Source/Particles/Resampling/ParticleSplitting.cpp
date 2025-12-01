@@ -235,7 +235,7 @@ void ParticleSplitting::operator() (
                             amrex::ParallelDescriptor::MyProc()
                         );
                     }
-#elif defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_3D)
                     // Split parent particle in 6 particles
                     for (int k = 0; k < 6; ++k) {
                         const int idx = child_base + k;
