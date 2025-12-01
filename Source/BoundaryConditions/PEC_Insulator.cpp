@@ -247,24 +247,24 @@ namespace
     /* \brief Sets up the parsers, taking the input data and arranging it as needed
      *        for the loops, and compiling the parser expressions.
      *
-     * \param[in] set_field_lo      flags whether the insulator expressions were specified
-     * \param[in] set_field_hi      flags whether the insulator expressions were specified
-     * \param[in] parser_field1_lo  the parser for the first transverse field at the low boundary
-     * \param[in] parser_field2_lo  the parser for the second transverse field at the low boundary
-     * \param[in] parser_field1_hi  the parser for the first transverse field at the high boundary
-     * \param[in] parser_field2_hi  the parser for the second transverse field at the high boundary
-     * \param[out] set_fields_x_lo  the flags for the field along x at the lower boundary
-     * \param[out] set_fields_y_lo  the flags for the field along y at the lower boundary
-     * \param[out] set_fields_z_lo  the flags for the field along z at the lower boundary
-     * \param[out] set_fields_x_hi  the flags for the field along x at the upper boundary
-     * \param[out] set_fields_y_hi  the flags for the field along y at the upper boundary
-     * \param[out] set_fields_z_hi  the flags for the field along z at the upper boundary
-     * \param[out] Fx_parsers_lo    the parsers for the field along x at the lower boundary
-     * \param[out] Fy_parsers_lo    the parsers for the field along y at the lower boundary
-     * \param[out] Fz_parsers_lo    the parsers for the field along z at the lower boundary
-     * \param[out] Fx_parsers_hi    the parsers for the field along x at the upper boundary
-     * \param[out] Fy_parsers_hi    the parsers for the field along y at the upper boundary
-     * \param[out] Fz_parsers_hi    the parsers for the field along z at the upper boundary
+     * \param[in] set_field_lo      flags whether the insulator expressions were specified at the lower boundaries
+     * \param[in] set_field_hi      flags whether the insulator expressions were specified at the upper boundaries
+     * \param[in] parser_field1_lo  the parser for the first transverse field at the lower boundaries
+     * \param[in] parser_field2_lo  the parser for the second transverse field at the lower boundaries
+     * \param[in] parser_field1_hi  the parser for the first transverse field at the upper boundaries
+     * \param[in] parser_field2_hi  the parser for the second transverse field at the upper boundaries
+     * \param[out] set_fields_x_lo  the flags for the x-field at the lower boundaries
+     * \param[out] set_fields_y_lo  the flags for the y-field at the lower boundaries
+     * \param[out] set_fields_z_lo  the flags for the z-field at the lower boundaries
+     * \param[out] set_fields_x_hi  the flags for the x-field at the upper boundaries
+     * \param[out] set_fields_y_hi  the flags for the y-field at the upper boundaries
+     * \param[out] set_fields_z_hi  the flags for the z-field at the upper boundaries
+     * \param[out] Fx_parsers_lo    the parsers for the x-field at the lower boundaries
+     * \param[out] Fy_parsers_lo    the parsers for the y-field at the lower boundaries
+     * \param[out] Fz_parsers_lo    the parsers for the z-field at the lower boundaries
+     * \param[out] Fx_parsers_hi    the parsers for the x-field at the upper boundaries
+     * \param[out] Fy_parsers_hi    the parsers for the y-field at the upper boundaries
+     * \param[out] Fz_parsers_hi    the parsers for the z-field at the upper boundaries
     */
     void SetupFieldParsers(amrex::Vector<int> const & set_field_lo,
                            amrex::Vector<int> const & set_field_hi,
@@ -292,13 +292,18 @@ namespace
         set_fields_y_hi.resize(AMREX_SPACEDIM, false);
         set_fields_z_hi.resize(AMREX_SPACEDIM, false);
 
+        // For the fields normal to the boundaries, empty parsers are added to the vectors as
+        // place holders. They will not be used.
+
 #ifndef WARPX_DIM_1D_Z
         set_fields_y_lo[0] = set_field_lo[0];
         set_fields_z_lo[0] = set_field_lo[0];
         set_fields_y_hi[0] = set_field_hi[0];
         set_fields_z_hi[0] = set_field_hi[0];
+        Fx_parsers_lo.push_back(amrex::ParserExecutor<3>());
         Fy_parsers_lo.push_back(parser_field1_lo[0]->compile<3>());
         Fz_parsers_lo.push_back(parser_field2_lo[0]->compile<3>());
+        Fx_parsers_hi.push_back(amrex::ParserExecutor<3>());
         Fy_parsers_hi.push_back(parser_field1_hi[0]->compile<3>());
         Fz_parsers_hi.push_back(parser_field2_hi[0]->compile<3>());
 #endif
@@ -308,8 +313,10 @@ namespace
         set_fields_x_hi[1] = set_field_hi[1];
         set_fields_z_hi[1] = set_field_hi[1];
         Fx_parsers_lo.push_back(parser_field1_lo[1]->compile<3>());
+        Fy_parsers_lo.push_back(amrex::ParserExecutor<3>());
         Fz_parsers_lo.push_back(parser_field2_lo[1]->compile<3>());
         Fx_parsers_hi.push_back(parser_field1_hi[1]->compile<3>());
+        Fy_parsers_hi.push_back(amrex::ParserExecutor<3>());
         Fz_parsers_hi.push_back(parser_field2_hi[1]->compile<3>());
 #endif
 #if defined(WARPX_ZINDEX)
@@ -319,8 +326,10 @@ namespace
         set_fields_y_hi[WARPX_ZINDEX] = set_field_hi[WARPX_ZINDEX];
         Fx_parsers_lo.push_back(parser_field1_lo[WARPX_ZINDEX]->compile<3>());
         Fy_parsers_lo.push_back(parser_field2_lo[WARPX_ZINDEX]->compile<3>());
+        Fz_parsers_lo.push_back(amrex::ParserExecutor<3>());
         Fx_parsers_hi.push_back(parser_field1_hi[WARPX_ZINDEX]->compile<3>());
         Fy_parsers_hi.push_back(parser_field2_hi[WARPX_ZINDEX]->compile<3>());
+        Fz_parsers_hi.push_back(amrex::ParserExecutor<3>());
 #endif
     }
 
@@ -593,15 +602,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                 amrex::ParserExecutor<2> const & area_parser = ( (iside == -1) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim]);
 
-                // A special check is needed for Fx and Fz since in 1D cases no parsers will be defined for one
-                // or the other. Instead, create a dummy ParserExecutor.
-                amrex::ParserExecutor<3> const & Fx_parser = ( Fx_parsers_lo.size() > 0 ?
-                                                             ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]) :
-                                                             amrex::ParserExecutor<3>() );
+                amrex::ParserExecutor<3> const & Fx_parser = ( (iside == -1) ? Fx_parsers_lo[idim] : Fx_parsers_hi[idim]);
                 amrex::ParserExecutor<3> const & Fy_parser = ( (iside == -1) ? Fy_parsers_lo[idim] : Fy_parsers_hi[idim]);
-                amrex::ParserExecutor<3> const & Fz_parser = ( Fz_parsers_lo.size() > 0 ?
-                                                             ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]) :
-                                                             amrex::ParserExecutor<3>() );
+                amrex::ParserExecutor<3> const & Fz_parser = ( (iside == -1) ? Fz_parsers_lo[idim] : Fz_parsers_hi[idim]);
 
                 // loop over cells and update fields
                 amrex::ParallelFor(
