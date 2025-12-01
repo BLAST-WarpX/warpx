@@ -20,12 +20,12 @@
 #define ABLASTR_QED_SCHWINGER_PROCESS
 
 #include "ablastr/constant.H"
-#include "ablastr/math/Vec3.H"
 #include "ablastr/qed/UnitConversion.H"
 
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Math.H>
 #include <AMReX_Random.H>
+#include <AMReX_RealVect.H>
 
 #include <cmath>
 
@@ -37,55 +37,54 @@ namespace ablastr::qed::schwinger
         * This function computes the Schwinger pair production rate
         * using the Nikishov formula.
         *
-        * @tparam RealType the floating point type to be used
         * @tparam UnitSystem unit system to be used for inputs & outputs
-        * @param[in] t_em_e a vec3<RealType> containing the electric field
-        * @param[in] t_em_b a vec3<RealType> containing the magnetic field
+        * @param[in] t_em_e an amrex::RealVectND<3> containing the electric field
+        * @param[in] t_em_b an amrex::RealVectND<3> containing the magnetic field
         *
         * @return the pair production rate
         */
-        template<typename RealType, unit_system UnitSystem = unit_system::SI>
+        template<unit_system UnitSystem = unit_system::SI>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        RealType pair_production_rate(
-            const math::vec3<RealType>& t_em_e,
-            const math::vec3<RealType>& t_em_b) noexcept
+        amrex::Real pair_production_rate(
+            const amrex::RealVectND<3>& t_em_e,
+            const amrex::RealVectND<3>& t_em_b) noexcept
         {
+            using namespace amrex;
+
             const auto em_e = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>(t_em_e);
             const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>(t_em_b);
 
-            constexpr auto one_over_schwinger = static_cast<RealType>(
+            constexpr auto one_over_schwinger = static_cast<amrex::Real>(
                 1.0/heaviside_lorentz_schwinger_field<double>);
 
-            const auto ff =(math::norm_square(em_e) - math::norm_square(em_b))*RealType(0.5);
-            const auto gg = math::dot(em_e, em_b);
+            const auto em_e_2 = em_e.dotProduct(em_e);
+            const auto em_b_2 = em_b.dotProduct(em_b);
+
+            const auto ff = (em_e_2 - em_b_2)*0.5_rt;
+            const auto gg = em_e.dotProduct(em_b);
 
             const auto inner = std::sqrt(ff*ff+ gg*gg);
 
             const auto epsi = std::sqrt(std::fabs(inner + ff))*one_over_schwinger;
             const auto eta = std::sqrt(std::fabs(inner - ff))*one_over_schwinger;
 
-            constexpr const auto coeff = static_cast<RealType>(
+            constexpr const auto coeff = static_cast<amrex::Real>(
                 amrex::Math::powi<2>(
                     (heaviside_lorentz_elementary_charge<double>*heaviside_lorentz_schwinger_field<double>)/
                     (2.0*ablastr::constant::math::pi_v<double>)));
 
             constexpr auto rate_conv =
-                convert_from_to<unit_system::heaviside_lorentz, UnitSystem, quantity::rate>(RealType(1.0));
+                convert_from_to<unit_system::heaviside_lorentz, UnitSystem, quantity::rate>(1.0_rt);
 
-            constexpr auto zero = RealType(0.0);
-            constexpr auto rtp  = ablastr::constant::math::pi_v<RealType>;
-
-            if(epsi != zero && eta != zero)
-            {
-                return coeff*rate_conv*epsi*eta*std::exp(-rtp/epsi)/std::tanh(rtp*eta/epsi);
+            constexpr auto pi = ablastr::constant::math::pi;
+            if(epsi != 0.0_rt && eta != 0.0_rt){
+                return coeff*rate_conv*epsi*eta*std::exp(-pi/epsi)/std::tanh(pi*eta/epsi);
             }
-            else if(epsi == zero)
-            {
-                return zero;
+            else if(epsi == 0.0_rt){
+                return 0.0_rt;
             }
-            else
-            {
-                return coeff*rate_conv*epsi*epsi*std::exp(-rtp/epsi)/rtp;
+            else{
+                return coeff*rate_conv*epsi*epsi*std::exp(-pi/epsi)/pi;
             }
         }
 
@@ -93,35 +92,33 @@ namespace ablastr::qed::schwinger
         * This function computes the number of expected Schwinger pairs
         * in a given volume for a given timestep using the Nikishov formula.
         *
-        * @tparam RealType the floating point type to be used
         * @tparam UnitSystem unit system to be used for inputs & outputs
-        * @param[in] ex a RealType containing the x component of the electric field
-        * @param[in] ey a RealType containing the y component of the electric field
-        * @param[in] ez a RealType containing the z component of the electric field
-        * @param[in] bx a RealType containing the x component of the magnetic field
-        * @param[in] by a RealType containing the y component of the magnetic field
-        * @param[in] bz a RealType containing the z component of the magnetic field
+        * @param[in] ex a Real containing the x component of the electric field
+        * @param[in] ey a Real containing the y component of the electric field
+        * @param[in] ez a Real containing the z component of the electric field
+        * @param[in] bx a Real containing the x component of the magnetic field
+        * @param[in] by a Real containing the y component of the magnetic field
+        * @param[in] bz a Real containing the z component of the magnetic field
         * @param[in] t_volume the volume of the physical region
         * @param[in] t_dt the temporal step
         *
         * @return the expected number of generated pairs
         */
-        template<typename RealType, unit_system UnitSystem>
+        template<unit_system UnitSystem>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        RealType expected_pair_number(
-            const RealType ex, const RealType ey, const RealType ez,
-            const RealType bx, const RealType by, const RealType bz,
-            const RealType t_volume, const RealType t_dt) noexcept
+        amrex::Real expected_pair_number(
+            const amrex::Real ex, const amrex::Real ey, const amrex::Real ez,
+            const amrex::Real bx, const amrex::Real by, const amrex::Real bz,
+            const amrex::Real t_volume, const amrex::Real t_dt) noexcept
         {
             const auto em_e =
                 convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::E>(
-                    math::vec3<RealType>{ex, ey, ez});
+                    amrex::RealVectND<3>{ex, ey, ez});
             const auto em_b =
                 convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>(
-                    math::vec3<RealType>{bx, by, bz});
+                    amrex::RealVectND<3>{bx, by, bz});
 
-            const auto schwinger_pair_production_rate = pair_production_rate<
-                RealType, unit_system::heaviside_lorentz>(em_e, em_b);
+            const auto schwinger_pair_production_rate = pair_production_rate<unit_system::heaviside_lorentz>(em_e, em_b);
 
             const auto dt     = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::time>  (t_dt);
             const auto volume = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::volume>(t_volume);
@@ -154,15 +151,15 @@ namespace ablastr::qed::schwinger
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real
     get_schwinger_pair_number (const amrex::Real dV, const amrex::Real dt,
-                const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
-                const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-                const amrex::ParticleReal PoissonToGaussianThreshold,
+                const amrex::Real Ex, const amrex::Real Ey, const amrex::Real Ez,
+                const amrex::Real Bx, const amrex::Real By, const amrex::Real Bz,
+                const amrex::Real PoissonToGaussianThreshold,
                 amrex::RandomEngine const& engine)
     {
         using namespace amrex;
 
         const auto expectedPairNumber =
-            detail::expected_pair_number<amrex::Real, ablastr::qed::unit_system::SI>(
+            detail::expected_pair_number<ablastr::qed::unit_system::SI>(
                 Ex, Ey, Ez, Bx, By, Bz, dV, dt);
 
         if (expectedPairNumber <= PoissonToGaussianThreshold) {

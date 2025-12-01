@@ -12,7 +12,6 @@
 #include "ablastr/constant.H"
 
 #include <AMReX_Math.H>
-#include <AMReX_REAL.H>
 
     /**
      * The interface of the ABLASTR QED library supports 2 unit systems
@@ -148,17 +147,21 @@ namespace ablastr::qed
             fact<quantity::E, double>*ablastr::constant::SI::c_v<double>);
     }
 
+    // Using SFINAE this version of the function applies only
+    // to types that have a value_type attribute (i.e., vectors)
     template
     <
         unit_system From,
         unit_system To,
         quantity Quantity,
-        typename RealType
+        typename T,
+        typename T::value_type TV = 0
     >
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    constexpr RealType
-    convert_from_to (RealType value) noexcept
+    constexpr T
+    convert_from_to (const T& value) noexcept
     {
+        using RealType = typename T::value_type;
         if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
         {
             return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
@@ -180,17 +183,26 @@ namespace ablastr::qed
         unit_system From,
         unit_system To,
         quantity Quantity,
-        typename RealType
+        typename T
     >
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    constexpr math::vec3<RealType>
-    convert_from_to (const math::vec3<RealType>& vec) noexcept
+    constexpr T
+    convert_from_to (const T& value) noexcept
     {
-        using namespace math;
-
-        constexpr auto fact =
-            convert_from_to<From, To, Quantity, RealType> (RealType(1.0));
-        return vec*fact;
+        if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
+        {
+            return value*detail::SI_to_HL_factors::fact<Quantity, T>;
+        }
+        else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
+        {
+            constexpr auto fact = static_cast<T>(
+                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
+            return value*fact;
+        }
+        else
+        {
+            return value;
+        }
     }
 
     /**
