@@ -84,18 +84,18 @@ public:
      * \param[in]     time                current time of the simulation
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
      * \param[in]     E_like              whether the field is E like or B like
-     * \param[in]     set_Fx_lo           the flags for the field along x at the lower boundary
-     * \param[in]     set_Fy_lo           the flags for the field along y at the lower boundary
-     * \param[in]     set_Fz_lo           the flags for the field along z at the lower boundary
-     * \param[in]     set_Fx_hi           the flags for the field along x at the upper boundary
-     * \param[in]     set_Fy_hi           the flags for the field along y at the upper boundary
-     * \param[in]     set_Fz_hi           the flags for the field along z at the upper boundary
-     * \param[in]     Fx_parsers_lo       the parsers for the field along x at the lower boundary
-     * \param[in]     Fy_parsers_lo       the parsers for the field along y at the lower boundary
-     * \param[in]     Fz_parsers_lo       the parsers for the field along z at the lower boundary
-     * \param[in]     Fx_parsers_hi       the parsers for the field along x at the upper boundary
-     * \param[in]     Fy_parsers_hi       the parsers for the field along y at the upper boundary
-     * \param[in]     Fz_parsers_hi       the parsers for the field along z at the upper boundary
+     * \param[in]     set_Fx_lo           the flags for the x-field at the lower boundaries
+     * \param[in]     set_Fy_lo           the flags for the y-field at the lower boundaries
+     * \param[in]     set_Fz_lo           the flags for the z-field at the lower boundaries
+     * \param[in]     set_Fx_hi           the flags for the x-field at the upper boundaries
+     * \param[in]     set_Fy_hi           the flags for the y-field at the upper boundaries
+     * \param[in]     set_Fz_hi           the flags for the z-field at the upper boundaries
+     * \param[in]     Fx_parsers_lo       the parsers for the x-field at the lower boundaries
+     * \param[in]     Fy_parsers_lo       the parsers for the y-field at the lower boundaries
+     * \param[in]     Fz_parsers_lo       the parsers for the z-field at the lower boundaries
+     * \param[in]     Fx_parsers_hi       the parsers for the x-field at the upper boundaries
+     * \param[in]     Fy_parsers_hi       the parsers for the y-field at the upper boundaries
+     * \param[in]     Fz_parsers_hi       the parsers for the z-field at the upper boundaries
      */
     void
     ApplyPEC_InsulatortoField (std::array<amrex::MultiFab*, 3> field,
