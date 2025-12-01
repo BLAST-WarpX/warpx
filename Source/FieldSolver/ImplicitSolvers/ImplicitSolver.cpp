@@ -250,6 +250,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
             const amrex::IntVect ncomp_zy = m_ncomp_zy;
             const amrex::IntVect ncomp_zz = m_ncomp_zz;
 
+            if (!m_blank_electric_field[0]) {
             amrex::ParallelFor(
             Jbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -313,6 +314,8 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 
                 Jx(i,j,k,n) += Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
             });
+            }
+            if (!m_blank_electric_field[1]) {
             amrex::ParallelFor(
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -376,6 +379,8 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 
                 Jy(i,j,k,n) += Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
             });
+            }
+            if (!m_blank_electric_field[2]) {
             amrex::ParallelFor(
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -439,6 +444,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 
                 Jz(i,j,k,n) += Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
             });
+            }
         }
 
     }
