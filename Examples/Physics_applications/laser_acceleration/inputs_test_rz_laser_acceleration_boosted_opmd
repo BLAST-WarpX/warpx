@@ -29,7 +29,6 @@ warpx.use_filter = 1
 warpx.filter_npass_each_dir =1 4
 warpx.cfl = 1.
 warpx.n_rz_azimuthal_modes = 2
-warpx.random_seed = random
 warpx.abort_on_warning_threshold = medium
 
 #Boosted frame
