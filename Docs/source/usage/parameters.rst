@@ -3842,6 +3842,8 @@ These features require to compile with ``-DWarpX_QED=ON``, unless stated otherwi
 Nonlinear Compton scattering
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+This process is also known more generically as Quantum Synchrotron emission.
+
 * ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
     Energy threshold for photon particle creation in units of :math:`m_e c^2`.
 
@@ -3861,7 +3863,7 @@ Nonlinear Compton scattering
     simulation. If both ``<species>.do_classical_radiation_reaction`` and
     ``<species_name>.do_qed_quantum_sync`` are enabled, then the classical module
     will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
-    the discrete quantum module otherwise.
+    the discrete quantum module otherwise. This feature does not require to compile with ``-DWarpX_QED=ON``.
 
 
 Nonlinear Breit-Wheeler
@@ -3885,54 +3887,18 @@ Nonlinear Breit-Wheeler
 Lookup tables
 ^^^^^^^^^^^^^
 
-Lookup tables store pre-computed values for functions used by the QED modules.
-This feature requires with the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON`` for table generation.
-
-* ``qed_bw.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Breit-Wheeler module:
-
-    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
-
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the photons, while table 2 is used for pair generation):
-
-        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of the photons)
-
-        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
-
-        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
-
-        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for pair generation)
-
-        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
-
-        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
-
-        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
-          quantum parameter of the photon).
-
-        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
-
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
-
-        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
+Lookup tables store pre-computed values for functions used by the nonlinear Compton Scattering and nonlinear Breit-Wheeler modules.
+The lookup tables can be pre-generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+Alternatively, one can use the low-resolution builtin tables or generate them on the fly at the beginning of the simulation.
 
 * ``qed_qs.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
+    There are three options to prepare the lookup table required by the nonlinear Compton Scattering (or Quantum Synchrotron) module:
 
     * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
 
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
+    * ``generate``: a new table is generated on the fly at the beginning of the simulation. This option requires Boost math library
+      (version >= 1.66) and the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON``.
+      All the following parameters must be specified (table 1 is used to evolve the optical depth
       of the particles, while table 2 is used for photon emission):
 
         * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
@@ -3957,18 +3923,51 @@ This feature requires with the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON
 
         * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
 
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
+    * ``load``: a lookup table is loaded from a pre-generated binary file. This can be a table generated by a previous run or using the standalone tool.
+      The following parameter must be specified:
 
         * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
 
-* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
-    (suggested value : 0.01)
+* ``qed_bw.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Breit-Wheeler module:
+
+    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated on the fly at the beginning of the simulation. This option requires Boost math library
+      (version >= 1.66) and the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON``.
+      All the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the photons, while table 2 is used for pair generation):
+
+        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of the photons)
+
+        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for pair generation)
+
+        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
+          quantum parameter of the photon).
+
+        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. This can be a table generated by a previous run or using the standalone tool.
+      The following parameter must be specified:
+
+        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
 
 * ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
     (suggested value : 0.001)
+
+* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
+    (suggested value : 0.01)
 
 
 Schwinger process
