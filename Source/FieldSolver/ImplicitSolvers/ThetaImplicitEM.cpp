@@ -302,8 +302,15 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     val1 = 1.0;
                 }
                 if (bc_type == FieldBoundaryType::PECInsulator) {
-                    val0 = 0.5;
-                    val1 = 1.0;
+                    const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
+                    if (voltage_driven) { // Dirichlet boundary for E
+                        val0 = 0.0;
+                        val1 = 0.0;
+                    }
+                    else { // Dirichlet boundary for B
+                        val0 = 0.5;
+                        val1 = 1.0;
+                    }
                 }
 
                 // Set mask values on the boundary cells (same for Ex and Ey for 1D_Z)
@@ -381,9 +388,17 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         val2 = 2.0;
                     }
                     if (bc_type == FieldBoundaryType::PECInsulator) {
-                        val0 = 0.5;
-                        val1 = 1.0;
-                        val2 = 1.0;
+                        const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
+                        if (voltage_driven) { // Dirichlet boundary for E
+                            val0 = 0.0;
+                            val1 = 0.0;
+                            val2 = 0.0;
+                        }
+                        else { // Dirichlet boundary for B
+                            val0 = 0.5;
+                            val1 = 1.0;
+                            val2 = 1.0;
+                        }
                     }
 
                     // Set mask values on the boundary cells
