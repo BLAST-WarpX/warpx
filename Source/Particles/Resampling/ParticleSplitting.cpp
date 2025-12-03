@@ -44,10 +44,8 @@ ParticleSplitting::ParticleSplitting (const std::string& species_name)
         "  - position_axes_aligned_split\n"
         "  - position_velocity_aligned_split.\n");
 
-    if (!m_resampling_random_splitting_angle) {
-        utils::parser::queryWithParser(
-            pp_species_name, "resampling_splitting_angle", m_splitting_angle);
-    }
+    utils::parser::queryWithParser(
+        pp_species_name, "resampling_splitting_angle", m_splitting_angle);
 }
 void ParticleSplitting::operator() (
     const amrex::Geometry& geom_lev, WarpXParIter& pti,
@@ -171,8 +169,10 @@ void ParticleSplitting::operator() (
 #endif
 
             const auto resampling_random_splitting_angle = m_resampling_random_splitting_angle;
-            const amrex::Real splitting_angle = resampling_random_splitting_angle ?
-                amrex::Random(engine) * 2.0_rt * MathConst::pi : m_splitting_angle;
+            const amrex::Real splitting_angle_fixed = m_splitting_angle;
+            const amrex::Real random_number = amrex::Random(engine);
+
+            amrex::Real splitting_angle = resampling_random_splitting_angle ? random_number * 2.0_rt * MathConst::pi : splitting_angle_fixed;
 
             // Starting index for new children particles for i_cell
             const int new_particle_start = num_particles_tile + offset_ptr[i_cell];
