@@ -375,6 +375,14 @@ guardCellManager::Init (
         // for the field solve too.
         ng_FieldGather = ng_FieldGather.max(ng_FieldSolver);
 
+        if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+            evolve_scheme == EvolveScheme::SemiImplicitEM ||
+            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            // For these implicit schemes, the number of ghost cells
+            // needs to be consistent for EB, J, and the field gather
+            ng_FieldGather = ng_alloc_EB;
+        }
+
         if (do_moving_window){
             ng_MovingWindow[moving_window_dir] = 1;
         }
