@@ -173,6 +173,7 @@ void ParticleSplitting::operator() (
             auto phi = amrex::Random(engine) * 2.0_rt * MathConst::pi;
 
             amrex::Real splitting_angle = resampling_random_splitting_angle ? phi : splitting_angle_fixed;
+            amrex::ignore_unused(splitting_angle);
 
             // Starting index for new children particles for i_cell
             const int new_particle_start = num_particles_tile + offset_ptr[i_cell];
