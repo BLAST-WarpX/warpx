@@ -96,9 +96,6 @@ namespace
      * \brief At the specified grid location, apply either the PEC or insulator boundary condition if
      *        the cell is on the boundary or in the guard cells.
      *
-     * \param[in] icomp        component of the field being updated
-     *                         (0=x, 1=y, 2=z in Cartesian)
-     *                         (0=r, 1=theta, 2=z in RZ)
      * \param[in] dom_lo       index value of the lower domain boundary (cell-centered)
      * \param[in] dom_hi       index value of the higher domain boundary (cell-centered)
      * \param[in] ijk_vec      indices along the x(i), y(j), z(k) of field Array4
@@ -108,13 +105,13 @@ namespace
      * \param[in] E_like       whether the field behaves like E field or B field
      * \param[in] is_nodal     staggering of the field data being updated.
      * \param[in] is_insulator_boundary Specifies whether the boundary is an insulator
+     * \param[in] is_normal_to_boundary Specified whether the vector is normal to the boundary
      * \param[in] field_value  the value of the field for the insulator boundary cell
      * \param[in] set_field    whether to set the field on the lower boundary
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void SetFieldOnPEC_Insulator (int idim,
                                   int iside,
-                                  int icomp,
                                   amrex::IntVect const & dom_lo,
                                   amrex::IntVect const & dom_hi,
                                   amrex::IntVect const & ijk_vec,
@@ -123,8 +120,10 @@ namespace
                                   bool const E_like,
                                   amrex::IntVect const & is_nodal,
                                   const bool is_insulator_boundary,
+                                  const int is_normal_to_boundary,
                                   amrex::Real const field_value,
-                                  bool const set_field)
+                                  bool const set_field,
+                                  bool const only_zero_parallel_insulator)
     {
         using namespace amrex::literals;
 
@@ -139,19 +138,6 @@ namespace
         int const ig = ((iside == -1) ? (dom_lo[idim] - ijk_vec[idim])
                                       : (ijk_vec[idim] - (dom_hi[idim] + is_nodal[idim])));
 
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
-        // For 2D : for icomp==1, (Fy in XZ, Ftheta in RZ),
-        //          icomp=1 is not normal to x or z boundary
-        //          The logic below ensures that the flags are set right for 2D
-        bool const is_normal_to_boundary = (icomp == (2*idim));
-#elif (defined WARPX_DIM_1D_Z)
-        // For 1D : icomp=0 and icomp=1 (Fx and Fy are not normal to the z boundary)
-        //          The logic below ensures that the flags are set right for 1D
-        bool const is_normal_to_boundary = (icomp == 2);
-#else
-        bool const is_normal_to_boundary = (icomp == idim);
-#endif
-
         // For B fields, the parallel fields are cell centered, so are on the boundary
         // when ig == 1, the first cell beyond the boundary.
         bool const on_cell_boundary = (ig == 1);
@@ -159,6 +145,13 @@ namespace
         // For E fields, the parallel fields are node centered, so are on the boundary
         // when ig == 0.
         bool const on_nodal_boundary = (ig == 0);
+
+        if (only_zero_parallel_insulator) {
+            if (on_nodal_boundary && !is_insulator_boundary && !is_normal_to_boundary) {
+                field(ijk_vec, n) = 0._rt;
+            }
+            return;
+        }
 
         amrex::IntVect ijk_mirror = ijk_vec;
         amrex::IntVect ijk_boundary = ijk_vec;
@@ -488,9 +481,10 @@ PEC_Insulator::ApplyPEC_InsulatortoEfield (
     bool split_pml_field)
 {
     bool const E_like = true;
+    bool const only_zero_parallel_insulator = false;
     ApplyPEC_InsulatortoField(Efield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like,
+                              E_like, only_zero_parallel_insulator,
                               m_set_Ex_lo, m_set_Ey_lo, m_set_Ez_lo,
                               m_set_Ex_hi, m_set_Ey_hi, m_set_Ez_hi,
                               m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo,
@@ -508,15 +502,37 @@ PEC_Insulator::ApplyPEC_InsulatortoBfield (
 {
     bool const E_like = false;
     bool const split_pml_field = false;
+    bool const only_zero_parallel_insulator = false;
     ApplyPEC_InsulatortoField(Bfield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like,
+                              E_like, only_zero_parallel_insulator,
                               m_set_Bx_lo, m_set_By_lo, m_set_Bz_lo,
                               m_set_Bx_hi, m_set_By_hi, m_set_Bz_hi,
                               m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo,
                               m_Bx_parsers_hi, m_By_parsers_hi, m_Bz_parsers_hi);
 }
 
+void
+PEC_Insulator::ZeroParallelFieldInInsulator (
+    std::array<amrex::MultiFab*, 3> field,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+    amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
+    int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
+    amrex::Real time)
+{
+    bool const E_like = true;
+    bool const split_pml_field = false;
+    bool const only_zero_parallel_insulator = true;
+    amrex::Vector<int> set_F(AMREX_SPACEDIM, false);
+    ApplyPEC_InsulatortoField(field, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
+                              lev, patch_type, ref_ratios, time, split_pml_field,
+                              E_like, only_zero_parallel_insulator,
+                              set_F, set_F, set_F,
+                              set_F, set_F, set_F,
+                              m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo,
+                              m_Ex_parsers_hi, m_Ey_parsers_hi, m_Ez_parsers_hi);
+}
 
 void
 PEC_Insulator::ApplyPEC_InsulatortoField (
@@ -531,6 +547,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::Real time,
     bool split_pml_field,
     bool E_like,
+    bool only_zero_parallel_insulator,
     amrex::Vector<int> const & set_Fx_lo,
     amrex::Vector<int> const & set_Fy_lo,
     amrex::Vector<int> const & set_Fz_lo,
@@ -597,6 +614,19 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
             if ( (node_box.smallEnd()[idim] > domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] < domain_hi[idim]) ) { continue; }
 
+            amrex::IntVectND<3> is_normal_to_boundary{0, 0, 0};
+
+#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+            // For 2D : for icomp==1, (Fy in XZ, Ftheta in RZ),
+            //          icomp=1 is not normal to x or z boundary
+            is_normal_to_boundary[2*idim] = 1;
+#elif (defined WARPX_DIM_1D_Z)
+            // For 1D : icomp=0 and icomp=1 (Fx and Fy are not normal to the z boundary)
+            is_normal_to_boundary[2] = 1;
+#else
+            is_normal_to_boundary[idim] = 1;
+#endif
+
             // Extract tileboxes for which to loop
             // if split field, the box includes nodal flag
             // For E-field used in Maxwell's update, nodal flag plus cells that particles
@@ -658,10 +688,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fx ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
-                        int const icomp = 0;
-                        ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fx, E_like, Fx_nodal, is_insulator,
-                                                  field_value, set_Fx);
+                        ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
+                                                  Fx, E_like, Fx_nodal, is_insulator, is_normal_to_boundary[0],
+                                                  field_value, set_Fx, only_zero_parallel_insulator);
                     },
                     tey_guard, nComp_y,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -674,10 +703,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
-                        int const icomp = 1;
-                        ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fy, E_like, Fy_nodal, is_insulator,
-                                                  field_value, set_Fy);
+                        ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
+                                                  Fy, E_like, Fy_nodal, is_insulator, is_normal_to_boundary[1],
+                                                  field_value, set_Fy, only_zero_parallel_insulator);
                     },
                     tez_guard, nComp_z,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -690,10 +718,194 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fz ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
 
-                        int const icomp = 2;
-                        ::SetFieldOnPEC_Insulator(idim, iside, icomp, domain_lo, domain_hi, iv, n,
-                                                  Fz, E_like, Fz_nodal, is_insulator,
-                                                  field_value, set_Fz);
+                        ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
+                                                  Fz, E_like, Fz_nodal, is_insulator, is_normal_to_boundary[2],
+                                                  field_value, set_Fz, only_zero_parallel_insulator);
+                    }
+                );
+            }
+        }
+    }
+}
+
+void
+PEC_Insulator::ZeroParallelFieldInInsulatorDuplicate (
+    std::array<amrex::MultiFab*, 3> field,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+    amrex::IntVect const & ng_fieldgather,
+    amrex::Geometry const & geom,
+    int lev,
+    PatchType patch_type,
+    amrex::Vector<amrex::IntVect> const & ref_ratios)
+{
+    using namespace amrex::literals;
+    amrex::Box domain_box = geom.Domain();
+    if (patch_type == PatchType::coarse && (lev > 0)) {
+        domain_box.coarsen(ref_ratios[lev-1]);
+    }
+    amrex::IntVect const domain_lo = domain_box.smallEnd();
+    amrex::IntVect const domain_hi = domain_box.bigEnd();
+
+    amrex::IntVect const Fx_nodal = field[0]->ixType().toIntVect();
+    amrex::IntVect const Fy_nodal = field[1]->ixType().toIntVect();
+    amrex::IntVect const Fz_nodal = field[2]->ixType().toIntVect();
+
+    // For each field multifab, apply boundary condition to ncomponents
+    // If not split field, the boundary condition is applied to the regular field used in Maxwell's eq.
+    // If split_pml_field is true, then boundary condition is applied to all the split field components.
+    int const nComp_x = field[0]->nComp();
+    int const nComp_y = field[1]->nComp();
+    int const nComp_z = field[2]->nComp();
+
+    std::array<amrex::Real,3> const & dx = WarpX::CellSize(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include transverse ghost cells prior to the reflection.
+    // Tiling is problematic because neighboring tiles will have overlapping boxes
+    // in the direction transverse to the boundary, thereby reflecting the value multiple
+    // times in the overlapping region.
+    for (amrex::MFIter mfi(*field[0], false); mfi.isValid(); ++mfi) {
+        // Extract field data
+        amrex::Array4<amrex::Real> const & Fx = field[0]->array(mfi);
+        amrex::Array4<amrex::Real> const & Fy = field[1]->array(mfi);
+        amrex::Array4<amrex::Real> const & Fz = field[2]->array(mfi);
+
+        // Get nodal box that does not include ghost cells
+        amrex::Box const & valid_box = mfi.validbox();
+        amrex::Box const node_box = amrex::convert(valid_box, amrex::IntVect::TheNodeVector());
+
+        // The lower end of the box is the same for nodal and cell centered,
+        // so the same lower end can be used for the three fields even though
+        // they will have different centerings.
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(valid_box, lev, 0._rt);
+        amrex::IntVect const lo = valid_box.smallEnd();
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+
+            if (!(field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) &&
+                !(field_boundary_hi[idim] == FieldBoundaryType::PECInsulator)) { continue; }
+
+            if ( (node_box.smallEnd()[idim] > domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] < domain_hi[idim]) ) { continue; }
+
+            amrex::IntVectND<3> is_normal_to_boundary{0, 0, 0};
+
+#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+            // For 2D : for icomp==1, (Fy in XZ, Ftheta in RZ),
+            //          icomp=1 is not normal to x or z boundary
+            is_normal_to_boundary[2*idim] = 1;
+#elif (defined WARPX_DIM_1D_Z)
+            // For 1D : icomp=0 and icomp=1 (Fx and Fy are not normal to the z boundary)
+            is_normal_to_boundary[2] = 1;
+#else
+            is_normal_to_boundary[idim] = 1;
+#endif
+
+            // Extract tileboxes for which to loop
+            // if split field, the box includes nodal flag
+            // For E-field used in Maxwell's update, nodal flag plus cells that particles
+            // gather fields from in the guard-cell region are included.
+            // Note that for simulations without particles or laser, ng_field_gather is 0
+            // and the guard-cell values of the E-field multifab will not be modified.
+            amrex::Box tex = mfi.tilebox(field[0]->ixType().toIntVect(), ng_fieldgather);
+            amrex::Box tey = mfi.tilebox(field[1]->ixType().toIntVect(), ng_fieldgather);
+            amrex::Box tez = mfi.tilebox(field[2]->ixType().toIntVect(), ng_fieldgather);
+
+            // Loop over sides, iside = -1 (lo), iside = +1 (hi)
+            for (int iside = -1; iside <= +1; iside += 2) {
+
+                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PECInsulator)) ||
+                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PECInsulator))) { continue; }
+
+                if ((iside == -1 && (node_box.smallEnd()[idim] > domain_lo[idim])) ||
+                    (iside == +1 && (node_box.bigEnd()[idim] < domain_hi[idim]))) { continue; }
+
+                amrex::Box tex_guard = tex;
+                amrex::Box tey_guard = tey;
+                amrex::Box tez_guard = tez;
+
+                // Shrink the box to only include the guard and boundary cells
+                if (iside == -1) {
+                    tex_guard.setBig(idim, node_box.smallEnd(idim));
+                    tey_guard.setBig(idim, node_box.smallEnd(idim));
+                    tez_guard.setBig(idim, node_box.smallEnd(idim));
+                } else {
+                    tex_guard.setSmall(idim, node_box.bigEnd(idim));
+                    tey_guard.setSmall(idim, node_box.bigEnd(idim));
+                    tez_guard.setSmall(idim, node_box.bigEnd(idim));
+                }
+
+                amrex::ParserExecutor<2> const & area_parser = ( (iside == -1) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim]);
+
+                // loop over cells and update fields
+                amrex::ParallelFor(
+                    tex_guard, nComp_x,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
+                        if (is_normal_to_boundary[0]) {
+                            return;
+                        }
+
+                        amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fx_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+
+                        int const ig = ((iside == -1) ? (domain_lo[idim] - iv[idim])
+                                                      : (iv[idim] - (domain_hi[idim] + Fx_nodal[idim])));
+
+                        bool const on_nodal_boundary = (ig == 0);
+
+                        if (on_nodal_boundary && !is_insulator) {
+                            Fx(i,j,k,n) = 0._rt;
+                        }
+                    },
+                    tey_guard, nComp_y,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
+                        if (is_normal_to_boundary[1]) {
+                            return;
+                        }
+
+                        amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fy_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+
+                        int const ig = ((iside == -1) ? (domain_lo[idim] - iv[idim])
+                                                      : (iv[idim] - (domain_hi[idim] + Fz_nodal[idim])));
+
+                        bool const on_nodal_boundary = (ig == 0);
+
+                        if (on_nodal_boundary && !is_insulator) {
+                            Fy(i,j,k,n) = 0._rt;
+                        }
+                    },
+                    tez_guard, nComp_z,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
+                        if (is_normal_to_boundary[2]) {
+                            return;
+                        }
+
+                        amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fz_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+
+                        int const ig = ((iside == -1) ? (domain_lo[idim] - iv[idim])
+                                                      : (iv[idim] - (domain_hi[idim] + Fz_nodal[idim])));
+
+                        bool const on_nodal_boundary = (ig == 0);
+
+                        if (on_nodal_boundary && !is_insulator) {
+                            Fz(i,j,k,n) = 0._rt;
+                        }
                     }
                 );
             }
