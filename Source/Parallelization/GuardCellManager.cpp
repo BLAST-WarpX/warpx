@@ -378,7 +378,7 @@ guardCellManager::Init (
         // For these implicit schemes, the number of ghost cells
         // for EB gather must be consistent with those for J.
         ng_alloc_EB.max( ng_alloc_J );
-        ng_FieldGather = ng_alloc_J;
+        ng_FieldGather.max( ng_alloc_J );
     }
 
 }
