@@ -49,10 +49,10 @@ public:
         int lev, WarpXParticleContainer* pc) const final;
 
 private:
-
     int m_min_ppc = 1;
     bool m_resampling_random_splitting_angle = true;
     amrex::ParticleReal m_splitting_angle = 0.0_rt;
     std::string m_splitting_type = "position_axes_aligned_split";
+    int m_splitting_type_id = 1; // 1: axes-aligned splitting type, 0: velocity-aligned splitting type
 };
 #endif // WARPX_PARTICLE_SPLITTING_H_

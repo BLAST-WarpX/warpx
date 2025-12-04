@@ -44,6 +44,8 @@ ParticleSplitting::ParticleSplitting (const std::string& species_name)
         "  - position_axes_aligned_split\n"
         "  - position_velocity_aligned_split.\n");
 
+    m_splitting_type_id = (m_splitting_type == "position_axes_aligned_split") ? 1 : 0;
+
     utils::parser::queryWithParser(
         pp_species_name, "resampling_splitting_angle", m_splitting_angle);
 }
@@ -67,7 +69,7 @@ void ParticleSplitting::operator() (
 
     int np_split_per_parent = 2;
 
-    if (m_splitting_type == "position_axes_aligned_split") {
+    if (m_splitting_type_id == 1) {
 #if defined(WARPX_DIM_1D_Z)
         np_split_per_parent = 2;
 #endif
@@ -77,10 +79,10 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_DIM_XZ)
         np_split_per_parent = 4;
 #endif
-    }
-    else if (m_splitting_type == "position_velocity_aligned_split") {
+    } else {
         np_split_per_parent = 2;
     }
+    int splitting_type_id = m_splitting_type_id;
 
     const auto min_ppc = m_min_ppc;
     const auto resampling_random_splitting_angle = m_resampling_random_splitting_angle;
@@ -196,7 +198,7 @@ void ParticleSplitting::operator() (
                 const amrex::Real child_weight = parent_weight / static_cast<amrex::Real>(np_split_per_parent);
                 const int child_base = new_particle_start + split_count * np_split_per_parent;
 
-                if (m_splitting_type == "position_axes_aligned_split") {
+                if (splitting_type_id == 1) {
 #if defined(WARPX_DIM_1D_Z)
                     amrex::Print() << "Splitting particle along z axis (WARPX_DIM_1D_Z)" << std::endl;
                     // Split particle in 2 along z axis
@@ -284,7 +286,7 @@ void ParticleSplitting::operator() (
                     }
 #endif
                 }
-                else if (m_splitting_type == "position_velocity_aligned_split") {
+                else if (splitting_type_id == 0) {
                     // Split particle in 2 along the velocity direction
                     const amrex::Real u2 = ux[parent_idx] * ux[parent_idx] +
                                            uy[parent_idx] * uy[parent_idx] +
