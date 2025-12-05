@@ -146,7 +146,7 @@ namespace
         // when ig == 0.
         bool const on_nodal_boundary = (ig == 0);
 
-        if (only_zero_parallel_conductor) {
+        if (only_zero_parallel_conductor && set_field) {
             if (on_nodal_boundary && !is_insulator_boundary && !is_normal_to_boundary) {
                 field(ijk_vec, n) = 0._rt;
             }
@@ -524,14 +524,14 @@ PEC_Insulator::ZeroParallelFieldInConductor (
     bool const E_like = false;  // E_like will be unused
     bool const split_pml_field = false;
     amrex::Real const time = 0.;  // time will be unused
-    // since no fields are to be calculated, set_F is all false and dummy parsers are passed in
-    amrex::Vector<int> set_F(AMREX_SPACEDIM, false);
+    // The field is only zeroed out when the E field is being set
+    // since no fields are needed, dummy parsers are passed in
     amrex::Vector<amrex::ParserExecutor<3>> dummy_parsers(3, amrex::ParserExecutor<3>());
     ApplyPEC_InsulatortoField(field, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
                               E_like, only_zero_parallel_conductor,
-                              set_F, set_F, set_F,
-                              set_F, set_F, set_F,
+                              m_set_Ex_lo, m_set_Ey_lo, m_set_Ez_lo,
+                              m_set_Ex_hi, m_set_Ey_hi, m_set_Ez_hi,
                               dummy_parsers, dummy_parsers, dummy_parsers,
                               dummy_parsers, dummy_parsers, dummy_parsers);
 }
