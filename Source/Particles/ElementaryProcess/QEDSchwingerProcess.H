@@ -8,11 +8,12 @@
 #ifndef WARPX_QED_SCHWINGER_PROCESS_H_
 #define WARPX_QED_SCHWINGER_PROCESS_H_
 
-#include "Particles/ElementaryProcess/QEDInternals/SchwingerProcessWrapper.H"
 #include "Utils/TextMsg.H"
 
+#include "ablastr/qed/SchwingerProcess.H"
+
 /**
- * This structure is a functor which calls getSchwingerProductionNumber to
+ * This structure is a functor which calls ablastr::qed::schwinger::get_schwinger_pair_number to
  * calculate the number of pairs created during a given timestep at a given cell.
  */
 struct SchwingerFilterFunc
@@ -45,10 +46,11 @@ struct SchwingerFilterFunc
         const auto& arrBy = src_FABs.By;
         const auto& arrBz = src_FABs.Bz;
 
-        return getSchwingerProductionNumber( m_dV, m_dt,
-                    arrEx(i,j,k),arrEy(i,j,k),arrEz(i,j,k),
-                    arrBx(i,j,k),arrBy(i,j,k),arrBz(i,j,k),
-                    m_threshold_poisson_gaussian,engine);
+        return ablastr::qed::schwinger::get_schwinger_pair_number(
+            m_dV, m_dt,
+            arrEx(i,j,k), arrEy(i,j,k), arrEz(i,j,k),
+            arrBx(i,j,k), arrBy(i,j,k), arrBz(i,j,k),
+            m_threshold_poisson_gaussian, engine);
     }
 };
 

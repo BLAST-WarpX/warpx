@@ -9,9 +9,6 @@
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
 #include "Fields.H"
-#if (defined WARPX_QED)
-#   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
-#endif
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/MultiParticleContainer.H"
@@ -47,6 +44,7 @@
 #include <AMReX_Vector.H>
 
 #include <ablastr/coarsen/sample.H>
+#include <ablastr/qed/ChiFunctions.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <algorithm>
@@ -521,10 +519,10 @@ void ColliderRelevant::ComputeDiags (int step)
                     // compute chi
                     amrex::Real chi = 0.0_rt;
                     if (is_photon) {
-                        chi = QedUtils::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
+                        chi = ablastr::qed::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
                                             ex, ey, ez, bx, by, bz);
                     } else {
-                        chi = QedUtils::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
+                        chi = ablastr::qed::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
                                             ex, ey, ez, bx, by, bz);
                     }
                     return {chi, chi, chi*w[i]};

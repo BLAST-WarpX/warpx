@@ -218,11 +218,12 @@ WarpX::Evolve (int numsteps)
         // multi-physics: field ionization
         doFieldIonization();
 
-#ifdef WARPX_QED
         // multi-physics: QED effects
+#ifdef WARPX_QED
         doQEDEvents();
-        mypc->doQEDSchwinger();
 #endif
+        mypc->doQEDSchwinger();
+
 
         // perform particle injection
         ExecutePythonCallback("particleinjection");

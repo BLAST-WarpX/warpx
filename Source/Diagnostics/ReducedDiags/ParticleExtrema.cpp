@@ -8,9 +8,6 @@
 #include "ParticleExtrema.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#if (defined WARPX_QED)
-#   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
-#endif
 #include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -22,6 +19,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/qed/ChiFunctions.H>
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_Array.H>
@@ -345,10 +343,10 @@ void ParticleExtrema::ComputeDiags (int step)
                         // compute chi
                         amrex::Real chi = 0.0_rt;
                         if ( is_photon ) {
-                            chi = QedUtils::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
+                            chi = ablastr::qed::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
                                              ex, ey, ez, bx, by, bz);
                         } else {
-                            chi = QedUtils::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
+                            chi = ablastr::qed::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
                                              ex, ey, ez, bx, by, bz);
                         }
                         return {chi,chi};
