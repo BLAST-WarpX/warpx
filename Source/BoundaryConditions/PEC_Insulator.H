@@ -80,14 +80,12 @@ public:
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
-     * \param[in]     time                current time of the simulation
      */
-    void ZeroParallelFieldInInsulator (std::array<amrex::MultiFab*, 3> field,
+    void ZeroParallelFieldInConductor (std::array<amrex::MultiFab*, 3> field,
                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
                                        amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
-                                       int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
-                                       amrex::Real time);
+                                       int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios);
 
     /**
      * \brief The work routine applying the boundary condition
@@ -103,7 +101,7 @@ public:
      * \param[in]     time                current time of the simulation
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
      * \param[in]     E_like              whether the field is E like or B like
-     * \param[in]     only_zero_parallel_insulator only zero the field when it's parallel to the insulator
+     * \param[in]     only_zero_parallel_conductor only zero the parallel field in the conductor
      * \param[in]     set_Fx_lo           the flags for the x-field at the lower boundaries
      * \param[in]     set_Fy_lo           the flags for the y-field at the lower boundaries
      * \param[in]     set_Fz_lo           the flags for the z-field at the lower boundaries
@@ -129,7 +127,7 @@ public:
                                amrex::Real time,
                                bool split_pml_field,
                                bool E_like,
-                               bool only_zero_parallel_insulator,
+                               bool only_zero_parallel_conductor,
                                amrex::Vector<int> const & set_Fx_lo,
                                amrex::Vector<int> const & set_Fy_lo,
                                amrex::Vector<int> const & set_Fz_lo,
@@ -142,28 +140,6 @@ public:
                                amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
                                amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
                                amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
-
-    /**
-     * \brief Zeros the fields in the conductor region parallel to the boundary
-     *
-     * \param[in,out] field
-     * \param[in]     field_boundary_lo   lower field boundary conditions
-     * \param[in]     field_boundary_hi   upper field boundary conditions
-     * \param[in]     ng_fieldgather      number of guard cells used by field gather
-     * \param[in]     geom                geometry object of level "lev"
-     * \param[in]     lev                 level of the Multifab
-     * \param[in]     patch_type          coarse or fine
-     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
-     */
-    void
-    ZeroParallelFieldInInsulatorDuplicate (std::array<amrex::MultiFab*, 3> field,
-                               amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
-                               amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
-                               amrex::IntVect const & ng_fieldgather,
-                               amrex::Geometry const & geom,
-                               int lev,
-                               PatchType patch_type,
-                               amrex::Vector<amrex::IntVect> const & ref_ratios);
 
     /* \brief Returns whether any E field is set on a boundary
      * \param[in] idim dimension to check

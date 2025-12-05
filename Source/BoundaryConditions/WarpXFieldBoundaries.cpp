@@ -286,6 +286,13 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
             particle_boundary_lo, particle_boundary_hi,
             Geom(lev), lev, patch_type, ref_ratio);
     }
+
+    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+        pec_insulator_boundary->ZeroParallelFieldInConductor({Jx, Jy, Jz},
+            field_boundary_lo, field_boundary_hi,
+            get_ng_fieldgather(), Geom(lev),
+            lev, patch_type, ref_ratio);
+    }
 }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
