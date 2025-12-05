@@ -143,6 +143,7 @@ void ParticleSplitting::operator() (
     auto * const AMREX_RESTRICT w = soa.GetRealData(PIdx::w).data();
     auto * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
 
+    const int cpu_rank = amrex::ParallelDescriptor::MyProc();
     amrex::ParallelForRNG(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
         {
@@ -200,7 +201,6 @@ void ParticleSplitting::operator() (
 
                 if (splitting_type_id == 1) {
 #if defined(WARPX_DIM_1D_Z)
-                    amrex::Print() << "Splitting particle along z axis (WARPX_DIM_1D_Z)" << std::endl;
                     // Split particle in 2 along z axis
                     for (int k = 0; k < 2; ++k) {
                         const int sign_offset = (k == 0) ? -1 : 1;
@@ -212,7 +212,7 @@ void ParticleSplitting::operator() (
                         w[idx] = child_weight;
                         idcpu[idx] = amrex::SetParticleIDandCPU(
                             amrex::LongParticleIds::NoSplitParticleID,
-                            amrex::ParallelDescriptor::MyProc()
+                            cpu_rank
                         );
                     }
 #elif defined(WARPX_DIM_XZ)
@@ -235,7 +235,7 @@ void ParticleSplitting::operator() (
                         w[idx] = child_weight;
                         idcpu[idx] = amrex::SetParticleIDandCPU(
                             amrex::LongParticleIds::NoSplitParticleID,
-                            amrex::ParallelDescriptor::MyProc()
+                            cpu_rank
                         );
                     }
 #elif defined(WARPX_DIM_3D)
@@ -266,7 +266,7 @@ void ParticleSplitting::operator() (
                         w[idx] = child_weight;
                         idcpu[idx] = amrex::SetParticleIDandCPU(
                             amrex::LongParticleIds::NoSplitParticleID,
-                            amrex::ParallelDescriptor::MyProc()
+                            cpu_rank
                         );
                     }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -281,7 +281,7 @@ void ParticleSplitting::operator() (
                         w[idx] = child_weight;
                         idcpu[idx] = amrex::SetParticleIDandCPU(
                             amrex::LongParticleIds::NoSplitParticleID,
-                            amrex::ParallelDescriptor::MyProc()
+                            cpu_rank
                         );
                     }
 #endif
@@ -311,7 +311,7 @@ void ParticleSplitting::operator() (
                         w[idx] = child_weight;
                         idcpu[idx] = amrex::SetParticleIDandCPU(
                             amrex::LongParticleIds::NoSplitParticleID,
-                            amrex::ParallelDescriptor::MyProc()
+                            cpu_rank
                         );
                     }
                 }
