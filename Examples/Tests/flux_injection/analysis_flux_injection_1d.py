@@ -14,7 +14,7 @@ to attempt to maintain the constant density.
 """
 import numpy as np
 import openpmd_viewer
-from scipy.constants import c, e
+from scipy.constants import c, e, m_e, m_p
 
 e_mass = 100.*m_e
 i_mass = m_p
@@ -23,6 +23,8 @@ T = 1.
 
 nz = 200
 L = 2.e-7
+
+dz = L / nz
 
 def calcdensity(species, it):
     nn, info = ts.get_field(f"nn_{species}", iteration=it)
