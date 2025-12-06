@@ -273,68 +273,126 @@ Running
 -------
 
 For general instructions refer to `here <https://warpx.readthedocs.io/en/latest/usage/how_to_run.html#run>`__.
-
-On CPU Nodes
-
 The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (see `here <https://s3df.slac.stanford.edu/#/interactive-compute?id=using-a-terminal>`__).
 
-You can run an interactive job directly from the terminal by typing:
+.. tab-set::
 
-.. code-block:: bash
+   .. tab-item:: A100 GPUs
 
-    srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 4 --time=01:00:00 --pty /bin/bash
+        You can run an interactive job directly from the terminal by typing:
 
-.. _running-s3df-terminal:
+        .. code-block:: bash
+        
+            srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 4 --gres=gpu:1 --time=01:00:00 --pty /bin/bash
+        
+        .. _running-s3df-terminal:
 
-where ``<partitionname>`` is the cluster partition that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 4`` CPU cores (physical threads) per task. This means 8 CPU cores will be requested by this job, 1 job will run per node, each job with 4 CPU cores. Once the scheduler allocated the resources you can run WarpX:
+        where ``<partitionname>`` is the cluster partition that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 1`` nodes, ``-n 1`` tasks (MPI processes) and ``-c 1`` CPU cores (physical threads) per task and and one GPU (``--gres=gpu:1``). Once the scheduler allocated the resources you can run WarpX:
 
-.. code-block:: bash
+        .. code-block:: bash
+        
+            module load openmpi/v4.1.6
+            srun ./warpx.3d.MPI.CUDA.DP.PDP.OPMD.FFT.EB.QED.GENQEDTABLES input_simple.txt
+        
+        .. _running-s3df-run:
 
-    module load openmpi/v4.1.6
-    mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
+        Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it like ``sbatch submit.sh``.
+        
+        .. code-block:: bash
+        
+            #!/bin/bash -l
+            
+            # Copyright 2025 Peter Kicsiny
+            #
+            # This file is part of WarpX.
+            #
+            # License: BSD-3-Clause-LBNL
+            
+            #SBATCH --partition=milano
+            #SBATCH --account=facet
+            #SBATCH -N 1 # --nodes= number of nodes
+            #SBATCH --gres=gpu:1 # request a GPU
+            #SBATCH -t 00:10:00 # --time= walltime
+            #SBATCH -J WarpX # --job-name= name of job
+            #SBATCH --qos=preemptable # queue
+            #SBATCH -o WarpX.o%j # --output= stdout
+            #SBATCH -e WarpX.e%j # --error= stderr
+            
+            # executable & inputs file or python interpreter & PICMI script here
+            EXE=./warpx.3d.MPI.CUDA.DP.PDP.OPMD.FFT.EB.QED.GENQEDTABLES
+            INPUTS=input_simple.txt
 
-.. _running-s3df-run:
+            command="module load openmpi/v4.1.6"
+            echo ${command}
+            ${command}
+            
+            command="srun ${EXE} ${INPUTS}"
+            echo ${command}
+            ${command}
 
-Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it like ``sbatch submit.sh``.
+        .. _running-s3df-script:
 
-.. code-block:: bash
+        Here an example is shown using the group account ``facet`` and the ``preemptable`` queue. 
 
-    #!/bin/bash -l
-    
-    # Copyright 2025 Peter Kicsiny
-    #
-    # This file is part of WarpX.
-    #
-    # License: BSD-3-Clause-LBNL
-    
-    #SBATCH --partition=milano
-    #SBATCH --account=facet
-    #SBATCH -N 2 # --nodes= number of nodes
-    #SBATCH -n 2 # --ntasks= number of MPI processes or tasks in total
-    #SBATCH -c 4 # --cpus-per-task= number of CPU cores (threads) per task
-    #SBATCH -t 00:10:00 # --time= walltime
-    #SBATCH -J WarpX # --job-name= name of job
-    #SBATCH --qos=preemptable # queue
-    #SBATCH -o WarpX.o%j # --output= stdout
-    #SBATCH -e WarpX.e%j # --error= stderr
-    
-    # executable & inputs file or python interpreter & PICMI script here
-    EXE=./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED
-    INPUTS=input_simple.txt
-    
-    # threads for OpenMP and threaded compressors per MPI rank
-    export OMP_PLACES=threads
-    export OMP_PROC_BIND=spread
-    export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK} # -c 4 so 4 threads per MPI rank
-    
-    command="module load openmpi/v4.1.6"
-    echo ${command}
-    ${command}
-    
-    command="mpirun -np ${SLURM_NTASKS} ${EXE} ${INPUTS}"
-    echo ${command}
-    ${command}
+   .. tab-item:: CPU Nodes
+        
+        You can run an interactive job directly from the terminal by typing:
 
-.. _running-s3df-script:
+        .. code-block:: bash
+        
+            srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 4 --time=01:00:00 --pty /bin/bash
+        
+        .. _running-s3df-terminal:
+        
+        where ``<partitionname>`` is the cluster partition that you want to use (see `here <https://s3df.slac.stanford.edu/#/batch-compute?id=partitions-amp-accounts>`__),  and ``<accountname>`` is the group you are associated with e.g. ``facet``. Note that on S3DF there are no individual accounts, only group accounts. Here we request ``-N 2`` nodes, ``-n 2`` tasks (MPI processes) and ``-c 4`` CPU cores (physical threads) per task. This means 8 CPU cores will be requested by this job, 1 job will run per node, each job with 4 CPU cores. Once the scheduler allocated the resources you can run WarpX:
+        
+        .. code-block:: bash
+        
+            module load openmpi/v4.1.6
+            mpirun -np 2 ./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED input_simple.txt
+        
+        .. _running-s3df-run:
 
-Here an example is shown using the group account ``facet`` and the ``preemptable`` queue. We request 2 nodes and run 2 MPI ranks each using 4 threads. 
+        Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it like ``sbatch submit.sh``.
+        
+        .. code-block:: bash
+        
+            #!/bin/bash -l
+            
+            # Copyright 2025 Peter Kicsiny
+            #
+            # This file is part of WarpX.
+            #
+            # License: BSD-3-Clause-LBNL
+            
+            #SBATCH --partition=milano
+            #SBATCH --account=facet
+            #SBATCH -N 2 # --nodes= number of nodes
+            #SBATCH -n 2 # --ntasks= number of MPI processes or tasks in total
+            #SBATCH -c 4 # --cpus-per-task= number of CPU cores (threads) per task
+            #SBATCH -t 00:10:00 # --time= walltime
+            #SBATCH -J WarpX # --job-name= name of job
+            #SBATCH --qos=preemptable # queue
+            #SBATCH -o WarpX.o%j # --output= stdout
+            #SBATCH -e WarpX.e%j # --error= stderr
+            
+            # executable & inputs file or python interpreter & PICMI script here
+            EXE=./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED
+            INPUTS=input_simple.txt
+            
+            # threads for OpenMP and threaded compressors per MPI rank
+            export OMP_PLACES=threads
+            export OMP_PROC_BIND=spread
+            export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK} # -c 4 so 4 threads per MPI rank
+            
+            command="module load openmpi/v4.1.6"
+            echo ${command}
+            ${command}
+            
+            command="mpirun -np ${SLURM_NTASKS} ${EXE} ${INPUTS}"
+            echo ${command}
+            ${command}
+
+        .. _running-s3df-script:
+
+        Here an example is shown using the group account ``facet`` and the ``preemptable`` queue. We request 2 nodes and run 2 MPI ranks each using 4 threads. 
