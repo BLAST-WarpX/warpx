@@ -326,20 +326,29 @@ namespace
 #endif
     }
 
-}
+    /* \brief Read in the parsers for the tangential fields, returning whether
+     *        the input parameter was specified.
+     * \param[in]  pp_insulator ParmParse instance
+     * \param[out] parsers vector holding the parsers generated from the input
+     * \param[in]  input_name the name of the input parameter
+     * \param[in]  coord1 the first coordinate in the plane
+     * \param[in]  coord2 the second coordinate in the plane
+     * \return wether the parameter was specified
+     */
+    bool
+    ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
+                               amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
+                               std::string const & input_name,
+                               std::string const & coord1,
+                               std::string const & coord2)
+    {
+        std::string str = "0";
+        bool const specified = utils::parser::Query_parserString(pp_insulator, input_name, str);
+        parsers.push_back(
+            std::make_unique<amrex::Parser>(utils::parser::makeParser(str, {coord1, coord2, "t"})));
+        return specified;
+    }
 
-bool
-PEC_Insulator::ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                          amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
-                                          std::string const & input_name,
-                                          std::string const & coord1,
-                                          std::string const & coord2)
-{
-    std::string str = "0";
-    bool const specified = utils::parser::Query_parserString(pp_insulator, input_name, str);
-    parsers.push_back(
-        std::make_unique<amrex::Parser>(utils::parser::makeParser(str, {coord1, coord2, "t"})));
-    return specified;
 }
 
 PEC_Insulator::PEC_Insulator ()
@@ -357,15 +366,15 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_x_hi, {"y", "z"})));
 
-    m_set_B_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "By_x_lo(y,z,t)", "y", "z");
-    m_set_B_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_x_lo(y,z,t)", "y", "z");
-    m_set_B_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "By_x_hi(y,z,t)", "y", "z");
-    m_set_B_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_x_hi(y,z,t)", "y", "z");
+    m_set_B_lo[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "By_x_lo(y,z,t)", "y", "z");
+    m_set_B_lo[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_x_lo(y,z,t)", "y", "z");
+    m_set_B_hi[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "By_x_hi(y,z,t)", "y", "z");
+    m_set_B_hi[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_x_hi(y,z,t)", "y", "z");
 
-    m_set_E_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ey_x_lo(y,z,t)", "y", "z");
-    m_set_E_lo[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_x_lo(y,z,t)", "y", "z");
-    m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ey_x_hi(y,z,t)", "y", "z");
-    m_set_E_hi[0] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_x_hi(y,z,t)", "y", "z");
+    m_set_E_lo[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ey_x_lo(y,z,t)", "y", "z");
+    m_set_E_lo[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_x_lo(y,z,t)", "y", "z");
+    m_set_E_hi[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ey_x_hi(y,z,t)", "y", "z");
+    m_set_E_hi[0] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_x_hi(y,z,t)", "y", "z");
 #endif
 
 #if defined(WARPX_DIM_3D)
@@ -378,15 +387,15 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_y_hi, {"x", "z"})));
 
-    m_set_B_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_y_lo(x,z,t)", "x", "z");
-    m_set_B_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_y_lo(x,z,t)", "x", "z");
-    m_set_B_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_y_hi(x,z,t)", "x", "z");
-    m_set_B_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_y_hi(x,z,t)", "x", "z");
+    m_set_B_lo[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_y_lo(x,z,t)", "x", "z");
+    m_set_B_lo[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "Bz_y_lo(x,z,t)", "x", "z");
+    m_set_B_hi[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_y_hi(x,z,t)", "x", "z");
+    m_set_B_hi[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "Bz_y_hi(x,z,t)", "x", "z");
 
-    m_set_E_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_y_lo(x,z,t)", "x", "z");
-    m_set_E_lo[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_y_lo(x,z,t)", "x", "z");
-    m_set_E_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_y_hi(x,z,t)", "x", "z");
-    m_set_E_hi[1] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_y_hi(x,z,t)", "x", "z");
+    m_set_E_lo[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_y_lo(x,z,t)", "x", "z");
+    m_set_E_lo[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ez_y_lo(x,z,t)", "x", "z");
+    m_set_E_hi[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_y_hi(x,z,t)", "x", "z");
+    m_set_E_hi[1] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ez_y_hi(x,z,t)", "x", "z");
 #endif
 
 #if defined(WARPX_ZINDEX)
@@ -399,15 +408,15 @@ PEC_Insulator::PEC_Insulator ()
     m_insulator_area_hi.push_back(
         std::make_unique<amrex::Parser>(utils::parser::makeParser(str_area_z_hi, {"x", "y"})));
 
-    m_set_B_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_z_lo(x,y,t)", "x", "y");
-    m_set_B_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "By_z_lo(x,y,t)", "x", "y");
-    m_set_B_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_z_hi(x,y,t)", "x", "y");
-    m_set_B_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "By_z_hi(x,y,t)", "x", "y");
+    m_set_B_lo[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_lo, "Bx_z_lo(x,y,t)", "x", "y");
+    m_set_B_lo[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_lo, "By_z_lo(x,y,t)", "x", "y");
+    m_set_B_hi[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B1_hi, "Bx_z_hi(x,y,t)", "x", "y");
+    m_set_B_hi[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_B2_hi, "By_z_hi(x,y,t)", "x", "y");
 
-    m_set_E_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_z_lo(x,y,t)", "x", "y");
-    m_set_E_lo[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ey_z_lo(x,y,t)", "x", "y");
-    m_set_E_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_z_hi(x,y,t)", "x", "y");
-    m_set_E_hi[WARPX_ZINDEX] |= ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ey_z_hi(x,y,t)", "x", "y");
+    m_set_E_lo[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_lo, "Ex_z_lo(x,y,t)", "x", "y");
+    m_set_E_lo[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_lo, "Ey_z_lo(x,y,t)", "x", "y");
+    m_set_E_hi[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E1_hi, "Ex_z_hi(x,y,t)", "x", "y");
+    m_set_E_hi[WARPX_ZINDEX] |= ::ReadTangentialFieldParser(pp_insulator, m_parsers_E2_hi, "Ey_z_hi(x,y,t)", "x", "y");
 #endif
 
     for(const auto & area_parser : m_insulator_area_lo) {

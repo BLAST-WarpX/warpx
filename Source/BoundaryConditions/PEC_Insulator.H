@@ -173,20 +173,6 @@ public:
 
 private:
 
-    /* \brief Read in the parsers for the tangential fields, returning whether
-     *        the input parameter was specified.
-     * \param[in]  pp_insulator ParmParse instance
-     * \param[out] parsers vector holding the parsers generated from the input
-     * \param[in]  input_name the name of the input parameter
-     * \param[in]  coord1 the first coordinate in the plane
-     * \param[in]  coord2 the second coordinate in the plane
-     * \return wether the parameter was specified
-     */
-    bool ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                    amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
-                                    std::string const & input_name,
-                                    std::string const & coord1,
-                                    std::string const & coord2);
 
     // Parsers specifying the region of each boundary that is insulator
     amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
