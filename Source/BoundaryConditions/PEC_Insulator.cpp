@@ -648,12 +648,14 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
             // gather fields from in the guard-cell region are included.
             // Note that for simulations without particles or laser, ng_field_gather is 0
             // and the guard-cell values of the E-field multifab will not be modified.
+            amrex::IntVect ng = ng_fieldgather;
+            ng.min(field[0]->nGrowVect());
             amrex::Box tex = (split_pml_field) ? mfi.tilebox(field[0]->ixType().toIntVect())
-                                               : mfi.tilebox(field[0]->ixType().toIntVect(), ng_fieldgather);
+                                               : mfi.tilebox(field[0]->ixType().toIntVect(), ng);
             amrex::Box tey = (split_pml_field) ? mfi.tilebox(field[1]->ixType().toIntVect())
-                                               : mfi.tilebox(field[1]->ixType().toIntVect(), ng_fieldgather);
+                                               : mfi.tilebox(field[1]->ixType().toIntVect(), ng);
             amrex::Box tez = (split_pml_field) ? mfi.tilebox(field[2]->ixType().toIntVect())
-                                               : mfi.tilebox(field[2]->ixType().toIntVect(), ng_fieldgather);
+                                               : mfi.tilebox(field[2]->ixType().toIntVect(), ng);
 
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
