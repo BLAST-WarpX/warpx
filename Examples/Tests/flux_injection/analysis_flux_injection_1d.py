@@ -12,19 +12,21 @@ This script tests the Gaussian-flux injection
 The input files setup a uniform plasma with a drift and use flux injection
 to attempt to maintain the constant density.
 """
+
 import numpy as np
 import openpmd_viewer
 from scipy.constants import c, e, m_e, m_p
 
-e_mass = 100.*m_e
+e_mass = 100.0 * m_e
 i_mass = m_p
-N = 1.e25
-T = 1.
+N = 1.0e25
+T = 1.0
 
 nz = 200
-L = 2.e-7
+L = 2.0e-7
 
 dz = L / nz
+
 
 def calcdensity(species, it):
     nn, info = ts.get_field(f"nn_{species}", iteration=it)
@@ -50,7 +52,8 @@ def calctemperature(species, mass, it):
     )
     return T / e, info
 
-ts = openpmd_viewer.OpenPMDTimeSeries('diags/diag1')
+
+ts = openpmd_viewer.OpenPMDTimeSeries("diags/diag1")
 
 it = 100
 

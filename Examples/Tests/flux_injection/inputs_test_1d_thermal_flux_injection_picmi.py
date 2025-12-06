@@ -3,7 +3,6 @@
 # --- Simple example of Langmuir oscillations in a uniform plasma
 # --- in two dimensions
 import numpy as np
-import openpmd_viewer
 
 from pywarpx import picmi
 
@@ -44,50 +43,62 @@ number_per_cell = 1000
 vthe = np.sqrt(T * constants.q_e / e_mass)
 vthi = np.sqrt(T * constants.q_e / i_mass)
 
-electrons_fill = picmi.UniformDistribution(density = N,
-                                           rms_velocity = [vthe, vthe, vthe],
-                                           directed_velocity = [mean_velocity, 0., 0.])
-electrons_flux_left = picmi.UniformFluxDistribution(warpx_fixed_num_particles_per_cell = True,
-                                                    warpx_density = N,
-                                                    flux_normal_axis = 'z',
-                                                    surface_flux_position = 0.,
-                                                    flux_direction = +1,
-                                                    rms_velocity = [vthe, vthe, vthe],
-                                                    directed_velocity = [mean_velocity, 0., 0.],
-                                                    gaussian_flux_momentum_distribution = True,
-                                                    flux = None)
-electrons_flux_right = picmi.UniformFluxDistribution(warpx_fixed_num_particles_per_cell = True,
-                                                     warpx_density = N,
-                                                     flux_normal_axis = 'z',
-                                                     surface_flux_position = zmax,
-                                                     flux_direction = -1,
-                                                     rms_velocity = [vthe, vthe, vthe],
-                                                     directed_velocity = [mean_velocity, 0., 0.],
-                                                     gaussian_flux_momentum_distribution = True,
-                                                     flux = None)
+electrons_fill = picmi.UniformDistribution(
+    density=N,
+    rms_velocity=[vthe, vthe, vthe],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+)
+electrons_flux_left = picmi.UniformFluxDistribution(
+    warpx_fixed_num_particles_per_cell=True,
+    warpx_density=N,
+    flux_normal_axis="z",
+    surface_flux_position=0.0,
+    flux_direction=+1,
+    rms_velocity=[vthe, vthe, vthe],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+    gaussian_flux_momentum_distribution=True,
+    flux=None,
+)
+electrons_flux_right = picmi.UniformFluxDistribution(
+    warpx_fixed_num_particles_per_cell=True,
+    warpx_density=N,
+    flux_normal_axis="z",
+    surface_flux_position=zmax,
+    flux_direction=-1,
+    rms_velocity=[vthe, vthe, vthe],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+    gaussian_flux_momentum_distribution=True,
+    flux=None,
+)
 
 
-ions_fill = picmi.UniformDistribution(density = N,
-                                      rms_velocity = [vthi, vthi, vthi],
-                                      directed_velocity = [mean_velocity, 0., 0.])
-ions_flux_left = picmi.UniformFluxDistribution(warpx_fixed_num_particles_per_cell = True,
-                                               warpx_density = N,
-                                               flux_normal_axis = 'z',
-                                               surface_flux_position = 0.,
-                                               flux_direction = +1,
-                                               rms_velocity = [vthi, vthi, vthi],
-                                               directed_velocity = [mean_velocity, 0., 0.],
-                                               gaussian_flux_momentum_distribution = True,
-                                               flux = None)
-ions_flux_right = picmi.UniformFluxDistribution(warpx_fixed_num_particles_per_cell = True,
-                                                warpx_density = N,
-                                                flux_normal_axis = 'z',
-                                                surface_flux_position = zmax,
-                                                flux_direction = -1,
-                                                rms_velocity = [vthi, vthi, vthi],
-                                                directed_velocity = [mean_velocity, 0., 0.],
-                                                gaussian_flux_momentum_distribution = True,
-                                                flux = None)
+ions_fill = picmi.UniformDistribution(
+    density=N,
+    rms_velocity=[vthi, vthi, vthi],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+)
+ions_flux_left = picmi.UniformFluxDistribution(
+    warpx_fixed_num_particles_per_cell=True,
+    warpx_density=N,
+    flux_normal_axis="z",
+    surface_flux_position=0.0,
+    flux_direction=+1,
+    rms_velocity=[vthi, vthi, vthi],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+    gaussian_flux_momentum_distribution=True,
+    flux=None,
+)
+ions_flux_right = picmi.UniformFluxDistribution(
+    warpx_fixed_num_particles_per_cell=True,
+    warpx_density=N,
+    flux_normal_axis="z",
+    surface_flux_position=zmax,
+    flux_direction=-1,
+    rms_velocity=[vthi, vthi, vthi],
+    directed_velocity=[mean_velocity, 0.0, 0.0],
+    gaussian_flux_momentum_distribution=True,
+    flux=None,
+)
 
 electrons = picmi.Species(
     particle_type="electron",
@@ -132,14 +143,16 @@ particle_diags = [
     picmi.ParticleFieldDiagnostic("vzvz", "uz*uz", do_average=0),
 ]
 
-field_diag1 = picmi.FieldDiagnostic(name = 'diag1',
-                                    warpx_format = 'openpmd',
-                                    grid = grid,
-                                    period = diagnostic_intervals,
-                                    data_list = ['Bx', 'By', 'Bz', 'Ex', 'Ey', 'Ez', 'Jx', 'Jy', 'Jz'],
-                                    warpx_particle_fields_to_plot = particle_diags,
-                                    write_dir = '.',
-                                    warpx_file_prefix = 'diags/diag1')
+field_diag1 = picmi.FieldDiagnostic(
+    name="diag1",
+    warpx_format="openpmd",
+    grid=grid,
+    period=diagnostic_intervals,
+    data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez", "Jx", "Jy", "Jz"],
+    warpx_particle_fields_to_plot=particle_diags,
+    write_dir=".",
+    warpx_file_prefix="diags/diag1",
+)
 
 part_diag1 = picmi.ParticleDiagnostic(
     name="diag1",

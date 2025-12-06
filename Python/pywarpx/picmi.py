@@ -834,7 +834,9 @@ class UniformFluxDistribution(
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         if self.fixed_num_particles_per_cell:
-            species.add_new_group_attr(source_name, "flux_profile", "fixed_num_particles_per_cell")
+            species.add_new_group_attr(
+                source_name, "flux_profile", "fixed_num_particles_per_cell"
+            )
             species.add_new_group_attr(source_name, "profile", "constant")
             species.add_new_group_attr(source_name, "density", self.density)
             if density_scale is not None:
