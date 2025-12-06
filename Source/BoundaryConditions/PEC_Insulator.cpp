@@ -96,6 +96,8 @@ namespace
      * \brief At the specified grid location, apply either the PEC or insulator boundary condition if
      *        the cell is on the boundary or in the guard cells.
      *
+     * \param[in] idim         the dimension being updated
+     * \param[in] iside        the side being updated, either -1 or +1
      * \param[in] dom_lo       index value of the lower domain boundary (cell-centered)
      * \param[in] dom_hi       index value of the higher domain boundary (cell-centered)
      * \param[in] ijk_vec      indices along the x(i), y(j), z(k) of field Array4
@@ -108,6 +110,7 @@ namespace
      * \param[in] is_normal_to_boundary Specified whether the vector is normal to the boundary
      * \param[in] field_value  the value of the field for the insulator boundary cell
      * \param[in] set_field    whether to set the field on the lower boundary
+     * \param[in] only_zero_parallel_field only zero the parallel field on the boundary
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void SetFieldOnPEC_Insulator (int idim,
@@ -123,7 +126,7 @@ namespace
                                   const int is_normal_to_boundary,
                                   amrex::Real const field_value,
                                   bool const set_field,
-                                  bool const only_zero_parallel_conductor)
+                                  bool const only_zero_parallel_field)
     {
         using namespace amrex::literals;
 
@@ -146,7 +149,7 @@ namespace
         // when ig == 0.
         bool const on_nodal_boundary = (ig == 0);
 
-        if (only_zero_parallel_conductor) {
+        if (only_zero_parallel_field) {
             if (on_nodal_boundary && (set_field || !is_insulator_boundary) && !is_normal_to_boundary) {
                 field(ijk_vec, n) = 0._rt;
             }
@@ -490,10 +493,10 @@ PEC_Insulator::ApplyPEC_InsulatortoEfield (
     bool split_pml_field)
 {
     bool const E_like = true;
-    bool const only_zero_parallel_conductor = false;
+    bool const only_zero_parallel_field = false;
     ApplyPEC_InsulatortoField(Efield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like, only_zero_parallel_conductor,
+                              E_like, only_zero_parallel_field,
                               m_set_Ex_lo, m_set_Ey_lo, m_set_Ez_lo,
                               m_set_Ex_hi, m_set_Ey_hi, m_set_Ez_hi,
                               m_Ex_parsers_lo, m_Ey_parsers_lo, m_Ez_parsers_lo,
@@ -511,10 +514,10 @@ PEC_Insulator::ApplyPEC_InsulatortoBfield (
 {
     bool const E_like = false;
     bool const split_pml_field = false;
-    bool const only_zero_parallel_conductor = false;
+    bool const only_zero_parallel_field = false;
     ApplyPEC_InsulatortoField(Bfield, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like, only_zero_parallel_conductor,
+                              E_like, only_zero_parallel_field,
                               m_set_Bx_lo, m_set_By_lo, m_set_Bz_lo,
                               m_set_Bx_hi, m_set_By_hi, m_set_Bz_hi,
                               m_Bx_parsers_lo, m_By_parsers_lo, m_Bz_parsers_lo,
@@ -529,7 +532,7 @@ PEC_Insulator::ZeroParallelFieldInConductor (
     amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
     int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios)
 {
-    bool const only_zero_parallel_conductor = true;
+    bool const only_zero_parallel_field = true;
     bool const E_like = false;  // E_like will be unused
     bool const split_pml_field = false;
     amrex::Real const time = 0.;  // time will be unused
@@ -539,7 +542,7 @@ PEC_Insulator::ZeroParallelFieldInConductor (
     amrex::Vector<amrex::ParserExecutor<3>> dummy_parsers(3, amrex::ParserExecutor<3>());
     ApplyPEC_InsulatortoField(field, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
-                              E_like, only_zero_parallel_conductor,
+                              E_like, only_zero_parallel_field,
                               m_set_E_lo, m_set_E_lo, m_set_E_lo,
                               m_set_E_hi, m_set_E_hi, m_set_E_hi,
                               dummy_parsers, dummy_parsers, dummy_parsers,
@@ -559,7 +562,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
     amrex::Real time,
     bool split_pml_field,
     bool E_like,
-    bool only_zero_parallel_conductor,
+    bool only_zero_parallel_field,
     amrex::Vector<int> const & set_Fx_lo,
     amrex::Vector<int> const & set_Fy_lo,
     amrex::Vector<int> const & set_Fz_lo,
@@ -702,7 +705,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fx, E_like, Fx_nodal, is_insulator, is_normal_to_boundary[0],
-                                                  field_value, set_Fx, only_zero_parallel_conductor);
+                                                  field_value, set_Fx, only_zero_parallel_field);
                     },
                     tey_guard, nComp_y,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -717,7 +720,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fy, E_like, Fy_nodal, is_insulator, is_normal_to_boundary[1],
-                                                  field_value, set_Fy, only_zero_parallel_conductor);
+                                                  field_value, set_Fy, only_zero_parallel_field);
                     },
                     tez_guard, nComp_z,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -732,7 +735,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fz, E_like, Fz_nodal, is_insulator, is_normal_to_boundary[2],
-                                                  field_value, set_Fz, only_zero_parallel_conductor);
+                                                  field_value, set_Fz, only_zero_parallel_field);
                     }
                 );
             }

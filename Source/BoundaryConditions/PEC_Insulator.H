@@ -70,7 +70,9 @@ public:
                                      int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
                                      amrex::Real time);
     /**
-     * \brief Zeros the fields in the conductor region parallel to the boundary
+     * \brief Zeros the parallel fields on the boundary
+     *        When the E field is being set, the field is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the field is zeroed only in the conductor.
      *
      * \param[in,out] field
      * \param[in]     field_boundary_lo   lower field boundary conditions
@@ -101,7 +103,7 @@ public:
      * \param[in]     time                current time of the simulation
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
      * \param[in]     E_like              whether the field is E like or B like
-     * \param[in]     only_zero_parallel_conductor only zero the parallel field in the conductor
+     * \param[in]     only_zero_parallel_field only zero the parallel field on the boundary
      * \param[in]     set_Fx_lo           the flags for the x-field at the lower boundaries
      * \param[in]     set_Fy_lo           the flags for the y-field at the lower boundaries
      * \param[in]     set_Fz_lo           the flags for the z-field at the lower boundaries
@@ -127,7 +129,7 @@ public:
                                amrex::Real time,
                                bool split_pml_field,
                                bool E_like,
-                               bool only_zero_parallel_conductor,
+                               bool only_zero_parallel_field,
                                amrex::Vector<int> const & set_Fx_lo,
                                amrex::Vector<int> const & set_Fy_lo,
                                amrex::Vector<int> const & set_Fz_lo,
