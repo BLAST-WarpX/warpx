@@ -53,6 +53,6 @@ private:
     bool m_resampling_random_splitting_angle = true;
     amrex::ParticleReal m_splitting_angle = 0.0_rt;
     std::string m_splitting_type = "position_axes_aligned_split";
-    int m_splitting_type_id = 1; // 1: axes-aligned splitting type, 0: velocity-aligned splitting type
+    int m_splitting_type_id = 1; // 0: unchanged positions splitting type; 1: axes-aligned positions, 2: velocity-aligned positions
 };
 #endif // WARPX_PARTICLE_SPLITTING_H_

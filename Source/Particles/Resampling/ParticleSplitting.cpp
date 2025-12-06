@@ -38,13 +38,18 @@ ParticleSplitting::ParticleSplitting (const std::string& species_name)
     pp_species_name.query("resampling_splitting_type", m_splitting_type);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_splitting_type == "position_axes_aligned_split" || m_splitting_type == "position_velocity_aligned_split",
+        m_splitting_type == "position_axes_aligned_split" || m_splitting_type == "position_velocity_aligned_split" || m_splitting_type == "position_unchanged_split",
         "Invalid resampling_splitting_type specified.\n"
         "Valid options are:\n"
+        "  - position_unchanged_split\n"
         "  - position_axes_aligned_split\n"
         "  - position_velocity_aligned_split.\n");
 
-    m_splitting_type_id = (m_splitting_type == "position_axes_aligned_split") ? 1 : 0;
+    if (m_splitting_type == "position_unchanged_split") {
+        m_splitting_type_id = 0;
+    } else if (m_splitting_type == "position_velocity_aligned_split") {
+        m_splitting_type_id = 2;
+    }
 
     utils::parser::queryWithParser(
         pp_species_name, "resampling_splitting_angle", m_splitting_angle);
@@ -83,7 +88,6 @@ void ParticleSplitting::operator() (
         np_split_per_parent = 2;
     }
     int splitting_type_id = m_splitting_type_id;
-
     const auto min_ppc = m_min_ppc;
     const auto resampling_random_splitting_angle = m_resampling_random_splitting_angle;
     const amrex::Real splitting_angle_fixed = m_splitting_angle;
@@ -198,8 +202,29 @@ void ParticleSplitting::operator() (
                 const amrex::Real parent_weight = w[parent_idx];
                 const amrex::Real child_weight = parent_weight / static_cast<amrex::Real>(np_split_per_parent);
                 const int child_base = new_particle_start + split_count * np_split_per_parent;
-
-                if (splitting_type_id == 1) {
+                if (splitting_type_id == 0) {
+                    for (int k = 0; k < 2; ++k) {
+                        const int idx = child_base + k;
+#if !defined(WARPX_DIM_1D_Z)
+                        x[idx] = xp;
+#endif
+#if defined(WARPX_DIM_3D)
+                        y[idx] = yp;
+#endif
+#if defined(WARPX_ZINDEX)
+                        z[idx] = zp;
+#endif
+                        ux[idx] = ux[parent_idx];
+                        uy[idx] = uy[parent_idx];
+                        uz[idx] = uz[parent_idx];
+                        w[idx] = child_weight;
+                        idcpu[idx] = amrex::SetParticleIDandCPU(
+                            amrex::LongParticleIds::NoSplitParticleID,
+                            cpu_rank
+                        );
+                    }
+                }
+                else if (splitting_type_id == 1) {
 #if defined(WARPX_DIM_1D_Z)
                     // Split particle in 2 along z axis
                     for (int k = 0; k < 2; ++k) {
@@ -286,7 +311,7 @@ void ParticleSplitting::operator() (
                     }
 #endif
                 }
-                else if (splitting_type_id == 0) {
+                else if (splitting_type_id == 2) {
                     // Split particle in 2 along the velocity direction
                     const amrex::Real u2 = ux[parent_idx] * ux[parent_idx] +
                                            uy[parent_idx] * uy[parent_idx] +
