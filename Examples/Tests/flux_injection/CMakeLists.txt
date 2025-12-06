@@ -56,8 +56,8 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_thermal_flux_injection  # inputs
-    "analysis_flux_injection_1d.py diags/diag1000100"  # analysis
-    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    "analysis_flux_injection_1d.py diags/diag1"  # analysis
+    "analysis_default_regression.py --path diags/diag1"  # checksum
     OFF  # dependency
 )
 
@@ -66,7 +66,7 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_thermal_flux_injection_picmi.py  # inputs
-    "analysis_flux_injection_1d.py diags/diag1000100"  # analysis
-    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    "analysis_flux_injection_1d.py diags/diag1"  # analysis
+    "analysis_default_regression.py --path diags/diag1"  # checksum
     OFF  # dependency
 )

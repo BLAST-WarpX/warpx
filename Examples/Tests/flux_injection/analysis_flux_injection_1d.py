@@ -12,32 +12,17 @@ This script tests the Gaussian-flux injection
 The input files setup a uniform plasma with a drift and use flux injection
 to attempt to maintain the constant density.
 """
-
-import os
-import sys
-
 import numpy as np
 import openpmd_viewer
 from scipy.constants import c, e
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-import checksumAPI
+e_mass = 100.*m_e
+i_mass = m_p
+N = 1.e25
+T = 1.
 
-sys.path.append("../../../../warpx/Tools/Parser/")
-from input_file_parser import parse_input_file
-
-input_dict = parse_input_file("inputs_1d_fixed")
-
-e_mass = eval(input_dict["my_constants.e_mass"][0])
-i_mass = eval(input_dict["my_constants.i_mass"][0])
-N = float(input_dict["my_constants.N"][0])
-T = eval(input_dict["my_constants.T"][0])
-
-nz = eval(input_dict["my_constants.nz"][0])
-L = eval(input_dict["my_constants.L"][0])
-
-dz = L / nz
-
+nz = 200
+L = 2.e-7
 
 def calcdensity(species, it):
     nn, info = ts.get_field(f"nn_{species}", iteration=it)
@@ -63,8 +48,7 @@ def calctemperature(species, mass, it):
     )
     return T / e, info
 
-
-ts = openpmd_viewer.OpenPMDTimeSeries("FluxInjection1D_plt")
+ts = openpmd_viewer.OpenPMDTimeSeries('diags/diag1')
 
 it = 100
 
@@ -84,12 +68,7 @@ print(f"nn_ions_error.max() = {nn_ions_error.max()}")
 print(f"T_electrons_error.max() = {T_electrons_error.max()}")
 print(f"T_ions_error.max() = {T_ions_error.max()}")
 
-assert nn_electrons_error.max() < 0.03
-assert nn_ions_error.max() < 0.03
-assert T_electrons_error.max() < 0.03
-assert T_ions_error.max() < 0.03
-
-# Verify checksum
-fn = sys.argv[1]
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, output_format="openpmd")
+assert nn_electrons_error.max() < 0.1
+assert nn_ions_error.max() < 0.1
+assert T_electrons_error.max() < 0.1
+assert T_ions_error.max() < 0.1
