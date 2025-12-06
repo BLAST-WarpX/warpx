@@ -1288,7 +1288,18 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         const amrex::Box& tile_box = mfi.tilebox();
-        const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+        amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+
+        // This ensures that the upper end of tile_realbox is exactly the
+        // same as ProbHi when it is at the upper end of the domain.
+        // This is needed in case injection is done on an upper boundary
+        // since particles are first placed on that boundary.
+        // Should this code be put in getRealBox?
+        for (int i = 0 ; i < AMREX_SPACEDIM ; i++) {
+            if (tile_box.bigEnd(i) == geom.Domain().bigEnd(i)) {
+                tile_realbox.setHi(i, geom.ProbHi(i));
+            }
+        }
 
         // This will hold the cell location on the emitting plane.
         // When the flux direction is positive, this will be the same as overlap_corner.

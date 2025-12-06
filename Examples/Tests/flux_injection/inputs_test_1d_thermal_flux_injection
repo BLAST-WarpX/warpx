@@ -17,6 +17,7 @@ max_step = 100
 # number of grid points
 amr.n_cell = nz
 amr.max_level = 0
+amr.max_grid_size = 32
 
 # Geometry
 geometry.dims = 1
