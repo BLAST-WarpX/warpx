@@ -135,7 +135,9 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     {
         // Prepare temporary particle tile to copy to
         ParticleTileType ptile_tmp;
-        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps());
+        auto soa_rdata_names = GetRealSoANames();
+        auto soa_idata_names = GetIntSoANames();
+        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names);
         ptile_tmp.resize(np);
 
         // Copy and re-order the data of the current particle tile

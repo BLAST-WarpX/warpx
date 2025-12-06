@@ -3,17 +3,17 @@
 Inputs: Parameter List
 ======================
 
-This documents on how to use WarpX with an inputs file (e.g., ``warpx.3d input_3d``).
+This section describes the list of parameters that can be set in the WarpX inputs file.
 
-Complete example input files can be found in :ref:`the examples section <usage-examples>`.
-
-.. note::
-
-   WarpX input options are read via AMReX `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
+Examples of inputs files can be found in the :ref:`Examples <usage-examples>` section.
 
 .. note::
 
-   The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand-side of all input parameters that consist of one or more integers or floats, so expressions like ``<species_name>.density_max = "2.+1."`` and/or using user-defined constants are accepted.
+   WarpX's input paramters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
+
+.. note::
+
+   The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand side of all input parameters that consist of one or more integers or floats. Expressions like ``<species_name>.density_max = "0.1+2.3"`` and expressions that include user-defined constants are accepted.
 
 .. _running-cpp-parameters-overall:
 
@@ -377,7 +377,6 @@ Setting up the field mesh
     When using mesh refinement, the number of refinement levels that will be used.
 
     Use 0 in order to disable mesh refinement.
-    Note: currently, ``0`` and ``1`` are supported.
 
 * ``amr.ref_ratio`` (`integer` per refined level, default: ``2``)
     When using mesh refinement, this is the refinement ratio per level.
@@ -558,7 +557,7 @@ Domain Boundary Conditions
       and their velocities are thermalized. The tangential velocity components are sampled from ``gaussian`` distribution
       and the component normal to the boundary is sampled from ``gaussian flux`` distribution.
       The standard deviation for these distributions should be provided for each species using
-      ``boundary.<species>.u_th``. The same standard deviation is used to sample all components.
+      ``boundary.<species_name>.u_th``. The same standard deviation is used to sample all components.
 
     * ``None``: No boundary conditions are applied to the particles.
       When using RZ, RCYLINDER, and RSPHERE, this option must be used for the lower radial boundary, the first value of ``boundary.particle_lo``.
@@ -899,7 +898,7 @@ Particle initialization
 * ``<species_name>.charge`` (`float`) optional (default `NaN`)
     The charge of one `physical` particle of this species.
     If ``species_type`` is specified, the charge will be set to the physical value and ``charge`` is optional.
-    When ``<species>.do_field_ionization = 1``, the physical particle charge is equal to ``ionization_initial_level * charge``, so latter parameter should be equal to q_e (which is defined in WarpX as the elementary charge in coulombs).
+    When ``<species_name>.do_field_ionization = 1``, the physical particle charge is equal to ``ionization_initial_level * charge``, so latter parameter should be equal to q_e (which is defined in WarpX as the elementary charge in coulombs).
 
 * ``<species_name>.mass`` (`float`) optional (default `NaN`)
     The mass of one `physical` particle of this species.
@@ -1382,7 +1381,7 @@ Particle initialization
      :math:`\gamma` is the Lorentz factor,
      :math:`v/c` is the particle velocity normalized by the speed of light.
 
-* ``<species>.save_particles_at_xlo/ylo/zlo``, ``<species>.save_particles_at_xhi/yhi/zhi`` and ``<species>.save_particles_at_eb`` (`0` or `1` optional, default `0`)
+* ``<species_name>.save_particles_at_xlo/ylo/zlo``, ``<species_name>.save_particles_at_xhi/yhi/zhi`` and ``<species_name>.save_particles_at_eb`` (`0` or `1` optional, default `0`)
     If `1` particles of this species will be copied to the scraped particle
     buffer for the specified boundary if they leave the simulation domain in
     the specified direction. **If USE_EB=TRUE** the ``save_particles_at_eb``
@@ -1408,67 +1407,30 @@ Particle initialization
        lead to memory issues if not periodically cleared. To clear the buffer
        call ``clear_buffer()``.
 
-* ``<species>.do_field_ionization`` (`0` or `1`) optional (default `0`)
+* ``<species_name>.do_field_ionization`` (`0` or `1`) optional (default `0`)
     Do field ionization for this species (using the ADK theory).
 
-* ``<species>.do_adk_correction`` (`0` or `1`) optional (default `0`)
+* ``<species_name>.do_adk_correction`` (`0` or `1`) optional (default `0`)
     Whether to apply the correction to the ADK theory proposed by Zhang, Lan and Lu in `Q. Zhang et al. (Phys. Rev. A 90, 043410, 2014) <https://doi.org/10.1103/PhysRevA.90.043410>`__.
     If so, the probability of ionization is modified using an empirical model that should be more accurate in the regime of high electric fields.
     Currently, this is only implemented for Hydrogen, although Argon is also available in the same reference.
 
-* ``<species>.physical_element`` (`string`)
+* ``<species_name>.physical_element`` (`string`)
     Only read if `do_field_ionization = 1`. Symbol of chemical element for
     this species. Example: for Helium, use ``physical_element = He``.
     All the elements up to atomic number Z=100 (Fermium) are supported.
 
-* ``<species>.ionization_product_species`` (`string`)
+* ``<species_name>.ionization_product_species`` (`string`)
     Only read if `do_field_ionization = 1`. Name of species in which ionized
     electrons are stored. This species must be created as a regular species
     in the input file (in particular, it must be in `particles.species_names`).
 
-* ``<species>.ionization_initial_level`` (`int`) optional (default `0`)
+* ``<species_name>.ionization_initial_level`` (`int`) optional (default `0`)
     Only read if `do_field_ionization = 1`. Initial ionization level of the
     species (must be smaller than the atomic number of chemical element given
     in `physical_element`).
 
-* ``<species>.do_classical_radiation_reaction`` (`int`) optional (default `0`)
-    Enables Radiation Reaction (or Radiation Friction) for the species. Species
-    must be either electrons or positrons. Boris pusher must be used for the
-    simulation. If both ``<species>.do_classical_radiation_reaction`` and
-    ``<species>.do_qed_quantum_sync`` are enabled, then the classical module
-    will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
-    the discrete quantum module otherwise.
-
-* ``<species>.do_qed_quantum_sync`` (`int`) optional (default `0`)
-    Enables Quantum synchrotron emission for this species.
-    Quantum synchrotron lookup table should be either generated or loaded from disk to enable
-    this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be either an electron or a positron species.
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.do_qed_breit_wheeler`` (`int`) optional (default `0`)
-    Enables non-linear Breit-Wheeler process for this species.
-    Breit-Wheeler lookup table should be either generated or loaded from disk to enable
-    this process (see "Lookup tables for QED modules" section below).
-    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
-    **This feature requires to compile with -DWarpX_QED=ON**
-
-* ``<species>.qed_quantum_sync_phot_product_species`` (`string`)
-    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
-    (the name of an existing photon species must be provided)
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.qed_breit_wheeler_ele_product_species`` (`string`)
-    If a photon species has the Breit-Wheeler process, an electron product species must be specified
-    (the name of an existing electron species must be provided)
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.qed_breit_wheeler_pos_product_species`` (`string`)
-    If a photon species has the Breit-Wheeler process, a positron product species must be specified
-    (the name of an existing positron species must be provided).
-    **This feature requires to compile with QED=TRUE**
-
-* ``<species>.do_resampling`` (`0` or `1`) optional (default `0`)
+* ``<species_name>.do_resampling`` (`0` or `1`) optional (default `0`)
     If `1` resampling is performed for this species. This means that the number of macroparticles
     will be reduced at specific timesteps while preserving the distribution function as much as
     possible (details depend on the chosen resampling algorithm).
@@ -1476,13 +1438,13 @@ Particle initialization
     or with QED effects). At least one resampling trigger (see below) must be specified to actually
     perform resampling.
 
-* ``<species>.resampling_algorithm`` (`string`) optional (default `leveling_thinning`)
+* ``<species_name>.resampling_algorithm`` (`string`) optional (default `leveling_thinning`)
     The algorithm used for resampling:
 
     * ``leveling_thinning`` This algorithm is defined in :cite:t:`param-MuravievCPC2021`.
       It has one parameter:
 
-        * ``<species>.resampling_algorithm_target_ratio`` (`float`) optional (default `1.5`)
+        * ``<species_name>.resampling_algorithm_target_ratio`` (`float`) optional (default `1.5`)
             This **roughly** corresponds to the ratio between the number of particles before and
             after resampling.
 
@@ -1490,33 +1452,51 @@ Particle initialization
       cells and merged, similar to the approach described in :cite:t:`param-Vranic2015`.
       It has three parameters:
 
-        * ``<species>.resampling_algorithm_delta_ur`` (`float`)
+        * ``<species_name>.resampling_algorithm_delta_ur`` (`float`)
             The width of momentum cells used in clustering particles, in m/s.
 
-        * ``<species>.resampling_algorithm_n_theta`` (`int`)
+        * ``<species_name>.resampling_algorithm_n_theta`` (`int`)
             The number of cell divisions to use in the :math:`\theta` direction
             when clustering the particle velocities.
 
-        * ``<species>.resampling_algorithm_n_phi`` (`int`)
+        * ``<species_name>.resampling_algorithm_n_phi`` (`int`)
             The number of cell divisions to use in the :math:`\phi` direction
             when clustering the particle velocities.
 
-* ``<species>.resampling_min_ppc`` (`int`) optional (default `1`)
+* ``<species_name>.resampling_min_ppc`` (`int`) optional (default `1`)
     Resampling is not performed in cells with a number of macroparticles strictly smaller
     than this parameter.
 
-* ``<species>.resampling_trigger_intervals`` (`string`) optional (default `0`)
+* ``<species_name>.resampling_trigger_intervals`` (`string`) optional (default `0`)
     Using the `Intervals parser`_ syntax, this string defines timesteps at which resampling is
     performed.
 
-* ``<species>.resampling_trigger_max_avg_ppc`` (`float`) optional (default `infinity`)
+* ``<species_name>.resampling_trigger_max_avg_ppc`` (`float`) optional (default `infinity`)
     Resampling is performed everytime the number of macroparticles per cell of the species
     averaged over the whole simulation domain exceeds this parameter.
 
-* ``<species>.do_temperature_deposition`` (`boolean`) optional (default `false`)
+* ``<species_name>.do_temperature_deposition`` (`boolean`) optional (default `false`)
     When running with Ohm's Law Hybrid Solver, this will enable temperature deposition
     in each dimension with a matched shape function and filtering used for current deposition.
     This is required when using the electron energy solver with electron-ion temperature relaxation.
+
+* ``<species>.do_qed_virtual_photons`` (`boolean`) optional (default `false`)
+    Create a population of virtual photons associated with ``<species>``.
+    It only works if ``<species>`` is an electron or a positron species.
+    The virtual photon species has to be created as a regular photon species in the input file.
+    Virtual photons are created from scratch at each timestep at the same position as the parent particle.
+    This implies that different primary species must have different virtual photon species.
+    The energy of the virtual photons is sampled from their spectrum (see :cite:t:`LandauVol4` section 99 for more details).
+    The momentum of the virtual photons is parallel to that of the parent particle.
+    This feature also requires the following input parameters:
+      * ``<species>.qed_virtual_photon_species_name`` (`string`) name of the virtual photon species associated with the current lepton species.
+      * ``<virtual_photon_species>.qed_virtual_photon_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
+      * ``<virtual_photon_species>.qed_virtual_photon_multiplier`` (`int`), sampling factor for the virtual photons.
+        A sampling factor of ``f`` means that the number of virtual photons is multiplied by ``f``, while their weights are divided by ``f``.
+    The virtual photons can undergo collisions via the linear Breit-Wheeler or linear Compton processes.
+    This is useful to model incoherent beam-beam effects in colliders (e.g. pair generation, radiative Bhabha scattering).
+    This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
+    It requires WarpX to be compiled with ``WarpX_QED=ON`` (CMake) or ``QED=TRUE`` (GNU Make).
 
 .. _running-cpp-parameters-fluids:
 
@@ -2789,17 +2769,6 @@ Additional parameters
     Note that if Perfectly Matched Layers (PML) are used, synchronization of the `E` and `B` fields
     is performed at every timestep regardless of this parameter.
 
-* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
-    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
-    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
-    Note that this option can only be used with the PSATD build. Furthermore, one must set
-    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
-
-* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
-     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
-     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
-     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
-
 * ``warpx.do_device_synchronize`` (`bool`) optional (default `1`)
     When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
@@ -3049,9 +3018,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
    .. math::
 
-      \texttt{<field_name>_<species>} = \frac{\sum_{i=1}^N w_i \, f(x_i,y_i,z_i,u_{x,i},u_{y,i},u_{z,i})}{\sum_{i=1}^N w_i}
+      \texttt{<field_name>_<species_name>} = \frac{\sum_{i=1}^N w_i \, f(x_i,y_i,z_i,u_{x,i},u_{y,i},u_{z,i})}{\sum_{i=1}^N w_i}
 
-   where :math:`w_i` is the particle weight, :math:`f()` is the parser function, and :math:`(x_i,y_i,z_i)` are particle positions in units of a meter. The sums are over all particles of type ``<species>`` in a cell (ignoring the particle shape factor) that satisfy ``<diag_name>.particle_fields.<field_name>.filter(x,y,z,ux,uy,uz)``.
+   where :math:`w_i` is the particle weight, :math:`f()` is the parser function, and :math:`(x_i,y_i,z_i)` are particle positions in units of a meter. The sums are over all particles of type ``<species_name>`` in a cell (ignoring the particle shape factor) that satisfy ``<diag_name>.particle_fields.<field_name>.filter(x,y,z,ux,uy,uz)``.
    When ``<diag_name>.particle_fields.<field_name>.do_average`` is `0`, the division by the sum over particle weights is not done.
    In 1D or 2D, the particle coordinates will follow the WarpX convention. :math:`(u_{x,i},u_{y,i},u_{z,i})` are components of the particle four-momentum. :math:`u = \gamma v/c`, :math:`\gamma` is the Lorentz factor, :math:`v` is the particle velocity and :math:`c` is the speed of light.
    For photons, we use the standardized momentum :math:`u = p/(m_{e}c)`, where :math:`p` is the momentum of the photon and :math:`m_{e}` the mass of an electron.
@@ -3267,7 +3236,7 @@ Boundary Scraping Diagnostics
 This diagnostic type is specified by setting ``<diag_name>.diag_type`` = ``BoundaryScraping``.
 Currently, the only supported output format is openPMD, so the user also needs to set ``<diag>.format=openpmd`` and WarpX must be compiled with openPMD turned on.
 The data that is to be collected and recorded is controlled per species and per boundary by setting one or more of the flags to ``1``,
-``<species>.save_particles_at_xlo/ylo/zlo``, ``<species>.save_particles_at_xhi/yhi/zhi``, and ``<species>.save_particles_at_eb``.
+``<species_name>.save_particles_at_xlo/ylo/zlo``, ``<species_name>.save_particles_at_xhi/yhi/zhi``, and ``<species_name>.save_particles_at_eb``.
 (Note that this diagnostics does not save any field ; it only saves particles.)
 
 The data collected at each boundary is written out to a subdirectory of the diagnostics directory with the name of the boundary, for example, ``particles_at_xlo``, ``particles_at_zhi``, or ``particles_at_eb``.
@@ -3280,7 +3249,7 @@ In addition to their usual attributes, the saved particles have
    and the exact time when each particle hits the boundary.
    3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary on the point of contact of the particles (not saved if they reach non-EB boundaries)
 
-``BoundaryScrapingDiagnostics`` can be used with ``<diag_name>.<species>.random_fraction``, ``<diag_name>.<species>.uniform_stride``, and ``<diag_name>.<species>.plot_filter_function``, which have the same behavior as for ``FullDiagnostics``. For ``BoundaryScrapingDiagnostics``, these filters are applied at the time the data is written to file. An implication of this is that more particles may initially be accumulated in memory than are ultimately written. ``t`` in ``plot_filter_function`` refers to the time the diagnostic is written rather than the time the particle crossed the boundary.
+``BoundaryScrapingDiagnostics`` can be used with ``<diag_name>.<species_name>.random_fraction``, ``<diag_name>.<species_name>.uniform_stride``, and ``<diag_name>.<species_name>.plot_filter_function``, which have the same behavior as for ``FullDiagnostics``. For ``BoundaryScrapingDiagnostics``, these filters are applied at the time the data is written to file. An implication of this is that more particles may initially be accumulated in memory than are ultimately written. ``t`` in ``plot_filter_function`` refers to the time the diagnostic is written rather than the time the particle crossed the boundary.
 
 .. _running-cpp-parameters-diagnostics-reduced:
 
@@ -3886,57 +3855,73 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     The precision used when writing out the data to the text files.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.precision``.
 
-Lookup tables and other settings for QED modules
-------------------------------------------------
+.. _running-cpp-parameters-qed:
 
-Lookup tables store pre-computed values for functions used by the QED modules.
-**This feature requires to compile with QED=TRUE (and also with QED_TABLE_GEN=TRUE for table generation)**
+QED
+---
 
-* ``qed_bw.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Breit-Wheeler module:
+These features require to compile with ``-DWarpX_QED=ON``, unless stated otherwise.
 
-    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+Nonlinear Compton scattering
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the photons, while table 2 is used for pair generation):
+This process is also known more generically as Quantum Synchrotron emission.
 
-        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of the photons)
+* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
+    Energy threshold for photon particle creation in units of :math:`m_e c^2`.
 
-        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+* ``<species_name>.do_qed_quantum_sync`` (`int`) optional (default `0`)
+    Enables Quantum synchrotron emission for this species.
+    Quantum synchrotron lookup table should be either generated or loaded from disk to enable
+    this process (see "Lookup tables for QED modules" section below).
+    `<species>` must be either an electron or a positron species.
 
-        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+* ``<species_name>.qed_quantum_sync_phot_product_species`` (`string`)
+    If an electron or a positron species has the Quantum synchrotron process, a photon product species must be specified
+    (the name of an existing photon species must be provided)
 
-        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
-          used for pair generation)
+* ``<species_name>.do_classical_radiation_reaction`` (`int`) optional (default `0`)
+    Enables Radiation Reaction (or Radiation Friction) for the species. Species
+    must be either electrons or positrons. Boris pusher must be used for the
+    simulation. If both ``<species>.do_classical_radiation_reaction`` and
+    ``<species_name>.do_qed_quantum_sync`` are enabled, then the classical module
+    will be used when the particle's chi parameter is below ``qed_qs.chi_min``,
+    the discrete quantum module otherwise. This feature does not require to compile with ``-DWarpX_QED=ON``.
 
-        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
 
-        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+Nonlinear Breit-Wheeler
+^^^^^^^^^^^^^^^^^^^^^^^
 
-        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
-          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
-          quantum parameter of the photon).
+* ``<species_name>.do_qed_breit_wheeler`` (`int`) optional (default `0`)
+    Enables non-linear Breit-Wheeler process for this species.
+    Breit-Wheeler lookup table should be either generated or loaded from disk to enable
+    this process (see "Lookup tables for QED modules" section below).
+    `<species>` must be a photon species (i.e., a species with ``<species_name>.species_type`` set to `photon`)
 
-        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
+* ``<species_name>.qed_breit_wheeler_ele_product_species`` (`string`)
+    If a photon species has the Breit-Wheeler process, an electron product species must be specified
+    (the name of an existing electron species must be provided)
 
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+* ``<species_name>.qed_breit_wheeler_pos_product_species`` (`string`)
+    If a photon species has the Breit-Wheeler process, a positron product species must be specified
+    (the name of an existing positron species must be provided).
 
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
 
-        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
+Lookup tables
+^^^^^^^^^^^^^
+
+Lookup tables store pre-computed values for functions used by the nonlinear Compton Scattering and nonlinear Breit-Wheeler modules.
+The lookup tables can be pre-generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
+Alternatively, one can use the low-resolution builtin tables or generate them on the fly at the beginning of the simulation.
 
 * ``qed_qs.lookup_table_mode`` (`string`)
-    There are three options to prepare the lookup table required by the Quantum Synchrotron module:
+    There are three options to prepare the lookup table required by the nonlinear Compton Scattering (or Quantum Synchrotron) module:
 
     * ``builtin``: a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
 
-    * ``generate``: a new table is generated. This option requires Boost math library
-      (version >= 1.66) and to compile with ``QED_TABLE_GEN=TRUE``. All
-      the following parameters must be specified (table 1 is used to evolve the optical depth
+    * ``generate``: a new table is generated on the fly at the beginning of the simulation. This option requires Boost math library
+      (version >= 1.66) and the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON``.
+      All the following parameters must be specified (table 1 is used to evolve the optical depth
       of the particles, while table 2 is used for photon emission):
 
         * ``qed_qs.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
@@ -3961,25 +3946,58 @@ Lookup tables store pre-computed values for functions used by the QED modules.
 
         * ``qed_qs.save_table_in`` (`string`): where to save the lookup table
 
-      Alternatively, the lookup table can be generated using a standalone tool (see :ref:`qed tools section <generate-lookup-tables-with-tools>`).
-
-    * ``load``: a lookup table is loaded from a pre-generated binary file. The following parameter
-      must be specified:
+    * ``load``: a lookup table is loaded from a pre-generated binary file. This can be a table generated by a previous run or using the standalone tool.
+      The following parameter must be specified:
 
         * ``qed_qs.load_table_from`` (`string`): name of the lookup table file to read from.
 
-* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
-    (suggested value : 0.01)
+* ``qed_bw.lookup_table_mode`` (`string`)
+    There are three options to prepare the lookup table required by the Breit-Wheeler module:
+
+    * ``builtin``:  a built-in table is used (Warning: the table gives reasonable results but its resolution is quite low).
+
+    * ``generate``: a new table is generated on the fly at the beginning of the simulation. This option requires Boost math library
+      (version >= 1.66) and the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON``.
+      All the following parameters must be specified (table 1 is used to evolve the optical depth
+      of the photons, while table 2 is used for pair generation):
+
+        * ``qed_bw.tab_dndt_chi_min`` (`float`): minimum chi parameter for lookup table 1 (
+          used for the evolution of the optical depth of the photons)
+
+        * ``qed_bw.tab_dndt_chi_max`` (`float`): maximum chi parameter for lookup table 1
+
+        * ``qed_bw.tab_dndt_how_many`` (`int`): number of points to be used for lookup table 1
+
+        * ``qed_bw.tab_pair_chi_min`` (`float`): minimum chi parameter for lookup table 2 (
+          used for pair generation)
+
+        * ``qed_bw.tab_pair_chi_max`` (`float`): maximum chi parameter for lookup table 2
+
+        * ``qed_bw.tab_pair_chi_how_many`` (`int`): number of points to be used for chi axis in lookup table 2
+
+        * ``qed_bw.tab_pair_frac_how_many`` (`int`): number of points to be used for the second axis in lookup table 2
+          (the second axis is the ratio between the quantum parameter of the less energetic particle of the pair and the
+          quantum parameter of the photon).
+
+        * ``qed_bw.save_table_in`` (`string`): where to save the lookup table
+
+    * ``load``: a lookup table is loaded from a pre-generated binary file. This can be a table generated by a previous run or using the standalone tool.
+      The following parameter must be specified:
+
+        * ``qed_bw.load_table_from`` (`string`): name of the lookup table file to read from.
 
 * ``qed_qs.chi_min`` (`float`): minimum chi parameter to be considered by the Quantum Synchrotron engine
     (suggested value : 0.001)
 
-* ``qed_qs.photon_creation_energy_threshold`` (`float`) optional (default `2`)
-    Energy threshold for photon particle creation in `*me*c^2` units.
+* ``qed_bw.chi_min`` (`float`): minimum chi parameter to be considered by the Breit-Wheeler engine
+    (suggested value : 0.01)
+
+
+Schwinger process
+^^^^^^^^^^^^^^^^^
 
 * ``warpx.do_qed_schwinger`` (`bool`) optional (default `0`)
     If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    Activating the Schwinger process requires the code to be compiled with ``QED=TRUE`` and ``PICSAR``.
     If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
     ``qed_schwinger.ele_product_species`` and ``qed_schwinger.pos_product_species``.
     Schwinger process requires either ``warpx.grid_type = collocated`` or
@@ -4012,6 +4030,20 @@ Lookup tables store pre-computed values for functions used by the QED modules.
     Otherwise a Gaussian distribution is used.
     Note that, regardless of this parameter, the number of macroparticles created is at most one per cell
     per timestep per species (with a weight corresponding to the number of physical pairs created).
+
+* ``warpx.use_hybrid_QED`` (`bool`; default: 0)
+    Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
+    field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
+    Note that this option can only be used with the PSATD build. Furthermore, one must set
+    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
+    This feature does not require to compile with ``-DWarpX_QED=ON``.
+
+* ``warpx.quantum_xi`` (`float`; default: 1.3050122.e-52)
+     Overwrites the actual quantum parameter used in Maxwell's QED equations. Assigning a
+     value here will make the simulation unphysical, but will allow QED effects to become more apparent.
+     Note that this option will only have an effect if the ``warpx.use_Hybrid_QED`` flag is also triggered.
+     This feature does not require to compile with ``-DWarpX_QED=ON``.
+
 
 Checkpoints and restart
 -----------------------
