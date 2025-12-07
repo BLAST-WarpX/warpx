@@ -190,11 +190,9 @@ WarpX::Evolve (int numsteps)
 
         CheckLoadBalance(step);
 
-        // Update timestep for electrostatic solver if a constant dt is not provided
-        // This first synchronizes the position and velocity before setting the new timestep
-        if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) &&
-            !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
+        // Update the timestep for solvers that support adaptive timestepping
+        // (electrostatic and theta-implicit EM), provided const_dt is not specified.
+        if (m_dt_update_interval.contains(step+1)) {
             if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
