@@ -855,6 +855,9 @@ PEC_Insulator::ZeroParallelScalarInConductor (
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   S, E_like, S_nodal, is_insulator, is_normal_to_boundary,
                                                   field_value, set_S, only_zero_parallel_field);
+=======
+                                                  field_value, set_Fz, only_zero_parallel_conductor);
+>>>>>>> 33d732941 (add particle orbit cropping routines.)
                     }
                 );
             }
