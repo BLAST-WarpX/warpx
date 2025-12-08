@@ -6,18 +6,12 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-#module load gpu
-#module load PrgEnv-gnu
-#module load craype
-#module load craype-x86-milan
-#module load craype-accel-nvidia80
-#module load cudatoolkit
-#module load cmake/3.30.2
 module load openmpi/v4.1.6
 
 # missing modules installed here
-export SW_DIR=/sdf/group/${proj}/${USER}/sw/warpx/s3df/gpu
-#export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
+# missing modules installed here
+export WORK="/sdf/group/${proj}/${USER}"
+export SW_DIR="${WORK}/sw/warpx/s3df/gpu"
 
 # cmake
 export PATH=${SW_DIR}/cmake-4.1.2/bin:$PATH
@@ -43,9 +37,6 @@ export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 # optional: CCache
 export PATH=${SW_DIR}/ccache-4.10.2:$PATH
 
-# optional: for Python bindings or libEnsemble
-#module load cray-python/3.11.5
-
 if [ -d "${SW_DIR}/venvs/warpx-gpu" ]
 then
   source ${SW_DIR}/venvs/warpx-gpu/bin/activate
@@ -63,15 +54,3 @@ export CRAY_ACCEL_TARGET=nvidia80
 
 # optimize CUDA compilation for A100
 export AMREX_CUDA_ARCH=8.0
-
-# optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
-# note: the cc/CC/ftn wrappers below add those
-#export CXXFLAGS="-march=znver3"
-#export CFLAGS="-march=znver3"
-
-# compiler environment hints
-#export CC=cc
-#export CXX=CC
-#export FC=ftn
-#export CUDACXX=$(which nvcc)
-#export CUDAHOSTCXX=CC
