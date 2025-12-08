@@ -1,47 +1,29 @@
 #!/bin/bash -l
 
-# Copyright 2021-2023 Axel Huebl, Kevin Gott
+# Copyright 2025 Peter Kicsiny
 #
 # This file is part of WarpX.
 #
 # License: BSD-3-Clause-LBNL
 
-#SBATCH -t 00:10:00
-#SBATCH -N 2
-#SBATCH -J WarpX
-#    note: <proj> must end on _g
-#SBATCH -A <proj>
-#SBATCH -q regular
-# A100 40GB (most nodes)
-#SBATCH -C gpu
-# A100 80GB (256 nodes)
-#S BATCH -C gpu&hbm80g
-#SBATCH --exclusive
-#SBATCH --cpus-per-task=32
-# ideally single:1, but NERSC cgroups issue
-#SBATCH --gpu-bind=none
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-node=4
-#SBATCH -o WarpX.o%j
-#SBATCH -e WarpX.e%j
+#SBATCH --partition=ampere
+#SBATCH --account=facet
+#SBATCH -N 1 # --nodes= number of nodes
+#SBATCH --gres=gpu:1 # request a GPU
+#SBATCH -t 00:10:00 # --time= walltime
+#SBATCH -J WarpX # --job-name= name of job
+#SBATCH --qos=preemptable # queue
+#SBATCH -o WarpX.o%j # --output= stdout
+#SBATCH -e WarpX.e%j # --error= stderr
 
 # executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs
+EXE=./warpx.3d.MPI.CUDA.DP.PDP.OPMD.FFT.EB.QED.GENQEDTABLES
+INPUTS=input_simple.txt
 
-# pin to closest NIC to GPU
-export MPICH_OFI_NIC_POLICY=GPU
+command="module load openmpi/v4.1.6"
+echo ${command}
+${command}
 
-# threads for OpenMP and threaded compressors per MPI rank
-#   note: 16 avoids hyperthreading (32 virtual cores, 16 physical)
-export OMP_NUM_THREADS=16
-
-# GPU-aware MPI optimizations
-GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
-
-# CUDA visible devices are ordered inverse to local task IDs
-#   Reference: nvidia-smi topo -m
-srun --cpu-bind=cores bash -c "
-    export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
-    ${EXE} ${INPUTS} ${GPU_AWARE_MPI}" \
-  > output.txt
+command="srun ${EXE} ${INPUTS}"
+echo ${command}
+${command}
