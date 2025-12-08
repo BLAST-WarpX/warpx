@@ -90,6 +90,25 @@ public:
                                        int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios);
 
     /**
+     * \brief Zeros the scalar on the boundary
+     *        When the E field is being set, the scalar is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the scalar is zeroed only in the conductor.
+     *
+     * \param[in,out] scalar
+     * \param[in]     field_boundary_lo   lower field boundary conditions
+     * \param[in]     field_boundary_hi   upper field boundary conditions
+     * \param[in]     geom                geometry object of level "lev"
+     * \param[in]     lev                 level of the Multifab
+     * \param[in]     patch_type          coarse or fine
+     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     */
+    void ZeroParallelScalarInConductor (amrex::MultiFab* scalar,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+                                        amrex::Geometry const & geom, int lev, PatchType patch_type,
+                                        amrex::Vector<amrex::IntVect> const & ref_ratios);
+
+    /**
      * \brief The work routine applying the boundary condition
      *
      * \param[in,out] field

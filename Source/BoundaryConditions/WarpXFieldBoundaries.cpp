@@ -268,6 +268,12 @@ void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
             particle_boundary_lo, particle_boundary_hi,
             Geom(lev), lev, patch_type, ref_ratio);
     }
+
+    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+        pec_insulator_boundary->ZeroParallelScalarInConductor(rho,
+            field_boundary_lo, field_boundary_hi,
+            Geom(lev), lev, patch_type, ref_ratio);
+    }
 }
 
 void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,

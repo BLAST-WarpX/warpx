@@ -744,3 +744,108 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
         }
     }
 }
+
+void
+PEC_Insulator::ZeroParallelScalarInConductor (
+    amrex::MultiFab* scalar,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+    amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+    amrex::Geometry const & geom,
+    int lev,
+    PatchType patch_type,
+    amrex::Vector<amrex::IntVect> const & ref_ratios)
+{
+    using namespace amrex::literals;
+    amrex::Box domain_box = geom.Domain();
+    if (patch_type == PatchType::coarse && (lev > 0)) {
+        domain_box.coarsen(ref_ratios[lev-1]);
+    }
+    amrex::IntVect const domain_lo = domain_box.smallEnd();
+    amrex::IntVect const domain_hi = domain_box.bigEnd();
+
+    amrex::IntVect const S_nodal = scalar->ixType().toIntVect();
+
+    // Apply boundary condition to ncomponents
+    int const nComp = scalar->nComp();
+
+    std::array<amrex::Real,3> const & dx = WarpX::CellSize(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include transverse ghost cells prior to the reflection.
+    // Tiling is problematic because neighboring tiles will have overlapping boxes
+    // in the direction transverse to the boundary, thereby reflecting the value multiple
+    // times in the overlapping region.
+    for (amrex::MFIter mfi(*scalar, false); mfi.isValid(); ++mfi) {
+        // Extract scalar data
+        amrex::Array4<amrex::Real> const & S = scalar->array(mfi);
+
+        // Get nodal box that does not include ghost cells
+        amrex::Box const & valid_box = mfi.validbox();
+        amrex::Box const node_box = amrex::convert(valid_box, amrex::IntVect::TheNodeVector());
+
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(valid_box, lev, 0._rt);
+        amrex::IntVect const lo = valid_box.smallEnd();
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+
+            if (!(field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) &&
+                !(field_boundary_hi[idim] == FieldBoundaryType::PECInsulator)) { continue; }
+
+            if ( (node_box.smallEnd()[idim] > domain_lo[idim]) &&
+                 (node_box.bigEnd()[idim] < domain_hi[idim]) ) { continue; }
+
+            // Extract tilebox for which to loop.
+            // Does not include guard cells.
+            amrex::Box tbox = mfi.tilebox(scalar->ixType().toIntVect());
+
+            // Loop over sides, iside = -1 (lo), iside = +1 (hi)
+            for (int iside = -1; iside <= +1; iside += 2) {
+
+                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PECInsulator)) ||
+                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PECInsulator))) { continue; }
+
+                if ((iside == -1 && (node_box.smallEnd()[idim] > domain_lo[idim])) ||
+                    (iside == +1 && (node_box.bigEnd()[idim] < domain_hi[idim]))) { continue; }
+
+                amrex::Box tbox_boundary = tbox;
+
+                // Shrink the box to only include the boundary cells
+                if (iside == -1) {
+                    tbox_boundary.setBig(idim, node_box.smallEnd(idim));
+                } else {
+                    tbox_boundary.setSmall(idim, node_box.bigEnd(idim));
+                }
+
+                bool const set_S = ( (iside == -1) ? m_set_E_lo[idim] : m_set_E_hi[idim]);
+
+                amrex::ParserExecutor<2> const & area_parser = ( (iside == -1) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim]);
+
+                // loop over cells and update the scalar
+                amrex::ParallelFor(
+                    tbox_boundary, nComp,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
+                        amrex::ignore_unused(j, k);
+
+                        amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
+
+                        amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, S_nodal);
+                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+
+                        bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
+
+                        bool const E_like = false;
+                        bool const is_normal_to_boundary = false;
+                        amrex::Real const field_value = 0.;
+                        bool const only_zero_parallel_field = true;
+                        ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
+                                                  S, E_like, S_nodal, is_insulator, is_normal_to_boundary,
+                                                  field_value, set_S, only_zero_parallel_field);
+                    }
+                );
+            }
+        }
+    }
+}
