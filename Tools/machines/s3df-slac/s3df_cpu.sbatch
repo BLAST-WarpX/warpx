@@ -1,41 +1,35 @@
 #!/bin/bash -l
 
-# Copyright 2021-2023 WarpX
+# Copyright 2025 Peter Kicsiny
 #
 # This file is part of WarpX.
 #
-# Authors: Axel Huebl
 # License: BSD-3-Clause-LBNL
 
-#SBATCH -t 00:10:00
-#SBATCH -N 2
-#SBATCH -J WarpX
-#SBATCH -A <proj>
-#SBATCH -q regular
-#SBATCH -C cpu
-# 8 cores per chiplet, 2x SMP
-#SBATCH --cpus-per-task=16
-#SBATCH --ntasks-per-node=16
-#SBATCH --exclusive
-#SBATCH -o WarpX.o%j
-#SBATCH -e WarpX.e%j
+#SBATCH --partition=milano
+#SBATCH --account=facet
+#SBATCH -N 2 # --nodes= number of nodes
+#SBATCH -n 2 # --ntasks= number of MPI processes or tasks in total
+#SBATCH -c 4 # --cpus-per-task= number of CPU cores (threads) per task
+#SBATCH -t 00:10:00 # --time= walltime
+#SBATCH -J WarpX # --job-name= name of job
+#SBATCH --qos=preemptable # queue
+#SBATCH -o WarpX.o%j # --output= stdout
+#SBATCH -e WarpX.e%j # --error= stderr
 
 # executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs_small
-
-# each CPU node on Perlmutter (NERSC) has 64 hardware cores with
-# 2x Hyperthreading/SMP
-# https://en.wikichip.org/wiki/amd/epyc/7763
-# https://www.amd.com/en/products/cpu/amd-epyc-7763
-# Each CPU is made up of 8 chiplets, each sharing 32MB L3 cache.
-# This will be our MPI rank assignment (2x8 is 16 ranks/node).
+EXE=./warpx.3d.MPI.OMP.DP.PDP.OPMD.FFT.EB.QED
+INPUTS=input_simple.txt
 
 # threads for OpenMP and threaded compressors per MPI rank
 export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK} # -c 4 so 4 threads per MPI rank
 
-srun --cpu-bind=cores \
-  ${EXE} ${INPUTS} \
-  > output.txt
+command="module load openmpi/v4.1.6"
+echo ${command}
+${command}
+
+command="mpirun -np ${SLURM_NTASKS} ${EXE} ${INPUTS}"
+echo ${command}
+${command}
