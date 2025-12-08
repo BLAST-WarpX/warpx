@@ -38,11 +38,25 @@ It is recommended that you install WarpX in your project directory instead of yo
 
    cd /sdf/group/projectname/username
 
-Here replace ``projectname`` with your project e.g. ``facet``, and ``username`` with your s3df user name. It makes sense to export this path for frequent use:
+Here replace ``projectname`` with your project e.g. ``facet``, and ``username`` with your s3df user name. It makes sense to save this path for frequent use by putting it in your ``.bashrc`` file:
+
+.. code-block:: bash
+
+    vi ~/.bashrc
+
+Add the following line in this file:
 
 .. code-block:: bash
 
    export WORK="/sdf/group/projectname/username"
+
+Quit the file and run it:
+
+.. code-block:: bash
+
+    source ~/.bashrc
+
+Like this the ``WORK`` variable will be automatically set at every login.
 
 Use the following command to download the WarpX source code:
 
@@ -87,7 +101,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
          Now, and as the first step on future logins to Perlmutter, activate these environment settings:
 
          .. code-block:: bash
-
+            cd $WORK
             source $WORK/s3df_gpu_warpx.profile
 
       Finally, since Perlmutter does not yet provide software modules for some of our dependencies, install them once:
