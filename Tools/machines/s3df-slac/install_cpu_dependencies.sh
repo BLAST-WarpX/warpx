@@ -31,8 +31,7 @@ fi
 
 # Remove old dependencies #####################################################
 #
-#SW_DIR="${HOME}/sw/warpx/s3df/cpu"
-SW_DIR="/sdf/group/${proj}/${USER}/sw/warpx/s3df/cpu"
+SW_DIR="${WORK}/sw/warpx/s3df/cpu"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -48,7 +47,7 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # build parallelism
 PARALLEL=16
 
-# tmpfs build directory: avoids issues often seen with $HOME and is faster
+# tmpfs build directory: avoids issues often seen with $WORK and is faster
 build_dir=$(mktemp -d)
 
 # cmake
@@ -72,94 +71,93 @@ rm -rf ccache.tar.xz
 
 # Boost (QED tables)
 echo "installing boost..."
-rm -rf $HOME/src/boost-temp
-mkdir -p $HOME/src/boost-temp
-curl -Lo $HOME/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.82.0/source/boost_1_82_0.tar.gz
-tar -xzf $HOME/src/boost-temp/boost.tar.gz -C $HOME/src/boost-temp
-cd $HOME/src/boost-temp/boost_1_82_0
+rm -rf $WORK/src/boost-temp
+mkdir -p $WORK/src/boost-temp
+curl -Lo $WORK/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.82.0/source/boost_1_82_0.tar.gz
+tar -xzf $WORK/src/boost-temp/boost.tar.gz -C $WORK/src/boost-temp
+cd $WORK/src/boost-temp/boost_1_82_0
 ./bootstrap.sh --with-libraries=math --prefix=${SW_DIR}/boost-1.82.0
 ./b2 cxxflags="-std=c++17" install -j ${PARALLEL}
 cd -
-rm -rf $HOME/src/boost-temp
+rm -rf $WORK/src/boost-temp
 
 # c-blosc (I/O compression)
 echo "installing c-blosc"
-if [ -d $HOME/src/c-blosc ]
+if [ -d $WORK/src/c-blosc ]
 then
-  cd $HOME/src/c-blosc
+  cd $WORK/src/c-blosc
   git fetch --prune
   git checkout v1.21.1
   cd -
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $HOME/src/c-blosc
+  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $WORK/src/c-blosc
 fi
-rm -rf $HOME/src/c-blosc-pm-cpu-build
-cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-cpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+rm -rf $WORK/src/c-blosc-pm-cpu-build
+cmake -S $WORK/src/c-blosc -B ${build_dir}/c-blosc-pm-cpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build ${build_dir}/c-blosc-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/c-blosc-pm-cpu-build
 
 # ADIOS2
 echo "installing adios2..."
-if [ -d $HOME/src/adios2 ]
+if [ -d $WORK/src/adios2 ]
 then
-  cd $HOME/src/adios2
+  cd $WORK/src/adios2
   git fetch --prune
   git checkout v2.10.2
   cd -
 else
-  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $WORK/src/adios2
 fi
-rm -rf $HOME/src/adios2-pm-cpu-build
-cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-cpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_CUDA=OFF -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
+rm -rf $WORK/src/adios2-pm-cpu-build
+cmake -S $WORK/src/adios2 -B ${build_dir}/adios2-pm-cpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_CUDA=OFF -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake --build ${build_dir}/adios2-pm-cpu-build --target install -j ${PARALLEL}
 rm -rf ${build_dir}/adios2-pm-cpu-build
 
 # OPENBLAS
 echo "installing openblas..."
-if [ -d $HOME/src/openblas ]
+if [ -d $WORK/src/openblas ]
 then
-  cd $HOME/src/openblas
+  cd $WORK/src/openblas
   git fetch --prune
   git checkout v0.3.30
   cd -
 else
-  git clone -b v0.3.30 https://github.com/xianyi/OpenBLAS.git $HOME/src/openblas
+  git clone -b v0.3.30 https://github.com/xianyi/OpenBLAS.git $WORK/src/openblas
 fi
-rm -rf $HOME/src/openblas-pm-cpu-build
-CXX=$(which CC) cmake -S $HOME/src/openblas -B ${build_dir}/openblas-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/openblas-0.3.30 -DBUILD_SHARED_LIBS=ON
+rm -rf $WORK/src/openblas-pm-cpu-build
+CXX=$(which CC) cmake -S $WORK/src/openblas -B ${build_dir}/openblas-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/openblas-0.3.30 -DBUILD_SHARED_LIBS=ON
 cmake --build ${build_dir}/openblas-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/openblas-pm-cpu-build
 
-
 # BLAS++ (for PSATD+RZ)
 echo "installing blas++..."
-if [ -d $HOME/src/blaspp ]
+if [ -d $WORK/src/blaspp ]
 then
-  cd $HOME/src/blaspp
+  cd $WORK/src/blaspp
   git fetch --prune
   git checkout v2024.05.31
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $WORK/src/blaspp
 fi
-rm -rf $HOME/src/blaspp-pm-cpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DBLAS_LIBRARIES=${SW_DIR}/openblas-0.3.30/lib64/libopenblas.so -DBLAS_INCLUDE_DIR=${SW_DIR}/openblas-0.3.30/include
+rm -rf $WORK/src/blaspp-pm-cpu-build
+CXX=$(which CC) cmake -S $WORK/src/blaspp -B ${build_dir}/blaspp-pm-cpu-build -Duse_openmp=ON -Dgpu_backend=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DBLAS_LIBRARIES=${SW_DIR}/openblas-0.3.30/lib64/libopenblas.so -DBLAS_INCLUDE_DIR=${SW_DIR}/openblas-0.3.30/include
 cmake --build ${build_dir}/blaspp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-cpu-build
 
 # LAPACK++ (for PSATD+RZ)
 echo "installing lapack++..."
-if [ -d $HOME/src/lapackpp ]
+if [ -d $WORK/src/lapackpp ]
 then
-  cd $HOME/src/lapackpp
+  cd $WORK/src/lapackpp
   git fetch --prune
   git checkout v2024.05.31
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $WORK/src/lapackpp
 fi
-rm -rf $HOME/src/lapackpp-pm-cpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B ${build_dir}/lapackpp-pm-cpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+rm -rf $WORK/src/lapackpp-pm-cpu-build
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $WORK/src/lapackpp -B ${build_dir}/lapackpp-pm-cpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build ${build_dir}/lapackpp-pm-cpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/lapackpp-pm-cpu-build
 
@@ -181,12 +179,12 @@ python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
 python3 -m pip install --upgrade scipy
-MPICC=$(which mpicc) python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
+python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py # this works as openmpi was loaded in profile
 python3 -m pip install --upgrade openpmd-api
 python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies
-python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
+python3 -m pip install --upgrade -r $WORK/src/warpx/requirements.txt
 # optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cpu
 python3 -m pip install --upgrade optimas[all]
