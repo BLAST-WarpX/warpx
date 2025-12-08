@@ -10,7 +10,8 @@
 
 #include "Utils/TextMsg.H"
 
-#include "ablastr/qed/SchwingerProcess.H"
+#include <ablastr/sfqed/SchwingerProcess.H>
+
 
 /**
  * This structure is a functor which calls ablastr::qed::schwinger::get_schwinger_pair_number to

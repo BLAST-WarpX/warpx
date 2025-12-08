@@ -20,7 +20,7 @@
 #define ABLASTR_QED_SCHWINGER_PROCESS
 
 #include "ablastr/constant.H"
-#include "ablastr/qed/UnitConversion.H"
+#include "ablastr/sfqed/UnitConversion.H"
 
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Math.H>
