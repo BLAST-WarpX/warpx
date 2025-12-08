@@ -12,6 +12,10 @@
 
 #include <ablastr/sfqed/SchwingerProcess.H>
 
+#include <AMReX.H>
+#include <AMReX_RandomEngine.H>
+#include <AMReX_REAL.H>
+
 
 /**
  * This structure is a functor which calls ablastr::qed::schwinger::get_schwinger_pair_number to
