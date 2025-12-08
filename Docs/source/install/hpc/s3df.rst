@@ -310,7 +310,7 @@ The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (
         
         .. _running-s3df-run:
 
-        Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it with ``sbatch submit_gpu.sh``.
+        Alternatively you can create a bash submission script ``submit_gpu.sh`` with the content shown below and launch it with ``sbatch submit_gpu.sh``.
         
         .. code-block:: bash
         
@@ -322,7 +322,7 @@ The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (
             #
             # License: BSD-3-Clause-LBNL
             
-            #SBATCH --partition=milano
+            #SBATCH --partition=ampere
             #SBATCH --account=facet
             #SBATCH -N 1 # --nodes= number of nodes
             #SBATCH --gres=gpu:1 # request a GPU
@@ -367,7 +367,7 @@ The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (
         
         .. _running-s3df-run:
 
-        Alternatively you can create a bash submission script ``submit.sh`` with the content shown below and launch it like ``sbatch submit_cpu.sh``.
+        Alternatively you can create a bash submission script ``submit_cpu.sh`` with the content shown below and launch it like ``sbatch submit_cpu.sh``.
         
         .. code-block:: bash
         
