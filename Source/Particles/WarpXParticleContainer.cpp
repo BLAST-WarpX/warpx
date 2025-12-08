@@ -222,7 +222,9 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 
     using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
     PinnedTile pinned_tile;
-    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps());
+    auto soa_rdata_names = GetRealSoANames();
+    auto soa_idata_names = GetIntSoANames();
+    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names);
 
     const std::size_t np = iend-ibegin;
 
