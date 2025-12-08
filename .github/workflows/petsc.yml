@@ -24,6 +24,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
+      PETSC_ARCH: arch-opt
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -46,23 +47,18 @@ jobs:
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-        export warpx_dir=${PWD}
-        export PETSC_DIR=${warpx_dir}/petsc
-        export PETSC_ARCH=arch-opt
         # clone and configure PETSc
-        cd ${warpx_dir}
         git clone -b release https://gitlab.com/petsc/petsc.git petsc
-        cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no --with-mpi=0 --with-debugging=1
+        cd petsc
+        ./configure --prefix=/usr --with-fortran-bindings=no --with-x=no --with-mpi=0 --with-debugging=0
         make -j 4
+        sudo make install
+        cd -
         # configure WarpX
-        cd ${warpx_dir}
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="1;2;RZ;3"      \
           -DAMReX_PETSC=YES            \
-          -DPETSC_DIR=${PETSC_DIR}     \
-          -DPETSC_ARCH=${PETSC_ARCH}   \
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
@@ -78,6 +74,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
+      PETSC_ARCH: arch-opt
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
@@ -100,23 +97,18 @@ jobs:
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
-        export warpx_dir=${PWD}
-        export PETSC_DIR=${warpx_dir}/petsc
-        export PETSC_ARCH=arch-opt
         # clone and configure PETSc
-        cd ${warpx_dir}
         git clone -b release https://gitlab.com/petsc/petsc.git petsc
-        cd ${PETSC_DIR}
-        ./configure --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx --with-debugging=1
+        cd petsc
+        ./configure --prefix=/usr --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx --with-debugging=0
         make -j 4
+        sudo make install
+        cd -
         # configure WarpX
-        cd ${warpx_dir}
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="1;2;RZ;3"      \
           -DAMReX_PETSC=YES            \
-          -DPETSC_DIR=${PETSC_DIR}     \
-          -DPETSC_ARCH=${PETSC_ARCH}   \
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=ON               \
           -DWarpX_QED=OFF
