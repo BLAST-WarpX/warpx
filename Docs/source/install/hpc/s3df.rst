@@ -297,7 +297,7 @@ The ``iana`` pool gives access to 4 servers, 40 HT cores and 384 GB per server (
 
         .. code-block:: bash
         
-            srun --partition <partitionname> --account <accountname> -N 2 -n 2 -c 4 --gres=gpu:1 --time=01:00:00 --pty /bin/bash
+            srun --partition <partitionname> --account <accountname> -N 1 --gres=gpu:1 --time=01:00:00 --pty /bin/bash
         
         .. _running-s3df-terminal:
 
