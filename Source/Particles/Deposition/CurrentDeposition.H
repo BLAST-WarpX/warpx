@@ -665,8 +665,6 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  *                          the time of the deposition.
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
- * \param domain       The domain box
- * \param is_absorbing Whether each boundary is absorbing
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
@@ -689,8 +687,6 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Real relative_time,
                                   const amrex::XDim3 & dinv,
                                   const amrex::XDim3 & xyzmin,
-                                  const amrex::Box & domain,
-                                  const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                   amrex::Dim3 lo,
                                   amrex::Real q,
                                   [[maybe_unused]] int n_rz_azimuthal_modes,
@@ -805,27 +801,6 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // Keep these double to avoid bug in single precision
             double z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
-#endif
-
-            // Crop the particles at the boundaries if it is absorbing.
-            // Calculate the change in the length of the trajectory
-            // so that the time step size can be appropriately scaled.
-#if defined(WARPX_DIM_3D)
-            ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                            domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-            ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                            domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
-            ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                            domain.smallEnd(2) - lo.z, domain.bigEnd(2) - lo.z, is_absorbing[2]);
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                            domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-            ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                            domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
-#elif defined(WARPX_DIM_1D_Z)
-            ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
 #endif
 
             // Check whether the particle is close to the EB at the old and new position
