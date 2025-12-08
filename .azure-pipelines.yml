@@ -44,10 +44,7 @@ jobs:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cartesian 2D
       cartesian_2d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
-      # Cartesian 2D with PETSc
-      cartesian_petsc_2d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=OFF -DWarpX_PYTHON=ON -DAMReX_PETSC=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 3D
       cartesian_3d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
@@ -112,8 +109,7 @@ jobs:
       #    -DopenPMD_USE_PYTHON=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_CLI_TOOLS=OFF
       #  #python3 -m pip install --upgrade openpmd-api
       #fi
-      if [ "${AMReX_PETSC:-OFF}" == "ON" ]; then
-         # clone and configure PETSc
+      if [[ "${WARPX_CMAKE_FLAGS}" == *"-DWarpX_PETSC=ON"* ]]; then
          git clone --depth 1 --shallow-submodules -b release https://gitlab.com/petsc/petsc.git petsc
          cd petsc
          ./configure --prefix=/usr --with-fortran-bindings=no --with-x=no --with-cc="ccache mpicc" --with-fc="ccache mpif90" --with-cxx="ccache mpicxx" --with-debugging=0 --download-superlu --download-superlu_dist
