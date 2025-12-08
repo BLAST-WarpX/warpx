@@ -254,7 +254,7 @@ namespace ParticleUtils {
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double & x1,
-                          int xmin, int xmax, amrex::GpuArray<bool,2> const& check) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& check) {
         if (check[0] && x1 < xmin) {
             x1 = xmin;
         }
@@ -273,7 +273,7 @@ namespace ParticleUtils {
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double x0, double z0,
                           double & x1, double & z1,
-                          int xmin, int xmax, amrex::GpuArray<bool,2> const& check) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& check) {
         if (check[0] && x1 < xmin) {
             double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
@@ -296,7 +296,7 @@ namespace ParticleUtils {
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double x0, double y0, double z0,
                           double & x1, double & y1, double & z1,
-                          int xmin, int xmax, amrex::GpuArray<bool,2> const& check) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& check) {
         if (check[0] && x1 < xmin) {
             double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;

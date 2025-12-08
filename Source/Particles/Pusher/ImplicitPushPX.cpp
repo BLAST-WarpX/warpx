@@ -100,7 +100,7 @@ namespace {
         amrex::IndexType const & bz_type,
         amrex::XDim3 const & dinv,
         amrex::XDim3 const & xyzmin,
-        amrex::Box const & domain_box,
+        amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double,
         amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> const & is_absorbing,
         amrex::Dim3 const & lo,
         int const & n_rz_azimuthal_modes,
@@ -165,7 +165,7 @@ namespace {
                 doGatherShapeNImplicit(xp_n, yp_n, zp_n, xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                        ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                       dinv, xyzmin, domain_box, is_absorbing, lo, n_rz_azimuthal_modes,
+                                       dinv, xyzmin, domain_double, is_absorbing, lo, n_rz_azimuthal_modes,
                                        depos_order, depos_type);
             }
 
@@ -449,6 +449,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
+    amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         is_absorbing[idim][0] = m_crop_on_PEC_boundary &&
                                 (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
@@ -458,6 +459,9 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                 (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+
+        domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - box.smallEnd(idim));
+        domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - box.smallEnd(idim));
     }
 
     const auto depos_type = WarpX::current_deposition_algo;
@@ -606,7 +610,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              Bxp, Byp, Bzp,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                             dinv, xyzmin, domain_box, is_absorbing, lo, n_rz_azimuthal_modes, depos_order, depos_type,
+                             dinv, xyzmin, domain_double, is_absorbing, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                              getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                              , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
@@ -768,6 +772,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
     amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
+    amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
         is_absorbing[idim][0] = m_crop_on_PEC_boundary &&
                                 (box.smallEnd(idim) <= domain_box.smallEnd(idim) &&
@@ -777,6 +782,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                 (box.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+
+        domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - box.smallEnd(idim));
+        domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - box.smallEnd(idim));
     }
 
     const int depos_order = WarpX::nox;
@@ -992,7 +1000,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  Bxp, Byp, Bzp,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                 dinv, xyzmin, domain_box, is_absorbing, lo, n_rz_azimuthal_modes, depos_order, depos_type,
+                                 dinv, xyzmin, domain_double, is_absorbing, lo, n_rz_azimuthal_modes, depos_order, depos_type,
                                  getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
                                  , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
@@ -1096,25 +1104,25 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                         VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_box, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                            dt_suborbit, dinv, xyzmin, domain_double, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_two) {
                         VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_box, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                            dt_suborbit, dinv, xyzmin, domain_double, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_three) {
                         VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_box, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                            dt_suborbit, dinv, xyzmin, domain_double, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
                     }
                     else if constexpr (depos_order_control == order_four) {
                         VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
                                                             ux[ip], uy[ip], uz[ip], gaminv,
                                                             Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_box, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                            dt_suborbit, dinv, xyzmin, domain_double, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
                     }
                 }
             }

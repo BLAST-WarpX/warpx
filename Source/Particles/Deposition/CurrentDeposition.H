@@ -1107,7 +1107,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param dt           Time step for particle level
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
- * \param domain       The domain box
+ * \param domain_double The domain boundary indicies cast to double values
  * \param is_absorbing Whether each boundary is absorbing
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
@@ -1133,7 +1133,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::Real dt,
                                                  const amrex::XDim3 & dinv,
                                                  const amrex::XDim3 & xyzmin,
-                                                 const amrex::Box & domain,
+                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain,
                                                  const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                                  const amrex::Dim3 lo,
                                                  const amrex::Real q,
@@ -1274,20 +1274,20 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             // so that the time step size can be appropriately scaled.
 #if defined(WARPX_DIM_3D)
             ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                            domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+                                            domain[0][0], domain[0][1], is_absorbing[0]);
             ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                            domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+                                            domain[1][0], domain[1][1], is_absorbing[1]);
             ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                            domain.smallEnd(2) - lo.z, domain.bigEnd(2) - lo.z, is_absorbing[2]);
+                                            domain[2][0], domain[2][1], is_absorbing[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                            domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+                                            domain[0][0], domain[0][1], is_absorbing[0]);
             ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                            domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+                                            domain[1][0], domain[1][1], is_absorbing[1]);
 #elif defined(WARPX_DIM_1D_Z)
-            ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(z_new, domain[0][0], domain[0][1], is_absorbing[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(x_new, domain[0][0], domain[0][1], is_absorbing[0]);
 #endif
 
             // --- Compute shape factors
@@ -1488,7 +1488,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain
- * \param domain                The domain box
+ * \param domain_double         The domain boundary indicies cast to double values
  * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
@@ -1513,7 +1513,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                                        amrex::Real const dt,
                                        amrex::XDim3 const & dinv,
                                        amrex::XDim3 const & xyzmin,
-                                       const amrex::Box & domain,
+                                       const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
                                        const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                        amrex::Dim3 const lo,
                                        amrex::Real const invvol,
@@ -1609,20 +1609,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
 #if defined(WARPX_DIM_3D)
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                    domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+                                    domain_double[0][0], domain_double[0][1], is_absorbing[0]);
     ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                    domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+                                    domain_double[1][0], domain_double[1][1], is_absorbing[1]);
     ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                    domain.smallEnd(2) - lo.z, domain.bigEnd(2) - lo.z, is_absorbing[2]);
+                                    domain_double[2][0], domain_double[2][1], is_absorbing[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                    domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+                                    domain_double[0][0], domain_double[0][1], is_absorbing[0]);
     ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                    domain.smallEnd(1) - lo.y, domain.bigEnd(1) - lo.y, is_absorbing[1]);
+                                    domain_double[1][0], domain_double[1][1], is_absorbing[1]);
 #elif defined(WARPX_DIM_1D_Z)
-    ParticleUtils::crop_at_boundary(z_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], is_absorbing[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    ParticleUtils::crop_at_boundary(x_new, domain.smallEnd(0) - lo.x, domain.bigEnd(0) - lo.x, is_absorbing[0]);
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], is_absorbing[0]);
 #endif
 
     // Define velocity kernals to deposit
@@ -2179,7 +2179,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
- * \param domain                The domain box
+ * \param domain_double         The domain boundary indicies cast to double values
  * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
@@ -2200,7 +2200,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::Real relative_time,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
-                                           const amrex::Box & domain,
+                                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
                                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
@@ -2243,7 +2243,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
             VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp[ip], uyp[ip], uzp[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                          dt, dinv, xyzmin, domain_double, is_absorbing,
+                                                          lo, invvol, n_rz_azimuthal_modes);
 
     });
 }
@@ -2270,7 +2271,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
- * \param domain                The domain box
+ * \param domain_double         The domain boundary indicies cast to double values
  * \param is_absorbing          Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
@@ -2296,7 +2297,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
-                                           const amrex::Box & domain,
+                                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
                                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
@@ -2348,7 +2349,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain, is_absorbing, lo, invvol, n_rz_azimuthal_modes);
+                                                          dt, dinv, xyzmin, domain_double, is_absorbing,
+                                                          lo, invvol, n_rz_azimuthal_modes);
 
     });
 }
