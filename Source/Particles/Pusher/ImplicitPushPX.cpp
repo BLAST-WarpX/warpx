@@ -1050,7 +1050,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, lo );
+                                                              dt_suborbit, dinv, xyzmin, domain_double, is_cropping, lo );
                     } else if constexpr (depos_order_control == order_two) {
                         doVillasenorJandSigmaDepositionKernel<2,false>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
@@ -1063,7 +1063,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, lo );
+                                                              dt_suborbit, dinv, xyzmin, domain_double, is_cropping, lo );
                     } else if constexpr (depos_order_control == order_three) {
                         doVillasenorJandSigmaDepositionKernel<3,false>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
@@ -1076,7 +1076,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, lo );
+                                                              dt_suborbit, dinv, xyzmin, domain_double, is_cropping, lo );
                     } else if constexpr (depos_order_control == order_four) {
                         doVillasenorJandSigmaDepositionKernel<4,false>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
@@ -1089,7 +1089,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, lo );
+                                                              dt_suborbit, dinv, xyzmin, domain_double, is_cropping, lo );
                     }
 
                 } else {

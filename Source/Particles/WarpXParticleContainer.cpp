@@ -1135,6 +1135,30 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     // Take into account Galilean shift
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.5_rt*dt);
 
+    amrex::Box domain_box = warpx.Geom(depos_lev).Domain();
+
+    // Make sure that domain_box includes the upper boundary node
+    domain_box.surroundingNodes();
+
+    auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
+    auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
+
+    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_cropping;
+    amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
+    for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+        is_cropping[idim][0] = m_crop_on_PEC_boundary &&
+                                (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
+                                 (field_boundary_lo[idim] == FieldBoundaryType::PEC
+                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
+        is_cropping[idim][1] = m_crop_on_PEC_boundary &&
+                                (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
+                                 (field_boundary_hi[idim] == FieldBoundaryType::PEC
+                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+
+        domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - tilebox.smallEnd(idim));
+        domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - tilebox.smallEnd(idim));
+    }
+
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
         WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
         WARPX_ABORT_WITH_MESSAGE("mass matrices cannot be used with Esirkepov or Vay depositions.");
@@ -1197,7 +1221,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 1 && full_mass_matrices){
             doVillasenorJandSigmaDeposition<1,true>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1209,7 +1233,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices){
             doVillasenorJandSigmaDeposition<2,false>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1221,7 +1245,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices){
             doVillasenorJandSigmaDeposition<2,true>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1233,7 +1257,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices){
             doVillasenorJandSigmaDeposition<3,false>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1245,7 +1269,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices){
             doVillasenorJandSigmaDeposition<3,true>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1257,7 +1281,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices){
             doVillasenorJandSigmaDeposition<4,false>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1269,7 +1293,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices){
             doVillasenorJandSigmaDeposition<4,true>(
                 xp_n_data, yp_n_data, zp_n_data,
@@ -1281,7 +1305,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
                 Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
-                np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
+                np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, qs, mass);
         }
     } else { // Direct deposition
         if        (WarpX::nox == 1){
