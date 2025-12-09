@@ -68,6 +68,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
+        bool bse = primary.has_bhabha_beam_size_effect();
 
         // Minimum allowed energy of the virtual photons
         amrex::Real vphoton_min_energy;
@@ -231,6 +232,11 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         // Energy of the virtual photon
                         amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
 
+                        // virtuality Q2 = -q2 = -t of the photon [eV^2]
+                        amrex::ParticleReal Q2_max = PhysConst::m_e * PhysConst::m_e / (PhysConst::q_e * PhysConst::q_e) * std::pow(PhysConst::c, 4); // [eV^2]   
+                        amrex::ParticleReal Q2_min = frac_energy * frac_energy * Q2_max; // [eV^2]
+                        amrex::ParticleReal vphoton_Q2 = Q2_min * std::pow(Q2_max / Q2_min, amrex::Random(engine)); // [eV^2]
+
                         // Photon index for the current primary
                         amrex::Long ip = offset_vp_data[i] + j;
                         pa_vp[PIdx::ux][ip] = vphoton_energy * nx; // will be multiplied by m_e before dumping the outputs
@@ -261,7 +267,20 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 #endif
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
                         pid_vp[ip] = amrex::SetParticleIDandCPU(pid_start + ip, cpuid);
-                    }
+
+			if (bse){ // need q2 here
+                            amrex::ParticleReal theta = 2.0 * MathConst::pi * amrex::Random(engine);
+                            amrex::ParticleReal cos_theta = std::cos(theta);
+                            amrex::ParticleReal sin_theta = std::sin(theta);
+                            amrex::ParticleReal radius = PhysConst::hbar / PhysConst::q_e * PhysConst::c / std::sqrt(vphoton_Q2 * (1 - frac_energy));
+                            radius = std::min(radius, 1e5); // [m]
+
+                            std::cout << "x: " << x << ", y: " << y << ", r: " << radius << ", q2: " << vphoton_Q2 << ", e: " << frac_energy <<
+                                    ", xnew: "<< x + cos_theta * radius << ", ynew: " << y + sin_theta * radius << std::endl;
+                            pa_vp[PIdx::x][ip] += cos_theta * radius;
+                            pa_vp[PIdx::y][ip] += sin_theta * radius;
+                        } // bse
+                    } // vphoton loop
                 });
             } // mfi
         } // lev
