@@ -656,7 +656,7 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   Physical lower bounds of domain
  * \param domain_double            The domain boundary indicies cast to double values
- * \param is_cropping              Whether to crop particle orbits at domain boundaries
+ * \param do_cropping              Whether to crop particle orbits at domain boundaries
  * \param lo                       Index lower bounds of domain
  */
 template <int depos_order, bool full_mass_matrices>
@@ -698,7 +698,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                                              const amrex::XDim3& dinv,
                                              const amrex::XDim3& xyzmin,
                                              const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                             const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                             const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                              const amrex::Dim3 lo )
 {
 
@@ -793,20 +793,20 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     // Crop particle orbits at absorbing domain boundaries
 #if defined(WARPX_DIM_3D)
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                    domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
     ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                    domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
     ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                    domain_double[2][0], domain_double[2][1], is_cropping[2]);
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                    domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
     ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                    domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
 #elif defined(WARPX_DIM_1D_Z)
-    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
     // 1) Determine the number of segments.
@@ -1601,7 +1601,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   Physical lower bounds of domain.
  * \param domain_double            The domain boundary indicies cast to double values
- * \param is_cropping              Whether to crop particle orbits at domain boundaries
+ * \param do_cropping              Whether to crop particle orbits at domain boundaries
  * \param lo                       Index lower bounds of domain.
  * \param qs                       Species charge.
  * \param ms                       Species mass.
@@ -1642,7 +1642,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        const amrex::XDim3& dinv,
                                        const amrex::XDim3& xyzmin,
                                        const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                        const amrex::Dim3 lo,
                                        const amrex::Real qs,
                                        const amrex::Real ms )
@@ -1719,7 +1719,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,
                                                                 Szx_arr, Szy_arr, Szz_arr,
-                                                                dt, dinv, xyzmin, domain_double, is_cropping, lo );
+                                                                dt, dinv, xyzmin, domain_double, do_cropping, lo );
 
     });
 }

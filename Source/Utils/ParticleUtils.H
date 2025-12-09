@@ -245,65 +245,65 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
-    /* \brief Crops the position at the specified boundary if is_cropping is true, 1D version
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version
      * \param[in] x0 The initial particle position
      * \param[in/out] x1 The final particle position, with the returned value being cropped
      * \param[in] xmin The lower boundary of the domain in grid units
      * \param[in] xmax The upper boundary of the domain in grid units
-     * \param[in] is_cropping Whether to crop at each of the boundaries
+     * \param[in] do_cropping Whether to crop at each of the boundaries
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double & x1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& is_cropping) {
-        if (is_cropping[0] && x1 < xmin) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
             x1 = xmin;
         }
-        else if (is_cropping[1] && x1 > xmax) {
+        else if (do_cropping[1] && x1 > xmax) {
             x1 = xmax;
         }
     }
 
-    /* \brief Crops the position at the specified boundary if is_cropping is true, 2D version
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 2D version
      * \param[in] x0, z0 The initial particle position
      * \param[in/out] x1, z1 The final particle position, with the returned value being cropped
      * \param[in] xmin The lower boundary of the domain in grid units
      * \param[in] xmax The upper boundary of the domain in grid units
-     * \param[in] is_cropping Whether to crop at each of the boundaries
+     * \param[in] do_cropping Whether to crop at each of the boundaries
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double x0, double z0,
                           double & x1, double & z1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& is_cropping) {
-        if (is_cropping[0] && x1 < xmin) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
             double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             z1 = z0 + fx*(z1 - z0);
         }
-        else if (is_cropping[1] && x1 > xmax) {
+        else if (do_cropping[1] && x1 > xmax) {
             double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             z1 = z0 + fx*(z1 - z0);
         }
     }
 
-    /* \brief Crops the position at the specified boundary if is_cropping is true, 3D version
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 3D version
      * \param[in] x0, y0, z0 The initial particle position
      * \param[in/out] x1, y1, z1 The final particle position, with the returned value being cropped
      * \param[in] xmin The lower boundary of the domain in grid units
      * \param[in] xmax The upper boundary of the domain in grid units
-     * \param[in] is_cropping Whether to crop at each of the boundaries
+     * \param[in] do_cropping Whether to crop at each of the boundaries
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void crop_at_boundary(double x0, double y0, double z0,
                           double & x1, double & y1, double & z1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& is_cropping) {
-        if (is_cropping[0] && x1 < xmin) {
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
             double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);
         }
-        else if (is_cropping[1] && x1 > xmax) {
+        else if (do_cropping[1] && x1 > xmax) {
             double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             y1 = y0 + fx*(y1 - y0);

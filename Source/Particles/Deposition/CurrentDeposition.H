@@ -1108,7 +1108,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
  * \param domain_double The domain boundary indicies cast to double values
- * \param is_cropping  Whether each boundary is absorbing
+ * \param do_cropping   Whether to crop particle orbits at domain boundaries
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
@@ -1134,7 +1134,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::XDim3 & dinv,
                                                  const amrex::XDim3 & xyzmin,
                                                  const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                                 const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                                 const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                                  const amrex::Dim3 lo,
                                                  const amrex::Real q,
                                                  [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -1274,20 +1274,20 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             // so that the time step size can be appropriately scaled.
 #if defined(WARPX_DIM_3D)
             ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                            domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                            domain_double[0][0], domain_double[0][1], do_cropping[0]);
             ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                            domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                            domain_double[1][0], domain_double[1][1], do_cropping[1]);
             ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                            domain_double[2][0], domain_double[2][1], is_cropping[2]);
+                                            domain_double[2][0], domain_double[2][1], do_cropping[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                            domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                            domain_double[0][0], domain_double[0][1], do_cropping[0]);
             ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                            domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                            domain_double[1][0], domain_double[1][1], do_cropping[1]);
 #elif defined(WARPX_DIM_1D_Z)
-            ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+            ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+            ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
             // --- Compute shape factors
@@ -1489,7 +1489,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain
  * \param domain_double         The domain boundary indicies cast to double values
- * \param is_cropping           Whether each boundary is absorbing
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
@@ -1514,7 +1514,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
                                        amrex::XDim3 const & dinv,
                                        amrex::XDim3 const & xyzmin,
                                        const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                        amrex::Dim3 const lo,
                                        amrex::Real const invvol,
                                        [[maybe_unused]] int const n_rz_azimuthal_modes)
@@ -1609,20 +1609,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
 #if defined(WARPX_DIM_3D)
     ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                    domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
     ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                    domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
     ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                    domain_double[2][0], domain_double[2][1], is_cropping[2]);
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                    domain_double[0][0], domain_double[0][1], is_cropping[0]);
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
     ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                    domain_double[1][0], domain_double[1][1], is_cropping[1]);
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
 #elif defined(WARPX_DIM_1D_Z)
-    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], is_cropping[0]);
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
     // Define velocity kernals to deposit
@@ -2180,7 +2180,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
  * \param domain_double         The domain boundary indicies cast to double values
- * \param is_cropping           Whether each boundary is absorbing
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
@@ -2201,7 +2201,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
                                            const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -2243,7 +2243,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
             VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp[ip], uyp[ip], uzp[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain_double, is_cropping,
+                                                          dt, dinv, xyzmin, domain_double, do_cropping,
                                                           lo, invvol, n_rz_azimuthal_modes);
 
     });
@@ -2272,7 +2272,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
  * \param domain_double         The domain boundary indicies cast to double values
- * \param is_cropping           Whether each boundary is absorbing
+ * \param do_cropping           Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
@@ -2298,7 +2298,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
                                            const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_cropping,
+                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -2349,7 +2349,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain_double, is_cropping,
+                                                          dt, dinv, xyzmin, domain_double, do_cropping,
                                                           lo, invvol, n_rz_azimuthal_modes);
 
     });
