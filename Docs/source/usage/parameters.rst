@@ -1488,7 +1488,7 @@ Particle initialization
 
       * ``<virtual_photon_species>.qed_virtual_photons_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
 
-      * ``<virtual_photon_species>.qed_virtual_photon_multiplier`` (`int`), sampling factor for the virtual photons.
+      * ``<virtual_photon_species>.qed_virtual_photons_multiplier`` (`int`), sampling factor for the virtual photons.
         A sampling factor of ``f`` means that the number of virtual photons is multiplied by ``f``, while their weights are divided by ``f``.
 
     The virtual photons can undergo collisions via the linear Breit-Wheeler or linear Compton processes.
