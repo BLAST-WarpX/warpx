@@ -526,14 +526,14 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
     auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
-    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_absorbing;
+    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> is_cropping;
     amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        is_absorbing[idim][0] = m_crop_on_PEC_boundary &&
+        is_cropping[idim][0] = m_crop_on_PEC_boundary &&
                                 (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
                                || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
-        is_absorbing[idim][1] = m_crop_on_PEC_boundary &&
+        is_cropping[idim][1] = m_crop_on_PEC_boundary &&
                                 (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
                                || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
@@ -720,7 +720,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
                     doChargeConservingDepositionShapeNImplicit<2>(
@@ -728,7 +728,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
                     doChargeConservingDepositionShapeNImplicit<3>(
@@ -736,7 +736,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
                     doChargeConservingDepositionShapeNImplicit<4>(
@@ -744,7 +744,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 }
             }
@@ -777,7 +777,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
                     doVillasenorDepositionShapeNImplicit<2>(
@@ -785,7 +785,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
                     doVillasenorDepositionShapeNImplicit<3>(
@@ -793,7 +793,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
                     doVillasenorDepositionShapeNImplicit<4>(
@@ -801,7 +801,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
-                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_absorbing, lo, q,
+                        jx_arr, jy_arr, jz_arr, np_to_deposit, dt, dinv, xyzmin, domain_double, is_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes);
                 }
             }
@@ -811,25 +811,25 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin,
-                        domain_double, is_absorbing, lo, q, WarpX::n_rz_azimuthal_modes);
+                        domain_double, is_cropping, lo, q, WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 2){
                     doVillasenorDepositionShapeNExplicit<2>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin,
-                        domain_double, is_absorbing, lo, q, WarpX::n_rz_azimuthal_modes);
+                        domain_double, is_cropping, lo, q, WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 3){
                     doVillasenorDepositionShapeNExplicit<3>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin,
-                        domain_double, is_absorbing, lo, q, WarpX::n_rz_azimuthal_modes);
+                        domain_double, is_cropping, lo, q, WarpX::n_rz_azimuthal_modes);
                 } else if (WarpX::nox == 4){
                     doVillasenorDepositionShapeNExplicit<4>(
                         GetPosition, wp.dataPtr() + offset,
                         uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
                         jx_arr, jy_arr, jz_arr, np_to_deposit, dt, relative_time, dinv, xyzmin,
-                        domain_double, is_absorbing, lo, q, WarpX::n_rz_azimuthal_modes);
+                        domain_double, is_cropping, lo, q, WarpX::n_rz_azimuthal_modes);
                 }
             }
         } else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
