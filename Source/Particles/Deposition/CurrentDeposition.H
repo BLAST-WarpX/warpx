@@ -1133,7 +1133,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::Real dt,
                                                  const amrex::XDim3 & dinv,
                                                  const amrex::XDim3 & xyzmin,
-                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain,
+                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
                                                  const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & is_absorbing,
                                                  const amrex::Dim3 lo,
                                                  const amrex::Real q,
@@ -1274,20 +1274,20 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             // so that the time step size can be appropriately scaled.
 #if defined(WARPX_DIM_3D)
             ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
-                                            domain[0][0], domain[0][1], is_absorbing[0]);
+                                            domain_double[0][0], domain_double[0][1], is_absorbing[0]);
             ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
-                                            domain[1][0], domain[1][1], is_absorbing[1]);
+                                            domain_double[1][0], domain_double[1][1], is_absorbing[1]);
             ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
-                                            domain[2][0], domain[2][1], is_absorbing[2]);
+                                            domain_double[2][0], domain_double[2][1], is_absorbing[2]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
-                                            domain[0][0], domain[0][1], is_absorbing[0]);
+                                            domain_double[0][0], domain_double[0][1], is_absorbing[0]);
             ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
-                                            domain[1][0], domain[1][1], is_absorbing[1]);
+                                            domain_double[1][0], domain_double[1][1], is_absorbing[1]);
 #elif defined(WARPX_DIM_1D_Z)
-            ParticleUtils::crop_at_boundary(z_new, domain[0][0], domain[0][1], is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], is_absorbing[0]);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            ParticleUtils::crop_at_boundary(x_new, domain[0][0], domain[0][1], is_absorbing[0]);
+            ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], is_absorbing[0]);
 #endif
 
             // --- Compute shape factors
