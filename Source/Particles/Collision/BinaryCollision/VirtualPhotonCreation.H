@@ -275,8 +275,8 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                             amrex::ParticleReal radius = PhysConst::hbar / PhysConst::q_e * PhysConst::c / std::sqrt(vphoton_Q2 * (1 - frac_energy));
                             radius = std::min(radius, 1e5); // [m]
 
-                            std::cout << "x: " << x << ", y: " << y << ", r: " << radius << ", q2: " << vphoton_Q2 << ", e: " << frac_energy <<
-                                    ", xnew: "<< x + cos_theta * radius << ", ynew: " << y + sin_theta * radius << std::endl;
+                            //std::cout << "x: " << x << ", y: " << y << ", r: " << radius << ", q2: " << vphoton_Q2 << ", e: " << frac_energy <<
+                            //        ", xnew: "<< x + cos_theta * radius << ", ynew: " << y + sin_theta * radius << std::endl;
                             pa_vp[PIdx::x][ip] += cos_theta * radius;
                             pa_vp[PIdx::y][ip] += sin_theta * radius;
                         } // bse
