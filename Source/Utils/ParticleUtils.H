@@ -252,7 +252,7 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void crop_at_boundary(double & x1,
                           double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
         if (do_cropping[0] && x1 < xmin) {
@@ -270,7 +270,7 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void crop_at_boundary(double x0, double z0,
                           double & x1, double & z1,
                           double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
@@ -293,7 +293,7 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void crop_at_boundary(double x0, double y0, double z0,
                           double & x1, double & y1, double & z1,
                           double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
