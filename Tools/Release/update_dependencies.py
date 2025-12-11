@@ -129,12 +129,18 @@ def update(args):
             # latest available tag (index 0) for all other dependencies
             repo_version_tag = tags_list_filtered[0]["name"]
 
-        # use version tag instead of commit sha for a release update or for pybind11
-        use_version_tag = args.release or (repo_name == "pybind11")
-        new_commit_sha = repo_version_tag if use_version_tag else repo_commit_sha
-
         # update commit
         if repo_name != "warpx":
+            # use version tag instead of commit sha:
+            # - for a release update
+            # - for pybind11 (always)
+            # - if the commit has not changed since the last version tag
+            use_version_tag = (
+                args.release
+                or (repo_name == "pybind11")
+                or (repo_commit_sha == tags_list_filtered[0]["commit"]["sha"])
+            )
+            new_commit_sha = repo_version_tag if use_version_tag else repo_commit_sha
             print(f"- old commit: {dependencies_data[commit_key]}")
             print(f"- new commit: {new_commit_sha}")
             if dependencies_data[commit_key] == new_commit_sha:

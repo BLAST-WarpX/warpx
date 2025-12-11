@@ -147,7 +147,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Dependencies
-      run: .github/workflows/dependencies/nvhpc.sh 25.1
+      run: |
+        .github/workflows/dependencies/ubuntu_free_disk_space.sh
+        .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
       uses: actions/cache@v4
       with:
