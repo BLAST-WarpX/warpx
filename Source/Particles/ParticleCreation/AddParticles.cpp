@@ -376,6 +376,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const amrex::Real y_cut = plasma_injector.y_cut;
     const amrex::Real z_cut = plasma_injector.z_cut;
     const amrex::Real q_tot = plasma_injector.q_tot;
+    const amrex::Real N_tot = plasma_injector.N_tot;
     long npart = plasma_injector.npart;
     const int do_symmetrize = plasma_injector.do_symmetrize;
     const int symmetrization_order = plasma_injector.symmetrization_order;
@@ -399,24 +400,28 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
         if (do_symmetrize){
             npart /= symmetrization_order;
         }
+        // compute the weight from N_tot if the user specified npart_real = N_tot
+        // compute the weight from q_tot if the user specified q_tot
+        // note that npart is the number of macroparticles
+        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*charge));
         for (long i = 0; i < npart; ++i) {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            const amrex::Real weight = q_tot/(npart*charge);
+            const amrex::Real weight = weight_3d;
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             amrex::Real y = amrex::RandomNormal(y_m, y_rms);
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_XZ)
-            const amrex::Real weight = q_tot/(npart*charge*y_rms);
+            const amrex::Real weight = weight_3d/y_rms;
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             constexpr amrex::Real y = 0._prt;
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_1D_Z)
-            const amrex::Real weight = q_tot/(npart*charge*x_rms*y_rms);
+            const amrex::Real weight = weight_3d/(x_rms*y_rms);
             constexpr amrex::Real x = 0._prt;
             constexpr amrex::Real y = 0._prt;
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            const amrex::Real weight = q_tot/(npart*charge*y_rms*z_rms);
+            const amrex::Real weight = weight_3d/(y_rms*z_rms);
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             constexpr amrex::Real y = 0._prt;
             constexpr amrex::Real z = 0._prt;
