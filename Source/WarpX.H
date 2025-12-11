@@ -519,6 +519,11 @@ public:
      */
     void LoadBalance ();
 
+    /** \brief Make new load-balanced Layout
+     */
+    std::pair<amrex::BoxArray,amrex::DistributionMapping>
+    LoadBalanceMakeNewLayout (int lev);
+
     /** \brief resets costs to zero
      */
     void ResetCosts ();
