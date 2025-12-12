@@ -466,7 +466,8 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
 #endif
             }
 
-        // crabwaist
+        // crabwaist before rotation
+	// Lorentz boost currently only possible along z direction: x and z coords swapped if boost on, not if I only rotate
         if (plasma_injector.do_crabwaist){
           const Real acw = -crabwaist_strength/std::tan(2*rotation_angle);
           u.x += 0.5 * acw * u.y*u.y;
