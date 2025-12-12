@@ -181,5 +181,4 @@ for pti in electrons.iterator(level=0):
 
 sim.step(1)
 
-# if not sim.amr_restart:
 del electrons
