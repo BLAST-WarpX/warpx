@@ -1,0 +1,152 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.mc2   = m_e*clight*clight
+my_constants.nano  = 1.0e-9
+my_constants.micro = 1.e-6
+my_constants.GeV   = q_e*1.e9
+
+# BEAMS
+my_constants.beam_energy = 182.5*GeV
+my_constants.beam_gamma  = beam_energy/mc2 
+my_constants.beam_npart  = 155000000000 # [e]
+my_constants.nmacropart  = 1
+my_constants.beam_charge = q_e * beam_npart
+my_constants.sigmax      = 1 #3.987480407475377e-05 # [m]
+my_constants.sigmay      = 1 #3.987480407475377e-05 # 3.7947331922020554e-08 # [m]
+my_constants.sigmaz      = 0.00217 # [m]
+my_constants.mux         = 0.
+my_constants.muy         = 0.
+my_constants.muz         = 4*sigmaz
+
+# VIRTUAL PHOTONS
+# minimum energy
+my_constants.hwmin = 1e-4 * mc2 * mc2 / beam_energy
+
+# full box
+my_constants.Lx = 1024*sigmax
+my_constants.Ly = 1024*sigmay
+my_constants.Lz = 16*sigmaz
+my_constants.nx = 32
+my_constants.ny = 32
+my_constants.nz = 32
+my_constants.dx = Lx/nx
+my_constants.dy = Ly/ny
+my_constants.dz = Lz/nz
+
+# TIME
+my_constants.T = 0.5*Lz/clight
+my_constants.dt = T / nz
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 1
+amr.n_cell = nx ny nz
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
+geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
+warpx.numprocs = 1 1 1
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.particle_lo = Absorbing Absorbing Absorbing
+boundary.particle_hi = Absorbing Absorbing Absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+algo.maxwell_solver = none
+warpx.const_dt = dt
+algo.particle_shape = 3
+algo.particle_pusher = vay
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = beam1 virtual_photons1 beam2 virtual_photons2
+particles.photon_species = virtual_photons1 virtual_photons2
+
+beam1.species_type = electron
+beam1.injection_style = gaussian_beam
+beam1.x_rms = sigmax
+beam1.y_rms = sigmay
+beam1.z_rms = sigmaz 
+beam1.x_m = 0
+beam1.y_m = 0
+beam1.z_m = - muz
+beam1.npart = nmacropart
+beam1.q_tot = -beam_charge
+beam1.z_cut = 4
+beam1.momentum_distribution_type = gaussian
+beam1.uz_m = beam_gamma
+beam1.uy_m = 0.0
+beam1.ux_m = 0.0
+beam1.ux_th = 0.0
+beam1.uy_th = 0.0
+beam1.uz_th = 0.0
+beam1.do_qed_virtual_photons = 1
+beam1.do_bhabha_beam_size_effect = 0
+beam1.qed_virtual_photon_species_name = virtual_photons1
+beam1.do_not_deposit = 1
+beam1.do_not_push = 1
+
+beam2.species_type = positron
+beam2.injection_style = gaussian_beam
+beam2.x_rms = sigmax
+beam2.y_rms = sigmay
+beam2.z_rms = sigmaz
+beam2.x_m = 0 
+beam2.y_m = 0
+beam2.z_m = muz
+beam2.npart = nmacropart
+beam2.q_tot = beam_charge
+beam2.z_cut = 4
+beam2.momentum_distribution_type = gaussian
+beam2.uz_m = -beam_gamma
+beam2.uy_m = 0.0
+beam2.ux_m = 0.0
+beam2.ux_th = 0.0
+beam2.uy_th = 0.0
+beam2.uz_th = 0.0
+beam2.do_qed_virtual_photons = 1
+beam2.do_bhabha_beam_size_effect = 1
+beam2.qed_virtual_photon_species_name = virtual_photons2
+beam2.do_not_deposit = 1
+beam2.do_not_push = 1
+
+# Virtual photons 1
+virtual_photons1.species_type = photon
+virtual_photons1.injection_style = none
+virtual_photons1.do_not_push = 1
+virtual_photons1.do_not_gather = 1
+virtual_photons1.do_not_deposit = 1
+virtual_photons1.qed_virtual_photons_min_energy = hwmin
+virtual_photons1.qed_virtual_photons_multiplier = 1000000
+
+# Virtual photons 2
+virtual_photons2.species_type = photon
+virtual_photons2.injection_style = none
+virtual_photons2.do_not_push = 1
+virtual_photons2.do_not_gather = 1
+virtual_photons2.do_not_deposit = 1
+virtual_photons2.qed_virtual_photons_min_energy = hwmin
+virtual_photons2.qed_virtual_photons_multiplier = 1000000
+
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+
+diagnostics.diags_names = diag1
+
+diag1.intervals = -1
+diag1.diag_type = Full
+diag1.write_species = 1
+diag1.species = beam1 beam2 virtual_photons1 virtual_photons2
+diag1.format = openpmd
+diag1.openpmd_backend = bp
+diag1.virtual_photons1.variables = uz w x y z
+diag1.virtual_photons2.variables = uz w x y z
