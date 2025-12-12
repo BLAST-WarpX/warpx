@@ -157,11 +157,15 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
+#if !defined(WARPX_EM_TEY)
         ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+#endif
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
 
         const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
+#if !defined(WARPX_EM_TEY)
         const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
+#endif
         const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
 
         if (a_J_from_MM_only) {
@@ -172,24 +176,27 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
         }
 
         // Compute the component offset in each direction (careful with staggering)
-        amrex::IntVect offset_xx, offset_xy, offset_xz;
-        amrex::IntVect offset_yx, offset_yy, offset_yz;
-        amrex::IntVect offset_zx, offset_zy, offset_zz;
+        amrex::IntVect offset_xx, offset_xz, offset_zx, offset_zz;
+#if !defined(WARPX_EM_TEY)
+        amrex::IntVect offset_xy, offset_yx, offset_yy, offset_yz, offset_zy;
+#endif
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
             offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
-            offset_xy[dir] = (Jx_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
-                                                             : ((m_ncomp_xy[dir]-1)/2);
             offset_xz[dir] = (Jx_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
                                                              : ((m_ncomp_xz[dir]-1)/2);
+#if !defined(WARPX_EM_TEY)
+            offset_xy[dir] = (Jx_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
+                                                             : ((m_ncomp_xy[dir]-1)/2);
             offset_yx[dir] = (Jy_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
                                                              : ((m_ncomp_yx[dir]-1)/2);
             offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
             offset_yz[dir] = (Jy_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
                                                              : ((m_ncomp_yz[dir]-1)/2);
-            offset_zx[dir] = (Jz_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
-                                                             : ((m_ncomp_zx[dir]-1)/2);
             offset_zy[dir] = (Jz_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
                                                              : ((m_ncomp_zy[dir]-1)/2);
+#endif
+            offset_zx[dir] = (Jz_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
+                                                             : ((m_ncomp_zx[dir]-1)/2);
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
         }
 
@@ -200,54 +207,58 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
         {
 
             amrex::Array4<amrex::Real> const& Jx = J[0]->array(mfi);
-            amrex::Array4<amrex::Real> const& Jy = J[1]->array(mfi);
             amrex::Array4<amrex::Real> const& Jz = J[2]->array(mfi);
 
             amrex::Array4<const amrex::Real> const& Ex = E[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ey = E[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Ez = E[2]->array(mfi);
 
             amrex::Array4<const amrex::Real> const& Jx0 = J0[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Jy0 = J0[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Jz0 = J0[2]->array(mfi);
 
             amrex::Array4<const amrex::Real> const& Ex0 = E0[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ey0 = E0[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Ez0 = E0[2]->array(mfi);
 
             amrex::Array4<const amrex::Real> const& Sxx = SX[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Sxz = SX[2]->array(mfi);
+#if !defined(WARPX_EM_TEY)
+            amrex::Array4<amrex::Real> const& Jy = J[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ey = E[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Jy0 = J0[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Ey0 = E0[1]->array(mfi);
 
+            amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Syx = SY[0]->array(mfi);
             amrex::Array4<const amrex::Real> const& Syy = SY[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Syz = SY[2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& Szx = SZ[0]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
+#endif
+            amrex::Array4<const amrex::Real> const& Szx = SZ[0]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
             // Use grown boxes here with all J guard cells
             amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType());
-            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
             amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType());
             Jbx.grow(J[0]->nGrowVect());
-            Jby.grow(J[1]->nGrowVect());
             Jbz.grow(J[2]->nGrowVect());
 
             // Use same box for E as for J (requires ngE >= ngJ)
             const amrex::Box Ebx = Jbx;
-            const amrex::Box Eby = Jby;
             const amrex::Box Ebz = Jbz;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
-            const amrex::IntVect ncomp_xy = m_ncomp_xy;
             const amrex::IntVect ncomp_xz = m_ncomp_xz;
+#if !defined(WARPX_EM_TEY)
+            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
+            Jby.grow(J[1]->nGrowVect());
+            const amrex::Box Eby = Jby;
+
+            const amrex::IntVect ncomp_xy = m_ncomp_xy;
             const amrex::IntVect ncomp_yx = m_ncomp_yx;
             const amrex::IntVect ncomp_yy = m_ncomp_yy;
             const amrex::IntVect ncomp_yz = m_ncomp_yz;
-            const amrex::IntVect ncomp_zx = m_ncomp_zx;
             const amrex::IntVect ncomp_zy = m_ncomp_zy;
+#endif
+            const amrex::IntVect ncomp_zx = m_ncomp_zx;
             const amrex::IntVect ncomp_zz = m_ncomp_zz;
 
             if (!m_blank_electric_field[0]) {
@@ -276,12 +287,13 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                     }
                 }
 
+                amrex::Real SxydEy = 0.0;
+#if !defined(WARPX_EM_TEY)
                 // Compute Sxy*dEy
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
                     index_min[dim] = std::max(-offset_xy[dim],Eby.smallEnd(dim)-idx[dim]);
                     index_max[dim] = std::min(ncomp_xy[dim]-1-offset_xy[dim],Eby.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SxydEy = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
@@ -293,6 +305,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                         }
                     }
                 }
+#endif
 
                 // Compute Sxz*dEz
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
@@ -315,6 +328,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 Jx(i,j,k,n) += Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
             });
             }
+#if !defined(WARPX_EM_TEY)
             if (!m_blank_electric_field[1]) {
             amrex::ParallelFor(
             Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -380,6 +394,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 Jy(i,j,k,n) += Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
             });
             }
+#endif
             if (!m_blank_electric_field[2]) {
             amrex::ParallelFor(
             Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -406,12 +421,13 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                     }
                 }
 
+                amrex::Real SzydEy = 0.0;
+#if !defined(WARPX_EM_TEY)
                 // Compute Szy*dEy
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
                     index_min[dim] = std::max(-offset_zy[dim],Eby.smallEnd(dim)-idx[dim]);
                     index_max[dim] = std::min(ncomp_zy[dim]-1-offset_zy[dim],Eby.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SzydEy = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
@@ -423,6 +439,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                         }
                     }
                 }
+#endif
 
                 // Compute Szz*dEz
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
@@ -719,6 +736,21 @@ void ImplicitSolver::InitializeMassMatrices ()
         }
     }
 
+#if defined(WARPX_EM_TEY)
+    for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+        m_ncomp_xy[dir] = 0;
+        m_ncomp_yx[dir] = 0;
+        m_ncomp_yy[dir] = 0;
+        m_ncomp_yz[dir] = 0;
+        m_ncomp_zy[dir] = 0;
+    }
+    Nc_tot_xy = 0;
+    Nc_tot_yx = 0;
+    Nc_tot_yy = 0;
+    Nc_tot_yz = 0;
+    Nc_tot_zy = 0;
+#endif
+
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Jx = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Jy = m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev)->boxArray();
@@ -752,7 +784,11 @@ void ImplicitSolver::InitializeMassMatrices ()
             const int ncomp_dir_pc = (m_use_mass_matrices_jacobian ? 1 + 2*m_mass_matrices_pc_width : 1);
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 m_ncomp_pc_xx[dir] = std::min(m_ncomp_xx[dir],ncomp_dir_pc);
+#if defined(WARPX_EM_TEY)
+                m_ncomp_pc_yy[dir] = 1;
+#else
                 m_ncomp_pc_yy[dir] = std::min(m_ncomp_yy[dir],ncomp_dir_pc);
+#endif
                 m_ncomp_pc_zz[dir] = std::min(m_ncomp_zz[dir],ncomp_dir_pc);
                 ncomp_tot_pc_xx *= m_ncomp_pc_xx[dir];
                 ncomp_tot_pc_yy *= m_ncomp_pc_yy[dir];
@@ -876,7 +912,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     // are not included in the mass matrices.
 
     const int diag_comp_xx = (AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2])-1)/2;
+#if !defined(WARPX_EM_TEY)
     const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
+#endif
     const int diag_comp_zz = (AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2])-1)/2;
     int MM_PC_ncomp_xx[3] = {1, 1, 1};
     int MM_PC_ncomp_yy[3] = {1, 1, 1};
@@ -896,7 +934,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         const amrex::MultiFab* MM_xx = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
+#if !defined(WARPX_EM_TEY)
         const amrex::MultiFab* MM_yy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
+#endif
         const amrex::MultiFab* MM_zz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
         ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
 
@@ -909,6 +949,7 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
             const int mm_pc_comp_start = diag_comp_pc_xx - MM_PC_width_xx[0] + m_ncomp_pc_xx[0]*jj0;
             amrex::MultiFab::Add(*MM_PC[0], *MM_xx, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_xx[0], MM_xx->nGrowVect());
         }
+#if !defined(WARPX_EM_TEY)
         const int diag_comp_pc_yy = (MM_PC[1]->nComp() - 1)/2;
         for (int comp1 = 0; comp1 < MM_PC_ncomp_yy[1]; comp1++) {
             const int jj0 = comp1 - MM_PC_width_yy[1]; // -2 -1, 0, 1, 2
@@ -916,6 +957,7 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
             const int mm_pc_comp_start = diag_comp_pc_yy - MM_PC_width_yy[0] + m_ncomp_pc_yy[0]*jj0;
             amrex::MultiFab::Add(*MM_PC[1], *MM_yy, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_yy[0], MM_yy->nGrowVect());
         }
+#endif
         const int diag_comp_pc_zz = (MM_PC[2]->nComp() - 1)/2;
         for (int comp1 = 0; comp1 < MM_PC_ncomp_zz[1]; comp1++) {
             const int jj0 = comp1 - MM_PC_width_zz[1]; // -2 -1, 0, 1, 2
@@ -957,7 +999,9 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
         amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);
         amrex::MultiFab* MMzz_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev);
         MMxx_PC->mult(pc_factor, 0, MMxx_PC->nComp());
+#if !defined(WARPX_EM_TEY)
         MMyy_PC->mult(pc_factor, 0, MMyy_PC->nComp());
+#endif
         MMzz_PC->mult(pc_factor, 0, MMzz_PC->nComp());
         const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
         if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {

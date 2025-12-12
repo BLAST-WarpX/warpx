@@ -652,20 +652,20 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                                             [[maybe_unused]] const amrex::ParticleReal fpxy,
                                             [[maybe_unused]] const amrex::ParticleReal fpxz,
                                             [[maybe_unused]] const amrex::ParticleReal fpyx,
-                                            const amrex::ParticleReal fpyy,
+                                            [[maybe_unused]] const amrex::ParticleReal fpyy,
                                             [[maybe_unused]] const amrex::ParticleReal fpyz,
                                             [[maybe_unused]] const amrex::ParticleReal fpzx,
                                             [[maybe_unused]] const amrex::ParticleReal fpzy,
                                             const amrex::ParticleReal fpzz,
                                             amrex::Array4<amrex::Real> const& Jx_arr,
-                                            amrex::Array4<amrex::Real> const& Jy_arr,
+                                            [[maybe_unused]] amrex::Array4<amrex::Real> const& Jy_arr,
                                             amrex::Array4<amrex::Real> const& Jz_arr,
                                             [[maybe_unused]] int max_crossings,
                                             amrex::Array4<amrex::Real> const& Sxx_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxy_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Sxz_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Syx_arr,
-                                            amrex::Array4<amrex::Real> const& Syy_arr,
+                                            [[maybe_unused]] amrex::Array4<amrex::Real> const& Syy_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Syz_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Szx_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Szy_arr,
@@ -680,7 +680,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
 
     using namespace amrex::literals;
 
-#if (AMREX_SPACEDIM > 1)
+#if (AMREX_SPACEDIM > 1) && !defined(WARPX_EM_TEY)
     amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
     amrex::Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
@@ -729,7 +729,9 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (xp_new - xp_old)/dt;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
+#endif 
 #elif defined(WARPX_DIM_1D_Z)
     amrex::Real const vx = uxp_mid*gaminv;
     amrex::Real const vy = uyp_mid*gaminv;
@@ -752,7 +754,9 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
 
     // Define velocity kernels to deposit
     amrex::Real const wqx = wq_invvol*vx;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const wqy = wq_invvol*vy;
+#endif
     amrex::Real const wqz = wq_invvol*vz;
 
     // Compute total change in particle position (always do before cropping)
@@ -1033,7 +1037,9 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     int k0_node[num_segments_max];
     amrex::Real weight_cellX_nodeZ[num_segments_max][depos_order][depos_order+1];
     amrex::Real weight_nodeX_cellZ[num_segments_max][depos_order+1][depos_order];
+#if !defined(WARPX_EM_TEY)
     amrex::Real weight_nodeX_nodeZ[num_segments_max][depos_order+1][depos_order+1];
+#endif
 
     const auto i_mid = static_cast<int>(0.5*(x_new+x_old)-shift);
     const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
@@ -1132,6 +1138,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
             }
         }
 
+#if !defined(WARPX_EM_TEY)
         // deposit out-of-plane Jy and Sy for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         for (int i = 0; i <= depos_order; i++) {
@@ -1151,6 +1158,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                 }
             }
         }
+#endif
 
         // deposit Jz and Szz for this segment
         for (int i = 0; i <= depos_order; i++) {
@@ -1226,6 +1234,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                             amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(i_J, k_J, 0, comp_xz), fpxz*weight_J*weight_E);
                         }
                     }
+#if !defined(WARPX_EM_TEY)
                     // Deposit Sxy
                     for (int iE = 0; iE <= depos_order; iE++) {
                         for (int kE = 0; kE <= depos_order; kE++) {
@@ -1235,6 +1244,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                             amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(i_J, k_J, 0, comp_xy), fpxy*weight_J*weight_E);
                         }
                     }
+#endif
                 }
             }
         }
@@ -1269,6 +1279,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                             amrex::Gpu::Atomic::AddNoRet( &Szz_arr(i_J, k_J, 0, comp_zz), fpzz*weight_J*weight_E);
                         }
                     }
+#if !defined(WARPX_EM_TEY)
                     // Deposit Szy
                     for (int iE = 0; iE <= depos_order; iE++) {
                         for (int kE = 0; kE <= depos_order; kE++) {
@@ -1278,10 +1289,12 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                             amrex::Gpu::Atomic::AddNoRet( &Szy_arr(i_J, k_J, 0, comp_zy), fpzy*weight_J*weight_E);
                         }
                     }
+#endif
                 }
             }
         }
 
+#if !defined(WARPX_EM_TEY)
         // Deposit Syx, Syz, and Syy for this segment
         for (int i = 0; i <= depos_order; i++) {
             for (int k = 0; k <= depos_order; k++) {
@@ -1325,6 +1338,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                 }
             }
         }
+#endif
 
      }
 
