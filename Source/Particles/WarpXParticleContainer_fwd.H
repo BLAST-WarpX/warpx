@@ -18,13 +18,4 @@ class WarpXParIter;
 
 class WarpXParticleContainer;
 
-struct DiagIdx
-{
-    enum {
-        w = 0,
-        x, y, z, ux, uy, uz,
-        nattribs
-    };
-};
-
 #endif /* WARPX_WarpXParticleContainer_fwd_H_ */

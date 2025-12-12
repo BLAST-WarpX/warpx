@@ -155,7 +155,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("level")
         )
 
-        .def("get",
+        .def("_get",
              py::overload_cast<
                  std::string,
                  int
@@ -165,7 +165,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("level")
         )
 
-        .def("get",
+        .def("_get",
              py::overload_cast<
                  std::string,
                  ablastr::fields::Direction,

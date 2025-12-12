@@ -44,7 +44,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
    .. tab-item:: Executable: Input File
 
       .. literalinclude:: inputs_base_3d
-         :language: ini
+         :language: none
          :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/inputs_base_3d``.
 
 Analyze

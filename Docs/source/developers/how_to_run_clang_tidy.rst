@@ -24,7 +24,7 @@ Under `Tools/Linter <https://github.com/BLAST-WarpX/warpx/blob/development/Tools
    .. literalinclude:: ../../../Tools/Linter/runClangTidy.sh
       :language: bash
 
-It is a prerequisite that WarpX is compiled following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+It is a prerequisite that WarpX is compiled following the instructions that you find in our :ref:`Users <install-methods-cmake>` or :ref:`Developers <install-build-cmake>` sections.
 
 The script generates a wrapper to ensure that clang-tidy is only applied to WarpX source files and compiles WarpX in 1D, 2D, 3D, and RZ geometry, using such wrapper.
 

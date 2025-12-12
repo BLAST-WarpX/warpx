@@ -4,7 +4,8 @@ import sys
 
 import numpy as np
 
-from pywarpx import callbacks, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 # Create the parser and add the argument
 parser = argparse.ArgumentParser()
@@ -104,16 +105,29 @@ sim.initialize_warpx()
 
 # set numpy random seed so that the particle properties generated
 # below will be reproducible from run to run
-np.random.seed(30025025)
+xp, _ = load_cupy()
+xp.random.seed(30025025)
 
-elec_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-elec_wrapper.add_real_comp("newPid")
+electrons = sim.particles.get("electrons")
+electrons.add_real_comp("newPid")
 
 my_id = libwarpx.amr.ParallelDescriptor.MyProc()
+num_ranks = libwarpx.amr.ParallelDescriptor.NProcs()
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return np.asarray(arr)
+
+
+def nps_per_rank(rank):
+    return 10 * (rank + 1)
 
 
 def add_particles():
-    nps = 10 * (my_id + 1)
+    nps = nps_per_rank(my_id)
     x = np.linspace(0.005, 0.025, nps)
     y = np.zeros(nps)
     z = np.linspace(0.005, 0.025, nps)
@@ -121,9 +135,9 @@ def add_particles():
     uy = np.random.normal(loc=0, scale=1e3, size=nps)
     uz = np.random.normal(loc=0, scale=1e3, size=nps)
     w = np.ones(nps) * 2.0
-    newPid = 5.0
+    newPid = np.ones(nps) * 5.0
 
-    elec_wrapper.add_particles(
+    electrons.add_particles(
         x=x,
         y=y,
         z=z,
@@ -132,7 +146,7 @@ def add_particles():
         uz=uz,
         w=w,
         newPid=newPid,
-        unique_particles=args.unique,
+        unique_particles=True,
     )
 
 
@@ -148,13 +162,16 @@ sim.step(max_steps - 1)
 # check that the new PIDs
 # are properly set
 ##########################
+total_expected_electrons_size = sum(
+    nps_per_rank(rank) * (max_steps - 1) for rank in range(num_ranks)
+)
 
-assert elec_wrapper.nps == 270 / (2 - args.unique)
-assert elec_wrapper.particle_container.get_real_comp_index("w") == 2
-assert elec_wrapper.particle_container.get_real_comp_index("newPid") == 6
+assert electrons.size == total_expected_electrons_size
+assert electrons.get_real_comp_index("w") == 2
+assert electrons.get_real_comp_index("newPid") == 6
 
-new_pid_vals = elec_wrapper.get_particle_real_arrays("newPid", 0)
-for vals in new_pid_vals:
+for pti in electrons.iterator(level=0):
+    vals = pti["newPid"]
     assert np.allclose(vals, 5)
 
 ##########################
@@ -162,3 +179,6 @@ for vals in new_pid_vals:
 ##########################
 
 sim.step(1)
+
+if not sim.amr_restart:
+    del electrons

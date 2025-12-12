@@ -74,6 +74,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <string>
@@ -973,6 +974,12 @@ MultiParticleContainer::mapSpeciesProduct ()
                 pc->m_qed_quantum_sync_phot_product_name);
             pc->m_qed_quantum_sync_phot_product = i_product_phot;
         }
+
+        if(pc->has_virtual_photons()){
+            const int i_vphot = getSpeciesID(
+                pc->m_qed_virtual_photon_species_name);
+            pc->m_qed_virtual_photon_species = i_vphot;
+        }
 #endif
 
     }
@@ -1394,8 +1401,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1479,8 +1485,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1877,6 +1882,12 @@ void MultiParticleContainer::CheckQEDProductSpecies()
                 allcontainers[pc->m_qed_quantum_sync_phot_product]->
                     AmIA<PhysicalSpecies::photon>(),
                 "ERROR: Quantum Synchrotron product species is of wrong type");
+        }
+        if(pc->has_virtual_photons()){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                allcontainers[pc->m_qed_virtual_photon_species]->
+                    AmIA<PhysicalSpecies::photon>(),
+                "ERROR: virtual photons species has to be a...photon species!");
         }
     }
 

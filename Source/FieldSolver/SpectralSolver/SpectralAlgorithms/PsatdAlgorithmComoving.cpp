@@ -221,7 +221,7 @@ void PsatdAlgorithmComoving::InitializeSpectralCoefficients (const SpectralKSpac
             // Physical constants c, c**2, and epsilon_0, and imaginary unit
             constexpr amrex::Real c   = PhysConst::c;
             constexpr amrex::Real c2  = c*c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr Complex     I   = Complex{0._rt, 1._rt};
 
             // Auxiliary coefficients used when update_with_rho=false

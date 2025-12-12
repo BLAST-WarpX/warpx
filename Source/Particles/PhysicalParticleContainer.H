@@ -392,6 +392,20 @@ public:
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
     PairGenerationFilterFunc getPairGenerationFilterFunc ();
+
+    /**
+     * Tells if this PhysicalParticleContainer has
+     * virtual photons enabled
+     * @return true if process is enabled
+     */
+    bool has_virtual_photons () const override;
+
+    /**
+     * Gets the index of the PhysicalParticleContainer
+     * that corresponds to the virtual photons
+     * @return index of the virtual photon species
+     */
+    int getVirtualPhotonSpeciesIndex () const override;
 #endif
 
     std::vector<std::string> getUserIntAttribs () const override {
@@ -485,6 +499,9 @@ protected:
 
     // A smart pointer to an instance of a Breit Wheeler engine [photons only!]
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
+
+    // A flag to enable virtual photons
+    bool m_do_qed_virtual_photons = false;
 #endif
     /* Vector of user-defined integer attributes for species, species_name */
     std::vector<std::string> m_user_int_attribs;
