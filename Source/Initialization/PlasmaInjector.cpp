@@ -241,7 +241,7 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
 
     const bool q_tot_is_specified = pp_species.contains("q_tot");
     const bool N_tot_is_specified = pp_species.contains("npart_real");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (q_tot_is_specified || N_tot_is_specified) && !(q_tot_is_specified && N_tot_is_specified),
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( q_tot_is_specified != N_tot_is_specified,
         "Error: Exactly one between q_tot and npart_real have to be specified.");
     if(q_tot_is_specified){
         utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
