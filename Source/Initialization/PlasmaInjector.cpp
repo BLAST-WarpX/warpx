@@ -248,6 +248,7 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "do_crabwaist", do_crabwaist);
 
     if(do_crabwaist){
+        ablastr::warn_manager::WMRecordWarning("Species", "Currently crab waist is supported in y dimension only.\n");
         utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
     }
 
