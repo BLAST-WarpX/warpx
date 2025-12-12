@@ -247,14 +247,20 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
     utils::parser::queryWithParser(pp_species, source_name, "do_crabwaist", do_crabwaist);
 
-    if(do_crabwaist){
-        ablastr::warn_manager::WMRecordWarning("Species", "Currently crab waist is supported in y dimension only.\n");
-        utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
-    }
-
     if(do_rotation){
         utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
         utils::parser::getArrWithParser(pp_species, source_name, "gaussian_beam_rotation_axis", rotation_axis, 0, 3);
+
+	// crabwaist only if beams collide with a nonzero crossing angle
+        if(do_crabwaist){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( rotation_angle>0,
+                "Error: Invalid value for rotation_angle. (" + rotation_angle +") It must be larger than 0!");
+            ablastr::warn_manager::WMRecordWarning("Species", "Currently crab waist is supported in y dimension only.\n");
+            utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
+        }
+    }else if (do_crabwaist){
+        ablastr::warn_manager::WMRecordWarning("Species", "Crab waist works only when do_rotation flag is enabled." 
+			" do_crabwaist and crabwaist_strength flags will be ignored.\n");
     }
 
     if(focusing_is_specified){
