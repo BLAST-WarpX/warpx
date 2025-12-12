@@ -968,7 +968,9 @@ Particle initialization
       * ``<species_name>.q_tot`` (beam charge),
 
       * ``<species_name>.npart_real`` (total number of real particles in the beam)
-      The user must define one and only only between `q_tot` and `npart_real`.
+
+      The user must define one and only only between ``q_tot`` and ``npart_real``.
+      The latter must be used for neutral species.
 
       * ``<species_name>.npart`` (number of macroparticles in the beam),
 
