@@ -406,8 +406,9 @@ void WarpX::OneStep (
                     MomentumPushType::Full
                 );
 
-                // communicate particle data
-                mypc->Redistribute();
+                // perform essential particle house keeping at the boundaries
+                // (inject, communicate, scrape, sort, etc.)
+                HandleParticlesAtBoundaries(a_step, a_cur_time, /*num_moved=*/0);
 
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
