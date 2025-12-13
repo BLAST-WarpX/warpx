@@ -1031,30 +1031,38 @@ void ImplicitSolver::FinishMassMatrices ()
 
 #if AMREX_SPACEDIM > 1
     const int ncomp_tot_xx = AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2]);
+#if !defined(WARPX_EM_TEY)
     const int ncomp_tot_yy = AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2]);
+#endif
     const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
 #endif
 
     amrex::GpuArray<int,3> ncomp_xx = {1,1,1};
-    amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
     amrex::GpuArray<int,3> ncomp_zz = {1,1,1};
     amrex::GpuArray<int,3> Sxx_width = {0,0,0};
-    amrex::GpuArray<int,3> Syy_width = {0,0,0};
     amrex::GpuArray<int,3> Szz_width = {0,0,0};
+#if !defined(WARPX_EM_TEY)
+    amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
+    amrex::GpuArray<int,3> Syy_width = {0,0,0};
+#endif
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
         ncomp_xx[dir] = m_ncomp_xx[dir];
-        ncomp_yy[dir] = m_ncomp_yy[dir];
         ncomp_zz[dir] = m_ncomp_zz[dir];
         Sxx_width[dir] = (ncomp_xx[dir] - 1)/2;
-        Syy_width[dir] = (ncomp_yy[dir] - 1)/2;
         Szz_width[dir] = (ncomp_zz[dir] - 1)/2;
+#if !defined(WARPX_EM_TEY)
+        ncomp_yy[dir] = m_ncomp_yy[dir];
+        Syy_width[dir] = (ncomp_yy[dir] - 1)/2;
+#endif
     }
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
-        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+#if !defined(WARPX_EM_TEY)
+        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+#endif
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1063,20 +1071,26 @@ void ImplicitSolver::FinishMassMatrices ()
         {
 
             amrex::Array4<amrex::Real> const& Sxx = SX[0]->array(mfi);
-            amrex::Array4<amrex::Real> const& Syy = SY[1]->array(mfi);
             amrex::Array4<amrex::Real> const& Szz = SZ[2]->array(mfi);
 
             // Use grown boxes here with all S guard cells
             amrex::Box Sbx = amrex::convert(mfi.validbox(),SX[0]->ixType());
-            amrex::Box Sby = amrex::convert(mfi.validbox(),SY[1]->ixType());
             amrex::Box Sbz = amrex::convert(mfi.validbox(),SZ[2]->ixType());
             Sbx.grow(SX[0]->nGrowVect());
             Sbz.grow(SZ[2]->nGrowVect());
+
+#if !defined(WARPX_EM_TEY)
+            amrex::Array4<amrex::Real> const& Syy = SY[1]->array(mfi);
+            amrex::Box Sby = amrex::convert(mfi.validbox(),SY[1]->ixType());
             Sby.grow(SY[1]->nGrowVect());
+#endif
 
 #if AMREX_SPACEDIM == 1
+#if defined(WARPX_EM_TEY)
+            amrex::ParallelFor( Sbx, Sbz,
+#else
             amrex::ParallelFor( Sbx, Sby, Sbz,
-
+#endif
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 // Sxx(i,d + n) = Sxx(i + n,d - n), where d = Sxx_width[0]
@@ -1088,6 +1102,7 @@ void ImplicitSolver::FinishMassMatrices ()
                 }
             },
 
+#if !defined(WARPX_EM_TEY)
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 // Syy(i,d + n) = Syy(i + n,d - n), where d = Syy_width[0]
@@ -1098,6 +1113,7 @@ void ImplicitSolver::FinishMassMatrices ()
                     Syy(i,j,k,dst_comp) = Syy(i + n,j,k,src_comp);
                 }
             },
+#endif
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
@@ -1111,8 +1127,11 @@ void ImplicitSolver::FinishMassMatrices ()
             });
 
 #elif AMREX_SPACEDIM == 2
+#if defined(WARPX_EM_TEY)
+            amrex::ParallelFor( Sbx, Sbz,
+#else
             amrex::ParallelFor( Sbx, Sby, Sbz,
-
+#endif
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 ignore_unused(k);
@@ -1142,6 +1161,7 @@ void ImplicitSolver::FinishMassMatrices ()
 
             },
 
+#if !defined(WARPX_EM_TEY)
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 ignore_unused(k);
@@ -1169,6 +1189,7 @@ void ImplicitSolver::FinishMassMatrices ()
                 }
 
             },
+#endif
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
