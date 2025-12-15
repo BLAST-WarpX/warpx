@@ -783,6 +783,17 @@ WarpX::ReadParameters ()
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+        if (m_dt_update_interval.isActivated()) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_const_dt.has_value(),
+                "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+                 evolve_scheme == EvolveScheme::ThetaImplicitEM),
+                "For electromagnetic solvers, warpx.dt_update_interval can only be used with algo.evolve_scheme = theta_implicit_em."
+            );
+        }
 
         // Filter defaults to true for the explicit scheme, and false for the implicit schemes
         if (evolve_scheme != EvolveScheme::Explicit) {
@@ -3506,8 +3517,10 @@ amrex::DistributionMapping
 WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 {
     bool roundrobin_sfc = false;
+    bool split_high_density_boxes = false;
     const ParmParse pp("warpx");
     pp.query("roundrobin_sfc", roundrobin_sfc);
+    pp.query("split_high_density_boxes", split_high_density_boxes);
 
     // If this is true, AMReX's RRSFC strategy is used to make
     // DistributionMapping. Note that the DistributionMapping made by the
@@ -3523,6 +3536,15 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
         amrex::DistributionMapping dm(ba);
         amrex::DistributionMapping::strategy(old_strategy);
         return dm;
+    } else if (split_high_density_boxes &&
+               amrex::DistributionMapping::strategy() == amrex::DistributionMapping::SFC) {
+        // By default, amrex uses box volumes as weights when distributing
+        // boxes. But this would somewhat defeat the purpose of splitting
+        // high density boxes until the next load balance is
+        // performed. Thus, we are going building SFC assuming every boxes
+        // have the same weight.
+        amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
+        return amrex::DistributionMapping::makeSFC(wgt, ba, false);
     } else {
         return amrex::AmrCore::MakeDistributionMap(lev, ba);
     }
