@@ -767,7 +767,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     amrex::Real const vx = (xp_new - xp_old)/dt;
 #if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
-#endif 
+#endif
 #elif defined(WARPX_DIM_1D_Z)
     amrex::Real const vx = uxp_mid*gaminv;
     amrex::Real const vy = uyp_mid*gaminv;
