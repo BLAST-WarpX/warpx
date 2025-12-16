@@ -1131,7 +1131,16 @@ Particle initialization
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field named ``density``. See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file.
+      for an example of how to prepare the openPMD data file. There is
+      another optional parameter,
+      ``<species_name>.read_density_distributed=true``, which controls how the
+      openPMD data are distributed among processes. If it is set to false, the
+      openPMD data are loaded and duplicated on every process. If it is set to
+      true, the openPMD data required for initializing the density profile
+      are distributed among MPI processes. If particles are continuously
+      injected during the simulation and
+      ``<species_name>.read_density_distributed`` is true, chunks of the
+      openPMD data are loaded and cached as needed.
 
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``

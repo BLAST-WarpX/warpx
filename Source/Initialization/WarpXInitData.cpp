@@ -1757,8 +1757,12 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component);
-    ExternalFieldView const& external_field_view = external_field_reader.getView();
+    Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    bool distributed = true;
+    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
+                                              problo, dx, pbox, distributed);
+    external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
+                                  mf->nGrowVect());
 
     // Loop over boxes
 #if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
@@ -1768,6 +1772,9 @@ WarpX::ReadExternalFieldFromFile (
     {
         const amrex::Box tb = mfi.tilebox(nodal_flag, mf->nGrowVect());
         auto const& mffab = mf->array(mfi);
+
+        // This is thread safe because getView return by value.
+        auto const& external_field_view = external_field_reader.getView(mfi.LocalIndex());
 
         // Start ParallelFor
         amrex::ParallelFor (tb,
