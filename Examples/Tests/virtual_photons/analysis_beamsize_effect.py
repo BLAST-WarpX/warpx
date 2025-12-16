@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# Copyright 2025 Peter Kicsiny
+#
+# This file is part of WarpX.
+#
+# License: BSD-3-Clause-LBNL
+
 # This test generates the population of virtual photons
 # of two high-energy electrons.
 # In one case the beam size effect (bse) is on and it is off for the other.
