@@ -6,6 +6,14 @@
 #
 # License: BSD-3-Clause-LBNL
 
+# This test compares the output particle distribution from 2 simulations.
+# In both simulations the bunch distribution is dumped after initialization.
+# The seed is the same for both simulations.
+# Sim 1: apply rotation by half crossing angle phi on bunch then dump.
+# Sim 2: apply crabwaist operation then rotation then dump.
+# In the test I apply the inverse rotation and CW on both bunches and
+# compare them cordinate by coordinate.
+
 import numpy as np
 import matplotlib.pyplot as plt
 from openpmd_viewer import OpenPMDTimeSeries
