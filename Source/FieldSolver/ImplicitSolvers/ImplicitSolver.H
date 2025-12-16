@@ -90,7 +90,12 @@ public:
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
+<<<<<<< HEAD
     void PreLinearSolve ();
+=======
+    void PreLinearSolve ( const amrex::Real  a_cur_time,
+                          const int          a_nl_iter );
+>>>>>>> f9f9092c1 (created a PreLinearSolve() routine.)
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
