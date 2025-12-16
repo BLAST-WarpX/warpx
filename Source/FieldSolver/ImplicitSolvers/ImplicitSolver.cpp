@@ -1055,6 +1055,12 @@ void ImplicitSolver::FinishMassMatrices ()
 #endif
     }
 
+    const amrex::IntVect ncomp_xx = m_ncomp_xx;
+    const amrex::IntVect ncomp_zz = m_ncomp_zz;
+#if !defined(WARPX_EM_TEY)
+    const amrex::IntVect ncomp_yy = m_ncomp_yy;
+#endif
+
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
