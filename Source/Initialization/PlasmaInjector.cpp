@@ -237,13 +237,25 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "x_cut", x_cut);
     utils::parser::queryWithParser(pp_species, source_name, "y_cut", y_cut);
     utils::parser::queryWithParser(pp_species, source_name, "z_cut", z_cut);
-    utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
+
+    const bool q_tot_is_specified = pp_species.contains("q_tot");
+    const bool N_tot_is_specified = pp_species.contains("npart_real");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( q_tot_is_specified != N_tot_is_specified,
+        "Error: Exactly one between q_tot and npart_real have to be specified.");
+    if(q_tot_is_specified){
+        utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
+    }
+    if(N_tot_is_specified){
+        utils::parser::getWithParser(pp_species, source_name, "npart_real", N_tot);
+    }
+
     utils::parser::getWithParser(pp_species, source_name, "npart", npart);
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
     const bool focusing_is_specified = pp_species.contains("focal_distance");
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
+
 
     if(do_rotation){
         utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
