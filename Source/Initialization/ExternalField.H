@@ -196,9 +196,9 @@ private:
     std::string m_file;
     std::string m_name;
     std::string m_component;
-    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo; // WarpX's initial prob lo
-    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx; // WarpX's cell size
-    amrex::Box m_dombox;                                  // WarpX's initial domain
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_problo; //! WarpX's initial prob lo
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> m_probdx; //! WarpX's cell size
+    amrex::Box m_dombox;                                  //! WarpX's initial domain
     bool m_distributed = false;
     bool m_moving_window = false;
     amrex::RealVect m_dx;     // Field data's dx
