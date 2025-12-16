@@ -1025,7 +1025,7 @@ Particle initialization
 
     It is applied on the coordinates in the lab frame before the rotation. Currently supports vertical crab waist only. See (:cite:t:`param-Zobov2010`) for more details.
 
-      * ``<species_name>.crabwaist_strength`` (`double`, optional) is the strength of the crab waist transformation. :math:`k\in\[0, 1\]`. A value of 0 is equivalent to no crab waist. A value of 1 is equivalent to the full crab sextupole strength. Optimal value is typically in between.
+      * ``<species_name>.crabwaist_strength`` (`double`, optional) is the strength of the crab waist transformation. :math:`k\in [0, 1]`. A value of 0 is equivalent to no crab waist. A value of 1 is equivalent to the full crab sextupole strength. Optimal value is typically in between.
 
     * ``external_file``: Inject macroparticles with properties (mass, charge, position, and momentum - :math:`\gamma \beta m c`) read from an external openPMD file.
       With it users can specify the additional arguments:
