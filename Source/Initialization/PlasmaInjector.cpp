@@ -253,12 +253,12 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
 
 	// crabwaist only if beams collide with a nonzero crossing angle in the x-z plane
         if(do_crabwaist){
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (rotation_angle>0 && rotation_axis==std::vector,<int>{0,1,0}),
-                "Error: Invalid value for rotation_angle. (" + rotation_angle +") It must be larger than 0!");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (rotation_angle>0 && rotation_axis[0]==0 && rotation_axis[0]==1 && rotation_axis[2]==0),
+                "Error: Invalid value for rotation_angle. It must be larger than 0!");
             ablastr::warn_manager::WMRecordWarning("Species", "Currently crab waist is supported in y dimension only.\n");
             utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
 	    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (crabwaist_strength>=0 && crabwaist_strength<=1),
-                "Error: Invalid value for crabwaist_strength. (" + crabwaist_strength +") It must be between [0,1]!");
+                "Error: Invalid value for crabwaist_strength. It must be between [0,1]!");
         }
     }else if (do_crabwaist){
         ablastr::warn_manager::WMRecordWarning("Species", "Crab waist works only when do_rotation flag is enabled." 
