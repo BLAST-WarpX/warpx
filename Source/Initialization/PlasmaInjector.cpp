@@ -253,7 +253,6 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
 
 	// crabwaist only if beams collide with a nonzero crossing angle in the x-z plane
         if(do_crabwaist){
-	    std::cout << rotation_angle << std::endl;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rotation_angle!=0,
                 "Error: Invalid value for rotation_angle. It must not be 0!");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE((rotation_axis[0]==0 && rotation_axis[1]==1 && rotation_axis[2]==0),
