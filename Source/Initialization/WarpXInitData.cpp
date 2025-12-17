@@ -1688,59 +1688,75 @@ WarpX::LoadExternalFields (int const lev)
         // Call Python callback which might write values to external field multifabs
         ExecutePythonCallback("loadExternalFields");
     }
-    // External particle fields
 
+    // External particle B fields
     if (mypc->m_B_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
-            "B", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
-            "B", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
-            "B", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
+        if (!metaB.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaB.size()); ++ic) {
+                const std::string& path = metaB[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
+                    "B", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
+                    "B", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
+                    "B", dimnames[2], ic);
+            }
+        }
     }
+
+    //  External particle E fields
     if (mypc->m_E_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
-            "E", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
-            "E", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
-            "E", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
+        if (!metaE.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaE.size()); ++ic) {
+                const std::string& path = metaE[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
+                    "E", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
+                    "E", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
+                    "E", dimnames[2], ic);
+            }
+        }
     }
 }
 
 void
 WarpX::ReadExternalFieldFromFile (
        const std::string& read_fields_from_path, amrex::MultiFab* mf,
-       const std::string& F_name, const std::string& F_component)
+       const std::string& F_name, const std::string& F_component, int dest_comp)
 {
 #if !defined(WARPX_USE_OPENPMD)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile requires OpenPMD support to be enabled");
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile is not supported for 1D RCYLINDER and RSPHERE");
 
 #else
@@ -1798,7 +1814,7 @@ WarpX::ReadExternalFieldFromFile (
                     (AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
                                   problo[2] + k *dx[2]));
-                mffab(i,j,k) = external_field_view(pos);
+                mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 
         ); // End ParallelFor
