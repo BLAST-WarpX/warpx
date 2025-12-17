@@ -1494,7 +1494,7 @@ Particle initialization
 
 * ``<species>.do_bhabha_beamsize_effect`` (`boolean`) optional (default `false`) 
     Applies the beam size effect on the virtual photons. 
-    This effect reduces the radiative Bhabha cross section by approximately half. Virtual photons :math:`x` and :math:`y` will be randomized around the coordinate
+    This effect reduces the radiative Bhabha scattering cross section by approximately half. Virtual photon :math:`x` and :math:`y` coordinates will be randomized around the coordinate
     of the equivalent primary and distributed on a disc of radius :math:`\rho=\frac{\hbar}{\sqrt{Q^2(1-x)}}` where :math:`Q` is the photon virtuality and :math`x` is the fractional photon energy.
     See :cite:t:`param-Kicsiny2024 for more details.
     
