@@ -1492,7 +1492,8 @@ Particle initialization
     This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
     It requires WarpX to be compiled with ``WarpX_QED=ON`` (CMake) or ``QED=TRUE`` (GNU Make).
 
-* ``<species>.do_bhabha_beamsize_effect`` (`bool`, optional, default `false`) applies the beam size effect on the virtual photons. 
+* ``<species>.do_bhabha_beamsize_effect`` (`boolean`) optional (default `false`) 
+    Applies the beam size effect on the virtual photons. 
     This effect reduces the radiative Bhabha cross section by approximately half. Virtual photons :math:`x` and :math:`y` will be randomized around the coordinate
     of the equivalent primary and distributed on a disc of radius :math:`\rho=\frac{\hbar}{\sqrt{Q^2(1-x)}}` where :math:`Q` is the photon virtuality and :math`x` is the fractional photon energy.
     See :cite:t:`param-Kicsiny2024 for more details.
