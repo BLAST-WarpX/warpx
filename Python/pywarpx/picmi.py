@@ -2391,53 +2391,41 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     """
-    Load external electromagnetic fields (E and/or B) from an openPMD file
-    and optionally apply time-dependent scaling factors.
+    Load external electromagnetic fields (E and/or B) from an openPMD file and
+    optionally apply a time-dependent scaling.
 
-    This class extends the standard PICMI interface to support both
-    **single-field loading** (one E/B field pair) and **multi-field loading**
-    (several independently scaled E/B field maps).
+    Multiple external field maps are supported by adding several
+    ``LoadAppliedField`` objects to the simulation via repeated calls to
+    ``Simulation.add_applied_field(...)``. Each instance contributes one
+    independently scaled field map; the resulting fields are summed by WarpX.
 
-    Examples
-    --------
-    **Single-field mode:**
-    ```python
-    applied_field = picmi.LoadAppliedField(
-        read_fields_from_path="diags/field_input",
-        load_E=True,
-        load_B=True,
-        warpx_E_time_function="cos(2*pi*2e6*t)",
-        warpx_B_time_function="cos(2*pi*2e6*t + pi/2)",
-    )
-    ```
+    Example (multiple applied fields)::
 
-    **Multi-field mode (multiple independent field maps):**
-    ```python
-    applied_field = picmi.LoadAppliedField(
-        load_E=False,
-        load_B=True,
-        B_external_fields={
-            "b1": {
-                "read_fields_from_path": "diags/Bfield_map1",
-                "read_fields_B_dependency(t)": f"cos({omega}*t + {phase})",
-            },
-            "b2": {
-                "read_fields_from_path": "diags/Bfield_map2",
-                "read_fields_B_dependency(t)": f"cos(2*{omega}*t + {phase})",
-            },
-        },
-    )
-    ```
-    In this case, each key (``b1``, ``b2``) identifies a field map and may include its own
-    time-dependent expression. The field dependencies are parsed and mangled with
-    ``my_constants`` before being passed to WarpX.
+        applied_field1 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(omega*t)",
+        )
+
+        applied_field2 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(2*omega*t)",
+        )
+
+        sim.add_applied_field(applied_field1)
+        sim.add_applied_field(applied_field2)
+
+    Internally, each object registers a uniquely named external field entry
+    (``particles.<name>.*``), ensuring that multiple applied fields compose
+    without overwriting each other.
 
     Parameters
     ----------
     read_fields_from_path : str, optional
         Path to diagnostics containing the external field data to load.
-        Required in single-field mode (i.e., when neither ``B_external_fields``
-        nor ``E_external_fields`` are provided). Ignored when fields are provided via dictionary
 
     load_E : bool, default=True
         If True, load the external E field from file.
@@ -2457,29 +2445,43 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
 
     warpx_do_initial_div_cleaning : bool, optional
         If True, run the projection-based B-field divergence cleaner after loading.
+        (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
         Absolute tolerance for the divergence cleaner solve.
 
     warpx_projection_div_cleaner_rtol : float, optional
         Relative tolerance for the divergence cleaner solve.
-
-    B_external_fields : dict, optional
-        Dictionary specifying multiple magnetic field maps to load.
-        Each key is a unique field name, and each value is a dict containing:
-        - ``read_fields_from_path`` (str): Path to the field data.
-        - ``read_fields_B_dependency(t)`` (str, optional): Time scaling expression.
-
-    E_external_fields : dict, optional
-        Same structure as ``B_external_fields`` but for electric fields.
-        Uses the key ``read_fields_E_dependency(t)`` for time scaling.
-
     """
 
-    def __init__(self, **kw):
-        self.B_external_fields = kw.pop("B_external_fields", None)
-        self.E_external_fields = kw.pop("E_external_fields", None)
+    _auto_field_counter = 0
 
+    def _next_auto_name(self):
+        LoadAppliedField._auto_field_counter += 1
+        return f"ext_field{LoadAppliedField._auto_field_counter}"
+
+    def _as_list(self, x):
+        if x is None:
+            return []
+        if isinstance(x, (list, tuple)):
+            return list(x)
+        if isinstance(x, str):
+            return [s for s in x.split() if s]
+        return [x]
+
+    def _append_names(self, list_key, new_names):
+        existing = None
+        try:
+            existing = getattr(pywarpx.particles, list_key)
+        except Exception:
+            existing = None
+        existing = self._as_list(existing)
+        for n in new_names:
+            if n not in existing:
+                existing.append(n)
+        pywarpx.particles.__setattr__(list_key, existing)
+
+    def __init__(self, **kw):
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
         self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
         self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
@@ -2492,15 +2494,9 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         base_keys = {"read_fields_from_path", "load_E", "load_B"}
         self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
 
-        # appease the base class requirement
+        # Base class requires read_fields_from_path -> enforce it
         if "read_fields_from_path" not in kw:
-            if self.B_external_fields or self.E_external_fields:
-                kw["read_fields_from_path"] = ""  # placeholder for multi-field mode
-            else:
-                raise ValueError(
-                    "LoadAppliedField requires 'read_fields_from_path' in single field mode "
-                    "(no B_external_fields/E_external_fields provided)."
-                )
+            raise ValueError("LoadAppliedField requires 'read_fields_from_path'.")
 
         super().__init__(**kw)
 
@@ -2510,92 +2506,52 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         if not self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "none"
 
-    def _apply_multi_particle_fields(
-        self, which: str, fields_dict: dict, mangle_dict: dict
-    ):
-        """
-        which: 'B' or 'E'
-        fields_dict: { name: {'read_fields_from_path': str,
-                              'read_fields_B_dependency(t)' or
-                              'read_fields_E_dependency(t)': str (optional)} }
-        """
-        assert which in ("B", "E")
-        if which == "B":
-            pywarpx.particles.B_ext_particle_init_style = "read_from_file"
-            list_key = "B_ext_particle_fields"
-            dep_key = "read_fields_B_dependency(t)"
-        else:
-            pywarpx.particles.E_ext_particle_init_style = "read_from_file"
-            list_key = "E_ext_particle_fields"
-            dep_key = "read_fields_E_dependency(t)"
-
-        names = list(fields_dict.keys())
-
-        # list of field names
-        pywarpx.particles.__setattr__(list_key, names)
-
-        for fname, fdict in fields_dict.items():
-            path = fdict.get("read_fields_from_path", None)
-            if not path:
-                raise ValueError(
-                    f"[PICMI] particles.{fname}.read_fields_from_path must be provided"
-                )
-            pywarpx.particles.__setattr__(f"{fname}.read_fields_from_path", path)
-
-            # time dependence (default "1.0"), then mangle with my_constants
-            dep_expr_raw = fdict.get(dep_key, "1.0")
-            dep_expr = pywarpx.my_constants.mangle_expression(dep_expr_raw, mangle_dict)
-            pywarpx.particles.__setattr__(f"{fname}.{dep_key}", dep_expr)
-
     def applied_field_initialize_inputs(self):
-        # Add the user defined keywords to my_constants
-        # The keywords are mangled if there is a conflicting variable already
-        # defined in my_constants with the same name but different value.
         mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
-        # In single field mode only keep the top-level path
-        if not self.B_external_fields and not self.E_external_fields:
-            if hasattr(self, "read_fields_from_path") and self.read_fields_from_path:
-                pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+        if not (self.load_E or self.load_B):
+            pywarpx.particles.E_ext_particle_init_style = "none"
+            pywarpx.particles.B_ext_particle_init_style = "none"
+            return
 
-        # enable file-loading styles
+        # Always register this object as a named external field so that multiple
+        # LoadAppliedField objects compose (no overwrite of global keys).
+        if not hasattr(self, "read_fields_from_path") or not self.read_fields_from_path:
+            raise ValueError("[PICMI] read_fields_from_path must be provided.")
+
+        # construct particles.<fname>.read_fields_from_path as needed for WarpX input
+        fname = self._next_auto_name()
+        pywarpx.particles.__setattr__(
+            f"{fname}.read_fields_from_path", self.read_fields_from_path
+        )
+
         if self.load_E:
-            if self.E_external_fields:
-                self._apply_multi_particle_fields(
-                    "E", self.E_external_fields, mangle_dict
-                )
-            else:
-                pywarpx.particles.E_ext_particle_init_style = "read_from_file"
-                if self.warpx_E_time_function:
-                    dep = pywarpx.my_constants.mangle_expression(
-                        self.warpx_E_time_function, mangle_dict
-                    )
-                    pywarpx.particles.__setattr__("read_fields_E_dependency(t)", dep)
+            pywarpx.particles.E_ext_particle_init_style = "read_from_file"
+            self._append_names("E_ext_particle_fields", [fname])
+
+            dep_raw = self.warpx_E_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_E_dependency(t)", dep)
         else:
-            # ensure E is not implicitly enabled by the base class
             pywarpx.particles.E_ext_particle_init_style = "none"
 
         if self.load_B:
-            if self.B_external_fields:
-                self._apply_multi_particle_fields(
-                    "B", self.B_external_fields, mangle_dict
-                )
-            else:
-                pywarpx.particles.B_ext_particle_init_style = "read_from_file"
-                pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-                pywarpx.warpx.add_new_group_attr(
-                    "projection_div_cleaner", "atol", self.div_cleaner_atol
-                )
-                pywarpx.warpx.add_new_group_attr(
-                    "projection_div_cleaner", "rtol", self.div_cleaner_rtol
-                )
-                if self.warpx_B_time_function:
-                    dep = pywarpx.my_constants.mangle_expression(
-                        self.warpx_B_time_function, mangle_dict
-                    )
-                    pywarpx.particles.__setattr__("read_fields_B_dependency(t)", dep)
+            pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+            self._append_names("B_ext_particle_fields", [fname])
+
+            # div cleaner knobs are global-ish: last set value wins
+            pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
+
+            dep_raw = self.warpx_B_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_B_dependency(t)", dep)
         else:
-            # ensure B is not implicitly enabled by the base class
             pywarpx.particles.B_ext_particle_init_style = "none"
 
 

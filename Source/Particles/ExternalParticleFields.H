@@ -23,8 +23,6 @@
 //  *
 //  */
 struct ParticleFieldMetaData {
-    //! Name of the field
-    std::string name;
     //! Path to the openPMD file containing the field
     std::string path;
     //! Time dependency function as a string

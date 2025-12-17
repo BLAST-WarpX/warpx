@@ -50,19 +50,18 @@ ions = picmi.Species(
 # -------------------
 # Applied field (file)
 # -------------------
-applied_field = picmi.LoadAppliedField(
+applied_field1 = picmi.LoadAppliedField(
+    read_fields_from_path="../../../../openPMD-example-datasets/example-femm-3d.h5",
     load_E=False,
     load_B=True,
-    B_external_fields={
-        "b1": {
-            "read_fields_from_path": path,
-            "read_fields_B_dependency(t)": f"cos({omega}*t + {phase})",
-        },
-        "b2": {
-            "read_fields_from_path": path,
-            "read_fields_B_dependency(t)": f"cos(2*{omega}*t + {phase})",
-        },
-    },
+    warpx_B_time_function=f"cos({omega}*t + {phase})",
+)
+
+applied_field2 = picmi.LoadAppliedField(
+    read_fields_from_path="../../../../openPMD-example-datasets/example-femm-3d.h5",
+    load_E=False,
+    load_B=True,
+    warpx_B_time_function=f"cos(2*{omega}*t + {phase})",
 )
 
 # -------------------
@@ -107,7 +106,8 @@ sim = picmi.Simulation(
     time_step_size=dt,
     particle_shape=1,
 )
-sim.add_applied_field(applied_field)
+sim.add_applied_field(applied_field1)
+sim.add_applied_field(applied_field2)
 sim.add_species(
     ions,
     layout=picmi.PseudoRandomLayout(
