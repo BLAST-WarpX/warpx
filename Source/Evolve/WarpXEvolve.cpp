@@ -270,6 +270,12 @@ WarpX::Evolve (int numsteps)
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
+        if (m_implicit_solver) {
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(step, cur_time, dt[0]);
+            ExecutePythonCallback("aftercollisions");
+        }
+
         // Field solve step for electrostatic or hybrid-PIC solvers
         if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
@@ -385,11 +391,6 @@ void WarpX::OneStep (
     if (m_implicit_solver) {
         // advance fields and particles by one time step
         m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
-
-        // perform particle collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(a_step, a_cur_time, a_dt);
-        ExecutePythonCallback("aftercollisions");
     }
     // explicit solver
     else {
