@@ -3,9 +3,9 @@
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
-import numpy as np
 
 from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # numerics parameters
@@ -112,14 +112,22 @@ sim.initialize_warpx()
 ##########################
 # python particle data access
 ##########################
+xp, _ = load_cupy()
 
 
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
-        return np.empty(0)
+        return xp.empty(0)
     else:
-        return np.concatenate(list_of_arrays)
+        return xp.concatenate(list_of_arrays)
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return arr
 
 
 def mirror_reflection():
@@ -136,9 +144,10 @@ def mirror_reflection():
     theta = concat(
         buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
     )
+
     z = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev))
-    x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-    y = r * np.sin(theta)
+    x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * xp.sin(theta)
     ux = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ux", lev))
     uy = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uy", lev))
     uz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uz", lev))
@@ -155,6 +164,16 @@ def mirror_reflection():
     ux_reflect = -2 * un * nx + ux  # for a "mirror reflection" u(sym)=-2(u.n)n+u
     uy_reflect = -2 * un * ny + uy
     uz_reflect = -2 * un * nz + uz
+
+    x = to_numpy(x)
+    y = to_numpy(y)
+    z = to_numpy(z)
+    w = to_numpy(w)
+    delta_t = to_numpy(delta_t)
+    ux_reflect = to_numpy(ux_reflect)
+    uy_reflect = to_numpy(uy_reflect)
+    uz_reflect = to_numpy(uz_reflect)
+
     electrons.add_particles(
         x=x + (dt - delta_t) * ux_reflect,
         y=y + (dt - delta_t) * uy_reflect,

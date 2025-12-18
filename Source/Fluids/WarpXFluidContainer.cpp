@@ -28,16 +28,21 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
 {
     ReadParameters();
 
+    WarpX &warpx = WarpX::GetInstance();
+    const amrex::Geometry &geom = warpx.Geom(0);
+
     // Initialize injection objects
     const ParmParse pp_species_name(species_name);
-    SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser, geom);
     SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
         ux_parser, uy_parser, uz_parser, ux_th_parser, uy_th_parser, uz_th_parser, h_mom_temp, h_mom_vel);
     if (h_inj_rho) {
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
             (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        if (! h_inj_rho->needPreparation()) {
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        }
 #else
         d_inj_rho = h_inj_rho.get();
 #endif
@@ -173,21 +178,36 @@ void WarpXFluidContainer::InitData(
     // Convert initialization box to nodal box
     init_box.surroundingNodes();
 
-    // Create local copies of pointers for GPU kernels
-    InjectorDensity* inj_rho = d_inj_rho;
-    InjectorMomentum* inj_mom = d_inj_mom;
-
     // Extract grid geometry properties
     const auto dx = geom_lev.CellSizeArray();
     const auto problo = geom_lev.ProbLoArray();
     const amrex::Real clight = PhysConst::c;
 
+    // Create local copies of pointers for GPU kernels
+    InjectorMomentum* inj_mom = d_inj_mom;
+
+    if (h_inj_rho && h_inj_rho->needPreparation()) {
+        auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+        {
+            return gamma_boost*(z + beta_boost*clight*cur_time);
+        };
+        auto const& mf = *fields.get(name_mf_N, lev);
+        h_inj_rho->prepare(mf.boxArray(), mf.DistributionMap(), IntVect(0), get_zlab);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+#endif
+    }
+
     // Loop through cells and initialize their value
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+#pragma omp parallel
 #endif
     for (MFIter mfi(*fields.get(name_mf_N, lev), TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
+        InjectorDensity* inj_rho = d_inj_rho;
+        if (h_inj_rho->distributed()) {
+            h_inj_rho->prepare(mfi.LocalIndex(), &inj_rho);
+        }
 
         amrex::Box const tile_box  = mfi.tilebox(fields.get(name_mf_N, lev)->ixType().toIntVect());
         amrex::Array4<Real> const &N_arr = fields.get(name_mf_N, lev)->array(mfi);
@@ -252,6 +272,12 @@ void WarpXFluidContainer::InitData(
 
             }
         );
+
+        if (h_inj_rho->distributed()) {
+            // h_inj_rho is shared by multiple GPU streams. We need to sync
+            // to avoid race conditions in h_inj_rho->prepare(int).
+            Gpu::streamSynchronize();
+        }
     }
 }
 

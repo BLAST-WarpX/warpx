@@ -7,6 +7,7 @@
 #ifndef WARPX_SPECIES_UTILS_H_
 #define WARPX_SPECIES_UTILS_H_
 
+#include <AMReX_Geometry.H>
 #include <AMReX_REAL.H>
 #include "Initialization/InjectorDensity.H"
 #include "Initialization/InjectorMomentum.H"
@@ -23,7 +24,8 @@ namespace SpeciesUtils {
 
     void parseDensity (std::string const& species_name, std::string const& source_name,
         std::unique_ptr<InjectorDensity,InjectorDensityDeleter>& h_inj_rho,
-        std::unique_ptr<amrex::Parser>& density_parser);
+        std::unique_ptr<amrex::Parser>& density_parser,
+        amrex::Geometry const& geom);
 
     void parseMomentum (std::string const& species_name, std::string const& source_name, const std::string& style,
         std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter>& h_inj_mom,

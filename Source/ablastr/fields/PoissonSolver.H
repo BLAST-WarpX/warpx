@@ -416,6 +416,8 @@ computePhi (
             mlmg.setFinalFillBC(true);
         }
 
+        rho[lev]->OverrideSync(geom[lev].periodicity());
+
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
                      relative_tolerance, absolute_tolerance );
