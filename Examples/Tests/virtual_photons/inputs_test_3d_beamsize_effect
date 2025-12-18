@@ -2,21 +2,17 @@
 ########## MY CONSTANTS #########
 #################################
 my_constants.mc2   = m_e*clight*clight
-my_constants.nano  = 1.0e-9
-my_constants.micro = 1.e-6
 my_constants.GeV   = q_e*1.e9
 
 # BEAMS
 my_constants.beam_energy = 182.5*GeV
-my_constants.beam_gamma  = beam_energy/mc2 
+my_constants.beam_gamma  = beam_energy/mc2
 my_constants.beam_npart  = 155000000000 # [e]
 my_constants.nmacropart  = 1
 my_constants.beam_charge = q_e * beam_npart
 my_constants.sigmax      = 1 # [m]
 my_constants.sigmay      = 1 # [m]
 my_constants.sigmaz      = 0.00217 # [m]
-my_constants.mux         = 0.
-my_constants.muy         = 0.
 my_constants.muz         = 4*sigmaz
 
 # VIRTUAL PHOTONS
@@ -30,9 +26,6 @@ my_constants.Lz = 16*sigmaz
 my_constants.nx = 32
 my_constants.ny = 32
 my_constants.nz = 32
-my_constants.dx = Lx/nx
-my_constants.dy = Ly/ny
-my_constants.dz = Lz/nz
 
 # TIME
 my_constants.T = 0.5*Lz/clight
@@ -73,7 +66,7 @@ beam1.species_type = electron
 beam1.injection_style = gaussian_beam
 beam1.x_rms = sigmax
 beam1.y_rms = sigmay
-beam1.z_rms = sigmaz 
+beam1.z_rms = sigmaz
 beam1.x_m = 0
 beam1.y_m = 0
 beam1.z_m = - muz
@@ -98,7 +91,7 @@ beam2.injection_style = gaussian_beam
 beam2.x_rms = sigmax
 beam2.y_rms = sigmay
 beam2.z_rms = sigmaz
-beam2.x_m = 0 
+beam2.x_m = 0
 beam2.y_m = 0
 beam2.z_m = muz
 beam2.npart = nmacropart
