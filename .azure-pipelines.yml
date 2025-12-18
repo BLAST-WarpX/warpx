@@ -32,6 +32,7 @@ jobs:
     CEI_TMP: '/tmp/cei'
     CMAKE_GENERATOR: 'Ninja'
     FFTW_HOME: '/usr'
+    PETSC_ARCH: 'arch-opt'
     LAPACKPP_HOME: '/usr/local'
     WARPX_CI_CCACHE: 'TRUE'
     #WARPX_OPENPMD: 'TRUE'
@@ -43,7 +44,7 @@ jobs:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cartesian 2D
       cartesian_2d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 3D
       cartesian_3d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
@@ -86,7 +87,7 @@ jobs:
       sudo apt install -y ccache curl gcc gfortran git g++ ninja-build \
         openmpi-bin libopenmpi-dev \
         libfftw3-dev libfftw3-mpi-dev libhdf5-openmpi-dev pkg-config make \
-        python3 python3-pandas python3-pip python3-venv python3-setuptools libblas-dev liblapack-dev
+        python3 python3-pandas python3-pip python3-venv python3-setuptools libblas-dev liblapack-dev libsuperlu-dev libsuperlu-dist-dev
       ccache --set-config=max_size=10.0G
       python3 -m pip install --upgrade pip
       python3 -m pip install --upgrade build
@@ -108,6 +109,27 @@ jobs:
       #    -DopenPMD_USE_PYTHON=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_CLI_TOOLS=OFF
       #  #python3 -m pip install --upgrade openpmd-api
       #fi
+      if [[ "${WARPX_CMAKE_FLAGS}" == *"-DWarpX_PETSC=ON"* ]]; then
+         git clone --depth 1 --shallow-submodules -b release https://gitlab.com/petsc/petsc.git petsc
+         cd petsc
+         ./configure                        \
+             --prefix=/usr                  \
+             --with-fortran-bindings=no     \
+             --with-x=no                    \
+             --with-cc="ccache mpicc"       \
+             --with-fc="ccache mpif90"      \
+             --with-cxx="ccache mpicxx"     \
+             --with-debugging=0             \
+             --with-superlu=1                            \
+             --with-superlu-include=/usr/include/superlu \
+             --with-superlu-lib="-lsuperlu"              \
+             --with-superlu_dist=1                                 \
+             --with-superlu_dist-include=/usr/include/superlu-dist \
+             --with-superlu_dist-lib="-lsuperlu_dist"
+         make -j 2
+         sudo make install
+         cd -
+      fi
       if [ "${WARPX_RZ_FFT:-FALSE}" == "TRUE" ]; then
         # BLAS++
         cmake-easyinstall --prefix=/usr/local           \
