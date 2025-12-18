@@ -242,6 +242,43 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::y][ip] = y;
                         pa_vp[PIdx::z][ip] = z;
+                        // Beam size effect: displace the virtual photon position according to the virtuality
+                        if (do_beam_size_effect){
+                            // Find distance at which the photon should be displaced (radius)
+                            // Refer to [ADD REFERENCE]
+                            // radius = hbar * c / [ e * sqrt( Q2*(1-y) ) ]
+                            // where Q2 is the virtuality, y the fractional energy
+                            // log(Q2) is uniformly distributed between Q2_min and Q2_max
+                            // where Q2_min = y^2 Q2_max, Q2_max = (m_e * c)^2
+                            // which implies that Q2 can be sampled as
+                            // Q2 = Q2_min * (Q2_max / Q2_min)^(rnd)
+                            // where rnd is a random number uniformly distributed between 0 and 1
+                            const amrex::ParticleReal compton_wavelength = PhysConst::hbar / (PhysConst::m_e * PhysConst::c);
+                            amrex::ParticleReal radius = compton_wavelength * std::pow(frac_energy,  amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
+
+                            amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
+                            amrex::ParticleReal cos_theta = std::cos(theta);
+                            amrex::ParticleReal sin_theta = std::sin(theta);
+
+                            // The displacement must be perpendicular to the momentum
+                            // Find two unit vectors perpendicular to the momentum
+                            amrex::ParticleReal x_dot_n = x * nx + y * ny + z * nz;
+                            amrex::ParticleReal x_perp1 = x - x_dot_n * nx;
+                            amrex::ParticleReal y_perp1 = y - x_dot_n * ny;
+                            amrex::ParticleReal z_perp1 = z - x_dot_n * nz;
+                            amrex::ParticleReal perp1_norm = std::sqrt(x_perp1*x_perp1 + y_perp1*y_perp1 + z_perp1*z_perp1);
+                            amrex::ParticleReal nx_perp1 = x_perp1 / perp1_norm;
+                            amrex::ParticleReal ny_perp1 = y_perp1 / perp1_norm;
+                            amrex::ParticleReal nz_perp1 = z_perp1 / perp1_norm;
+                            amrex::ParticleReal nx_perp2 = ny*nz_perp1-nz*ny_perp1;
+                            amrex::ParticleReal ny_perp2 = nz*nx_perp1-nx*nz_perp1;
+                            amrex::ParticleReal nz_perp2 = nx*ny_perp1-ny*nx_perp1;
+
+                            // Move the photon position by radius along a random direction perpendicular to the momentum
+                            pa_vp[PIdx::x][ip] += radius * (cos_theta * nx_perp1 + sin_theta * nx_perp2);
+                            pa_vp[PIdx::y][ip] += radius * (cos_theta * ny_perp1 + sin_theta * ny_perp2);
+                            pa_vp[PIdx::z][ip] += radius * (cos_theta * nz_perp1 + sin_theta * nz_perp2);
+                        } // beam size effect
 #elif defined (WARPX_DIM_XZ)
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::z][ip] = z;
@@ -261,23 +298,6 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 #endif
                         pa_vp[PIdx::w][ip] = w / sampling_factor;
                         pid_vp[ip] = amrex::SetParticleIDandCPU(pid_start + ip, cpuid);
-
-                        // Beam size effect: displace the virtual photon position according to the virtuality
-                        if (do_beam_size_effect){
-
-                            // Sample the virtuality Q2 = -q2 = -t of the photon [eV^2]
-                            amrex::ParticleReal Q2_max = PhysConst::m_e * PhysConst::m_e / (PhysConst::q_e * PhysConst::q_e) * std::pow(PhysConst::c, 4); // [eV^2]
-                            amrex::ParticleReal Q2_min = frac_energy * frac_energy * Q2_max; // [eV^2]
-                            amrex::ParticleReal vphoton_Q2 = Q2_min * std::pow(Q2_max / Q2_min, amrex::Random(engine)); // [eV^2]
-                            amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
-                            amrex::ParticleReal cos_theta = std::cos(theta);
-                            amrex::ParticleReal sin_theta = std::sin(theta);
-                            // radius = hbar * m_e * c^3 / e^2 * y^(1-rnd) * sqrt(1-y)
-                            amrex::ParticleReal radius = PhysConst::hbar / PhysConst::q_e * PhysConst::c / std::sqrt(vphoton_Q2 * (1._rt - frac_energy));
-                            radius = std::min(radius, 1e5); // [m]
-                            pa_vp[PIdx::x][ip] += cos_theta * radius;
-                            pa_vp[PIdx::y][ip] += sin_theta * radius;
-                        } // beam size effect
                     } // vphoton loop
                 });
             } // mfi
