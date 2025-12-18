@@ -847,7 +847,7 @@ public:
      */
     void ReadExternalFieldFromFile (
          const std::string& read_fields_from_path, amrex::MultiFab* mf,
-         const std::string& F_name, const std::string& F_component);
+         const std::string& F_name, const std::string& F_component, int dest_comp = 0);
 
     /**
      * \brief

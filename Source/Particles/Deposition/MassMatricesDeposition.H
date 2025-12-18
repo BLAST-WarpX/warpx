@@ -655,6 +655,8 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
  * \param dt                       Time step for particle level
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   Physical lower bounds of domain
+ * \param domain_double            The domain boundary indicies cast to double values
+ * \param do_cropping              Whether to crop particle orbits at domain boundaries
  * \param lo                       Index lower bounds of domain
  */
 template <int depos_order, bool full_mass_matrices>
@@ -695,6 +697,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                                              const amrex::Real dt,
                                              const amrex::XDim3& dinv,
                                              const amrex::XDim3& xyzmin,
+                                             const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                             const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                              const amrex::Dim3 lo )
 {
 
@@ -716,7 +720,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
@@ -739,14 +743,14 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     amrex::Real const sinphi_mid = (rp_mid > 0._rt ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
     amrex::Real const vz = (-uxp_mid*costheta_mid*cosphi_mid - uyp_mid*sintheta_mid*cosphi_mid + uzp_mid*sinphi_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (xp_new - xp_old)/dt;
     amrex::Real const vy = uyp_mid*gaminv;
@@ -755,9 +759,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     amrex::Real const vy = uyp_mid*gaminv;
 #elif defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
-    double const y_new = (yp_new - xyzmin.y)*dinv.y;
+    double y_new = (yp_new - xyzmin.y)*dinv.y;
     double const y_old = (yp_old - xyzmin.y)*dinv.y;
     amrex::Real const vx = (xp_new - xp_old)/dt;
     amrex::Real const vy = (yp_new - yp_old)/dt;
@@ -765,7 +769,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // Keep these double to avoid bug in single precision
-    double const z_new = (zp_new - xyzmin.z)*dinv.z;
+    double z_new = (zp_new - xyzmin.z)*dinv.z;
     double const z_old = (zp_old - xyzmin.z)*dinv.z;
     amrex::Real const vz = (zp_new - zp_old)/dt;
 #endif
@@ -774,6 +778,36 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     amrex::Real const wqx = wq_invvol*vx;
     amrex::Real const wqy = wq_invvol*vy;
     amrex::Real const wqz = wq_invvol*vz;
+
+    // Compute total change in particle position (always do before cropping)
+#if !defined(WARPX_DIM_1D_Z)
+    const double dxp = x_new - x_old;
+#endif
+#if defined(WARPX_DIM_3D)
+    const double dyp = y_new - y_old;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    const double dzp = z_new - z_old;
+#endif
+
+    // Crop particle orbits at absorbing domain boundaries
+#if defined(WARPX_DIM_3D)
+    ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#endif
 
     // 1) Determine the number of segments.
     // 2) Loop over segments and deposit current.
@@ -805,12 +839,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
+    // Compute initial particle cell locations in each direction
+    // used to find the position at cell crossings.
     // Keep these double to avoid bug in single precision
-    const double dxp = x_new - x_old;
-    const double dyp = y_new - y_old;
-    const double dzp = z_new - z_old;
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -990,11 +1021,9 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
+    // Compute initial particle cell locations in each direction
+    // used to find the position at cell crossings.
     // Keep these double to avoid bug in single precision
-    const double dxp = x_new - x_old;
-    const double dzp = z_new - z_old;
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Xcell = 0., Zcell = 0.;
@@ -1308,9 +1337,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_x = std::abs(i_new-i_old);
     num_segments += cell_crossings_x;
 
-    // Compute dxp and the initial cell location used to find the cell crossings.
+    // Compute the initial cell location used to find the cell crossings.
     // Keep these double to avoid bug in single precision
-    double const dxp = x_new - x_old;
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
 
@@ -1392,9 +1420,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // Compute dzp and the initial cell location used to find the cell crossings.
+    // Compute initial particle cell location used to find cell crossings.
     // Keep these double to avoid bug in single precision
-    double const dzp = z_new - z_old;
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
 
@@ -1573,6 +1600,8 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param dt                       Time step for particle level
  * \param dinv                     3D cell size inverse
  * \param xyzmin                   Physical lower bounds of domain.
+ * \param domain_double            The domain boundary indicies cast to double values
+ * \param do_cropping              Whether to crop particle orbits at domain boundaries
  * \param lo                       Index lower bounds of domain.
  * \param qs                       Species charge.
  * \param ms                       Species mass.
@@ -1612,6 +1641,8 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                        const amrex::Real dt,
                                        const amrex::XDim3& dinv,
                                        const amrex::XDim3& xyzmin,
+                                       const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                        const amrex::Dim3 lo,
                                        const amrex::Real qs,
                                        const amrex::Real ms )
@@ -1688,7 +1719,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,
                                                                 Szx_arr, Szy_arr, Szz_arr,
-                                                                dt, dinv, xyzmin, lo );
+                                                                dt, dinv, xyzmin, domain_double, do_cropping, lo );
 
     });
 }

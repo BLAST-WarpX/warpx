@@ -496,6 +496,7 @@ Domain Boundary Conditions
     * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for RZ, RCYLINDER, and RSPHERE. Please use ``none`` option. This boundary condition does not work with the spectral solver.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross PEC boundaries, defaulting to false.
 
     * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
 
@@ -505,6 +506,7 @@ Domain Boundary Conditions
       The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
       expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
       magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross pec_insulator boundaries, defaulting to false.
 
       * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
 
@@ -965,6 +967,11 @@ Particle initialization
 
       * ``<species_name>.q_tot`` (beam charge),
 
+      * ``<species_name>.npart_real`` (total number of real particles in the beam)
+
+      The user must define one and only only between ``q_tot`` and ``npart_real``.
+      The latter must be used for neutral species.
+
       * ``<species_name>.npart`` (number of macroparticles in the beam),
 
       * ``<species_name>.x/y/z_m`` (average position in `x/y/z`),
@@ -1129,7 +1136,16 @@ Particle initialization
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field named ``density``. See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file.
+      for an example of how to prepare the openPMD data file. There is
+      another optional parameter,
+      ``<species_name>.read_density_distributed=true``, which controls how the
+      openPMD data are distributed among processes. If it is set to false, the
+      openPMD data are loaded and duplicated on every process. If it is set to
+      true, the openPMD data required for initializing the density profile
+      are distributed among MPI processes. If particles are continuously
+      injected during the simulation and
+      ``<species_name>.read_density_distributed`` is true, chunks of the
+      openPMD data are loaded and cached as needed.
 
 * ``<species_name>.flux_profile`` (`string`)
     Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
@@ -1480,13 +1496,17 @@ Particle initialization
     The virtual photon species has to be created as a regular photon species in the input file.
     Virtual photons are created from scratch at each timestep at the same position as the parent particle.
     This implies that different primary species must have different virtual photon species.
-    The energy of the virtual photons is sampled from their spectrum (see :cite:t:`LandauVol4` section 99 for more details).
+    The energy of the virtual photons is sampled from their spectrum (see :cite:t:`param-LandauVol4` section 99 for more details).
     The momentum of the virtual photons is parallel to that of the parent particle.
     This feature also requires the following input parameters:
+
       * ``<species>.qed_virtual_photon_species_name`` (`string`) name of the virtual photon species associated with the current lepton species.
-      * ``<virtual_photon_species>.qed_virtual_photon_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
-      * ``<virtual_photon_species>.qed_virtual_photon_multiplier`` (`int`), sampling factor for the virtual photons.
+
+      * ``<virtual_photon_species>.qed_virtual_photons_min_energy`` (`float`, in Joules) minimum energy of the virtual photons
+
+      * ``<virtual_photon_species>.qed_virtual_photons_multiplier`` (`int`), sampling factor for the virtual photons.
         A sampling factor of ``f`` means that the number of virtual photons is multiplied by ``f``, while their weights are divided by ``f``.
+
     The virtual photons can undergo collisions via the linear Breit-Wheeler or linear Compton processes.
     This is useful to model incoherent beam-beam effects in colliders (e.g. pair generation, radiative Bhabha scattering).
     This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
@@ -1887,28 +1907,74 @@ are applied to the particles directly, at each timestep. As a results, these fie
 
       Note that the position is defined in Cartesian coordinates, as a function of (x,y,z), even for RZ, RCYLINDER, and RSPHERE.
 
-    * ``read_from_file``: load the external field from an openPMD file.
-        An additional parameter, indicating the path of an openPMD data file, ``particles.read_fields_from_path``
-        must be specified, from which the external E field data can be loaded into WarpX.
-        One can refer to input files in ``Examples/Tests/LoadExternalField`` for more information.
-        Regarding how to prepare the openPMD data file, one can refer to
-        the `openPMD-example-datasets <https://github.com/openPMD/openPMD-example-datasets>`__.
-        Note that if both ``B_ext_particle_init_style`` and ``E_ext_particle_init_style`` are set to
-        ``read_from_file``, the openPMD file specified by ``particles.read_fields_from_path``
-        should contain both B and E external fields data.
+    * ``read_from_file``: load external fields from openPMD files.
 
-        .. note::
+        There are two ways to specify external field data: **single-field mode**
+        and **multi-field mode**.
 
-            When using ``read_from_file``, the fields loaded from the file will be interpolated
-            to the resolution of the grid used for the simulation. These fields are seen by the diagnostics.
+        **Single-field mode**
 
-        The time dependency of the E- and B-field can be specified by the input parameter:
+        In this mode, a single external E and/or B field is loaded from the path
+        given by ``particles.read_fields_from_path``. This parameter must always
+        be provided when using ``read_from_file``.
+
+        The time dependency of the E- and B-field can be specified by the input parameters:
 
         * ``particles.read_fields_E_dependency(t)``
 
         * ``particles.read_fields_B_dependency(t)``
 
-        The time dependency scales the E- and B-field uniformly in space by the given function.
+        The time dependency scales the corresponding field uniformly in space
+        and per level by the given function of time ``t`` (in seconds).
+
+        Example:
+
+        .. code-block:: none
+
+            particles.E_ext_particle_init_style = read_from_file
+            particles.B_ext_particle_init_style = read_from_file
+            particles.read_fields_from_path = diags/field_input
+            particles.read_fields_E_dependency(t) = cos(2*pi*2e6*t)
+            particles.read_fields_B_dependency(t) = cos(2*pi*2e6*t + pi/2)
+
+        If both ``B_ext_particle_init_style`` and ``E_ext_particle_init_style`` are set to
+        ``read_from_file``, the same openPMD file specified by
+        ``particles.read_fields_from_path`` should contain both E and B field data.
+
+        **Multi-field mode**
+
+        In this mode, several field maps can be loaded independently. Each field
+        is given a unique name listed in
+
+        * ``particles.E_ext_particle_fields``  (for electric fields)
+        * ``particles.B_ext_particle_fields``  (for magnetic fields)
+
+        Each named field must define its own path and may optionally define a
+        time dependency. The general key ``particles.read_fields_from_path`` is
+        ignored when these lists are provided.
+
+        Example:
+
+        .. code-block:: none
+
+            particles.B_ext_particle_init_style = read_from_file
+            particles.B_ext_particle_fields = b1 b2
+            particles.b1.read_fields_from_path = diags/Bfield_map1
+            particles.b1.read_fields_B_dependency(t) = cos(omega*t + phase)
+            particles.b2.read_fields_from_path = diags/Bfield_map2
+            particles.b2.read_fields_B_dependency(t) = cos(2*omega*t + phase)
+
+        Each field's scaling function is evaluated independently and may contain
+        user-defined constants. The expressions are parsed on the C++ side.
+
+        .. note::
+
+            When using ``read_from_file``, the fields loaded from file are interpolated
+            to the resolution of the grid used for the simulation. These interpolated
+            fields are visible to diagnostics.
+
+        To prepare openPMD-compatible field data files, see the
+        `openPMD-example-datasets <https://github.com/openPMD/openPMD-example-datasets>`__.
 
 
     * ``repeated_plasma_lens``: apply a series of plasma lenses.

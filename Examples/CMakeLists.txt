@@ -36,7 +36,6 @@ function(add_warpx_test
 )
     # cannot run MPI tests w/o MPI build
     if(nprocs GREATER_EQUAL 2 AND NOT WarpX_MPI)
-        message(WARNING "${name}: cannot run MPI tests without MPI build")
         return()
     endif()
 
