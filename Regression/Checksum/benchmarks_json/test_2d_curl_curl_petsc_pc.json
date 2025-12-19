@@ -1,31 +1,15 @@
 {
   "lev=0": {
-    "Bx": 9.069162586111297,
-    "By": 19.361810144285307,
-    "Bz": 12.107034717007863,
-    "Ex": 4193780781.9712296,
-    "Ey": 3007724460.40948,
-    "Ez": 4187550905.2162943,
-    "divE": 46810632867690.65,
+    "Bx": 0.0,
+    "By": 60.01815027050017,
+    "Bz": 0.0,
+    "Ex": 2.1122927397938126e-5,
+    "Ey": 0.0,
+    "Ez": 68249196990.12999,
+    "divE": 0.25157679798690386,
     "jx": 0.0,
     "jy": 0.0,
     "jz": 0.0,
     "rho": 0.0
-  },
-  "electrons": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_weight": 0.0
-  },
-  "deuterium": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_weight": 0.0
   }
 }
