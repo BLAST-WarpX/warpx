@@ -140,6 +140,5 @@ diag1.diag_type = Full
 diag1.write_species = 1
 diag1.species = beam1 beam2 virtual_photons1 virtual_photons2
 diag1.format = openpmd
-diag1.openpmd_backend = bp
 diag1.virtual_photons1.variables = uz w x y z
 diag1.virtual_photons2.variables = uz w x y z
