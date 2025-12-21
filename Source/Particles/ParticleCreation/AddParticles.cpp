@@ -382,7 +382,9 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const amrex::Real focal_distance = plasma_injector.focal_distance;
     const amrex::Real rotation_angle = plasma_injector.rotation_angle;
     const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
     const amrex::Real crabwaist_strength = plasma_injector.crabwaist_strength;
+#endif
 
     // Declare temporary vectors on the CPU
     amrex::Gpu::HostVector<ParticleReal> particle_x;
@@ -465,16 +467,15 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 x = x - (v_x - v_dot_n*n_x) * t;
 #endif
             }
-
-        // crabwaist before rotation
-	// Lorentz boost currently only possible along z direction: x and z coords swapped if boost on, not if I only rotate
-        if (plasma_injector.do_crabwaist){
-          const Real acw = -crabwaist_strength/std::tan(2*rotation_angle);
-          u.x += 0.5 * acw * u.y*u.y;
-          y  -= acw * x*u.y;
-        }
-
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+        // crabwaist before rotation
+            // Lorentz boost currently only possible along z direction: x and z coords swapped if boost on, not if I only rotate
+            if (plasma_injector.do_crabwaist){
+              const Real acw = -crabwaist_strength/std::tan(2*rotation_angle);
+              u.x += 0.5 * acw * u.y*u.y;
+              y  -= acw * x*u.y;
+            }
+
             if (plasma_injector.do_rotation){
 
                     // normalize the rotation axis
