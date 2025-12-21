@@ -2,13 +2,11 @@
 ########## MY CONSTANTS #########
 #################################
 my_constants.mc2   = m_e*clight*clight
-my_constants.nano  = 1.0e-9
-my_constants.micro = 1.e-6
 my_constants.GeV   = q_e*1.e9
 
 # BEAMS
 my_constants.beam_energy = 182.5*GeV # [J]
-my_constants.beam_gamma  = beam_energy/mc2 
+my_constants.beam_gamma  = beam_energy/mc2
 my_constants.beam_npart  = 155000000000 # [e]
 my_constants.nmacropart  = 1e6 # [1]
 my_constants.beam_charge = q_e * beam_npart # [C]
@@ -29,10 +27,7 @@ my_constants.Ly = 512*sigma_y
 my_constants.Lz = 512*sigma_z
 my_constants.nx = 32
 my_constants.ny = 32
-my_constants.nz = 3 
-my_constants.dx = Lx/nx
-my_constants.dy = Ly/ny
-my_constants.dz = Lz/nz
+my_constants.nz = 3
 
 # TIME
 my_constants.T = 0.5*Lz/clight
@@ -74,7 +69,7 @@ beam1.injection_style = gaussian_beam
 beam1.momentum_distribution_type = gaussian
 beam1.x_rms = sigma_x
 beam1.y_rms = sigma_y
-beam1.z_rms = sigma_z 
+beam1.z_rms = sigma_z
 beam1.ux_th = sigma_px
 beam1.uy_th = sigma_py
 beam1.uz_th = sigma_pz
@@ -105,7 +100,7 @@ beam2.z_rms = sigma_z
 beam2.ux_th = sigma_px
 beam2.uy_th = sigma_py
 beam2.uz_th = sigma_pz
-beam2.x_m = 0 
+beam2.x_m = 0
 beam2.y_m = 0
 beam2.z_m = 0
 beam2.uy_m = 0
@@ -134,6 +129,5 @@ diag1.diag_type = Full
 diag1.write_species = 1
 diag1.species = beam1 beam2
 diag1.format = openpmd
-diag1.openpmd_backend = bp
 diag1.virtual_photons1.variables = ux uy uz w x y z
 diag1.virtual_photons2.variables = ux uy uz w x y z
