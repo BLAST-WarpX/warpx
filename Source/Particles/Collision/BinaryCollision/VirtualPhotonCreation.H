@@ -69,7 +69,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
 #if defined (WARPX_DIM_3D)
-        bool do_beam_size_effect = primary.has_bhabha_beam_size_effect();
+        bool do_beam_size_effect = primary.has_virtual_photons_beam_size_effect();
 #endif
         // Minimum allowed energy of the virtual photons
         amrex::Real vphoton_min_energy;
