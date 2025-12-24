@@ -566,12 +566,8 @@ PEC::ApplyPECtoEfield (
     }
     const amrex::IntVect domain_lo = domain_box.smallEnd();
     const amrex::IntVect domain_hi = domain_box.bigEnd();
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo;
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi;
-    for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        fbndry_lo[idim] = field_boundary_lo[idim];
-        fbndry_hi[idim] = field_boundary_hi[idim];
-    }
+    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
+    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
     const amrex::IntVect Ex_nodal = Efield[0]->ixType().toIntVect();
     const amrex::IntVect Ey_nodal = Efield[1]->ixType().toIntVect();
     const amrex::IntVect Ez_nodal = Efield[2]->ixType().toIntVect();
@@ -650,12 +646,8 @@ PEC::ApplyPECtoBfield (
     }
     const amrex::IntVect domain_lo = domain_box.smallEnd();
     const amrex::IntVect domain_hi = domain_box.bigEnd();
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo;
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi;
-    for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
-        fbndry_lo[idim] = field_boundary_lo[idim];
-        fbndry_hi[idim] = field_boundary_hi[idim];
-    }
+    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
+    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
     const amrex::IntVect Bx_nodal = Bfield[0]->ixType().toIntVect();
     const amrex::IntVect By_nodal = Bfield[1]->ixType().toIntVect();
     const amrex::IntVect Bz_nodal = Bfield[2]->ixType().toIntVect();

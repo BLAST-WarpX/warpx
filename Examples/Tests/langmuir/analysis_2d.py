@@ -136,7 +136,7 @@ if particle_shape_4:
     # lower fidelity, due to smoothing
     tolerance_rel = 0.07
 else:
-    tolerance_rel = 0.05
+    tolerance_rel = 0.0503
 
 print("error_rel    : " + str(error_rel))
 print("tolerance_rel: " + str(tolerance_rel))

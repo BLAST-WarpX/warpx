@@ -160,10 +160,13 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                     {
                         for (int v = 0; v < ncomp; v++) {
                             int dof = dof_arr(i,j,k,2*v); // local
-                            data_arr(i,j,k,v) = a_arr[dof];
+                            if (dof >= 0) {
+                                data_arr(i,j,k,v) = a_arr[dof];
+                            }
                         }
                     });
                 }
+                m_array_vec[lev][n]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
             }
         }
         if (m_scalar_type != FieldType::None) {
@@ -176,10 +179,13 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                 {
                     for (int v = 0; v < ncomp; v++) {
                         int dof = dof_arr(i,j,k,2*v); // local
-                        data_arr(i,j,k,v) = a_arr[dof];
+                        if (dof >= 0) {
+                            data_arr(i,j,k,v) = a_arr[dof];
+                        }
                     }
                 });
             }
+            m_scalar_vec[lev]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         }
     }
 }
@@ -205,7 +211,9 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                     {
                         for (int v = 0; v < ncomp; v++) {
                             int dof = dof_arr(i,j,k,2*v); // local
-                            a_arr[dof] = data_arr(i,j,k,v);
+                            if (dof >= 0) {
+                                a_arr[dof] = data_arr(i,j,k,v);
+                            }
                         }
                     });
                 }
@@ -221,7 +229,9 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                 {
                     for (int v = 0; v < ncomp; v++) {
                         int dof = dof_arr(i,j,k,2*v); // local
-                        a_arr[dof] = data_arr(i,j,k,v);
+                        if (dof >= 0) {
+                            a_arr[dof] = data_arr(i,j,k,v);
+                        }
                     }
                 });
             }
