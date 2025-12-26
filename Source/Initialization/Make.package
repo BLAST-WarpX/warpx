@@ -1,3 +1,4 @@
+CEXE_sources += BackwardCompatibility.cpp
 CEXE_sources += ExternalField.cpp
 CEXE_sources += GetTemperature.cpp
 CEXE_sources += GetVelocity.cpp
