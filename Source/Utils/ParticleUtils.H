@@ -329,8 +329,7 @@ namespace ParticleUtils {
                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping)
     {
 
-        // Check if particle's position is out of bounds
-        bool out_of_bounds = false;
+        // Store logical particle position (in grid units) in temporary array
         amrex::GpuArray<double,AMREX_SPACEDIM> xp_grid;
 #if defined(WARPX_DIM_3D)
         xp_grid[0] = (xp - xyzmin.x)*dinv.x;
@@ -350,6 +349,8 @@ namespace ParticleUtils {
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
 #endif
 #endif
+        // Check if particle's position is out of bounds
+        bool out_of_bounds = false;
         for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
             if (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) {
                 out_of_bounds = true;
