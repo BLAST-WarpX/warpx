@@ -318,6 +318,7 @@ namespace ParticleUtils {
      * \param[in] xyzmin          Physical lower bounds of domain
      * \param[in] domain_double   The domain boundary indicies cast to double values
      * \param[in] do_cropping     Whether to crop particle orbits at domain boundaries
+     * return whether position is out of bounds
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool is_out_of_bounds ([[maybe_unused]] double xp,
@@ -341,14 +342,16 @@ namespace ParticleUtils {
 #elif defined(WARPX_DIM_RSPHERE)
         const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
-#endif
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#elif defined(WARPX_DIM_1D_Z)
+        xp_grid[0] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
 #endif
 #endif
+
         // Check if particle's position is out of bounds
         bool out_of_bounds = false;
         for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {

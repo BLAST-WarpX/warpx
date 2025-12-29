@@ -151,6 +151,8 @@ namespace {
         zp = zp_n + dzp;
         setPosition(ip, xp, yp, zp);
 
+        // Propogate ballistically if the suborbit starts out of bounds, avoiding
+        // field gather and the possiblity that the particle orbit re-enters the domain.
         if (this_suborbit_out_of_bounds) { return true; }
 
         bool convergence = false;
