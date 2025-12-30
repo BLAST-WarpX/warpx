@@ -339,9 +339,6 @@ namespace ParticleUtils {
 #elif defined(WARPX_DIM_XZ)
         xp_grid[0] = (xp - xyzmin.x)*dinv.x;
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
-#elif defined(WARPX_DIM_RSPHERE)
-        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
-        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_1D_Z)
         xp_grid[0] = (zp - xyzmin.z)*dinv.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -350,6 +347,9 @@ namespace ParticleUtils {
 #if defined(WARPX_DIM_RZ)
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
 #endif
+#elif defined(WARPX_DIM_RSPHERE)
+        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #endif
 
         // Check if particle's position is out of bounds
