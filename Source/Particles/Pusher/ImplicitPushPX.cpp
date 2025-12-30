@@ -980,6 +980,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::ParticleReal yp = yp_n;
         amrex::ParticleReal zp = zp_n;
 
+        ux[ip] = uxp_n;
+        uy[ip] = uyp_n;
+        uz[ip] = uzp_n;
+
         // For nonlinear stage, we first loop over all suborbits doing the push only to
         // check for non-convergence. If a suborbit does not convegence, then the number
         // of suborbits is increased and the loop starts over. This proceeds until all
