@@ -353,16 +353,15 @@ namespace ParticleUtils {
 #endif
 
         // Check if particle's position is out of bounds
-        bool out_of_bounds = false;
         for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
             if (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) {
-                out_of_bounds = true;
+                return = true;
             }
             else if (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1]) {
-                out_of_bounds = true;
+                return = true;
             }
         }
-        return out_of_bounds;
+        return false;
 
     }
 
