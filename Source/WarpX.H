@@ -1259,7 +1259,6 @@ private:
     amrex::Vector<int> m_mirror_z_npoints;
 
     // Plasma injection parameters
-    int warpx_do_continuous_injection = 0;
     int num_injected_species = -1;
     amrex::Vector<int> injected_plasma_species;
 
