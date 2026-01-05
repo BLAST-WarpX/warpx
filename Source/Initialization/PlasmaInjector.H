@@ -81,6 +81,11 @@ public:
     // bool: whether the flux injection of particles should be done.
     [[nodiscard]] bool doFluxInjection () const noexcept { return h_flux_pos != nullptr;}
 
+    [[nodiscard]] bool doTimeDependentInjection (amrex::Real cur_time) const noexcept
+    {
+        return !time_dependence_expression.empty() && time_dependence_parser_executor(cur_time);
+    }
+
     bool add_single_particle = false;
     amrex::Vector<amrex::ParticleReal> single_particle_pos;
     amrex::Vector<amrex::ParticleReal> single_particle_u;
@@ -209,6 +214,10 @@ protected:
     // contained Parser
     std::unique_ptr<TemperatureProperties> h_mom_temp;
     std::unique_ptr<VelocityProperties> h_mom_vel;
+
+    std::string time_dependence_expression;
+    std::unique_ptr<amrex::Parser> time_dependence_parser;
+    amrex::ParserExecutor<1> time_dependence_parser_executor;
 
     void setupSingleParticle (amrex::ParmParse const& pp_species);
     void setupMultipleParticles (amrex::ParmParse const& pp_species);

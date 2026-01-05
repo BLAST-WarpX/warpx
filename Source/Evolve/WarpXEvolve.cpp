@@ -268,6 +268,8 @@ WarpX::Evolve (int numsteps)
             }
         }
 
+        mypc->TimeDependentInjection(cur_time);
+
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
         if (m_implicit_solver) {

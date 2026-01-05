@@ -317,6 +317,9 @@ public:
     // Inject particles from a surface during the simulation
     void ContinuousFluxInjection(amrex::Real t, amrex::Real dt) const;
 
+    // Time dependent injection of bulk particles
+    void TimeDependentInjection (amrex::Real cur_time) const;
+
     [[nodiscard]] std::vector<std::string> GetSpeciesNames() const { return species_names; }
 
     [[nodiscard]] std::vector<std::string> GetLasersNames() const { return lasers_names; }

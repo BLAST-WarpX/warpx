@@ -423,6 +423,8 @@ public:
     // Inject a continuous flux of particles from a defined plane
     virtual void ContinuousFluxInjection(amrex::Real /*t*/, amrex::Real /*dt*/) {}
 
+    virtual void TimeDependentInjection (amrex::Real /*cur_time*/) {}
+
     int getSpeciesId() const {return species_id;}
 
     ///

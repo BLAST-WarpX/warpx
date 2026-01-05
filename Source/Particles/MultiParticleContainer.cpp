@@ -907,6 +907,14 @@ MultiParticleContainer::ContinuousFluxInjection (amrex::Real t, amrex::Real dt) 
     }
 }
 
+void
+MultiParticleContainer::TimeDependentInjection (amrex::Real cur_time) const
+{
+    for (const auto& pc : allcontainers){
+        pc->TimeDependentInjection(cur_time);
+    }
+}
+
 /* \brief Get ID of product species of each species.
  * The users specifies the name of the product species,
  * this routine get its ID.
