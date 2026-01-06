@@ -255,7 +255,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                             // Q2 = Q2_min * (Q2_max / Q2_min)^(rnd)
                             // where rnd is a random number uniformly distributed between 0 and 1
                             const amrex::ParticleReal compton_wavelength = PhysConst::hbar / (PhysConst::m_e * PhysConst::c);
-                            amrex::ParticleReal radius = compton_wavelength * std::pow(frac_energy,  amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
+                            amrex::ParticleReal radius = compton_wavelength * std::pow(frac_energy,  -amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
 
                             amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
                             amrex::ParticleReal cos_theta = std::cos(theta);
