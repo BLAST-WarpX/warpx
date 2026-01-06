@@ -300,27 +300,5 @@
       },
       "scheme": "url"
     }
-  ],
-  "custom_fields": {
-    "code:developmentStatus": {
-      "id": "active",
-      "title": {
-        "en": "Active"
-      }
-    },
-    "code:programmingLanguage": [
-      {
-        "id": "c++",
-        "title": {
-          "en": "C++"
-        }
-      },
-      {
-        "id": "python",
-        "title": {
-          "en": "Python"
-        }
-      }
-    ]
-  }
+  ]
 }
