@@ -270,34 +270,12 @@
     "related_identifiers": [
     {
       "identifier": "https://warpx.readthedocs.io",
-      "relation_type": {
-        "id": "isdocumentedby",
-        "title": {
-          "en": "Is documented by"
-        }
-      },
-      "resource_type": {
-        "id": "publication-softwaredocumentation",
-        "title": {
-          "en": "Software documentation"
-        }
-      },
+      "relation": "isDocumentedBy",
       "scheme": "url"
     },
     {
       "identifier": "https://blast-warpx.github.io",
-      "relation_type": {
-        "id": "isdescribedby",
-        "title": {
-          "en": "Is described by"
-        }
-      },
-      "resource_type": {
-        "id": "other",
-        "title": {
-          "en": "Other"
-        }
-      },
+      "relation": "isDescribedBy",
       "scheme": "url"
     }
   ]
