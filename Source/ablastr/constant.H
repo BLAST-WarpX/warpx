@@ -149,7 +149,7 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto reduced_compton_wavelength_v = static_cast<T>(hbar_v<double> / (m_e_v<double> * c_v<double>));
 
-    //! vacuum speed of light [m/s]
+        //! vacuum speed of light [m/s]
         constexpr auto c = c_v<amrex::Real>;
 
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
