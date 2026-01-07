@@ -198,7 +198,7 @@ PhysicalParticleContainer::AddParticles (int lev)
 
     for (auto const& plasma_injector : plasma_injectors) {
 
-        if (plasma_injector->add_single_particle) {
+        if ( (lev == 0) && plasma_injector->add_single_particle) {
             if (WarpX::gamma_boost > 1.) {
                 MapParticletoBoostedFrame(plasma_injector->single_particle_pos[0],
                                           plasma_injector->single_particle_pos[1],
@@ -220,7 +220,7 @@ PhysicalParticleContainer::AddParticles (int lev)
             return;
         }
 
-        if (plasma_injector->add_multiple_particles) {
+        if ((lev == 0) &&plasma_injector->add_multiple_particles) {
             if (WarpX::gamma_boost > 1.) {
                 for (int i=0 ; i < plasma_injector->multiple_particles_pos_x.size() ; i++) {
                     MapParticletoBoostedFrame(plasma_injector->multiple_particles_pos_x[i],
@@ -244,11 +244,11 @@ PhysicalParticleContainer::AddParticles (int lev)
                           1, attr, 0, attr_int, 0);
         }
 
-        if (plasma_injector->gaussian_beam) {
+        if ((lev == 0) && plasma_injector->gaussian_beam) {
             AddGaussianBeam(*plasma_injector);
         }
 
-        if (plasma_injector->external_file) {
+        if ((lev == 0) && plasma_injector->external_file) {
             AddPlasmaFromFile(*plasma_injector,
                               plasma_injector->q_tot,
                               plasma_injector->z_shift);
@@ -764,6 +764,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #endif
 
     const auto dx = geom.CellSizeArray();
+    const auto dxi = geom.InvCellSizeArray();
     const auto problo = geom.ProbLoArray();
 
     defineAllParticleTiles();
@@ -814,6 +815,20 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
         plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
     }
+
+    // this is used to exclude regions covered by finer levels
+    amrex::BoxArray ba_to_exclude;
+    auto finest_level = this->finestLevel();
+    if (lev < finest_level) {
+        ba_to_exclude = this->ParticleBoxArray(lev+1);
+        ba_to_exclude.coarsen(this->GetParGDB()->refRatio(lev));
+    }
+    auto& locator = WarpX::GetInstance().m_add_plasma_particle_locator;
+    if (!locator.isValid(ba_to_exclude)) {
+        locator.build(ba_to_exclude, Geom(lev));
+    }
+    locator.setGeometry(Geom(lev));
+    auto assign_grid = locator.getGridAssignor();
 
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
@@ -895,7 +910,14 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     }
                     return 0;
                 };
-                pcounts[index] = checker() ? num_ppc*r : 0;
+
+                // skip cells which are covered by a finer level (these will be handled when
+                // calling AddPlasma on lev+1)
+                int ii = int(amrex::Math::floor(((lo.x+hi.x)/2._rt-problo[0])*dxi[0]));
+                int jj = int(amrex::Math::floor(((lo.y+hi.y)/2._rt-problo[1])*dxi[1]));
+                int kk = int(amrex::Math::floor(((lo.z+hi.z)/2._rt-problo[2])*dxi[2]));
+                bool not_covered = (lev == finest_level) || (assign_grid(IntVect(AMREX_D_DECL(ii, jj, kk))) < 0);
+                pcounts[index] = (not_covered && checker()) ? num_ppc*r : 0;
             }
             amrex::ignore_unused(j,k);
         });
