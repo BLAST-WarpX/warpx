@@ -1,4 +1,4 @@
-.. _building-perlmutter:
+.. _building-s3df:
 
 S3DF (SLAC)
 ==================
@@ -98,13 +98,13 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
 
       .. important::
 
-         Now, and as the first step on future logins to Perlmutter, activate these environment settings:
+         Now, and as the first step on future logins to S3DF, activate these environment settings:
 
          .. code-block:: bash
             cd $WORK
             source $WORK/s3df_gpu_warpx.profile
 
-      Finally, since Perlmutter does not yet provide software modules for some of our dependencies, install them once:
+      Finally, since S3DF does not yet provide software modules for some of our dependencies, install them once:
 
       .. code-block:: bash
 
@@ -170,7 +170,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
             :language: bash
 
 
-.. _building-perlmutter-compilation:
+.. _building-s3df-compilation:
 
 
 Compilation
