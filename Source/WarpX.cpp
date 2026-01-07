@@ -2812,7 +2812,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
             amrex::convert(ba, m_fields.get(FieldType::Bfield_fp,Direction{2},lev)->ixType()),
             dm, ncomps, ngEB, 0.0_rt);
     }
-    if (mypc->m_B_ext_particle_s == "read_from_file") {
+    if ((mypc->m_B_ext_particle_s == "read_from_file") || (mypc->m_B_ext_particle_s == "load_from_python")) {
         //  These fields will be added to the fields that the particles see, and need to match the index type
         auto *Bfield_aux_levl_0 = m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
         auto *Bfield_aux_levl_1 = m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
@@ -2838,7 +2838,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::Efield_fp_external, Direction{2}, lev, amrex::convert(ba, m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->ixType()),
             dm, ncomps, ngEB, 0.0_rt);
     }
-    if (mypc->m_E_ext_particle_s == "read_from_file") {
+    if ((mypc->m_E_ext_particle_s == "read_from_file") || (mypc->m_E_ext_particle_s == "load_from_python")) {
         //  These fields will be added to the fields that the particles see, and need to match the index type
         auto *Efield_aux_levl_0 = m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
         auto *Efield_aux_levl_1 = m_fields.get(FieldType::Efield_aux, Direction{1}, lev);

@@ -83,15 +83,15 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
         m_repeated_plasma_lens_strengths_B = mypc.d_repeated_plasma_lens_strengths_B.data();
     }
 
-    // When the external particle fields are read from file,
+    // When the external particle fields are read from file or loaded from python,
     // the external fields are not added directly inside the gather kernel.
     // (Hence of `None`, which ensures that the gather kernel is compiled without support
     // for external fields.) Instead, the external fields are added to the MultiFab
     // Efield_aux and Bfield_aux before the particles gather from these MultiFab.
-    if (mypc.m_E_ext_particle_s == "read_from_file") {
+    if ((mypc->m_E_ext_particle_s == "read_from_file") || (mypc->m_E_ext_particle_s == "load_from_python")) {
         m_Etype = ExternalFieldInitType::None;
     }
-    if (mypc.m_B_ext_particle_s == "read_from_file") {
+    if ((mypc->m_B_ext_particle_s == "read_from_file") || (mypc->m_B_ext_particle_s == "load_from_python")) {
         m_Btype = ExternalFieldInitType::None;
     }
 
