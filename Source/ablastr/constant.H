@@ -219,7 +219,7 @@ namespace ablastr::constant
         //! inverse of the square of the vacuum speed of light [s^2/m^2]
         constexpr auto inv_c2 = inv_c2_v<amrex::Real>;
 
-    //! reduced Compton wavelength [m]
+        //! reduced Compton wavelength [m]
         constexpr auto reduced_compton_wavelength = reduced_compton_wavelength_v<amrex::Real>;
 
     } // namespace SI
