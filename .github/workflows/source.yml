@@ -41,6 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Zenodo Metadata
-        uses: vsoch/zenodo-validator@main
+        uses: vsoch/zenodo-validator@update-validation
         with:
           path: '.zenodo.json'
