@@ -918,8 +918,9 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 int kk = int(amrex::Math::floor(((lo.z+hi.z)/2._rt-problo[2])*dxi[2]));
                 bool not_covered = (lev == finest_level) || (assign_grid(IntVect(AMREX_D_DECL(ii, jj, kk))) < 0);
                 pcounts[index] = (not_covered && checker()) ? num_ppc*r : 0;
+                amrex::ignore_unused(jj,kk);
             }
-            amrex::ignore_unused(j,jj, k, kk);
+            amrex::ignore_unused(j,k);
         });
 
         // Max number of new particles. All of them are created,
