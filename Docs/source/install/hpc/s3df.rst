@@ -101,6 +101,7 @@ On S3DF, you can run either on GPU nodes with fast A100 GPUs (recommended) or CP
          Now, and as the first step on future logins to S3DF, activate these environment settings:
 
          .. code-block:: bash
+
             cd $WORK
             source $WORK/s3df_gpu_warpx.profile
 
