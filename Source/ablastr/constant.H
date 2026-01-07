@@ -145,7 +145,11 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto inv_c2_v = static_cast<T>(1.0/c2_v<double>);
 
-        //! vacuum speed of light [m/s]
+    //! reduced Compton wavelength [m] (variable template)
+        template<typename T>
+        constexpr auto reduced_compton_wavelength_v = static_cast<T>(hbar_v<double> / (m_e_v<double> * c_v<double>));
+
+    //! vacuum speed of light [m/s]
         constexpr auto c = c_v<amrex::Real>;
 
         //! vacuum permittivity: dielectric permittivity of vacuum [F/m]
@@ -214,6 +218,9 @@ namespace ablastr::constant
 
         //! inverse of the square of the vacuum speed of light [s^2/m^2]
         constexpr auto inv_c2 = inv_c2_v<amrex::Real>;
+
+    //! reduced Compton wavelength [m]
+        constexpr auto reduced_compton_wavelength = reduced_compton_wavelength_v<amrex::Real>;
 
     } // namespace SI
 
