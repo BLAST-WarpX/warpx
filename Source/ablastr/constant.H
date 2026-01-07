@@ -145,7 +145,7 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto inv_c2_v = static_cast<T>(1.0/c2_v<double>);
 
-    //! reduced Compton wavelength [m] (variable template)
+        //! reduced Compton wavelength [m] (variable template)
         template<typename T>
         constexpr auto reduced_compton_wavelength_v = static_cast<T>(hbar_v<double> / (m_e_v<double> * c_v<double>));
 
