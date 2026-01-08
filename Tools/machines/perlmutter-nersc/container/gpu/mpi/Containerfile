@@ -5,6 +5,14 @@
 # WarpX executables are installed in /usr/bin/
 # WarpX Python bindings are installed in /opt/venv
 #
+# To push this to the NERSC registry, first tag the full name and version,
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+# and then push
+#   podman login registry.nersc.gov
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+#
 # On Perlmutter, run WarpX like this:
 #   podman-hpc run --rm --gpu --cuda-mpi --nccl -v $PWD:/opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest warpx.2d /opt/pwd/inputs_base_2d
 # Prefix this line with "srun ..." in job scripts, as usual:
