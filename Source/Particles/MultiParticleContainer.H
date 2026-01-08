@@ -24,6 +24,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpXParticleContainer.H"
 #include "ParticleBoundaries.H"
+#include "ExternalParticleFields.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 
@@ -337,14 +338,8 @@ public:
     std::unique_ptr<amrex::Parser> m_Ex_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ey_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ez_particle_parser;
-    // Parser for time dependency of B_external from file on the particle
-    std::unique_ptr<amrex::Parser> m_B_particle_from_file_parser;
-    // Parser for time dependency of B_external from file on the particle
-    std::unique_ptr<amrex::Parser> m_E_particle_from_file_parser;
 
-    amrex::ParserExecutor<1> m_Efield_time_partparser;
-    amrex::ParserExecutor<1> m_Bfield_time_partparser;
-
+    ExternalParticleFields m_external_particle_fields_metadata;
 
     amrex::ParticleReal m_repeated_plasma_lens_period;
     amrex::Vector<amrex::ParticleReal> h_repeated_plasma_lens_starts;
