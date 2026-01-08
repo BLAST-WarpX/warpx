@@ -86,6 +86,7 @@ RUN git clone                               \
       -S /tmp/c-blosc2                      \
       -B /tmp/c-blosc2-build                \
       -DCMAKE_INSTALL_PREFIX=/opt/warpx     \
+      -DBUILD_STATIC=OFF                    \
       -DBUILD_TESTS=OFF                     \
       -DBUILD_BENCHMARKS=OFF                \
       -DBUILD_EXAMPLES=OFF                  \
@@ -210,6 +211,7 @@ RUN git clone                       \
     cmake                           \
         -S /tmp/warpx-src           \
         -B /tmp/warpx-build         \
+        -DBUILD_SHARED_LIBS=ON      \
         -DCMAKE_INSTALL_PREFIX=/opt/warpx \
         -DWarpX_COMPUTE=CUDA        \
         -DWarpX_DIMS="1;2;RZ;3"     \
@@ -230,7 +232,8 @@ RUN git clone                       \
     ln -s /opt/warpx/bin/warpx.1d* /opt/warpx/bin/warpx.1d  && \
     ln -s /opt/warpx/bin/warpx.2d* /opt/warpx/bin/warpx.2d  && \
     ln -s /opt/warpx/bin/warpx.rz* /opt/warpx/bin/warpx.rz  && \
-    ln -s /opt/warpx/bin/warpx.3d* /opt/warpx/bin/warpx.3d
+    ln -s /opt/warpx/bin/warpx.3d* /opt/warpx/bin/warpx.3d  && \
+    rm -rf /opt/warpx/lib/*.a
 
 # Reduce to runtime
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS warpx
@@ -255,8 +258,6 @@ RUN apt-get update            && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy installed software from previous stage
-#   TODO: Check BLAS still works
-#   TODO: Check this does not copy CUDA devel packages
 COPY --from=warpx-dev /opt/warpx /opt/warpx
 COPY --from=warpx-dev /opt/venv /opt/venv
 
