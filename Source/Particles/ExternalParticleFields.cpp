@@ -58,7 +58,7 @@ ExternalParticleFields::ReadParameters () {
 
     std::string e_init;
     pp_particles.query("E_ext_particle_init_style", e_init);
-    if ((e_init == "read_from_file") || (e_init == 'load_from_python')) {
+    if ((e_init == "read_from_file") || (e_init == "load_from_python")) {
 
         // Read in E field names
         std::vector<std::string> E_names;
@@ -116,7 +116,7 @@ ExternalParticleFields::ReadParameters () {
 
     std::string b_init;
     pp_particles.query("B_ext_particle_init_style", b_init);
-    if ((b_init == "read_from_file") or (b_init == 'load_from_python')) {
+    if ((b_init == "read_from_file") || (b_init == "load_from_python")) {
 
         // Read in B field names
         std::vector<std::string> B_names;
