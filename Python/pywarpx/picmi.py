@@ -2617,7 +2617,7 @@ class LoadAppliedFieldFromPython(picmistandard.PICMI_LoadAppliedField):
 
     def __init__(self, **kw):
         # If using load_from_python, a function handle is expected for callback
-        self.load_from_python = kw.get("load_from_python")
+        self.load_from_python = kw.pop("load_from_python")
 
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
         self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
@@ -2626,9 +2626,20 @@ class LoadAppliedFieldFromPython(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
+        # Base class requires read_fields_from_path -> enforce it by a hack for now
+        kw["read_fields_from_path"] = ""
+
         super().__init__(**kw)
 
+        # hard-disable unwanted loaders set by the base ctor
+        if not self.load_E:
+            pywarpx.particles.E_ext_particle_init_style = "none"
+        if not self.load_B:
+            pywarpx.particles.B_ext_particle_init_style = "none"
+
     def applied_field_initialize_inputs(self):
+        pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "load_from_python"
             # pass time dependence via parser
