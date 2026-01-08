@@ -13,8 +13,8 @@
 #   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter-nompi:latest
 #   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter-nompi:25.11
 #
-# On Perlmutter, run WarpX like this:
-#   podman-hpc run --rm --gpu -v $PWD:/opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter-nompi:latest warpx.2d /opt/pwd/inputs_base_2d
+# On Perlmutter, copy your inputs file to your present working directory (PWD) and run WarpX like this:
+#   podman-hpc run --rm --gpu -v $PWD:/opt/pwd --workdir /opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter-nompi:latest warpx.2d /opt/pwd/inputs_base_2d
 # Prefix this line with "srun ..." in job scripts, as usual:
 #   srun --cpu-bind=cores bash -c "
 #     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
