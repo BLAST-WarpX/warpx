@@ -205,42 +205,8 @@ MultiParticleContainer::ReadParameters ()
 
         }
 
-        // if the input string for B_ext_particle_s is
-        // "read_from_file" then the mathematical expression
-        // for the time dependency read_fields_B_dependency(t)
-        // can be provided in the input file. If not provided, it defaults to '1.0'
-        if (m_B_ext_particle_s == "read_from_file") {
-            // store the mathematical expression as string
-            std::string str_B_ext_time_function = "1.0";
-            utils::parser::Query_parserString(
-                pp_particles, "read_fields_B_dependency(t)",
-                str_B_ext_time_function);
-
-            // Parser for B_external on the particle
-            m_B_particle_from_file_parser = std::make_unique<amrex::Parser>(
-               utils::parser::makeParser(str_B_ext_time_function,{"t"}));
-
-            m_Bfield_time_partparser = m_B_particle_from_file_parser->compile<1>();
-        }
-
-        // if the input string for E_ext_particle_s is
-        // "read_from_file" then the mathematical expression
-        // for the time dependency read_fields_E_dependency(t)
-        // can be provided in the input file. If not provided, it defaults to '1.0'
-        if (m_E_ext_particle_s == "read_from_file") {
-            // store the mathematical expression as string
-            std::string str_E_ext_time_function = "1.0";
-            utils::parser::Query_parserString(
-                pp_particles, "read_fields_E_dependency(t)",
-                str_E_ext_time_function);
-
-            // Parser for B_external on the particle
-            m_E_particle_from_file_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_E_ext_time_function,{"t"}));
-
-            m_Efield_time_partparser = m_E_particle_from_file_parser->compile<1>();
-
-        }
+        // Read parameters and setup meta data for external particle fields
+        m_external_particle_fields_metadata.ReadParameters();
 
         // if the input string for E_ext_particle_s or B_ext_particle_s is
         // "repeated_plasma_lens" then the plasma lens properties
@@ -1014,6 +980,12 @@ MultiParticleContainer::mapSpeciesProduct ()
             const int i_product_phot = getSpeciesID(
                 pc->m_qed_quantum_sync_phot_product_name);
             pc->m_qed_quantum_sync_phot_product = i_product_phot;
+        }
+
+        if(pc->has_virtual_photons()){
+            const int i_vphot = getSpeciesID(
+                pc->m_qed_virtual_photon_species_name);
+            pc->m_qed_virtual_photon_species = i_vphot;
         }
 #endif
 
@@ -1917,6 +1889,12 @@ void MultiParticleContainer::CheckQEDProductSpecies()
                 allcontainers[pc->m_qed_quantum_sync_phot_product]->
                     AmIA<PhysicalSpecies::photon>(),
                 "ERROR: Quantum Synchrotron product species is of wrong type");
+        }
+        if(pc->has_virtual_photons()){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                allcontainers[pc->m_qed_virtual_photon_species]->
+                    AmIA<PhysicalSpecies::photon>(),
+                "ERROR: virtual photons species has to be a...photon species!");
         }
     }
 

@@ -3,6 +3,8 @@
 How-To Guides
 =============
 
+* :ref:`Debugging the code <debugging_warpx>`
+
 .. toctree::
    :maxdepth: 1
 

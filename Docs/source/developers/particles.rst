@@ -139,6 +139,13 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         Synchrotron process                            physics is used.
 ``opticalDepthBW``    ``real``          QED: optical depth of the Breit-    SoA   RT   Added when PICSAR QED
                                         Wheeler process                                physics is used.
+``x/y/z_n``           ``real``          For implicit solver, the position   SoA   RT   Added when implicit solver
+                                        at the start of the time step.                 is used. Not included in diagnostic output.
+``ux/uy/uz_n``        ``real``          For implicit solver, the momentum   SoA   RT   Added when implicit solver
+                                        at the start of the time step.                 is used. Not included in diagnostic output.
+``nsuborbits``        ``int``           For implicit solver, the number of  SoA   RT   Added when implicit solver
+                                        suborbits needed for the particle              is used. Not included in diagnostic output.
+                                        motion to be converged.
 ====================  ================  ==================================  ===== ==== ======================
 
 WarpX allows extra runtime attributes to be added to particle containers (through ``AddRealComp("attrname")`` or ``AddIntComp("attrname")``).

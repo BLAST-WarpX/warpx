@@ -21,6 +21,10 @@
 #include "Particles/Collision/InverseBremsstrahlung/InverseBremsstrahlung.H"
 #include "Utils/TextMsg.H"
 
+#include "Particles/ParticleCreation/SmartCopy.H"
+#ifdef WARPX_QED
+#include "Particles/Collision/BinaryCollision/VirtualPhotonCreation.H"
+#endif
 #include <AMReX_ParmParse.H>
 
 #include <vector>
@@ -113,6 +117,14 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+#ifdef WARPX_QED
+    // For QED incoherent processes (e.g. Bethe-Heitler, Landau-Lifschitz), the process is mediated by virtual photons.
+    // The virtual photons are newly generated here and participate in the collisions.
+    // Here, the virtual photons are regenerated from scratch, i.e. they are overwritten by new ones at each time step.
+    if(mypc->nSpecies() > 0) {
+        collision::binarycollision::virtualphotons::GenerateVirtualPhotons(mypc);
+    }
+#endif
 
     if (m_use_global_debye_length) {
         // This will calculate the temperature, Vbar, and particle number that are needed by
