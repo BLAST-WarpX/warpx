@@ -1,1 +1,1 @@
-Activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
+- Activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
