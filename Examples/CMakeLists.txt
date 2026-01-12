@@ -189,7 +189,25 @@ function(add_warpx_test
     # run all tests with 1 OpenMP thread by default
     set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-    if(python OR WIN32)
+    # Always use Python_EXECUTABLE for analysis/checksum scripts to ensure conda Python is used
+    if(analysis OR checksum)
+        if(NOT Python_EXECUTABLE)
+            # Try to find Python if not already set
+            # find_package(Python3 COMPONENTS Interpreter QUIET)
+            if(Python3_EXECUTABLE)
+                set(Python_EXECUTABLE ${Python3_EXECUTABLE})
+            else()
+                # Fallback to python3 from PATH
+                find_program(Python_EXECUTABLE python3)
+            endif()
+        endif()
+        if(Python_EXECUTABLE)
+            set(THIS_Python_SCRIPT_EXE ${Python_EXECUTABLE})
+        else()
+            # Fallback to empty (will use shebang)
+            set(THIS_Python_SCRIPT_EXE "")
+        endif()
+    elseif(python OR WIN32)
         set(THIS_Python_SCRIPT_EXE ${Python_EXECUTABLE})
     else()
         set(THIS_Python_SCRIPT_EXE "")
