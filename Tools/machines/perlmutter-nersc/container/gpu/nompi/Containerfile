@@ -183,6 +183,7 @@ RUN python3 -m venv /opt/venv && \
         --upgrade        \
         build            \
         cmake            \
+        "nvidia-cuda-runtime-cu12==12.4.*" \
         cupy-cuda12x     \
         cython           \
         h5py             \
