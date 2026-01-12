@@ -187,6 +187,7 @@ RUN python3 -m venv /opt/venv && \
         cupy-cuda12x     \
         cython           \
         h5py             \
+        lasy             \
         matplotlib       \
         numpy            \
         openpmd-api      \
