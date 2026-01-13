@@ -193,7 +193,7 @@ function(add_warpx_test
     if(analysis OR checksum)
         if(NOT Python_EXECUTABLE)
             # Try to find Python if not already set
-            # find_package(Python3 COMPONENTS Interpreter QUIET)
+            find_package(Python3 COMPONENTS Interpreter QUIET)
             if(Python3_EXECUTABLE)
                 set(Python_EXECUTABLE ${Python3_EXECUTABLE})
             else()
