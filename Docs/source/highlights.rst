@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Gardner C and Dollar F.
+   **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
+   New Journal of Physics **27**, 124301, 2025.
+   `DOI:10.1088/1367-2630/ae23f1 <https://doi.org/10.1088/1367-2630/ae23f1>`__
+
 #. Lei B., Zhang H., Bonţoiu C., Bonatto A., Resta-López J., Xia G., Qiao B. and Welsch C.
    **100 TeV/m-level particle accelerators driven by high-density electron beams in micro structured carbon nanotube forest channel**.
    New Journal of Physics **27**, 2025.
