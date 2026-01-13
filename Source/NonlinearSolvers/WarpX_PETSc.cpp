@@ -341,6 +341,7 @@ void PETScSolver_impl::applyPC( VecType& a_F,
 //! Assemble preconditioner matrix
 int PETScSolver_impl::assemblePCMatrix(LinOpType* const a_linop)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("PETScSolver_impl::assemblePCMatrix()");
 
     AMREX_ALWAYS_ASSERT(m_is_defined);

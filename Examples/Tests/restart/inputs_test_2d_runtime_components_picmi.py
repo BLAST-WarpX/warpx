@@ -7,8 +7,10 @@
 import sys
 
 import numpy as np
+from mpi4py import MPI as mpi
 
 from pywarpx import callbacks, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # physics parameters
@@ -104,15 +106,25 @@ sim.initialize_warpx()
 
 # set numpy random seed so that the particle properties generated
 # below will be reproducible from run to run
-np.random.seed(30025025)
+xp, _ = load_cupy()
+xp.random.seed(30025025)
 
 electrons = sim.particles.get("electrons")
 if not sim.amr_restart:
     electrons.add_real_comp("newPid")
 
 
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return np.asarray(arr)
+
+
 def add_particles():
-    nps = 10
+    global electrons
+    rank = mpi.COMM_WORLD.Get_rank()
+    nps = 10 if rank == 0 else 0
     x = np.linspace(0.005, 0.025, nps)
     y = np.zeros(nps)
     z = np.linspace(0.005, 0.025, nps)
@@ -120,9 +132,18 @@ def add_particles():
     uy = np.random.normal(loc=0, scale=1e3, size=nps)
     uz = np.random.normal(loc=0, scale=1e3, size=nps)
     w = np.ones(nps) * 2.0
-    newPid = 5.0
+    newPid = np.ones(nps) * 5.0
 
-    electrons.add_particles(x=x, y=y, z=z, ux=ux, uy=uy, uz=uz, w=w, newPid=newPid)
+    electrons.add_particles(
+        x=x,
+        y=y,
+        z=z,
+        ux=ux,
+        uy=uy,
+        uz=uz,
+        w=w,
+        newPid=newPid,
+    )
 
 
 callbacks.installbeforestep(add_particles)
@@ -134,9 +155,9 @@ callbacks.installbeforestep(add_particles)
 step_number = sim.extension.warpx.getistep(lev=0)
 sim.step(max_steps - 1 - step_number)
 
-##########################
+#######################################
 # check that the new PIDs are properly set
-##########################
+#######################################
 
 assert electrons.size == 90
 assert electrons.get_real_comp_index("w") == 2
@@ -151,3 +172,5 @@ for pti in electrons.iterator(level=0):
 ##########################
 
 sim.step(1)
+
+del electrons
