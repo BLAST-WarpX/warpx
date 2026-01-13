@@ -1020,7 +1020,7 @@ Particle initialization
       Therefore, the user should define the beam size, cuts, and focal distance for the beam pre-rotation, hence aligned to the Cartesian axes.
 
       * ``<species_name>.do_crabwaist`` (`bool`, optional, default: ``false``) perform the crab waist transformation on the Gaussian bunch coordinates. This is specific to high luminosity lepton colliders. Given a rotation angle (half crossing angle) :math:`\varphi` and a crab waist strength :math:`k` the transformation is:
-     
+
       .. math::
 
           \alpha &= -\frac{k}{\tan(2\varphi)},
