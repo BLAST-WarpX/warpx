@@ -190,27 +190,13 @@ function(add_warpx_test
     set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
     # Always use Python_EXECUTABLE for analysis/checksum scripts to ensure conda Python is used
-    if(analysis OR checksum)
+    if(python OR analysis OR checksum)
+        # Try to find Python if not already set
+        # This is more robust in virtual envs (conda, venv) than
+        # relying only on /usr/bin/env python3
         if(NOT Python_EXECUTABLE)
-            # Try to find Python if not already set
-            find_package(Python3 COMPONENTS Interpreter QUIET)
-            if(Python3_EXECUTABLE)
-                set(Python_EXECUTABLE ${Python3_EXECUTABLE})
-            else()
-                # Fallback to python3 from PATH
-                find_program(Python_EXECUTABLE python3)
-            endif()
+            find_package(Python COMPONENTS Interpreter)
         endif()
-        if(Python_EXECUTABLE)
-            set(THIS_Python_SCRIPT_EXE ${Python_EXECUTABLE})
-        else()
-            # Fallback to empty (will use shebang)
-            set(THIS_Python_SCRIPT_EXE "")
-        endif()
-    elseif(python OR WIN32)
-        set(THIS_Python_SCRIPT_EXE ${Python_EXECUTABLE})
-    else()
-        set(THIS_Python_SCRIPT_EXE "")
     endif()
 
     # test analysis
@@ -220,7 +206,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.analysis
             COMMAND
-                ${THIS_Python_SCRIPT_EXE}
+                ${Python_EXECUTABLE}
                 ${ANALYSIS_FILE}
                 ${ANALYSIS_ARGS}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
@@ -243,7 +229,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.checksum
             COMMAND
-                ${THIS_Python_SCRIPT_EXE}
+                ${Python_EXECUTABLE}
                 ${CHECKSUM_FILE}
                 ${CHECKSUM_ARGS}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
