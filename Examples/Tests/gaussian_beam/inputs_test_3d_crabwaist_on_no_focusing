@@ -88,7 +88,7 @@ beam1.do_gaussian_beam_rotation = 1
 beam1.do_gaussian_beam_rotation_momenta = 1
 beam1.gaussian_beam_rotation_angle = rotation_angle
 beam1.gaussian_beam_rotation_axis = 0 1 0
-beam1.do_crabwaist = 0
+beam1.do_crabwaist = 1
 beam1.crabwaist_strength = 0.4
 
 beam2.species_type = positron
@@ -115,19 +115,17 @@ beam2.do_gaussian_beam_rotation = 1
 beam2.do_gaussian_beam_rotation_momenta = 1
 beam2.gaussian_beam_rotation_angle = -rotation_angle
 beam2.gaussian_beam_rotation_axis = 0 1 0
-beam2.do_crabwaist = 0
+beam2.do_crabwaist = 1
 beam2.crabwaist_strength = 0.4
 
 #################################
 ######### DIAGNOSTICS ###########
 #################################
 
-diagnostics.diags_names = diag1
+diagnostics.diags_names = diag_on
 
-diag1.intervals = -1
-diag1.diag_type = Full
-diag1.write_species = 1
-diag1.species = beam1 beam2
-diag1.format = openpmd
-diag1.virtual_photons1.variables = ux uy uz w x y z
-diag1.virtual_photons2.variables = ux uy uz w x y z
+diag_on.intervals = -1
+diag_on.diag_type = Full
+diag_on.write_species = 1
+diag_on.species = beam1 beam2
+diag_on.format = openpmd

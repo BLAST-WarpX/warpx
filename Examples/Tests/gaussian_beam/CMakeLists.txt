@@ -2,13 +2,23 @@
 #
 
 add_warpx_test(
-    test_3d_crabwaist_no_focusing  # name
+    test_3d_crabwaist_off_no_focusing  # name
     3  # dims
     1  # nprocs
-    inputs_test_3d_crabwaist_no_focusing  # inputs
-    "analysis_crabwaist_no_focusing.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000000"  # checksum
+    inputs_test_3d_crabwaist_off_no_focusing  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag_off"  # checksum
     OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_crabwaist_on_no_focusing  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_crabwaist_on_no_focusing  # inputs
+    "analysis_crabwaist_no_focusing.py"  # analysis
+    "analysis_default_regression.py --path diags/diag_on"  # checksum
+    test_3d_crabwaist_off_no_focusing  # dependency
 )
 
 add_warpx_test(

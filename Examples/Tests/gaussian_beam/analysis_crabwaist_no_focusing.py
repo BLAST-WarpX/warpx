@@ -55,10 +55,11 @@ crabwaist_strength = 0.4  # cw strength [1]
 
 # 2 simulations with same seed
 # particles are shuffled so arrays wont be the same even with same seed
-sim_folder = "."
 
 # sim 1: init a gaussian bunch and rotate by phi
-series = OpenPMDTimeSeries(os.path.join(sim_folder, "diags_cw_off", "diag1"))
+series = OpenPMDTimeSeries(
+    os.path.join("../test_3d_crabwaist_off_no_focusing", "diags", "diag_off")
+)
 (
     ux_ele_cw_0,
     uy_ele_cw_0,
@@ -83,7 +84,9 @@ series = OpenPMDTimeSeries(os.path.join(sim_folder, "diags_cw_off", "diag1"))
 )
 
 # sim 2: init gaussian bunch, apply cw, rotate by phi
-series = OpenPMDTimeSeries(os.path.join(sim_folder, "diags_cw_on", "diag1"))
+series = OpenPMDTimeSeries(
+    os.path.join("../test_3d_crabwaist_on_no_focusing", "diags", "diag_on")
+)
 (
     ux_ele_cw_1,
     uy_ele_cw_1,
