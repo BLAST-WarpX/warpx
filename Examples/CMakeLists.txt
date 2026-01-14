@@ -195,7 +195,7 @@ function(add_warpx_test
         # This is more robust in virtual envs (conda, venv) than
         # relying only on /usr/bin/env python3
         if(NOT Python_EXECUTABLE)
-            find_package(Python COMPONENTS Interpreter)
+            find_package(Python COMPONENTS Interpreter REQUIRED)
         endif()
     endif()
 
