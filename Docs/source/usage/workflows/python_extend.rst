@@ -301,7 +301,7 @@ Particles
 
        # data access
        multi_pc = warpx.multi_particle_container()
-       pc = multi_pc.get_particle_container_from_name("electrons")
+       pc = multi_pc.get("electrons")
 
        # compute
        # iterate over mesh-refinement levels

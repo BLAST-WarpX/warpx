@@ -39,9 +39,7 @@ class ParticleContainerWrapper(object):
         if self._particle_container is None:
             try:
                 mypc = libwarpx.warpx.multi_particle_container()
-                self._particle_container = mypc.get_particle_container_from_name(
-                    self.name
-                )
+                self._particle_container = mypc.get(self.name)
             except AttributeError as e:
                 msg = "You must initialize WarpX before accessing a ParticleContainerWrapper's particle_container."
                 raise AttributeError(msg) from e
