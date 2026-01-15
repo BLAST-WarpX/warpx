@@ -32,15 +32,3 @@ ParticleThermalizer::ParticleThermalizer()
   pp.query("momentum_threshold", m_momentum_threshold);
   pp.query("temperature", m_temperature);
 }
-
-ParticleThermalizer::Normal ParticleThermalizer::normal() const { return m_normal; }
-amrex::Real ParticleThermalizer::start() const { return m_start; }
-amrex::Real ParticleThermalizer::end() const { return m_end; }
-amrex::Real ParticleThermalizer::momentum_threshold() const { return m_momentum_threshold; }
-amrex::Real ParticleThermalizer::temperature() const { return m_temperature; }
-
-void ParticleThermalizer::set_normal(Normal n) { m_normal = n; }
-void ParticleThermalizer::set_start(amrex::Real s) { m_start = s; }
-void ParticleThermalizer::set_end(amrex::Real e) { m_end = e; }
-void ParticleThermalizer::set_momentum_threshold(amrex::Real mt) { m_momentum_threshold = mt; }
-void ParticleThermalizer::set_temperature(amrex::Real t) { m_temperature = t; }
