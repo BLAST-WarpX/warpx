@@ -33,7 +33,7 @@ ARG NJOBS
 ENV NJOBS=$NJOBS
 
 # Perlmutter GPU: A100
-# Perlmutter CPU: Zen v3
+# Perlmutter CPU: x86-64-v3 for  p4d.24xlarge and p4de.24xlarge instances.
 ENV AMREX_CUDA_ARCH=8.0        \
     CUDAARCHS=80               \
     CXXFLAGS="-march=x86-64-v3"   \
