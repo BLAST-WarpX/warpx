@@ -127,7 +127,7 @@ jobs:
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
 
-        git clone https://github.com/EZoni/amrex.git ../amrex
+        git clone https://github.com/AMReX-Codes/amrex.git ../amrex
         dependencies_file="./dependencies.json"
         amrex_commit=$(jq -r '.commit_amrex' "${dependencies_file}")
         cd ../amrex && git checkout --detach ${amrex_commit} && cd -

@@ -526,6 +526,8 @@ WarpX::WarpX ()
 
     m_accelerator_lattice.resize(nlevs_max);
 
+    // Make sure WarpX is destroyed during amrex::Finalize()
+    amrex::ExecOnFinalize(WarpX::Finalize);
 }
 
 WarpX::~WarpX ()
