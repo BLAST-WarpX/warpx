@@ -12,21 +12,25 @@
 
 // Forward declaration to avoid heavy includes in the header
 class MultiParticleContainer;
+class WarpXParticleContainer;
 
 class ParticleThermalizer {
 public:
     enum class Normal { X, Y, Z };
 
     // Construct and read parameters from inputs under the `particle_thermalizer` block.
-    ParticleThermalizer();
+    ParticleThermalizer ();
 
     // Returns true if the particle_thermalizer parameters were provided
     // and the thermalizer is therefore on.
-    bool defined() const;    
+    bool defined () const;    
 
     // Apply the thermalizer to particles in the provided MultiParticleContainer.
-    // Currently a no-op placeholder that iterates species.
-    void applyThermalizer(MultiParticleContainer &mpc);
+    void applyThermalizer (MultiParticleContainer &mpc);
+
+protected:
+    // Per-species overload; operates on a single WarpXParticleContainer.
+    void applyThermalizer (WarpXParticleContainer &pcont);
 
 private:
     bool m_defined;

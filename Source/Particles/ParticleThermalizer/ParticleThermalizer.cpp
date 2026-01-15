@@ -59,15 +59,16 @@ bool ParticleThermalizer::defined() const {
 
 void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
 {
-    // Iterate over all species/particle containers. Keep this a no-op
-    // for now but structure the loop so the thermalization implementation
-    // can be added per-species.
-    for (auto &pc_uptr : mpc) {
-        if (!pc_uptr) continue;
-        auto &pc = *pc_uptr;
-        // Placeholder per-species work: currently no-op.
-        // Example: we could inspect species name via pc.GetSpeciesName() or
-        // call a method to modify particle momenta.
-        (void)pc; // silence unused variable warnings until implemented
-    }
+  // Iterate over all species/particle containers. 
+  for (auto &pc_uptr : mpc) {
+    if (!pc_uptr) continue;
+    applyThermalizer(*pc_uptr);
+  }
+}
+
+void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pcont)
+{
+  // Per-species thermalization logic will go here. For now this is a no-op
+  // placeholder to keep the API ready for implementation.
+  (void)pcont;
 }
