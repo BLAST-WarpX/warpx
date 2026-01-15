@@ -18,6 +18,8 @@ If your custom Python code uses high-performance, GPU-accelerated libraries -- s
 or `numba <https://numba.pydata.org/>`__ -- the extra computations are unlikely to significantly impact simulation speed.
 Note that WarpX's Python bindings provide direct access to particle and field data without creating copies, resulting in very low overhead.
 
+.. _usage-python-extend-run-simulation:
+
 How to run a simulation with Python extensions
 ----------------------------------------------
 
@@ -77,7 +79,7 @@ Callback Functions
 ------------------
 
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
-specific location in the WarpX simulation loop.
+specific location in the WarpX simulation loop. The syntax to use in order to define callback functions is described in the links below.
 
 .. toctree::
    :maxdepth: 1
@@ -89,7 +91,8 @@ specific location in the WarpX simulation loop.
 Accessing simulation data through Python
 ----------------------------------------
 
-While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
+While the simulation is running, the Python code (e.g. the code in the callback functions) will have read and write access the WarpX simulation data.
+The specific Python syntax to access this data is described in the following sections.
 
 .. toctree::
    :maxdepth: 1
