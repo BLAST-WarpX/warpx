@@ -54,3 +54,9 @@ ParticleThermalizer::ParticleThermalizer()
 bool ParticleThermalizer::defined() const {
   return m_defined;
 }
+
+void ParticleThermalizer::applyThermalizer()
+{
+    // Placeholder: actual thermalization logic to be implemented.
+    return;
+}

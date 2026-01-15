@@ -19,7 +19,10 @@ public:
 
     // Returns true if the particle_thermalizer parameters were provided
     // and the thermalizer is therefore on.
-    bool defined() const;
+    bool defined() const;    
+
+    // Apply the thermalizer to particles. Currently a no-op placeholder.
+    void applyThermalizer();
 
 private:
     bool m_defined;
