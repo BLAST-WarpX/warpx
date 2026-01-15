@@ -64,6 +64,7 @@ Fundamental Plasma Physics
    examples/langmuir/README.rst
    examples/capacitive_discharge/README.rst
    examples/pierce_diode/README.rst
+   examples/ion_beam_extraction/README.rst
 
 
 .. _examples-hybrid-model:
