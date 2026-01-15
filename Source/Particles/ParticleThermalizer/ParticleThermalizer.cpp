@@ -50,3 +50,7 @@ ParticleThermalizer::ParticleThermalizer()
   
   m_defined = true;
 }
+
+bool ParticleThermalizer::defined() const {
+  return m_defined;
+}

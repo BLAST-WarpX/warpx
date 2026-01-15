@@ -17,6 +17,10 @@ public:
     // Construct and read parameters from inputs under the `particle_thermalizer` block.
     ParticleThermalizer();
 
+    // Returns true if the particle_thermalizer parameters were provided
+    // and the thermalizer is therefore on.
+    bool defined() const;
+
 private:
     bool m_defined;
     Normal m_normal;
