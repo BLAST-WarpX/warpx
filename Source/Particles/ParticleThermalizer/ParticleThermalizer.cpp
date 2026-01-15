@@ -5,15 +5,22 @@
 #include <cctype>
 #include <string>
 
+using namespace amrex::literals;
+
 ParticleThermalizer::ParticleThermalizer()
-  : m_normal(Normal::X), m_start(0._rt), m_end(0._rt),
-    m_momentum_threshold(0._rt), m_temperature(0._rt)
+  : m_defined(false),
+    m_normal(Normal::X), m_start(0._rt), m_end(-1._rt),
+    m_momentum_threshold(-1._rt), m_temperature(-1._rt)
 {
   const amrex::ParmParse pp("particle_thermalizer");
 
   // Read normal as a string (x, y, or z)
   std::string normal_str = "x";
-  pp.query("normal", normal_str);
+  bool thermalizer_present = pp.query("normal", normal_str);
+  if (!thermalizer_present) {
+    // If no normal is specified, the thermalizer is not defined
+    return;
+  }
   // normalize to lowercase
   std::transform(normal_str.begin(), normal_str.end(), normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
   if (normal_str == "x") {
@@ -23,12 +30,23 @@ ParticleThermalizer::ParticleThermalizer()
   } else if (normal_str == "z") {
     m_normal = Normal::Z;
   } else {
-    // unknown value -> keep default X
+    amrex::Abort("particle_thermalizer: normal must be 'x', 'y', or 'z'");
   }
 
   // Read numeric parameters with defaults
-  pp.query("start", m_start);
-  pp.query("end", m_end);
-  pp.query("momentum_threshold", m_momentum_threshold);
-  pp.query("temperature", m_temperature);
+  pp.get("start", m_start);
+  pp.get("end", m_end);
+  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+      m_end > m_start,
+      "particle_thermalizer: 'end' must be greater than 'start'");
+  pp.get("momentum_threshold", m_momentum_threshold);
+  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+      m_momentum_threshold >= 0._rt,
+      "particle_thermalizer: 'momentum_threshold' must be non-negative");
+  pp.get("temperature", m_temperature);
+  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+      m_temperature >= 0._rt,
+      "particle_thermalizer: 'temperature' must be non-negative");
+  
+  m_defined = true;
 }

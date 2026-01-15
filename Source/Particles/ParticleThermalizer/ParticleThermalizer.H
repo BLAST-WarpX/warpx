@@ -18,6 +18,7 @@ public:
     ParticleThermalizer();
 
 private:
+    bool m_defined;
     Normal m_normal;
     amrex::Real m_start;
     amrex::Real m_end;
