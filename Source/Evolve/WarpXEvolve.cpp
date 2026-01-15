@@ -274,7 +274,7 @@ WarpX::Evolve (int numsteps)
 
         // Apply particle thermalizer (no-op until implemented)
         if (m_particle_thermalizer.defined()) {
-            m_particle_thermalizer.applyThermalizer();
+            m_particle_thermalizer.applyThermalizer(*mypc);
         }
 
         if (m_implicit_solver) {

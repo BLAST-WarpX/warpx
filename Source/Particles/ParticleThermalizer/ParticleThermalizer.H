@@ -10,6 +10,9 @@
 #include <string>
 #include <AMReX_REAL.H>
 
+// Forward declaration to avoid heavy includes in the header
+class MultiParticleContainer;
+
 class ParticleThermalizer {
 public:
     enum class Normal { X, Y, Z };
@@ -21,8 +24,9 @@ public:
     // and the thermalizer is therefore on.
     bool defined() const;    
 
-    // Apply the thermalizer to particles. Currently a no-op placeholder.
-    void applyThermalizer();
+    // Apply the thermalizer to particles in the provided MultiParticleContainer.
+    // Currently a no-op placeholder that iterates species.
+    void applyThermalizer(MultiParticleContainer &mpc);
 
 private:
     bool m_defined;

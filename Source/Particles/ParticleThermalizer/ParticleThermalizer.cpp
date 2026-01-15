@@ -5,6 +5,8 @@
 #include <cctype>
 #include <string>
 
+#include "Particles/MultiParticleContainer.H"
+
 using namespace amrex::literals;
 
 ParticleThermalizer::ParticleThermalizer()
@@ -55,8 +57,17 @@ bool ParticleThermalizer::defined() const {
   return m_defined;
 }
 
-void ParticleThermalizer::applyThermalizer()
+void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
 {
-    // Placeholder: actual thermalization logic to be implemented.
-    return;
+    // Iterate over all species/particle containers. Keep this a no-op
+    // for now but structure the loop so the thermalization implementation
+    // can be added per-species.
+    for (auto &pc_uptr : mpc) {
+        if (!pc_uptr) continue;
+        auto &pc = *pc_uptr;
+        // Placeholder per-species work: currently no-op.
+        // Example: we could inspect species name via pc.GetSpeciesName() or
+        // call a method to modify particle momenta.
+        (void)pc; // silence unused variable warnings until implemented
+    }
 }
