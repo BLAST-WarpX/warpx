@@ -796,6 +796,39 @@ additionally define the electric potential at the embedded boundary with an anal
     inside the embedded boundary. For this reason, it is important to define
     this function in such a way that it is constant inside the embedded boundary.
 
+.. _param-particle-thermalizer:
+
+Particle thermalizer
+--------------------
+
+* ``particle_thermalizer.normal`` (`string`)
+    The normal direction of the thermalizer surface. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive).
+    This parameter is optional. If not specified, the thermalizer will not be applied.
+
+* ``particle_thermalizer.start`` (`float`)
+    Starting coordinate (in SI units) of the thermalization region along the specified normal direction.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.end`` (`float`)
+    Ending coordinate (in SI units) of the thermalization region along the specified normal direction.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.momentum_threshold`` (`float`)
+    Momentum threshold used by the thermalizer. Particles for which the magnitude of their normalized momenta, i.e. :math:`\gamma |\beta|`) is less than this threshold will not be affected.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.temperature`` (`float`)
+    Temperature value (in Kelvin)used to sample or set the thermalized particle velocities.
+    This parameter is required if the thermalizer is enabled.
+
+Example::
+
+    particle_thermalizer.normal = z
+    particle_thermalizer.start = 0.0
+    particle_thermalizer.end = 1.0e-6
+    particle_thermalizer.momentum_threshold = 0.5
+    particle_thermalizer.temperature = 1.2e-3
+
 .. _running-cpp-parameters-parallelization:
 
 Distribution across MPI ranks and parallelization

@@ -15,7 +15,7 @@ ParticleThermalizer::ParticleThermalizer()
   const amrex::ParmParse pp("particle_thermalizer");
 
   // Read normal as a string (x, y, or z)
-  std::string normal_str = "x";
+  std::string normal_str = "";
   bool thermalizer_present = pp.query("normal", normal_str);
   if (!thermalizer_present) {
     // If no normal is specified, the thermalizer is not defined
