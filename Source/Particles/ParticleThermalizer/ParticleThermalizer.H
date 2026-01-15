@@ -1,3 +1,9 @@
+/* Copyright 2026 Andrew Myers
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
 #ifndef WARPX_PARTICLETHERMALIZER_H
 #define WARPX_PARTICLETHERMALIZER_H
 
@@ -8,8 +14,8 @@ class ParticleThermalizer {
 public:
     enum class Normal { X, Y, Z };
 
-    ParticleThermalizer(Normal normal, amrex::Real start, amrex::Real end,
-                        amrex::Real momentum_threshold, amrex::Real temperature);
+    // Construct and read parameters from inputs under the `particle_thermalizer` block.
+    ParticleThermalizer();
 
     // Accessors
     Normal normal() const;
