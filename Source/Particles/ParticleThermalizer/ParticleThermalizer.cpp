@@ -6,6 +6,7 @@
 #include <string>
 
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 
 using namespace amrex::literals;
 
@@ -68,7 +69,29 @@ void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
 
 void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pcont)
 {
-  // Per-species thermalization logic will go here. For now this is a no-op
-  // placeholder to keep the API ready for implementation.
-  (void)pcont;
+  // Loop over AMR levels for this particle container
+  for (int lev = 0; lev < pcont.numLevels(); ++lev) {
+    // Loop over tiles / particle chunks
+    for (WarpXParIter pti(pcont, lev); pti.isValid(); ++pti) {
+      // Number of particles on this tile
+      const long np = pti.numParticles();
+
+      // Acquire pointers/refs to particle attribute arrays as needed.
+      // For a no-op implementation we don't modify them, but set up the
+      // typical pattern so adding logic later is straightforward.
+      auto& ux = pti.GetAttribs(PIdx::ux);
+      auto& uy = pti.GetAttribs(PIdx::uy);
+      auto& uz = pti.GetAttribs(PIdx::uz);
+
+      // Parallel loop over particles in the tile.
+      amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept {
+        // No-op for now. Example access:
+        // amrex::ParticleReal px = ux[ip];
+        (void)ip;
+        (void)ux;
+        (void)uy;
+        (void)uz;
+      });
+    }
+  }
 }
