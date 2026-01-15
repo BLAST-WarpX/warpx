@@ -383,7 +383,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const amrex::Real focal_distance = plasma_injector.focal_distance;
     const amrex::Real rotation_angle = plasma_injector.rotation_angle;
     const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D)
     const amrex::Real crabwaist_strength = plasma_injector.crabwaist_strength;
 #endif
 
@@ -472,7 +472,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 x = x - (v_x - v_dot_n*n_x) * t;
 #endif
             }
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+#if defined(WARPX_DIM_3D)
         // crabwaist before rotation
             // Lorentz boost currently only possible along z direction: x and z coords swapped if boost on, not if I only rotate
             if (plasma_injector.do_crabwaist){
