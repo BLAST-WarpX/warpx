@@ -220,9 +220,11 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
         amrex::Gpu::Atomic::AddNoRet(
             &jx_arr(lo.x+l_jx+iz, 0, 0, 0),
             sz_jx[iz]*wqx);
+#if !defined(WARPX_EM_TEY)
         amrex::Gpu::Atomic::AddNoRet(
             &jy_arr(lo.x+l_jy+iz, 0, 0, 0),
             sz_jy[iz]*wqy);
+#endif
         amrex::Gpu::Atomic::AddNoRet(
             &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
             sz_jz[iz]*wqz);
@@ -1155,7 +1157,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
     // (do_ionization=1)
     bool const do_ionization = ion_lev;
 
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_EM_TEY)
+#if !defined(WARPX_DIM_3D) && !(defined(WARPX_EM_TEY) && AMREX_SPACEDIM==2)
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 #endif
 
@@ -1173,7 +1175,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_EM_TEY)
+#if !defined(WARPX_DIM_3D) && !(defined(WARPX_EM_TEY) && AMREX_SPACEDIM==2)
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
                                                                        uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
@@ -1269,7 +1271,9 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             amrex::Real const vy = uyp_nph[ip]*gaminv;
 #elif defined(WARPX_DIM_1D_Z)
             amrex::Real const vx = uxp_nph[ip]*gaminv;
+#if !defined(WARPX_EM_TEY)
             amrex::Real const vy = uyp_nph[ip]*gaminv;
+#endif
 #elif defined(WARPX_DIM_RCYLINDER)
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
             amrex::Real const vz = uzp_nph[ip]*gaminv;
@@ -1454,10 +1458,12 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                 amrex::Real const sdxi = wq*vx*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k_new-1+k, 0, 0, 0), sdxi);
             }
+#if !defined(WARPX_EM_TEY)
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k_new-1+k, 0, 0, 0), sdyj);
             }
+#endif
             amrex::Real sdzk = 0._rt;
             for (int k=dkl; k<=depos_order+1-dku; k++) {
                 sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k]);
@@ -1591,7 +1597,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
 #elif defined(WARPX_DIM_1D_Z)
     amrex::Real const vx = uxp_mid*gaminv;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
+#endif
 #elif defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
     double x_new = (xp_new - xyzmin.x)*dinv.x;
@@ -2078,7 +2086,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         for (int k=0; k<=depos_order; k++) {
             const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+#endif
         }
 
         // deposit Jz for this segment
