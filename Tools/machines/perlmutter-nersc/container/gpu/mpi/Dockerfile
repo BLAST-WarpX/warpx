@@ -32,11 +32,20 @@ ARG warpx_version=25.11
 ARG NJOBS
 ENV NJOBS=$NJOBS
 
-# Perlmutter GPU: A100
-# Perlmutter CPU: x86-64-v3 for  p4d.24xlarge and p4de.24xlarge instances.
-ENV AMREX_CUDA_ARCH=8.0        \
-    CUDAARCHS=80               \
-    CXXFLAGS="-march=x86-64-v3"   \
+# # Perlmutter GPU: A100
+# # Perlmutter CPU: x86-64-v3 for  p4d.24xlarge and p4de.24xlarge instances.
+# ENV AMREX_CUDA_ARCH=8.0        \
+#     CUDAARCHS=80               \
+#     CXXFLAGS="-march=x86-64-v3"   \
+#     CFLAGS="-march=x86-64-v3"
+
+# AWS G5 (A10G) Configuration
+# AMREX_CUDA_ARCH=8.6 for A10G
+# CUDAARCHS=86 for A10G
+# -march=x86-64-v3 for safe execution on AMD EPYC (Zen 2) or Intel
+ENV AMREX_CUDA_ARCH=8.6 \
+    CUDAARCHS=86 \
+    CXXFLAGS="-march=x86-64-v3" \
     CFLAGS="-march=x86-64-v3"
 
 # Ubuntu apt global options
