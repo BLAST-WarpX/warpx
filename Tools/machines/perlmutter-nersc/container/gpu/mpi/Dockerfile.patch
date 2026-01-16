@@ -1,0 +1,17 @@
+# 1. Start from your existing heavy image
+FROM 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v3
+
+# 2. Switch to root to ensure we have permission to install
+USER root
+
+# 3. Install SSH (The missing piece)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openssh-server \
+    openssh-client && \
+    mkdir -p /var/run/sshd && \
+    rm -rf /var/lib/apt/lists/*
+
+# 4. (Optional) If your original image used a specific user (like 'mpiuser'), switch back.
+# If you don't know, you can probably skip this line or check your original Dockerfile.
+# USER mpiuser

@@ -26,7 +26,7 @@
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS warpx-dev
 
 # WarpX version
-ARG warpx_version=25.11
+ARG warpx_version=26.01
 
 # Build parallelism
 ARG NJOBS
@@ -222,9 +222,11 @@ RUN python3 -m venv /opt/venv && \
     --upgrade        \
     build            \
     cmake            \
+    "nvidia-cuda-runtime-cu12==12.4.*" \
     cupy-cuda12x     \
     cython           \
     h5py             \
+    lasy             \
     matplotlib       \
     numpy            \
     openpmd-api      \
@@ -282,6 +284,16 @@ RUN git clone                       \
 
 # Reduce to runtime
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS warpx
+
+# Install runtime dependencies
+# ADDED: openssh-server openssh-client
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openssh-server \
+    openssh-client \
+    ca-certificates coreutils python3 python3-pip python3-venv \
+    libblas3 libbz2-1.0 libhdf5-103-1 libpng16-16 liblapack3 libzstd1 zlib1g && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install essential system dependencies (runtime)
 RUN apt-get update            && \
