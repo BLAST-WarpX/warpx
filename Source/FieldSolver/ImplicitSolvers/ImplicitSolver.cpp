@@ -1055,10 +1055,12 @@ void ImplicitSolver::FinishMassMatrices ()
 #endif
     }
 
+#if AMREX_SPACEDIM == 2
     const amrex::IntVect ncomp_xx = m_ncomp_xx;
     const amrex::IntVect ncomp_zz = m_ncomp_zz;
 #if !defined(WARPX_EM_TEY)
     const amrex::IntVect ncomp_yy = m_ncomp_yy;
+#endif
 #endif
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
