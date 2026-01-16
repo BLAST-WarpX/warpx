@@ -25,9 +25,21 @@
 #SBATCH -o WarpX.o%j
 #SBATCH -e WarpX.e%j
 
-# executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs
+# PICMI Python script or executable?
+USE_PICMI=true
+
+if [[ "${USE_PICMI}" = true ]]
+then
+    EXE=python3
+    INPUTS=PICMI_script.py
+    #   for GPU-aware MPI in PICMI, set
+    #   Simulation(..., warpx_amrex_use_gpu_aware_mpi=True)
+    GPU_AWARE_MPI=""
+else
+    EXE=./warpx
+    INPUTS=inputs.in
+    GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
+fi
 
 # pin to closest NIC to GPU
 export MPICH_OFI_NIC_POLICY=GPU
@@ -35,9 +47,6 @@ export MPICH_OFI_NIC_POLICY=GPU
 # threads for OpenMP and threaded compressors per MPI rank
 #   note: 16 avoids hyperthreading (32 virtual cores, 16 physical)
 export OMP_NUM_THREADS=16
-
-# GPU-aware MPI optimizations
-GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
 
 # CUDA visible devices are ordered inverse to local task IDs
 #   Reference: nvidia-smi topo -m
