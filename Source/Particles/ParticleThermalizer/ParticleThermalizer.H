@@ -16,14 +16,14 @@ class WarpXParticleContainer;
 
 class ParticleThermalizer {
 public:
-    enum class Normal { X, Y, Z };
+    enum class Normal { X = 0, Y, Z };
 
     // Construct and read parameters from inputs under the `particle_thermalizer` block.
     ParticleThermalizer ();
 
     // Returns true if the particle_thermalizer parameters were provided
     // and the thermalizer is therefore on.
-    bool defined () const;    
+    bool defined () const;
 
     // Apply the thermalizer to particles in the provided MultiParticleContainer.
     void applyThermalizer (MultiParticleContainer &mpc);

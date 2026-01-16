@@ -24,6 +24,7 @@ ParticleThermalizer::ParticleThermalizer()
     // If no normal is specified, the thermalizer is not defined
     return;
   }
+
   // normalize to lowercase
   std::transform(normal_str.begin(), normal_str.end(), normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
   if (normal_str == "x") {
@@ -50,7 +51,7 @@ ParticleThermalizer::ParticleThermalizer()
   AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
       m_temperature >= 0._rt,
       "particle_thermalizer: 'temperature' must be non-negative");
-  
+
   m_defined = true;
 }
 
@@ -60,38 +61,41 @@ bool ParticleThermalizer::defined() const {
 
 void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
 {
-  // Iterate over all species/particle containers. 
+  // Iterate over all species/particle containers.
   for (auto &pc_uptr : mpc) {
     if (!pc_uptr) continue;
     applyThermalizer(*pc_uptr);
   }
 }
 
-void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pcont)
+void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
 {
-  // Loop over AMR levels for this particle container
-  for (int lev = 0; lev < pcont.numLevels(); ++lev) {
-    // Loop over tiles / particle chunks
-    for (WarpXParIter pti(pcont, lev); pti.isValid(); ++pti) {
-      // Number of particles on this tile
-      const long np = pti.numParticles();
+    for (int lev = 0; lev < pc.numLevels(); ++lev) {
+        const auto& geom = pc.Geom(lev);
+        amrex::RealBox prob_domain = geom.ProbDomain();
+        int dir = static_cast<int>(m_normal);
+        // TODO - Handle non-3D
+        prob_domain.setLo(dir, m_start);
+        prob_domain.setHi(dir, m_end);
+        for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti) {
+            const long np = pti.numParticles();
 
-      // Acquire pointers/refs to particle attribute arrays as needed.
-      // For a no-op implementation we don't modify them, but set up the
-      // typical pattern so adding logic later is straightforward.
-      auto& ux = pti.GetAttribs(PIdx::ux);
-      auto& uy = pti.GetAttribs(PIdx::uy);
-      auto& uz = pti.GetAttribs(PIdx::uz);
+            const auto getPosition = GetParticlePosition(pti);
 
-      // Parallel loop over particles in the tile.
-      amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept {
-        // No-op for now. Example access:
-        // amrex::ParticleReal px = ux[ip];
-        (void)ip;
-        (void)ux;
-        (void)uy;
-        (void)uz;
-      });
+            // Acquire pointers to particle attribute arrays as needed.
+            auto* ux = pti.GetAttribs(PIdx::ux).data();
+            auto* uy = pti.GetAttribs(PIdx::uy).data();
+            auto* uz = pti.GetAttribs(PIdx::uz).data();
+
+            // Parallel loop over particles in the tile.
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept {
+                amrex::ParticleReal x, y, z;
+                getPosition(ip, x, y, z);
+                if (prob_domain.contains(amrex::XDim3{x, y, z})) {
+                    amrex::ignore_unused(ux, uy, uz);
+                    return;
+                }
+            });
+        }
     }
-  }
 }
