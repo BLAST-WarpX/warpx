@@ -245,6 +245,8 @@ public:
 
     void AddGaussianBeam (PlasmaInjector const& plasma_injector);
 
+    void AddTwiss (PlasmaInjector const& plasma_injector);
+
     /** Load a particle beam from an external file
      * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] q_tot total charge of the particle species to be initialized

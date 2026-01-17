@@ -91,6 +91,43 @@ private:
     amrex::Real m_ux_th, m_uy_th, m_uz_th;
 };
 
+struct InjectorMomentumTwiss
+{
+    InjectorMomentumTwiss (amrex::Real a_u0, amrex::XDim3 a_sigma_u) noexcept
+        : m_u0(a_u0), m_sigma_u(a_sigma_u)
+    {
+    }
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE
+    amrex::XDim3
+    getMomentum (
+        amrex::Real /*x*/, amrex::Real /*y*/, amrex::Real /*z*/,
+        amrex::RandomEngine const& engine) const noexcept
+    {
+        using namespace amrex::literals;
+
+        return amrex::XDim3 {
+            amrex::RandomNormal(0_rt, m_sigma_u.x, engine),
+            amrex::RandomNormal(0_rt, m_sigma_u.y, engine),
+            m_u0 + amrex::RandomNormal(0_rt, m_sigma_u.z, engine)
+        };
+    }
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE
+    amrex::XDim3
+    getBulkMomentum (amrex::Real /*x*/, amrex::Real /*y*/, amrex::Real /*z*/) const noexcept
+    {
+        using namespace amrex::literals;
+        return amrex::XDim3{ 0_rt, 0_rt, m_u0 };
+    }
+
+private:
+    amrex::Real m_u0;
+    amrex::XDim3 m_sigma_u;
+};
+
 // struct whose getMomentum returns momentum for 1 particle, from random
 // gaussian flux distribution in the specified direction.
 // Along the normal axis, the distribution is v*Gaussian,
@@ -540,6 +577,13 @@ struct InjectorMomentum
           object(t,a_ux_m,a_uy_m,a_uz_m,a_ux_th,a_uy_th,a_uz_th)
     { }
 
+    // This constructor stores a InjectorMomentumGaussian in union object.
+    InjectorMomentum (
+        InjectorMomentumTwiss* t, amrex::Real a_u0, amrex::XDim3 a_sigma_u)
+        : type(Type::twiss),
+          object(t, a_u0, a_sigma_u)
+    { }
+
     // This constructor stores a InjectorMomentumGaussianFlux in union object.
     InjectorMomentum (InjectorMomentumGaussianFlux* t,
                       amrex::Real a_ux_m, amrex::Real a_uy_m, amrex::Real a_uz_m,
@@ -607,6 +651,10 @@ struct InjectorMomentum
         {
             return object.gaussian.getMomentum(x,y,z,engine);
         }
+        case Type::twiss:
+        {
+            return object.twiss.getMomentum(x,y,z,engine);
+        }
         case Type::gaussianparser:
         {
             return object.gaussianparser.getMomentum(x,y,z,engine);
@@ -660,6 +708,10 @@ struct InjectorMomentum
         {
             return object.gaussian.getBulkMomentum(x,y,z);
         }
+        case Type::twiss:
+        {
+            return object.twiss.getBulkMomentum(x,y,z);
+        }
         case Type::gaussianparser:
         {
             return object.gaussianparser.getBulkMomentum(x,y,z);
@@ -696,7 +748,7 @@ struct InjectorMomentum
         }
     }
 
-    enum struct Type { constant, gaussian, gaussianflux, uniform, boltzmann, juttner, radial_expansion, parser, gaussianparser };
+    enum struct Type { constant, gaussian, twiss, gaussianflux, uniform, boltzmann, juttner, radial_expansion, parser, gaussianparser };
     Type type;
 
 private:
@@ -713,6 +765,9 @@ private:
                 amrex::Real a_uz_m, amrex::Real a_ux_th,
                 amrex::Real a_uy_th, amrex::Real a_uz_th) noexcept
             : gaussian(a_ux_m,a_uy_m,a_uz_m,a_ux_th,a_uy_th,a_uz_th) {}
+        Object (InjectorMomentumTwiss*,
+                amrex::Real a_u0, amrex::XDim3 a_sigma_u) noexcept
+            : twiss(a_u0, a_sigma_u) {}
         Object (InjectorMomentumGaussianFlux*,
                 amrex::Real a_ux_m, amrex::Real a_uy_m,
                 amrex::Real a_uz_m, amrex::Real a_ux_th,
@@ -749,6 +804,7 @@ private:
                              a_ux_th_parser, a_uy_th_parser, a_uz_th_parser) {}
         InjectorMomentumConstant constant;
         InjectorMomentumGaussian gaussian;
+        InjectorMomentumTwiss twiss;
         InjectorMomentumGaussianFlux gaussianflux;
         InjectorMomentumUniform uniform;
         InjectorMomentumBoltzmann boltzmann;

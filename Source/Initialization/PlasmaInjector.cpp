@@ -28,6 +28,7 @@
 #include <AMReX_Config.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuDevice.H>
+#include <AMReX_Math.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -41,6 +42,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <map>
 #include <memory>
 #include <set>
@@ -49,6 +51,45 @@
 #include <vector>
 
 using namespace amrex::literals;
+
+namespace
+{
+    inline amrex::XDim3 CrossProduct (const amrex::XDim3& a, const amrex::XDim3& b)
+    {
+        return { a.y*b.z - a.z*b.y,  a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+    }
+
+    inline amrex::Real DotProduct (const amrex::XDim3& a, const amrex::XDim3& b)
+    {
+        return a.x*b.x + a.y*b.y + a.z*b.z;
+    }
+
+    inline amrex::Real Norm (const amrex::XDim3& a)
+    {
+        return std::sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+    }
+
+    inline amrex::XDim3 Normalize (const amrex::XDim3& a)
+    {
+        const amrex::Real norm = std::sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+        return { a.x/norm, a.y/norm, a.z/norm };
+    }
+
+    // Projection of "a" in the plane with normal "n"
+    inline amrex::XDim3 Projection (const amrex::XDim3& a, const amrex::XDim3& n)
+    {
+        const amrex::Real a_dot_n = DotProduct(a, n);
+        return {
+            a.x - a_dot_n * n.x,
+            a.y - a_dot_n * n.y,
+            a.z - a_dot_n * n.z };
+    }
+
+    inline amrex::Real Square (const amrex::Real x)
+    {
+        return amrex::Math::powi<2>(x);
+    }
+}
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
@@ -140,6 +181,8 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
         return;
     } else if (injection_style == "gaussian_beam") {
         setupGaussianBeam(pp_species);
+    } else if (injection_style == "twiss") {
+        setupTwiss(pp_species);
     } else if (injection_style == "nrandompercell") {
         setupNRandomPerCell(pp_species);
     } else if (injection_style == "nfluxpercell") {
@@ -296,6 +339,113 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !do_rotation && !do_rotation_momenta,
         "Error: Gaussian beam cannot be rotated in 1D, RCYLINDER, RSPHERE, and RZ geometries.");
 #endif
+}
+
+void PlasmaInjector::setupTwiss (amrex::ParmParse const& pp_species)
+{
+    utils::parser::getWithParser(pp_species, source_name, "x0", x0.x);
+    utils::parser::getWithParser(pp_species, source_name, "y0", x0.y);
+    utils::parser::getWithParser(pp_species, source_name, "z0", x0.z);
+    utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
+    utils::parser::getWithParser(pp_species, source_name, "npart", npart);
+
+    if (pp_species.contains("twiss.planar_cut")) {
+        utils::parser::getArrWithParser(
+            pp_species, source_name, "twiss.planar_cut", twiss_planar_cut, 0, 6);
+    } else {
+        twiss_planar_cut.resize(6, std::numeric_limits<amrex::Real>::max());
+    }
+
+    if (pp_species.contains("twiss.ellipsoidal_cut")) {
+        utils::parser::getArrWithParser(
+            pp_species, source_name, "twiss.ellipsoidal_cut", twiss_ellipsoidal_cut, 0, 6);
+    } else {
+        twiss_ellipsoidal_cut.resize(6, std::numeric_limits<amrex::Real>::max());
+    }
+
+    utils::parser::getWithParser(pp_species, source_name, "twiss.u0", twiss_u0);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        twiss_u0 > 0_rt, "twiss.u0 must be positive");
+
+    amrex::Vector<amrex::Real> temp;
+    if (pp_species.contains("twiss.euler")) {
+        utils::parser::getArrWithParser(pp_species, source_name, "twiss.euler", temp, 0, 3);
+        const amrex::Real ca = std::cos(temp[0]), sa = std::sin(temp[0]);
+        const amrex::Real cb = std::cos(temp[1]), sb = std::sin(temp[1]);
+        const amrex::Real cg = std::cos(temp[2]), sg = std::sin(temp[2]);
+        twiss_nx = {
+            ca*cg - cb*sa*sg,
+            cg*sa + ca*cb*sg,
+            sb*sg
+        };
+        twiss_ny = {
+            -ca*sg - cb*cg*sa,
+            ca*cb*cg - sa*sg,
+            cg*sb
+        };
+        twiss_nz = {
+            sa*sb,
+            -ca*sb,
+            cb
+        };
+    } else {
+        if (pp_species.contains("twiss.nz")) {
+            utils::parser::getArrWithParser(pp_species, source_name, "twiss.nz", temp, 0, 3);
+            twiss_nz = Normalize({temp[0], temp[1], temp[2]});
+        } else {
+            twiss_nz = { 0_rt, 0_rt, 1_rt };
+        }
+        if (pp_species.contains("twiss.nx")) {
+            utils::parser::getArrWithParser(pp_species, source_name, "twiss.nx", temp, 0, 3);
+            twiss_nx = Normalize({temp[0], temp[1], temp[2]});
+        } else {
+            twiss_nx = { 1_rt, 0_rt, 0_rt };
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            Norm(CrossProduct(twiss_nz, twiss_nx)) > 0_rt,
+            "twiss.nz and twiss.nx must not be parallel");
+        twiss_nx = Normalize(Projection(twiss_nx, twiss_nz));
+        twiss_ny = CrossProduct(twiss_nz, twiss_nx);
+    }
+
+    parseTwissParameters(
+        pp_species, "x", twiss_focal_distance.x, twiss_sigma_x.x, twiss_sigma_u.x);
+    parseTwissParameters(
+        pp_species, "y", twiss_focal_distance.y, twiss_sigma_x.y, twiss_sigma_u.y);
+    parseTwissParameters(
+        pp_species, "zeta", twiss_focal_distance.z, twiss_sigma_x.z, twiss_sigma_u.z);
+
+#if defined(WARPX_DIM_XZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(twiss_sigma_x.y > 0_rt,
+        "Error: twiss.sigma_y must be strictly greater than 0 in 2D "
+        "(it is used when computing the particles' weights from the total beam charge)");
+#elif defined(WARPX_DIM_1D_Z)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(twiss_sigma_x.x> 0_rt,
+        "Error: twiss.sigma_x must be strictly greater than 0 in 1D "
+        "(it is used when computing the particles' weights from the total beam charge)");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(twiss_sigma_x.y > 0_rt,
+        "Error: twiss.sigma_y must be strictly greater than 0 in 1D "
+        "(it is used when computing the particles' weights from the total beam charge)");
+#endif
+
+    utils::parser::queryWithParser(
+        pp_species, source_name, "twiss.symmetrization_order", twiss_symmetrization_order);
+    const std::set<int> valid_symmetries = { 1, 8, 16 };
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(valid_symmetries.count(twiss_symmetrization_order),
+        "Error: Symmetrization only supported for orders 1, 8, or 16 ");
+
+    twiss = true;
+
+    // Momentum parameters have now been calculated.  Append them to the amrex::ParmParse for use in SpeciesUtils::parseMomentum().
+    amrex::ParmParse pp_mod(species_name);
+    pp_mod.add(std::string("twiss.sigma_ux").c_str(), twiss_sigma_u.x);
+    pp_mod.add(std::string("twiss.sigma_uy").c_str(), twiss_sigma_u.y);
+    pp_mod.add(std::string("twiss.sigma_uzeta").c_str(), twiss_sigma_u.z);
+    SpeciesUtils::parseMomentum(
+        species_name, source_name, "twiss", h_inj_mom,
+        ux_parser, uy_parser, uz_parser,
+        ux_th_parser, uy_th_parser, uz_th_parser,
+        h_mom_temp, h_mom_vel);
 }
 
 void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
@@ -614,6 +764,98 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
 #endif
     }
 
+}
+
+void PlasmaInjector::parseTwissParameters (
+    amrex::ParmParse const& pp_species, const std::string& dir,
+    amrex::Real& _focal_distance, amrex::Real& sigma_x, amrex::Real& sigma_u)
+{
+    enum class TwissParameter {
+        FOCAL_DISTANCE, SIGMA_X, SIGMA_U, EMITTANCE, ALPHA, BETA, GAMMA
+    };
+    using TP = TwissParameter;
+
+    const std::map<TwissParameter, std::string> lookup = {
+        {TP::FOCAL_DISTANCE, std::string("twiss.focal_distance_") + dir},
+        {TP::SIGMA_X, std::string("twiss.sigma_") + dir},
+        {TP::SIGMA_U, std::string("twiss.sigma_u") + dir},
+        {TP::EMITTANCE, std::string("twiss.emittance_") + dir},
+        {TP::ALPHA, std::string("twiss.alpha_") + dir},
+        {TP::BETA, std::string("twiss.beta_") + dir}
+    };
+
+    std::map<TwissParameter, amrex::Real> vars;
+    for (const auto& pair : lookup) {
+        amrex::Real value;
+        if (utils::parser::queryWithParser(pp_species, source_name, pair.second.c_str(), value)) {
+            vars[pair.first] = value;
+        }
+    }
+
+    // sigma_u specified in units of u0
+    if (vars.count(TP::SIGMA_U)) {
+        vars[TP::SIGMA_U] *= twiss_u0;
+    }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        vars.size() == 3,
+        std::string("Must provide exactly 3 Twiss parameters (dir=") + dir + ")");
+
+    // dispersion of transverse velocity with respect to transverse momentum
+    amrex::Real eta = 1_rt;
+    if (dir == "zeta") {
+        // dispersion of longitudinal velocity with respect to longitudinal momentum
+        const amrex::Real gamma0 = std::sqrt(1_rt + Square(twiss_u0));
+        eta = 1_rt/Square(gamma0);
+    }
+
+    while (
+        vars.count(TP::FOCAL_DISTANCE) + vars.count(TP::SIGMA_X) + vars.count(TP::SIGMA_U) < 3) {
+        if ( // beta gamma = 1 + alpha^2
+            vars.count(TP::BETA) && vars.count(TP::ALPHA) && !vars.count(TP::GAMMA)) {
+            vars[TP::GAMMA] = (1_rt + Square(vars[TP::ALPHA]))/vars[TP::BETA];
+        } else if (
+            vars.count(TP::GAMMA) && vars.count(TP::BETA) && !vars.count(TP::ALPHA)) {
+            vars[TP::ALPHA] = std::sqrt(vars[TP::BETA]*vars[TP::GAMMA] - 1_rt);
+        } else if (
+            vars.count(TP::ALPHA) && vars.count(TP::GAMMA) && !vars.count(TP::BETA)) {
+            vars[TP::BETA] = (1_rt+Square(vars[TP::ALPHA]))/vars[TP::GAMMA];
+        } else if ( // alpha = eta L gamma / u0
+            vars.count(TP::ALPHA) && vars.count(TP::FOCAL_DISTANCE) && !vars.count(TP::GAMMA)) {
+            vars[TP::GAMMA] = twiss_u0 * vars[TP::ALPHA] / (eta * vars[TP::FOCAL_DISTANCE]);
+        } else if (
+            vars.count(TP::GAMMA) && vars.count(TP::ALPHA) && !vars.count(TP::FOCAL_DISTANCE)) {
+            vars[TP::FOCAL_DISTANCE] = twiss_u0 * vars[TP::ALPHA] / (eta * vars[TP::GAMMA]);
+        } else if (
+            vars.count(TP::FOCAL_DISTANCE) && vars.count(TP::GAMMA) && !vars.count(TP::ALPHA)) {
+            vars[TP::ALPHA] = eta * vars[TP::FOCAL_DISTANCE] * vars[TP::GAMMA] / twiss_u0;
+        } else if ( // sigma_x sigma_u = emittance
+            vars.count(TP::SIGMA_X) && vars.count(TP::SIGMA_U) && !vars.count(TP::EMITTANCE)) {
+            vars[TP::EMITTANCE] = vars[TP::SIGMA_X]*vars[TP::SIGMA_U];
+        } else if (
+            vars.count(TP::EMITTANCE) && vars.count(TP::SIGMA_X) && !vars.count(TP::SIGMA_U)) {
+            vars[TP::SIGMA_U] = vars[TP::EMITTANCE]/vars[TP::SIGMA_X];
+        } else if (
+            vars.count(TP::SIGMA_U) && vars.count(TP::EMITTANCE) && !vars.count(TP::SIGMA_X)) {
+            vars[TP::SIGMA_X] = vars[TP::EMITTANCE]/vars[TP::SIGMA_U];
+        } else if ( // gamma sigma_x^2 = emittance
+            vars.count(TP::GAMMA) && vars.count(TP::SIGMA_X) && !vars.count(TP::EMITTANCE)) {
+            vars[TP::EMITTANCE] = vars[TP::GAMMA]*Square(vars[TP::SIGMA_X]);
+        } else if (
+            vars.count(TP::EMITTANCE) && vars.count(TP::GAMMA) && !vars.count(TP::SIGMA_X)) {
+            vars[TP::SIGMA_X] = std::sqrt(vars[TP::EMITTANCE]/vars[TP::GAMMA]);
+        } else if (
+            vars.count(TP::SIGMA_X) && vars.count(TP::EMITTANCE) && !vars.count(TP::GAMMA)) {
+            vars[TP::GAMMA] = vars[TP::EMITTANCE]/Square(vars[TP::SIGMA_X]);
+        } else {
+            WARPX_ABORT_WITH_MESSAGE(
+                std::string("Invalid set of Twiss parameters (dir=") + dir + ")");
+        }
+    }
+
+    _focal_distance = vars[TP::FOCAL_DISTANCE];
+    sigma_x = vars[TP::SIGMA_X];
+    sigma_u = vars[TP::SIGMA_U];
 }
 
 amrex::XDim3 PlasmaInjector::getMomentum (amrex::Real x,
