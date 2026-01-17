@@ -101,7 +101,7 @@ The specific Python syntax to access this data is described in the following sec
    python_particle_data
    python_particle_boundary_data
    python_warpx
-   pyamrex_api
+   python_portable
 
 Data Access
 -----------

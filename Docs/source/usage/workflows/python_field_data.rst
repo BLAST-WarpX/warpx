@@ -33,7 +33,8 @@ Different interfaces depending on complexity and performance
         AMReX defines many functions that operate on fields, many are wrapped in Python
         point to pyamrex doc (https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab)
 
-        e.g. Saxpy, mult, FillBoundary, ParallelCopy)
+        e.g. Saxpy, mult, FillBoundary, ParallelCopy
+        Very performant, but limited to existing functions
 
         Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
 
@@ -77,7 +78,11 @@ Different interfaces depending on complexity and performance
         Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
         The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
-    .. tab-item:: Explicit loops over grids
+        Use load_cupy?
+
+        Discuss the mesh function
+
+    .. tab-item:: Explicit loop over boxes
 
         All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
         This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
@@ -135,6 +140,7 @@ Different interfaces depending on complexity and performance
 
             sim.step(nsteps=100)
 
+        Use load_cupy?
         For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
 
