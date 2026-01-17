@@ -18,7 +18,7 @@ are selected with the ``sim.field.get`` method, as shown in the example below.
     Ex = sim.field.get("Efield_fp", dir="x", level=0)
 
 The available field names (e.g. ``"Efield_fp"``, ``"rho_fp"``, etc.) are listed in the :ref:`developers-fields-names` section.
-The function ``sim.field.get`` returns a `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ object of type ``MultiFab``, whose field data can be accessed or modified as described further below.
+The function ``sim.field.get`` returns a `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ object of type `MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__, whose field data can be accessed or modified as described below.
 
 Accessing/modifying the underlying field data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -30,9 +30,18 @@ Different interfaces depending on complexity and performance
 
     .. tab-item:: Pre-defined AMReX methods
 
-        Several AMReX methods ; Some are wrapped in Python ; point to pyamrex doc
+        AMReX defines many functions that operate on fields, many are wrapped in Python
+        point to pyamrex doc (https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab)
+
+        e.g. Saxpy, mult, FillBoundary, ParallelCopy)
 
         Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
+
+        .. dropdown:: See some of these methods used in a full example
+
+            .. literalinclude:: ../../../../Examples/Physics_applications/spacecraft_charging/inputs_test_rz_spacecraft_charging_picmi.py
+                :language: python3
+                :caption: You can copy this file from ``Examples/Physics_applications/spacecraft_charging/inputs_test_rz_secondary_ion_emission_picmi.py``.
 
     .. tab-item:: Numpy-like global indexing
 
@@ -150,7 +159,7 @@ In this example, a new MultiFab is added with the same properties as `Ex`.
                                          redistribute_on_remake=True)
 
 
-.. dropdown:: Full Example
+.. dropdown:: See this function used in a full example
 
     .. literalinclude:: ../../../../Examples/Physics_applications/spacecraft_charging/inputs_test_rz_spacecraft_charging_picmi.py
         :language: python3
