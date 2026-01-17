@@ -23,106 +23,110 @@ The function ``sim.field.get`` returns a `pyamrex <https://pyamrex.readthedocs.i
 Accessing/modifying the underlying field data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Define field data (field values on the grid)
 Different interfaces depending on complexity and performance
 
-Numpy-like global indexing
-==========================
+.. tab-set::
 
-The field ``MultiFab`` object provides access to the data via global indexing.
-Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
-For indices within the domain, values from valid cells are always returned.
-The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
-This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
+    .. tab-item:: Pre-defined AMReX methods
 
-.. code-block:: python
+        Several AMReX methods ; Some are wrapped in Python ; point to pyamrex doc
 
-   Bz = sim.fields.get("Bfield_fp", dir=2, level=0)
-   Bz_along_x = Bz[:,5,6]
+        Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
 
-The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
-specified ``x``. The data will be scattered appropriately to the underlying FABs. The set is a local operation.
+    .. tab-item:: Numpy-like global indexing
 
-.. code-block:: python
+        The field ``MultiFab`` object provides access to the data via global indexing.
+        Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
+        When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
+        For indices within the domain, values from valid cells are always returned.
+        The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
+        This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
-   Jy = sim.fields.get("current_fp", dir=1, level=0)
-   Jy[5,6:20,8:30] = 7.
+        .. code-block:: python
 
-In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
-Note that the ``+=`` will be a global operation.
+            Bz = sim.fields.get("Bfield_fp", dir=2, level=0)
+            Bz_along_x = Bz[:,5,6]
 
-.. code-block:: python
+        The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
+        specified ``x``. The data will be scattered appropriately to the underlying FABs. The set is a local operation.
 
-   Jx = sim.fields.get("current_fp", dir=0, level=0)
-   Jx[(),-1j,-1:2j] += 7.
+        .. code-block:: python
 
-To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
-Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
-The code does error checking to ensure that the specified indices are within the bounds of the global domain.
+            Jy = sim.fields.get("current_fp", dir=1, level=0)
+            Jy[5,6:20,8:30] = 7.
 
-Using AMReX methods that operate on fields
-==========================================
+        In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
+        Note that the ``+=`` will be a global operation.
 
-Several AMReX methods ; Some are wrapped in Python ; point to pyamrex doc
+        .. code-block:: python
 
-Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
+            Jx = sim.fields.get("current_fp", dir=0, level=0)
+            Jx[(),-1j,-1:2j] += 7.
 
-Explicit loops over grids
-=========================
+        To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
+        Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
+        The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
-All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
-This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
-This shows how to loop over levels and grid blocks.
+    .. tab-item:: Explicit loops over grids
 
-.. code-block:: python3
+        All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
+        This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
+        This shows how to loop over levels and grid blocks.
 
-   from pywarpx import picmi
-   from pywarpx.callbacks import callfromafterstep
+        More details: https://pyamrex.readthedocs.io/en/latest/usage/compute.html
 
-   # Preparation: set up the simulation
-   #   sim = picmi.Simulation(...)
-   #   ...
+        Advantages in terms of performance + how to use with cupy
 
+        .. code-block:: python3
 
-   @callfromafterstep
-   def set_Ex():
-       warpx = sim.extension.warpx
+            from pywarpx import picmi
+            from pywarpx.callbacks import callfromafterstep
 
-       # data access
-       #   vector field E, component x, on the fine patch of MR level 0
-       Ex_mf = sim.fields.get("Efield_fp", dir=0, level=0)
-       #   scalar field rho, on the fine patch of MR level 0
-       rho_mf = sim.fields.get("rho_fp", level=0)
-
-       # compute on Ex_mf
-       # iterate over mesh-refinement levels
-       for lev in range(warpx.finest_level + 1):
-           # grow (aka guard/ghost/halo) regions
-           ngv = Ex_mf.n_grow_vect
-
-           # get every local block of the field
-           for mfi in Ex_mf:
-               # global index space box, including guards
-               bx = mfi.tilebox().grow(ngv)
-               print(bx)  # note: global index space of this block
-
-               # numpy/cupy representation: non-copying view, including
-               # the guard/ghost region
-               Ex = Ex_mf.array(mfi).to_xp()
-
-               # notes on indexing in Ex:
-               # - numpy/cupy use locally zero-based indexing
-               # - layout is F_CONTIGUOUS by default, just like AMReX
-
-               # notes:
-               # Only the next lines are the "HOT LOOP" of the computation.
-               # For efficiency, we use array operation for speed.
-               Ex[()] = 42.0
+            # Preparation: set up the simulation
+            #   sim = picmi.Simulation(...)
+            #   ...
 
 
-   sim.step(nsteps=100)
+            @callfromafterstep
+            def set_Ex():
+                warpx = sim.extension.warpx
 
-For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
+                # data access
+                #   vector field E, component x, on the fine patch of MR level 0
+                Ex = sim.fields.get("Efield_fp", dir=0, level=0)
+                #   scalar field rho, on the fine patch of MR level 0
+                rho_mf = sim.fields.get("rho_fp", level=0)
+
+                # compute on Ex
+                # iterate over mesh-refinement levels
+                for lev in range(warpx.finest_level + 1):
+                    # grow (aka guard/ghost/halo) regions
+                    ngv = Ex.n_grow_vect
+
+                    # get every local block of the field
+                    for mfi in Ex:
+                        # global index space box, including guards
+                        bx = mfi.tilebox().grow(ngv)
+                        print(bx)  # note: global index space of this block
+
+                        # numpy/cupy representation: non-copying view, including
+                        # the guard/ghost region
+                        Ex_arr = Ex.array(mfi).to_xp()
+
+                        # notes on indexing in Ex:
+                        # - numpy/cupy use locally zero-based indexing
+                        # - layout is F_CONTIGUOUS by default, just like AMReX
+
+                        # notes:
+                        # Only the next lines are the "HOT LOOP" of the computation.
+                        # For efficiency, we use array operation for speed.
+                        Ex_arr[()] = 42.0
+
+
+            sim.step(nsteps=100)
+
+        For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
 
 Defining a new custom field
@@ -144,3 +148,10 @@ In this example, a new MultiFab is added with the same properties as `Ex`.
                                          initial_value=0.,
                                          redistribute=True,
                                          redistribute_on_remake=True)
+
+
+.. dropdown:: Full Example
+
+    .. literalinclude:: ../../../../Examples/Physics_applications/spacecraft_charging/inputs_test_rz_spacecraft_charging_picmi.py
+        :language: python3
+        :caption: You can copy this file from ``Examples/Physics_applications/spacecraft_charging/inputs_test_rz_secondary_ion_emission_picmi.py``.
