@@ -1,9 +1,7 @@
-# Start from your EXISTING huge image (v3)
-# This skips the 10-hour compile time because it's already done!
+# Start from your heavy v3 image
 FROM 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v3
 
-# Just install the missing SSH packages
-# This adds a small "layer" on top of the existing image
+# 1. Install SSH
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     openssh-server \
@@ -11,8 +9,49 @@ RUN apt-get update && \
     mkdir -p /var/run/sshd && \
     rm -rf /var/lib/apt/lists/*
 
-# (Optional) Ensure the SSH directory permissions are correct
-RUN chmod 755 /var/run/sshd
+# 2. PERMANENT SERVER FIX: Allow Root Login & Ignore Key Permissions
+# 'StrictModes no' ensures SSH accepts the keys even if volume permissions look weird to it
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    echo "StrictModes no" >> /etc/ssh/sshd_config
+
+# 3. PERMANENT CLIENT FIX: Disable "Are you sure?" prompt globally
+# This fixes the manual 'ssh' command and mpirun automatically
+RUN echo "Host *" >> /etc/ssh/ssh_config && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
+    echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # Start from your EXISTING huge image (v3)
+# # This skips the 10-hour compile time because it's already done!
+# FROM 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v3
+
+# # Just install the missing SSH packages
+# # This adds a small "layer" on top of the existing image
+# RUN apt-get update && \
+#     apt-get install -y --no-install-recommends \
+#     openssh-server \
+#     openssh-client && \
+#     mkdir -p /var/run/sshd && \
+#     rm -rf /var/lib/apt/lists/*
+
+# # (Optional) Ensure the SSH directory permissions are correct
+# RUN chmod 755 /var/run/sshd
 
 # # 1. Start from your existing heavy image
 # FROM 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v3

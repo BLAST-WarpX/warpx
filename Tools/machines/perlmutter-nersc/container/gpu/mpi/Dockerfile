@@ -313,6 +313,21 @@ RUN apt-get update            && \
     zlib1g           && \
     rm -rf /var/lib/apt/lists/*
 
+# 2. Setup SSH Directory    
+RUN mkdir -p /var/run/sshd
+
+# 3. PERMANENT SERVER FIX: Allow Root Login & Ignore Key Permissions
+# 'StrictModes no' ensures SSH accepts keys even if file permissions are imperfect on K8s volumes
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    echo "StrictModes no" >> /etc/ssh/sshd_config
+
+# 4. PERMANENT CLIENT FIX: Disable "Are you sure?" prompt globally
+# This prevents the "Host key verification failed" crash
+RUN echo "Host *" >> /etc/ssh/ssh_config && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config && \
+    echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
 # Copy installed software from previous stage
 COPY --from=warpx-dev /opt/warpx /opt/warpx
 COPY --from=warpx-dev /opt/venv /opt/venv
