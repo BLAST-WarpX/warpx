@@ -23,20 +23,24 @@ The function ``sim.field.get`` returns a `pyamrex <https://pyamrex.readthedocs.i
 Accessing/modifying the underlying field data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Define field data (field values on the grid)
-Different interfaces depending on complexity and performance
+Several ways to access and modify the field data (i.e., the values of the fields on the grid points) are available.
+These different methods differ in their user-friendliness, flexibility and performance overhead.
 
 .. tab-set::
 
     .. tab-item:: Pre-defined AMReX methods
 
-        AMReX defines many functions that operate on fields, many are wrapped in Python
-        point to pyamrex doc (https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab)
+        The AMReX library defines many functions that can operate on field data, and many of them are accessible
+        from Python via the `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ library. For a
+        full list of these methods, see the `pyamrex API documentation <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__.
 
-        e.g. Saxpy, mult, FillBoundary, ParallelCopy
-        Very performant, but limited to existing functions
+        Examples include:
 
-        Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
+        - Finding the maximum value of the field over the entire domain: ``Ex.max()``
+        - Scaling the field by a factor of 2: ``Ex.mult(2.)``
+        - Adding two fields together: ``Ex.saxpy(...)`` (see [this link](https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab.saxpy))
+
+        These methods are generally very performant, including when using GPUs and multi-node parallelization, but are limited to the existing functions provided by AMReX.
 
         .. dropdown:: See some of these methods used in a full example
 
