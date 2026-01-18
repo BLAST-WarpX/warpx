@@ -84,6 +84,11 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+#if defined(WARPX_DIM_1D_Z)
+    void Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
+                         const amrex::Real      a_theta_dt );
+#endif
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly

@@ -176,7 +176,58 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
         }
     }
 
+#if defined(WARPX_DIM_1D_Z)
+    // RHS += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+    Enforce1DESPeriodic(a_RHS, m_theta*m_dt);
+#endif
+
 }
+
+#if defined(WARPX_DIM_1D_Z)
+void ThetaImplicitEM::Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
+                                      const amrex::Real      a_theta_dt )
+{
+    BL_PROFILE("ImplicitSolver::Enforce1DESPeriodic()");
+
+    // Subtract the average Jz from the RHS to enforce zero potential
+    // drop in 1D electrostatic with periodic BCs.
+
+    // Check if doing electrostatic
+    if (!m_blank_electric_field[0] || !m_blank_electric_field[1]) { return; }
+
+    // Check if using periodic BCs
+    auto const& fbc_lo = m_WarpX->GetFieldBoundaryLo();
+    auto const& fbc_hi = m_WarpX->GetFieldBoundaryHi();
+    if (fbc_lo[0] != FieldBoundaryType::Periodic ||
+        fbc_hi[0] != FieldBoundaryType::Periodic)
+    {
+        return;
+    }
+
+    const amrex::Real norm_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+
+    using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = m_WarpX->Geom(lev);
+        const amrex::RealBox& prob_domain = geom.ProbDomain();
+        amrex::Real const *dx = geom.CellSize();
+        // Compute the spatial average of Jz
+        //
+        const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
+        const bool local_sum = false;
+        amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
+        amrex::Real meanJz = sumJz_global*dZ/Lz;
+
+        // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+        amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];
+        RHSz.plus(norm_factor*meanJz,0,RHSz.nComp());
+    }
+
+}
+#endif
+
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
