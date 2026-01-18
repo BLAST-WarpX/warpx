@@ -211,14 +211,15 @@ void ThetaImplicitEM::Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         const amrex::Geometry& geom = m_WarpX->Geom(lev);
-        const amrex::RealBox& prob_domain = geom.ProbDomain();
         amrex::Real const *dx = geom.CellSize();
+        const amrex::RealBox& prob_domain = geom.ProbDomain();
+        const amrex::Real Lz = prob_domain.hi(0) - prob_domain.lo(0);
+
         // Compute the spatial average of Jz
-        //
         const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
         const bool local_sum = false;
         amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
-        amrex::Real meanJz = sumJz_global*dZ/Lz;
+        amrex::Real meanJz = sumJz_global*dx[0]/Lz;
 
         // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
         amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];
