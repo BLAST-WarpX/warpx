@@ -65,13 +65,19 @@ def main():
     print(f"Expected ratio = {args.expected_ratio:.8f}")
     print(f"Observed ratio: mean = {r_mean:.8f}, median = {r_med:.8f}")
 
-    assert np.isclose(r_med, args.expected_ratio, rtol=args.rtol, atol=args.atol), (
-        f"Median ratio {r_med} != expected {args.expected_ratio} (rtol={args.rtol}, atol={args.atol})"
+    # choose an absolute tolerance when expected_ratio is 0 (rtol is ineffective then)
+    zero_like = np.isclose(args.expected_ratio, 0.0, rtol=0.0, atol=0.0)
+    eff_atol = max(args.atol, args.rtol) if zero_like else args.atol
+
+    assert np.isclose(r_med, args.expected_ratio, rtol=args.rtol, atol=eff_atol), (
+        f"Median ratio {r_med} != expected {args.expected_ratio} (rtol={args.rtol}, atol={eff_atol})"
     )
     # softer check
     assert np.isclose(
-        r_mean, args.expected_ratio, rtol=10 * args.rtol, atol=args.atol
-    ), f"Mean ratio {r_mean} != expected {args.expected_ratio}"
+        r_mean, args.expected_ratio, rtol=10 * args.rtol, atol=eff_atol
+    ), (
+        f"Mean ratio {r_mean} != expected {args.expected_ratio} (rtol={10 * args.rtol}, atol={eff_atol})"
+    )
 
 
 if __name__ == "__main__":
