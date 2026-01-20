@@ -883,21 +883,19 @@ WarpX::InitData ()
             WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
         {
             ExecutePythonCallback("beforeInitEsolve");
-
             if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
                 bool const reset_fields = false; // Do not erase previous user-specified values on the grid
                 ComputeSpaceChargeField(reset_fields);
                 if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                     ComputeMagnetostaticField();
                 }
-                // Add external fields to the fine patch fields. This makes it so that the
-                // net fields are the sum of the field solutions and any external fields.
-                for (int lev = 0; lev <= max_level; ++lev) {
-                    AddExternalFields(lev);
-                }
             }
-
             ExecutePythonCallback("afterInitEsolve");
+        }
+        // Add external fields to the fine patch fields. This makes it so that the
+        // net fields are the sum of the field solutions and any external fields.
+        for (int lev = 0; lev <= max_level; ++lev) {
+            AddExternalFields(lev);
         }
     }
     else {
