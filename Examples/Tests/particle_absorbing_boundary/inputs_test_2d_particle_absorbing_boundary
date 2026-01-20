@@ -7,7 +7,7 @@
 # max_step = 100
 stop_time = 5.0e-12            # [s]
 
-amr.n_cell = 100 29025
+amr.n_cell = 128 29056
 
 
 # simulation box, no MR
@@ -30,9 +30,9 @@ warpx.cfl = 0.999
 warpx.use_filter = 1          # bilinear current/charge filter
 
 # Grid size parameters (tune for performance on your machine)
-#amr.blocking_factor = 128
+amr.blocking_factor = 128
 amr.max_grid_size_x = 128
-amr.max_grid_size_y = 1161  # this is confusingly named and means z in 2D
+amr.max_grid_size_y = 2048  # this is confusingly named and means z in 2D
 
 # load balancing
 #   The grid & block parameters above are needed for load balancing:
@@ -66,9 +66,6 @@ hydrogen.num_particles_per_cell_each_dim = 4 4
 hydrogen.momentum_distribution_type = at_rest
 hydrogen.zmin = zmin
 hydrogen.profile = parse_density_function
-hydrogen.addRealAttributes = orig_x orig_z
-hydrogen.attribute.orig_x(x,y,z,ux,uy,uz,t) = "x"
-hydrogen.attribute.orig_z(x,y,z,ux,uy,uz,t) = "z"
 
 electrons.species_type = electron
 electrons.injection_style = NUniformPerCell
@@ -80,9 +77,9 @@ electrons.profile = parse_density_function
 
 # density profiles (target extent, pre-plasma and cutoffs defined above particle species list)
 electrons.density_function(x,y,z) = "nc*n0*(
-    if(z<=zmin, 0.0, 1.0 - exp((-(z - zmin))/L)) )"
+    if(z<=zmin, 0.0, 1.0 - exp(-(z - zmin)/L)))"
 hydrogen.density_function(x,y,z) = "nc*n0*(
-    if(z<=zmin, 0.0, 1.0 - exp((-(z - zmin))/L) )"
+    if(z<=zmin, 0.0, 1.0 - exp(-(z - zmin)/L)))"
 
 #################################
 # Laser Pulse Profile
