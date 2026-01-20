@@ -38,9 +38,12 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
         - Finding the maximum value of the field over the entire domain: ``Ex.max()``
         - Scaling the field by a factor of 2: ``Ex.mult(2.)``
-        - Adding two fields together: ``Ex.saxpy(...)`` (see [this link](https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab.saxpy))
+        - Adding two fields together: ``Ex.saxpy(...)`` (see `this link <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab.saxpy>`__)
 
-        These methods are generally very performant, including when using GPUs and multi-node parallelization, but are limited to the existing functions provided by AMReX.
+
+        .. note::
+
+            These methods are generally very performant, including when using GPUs and multi-node parallelization, but are limited to the existing functions provided by AMReX.
 
         .. dropdown:: See some of these methods used in a full example
 
