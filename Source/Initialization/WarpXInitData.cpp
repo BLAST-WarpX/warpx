@@ -879,17 +879,19 @@ WarpX::InitData ()
     {
         // Loop through species and calculate their space-charge field
         // Field solve step for electrostatic or hybrid-PIC solvers, or when
-        // any species has initialize_self_fields = true
+        // any species has initialize_self_fields = true, or when boundary potential is specified
         bool has_initialize_self_fields = false;
         for (auto const& species : *mypc) {
             has_initialize_self_fields |= species->initialize_self_fields;
         }
+        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
         if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
             WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ||
-            has_initialize_self_fields )
+            has_initialize_self_fields ||
+            has_boundary_potential )
         {
             ExecutePythonCallback("beforeInitEsolve");
-            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None || has_initialize_self_fields) {
+            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None || has_initialize_self_fields || has_boundary_potential) {
                 bool const reset_fields = false; // Do not erase previous user-specified values on the grid
                 ComputeSpaceChargeField(reset_fields);
                 if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
