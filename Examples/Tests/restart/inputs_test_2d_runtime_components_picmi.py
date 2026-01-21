@@ -122,6 +122,7 @@ def to_numpy(arr):
 
 
 def add_particles():
+    global electrons
     rank = mpi.COMM_WORLD.Get_rank()
     nps = 10 if rank == 0 else 0
     x = np.linspace(0.005, 0.025, nps)
@@ -172,5 +173,4 @@ for pti in electrons.iterator(level=0):
 
 sim.step(1)
 
-if not sim.amr_restart:
-    del electrons
+del electrons

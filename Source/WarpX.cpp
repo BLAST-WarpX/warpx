@@ -2818,13 +2818,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Bfield_aux_levl_1 = m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
         auto *Bfield_aux_levl_2 = m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
-        // Same as Bfield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_B = mypc->m_external_particle_fields_metadata.m_nBfields;
+
+        // Same as Bfield_fp for reading external field data, except for allocating as many components as external B fields are provided
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{0}, lev, amrex::convert(ba, Bfield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{1}, lev, amrex::convert(ba, Bfield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{2}, lev, amrex::convert(ba, Bfield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
     }
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero && m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::constant) {
         // These fields will be added directly to the grid, i.e. to fp, and need to match the index type
@@ -2841,13 +2844,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Efield_aux_levl_1 = m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
         auto *Efield_aux_levl_2 = m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
 
-        // Same as Efield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_E = mypc->m_external_particle_fields_metadata.m_nEfields;
+
+        // Same as Efield_fp for reading external field data, except for allocating as many components as external E fields are provided
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{0}, lev, amrex::convert(ba, Efield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{1}, lev, amrex::convert(ba, Efield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{2}, lev, amrex::convert(ba, Efield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
     }
 
     //

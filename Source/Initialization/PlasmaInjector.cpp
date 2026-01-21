@@ -52,7 +52,7 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
-    species_id{ispecies}, species_name{name}, source_name{src_name}
+    species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
 #ifdef AMREX_USE_GPU
@@ -156,7 +156,6 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
             (amrex::The_Arena()->alloc(sizeof(InjectorDensity)));
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
 #else
         d_inj_rho = h_inj_rho.get();
 #endif
@@ -238,13 +237,25 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "x_cut", x_cut);
     utils::parser::queryWithParser(pp_species, source_name, "y_cut", y_cut);
     utils::parser::queryWithParser(pp_species, source_name, "z_cut", z_cut);
-    utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
+
+    const bool q_tot_is_specified = pp_species.contains("q_tot");
+    const bool N_tot_is_specified = pp_species.contains("npart_real");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( q_tot_is_specified != N_tot_is_specified,
+        "Error: Exactly one between q_tot and npart_real have to be specified.");
+    if(q_tot_is_specified){
+        utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
+    }
+    if(N_tot_is_specified){
+        utils::parser::getWithParser(pp_species, source_name, "npart_real", N_tot);
+    }
+
     utils::parser::getWithParser(pp_species, source_name, "npart", npart);
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
     const bool focusing_is_specified = pp_species.contains("focal_distance");
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
+
 
     if(do_rotation){
         utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
@@ -311,7 +322,7 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
     d_inj_pos = h_inj_pos.get();
 #endif
 
-    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nrandompercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
                                 ux_th_parser, uy_th_parser, uz_th_parser,
@@ -459,7 +470,7 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
     num_particles_per_cell = num_particles_per_cell_each_dim[0] *
                              num_particles_per_cell_each_dim[1] *
                              num_particles_per_cell_each_dim[2];
-    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
+    SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nuniformpercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
                                 ux_th_parser, uy_th_parser, uz_th_parser,
@@ -662,9 +673,17 @@ PlasmaInjector::getInjectorFluxPosition () const
 }
 
 InjectorDensity*
-PlasmaInjector::getInjectorDensity () const
+PlasmaInjector::getInjectorDensity (int li) const
 {
-    return d_inj_rho;
+    auto* inj_rho = d_inj_rho;
+    if (inj_rho_prepared) {
+        if (inj_rho_distributed) {
+            h_inj_rho->prepare(li, &inj_rho);
+        }
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("Plasma Density Injector is not prepared");
+    }
+    return inj_rho;
 }
 
 InjectorFlux*
@@ -683,4 +702,38 @@ InjectorMomentum*
 PlasmaInjector::getInjectorMomentumHost () const
 {
     return h_inj_mom.get();
+}
+
+void PlasmaInjector::prepare (amrex::BoxArray const& grids,
+                              amrex::DistributionMapping const& dmap,
+                              amrex::IntVect const& ngrow,
+                              std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    if (h_inj_rho) {
+        h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
+        inj_rho_distributed = h_inj_rho->distributed();
+#ifdef AMREX_USE_GPU
+        if (! inj_rho_distributed) {
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+            amrex::Gpu::streamSynchronize();
+        }
+#endif
+        inj_rho_prepared = true;
+    }
+}
+
+void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                              std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    if (h_inj_rho) {
+        h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
+#ifdef AMREX_USE_GPU
+        // In principle, we don't need to do the memcpy every time. But the
+        // logic can get complicated.
+        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        amrex::Gpu::streamSynchronize();
+#endif
+        inj_rho_distributed = false;
+        inj_rho_prepared = true;
+    }
 }

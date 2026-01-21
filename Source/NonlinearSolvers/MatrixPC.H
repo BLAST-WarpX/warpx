@@ -425,7 +425,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
                                                       dofs_mfarrvec[lev][tdir1]->const_array(mfi),
                                                       dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
-#else
+#elif !defined(WARPX_DIM_1D_Z)
                 amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble encountered unknown dimensionality");
 #endif
