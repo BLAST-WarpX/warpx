@@ -886,10 +886,10 @@ WarpX::InitData ()
             has_initialize_self_fields |= species->initialize_self_fields;
         }
         bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
-        if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
-            WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ||
-            has_initialize_self_fields ||
-            has_boundary_potential )
+        if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
+             has_initialize_self_fields ||
+             has_boundary_potential) 
+            && WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
         {
             bool const reset_fields = false; // Do not erase previous user-specified values on the grid
             ComputeSpaceChargeField(reset_fields);
