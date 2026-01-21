@@ -24,12 +24,12 @@ Plasma source is set in two steps:
 A longitudinal electrostatic potential applied at the embedded-boundary surfaces defines the extraction voltage, accelerating ions from the plasma source to a target energy of :math:`\sim 40\,\mathrm{keV}`
 and forming single (or multiple) beamlet(s) with a defined transverse spacing.
 
-The figure below shows color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, and kinetic energy of the ion beam.
+The figure below shows color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the ion beam.
 
 .. _ion_beam:
 
 .. figure:: ion_beam_and_energy_1_beamlet.png
-   :alt:  [fig:ion_beam] Color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, and kinetic energy of the ion beam.
+   :alt:  [fig:ion_beam] Color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the ion beam.
    :align: center
 
 Run
@@ -37,7 +37,7 @@ Run
 
 This example can be run with the WarpX executable using an input file: ``warpx.3d inputs_test_3d_ion_beam_extraction``.
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
-Note: For the CI test, we intentionally specified very high values for `self_fields_absolute_tolerance` and `self_fields_required_precision`, and lowered spatial resolution to make the test run faster. For production runs, feel free to lower these values.
+Note: For the CI test, we intentionally specified very high values for `self_fields_absolute_tolerance` and `self_fields_required_precision`, and lowered spatial resolution to make the test run faster. For production runs, feel free to lower or increase these values accordingly.
 
 .. literalinclude:: inputs_test_3d_ion_beam_extraction
    :language: none
