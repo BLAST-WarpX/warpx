@@ -230,10 +230,14 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
         const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
-#if AMREX_SPACEDIM == 1
+#if defined(WARPX_DIM_1D_Z)
         const int ncomps_Ex = 2;
         const int ncomps_Ey = 2;
         const int ncomps_Ez = 0;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const int ncomps_Ex = 0;
+        const int ncomps_Ey = 2;
+        const int ncomps_Ez = 2;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         const int ncomps_Ex = 3;
         const int ncomps_Ey = 4;
