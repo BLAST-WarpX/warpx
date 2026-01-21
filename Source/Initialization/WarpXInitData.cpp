@@ -877,6 +877,7 @@ WarpX::InitData ()
 
     if (restart_chkfile.empty())
     {
+        ExecutePythonCallback("beforeInitEsolve");
         // Loop through species and calculate their space-charge field
         // Field solve step for electrostatic or hybrid-PIC solvers, or when
         // any species has initialize_self_fields = true, or when boundary potential is specified
@@ -890,16 +891,13 @@ WarpX::InitData ()
             has_initialize_self_fields ||
             has_boundary_potential )
         {
-            ExecutePythonCallback("beforeInitEsolve");
-            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None || has_initialize_self_fields || has_boundary_potential) {
-                bool const reset_fields = false; // Do not erase previous user-specified values on the grid
-                ComputeSpaceChargeField(reset_fields);
-                if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
-                    ComputeMagnetostaticField();
-                }
+            bool const reset_fields = false; // Do not erase previous user-specified values on the grid
+            ComputeSpaceChargeField(reset_fields);
+            if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
+                ComputeMagnetostaticField();
             }
-            ExecutePythonCallback("afterInitEsolve");
         }
+        ExecutePythonCallback("afterInitEsolve");
         // Add external fields to the fine patch fields. This makes it so that the
         // net fields are the sum of the field solutions and any external fields.
         for (int lev = 0; lev <= max_level; ++lev) {
