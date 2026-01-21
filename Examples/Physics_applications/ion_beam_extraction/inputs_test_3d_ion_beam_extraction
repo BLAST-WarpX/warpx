@@ -1,7 +1,11 @@
-# --- TODO: Modifyed accordignly
-# --- This input defines 3D ion-beam extraction from plasma source example:
-# --- This test simulates a ..... The injected current density is
-# --- chosen to
+# --- This input defines 3D ion-beam extraction from plasma source:
+# --- Problem set-up: the volume of the simulation region is initially
+# --- filled with a thermal plasma of positive Deuterium ions and electrons.
+# --- To maintain plasma density during extraction, additional ions and
+# --- electrons are injected from the simulation box boundaries.
+# --- The ions are accelerated by a prescribed electrostatic potential set via
+# --- embedded boundaries (EB), forming a focused ion beam with a target energy
+# --- of approximately 40 kEv and a defined transverse geometry (e.g., single or multiple beamlets).
 #############################
 # User-defined constants for this problem
 
