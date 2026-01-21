@@ -879,7 +879,7 @@ WarpX::InitData ()
     {
         ExecutePythonCallback("beforeInitEsolve");
         // Loop through species and calculate their space-charge field
-        // Field solve step for electrostatic or hybrid-PIC solvers, or when
+        // Field solve step for electrostatic solvers, or when
         // any species has initialize_self_fields = true, or when boundary potential is specified
         bool has_initialize_self_fields = false;
         for (auto const& species : *mypc) {
