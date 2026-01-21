@@ -52,12 +52,12 @@ const Array<FieldBoundaryType,AMREX_SPACEDIM>& ImplicitSolver::GetFieldBoundaryH
 
 Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::GetLinOpBCLo () const
 {
-    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryLo(),0);
+    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryLo(),/*bdry_side=*/0);
 }
 
 Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::GetLinOpBCHi () const
 {
-    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryHi(),1);
+    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryHi(),/*bdr_side=*/1);
 }
 
 Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const Array<FieldBoundaryType,AMREX_SPACEDIM>& a_fbc, const int bdry_side) const
@@ -87,7 +87,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
                 lbc[i] = LinOpBCType::Dirichlet;
             } else { // Dirichlet for B
                 ablastr::warn_manager::WMRecordWarning("Implicit solver with current-driven PECInsulator",
-                    "in the Curl-Curl preconditioner. Neumann boundary will be used since the full boundary is not yet implemented.",
+                    "in the Curl-Curl preconditioner. Symmetry boundary will be used since the full boundary is not yet implemented.",
                     ablastr::warn_manager::WarnPriority::medium);
                 lbc[i] = LinOpBCType::symmetry;
             }

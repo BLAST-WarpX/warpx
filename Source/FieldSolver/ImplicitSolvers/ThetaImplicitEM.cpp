@@ -350,7 +350,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 
 #if AMREX_SPACEDIM == 3
                 if (field_dir == bdry_dir) { continue; }
-                const int tdir1 = field_dir + 1 % 3; // next direction after field_dir
+                const int tdir1 = field_dir + 1 % AMREX_SPACEDIM; // next direction after field_dir
 #else
                 if (field_dir == 1) { continue; } // this is out-of-plane E in 2D
                 if (bdry_dir == 0 && field_dir == 0) { continue; } // Ex is centered in bdry_dir = 0
