@@ -878,12 +878,18 @@ WarpX::InitData ()
     if (restart_chkfile.empty())
     {
         // Loop through species and calculate their space-charge field
-        // Field solve step for electrostatic or hybrid-PIC solvers
+        // Field solve step for electrostatic or hybrid-PIC solvers, or when
+        // any species has initialize_self_fields = true
+        bool has_initialize_self_fields = false;
+        for (auto const& species : *mypc) {
+            has_initialize_self_fields |= species->initialize_self_fields;
+        }
         if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
-            WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
+            WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ||
+            has_initialize_self_fields )
         {
             ExecutePythonCallback("beforeInitEsolve");
-            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
+            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None || has_initialize_self_fields) {
                 bool const reset_fields = false; // Do not erase previous user-specified values on the grid
                 ComputeSpaceChargeField(reset_fields);
                 if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
