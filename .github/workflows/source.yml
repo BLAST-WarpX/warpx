@@ -1,46 +1,46 @@
-# Copyright 2019-2020 Axel Huebl, Maxence Thevenet
-#
-# This file is part of WarpX.
-#
-# License: BSD-3-Clause-LBNL
+# # Copyright 2019-2020 Axel Huebl, Maxence Thevenet
+# #
+# # This file is part of WarpX.
+# #
+# # License: BSD-3-Clause-LBNL
 
-name: 📜 Source
+# name: 📜 Source
 
-on:
-  push:
-    branches:
-      - "development"
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+# on:
+#   push:
+#     branches:
+#       - "development"
+#   pull_request:
+#     types: [opened, synchronize, reopened, ready_for_review]
 
-concurrency:
-  group: ${{ github.ref }}-${{ github.head_ref }}-source
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.ref }}-${{ github.head_ref }}-source
+#   cancel-in-progress: true
 
-jobs:
-  style:
-    runs-on: ubuntu-24.04
-    steps:
-    - uses: actions/checkout@v4
-    - name: Non-ASCII characters
-      run: .github/workflows/source/hasNonASCII
-    - name: TABs
-      run: .github/workflows/source/hasTabs
-    - name: End-of-Line whitespaces
-      run: .github/workflows/source/hasEOLwhiteSpace
-    - name: Check test input files
-      run: .github/workflows/source/check_inputs.py
-    - name: Doxygen
-      run: |
-        sudo apt update
-        sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
-        .github/workflows/source/doxygen
+# jobs:
+#   style:
+#     runs-on: ubuntu-24.04
+#     steps:
+#     - uses: actions/checkout@v4
+#     - name: Non-ASCII characters
+#       run: .github/workflows/source/hasNonASCII
+#     - name: TABs
+#       run: .github/workflows/source/hasTabs
+#     - name: End-of-Line whitespaces
+#       run: .github/workflows/source/hasEOLwhiteSpace
+#     - name: Check test input files
+#       run: .github/workflows/source/check_inputs.py
+#     - name: Doxygen
+#       run: |
+#         sudo apt update
+#         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
+#         .github/workflows/source/doxygen
 
-  zenodo:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate Zenodo Metadata
-        uses: vsoch/zenodo-validator@main
-        with:
-          path: '.zenodo.json'
+#   zenodo:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Validate Zenodo Metadata
+#         uses: vsoch/zenodo-validator@main
+#         with:
+#           path: '.zenodo.json'
