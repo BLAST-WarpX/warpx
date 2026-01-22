@@ -32,17 +32,17 @@ WarpX constants
 
 WarpX provides a few pre-defined constants that can be used for any input parameter that consists of one or more floats.
 
-============ ===================
-``q_e``      elementary charge
-``m_e``      electron mass
-``m_p``      proton mass
-``m_u``      unified atomic mass unit (Dalton)
-``epsilon0`` vacuum permittivity
-``mu0``      vacuum permeability
-``clight``   speed of light
-``kb``       Boltzmann's constant (J/K)
-``pi``       math constant pi
-============ ===================
+==============  ==================================
+``q_e``         elementary charge (C)
+``m_e``         electron mass (kg)
+``m_p``         proton mass (kg)
+``m_u``         unified atomic mass unit (kg)
+``epsilon_0``   vacuum permittivity (F/m)
+``mu0``         vacuum permeability (H/m)
+``c``           vacuum speed of light (m/s)
+``kb``          Boltzmann's constant (J/K)
+``pi``          mathematical constant :math:`\pi`
+==============  ==================================
 
 The numerical values of these constants are set in `Source/ablastr/constant.H <https://github.com/BLAST-WarpX/warpx/blob/development/Source/ablastr/constant.H>`__.
 
@@ -782,7 +782,7 @@ Distribution across MPI ranks and parallelization
     of the coarsest level, but also to any of the finer level.
 
 * ``algo.load_balance_intervals`` (`string`) optional (default `0`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which
     WarpX should try to redistribute the work across MPI ranks, in order to have
     better load balancing.
     Use 0 to disable load_balancing.
@@ -1521,7 +1521,7 @@ Particle initialization
     than this parameter.
 
 * ``<species_name>.resampling_trigger_intervals`` (`string`) optional (default `0`)
-    Using the `Intervals parser`_ syntax, this string defines timesteps at which resampling is
+    Using the `Time intervals`_ syntax, this string defines timesteps at which resampling is
     performed.
 
 * ``<species_name>.resampling_trigger_max_avg_ppc`` (`float`) optional (default `infinity`)
@@ -2864,7 +2864,7 @@ Additional parameters
     https://ieeexplore.ieee.org/document/8659392.
 
 * ``warpx.override_sync_intervals`` (`string`) optional (default `1`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which
     synchronization of sources (`rho` and `J`) and fields (`E` and `B`) on grid nodes at box
     boundaries is performed. Since the grid nodes at the interface between two neighbor boxes are
     duplicated in both boxes, an instability can occur if they have too different values.
@@ -2877,7 +2877,7 @@ Additional parameters
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
 
 * ``warpx.sort_intervals`` (`string`) optional (defaults: ``-1`` on CPU; ``4`` on GPU)
-     Using the `Intervals parser`_ syntax, this string defines the timesteps at which particles are
+     Using the `Time intervals`_ syntax, this string defines the timesteps at which particles are
      sorted.
      If ``<=0``, do not sort particles.
      It is turned on on GPUs for performance reasons (to improve memory locality).
@@ -2984,7 +2984,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     example: ``diagnostics.diags_names = diag1 my_second_diag``.
 
 * ``<diag_name>.intervals`` (`string`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which data is dumped.
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which data is dumped.
     Use a negative number or 0 to disable data dumping.
     example: ``diag1.intervals = 10,20:25:1``.
     Note that by default the last timestep is dumped regardless of this parameter. This can be
@@ -3284,7 +3284,7 @@ BackTransformed Diagnostics
 
 * ``<diag_name>.intervals`` (`string`)
     Only used when ``<diag_name>.diag_type`` is ``BackTransformed``.
-    Using the `Intervals parser`_ syntax, this string defines the lab frame times at which data is dumped,
+    Using the `Time intervals`_ syntax, this string defines the lab frame times at which data is dumped,
     given as multiples of the step size ``dt_snapshots_lab`` or ``dz_snapshots_lab`` described below.
     Example: ``btdiag1.intervals = 10:11,20:24:2`` and ``btdiag1.dt_snapshots_lab = 1.e-12``
     indicate to dump at lab times ``1e-11``, ``1.1e-11``, ``2e-11``, ``2.2e-11``, and ``2.4e-11`` seconds.
@@ -3937,7 +3937,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         This type outputs the simulation's physical timestep (in seconds) at each mesh refinement level.
 
 * ``reduced_diags.intervals`` (`string`)
-    Using the `Intervals Parser`_ syntax, this string defines the timesteps at which reduced
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which reduced
     diagnostics are written to the file.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.intervals``.
 
