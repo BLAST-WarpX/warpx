@@ -1,0 +1,169 @@
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: { { JOB_NAME } }
+  namespace: "duploservices-dev"
+spec:
+  slotsPerWorker: 4
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          nodeSelector:
+            node.kubernetes.io/instance-type: g5.12xlarge
+          containers:
+            - image: 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v7
+              name: mpi-launcher
+              env:
+                - name: HYDRA_IFACE
+                  value: "eth0"
+                - name: FI_PROVIDER
+                  value: "sockets"
+                - name: MPICH_GPU_SUPPORT_ENABLED
+                  value: "0"
+                - name: AMREX_CUDA_AWARE_MPI
+                  value: "0"
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -e
+                  echo "Waiting for Hostfile..."
+                  until [ -s /etc/mpi/hostfile ]; do sleep 1; done
+
+                  python3 -c '
+                  import socket, time
+                  def get_ip(host):
+                      while True:
+                          try:
+                              ip = socket.gethostbyname(host)
+                              if ip: return ip
+                          except: pass
+                          time.sleep(1)
+                  with open("/etc/mpi/hostfile", "r") as f:
+                      lines = f.readlines()
+                  with open("/tmp/hostfile_ips", "w") as fout:
+                      for line in lines:
+                          parts = line.strip().split()
+                          if not parts: continue
+                          host = parts[0]
+                          slots = "4"
+                          if "slots=" in parts[1]: slots = parts[1].split("=")[1]
+                          ip = get_ip(host)
+                          fout.write(f"{ip}:{slots}\n")
+                          print(f"Resolved {host} -> {ip}:{slots}", flush=True)
+                  '
+
+                  # =========================================================
+                  # FOLDER SETUP: Create dedicated directory for 3D output
+                  # =========================================================
+                  RUN_DIR="/data/{{OUTPUT_DIR}}"
+                  echo "Creating and switching to run directory: $RUN_DIR"
+                  mkdir -p "$RUN_DIR"
+                  cd "$RUN_DIR"
+
+                  echo "Starting 3D Simulation..."
+
+                  /opt/warpx/bin/mpirun \
+                    -f /tmp/hostfile_ips \
+                    -genv OMP_NUM_THREADS 1 \
+                    -genv MPICH_GPU_SUPPORT_ENABLED 0 \
+                    -genv AMREX_CUDA_AWARE_MPI 0 \
+                    -genv PLM_RSH_ARGS "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+                    -np 8 \
+                    /bin/bash -c 'export CUDA_VISIBLE_DEVICES=$((PMI_RANK % 4)); exec /opt/warpx/bin/warpx.3d amrex.use_gpu_aware_mpi=0 "$@"' _ /dev/null \
+                      max_step=100 \
+                      amr.n_cell="32 32 256" \
+                      amr.max_grid_size=64 \
+                      amr.blocking_factor=32 \
+                      geometry.dims=3 \
+                      geometry.prob_lo="-30.e-6 -30.e-6 -56.e-6" \
+                      geometry.prob_hi="30.e-6 30.e-6 12.e-6" \
+                      amr.max_level=0 \
+                      boundary.field_lo="periodic periodic pec" \
+                      boundary.field_hi="periodic periodic pec" \
+                      warpx.verbose=1 \
+                      warpx.do_dive_cleaning=0 \
+                      warpx.use_filter=1 \
+                      warpx.cfl=1. \
+                      warpx.do_moving_window=1 \
+                      warpx.moving_window_dir=z \
+                      warpx.moving_window_v=1.0 \
+                      warpx.do_dynamic_scheduling=0 \
+                      warpx.serialize_initial_conditions=1 \
+                      algo.particle_shape=3 \
+                      particles.species_names=electrons \
+                      electrons.charge=-q_e \
+                      electrons.mass=m_e \
+                      electrons.injection_style=NUniformPerCell \
+                      electrons.num_particles_per_cell_each_dim="1 1 1" \
+                      electrons.xmin=-20.e-6 \
+                      electrons.xmax=20.e-6 \
+                      electrons.ymin=-20.e-6 \
+                      electrons.ymax=20.e-6 \
+                      electrons.zmin=0 \
+                      electrons.profile=constant \
+                      electrons.density=2.e23 \
+                      electrons.momentum_distribution_type=at_rest \
+                      electrons.do_continuous_injection=1 \
+                      electrons.addIntegerAttributes=regionofinterest \
+                      'electrons.attribute.regionofinterest(x,y,z,ux,uy,uz,t)=(z>12.0e-6) * (z<13.0e-6)' \
+                      electrons.addRealAttributes=initialenergy \
+                      'electrons.attribute.initialenergy(x,y,z,ux,uy,uz,t)=ux*ux + uy*uy + uz*uz' \
+                      lasers.names=laser1 \
+                      laser1.profile=Gaussian \
+                      laser1.position="0. 0. 9.e-6" \
+                      laser1.direction="0. 0. 1." \
+                      laser1.polarization="0. 1. 0." \
+                      laser1.e_max=16.e12 \
+                      laser1.profile_waist=5.e-6 \
+                      laser1.profile_duration=15.e-15 \
+                      laser1.profile_t_peak=30.e-15 \
+                      laser1.profile_focal_distance=100.e-6 \
+                      laser1.wavelength=0.8e-6 \
+                      diagnostics.diags_names=diag1 \
+                      diag1.intervals=100 \
+                      diag1.diag_type=Full \
+                      diag1.fields_to_plot="Ex Ey Ez Bx By Bz jx jy jz rho" \
+                      diag1.format=openpmd \
+                      warpx.reduced_diags_names=FP \
+                      FP.type=FieldProbe \
+                      FP.intervals=10 \
+                      FP.integrate=0 \
+                      FP.probe_geometry=Line \
+                      FP.x_probe=0 \
+                      FP.y_probe=0 \
+                      FP.z_probe=-56e-6 \
+                      FP.x1_probe=0 \
+                      FP.y1_probe=0 \
+                      FP.z1_probe=12e-6 \
+                      FP.resolution=300 \
+                      FP.do_moving_window_FP=1
+
+              volumeMounts:
+                - name: shared-data
+                  mountPath: /data
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: warpx-efs-pvc
+    Worker:
+      replicas: 2
+      template:
+        spec:
+          containers:
+            - image: 359835242613.dkr.ecr.us-east-2.amazonaws.com/warpx-mpi-aws:v7
+              name: mpi-worker
+              command: ["/usr/sbin/sshd", "-D"]
+              resources:
+                limits:
+                  nvidia.com/gpu: 4
+              volumeMounts:
+                - name: shared-data
+                  mountPath: /data
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: warpx-efs-pvc

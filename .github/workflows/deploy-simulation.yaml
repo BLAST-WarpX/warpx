@@ -1,0 +1,86 @@
+name: Deploy WarpX Simulation
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulation_type:
+        description: "Simulation Type"
+        required: true
+        default: "2d"
+        type: choice
+        options:
+          - "2d"
+          - "3d"
+      job_name:
+        description: "Unique Job Name (e.g., run-001)"
+        required: true
+        default: "warpx-run-1"
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read # Required to checkout code
+
+env:
+  AWS_REGION: us-east-2 # <--- UPDATE THIS
+  EKS_CLUSTER_NAME: duploinfra-dev # <--- UPDATE THIS
+  IAM_ROLE_ARN: arn:aws:iam::359835242613:role/GitHubAction-EKS-Deployer # <--- UPDATE THIS
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Prepare Manifest
+        run: |
+          echo "Preparing ${{ inputs.simulation_type }} simulation..."
+
+          # Select the correct template
+          TEMPLATE_FILE="k8s-manifests/warpx-${{ inputs.simulation_type }}.yaml"
+          FINAL_MANIFEST="final-deployment.yaml"
+
+          # Define Output Directory Name
+          OUTPUT_DIR="output_${{ inputs.simulation_type }}_${{ inputs.job_name }}"
+
+          echo "Job Name: ${{ inputs.job_name }}"
+          echo "Output Dir: $OUTPUT_DIR"
+
+          # Replace Placeholders using sed
+          # We check if the job name already exists to avoid conflicts
+          if kubectl get mpijob ${{ inputs.job_name }} -n duploservices-dev > /dev/null 2>&1; then
+            echo "::error::Job '${{ inputs.job_name }}' already exists! Please choose a unique name."
+            exit 1
+          fi
+
+          cp $TEMPLATE_FILE $FINAL_MANIFEST
+
+          # Replace {{JOB_NAME}}
+          sed -i "s/{{JOB_NAME}}/${{ inputs.job_name }}/g" $FINAL_MANIFEST
+
+          # Replace {{OUTPUT_DIR}}
+          sed -i "s/{{OUTPUT_DIR}}/$OUTPUT_DIR/g" $FINAL_MANIFEST
+
+          echo "Manifest generated successfully."
+          cat $FINAL_MANIFEST
+
+      - name: Deploy to EKS
+        run: |
+          kubectl apply -f final-deployment.yaml
+          echo "Deployment submitted!"
+
+      - name: Monitor Status (Optional)
+        run: |
+          echo "Waiting for Launcher pod to start..."
+          sleep 2
+          kubectl get pods -n duploservices-dev -l training.kubeflow.org/job-name=${{ inputs.job_name }}
