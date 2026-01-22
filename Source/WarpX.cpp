@@ -2663,7 +2663,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     if (evolve_scheme == EvolveScheme::ThetaImplicitHybrid) {
         rho_ncomps = 2*ncomps;  // Need old and new time levels
     }
-    
+
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         if (do_dive_cleaning || update_with_rho || current_correction) {
             // For the PSATD-JRhom algorithm we can allocate only one rho component (no distinction between old and new)

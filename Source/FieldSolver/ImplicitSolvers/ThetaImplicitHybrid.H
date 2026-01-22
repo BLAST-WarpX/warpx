@@ -99,7 +99,7 @@ private:
      * \brief Solver vectors for the electric field.
      * m_E: E field at time n+theta (during solve), then n+1 (after FinishFieldUpdate)
      * m_Eold: E field at time n (saved at start of timestep)
-     * 
+     *
      * m_Eold is needed for:
      * - Initial guess for the nonlinear solver
      * - Reference value for residual computation in ComputeRHS

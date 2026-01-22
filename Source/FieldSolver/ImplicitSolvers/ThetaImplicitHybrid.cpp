@@ -39,7 +39,7 @@ void ThetaImplicitHybrid::Define ( WarpX* const a_WarpX )
         const auto& Bfp_x = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev);
         const auto& dm = Bfp_x->DistributionMap();
         const amrex::IntVect ngb = Bfp_x->nGrowVect();
-        
+
         for (int dir = 0; dir < 3; ++dir) {
             const auto& ba = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{dir}, lev)->boxArray();
             m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{dir}, lev, ba, dm, 1, ngb, 0.0_rt);
@@ -88,20 +88,20 @@ void ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
 
     // Save E^n
     m_Eold.Copy(FieldType::Efield_fp);
-    
+
     // Save B^n
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
         ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
         for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, 
+            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0,
                                   B_old[n]->nComp(), B_old[n]->nGrowVect());
         }
     }
 
     // Initial guess: E^{n+θ} = E^n
     m_E.Copy(m_Eold);
-    
+
     // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
     m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
@@ -132,19 +132,19 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
 
     // Get field arrays at all levels
-    ablastr::fields::MultiLevelVectorField Efield_fp = 
+    ablastr::fields::MultiLevelVectorField Efield_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelVectorField Bfield_fp = 
+    ablastr::fields::MultiLevelVectorField Bfield_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelVectorField current_fp = 
+    ablastr::fields::MultiLevelVectorField current_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelScalarField rho_fp = 
+    ablastr::fields::MultiLevelScalarField rho_fp =
         m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
 
     // Compute J_plasma = curl(B^{n+θ})/μ₀
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
 
-    // Compute electron pressure 
+    // Compute electron pressure
     m_hybrid_pic_model->CalculateElectronPressure();
 
     // Solve Ohm's law: E_ohm = f(B^{n+θ}, J_ion^{n+1/2}, ρ^{n+1/2}, Pe)
@@ -173,7 +173,7 @@ void ThetaImplicitHybrid::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, theta_time );
 
     // Compute B^{n+θ} = B^n - θ·dt·curl(E^{n+θ}) via Faraday's law
-    ablastr::fields::MultiLevelVectorField const& B_old = 
+    ablastr::fields::MultiLevelVectorField const& B_old =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, m_num_amr_levels - 1);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta * m_dt, start_time );
 }
@@ -192,7 +192,7 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, end_time );
 
     // B^{n+1}
-    ablastr::fields::MultiLevelVectorField const& B_old = 
+    ablastr::fields::MultiLevelVectorField const& B_old =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
 }
