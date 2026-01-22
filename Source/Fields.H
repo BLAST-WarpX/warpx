@@ -90,7 +90,8 @@ namespace warpx::fields
         MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
         ECTRhofield,
         Venl,
-        global_debye_length
+        global_debye_length,
+        effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );
 
     /** these are vector fields */

@@ -23,11 +23,13 @@ void EffectivePotentialES::InitData() {
 
     // Initialize "sigma" MF which stores the dressing of the Poisson equation.
     // It is a cell-centered multifab.
-    auto rho = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::rho_fp, 0);
-    auto const& ba = convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0)));
-    m_sigma = std::make_unique<MultiFab>(ba, rho->DistributionMap(), 1, 0);
-    // Set sigma to 1
-    m_sigma->setVal(1.0_rt);
+    auto& fields = warpx.GetMultiFabRegister();
+    auto rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
+    fields.alloc_init(
+        warpx::fields::FieldType::effective_potential_sigma, /*lev=*/0,
+        convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
+        rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
+    );
     m_overwrite_sigma = true;
 }
 
@@ -78,7 +80,7 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelVectorField const& efield )
 {
     // Use the AMREX MLMG solver
-    computePhi(rho, phi, efield, m_sigma, self_fields_required_precision,
+    computePhi(rho, phi, efield, self_fields_required_precision,
                 self_fields_absolute_tolerance, self_fields_max_iters,
                 self_fields_verbosity);
 }
@@ -141,8 +143,11 @@ void EffectivePotentialES::ComputeSigma (
         m_overwrite_sigma = false;
     }
 
+    // grab sigma from the multifab registry
+    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
+
     // scale sigma down from current value for time filtering
-    m_sigma->mult(1.0_rt - time_filter_param, 0);
+    sigma->mult(1.0_rt - time_filter_param, 0);
 
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
@@ -169,8 +174,8 @@ void EffectivePotentialES::ComputeSigma (
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( MFIter mfi(*m_sigma, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& sigma_arr = m_sigma->array(mfi);
+        for ( MFIter mfi(*sigma, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+            Array4<Real> const& sigma_arr = sigma->array(mfi);
             Array4<Real const> const& rho_arr = rho->const_array(mfi);
 
             // Loop over the cells and update the sigma field
@@ -189,14 +194,13 @@ void EffectivePotentialES::ComputeSigma (
             });
         }
     }
-    m_sigma->plus(time_filter_param, 0);
+    sigma->plus(time_filter_param, 0);
 }
 
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     ablastr::fields::MultiLevelVectorField const& efield,
-    std::unique_ptr<amrex::MultiFab> const& sigma,
     amrex::Real required_precision,
     amrex::Real absolute_tolerance,
     int max_iters,
@@ -262,6 +266,9 @@ void EffectivePotentialES::computePhi (
         eb_farray_box_factory = factories;
 #endif
     }
+
+    // grab sigma from the multifab registry
+    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
 
     ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,
