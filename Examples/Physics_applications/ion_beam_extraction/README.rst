@@ -13,23 +13,23 @@ and a defined transverse geometry (e.g., single or multiple beamlets).
 
 The purpose of this test is to verify that WarpX can correctly model ion beam extraction from a plasma source and subsequent electrostatic acceleration.
 
-Plasma source and Beam Injection Setup
+Plasma Source Setup
 --------
 Plasma source is set in two steps:
 
 1) Initial plasma injection in the volume of the simulation box: plasma is filling the box with Deuterium ions and electrons of density :math:`1.22\times10^{18} \, \mathrm{m}^{-3}` and temperature :math:`10` eV, randomly distributed with a constant profile.
 
-2) Boundary injection: Deuterium ions and electrons of the same density and temperature, injected from the simulation box boundaries -- from the :math:`\pm x`, :math:`\pm y` and  :math:`-z`.
+2) Boundary plasma injection: Deuterium ions and electrons of the same density and temperature, injected from the simulation box boundaries -- from the :math:`\pm x`, :math:`\pm y` and  :math:`-z`.
 
 A longitudinal electrostatic potential applied at the embedded-boundary surfaces defines the extraction voltage, accelerating ions from the plasma source to a target energy of :math:`\sim 40\,\mathrm{keV}`
-and forming single (or multiple) beamlet(s) with a defined transverse spacing.
+and forming single (or multiple) beamlet(s) with a defined transverse profile.
 
-The figure below shows color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the ion beam.
+The figure below shows color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the extracted ion beam.
 
 .. _ion_beam:
 
 .. figure:: ion_beam_and_energy_1_beamlet.png
-   :alt:  [fig:ion_beam] Color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the ion beam.
+   :alt:  [fig:ion_beam] Color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the extracted ion beam.
    :align: center
 
 Run
@@ -37,7 +37,7 @@ Run
 
 This example can be run with the WarpX executable using an input file: ``warpx.3d inputs_test_3d_ion_beam_extraction``.
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
-Note: For the CI test, we intentionally specified very high values for `self_fields_absolute_tolerance` and `self_fields_required_precision`, and lowered spatial resolution to make the test run faster. For production runs, feel free to lower or increase these values accordingly.
+Note: For the CI test, we intentionally specified very high values for `self_fields_absolute_tolerance` and `self_fields_required_precision`, and lowered spatial resolution as well as number of particles per cell to make the test run faster. For production runs, feel free to lower or increase these values accordingly.
 
 .. literalinclude:: inputs_test_3d_ion_beam_extraction
    :language: none
