@@ -85,7 +85,7 @@ namespace ablastr::qed
     namespace detail::SI_to_HL_factors
     {
         template <quantity Quantity, typename T>
-        constexpr T fact;
+        constexpr T fact = static_cast<T>(1.0);
 
         template <typename T>
         constexpr auto fact<quantity::mass, T> = static_cast<T>(
