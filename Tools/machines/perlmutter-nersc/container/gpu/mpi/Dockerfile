@@ -313,7 +313,7 @@ RUN apt-get update            && \
     zlib1g           && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Setup SSH Directory    
+# 2. Setup SSH Directory
 RUN mkdir -p /var/run/sshd
 
 # 3. PERMANENT SERVER FIX: Allow Root Login & Ignore Key Permissions
