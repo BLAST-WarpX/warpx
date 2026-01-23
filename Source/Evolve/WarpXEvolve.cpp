@@ -296,6 +296,20 @@ WarpX::Evolve (int numsteps)
                     // B field.  Time varying A contribution to E field is neglected.
                     // This is currently a lab frame calculation.
                     ComputeMagnetostaticField();
+                } else if (evolve_scheme == EvolveScheme::SemiImplicitDarwin) {
+                    // Set magnetic field equal to curl of A since it was reset
+                    // above.
+                    ablastr::fields::MultiLevelVectorField Bfield_fp =
+                        m_fields.get_mr_levels_alldirs("Bfield_fp", finestLevel());
+                    ablastr::fields::MultiLevelVectorField Afield_fp =
+                        m_fields.get_mr_levels_alldirs("vector_potential_fp", finestLevel());
+                    for (int lev = 0; lev <= finestLevel(); ++lev) {
+                        get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
+                            Bfield_fp[lev], Afield_fp[lev],
+                            GetEBUpdateBFlag()[lev],
+                            lev);
+                    }
+                    FillBoundaryB(getngEB(), true);
                 }
                 // Since the fields were reset above, the external fields are added
                 // back on to the fine patch fields. This make it so that the net fields

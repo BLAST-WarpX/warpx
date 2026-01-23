@@ -476,6 +476,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
+        // reset all relevant MultiFabs
         using ablastr::fields::Direction;
 
         fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);

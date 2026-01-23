@@ -46,23 +46,29 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     else if (m_vector_type_name=="Bfield_fp") {
         m_array_type = FieldType::Bfield_fp;
     }
+    else if (m_vector_type_name=="dA_fp") {
+        m_array_type = FieldType::dA_fp;
+    }
     else if (m_vector_type_name=="vector_potential_fp_nodal") {
         m_array_type = FieldType::vector_potential_fp;
     }
     else if (m_vector_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name
-                    +"is not a valid option for array type used in Definining"
-                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp,"
-                    +"and vector_potential_fp_nodal");
+        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name+" "
+                    +"is not a valid option for array type used in Definining "
+                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp, "
+                    +"dA_fp, and vector_potential_fp_nodal");
     }
 
     if (m_scalar_type_name=="phi_fp") {
         m_scalar_type = FieldType::phi_fp;
     }
+    else if (m_scalar_type_name=="xi_fp") {
+        m_scalar_type = FieldType::xi_fp;
+    }
     else if (m_scalar_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name
-                    +"is not a valid option for scalar type used in Definining"
-                    +"a WarpXSolverVec. Valid scalar types are: phi_fp");
+        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name+" "
+                    +"is not a valid option for scalar type used in Definining "
+                    +"a WarpXSolverVec. Valid scalar types are: phi_fp and xi_fp");
     }
 
     m_array_vec.resize(m_num_amr_levels);
@@ -124,14 +130,14 @@ void WarpXSolverVec::Copy ( FieldType  a_array_type,
         "WarpXSolverVec::Copy() called with vecs of different types");
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        if (m_array_type != FieldType::None) {
+        if (m_array_type != FieldType::None && a_array_type != FieldType::None) {
             const ablastr::fields::VectorField this_array = m_WarpX->m_fields.get_alldirs(a_array_type, lev);
             for (int n = 0; n < 3; ++n) {
                 amrex::MultiFab::Copy( *m_array_vec[lev][n], *this_array[n], 0, 0, m_ncomp,
                                        amrex::IntVect::TheZeroVector() );
             }
         }
-        if (m_scalar_type != FieldType::None) {
+        if (m_scalar_type != FieldType::None && a_scalar_type != FieldType::None) {
             const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(a_scalar_type,lev);
             amrex::MultiFab::Copy( *m_scalar_vec[lev], *this_mf, 0, 0, m_ncomp,
                                    amrex::IntVect::TheZeroVector() );
