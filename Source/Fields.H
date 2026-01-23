@@ -88,6 +88,7 @@ namespace warpx::fields
         MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
         MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
+        curl2_BC_mask,   // Masks used to incorporate boundary conditions into the curl curl matrix
         ECTRhofield,
         Venl,
         global_debye_length
@@ -137,6 +138,7 @@ namespace warpx::fields
         FieldType::MassMatrices_Y,
         FieldType::MassMatrices_Z,
         FieldType::MassMatrices_PC,
+        FieldType::curl2_BC_mask,
         FieldType::ECTRhofield,
         FieldType::Venl
     };
