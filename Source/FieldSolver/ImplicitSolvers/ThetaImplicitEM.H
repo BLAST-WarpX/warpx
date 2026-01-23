@@ -104,11 +104,6 @@ public:
      */
     void InitializeCurlCurlBCMasks ();
 
-    /**
-     * \brief Inititialize the BC masks for the curl curl operator
-     */
-    void InitializeCurlCurlBCMasks ();
-
 private:
 
     /**
