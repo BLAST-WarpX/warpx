@@ -655,7 +655,6 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
-    amrex::Print() << "                         ExplicitFillBoundaryEBUpdateAux() with -0.5_rt*dt[lev] \n";
     // At the beginning, we have B^{n} and E^{n}.
     // Particles have p^{n} and x^{n}.
     // m_is_synchronized is true.
