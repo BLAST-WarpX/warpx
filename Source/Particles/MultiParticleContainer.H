@@ -118,6 +118,9 @@ public:
         ImplicitOptions const * implicit_options = nullptr
     );
 
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                              int lev, amrex::Real dt);
+
     /**
      * \brief Deposit mass matrices.
     */
