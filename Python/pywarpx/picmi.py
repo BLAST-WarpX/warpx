@@ -2092,6 +2092,16 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         If the effective potential Poisson solver is used, this sets the value
         of C_EP (the method is marginally stable at C_EP = 1)
 
+    warpx_effective_potential_time_filter_param: float, default=0.1
+        Time filtering parameter used to filter sigma in the effective
+        potential scheme. sigma is updated using:
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n
+                  + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+
+    warpx_effective_potential_density_floor: float, default=0
+        If given, this value will be used as the minimum density during the
+        local calculation of sigma.
+
     warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
@@ -2111,6 +2121,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.effective_potential = kw.pop("warpx_effective_potential", False)
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
+        )
+        self.effective_potential_time_filter_param = kw.pop(
+            "warpx_effective_potential_time_filter_param", None
+        )
+        self.effective_potential_density_floor = kw.pop(
+            "warpx_effective_potential_density_floor", None
         )
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
@@ -2136,6 +2152,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
                 pywarpx.warpx.do_electrostatic = "labframe-effective-potential"
                 pywarpx.warpx.effective_potential_factor = (
                     self.effective_potential_factor
+                )
+                pywarpx.warpx.effective_potential_time_filter_param = (
+                    self.effective_potential_time_filter_param
+                )
+                pywarpx.warpx.effective_potential_density_floor = (
+                    self.effective_potential_density_floor
                 )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"

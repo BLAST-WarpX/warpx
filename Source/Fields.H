@@ -91,7 +91,8 @@ namespace warpx::fields
         curl2_BC_mask,   // Masks used to incorporate boundary conditions into the curl curl matrix
         ECTRhofield,
         Venl,
-        global_debye_length
+        global_debye_length,
+        effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );
 
     /** these are vector fields */
