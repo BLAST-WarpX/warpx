@@ -19,7 +19,7 @@ collision3.species = protons protons
 collisions.collision_names = collision1 collision2 collision3
 
 # diagnostics
-diagnostics.diags_names = diag1
+#diagnostics.diags_names = diag1
 diag1.diag_type = Full
 diag1.format = openpmd
 diag1.intervals = 2000
@@ -45,9 +45,9 @@ electrons.zmax = 10*de0
 electrons.zmin = 0
 
 # reduced diagnostics
-field_energy.intervals = 1
+field_energy.intervals = 200
 field_energy.type = FieldEnergy
-particle_energy.intervals = 1
+particle_energy.intervals = 200
 particle_energy.type = ParticleEnergy
 
 # geometry
@@ -59,7 +59,7 @@ geometry.prob_lo = 0. 0.
 interpolation.galerkin_scheme = 1
 
 # max_step
-max_step = 2000
+max_step = 40000
 
 # my_constants
 my_constants.de0 = clight/wpe  # skin depth, m

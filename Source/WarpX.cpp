@@ -1888,7 +1888,7 @@ WarpX::ReadParameters ()
     }
 
     // Set the default value of m_collisions_split_position_push
-    m_collisions_split_position_push = false;
+    m_collisions_split_position_push = true;
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
     pp_collisions.queryarr("collision_names", collision_names);

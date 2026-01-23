@@ -112,6 +112,8 @@ void
 WarpX::SynchronizeVelocityWithPosition () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
+    amrex::Print() << "                         SynchronizeVelocityWithPosition() with 0.5_rt*dt[lev] \n";
+
 
     if (!m_is_synchronized) {
         // This assumes that the particle boundary conditions have been checked
@@ -507,16 +509,19 @@ WarpX::OneStep_nosub (
     // with collisions placed in the middle of the position push and after the momentum push
     if (m_collisions_split_position_push) {
         // push particles (half position and full momentum)
+        amrex::Print() << "----------- start (1)\n";
         PushParticlesandDeposit(
             a_cur_time,
-            /*skip_deposition=*/true,
+            /*skip_deposition=*/false,
             PositionPushType::FirstHalf,
             MomentumPushType::Full
         );
+        amrex::Print() << "----------- end (1)\n";
+
 
         // perform essential particle house keeping at the boundaries
         // (inject, communicate, scrape, sort, etc.)
-        HandleParticlesAtBoundaries(a_step, a_cur_time, /*num_moved=*/0);
+        //HandleParticlesAtBoundaries(a_step, a_cur_time, /*num_moved=*/0);
 
         // perform particle collisions
         ExecutePythonCallback("beforecollisions");
@@ -524,12 +529,16 @@ WarpX::OneStep_nosub (
         ExecutePythonCallback("aftercollisions");
 
         // push particles (half position)
+        amrex::Print() << "----------- start (2)\n";
+
         PushParticlesandDeposit(
             a_cur_time,
             /*skip_deposition=*/false,
             PositionPushType::SecondHalf,
             MomentumPushType::None
         );
+        amrex::Print() << "----------- end (2)\n";
+
     }
     // with collisions placed before the position and momentum push, or without collisions
     else {
@@ -650,7 +659,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
-
+    amrex::Print() << "                         ExplicitFillBoundaryEBUpdateAux() with -0.5_rt*dt[lev] \n";
     // At the beginning, we have B^{n} and E^{n}.
     // Particles have p^{n} and x^{n}.
     // m_is_synchronized is true.
