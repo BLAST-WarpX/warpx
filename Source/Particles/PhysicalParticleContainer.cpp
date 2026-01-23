@@ -736,11 +736,6 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, position_dt, relative_time, push_type);
-                        amrex::Print() << " ------- momenta used for Deposition -------" << "\n";
-                        amrex::Print() << " ux[0] = " << uxp[0] << "  uy[0] = " << uyp[0] << "  uz[0] = " << uzp[0] << "\n";
-
-                        amrex::Print() << " ux[1] = " << uxp[1] << "  uy[1] = " << uyp[1] << "  uz[1] = " << uzp[1] << "\n";
-                        amrex::Print() << " relative_time = " << relative_time << "   position_dt  = " << position_dt<< "\n";
                     }
                     if (has_buffer)
                     {
@@ -1135,8 +1130,6 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
 {
     WARPX_PROFILE("PhysicalParticleContainer::PushP()");
-    amrex::Print() << " **************** PushP is called for lev = " << lev << "\n";
-
     if (do_not_push) { return; }
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
@@ -1497,7 +1490,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         if (momentum_push_type != MomentumPushType::None) {
             if (!do_sync) {
 
-                 if (ip==10) amrex::Print() <<" $$$$$$$$$$ before v-push-------ip = "<<ip  <<   "ux" << ux[ip] << "------uy = " << uy[ip] << "------uz = " << uz[ip] << "\n";
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
@@ -1517,13 +1509,11 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 #else
         if (momentum_push_type != MomentumPushType::None) {
-            if (ip==10)  amrex::Print() <<"+++++++ before v-push------- ux"<< ip << " " << ux[ip] << "------uy = " << uy[ip] << "------uz = " << uz[ip] << "\n";
             doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
                                       dt);
-            amrex::Print() <<"+++++++ after v-push------- ux"<< ip << " " << ux[ip] << "------uy = " << uy[ip] << "------uz = " << uz[ip] << "\n";
 
         }
 #endif
@@ -1535,20 +1525,11 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                 uz_avg[ip] = uz[ip];
             }
             else { // The momentum was updated during collisions
-                // ux_avg[ip] += ux[ip];
-                // uy_avg[ip] += uy[ip];
-                // uz_avg[ip] += uz[ip];
-                // ux_avg[ip] *= 0.5_rt;
-                // uy_avg[ip] *= 0.5_rt;
-                // uz_avg[ip] *= 0.5_rt;
                 ux_avg[ip] = ux[ip];
                 uy_avg[ip] = uy[ip];
                 uz_avg[ip] = uz[ip];
             }
         }
-        if (ip==10) amrex::Print() <<"after v-push ip = "<< ip << "------- ux" << ux[ip] << "------uy = " << uy[ip] << "------uz = " << uz[ip] << "\n";
-        if (ip==10) amrex::Print() <<"after v-push------ ip = "<< ip << " ux_avg" << ux_avg[ip] << "------uy = " << uy_avg[ip] << "------uz = " << uz_avg[ip] << "\n";
-
 
         amrex::Real position_dt = dt;
         if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
@@ -1556,7 +1537,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
         UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt, mass);
         setPosition(ip, xp, yp, zp);
-        if (ip==10) amrex::Print() <<"after UpdatePosition ------ ip = "<< ip << " xp " <<xp << "------yp = " << yp<< "------zp = " << zp << "\n";
 
 
 #ifdef WARPX_QED

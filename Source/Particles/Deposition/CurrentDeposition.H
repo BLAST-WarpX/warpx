@@ -345,7 +345,7 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real vy  = uyp[ip]*gaminv;
             const amrex::Real vz  = uzp[ip]*gaminv;
 
-            amrex::Real wq  = q*wp[ip];
+            amrex::Real wq  = (q/2._rt)*wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
@@ -729,7 +729,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                                  + uyp[ip]*uyp[ip]*clightsq
                                                  + uzp[ip]*uzp[ip]*clightsq);
 
-            Real wq = q*wp[ip];
+            Real wq = (q/2._rt)*wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }

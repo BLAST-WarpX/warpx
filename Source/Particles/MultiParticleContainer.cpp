@@ -477,15 +477,16 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
-
-        fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);
-        fields.get(current_fp_string, Direction{1}, lev)->setVal(0.0);
-        fields.get(current_fp_string, Direction{2}, lev)->setVal(0.0);
-        if (fields.has(FieldType::current_buf, Direction{0}, lev)) { fields.get(FieldType::current_buf, Direction{0}, lev)->setVal(0.0); }
-        if (fields.has(FieldType::current_buf, Direction{1}, lev)) { fields.get(FieldType::current_buf, Direction{1}, lev)->setVal(0.0); }
-        if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
-        if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
-        if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
+        if (position_push_type == PositionPushType::FirstHalf) {
+            fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);
+            fields.get(current_fp_string, Direction{1}, lev)->setVal(0.0);
+            fields.get(current_fp_string, Direction{2}, lev)->setVal(0.0);
+            if (fields.has(FieldType::current_buf, Direction{0}, lev)) { fields.get(FieldType::current_buf, Direction{0}, lev)->setVal(0.0); }
+            if (fields.has(FieldType::current_buf, Direction{1}, lev)) { fields.get(FieldType::current_buf, Direction{1}, lev)->setVal(0.0); }
+            if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
+            if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
+            if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
+        }
         if (implicit_options && implicit_options->deposit_mass_matrices) {
             fields.get(FieldType::current_fp_MM, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::current_fp_MM, Direction{1}, lev)->setVal(0.0);
