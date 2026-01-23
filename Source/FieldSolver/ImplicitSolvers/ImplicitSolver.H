@@ -101,6 +101,15 @@ public:
         else { return nullptr; }
     }
 
+    /**
+     * \brief Return reference to the multifabs for curl curl mask
+     */
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int dir) const
+    {
+        amrex::ignore_unused(lev,dir);
+        return nullptr;
+    }
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -242,7 +251,7 @@ protected:
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
-    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, const int bdry_side ) const;
 
 };
 

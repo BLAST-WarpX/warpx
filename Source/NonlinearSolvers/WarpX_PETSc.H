@@ -98,6 +98,12 @@ class PETScSolver_impl
         //! Preconditioner type
         PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
 
+        // Return the PC type
+        PreconditionerType getPreconditionerType () const
+        {
+            return m_pc_type;
+        }
+
     protected:
 
         //! Set PETSc options from WarpX input file

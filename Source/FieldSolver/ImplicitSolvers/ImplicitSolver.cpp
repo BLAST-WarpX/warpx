@@ -52,15 +52,15 @@ const Array<FieldBoundaryType,AMREX_SPACEDIM>& ImplicitSolver::GetFieldBoundaryH
 
 Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::GetLinOpBCLo () const
 {
-    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryLo());
+    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryLo(),/*bdry_side=*/0);
 }
 
 Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::GetLinOpBCHi () const
 {
-    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryHi());
+    return convertFieldBCToLinOpBC(m_WarpX->GetFieldBoundaryHi(),/*bdr_side=*/1);
 }
 
-Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const Array<FieldBoundaryType,AMREX_SPACEDIM>& a_fbc) const
+Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const Array<FieldBoundaryType,AMREX_SPACEDIM>& a_fbc, const int bdry_side) const
 {
     Array<LinOpBCType, AMREX_SPACEDIM> lbc;
     for (auto& bc : lbc) { bc = LinOpBCType::interior; }
@@ -82,10 +82,15 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             // Also for FieldBoundaryType::PMC
             lbc[i] = LinOpBCType::symmetry;
         } else if (a_fbc[i] == FieldBoundaryType::PECInsulator) {
-            ablastr::warn_manager::WMRecordWarning("Implicit solver",
-                "With PECInsulator, in the Curl-Curl preconditioner Neumann boundary will be used since the full boundary is not yet implemented.",
-                ablastr::warn_manager::WarnPriority::medium);
-            lbc[i] = LinOpBCType::symmetry;
+            const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(i,bdry_side);
+            if (voltage_driven) { // Dirichlet for E
+                lbc[i] = LinOpBCType::Dirichlet;
+            } else { // Dirichlet for B
+                ablastr::warn_manager::WMRecordWarning("Implicit solver with current-driven PECInsulator",
+                    "in the Curl-Curl preconditioner. Symmetry boundary will be used since the full boundary is not yet implemented.",
+                    ablastr::warn_manager::WarnPriority::medium);
+                lbc[i] = LinOpBCType::symmetry;
+            }
         } else if (a_fbc[i] == FieldBoundaryType::None) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else if (a_fbc[i] == FieldBoundaryType::Open) {
@@ -530,7 +535,8 @@ void ImplicitSolver::InitializeMassMatrices ()
 
     // check that PC is being used by nonlinear solver
     if (m_use_mass_matrices_pc) {
-        if (!m_nlsolver->UsePreconditioner()) {
+        const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+        if (pc_type == PreconditionerType::none) {
             m_use_mass_matrices_pc = false;
         }
     }
@@ -721,7 +727,7 @@ void ImplicitSolver::InitializeMassMatrices ()
     // Set the pointer to mass matrix MultiFab
     if (m_use_mass_matrices_pc) {
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, 0));
+            m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev));
         }
     }
 
@@ -835,16 +841,21 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt and add 1 to diagonal terms
+    // Scale mass matrices used by preconditioner by c^2*mu0*theta*dt.
+    // Add one to diagonal terms when using the curl_curl_mlmg pc_type.
+    // The pc_type petsc already has the one from the curl curl operator
     // Note: This should be done after Sync/communication has been called
 
     const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     const int diag_comp = 0;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         for (int dir = 0 ; dir < 3 ; dir++) {
             amrex::MultiFab* MM_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{dir}, lev);
             MM_PC->mult(pc_factor, 0, MM_PC->nComp());
-            MM_PC->plus(1.0_rt, diag_comp, 1, 0);
+            if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+                MM_PC->plus(1.0_rt, diag_comp, 1, 0);
+            }
         }
     }
 
