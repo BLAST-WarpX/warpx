@@ -197,6 +197,10 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
 #ifdef WARPX_DIM_RZ
             linop[adim]->setRZ(true);
+            // In cylindrical coordinates (with azimuthal symmetry), the vector Laplacian operator
+            // along each coordinate is `del dot (sigma grad ...) - 1/r^2 ...`.
+            // The alpha term below adds the 1/r^2 part.
+            linop[adim]->setAlpha(1._rt);
 #endif
 
             linop[adim]->setDomainBC( boundary_handler.lobc[adim], boundary_handler.hibc[adim] );
