@@ -110,6 +110,18 @@ public:
         return nullptr;
     }
 
+    /**
+     * \brief Return the IntVect number of components for the mass matrices used in
+     *        the preconditioner for field direction field_dir
+     */
+    amrex::IntVect GetMassMatricesPCNcomp (const int field_dir) const
+    {
+        if      (field_dir == 0) { return m_ncomp_pc_xx; }
+        else if (field_dir == 1) { return m_ncomp_pc_yy; }
+        else if (field_dir == 2) { return m_ncomp_pc_zz; }
+        else { return amrex::IntVect{-1}; }
+    }
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -192,6 +204,11 @@ protected:
     bool m_use_mass_matrices_pc = false;
 
     /**
+     * \brief Width for mass matrices in the preconditioner
+     */
+    int m_mass_matrices_pc_width = -1;
+
+    /**
      * \brief Direction-dependent component number of mass matrices elements
      */
     amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
@@ -203,6 +220,20 @@ protected:
     amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     *        used for the preconditioner
+     */
+    amrex::IntVect m_ncomp_pc_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_xy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_xz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_yx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_yz = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_zx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_zy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_zz = amrex::IntVect{0};
 
     /**
      * \brief Array of multifab pointers to mass matrix preconditioner
