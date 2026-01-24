@@ -157,118 +157,118 @@ namespace {
              PhysConst::m_p,
              PhysConst::q_e}},
         {PhysicalSpecies::hydrogen, Properties{
-             amrex::Real(1.00797) * PhysConst::m_u,
+             amrex::Real(1.00797) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},
         {PhysicalSpecies::hydrogen1, Properties{
-             amrex::Real(1.00782503223) * PhysConst::m_u,
+             amrex::Real(1.00782503223) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},
         {PhysicalSpecies::hydrogen2, Properties{
-             amrex::Real(2.01410177812) * PhysConst::m_u,
+             amrex::Real(2.01410177812) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},
         {PhysicalSpecies::hydrogen3, Properties{
-             amrex::Real(3.0160492779) * PhysConst::m_u,
+             amrex::Real(3.0160492779) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},
         {PhysicalSpecies::helium, Properties{
-             amrex::Real(4.002602) * PhysConst::m_u,
+             amrex::Real(4.002602) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::helium3, Properties{
-             amrex::Real(3.0160293201) * PhysConst::m_u,
+             amrex::Real(3.0160293201) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::helium4, Properties{
-             amrex::Real(4.00260325413) * PhysConst::m_u,
+             amrex::Real(4.00260325413) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::alpha, Properties{
-             amrex::Real(4.001506179127) * PhysConst::m_u,
+             amrex::Real(4.00260325413) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::lithium, Properties{
-             amrex::Real(6.967) * PhysConst::m_u,
+             amrex::Real(6.967) * PhysConst::m_u - amrex::Real(3) * PhysConst::m_e,
              amrex::Real(3) * PhysConst::q_e}},
         {PhysicalSpecies::lithium6, Properties{
-             amrex::Real(6.0151228874) * PhysConst::m_u,
+             amrex::Real(6.0151228874) * PhysConst::m_u - amrex::Real(3) * PhysConst::m_e,
              amrex::Real(3) * PhysConst::q_e}},
         {PhysicalSpecies::lithium7, Properties{
-             amrex::Real(7.0160034366) * PhysConst::m_u,
+             amrex::Real(7.0160034366) * PhysConst::m_u - amrex::Real(3) * PhysConst::m_e,
              amrex::Real(3) * PhysConst::q_e}},
         {PhysicalSpecies::beryllium, Properties{
-             amrex::Real(9.0121831) * PhysConst::m_u,
+             amrex::Real(9.0121831) * PhysConst::m_u - amrex::Real(4) * PhysConst::m_e,
              amrex::Real(4) * PhysConst::q_e}},
         {PhysicalSpecies::beryllium9, Properties{
-             amrex::Real(9.012183065) * PhysConst::m_u,
+             amrex::Real(9.012183065) * PhysConst::m_u - amrex::Real(4) * PhysConst::m_e,
              amrex::Real(4) * PhysConst::q_e}},
         {PhysicalSpecies::boron, Properties{
-             amrex::Real(10.813) * PhysConst::m_u,
+             amrex::Real(10.813) * PhysConst::m_u - amrex::Real(5) * PhysConst::m_e,
              amrex::Real(5) * PhysConst::q_e}},
         {PhysicalSpecies::boron10, Properties{
-             amrex::Real(10.01293695) * PhysConst::m_u,
+             amrex::Real(10.01293695) * PhysConst::m_u - amrex::Real(5) * PhysConst::m_e,
              amrex::Real(5) * PhysConst::q_e}},
         {PhysicalSpecies::boron11, Properties{
-             amrex::Real(11.00930536) * PhysConst::m_u,
+             amrex::Real(11.00930536) * PhysConst::m_u - amrex::Real(5) * PhysConst::m_e,
              amrex::Real(5) * PhysConst::q_e}},
         {PhysicalSpecies::carbon, Properties{
-             amrex::Real(12.0106) * PhysConst::m_u,
+             amrex::Real(12.0106) * PhysConst::m_u - amrex::Real(6) * PhysConst::m_e,
              amrex::Real(6) * PhysConst::q_e}},
         {PhysicalSpecies::carbon12, Properties{
-             amrex::Real(12.0000000) * PhysConst::m_u,
+             amrex::Real(12.0000000) * PhysConst::m_u - amrex::Real(6) * PhysConst::m_e,
              amrex::Real(6) * PhysConst::q_e}},
         {PhysicalSpecies::carbon13, Properties{
-             amrex::Real(13.00335483507) * PhysConst::m_u,
+             amrex::Real(13.00335483507) * PhysConst::m_u - amrex::Real(6) * PhysConst::m_e,
              amrex::Real(6) * PhysConst::q_e}},
         {PhysicalSpecies::carbon14, Properties{
-             amrex::Real(14.0032419884) * PhysConst::m_u,
+             amrex::Real(14.0032419884) * PhysConst::m_u - amrex::Real(6) * PhysConst::m_e,
              amrex::Real(6) * PhysConst::q_e}},
         {PhysicalSpecies::nitrogen, Properties{
-             amrex::Real(14.00685) * PhysConst::m_u,
+             amrex::Real(14.00685) * PhysConst::m_u - amrex::Real(7) * PhysConst::m_e,
              amrex::Real(7) * PhysConst::q_e}},
         {PhysicalSpecies::nitrogen14, Properties{
-             amrex::Real(14.00307400443) * PhysConst::m_u,
+             amrex::Real(14.00307400443) * PhysConst::m_u - amrex::Real(7) * PhysConst::m_e,
              amrex::Real(7) * PhysConst::q_e}},
         {PhysicalSpecies::nitrogen15, Properties{
-             amrex::Real(15.00010889888) * PhysConst::m_u,
+             amrex::Real(15.00010889888) * PhysConst::m_u - amrex::Real(7) * PhysConst::m_e,
              amrex::Real(7) * PhysConst::q_e}},
         {PhysicalSpecies::oxygen, Properties{
-             amrex::Real(15.9994) * PhysConst::m_u,
+             amrex::Real(15.9994) * PhysConst::m_u - amrex::Real(8) * PhysConst::m_e,
              amrex::Real(8) * PhysConst::q_e}},
         {PhysicalSpecies::oxygen16, Properties{
-             amrex::Real(15.99491461957) * PhysConst::m_u,
+             amrex::Real(15.99491461957) * PhysConst::m_u - amrex::Real(8) * PhysConst::m_e,
              amrex::Real(8) * PhysConst::q_e}},
         {PhysicalSpecies::oxygen17, Properties{
-             amrex::Real(16.99913175650) * PhysConst::m_u,
+             amrex::Real(16.99913175650) * PhysConst::m_u - amrex::Real(8) * PhysConst::m_e,
              amrex::Real(8) * PhysConst::q_e}},
         {PhysicalSpecies::oxygen18, Properties{
-             amrex::Real(17.99915961286) * PhysConst::m_u,
+             amrex::Real(17.99915961286) * PhysConst::m_u - amrex::Real(8) * PhysConst::m_e,
              amrex::Real(8) * PhysConst::q_e}},
         {PhysicalSpecies::fluorine, Properties{
-             amrex::Real(18.998403163) * PhysConst::m_u,
+             amrex::Real(18.998403163) * PhysConst::m_u - amrex::Real(9) * PhysConst::m_e,
              amrex::Real(9) * PhysConst::q_e}},
         {PhysicalSpecies::fluorine19, Properties{
-             amrex::Real(18.99840316273) * PhysConst::m_u,
+             amrex::Real(18.99840316273) * PhysConst::m_u - amrex::Real(9) * PhysConst::m_e,
              amrex::Real(9) * PhysConst::q_e}},
         {PhysicalSpecies::neon, Properties{
-             amrex::Real(20.1797) * PhysConst::m_u,
+             amrex::Real(20.1797) * PhysConst::m_u - amrex::Real(10) * PhysConst::m_e,
              amrex::Real(10) * PhysConst::q_e}},
         {PhysicalSpecies::neon20, Properties{
-             amrex::Real(19.9924401762) * PhysConst::m_u,
+             amrex::Real(19.9924401762) * PhysConst::m_u - amrex::Real(10) * PhysConst::m_e,
              amrex::Real(10) * PhysConst::q_e}},
         {PhysicalSpecies::neon21, Properties{
-             amrex::Real(20.993846685) * PhysConst::m_u,
+             amrex::Real(20.993846685) * PhysConst::m_u - amrex::Real(10) * PhysConst::m_e,
              amrex::Real(10) * PhysConst::q_e}},
         {PhysicalSpecies::neon22, Properties{
-             amrex::Real(21.991385114) * PhysConst::m_u,
+             amrex::Real(21.991385114) * PhysConst::m_u - amrex::Real(10) * PhysConst::m_e,
              amrex::Real(10) * PhysConst::q_e}},
         {PhysicalSpecies::aluminium, Properties{
-             amrex::Real(26.98153853) * PhysConst::m_u,
+             amrex::Real(26.98153853) * PhysConst::m_u - amrex::Real(13) * PhysConst::m_e,
              amrex::Real(13) * PhysConst::q_e}},
         {PhysicalSpecies::argon, Properties{
-             amrex::Real(39.948) * PhysConst::m_u,
+             amrex::Real(39.948) * PhysConst::m_u - amrex::Real(18) * PhysConst::m_e,
              amrex::Real(18) * PhysConst::q_e}},
         {PhysicalSpecies::copper, Properties{
-             amrex::Real(63.546) * PhysConst::m_u,
+             amrex::Real(63.546) * PhysConst::m_u - amrex::Real(29) * PhysConst::m_e,
              amrex::Real(29) * PhysConst::q_e}},
         {PhysicalSpecies::xenon, Properties{
-             amrex::Real(131.293) * PhysConst::m_u,
+             amrex::Real(131.293) * PhysConst::m_u - amrex::Real(54) * PhysConst::m_e,
              amrex::Real(54) * PhysConst::q_e}},
         {PhysicalSpecies::gold, Properties{
-             amrex::Real(196.966569) * PhysConst::m_u,
+             amrex::Real(196.966569) * PhysConst::m_u - amrex::Real(79) * PhysConst::m_e,
              amrex::Real(79) * PhysConst::q_e}},
     };
 }
