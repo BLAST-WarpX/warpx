@@ -138,11 +138,11 @@ namespace BinaryCollisionUtils{
                 ||(product_species1.AmIA<PhysicalSpecies::neutron>() && product_species2.AmIA<PhysicalSpecies::helium3>())){
                 return NuclearFusionType::DeuteriumDeuteriumToNeutronHelium;
             } else if (
-                (product_species1.AmIA<PhysicalSpecies::hydrogen3>() && product_species2.AmIA<PhysicalSpecies::hydrogen1>())
-                ||(product_species1.AmIA<PhysicalSpecies::hydrogen1>() && product_species2.AmIA<PhysicalSpecies::hydrogen3>())){
+                (product_species1.AmIA<PhysicalSpecies::hydrogen3>() && product_species2.AmIA<PhysicalSpecies::proton>())
+                ||(product_species1.AmIA<PhysicalSpecies::proton>() && product_species2.AmIA<PhysicalSpecies::hydrogen3>())){
                 return NuclearFusionType::DeuteriumDeuteriumToProtonTritium;
             } else {
-                WARPX_ABORT_WITH_MESSAGE("ERROR: Product species of deuterium-deuterium fusion must be of type helium3 and neutron, or hydrogen3 and hydrogen1");
+                WARPX_ABORT_WITH_MESSAGE("ERROR: Product species of deuterium-deuterium fusion must be of type helium3 and neutron, or tritium/hydrogen3 and proton");
             }
         }
         else if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::helium3>())
