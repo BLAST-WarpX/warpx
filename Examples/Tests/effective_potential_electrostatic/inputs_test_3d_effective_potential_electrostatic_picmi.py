@@ -130,8 +130,7 @@ grid = picmi.Cartesian3DGrid(
 )
 simulation.time_step_size = dt
 simulation.max_steps = total_steps
-simulation.current_deposition_algo = "direct"
-simulation.particle_shape = 1
+simulation.particle_shape = 3
 simulation.verbose = 1
 
 #######################################################################

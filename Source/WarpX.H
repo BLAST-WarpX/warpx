@@ -122,6 +122,9 @@ public:
         return field_boundary_hi;
     }
 
+    [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
+                                               const int  bdry_side ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
