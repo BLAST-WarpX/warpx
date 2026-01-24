@@ -15,7 +15,7 @@
 
 enum struct PhysicalSpecies{
     unspecified=0, electron, positron, muon, antimuon, photon, neutron, proton, hydrogen, hydrogen1, hydrogen2, hydrogen3,
-    helium, helium3, helium4, alpha, lithium, lithium6, lithium7, beryllium, beryllium9, boron, boron10, boron11, carbon,
+    helium, helium3, helium4, lithium, lithium6, lithium7, beryllium, beryllium9, boron, boron10, boron11, carbon,
     carbon12, carbon13, carbon14, nitrogen, nitrogen14, nitrogen15, oxygen, oxygen16, oxygen17, oxygen18, fluorine,
     fluorine19, neon, neon20, neon21, neon22, aluminium, argon, copper, xenon, gold};
 

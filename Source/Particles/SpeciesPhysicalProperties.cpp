@@ -33,7 +33,6 @@ namespace {
         {"neutron"    , PhysicalSpecies::neutron},
         {"hydrogen"   , PhysicalSpecies::hydrogen},
         {"hydrogen1"  , PhysicalSpecies::hydrogen1},
-        {"protium"    , PhysicalSpecies::hydrogen1},
         {"hydrogen2"  , PhysicalSpecies::hydrogen2},
         {"deuterium"  , PhysicalSpecies::hydrogen2},
         {"hydrogen3"  , PhysicalSpecies::hydrogen3},
@@ -42,7 +41,7 @@ namespace {
         {"helium"     , PhysicalSpecies::helium},
         {"helium3"    , PhysicalSpecies::helium3},
         {"helium4"    , PhysicalSpecies::helium4},
-        {"alpha"      , PhysicalSpecies::alpha},
+        {"alpha"      , PhysicalSpecies::helium4},
         {"lithium"    , PhysicalSpecies::lithium},
         {"lithium6"   , PhysicalSpecies::lithium6},
         {"lithium7"   , PhysicalSpecies::lithium7},
@@ -91,7 +90,6 @@ namespace {
         {PhysicalSpecies::helium     , "helium"},
         {PhysicalSpecies::helium3    , "helium3"},
         {PhysicalSpecies::helium4    , "helium4"},
-        {PhysicalSpecies::alpha      , "alpha"},
         {PhysicalSpecies::lithium    , "lithium"},
         {PhysicalSpecies::lithium6   , "lithium6"},
         {PhysicalSpecies::lithium7   , "lithium7"},
@@ -175,9 +173,6 @@ namespace {
              amrex::Real(3.0160293201) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::helium4, Properties{
-             amrex::Real(4.00260325413) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
-             amrex::Real(2) * PhysConst::q_e}},
-        {PhysicalSpecies::alpha, Properties{
              amrex::Real(4.00260325413) * PhysConst::m_u - amrex::Real(2) * PhysConst::m_e,
              amrex::Real(2) * PhysConst::q_e}},
         {PhysicalSpecies::lithium, Properties{
