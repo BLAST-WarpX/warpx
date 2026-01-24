@@ -186,8 +186,7 @@ class MatrixPC : public Preconditioner<T,Ops>
         int m_ndofs_g = 0;
         bool m_pc_diag_only = false;
         int m_pc_mat_nnz = 1;
-        int m_pc_mass_matrix_width = 0;
-        bool m_pc_mass_matrix_include_ij = false;
+        bool m_include_mass_matrices = false;
 
         std::string m_name = "noname";
 
@@ -213,10 +212,9 @@ template <class T, class Ops>
 void MatrixPC<T,Ops>::printParameters() const
 {
     using namespace amrex;
-    Print() << m_name << " verbose:                   " << (m_verbose?"true":"false") << "\n";
-    Print() << m_name << " pc_diagonal_only:          " << (m_pc_diag_only?"true":"false") << "\n";
-    Print() << m_name << " pc_mass_matrix_width:      " << m_pc_mass_matrix_width << "\n";
-    Print() << m_name << " pc_mass_matrix_include_ij: " << (m_pc_mass_matrix_include_ij?"true":"false") << "\n";
+    Print() << m_name << " verbose:                " << (m_verbose?"true":"false") << "\n";
+    Print() << m_name << " pc_diagonal_only:       " << (m_pc_diag_only?"true":"false") << "\n";
+    Print() << m_name << " include_mass_matrices:  " << (m_include_mass_matrices?"true":"false") << "\n";
 }
 
 template <class T, class Ops>
@@ -225,10 +223,6 @@ void MatrixPC<T,Ops>::readParameters()
     const amrex::ParmParse pp(m_name);
     pp.query("verbose", m_verbose);
     pp.query("pc_diagonal_only", m_pc_diag_only);
-    pp.query("pc_mass_matrix_width", m_pc_mass_matrix_width);
-    if(m_pc_mass_matrix_width>0) {
-       pp.query("pc_mass_matrix_include_ij", m_pc_mass_matrix_include_ij);
-    }
 }
 
 template <class T, class Ops>
@@ -279,14 +273,8 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
 
 
     m_bcoefs = m_ops->GetMassMatricesCoeff();
-    if (m_bcoefs == nullptr) {
-        if (m_pc_mass_matrix_width >= 0) {
-            std::stringstream warning_message;
-            warning_message << "pc_mass_matrix_width is nonnegative but unable to get mass matrices from operator.\n";
-            warning_message << "setting m_pc_mass_matrix_width = -1 (no mass matrix in PC).\n";
-            ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
-        }
-        m_pc_mass_matrix_width = -1;
+    if (m_bcoefs != nullptr) {
+        m_include_mass_matrices = true;
     }
 
     m_is_defined = true;
@@ -496,7 +484,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 val += 2.0_rt*alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 2) {
                                 val += 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
-                            } else {
+                            } else if (dir == 1) {
                                 val += 2.0_rt*alpha * ( dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0)
                                                       + dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,2) );
                             }
@@ -564,7 +552,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                                                         nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
-                        } else {
+                        } else if (dir==1) {
                             for (int jdir = 0; jdir <= 2; jdir+=2) {
                                 {
                                     int cidx_g_rhs = (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
@@ -634,11 +622,16 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 }
 
                 // Add the mass matrix piece
-                if (m_pc_mass_matrix_width >= 0) {
+                if (m_include_mass_matrices) {
 
-                    auto mm_width = m_pc_mass_matrix_width;
-                    auto mm_incl_ij = m_pc_mass_matrix_include_ij;
                     auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);
+                    const amrex::IntVect MM_ncomps = m_ops->GetMassMatricesPCNcomp(dir);
+                    const int MM_ncomps_tot = (*m_bcoefs)[lev][dir]->nComp();
+                    const int diag_MM_comp = (MM_ncomps_tot - 1)/2;
+                    amrex::IntVect MM_width;
+                    for (int space_dir=0; space_dir<AMREX_SPACEDIM; space_dir++) {
+                        MM_width[space_dir] = (MM_ncomps[space_dir] - 1)/2;
+                    }
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
@@ -646,19 +639,56 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         if (ridx_l < 0) { return; }
 
                         int icol = num_nz_ptr[ridx_l];
-
                         {
                             int cidx_g_lhs = dof_arr(i,j,k,1);
-                            amrex::Real val = sigma_ii_arr(i,j,k,0);
+                            amrex::Real val = sigma_ii_arr(i,j,k,diag_MM_comp);
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
                                                                     nnz_max, icol );
                             if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                         }
-
-                        amrex::ignore_unused(mm_width); // will be used when adding off-diagonal elements
-                        amrex::ignore_unused(mm_incl_ij); // will be used when adding off-diagonal elements
+#if defined(WARPX_DIM_1D_Z)
+                        for (int width = 1; width <= MM_width[0]; width++) {
+                        {
+                            int cidx_g_rhs = dof_arr(i - width,j,k,1);
+                            amrex::Real val = sigma_ii_arr(i,j,k,diag_MM_comp - width);
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                        {
+                            int cidx_g_rhs = dof_arr(i + width,j,k,1);
+                            amrex::Real val = sigma_ii_arr(i,j,k,diag_MM_comp + width);
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
+                        }
+#endif
+#if defined(WARPX_DIM_XZ)
+                        int mm_comp = 0;
+                        for (int comp1 = 0; comp1 < MM_ncomps[1]; comp1++) {
+                            const int jj0 = comp1 - MM_width[1]; // e.g., -2 -1, 0, 1, 2
+                            for (int comp0 = 0; comp0 < MM_ncomps[0]; comp0++) {
+                                const int ii0 = comp0 - MM_width[0]; // e.g., -2 -1, 0, 1, 2
+                                if (!(ii0==0 && jj0==0)) {
+                                    int cidx_g_rhs = dof_arr(i + ii0,j + jj0,k,1);
+                                    amrex::Real val = sigma_ii_arr(i,j,k,mm_comp);
+                                    auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                            &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                            &a_ij_ptr[ridx_l*nnz_max],
+                                                                            nnz_max, icol );
+                                    if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                                }
+                                mm_comp++;
+                            }
+                        }
+#endif
 
                         num_nz_ptr[ridx_l] = icol;
                     });
