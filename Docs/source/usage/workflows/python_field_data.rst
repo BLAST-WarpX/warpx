@@ -124,13 +124,15 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
     .. tab-item:: Explicit loop over boxes
 
-        All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
-        This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
+        This method provides similar capabilities to the numpy-like global indexing approach, but operates
+        only on local data within each MPI rank. Unlike global indexing, which may involve MPI communications
+        and CPU-GPU data transfers under the hood, this approach performs all operations locally on each processor.
+        As a result, this method offers significantly higher performance, especially for large-scale parallel simulations
+        and GPU-accelerated runs. The data is accessed by explicitly looping over mesh-refinement levels and
+        individual grid blocks (boxes), giving you direct access to the underlying ``numpy`` or ``cupy`` arrays for each local block.
+
+        The example below accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
         This shows how to loop over levels and grid blocks.
-
-        More details: https://pyamrex.readthedocs.io/en/latest/usage/compute.html
-
-        Advantages in terms of performance + how to use with cupy
 
         .. code-block:: python3
 
@@ -180,15 +182,17 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
             sim.step(nsteps=100)
 
-        Use load_cupy?
         For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 
 
 Defining a new custom field
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-New MultiFabs can be created at the Python level and added to the registry. Using this method, the new MultiFabs will be handled in the same way as internal MultiFabs, for example that data can be redistributed during load balancing (when the flags are set as shpwn in the example).
-In this example, a new MultiFab is added with the same properties as `Ex`.
+For some use cases, it is sometimes needed to create new custom fields (in addition to the existing fields in WarpX).
+New ``MultiFab`` objects can be created at the Python level. Using this method, the new ``MultiFab`` will be handled in the same way as WarpX's internal ``MultiFab``.
+For example, their data will be automatically redistributed during load balancing (when the flags are set as shown in the example).
+
+In the example below, a new ``MultiFab`` is created with the same properties as ``Ex``.
 
 .. code-block:: python
 
