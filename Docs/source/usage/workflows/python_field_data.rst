@@ -15,7 +15,7 @@ are selected with the ``sim.field.get`` method, as shown in the example below.
     #   ...
 
     # Extract the Ex field, at level 0 of mesh refinement
-    Ex = sim.field.get("Efield_fp", dir="x", level=0)
+    Ex = sim.fields.get("Efield_fp", dir="x", level=0)
 
 The available field names (e.g. ``"Efield_fp"``, ``"rho_fp"``, etc.) are listed in the :ref:`developers-fields-names` section.
 The function ``sim.field.get`` returns a `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ object of type `MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__, whose field data can be accessed or modified as described below.
@@ -106,7 +106,7 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
         .. code-block:: python
 
-            Ex = sim.field.get("Efield_fp", dir="x", level=0)
+            Ex = sim.fields.get("Efield_fp", dir="x", level=0)
             x_coords = Ex.mesh("x")
             y_coords = Ex.mesh("y")
             z_coords = Ex.mesh("z")
