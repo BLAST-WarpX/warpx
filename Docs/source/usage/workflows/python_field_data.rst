@@ -40,10 +40,9 @@ These different methods differ in their user-friendliness, flexibility and perfo
         - Scaling the field by a factor of 2: ``Ex.mult(2.)``
         - Adding two fields together: ``Ex.saxpy(...)`` (see `this link <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab.saxpy>`__)
 
-
         .. note::
 
-            These methods are generally very performant, including when using GPUs and multi-node parallelization, but are limited to the existing functions provided by AMReX.
+            These methods generally have high performance and low overhead, including when using GPUs and multi-node parallelization, but are limited to the existing functions provided by AMReX.
 
         .. dropdown:: See some of these methods used in a full example
 
@@ -53,9 +52,9 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
     .. tab-item:: Numpy-like global indexing
 
-        The field ``MultiFab`` object provides access to the data via global indexing.
-        Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-        When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
+        The field data in a ``MultiFab`` object can also be accessed via global indexing.
+        Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the ``MultiFab`` and across processors).
+        When the data is fetched the result is a ``numpy`` array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
         For indices within the domain, values from valid cells are always returned.
         The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
         This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
@@ -66,14 +65,15 @@ These different methods differ in their user-friendliness, flexibility and perfo
             Bz_along_x = Bz[:,5,6]
 
         The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
-        specified ``x``. The data will be scattered appropriately to the underlying FABs. The set is a local operation.
+        specified ``x``. The data will be scattered appropriately to the underlying FABs. Setting values is a local operation.
 
         .. code-block:: python
 
             Jy = sim.fields.get("current_fp", dir=1, level=0)
             Jy[5,6:20,8:30] = 7.
 
-        In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
+        In the example below, 7 is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple,
+        ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
         Note that the ``+=`` will be a global operation.
 
         .. code-block:: python
@@ -81,13 +81,46 @@ These different methods differ in their user-friendliness, flexibility and perfo
             Jx = sim.fields.get("current_fp", dir=0, level=0)
             Jx[(),-1j,-1:2j] += 7.
 
+        Instead of setting values with a scalar value, you can also set values using an array. The array shape must match the selected region.
+        The array must be either a ``numpy`` array (if WarpX is run on CPU) or a ``cupy`` array (if WarpX is run on GPU).
+        To write portable code that works on both CPU and GPU, it is recommended to use the `load_cupy` package.
+        See :ref:`usage-python-portable` for more details on writing portable Python code.
+
+        .. code-block:: python
+
+            from pywarpx.LoadThirdParty import load_cupy
+            xp = load_cupy()
+
+            Jy = sim.fields.get("current_fp", dir=1, level=0)
+            # Create random values with shape matching the selected region
+            random_values = xp.random.random((14, 22))  # shape: (20-6, 30-8)
+            Jy[5,6:20,8:30] = random_values
+
         To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
         Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
         The code does error checking to ensure that the specified indices are within the bounds of the global domain.
 
-        Use load_cupy?
+        Finally, the ``mesh`` method returns the physical coordinates of the mesh along a specified direction,
+        with appropriate centering based on the field's staggering. This is useful for plotting,
+        analysis, or when you need to know the physical positions corresponding to field values.
 
-        Discuss the mesh function
+        .. code-block:: python
+
+            Ex = sim.field.get("Efield_fp", dir="x", level=0)
+            x_coords = Ex.mesh("x")
+            y_coords = Ex.mesh("y")
+            z_coords = Ex.mesh("z")
+
+        The method accepts a direction string (``"x"``, ``"y"``, ``"z"`` in 3D; ``"r"``, ``"z"`` in RZ geometry)
+        and an optional ``include_ghosts`` parameter (default ``False``) to include ghost cell coordinates.
+        The returned array contains the physical coordinates of the mesh points along the specified direction,
+        properly accounting for the field's cell-centered or face-centered staggering.
+
+        .. note::
+
+            The global indexing is not the most high-performance way to access the field data
+            (since it potentially incurs MPI communications and CPU-GPU copies under the hood),
+            but it is the most flexible and easy to use.
 
     .. tab-item:: Explicit loop over boxes
 

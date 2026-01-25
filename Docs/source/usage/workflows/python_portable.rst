@@ -1,3 +1,5 @@
+.. _usage-python-portable:
+
 Writing portable Python code that can be executed on CPU and GPU
 ----------------------------------------------------------------
 
