@@ -331,7 +331,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                bool m_collisions_split_position_push = false);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *

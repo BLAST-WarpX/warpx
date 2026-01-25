@@ -64,7 +64,8 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                               const amrex::XDim3 & xyzmin,
                               const amrex::Real invvol,
                               const amrex::Dim3 lo,
-                              [[maybe_unused]] const int n_rz_azimuthal_modes)
+                              [[maybe_unused]] const int n_rz_azimuthal_modes
+                            )
 {
     using namespace amrex::literals;
 
@@ -311,7 +312,8 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                          const amrex::XDim3 & xyzmin,
                          amrex::Dim3 lo,
                          amrex::Real q,
-                         [[maybe_unused]]int n_rz_azimuthal_modes)
+                         [[maybe_unused]]int n_rz_azimuthal_modes,
+                         [[maybe_unused]] bool m_collisions_split_position_push = false)
 {
     using namespace amrex::literals;
 
@@ -345,7 +347,8 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real vy  = uyp[ip]*gaminv;
             const amrex::Real vz  = uzp[ip]*gaminv;
 
-            amrex::Real wq  = (q/2._rt)*wp[ip];
+            amrex::Real q_deposited = m_collisions_split_position_push ? q * 0.5_rt : q;
+            amrex::Real wq  = (q_deposited)*wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
@@ -691,12 +694,12 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Real q,
                                   [[maybe_unused]] int n_rz_azimuthal_modes,
                                   const amrex::Array4<const int>& reduced_particle_shape_mask,
-                                  bool enable_reduced_shape
+                                  bool enable_reduced_shape,
+                                  [[maybe_unused]] bool m_collisions_split_position_push = false
                                   )
 {
     using namespace amrex;
     using namespace amrex::literals;
-
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
     // (do_ionization=1)
     bool const do_ionization = ion_lev;
@@ -708,7 +711,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                              (1.0_rt/dt)*dinv.x*dinv.z,
                                              (1.0_rt/dt)*dinv.x*dinv.y};
 
-    Real constexpr clightsq = 1.0_rt / ( PhysConst::c * PhysConst::c );
+    amrex::Real constexpr clightsq = 1.0_rt / ( PhysConst::c * PhysConst::c );
+    amrex::Real q_deposited = m_collisions_split_position_push ? q * 0.5_rt : q;
 
 #if (AMREX_SPACEDIM > 1)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
@@ -729,7 +733,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                                  + uyp[ip]*uyp[ip]*clightsq
                                                  + uzp[ip]*uzp[ip]*clightsq);
 
-            Real wq = (q/2._rt)*wp[ip];
+            Real wq = q_deposited * wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
@@ -2204,7 +2208,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
-                                           [[maybe_unused]] const int n_rz_azimuthal_modes)
+                                           [[maybe_unused]] const int n_rz_azimuthal_modes,
+                                           [[maybe_unused]] bool m_collisions_split_position_push = false)
 {
     using namespace amrex::literals;
 
@@ -2224,7 +2229,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                                                + uyp[ip]*uyp[ip]*inv_c2
                                                                + uzp[ip]*uzp[ip]*inv_c2);
 
-            amrex::Real wq = q*wp[ip];
+            amrex::Real q_deposited = m_collisions_split_position_push ? q * 0.5_rt : q;
+            amrex::Real wq = q_deposited * wp[ip];
             if (do_ionization){
                 wq *= ion_lev[ip];
             }
@@ -2398,7 +2404,8 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                             const amrex::XDim3 & xyzmin,
                             amrex::Dim3 lo,
                             amrex::Real q,
-                            [[maybe_unused]]int n_rz_azimuthal_modes)
+                            [[maybe_unused]]int n_rz_azimuthal_modes,
+                            [[maybe_unused]] bool m_collisions_split_position_push = false)
 {
     using namespace amrex::literals;
 
@@ -2450,7 +2457,8 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                                            + uyp[ip] * uyp[ip] * PhysConst::inv_c2
                                                            + uzp[ip] * uzp[ip] * PhysConst::inv_c2);
         // Product of particle charges and weights
-        amrex::Real wq = q * wp[ip];
+        amrex::Real q_deposited = m_collisions_split_position_push ? q * 0.5_rt : q;
+        amrex::Real wq = q_deposited * wp[ip];
         if (do_ionization) { wq *= ion_lev[ip]; }
 
         // Current particle positions (in physical units)

@@ -81,7 +81,8 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
                        const amrex::Real q,
                        const int n_rz_azimuthal_modes,
                        const unsigned int ip,
-                       const int zdir, const int NODE, const int CELL, const int dir)
+                       const int zdir, const int NODE, const int CELL, const int dir,
+                       [[maybe_unused]]bool m_collisions_split_position_push = false)
 {
     using namespace amrex::literals;
 
@@ -101,7 +102,8 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
     const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
                                                 + uyp[ip]*uyp[ip]*clightsq
                                                 + uzp[ip]*uzp[ip]*clightsq);
-    amrex::Real wq  = q*wp[ip];
+    amrex::Real const q_deposited = m_collisions_split_position_push ? q * 0.5_rt : q;
+    amrex::Real wq  = q_deposited * wp[ip];
     if (do_ionization){
         wq *= ion_lev[ip];
     }

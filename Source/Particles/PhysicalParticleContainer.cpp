@@ -350,13 +350,6 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         m_boundary_conditions.SetThermalVelocity(boundary_uth);
     }
 
-    if (m_collisions_split_position_push) {
-        // Add the average momentum components to deposit the current correctly
-        // if the position push is split to perform collisions
-        AddRealComp("ux_avg");
-        AddRealComp("uy_avg");
-        AddRealComp("uz_avg");
-    }
 }
 
 void
@@ -495,8 +488,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     bool const deposit_current = (
         !skip_deposition &&
         !do_not_deposit &&
-        !(implicit_options && implicit_options->evolve_suborbit_particles_only) &&
-        (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::SecondHalf || position_push_type == PositionPushType::FirstHalf)
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only)
     );
     bool const split_particles = (
         do_splitting &&
@@ -530,9 +522,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             // Extract particle data
             auto& attribs = pti.GetAttribs();
             auto&  wp = attribs[PIdx::w];
-            auto& uxp = (m_collisions_split_position_push) ? pti.GetAttribs("ux_avg") : attribs[PIdx::ux];
-            auto& uyp = (m_collisions_split_position_push) ? pti.GetAttribs("uy_avg") : attribs[PIdx::uy];
-            auto& uzp = (m_collisions_split_position_push) ? pti.GetAttribs("uz_avg") : attribs[PIdx::uz];
+            auto& uxp = attribs[PIdx::ux];
+            auto& uyp = attribs[PIdx::uy];
+            auto& uzp = attribs[PIdx::uz];
 
             const long np = pti.numParticles();
 
@@ -698,7 +690,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 WARPX_PROFILE_VAR_STOP(blp_fg);
 
                 amrex::Real position_dt = dt;
-                if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
+                if (m_collisions_split_position_push) {
                     position_dt *= 0.5_rt;
                 }
                 // Current deposition
@@ -735,7 +727,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, position_dt, relative_time, push_type);
+                                       lev, lev, position_dt, relative_time, push_type, m_collisions_split_position_push);
                     }
                     if (has_buffer)
                     {
@@ -745,7 +737,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
-                                       lev, lev-1, dt, relative_time, push_type);
+                                       lev, lev-1, dt, relative_time, push_type, m_collisions_split_position_push);
                     }
                 }
 
@@ -1363,16 +1355,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
-    // Average momentum
-    amrex::ParticleReal* AMREX_RESTRICT ux_avg = nullptr;
-    amrex::ParticleReal* AMREX_RESTRICT uy_avg = nullptr;
-    amrex::ParticleReal* AMREX_RESTRICT uz_avg = nullptr;
-    if (m_collisions_split_position_push) {
-        ux_avg = pti.GetAttribs("ux_avg").dataPtr() + offset;
-        uy_avg = pti.GetAttribs("uy_avg").dataPtr() + offset;
-        uz_avg = pti.GetAttribs("uz_avg").dataPtr() + offset;
-    }
-
     CopyParticleAttribs copyAttribs;
     if (copy_particle_attribs) {
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
@@ -1429,9 +1411,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #else
     int qed_runtime_flag = no_qed;
 #endif
-
-    // Local copy for device lambda capture
-    bool const collisions_split_position_push = m_collisions_split_position_push;
 
     // Loop over the particles and update their momentum.
     // Using this version of ParallelFor with compile time options
@@ -1517,19 +1496,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
         }
 #endif
-        if (collisions_split_position_push) {
-            // Update average momentum
-            if (momentum_push_type != MomentumPushType::None) {
-                ux_avg[ip] = ux[ip];
-                uy_avg[ip] = uy[ip];
-                uz_avg[ip] = uz[ip];
-            }
-            else { // The momentum was updated during collisions
-                ux_avg[ip] = ux[ip];
-                uy_avg[ip] = uy[ip];
-                uz_avg[ip] = uz[ip];
-            }
-        }
 
         amrex::Real position_dt = dt;
         if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {

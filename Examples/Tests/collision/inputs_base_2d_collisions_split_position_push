@@ -59,7 +59,7 @@ geometry.prob_lo = 0. 0.
 interpolation.galerkin_scheme = 1
 
 # max_step
-max_step = 40000
+max_step = 4000
 
 # my_constants
 my_constants.de0 = clight/wpe  # skin depth, m

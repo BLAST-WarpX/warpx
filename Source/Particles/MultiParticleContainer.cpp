@@ -477,7 +477,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 {
     if (! skip_deposition) {
         using ablastr::fields::Direction;
-        if (position_push_type == PositionPushType::FirstHalf) {
+        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::Full) {
             fields.get(current_fp_string, Direction{0}, lev)->setVal(0.0);
             fields.get(current_fp_string, Direction{1}, lev)->setVal(0.0);
             fields.get(current_fp_string, Direction{2}, lev)->setVal(0.0);

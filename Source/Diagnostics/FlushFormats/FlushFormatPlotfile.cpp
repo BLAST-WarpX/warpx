@@ -400,10 +400,6 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
             real_names[index] = rnames[index];
             real_flags[index] = tmp.h_redistribute_real_comp[index];
-            // Do not write the average momentum runtime components added in PhysicalParticleContainer
-            if (rnames[index] == "ux_avg" || rnames[index] == "uy_avg" || rnames[index] == "uz_avg") {
-                real_flags[index] = 0;
-            }
         }
 
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA

@@ -113,7 +113,8 @@ public:
                                  int const /*depos_lev*/,
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
-                                 PushType /*push_type*/) override {}
+                                 PushType /*push_type*/,
+                                 bool /*m_collisions_split_position_push*/) override {}
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_
