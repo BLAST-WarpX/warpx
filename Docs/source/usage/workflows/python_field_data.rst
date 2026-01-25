@@ -188,7 +188,7 @@ These different methods differ in their user-friendliness, flexibility and perfo
 Defining a new custom field
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For some use cases, it is sometimes needed to create new custom fields (in addition to the existing fields in WarpX).
+For some use cases, it is sometimes needed to create new custom fields (in addition to the :ref:`existing fields in WarpX <developers-fields-names>`).
 New ``MultiFab`` objects can be created at the Python level. Using this method, the new ``MultiFab`` will be handled in the same way as WarpX's internal ``MultiFab``.
 For example, their data will be automatically redistributed during load balancing (when the flags are set as shown in the example).
 
