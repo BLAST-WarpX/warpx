@@ -18,7 +18,8 @@ are selected with the ``sim.fields.get`` method, as shown in the example below.
     Ex = sim.fields.get("Efield_fp", dir="x", level=0)
 
 The available field names (e.g. ``"Efield_fp"``, ``"rho_fp"``, etc.) are listed in the :ref:`developers-fields-names` section.
-The function ``sim.fields.get`` returns a `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ object of type `MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__, whose field data can be accessed or modified as described below.
+The function ``sim.fields.get`` returns a `pyamrex <https://pyamrex.readthedocs.io/en/latest/index.html>`__ object of
+type `MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__, whose field data can be accessed or modified as described below.
 
 Accessing/modifying the underlying field data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
