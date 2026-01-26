@@ -40,7 +40,7 @@ The different methods below differ in their user-friendliness, flexibility and p
 
 .. tab-set::
 
-    .. tab-item:: global access through ``pandas`` DataFrame (read-only)
+    .. tab-item:: Global access through pandas DataFrame (read-only)
 
         The method ``to_df`` of the ``WarpXParticleContainer`` object returns a
         `pandas DataFrame <https://pandas.pydata.org/docs/user_guide/dsintro.html#dataframe>`__ containing the particle data.
