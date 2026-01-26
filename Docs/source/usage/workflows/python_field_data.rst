@@ -119,9 +119,10 @@ These different methods differ in their user-friendliness, flexibility and perfo
 
         .. note::
 
-            The global indexing is not the most high-performance way to access the field data
-            (since it potentially incurs MPI communications and CPU-GPU copies under the hood),
-            but it is the most flexible and easy to use.
+            Global indexing is convenient and user-friendly, but has significant performance overheads,
+            since it potentially incurs MPI communications and CPU-GPU copies under the hood.
+            This method is thus mostly meant for debugging and visualization purposes,
+            and not for performance-critical operations.
 
     .. tab-item:: Explicit loop over boxes
 

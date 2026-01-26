@@ -45,7 +45,7 @@ The different methods below differ in their user-friendliness, flexibility and p
         The method ``to_df`` of the ``WarpXParticleContainer`` object returns a
         `pandas DataFrame <https://pandas.pydata.org/docs/user_guide/dsintro.html#dataframe>`__ containing the particle data.
         More specifically, the keys of the DataFrame are the particle attributes (e.g., ``'ux'``, ``'w'``, ``'idcpu'``),
-        and the corresponding arrays have one element per particle, and gather the particles of that species across all
+        and the corresponding arrays have one element per particle, and contain the particles of that species across all
         boxes and tiles (on the current MPI rank) and across all mesh refinement levels.
 
         .. warning::
@@ -57,7 +57,7 @@ The different methods below differ in their user-friendliness, flexibility and p
 
             The method ``to_df`` is very convenient because it automatically concatenates all particles across boxes and tiles,
             and across all mesh refinement levels. However, this implies significant performance overheads, as it incurs copies
-            and CPU-GPU data transfers. This method is thus mostly meant fordebugging and visualization purposes,
+            and CPU-GPU data transfers. This method is thus mostly meant for debugging and visualization purposes,
             and not for performance-critical operations.
 
         .. code-block:: python
