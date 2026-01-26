@@ -114,12 +114,12 @@ public:
      * \brief Return the IntVect number of components for the mass matrices used in
      *        the preconditioner for field direction field_dir
      */
-    amrex::IntVect GetMassMatricesPCnComp (const int field_dir) const
+    int GetMassMatricesPCnComp (const int field_dir, const int space_dir) const
     {
-        if      (field_dir == 0) { return m_ncomp_pc_xx; }
-        else if (field_dir == 1) { return m_ncomp_pc_yy; }
-        else if (field_dir == 2) { return m_ncomp_pc_zz; }
-        else { return amrex::IntVect{-1}; }
+        if      (field_dir == 0) { return m_ncomp_pc_xx[space_dir]; }
+        else if (field_dir == 1) { return m_ncomp_pc_yy[space_dir]; }
+        else if (field_dir == 2) { return m_ncomp_pc_zz[space_dir]; }
+        else { return -1; }
     }
 
     // This parameter is used for the time-step fraction in the PC for implicit
