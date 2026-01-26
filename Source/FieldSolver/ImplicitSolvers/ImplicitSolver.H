@@ -111,7 +111,7 @@ public:
     }
 
     /**
-     * \brief Return the IntVect number of components for the mass matrices used in
+     * \brief Return the space_dir number of components for the mass matrices used in
      *        the preconditioner for field direction field_dir
      */
     int GetMassMatricesPCnComp (const int field_dir, const int space_dir) const
