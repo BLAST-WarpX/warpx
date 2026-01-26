@@ -84,10 +84,12 @@ gmres.absolute_tolerance = 0.0
 implicit_evolve.use_mass_matrices_jacobian = true
 implicit_evolve.skip_particle_picard_init = true
 implicit_evolve.use_mass_matrices_pc = true
-jacobian.pc_type = "pc_curl_curl_mlmg"
-pc_curl_curl_mlmg.verbose = true
-pc_curl_curl_mlmg.max_iter = 1
-pc_curl_curl_mlmg.relative_tolerance = 1e-4
+implicit_evolve.mass_matrices_pc_width = 1
+jacobian.pc_type = pc_petsc
+pc_petsc.verbose = true
+pc_petsc.type = asm
+pc_petsc.asm_overlap = 4
+pc_petsc.sub_type = lu
 
 particles.max_grid_crossings = 2
 algo.particle_pusher = "higuera"
