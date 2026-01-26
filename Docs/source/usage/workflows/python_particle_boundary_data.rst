@@ -17,10 +17,10 @@ The ``ParticleBoundaryBufferWrapper`` object provides the following methods to a
 .. autoclass:: pywarpx.particle_containers.ParticleBoundaryBufferWrapper
    :members:
 
-This can be used to implement physics at occurs at the boundary (e.g., secondary emission),
+This can be used to implement custom processes that occur at the boundaries (e.g., secondary emission),
 as in the example below.
 
-.. dropdown:: See this function used in a full example
+.. dropdown:: Full example
 
     .. literalinclude:: ../../../../Examples/Tests/secondary_ion_emission/inputs_test_rz_secondary_ion_emission_picmi.py
         :language: python3
