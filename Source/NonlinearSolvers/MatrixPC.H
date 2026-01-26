@@ -623,16 +623,25 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 }
 
                 // Add the mass matrix piece
+                // See Figure B.9 of JCP 491, 112383 (2023) for an illustrative diagram
+                // of the mass matrices (https://doi.org/10.1016/j.jcp.2023.112383).
+                //
+                // The coupling of Jx(i,j,k) to Ex(i+i0,j+j0,k+k0), where i0 ranges from
+                // -MM_width[0] to +MM_ncomp[0], j0 ranges from -MM_width[1] to +MM_width[1], and k0 ranges
+                // from -MM_width[2] to +MM_width[2], is stored as components of m_bcoefs[dir=0] (mass matrices).
+                // Similarly for Jy/Ey (m_bcoefs[dir=1]) and Jz/Ez (m_bcoefs[dir=2]).
+                // The mapping to the components is given by:
+                // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + (MM_comp[0] + MM_comp[1])*(k0 + MM_width[1])
                 if (m_include_mass_matrices) {
 
                     auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);
-                    const int MM_ncomps_tot = (*m_bcoefs)[lev][dir]->nComp();
-                    const int diag_MM_comp = (MM_ncomps_tot - 1)/2;
-                    amrex::GpuArray<int,3> MM_ncomps = {1,1,1};
+                    const int MM_ncomp_tot = (*m_bcoefs)[lev][dir]->nComp();
+                    const int diag_MM_comp = (MM_ncomp_tot - 1)/2;
+                    amrex::GpuArray<int,3> MM_ncomp = {1,1,1};
                     amrex::GpuArray<int,3> MM_width = {0,0,0};
                     for (int space_dir=0; space_dir<AMREX_SPACEDIM; space_dir++) {
-                        MM_ncomps[space_dir] = m_ops->GetMassMatricesPCnComp(dir,space_dir);
-                        MM_width[space_dir] = (MM_ncomps[space_dir] - 1)/2;
+                        MM_ncomp[space_dir] = m_ops->GetMassMatricesPCnComp(dir,space_dir);
+                        MM_width[space_dir] = (MM_ncomp[space_dir] - 1)/2;
                     }
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -656,11 +665,11 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                         // Add off-diagonal terms of the diagonal mass matrices to the PC matrix
                         int mm_comp = 0;
-                        for (int comp2 = 0; comp2 < MM_ncomps[2]; comp2++) {
+                        for (int comp2 = 0; comp2 < MM_ncomp[2]; comp2++) {
                             [[maybe_unused]] const int kk0 = comp2 - MM_width[2];
-                            for (int comp1 = 0; comp1 < MM_ncomps[1]; comp1++) {
+                            for (int comp1 = 0; comp1 < MM_ncomp[1]; comp1++) {
                                 [[maybe_unused]] const int jj0 = comp1 - MM_width[1];
-                                for (int comp0 = 0; comp0 < MM_ncomps[0]; comp0++) {
+                                for (int comp0 = 0; comp0 < MM_ncomp[0]; comp0++) {
                                     const int ii0 = comp0 - MM_width[0]; // ..., -2, -1, 0, 1, 2, ...
                                     const amrex::IntVect iv_shift = IntVect(AMREX_D_DECL(ii0, jj0, kk0));
                                     if (iv_shift == amrex::IntVect(0)) { ++mm_comp; continue; }
