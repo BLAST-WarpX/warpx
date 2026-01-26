@@ -24,54 +24,62 @@ data of individual particles can be accessed or modified as described below.
 Accessing/modifying the underlying particle data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Several ways to access and modify the particle data exist.
-These different methods differ in their user-friendliness, flexibility and performance overhead.
-(For more information, see the `pyamrex documentation <http://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__)
+There are several ways to access and modify the particle data, i.e. the positions (``'x'``, ``'y'``, ``'z'`` in 3D Cartesian geometry),
+normalized momenta (``'ux'``, ``'uy'``, ``'uz'``), the particle weights (``'w'``), and the unique IDs (``'idcpu'``) of each individual particles.
 
-Quantities available
- one of x, y, z, r, theta, id, cpu, weight, ux, uy or uz.
+.. note::
+
+   In geometries other than 3D Cartesian, particle positions are defined by different variables.
+   For example, in RZ geometry, positions are accessed as ``'r'`` and ``'z'`` (with an additional ``'theta'`` attribute),
+   while in RCYLINDER geometry, only ``'r'`` is available (with ``'theta'``), and in RSPHERE geometry, ``'r'`` is available
+   (with ``'theta'`` and ``'phi'``). See :ref:`developers-dimensionality` for a complete table of position attributes
+   available in each geometry.
+
+The different methods below differ in their user-friendliness, flexibility and performance overhead.
+(For more information, see the `pyamrex documentation <http://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__)
 
 .. tab-set::
 
-    .. tab-item:: Pandas-like global access (read-only)
+    .. tab-item:: global access through ``pandas`` DataFrame (read-only)
 
-        Gets all particles, irrespective of MPI ranks and mesh refinement levels
-        Convenient to get all particles rapidly
+        The method ``to_df`` of the ``WarpXParticleContainer`` object returns a
+        `pandas DataFrame <https://pandas.pydata.org/docs/user_guide/dsintro.html#dataframe>`__ containing the particle data.
+        More specifically, the keys of the DataFrame are the particle attributes (e.g., ``'ux'``, ``'w'``, ``'idcpu'``),
+        and the corresponding arrays have one element per particle, and gather the particles of that species across all
+        boxes and tiles (on the current MPI rank) and across all mesh refinement levels.
+
+        .. warning::
+
+            The data in the DataFrame is a copy of the particle data, and therefore modifying it will not modify
+            the actual particle data in the simulation.
+
+        .. note::
+
+            The method ``to_df`` is very convenient because it automatically concatenates all particles across boxes and tiles,
+            and across all mesh refinement levels. However, this implies significant performance overheads, as it incurs copies
+            and CPU-GPU data transfers. This method is thus mostly meant fordebugging and visualization purposes,
+            and not for performance-critical operations.
 
         .. code-block:: python
 
-            # code-specific getter function, e.g.:
-            # pc = sim.get_particles()
-            # Config = sim.extension.Config
+            # Preparation: set up the simulation
+            #   sim = picmi.Simulation(...)
+            #   ...
 
-            # local particles on all levels
-            df = pc.to_df()  # this is a copy!
-            print(df)
+            # Extract the electrons particle species
+            electrons = sim.particles.get("electrons")
 
-            # read
-            print(df["x"])
+            # local particles (returns only particles on the current MPI rank)
+            df = electrons.to_df(local=True)  # this is a copy!
+            print('Available attributes: ', df.columns)
+            print('Number of particles: ', len(df))
 
-            # write (into copy!)
-            df["x"] = 0.30
-            df["y"] = 0.35
-            df["z"] = 0.40
+            # print position x (one element per particle)
+            print('Position x: ', df['x'])
 
-            df["a"] = df["x"] ** 2
-            df["b"] = df["x"] + df["y"]
-            df["c"] = 0.50
-
-            # int attributes
-            # df["i1"] = 12
-            # df["i2"] = 12
-            # ...
-
-            print(df)
-
-        .. warning::
-            Emphasize read-only
-
-        .. note::
-            Performance no good, because of MPI communications, CPU-GPU copies
+            # Warning: because `df` is a copy, modifying it will
+            # not modify the actual particle data
+            df['x'] += 0.1 # This does not modify the actual particle data
 
     .. tab-item:: Explicit loop over boxes
 

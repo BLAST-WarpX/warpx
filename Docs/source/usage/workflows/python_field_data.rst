@@ -180,7 +180,6 @@ These different methods differ in their user-friendliness, flexibility and perfo
                         # For efficiency, we use array operation for speed.
                         Ex_arr[()] = 42.0
 
-
             sim.step(nsteps=100)
 
         For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
