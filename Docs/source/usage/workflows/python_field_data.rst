@@ -145,43 +145,33 @@ These different methods differ in their user-friendliness, flexibility and perfo
             #   sim = picmi.Simulation(...)
             #   ...
 
+            # Extract the Ex field, at level 0 of mesh refinement
+            Ex = sim.fields.get("Efield_fp", dir="x", level=0)
 
-            @callfromafterstep
-            def set_Ex():
-                warpx = sim.extension.warpx
+            # compute on Ex
+            # iterate over mesh-refinement levels
+            for lev in range(warpx.finest_level + 1):
+                # grow (aka guard/ghost/halo) regions
+                ngv = Ex.n_grow_vect
 
-                # data access
-                #   vector field E, component x, on the fine patch of MR level 0
-                Ex = sim.fields.get("Efield_fp", dir=0, level=0)
-                #   scalar field rho, on the fine patch of MR level 0
-                rho_mf = sim.fields.get("rho_fp", level=0)
+                # get every local block of the field
+                for mfi in Ex:
+                    # global index space box, including guards
+                    bx = mfi.tilebox().grow(ngv)
+                    print(bx)  # note: global index space of this block
 
-                # compute on Ex
-                # iterate over mesh-refinement levels
-                for lev in range(warpx.finest_level + 1):
-                    # grow (aka guard/ghost/halo) regions
-                    ngv = Ex.n_grow_vect
+                # numpy/cupy representation of the field data, including
+                # the guard/ghost region
+                Ex_arr = Ex.array(mfi).to_xp()
 
-                    # get every local block of the field
-                    for mfi in Ex:
-                        # global index space box, including guards
-                        bx = mfi.tilebox().grow(ngv)
-                        print(bx)  # note: global index space of this block
+                # notes on indexing in Ex:
+                # - numpy/cupy use locally zero-based indexing
+                # - layout is F_CONTIGUOUS by default, just like AMReX
 
-                        # numpy/cupy representation: non-copying view, including
-                        # the guard/ghost region
-                        Ex_arr = Ex.array(mfi).to_xp()
-
-                        # notes on indexing in Ex:
-                        # - numpy/cupy use locally zero-based indexing
-                        # - layout is F_CONTIGUOUS by default, just like AMReX
-
-                        # notes:
-                        # Only the next lines are the "HOT LOOP" of the computation.
-                        # For efficiency, we use array operation for speed.
-                        Ex_arr[()] = 42.0
-
-            sim.step(nsteps=100)
+                # notes:
+                # Only the next lines are the "HOT LOOP" of the computation.
+                # For efficiency, we use array operation for speed.
+                Ex_arr[()] = 42.0
 
         For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
 

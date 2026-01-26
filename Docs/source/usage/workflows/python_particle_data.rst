@@ -36,7 +36,7 @@ normalized momenta (``'ux'``, ``'uy'``, ``'uz'``), the particle weights (``'w'``
    available in each geometry.
 
 The different methods below differ in their user-friendliness, flexibility and performance overhead.
-(For more information, see the `pyamrex documentation <http://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__)
+(For more information, see the `pyamrex documentation <http://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__.)
 
 .. tab-set::
 
@@ -81,51 +81,46 @@ The different methods below differ in their user-friendliness, flexibility and p
             # not modify the actual particle data
             df['x'] += 0.1 # This does not modify the actual particle data
 
-    .. tab-item:: Explicit loop over boxes
+    .. tab-item:: Explicit loop over boxes/tiles
 
-        Local to mesh refinement level and box
-        High performance
+        This method provides similar capabilities to the pandas DataFrame approach, but adapts to
+        the data structure of the particles in WarpX (i.e. particles are organized per box/tile and
+        mesh refinement level). Unlike the pandas DataFrame approach, this avoids unneeded copies
+        and CPU-GPU data transfers. As a result, this method offers significantly higher performance,
+        especially for large-scale parallel simulations and GPU-accelerated runs. The data is accessed
+        by explicitly looping over mesh-refinement levels and individual grid blocks (boxes), giving
+        direct access to the underlying particle data arrays for each local block.
 
         .. code-block:: python
 
-            # code-specific getter function, e.g.:
-            # pc = sim.get_particles()
-            # Config = sim.extension.Config
+            # Preparation: set up the simulation
+            #   sim = picmi.Simulation(...)
+            #   xp, _ = load_cupy()
+            #   ...
 
-            # iterate over particles on level 0
-            for pti in pc.iterator(level=0):
-                # print all particle ids in the tile
-                print("idcpu =", pti["idcpu"])
+            # Extract the electrons particle species
+            electrons = sim.particles.get("electrons")
 
-                x = pti["x"]  # this is automatically a cupy or numpy
-                y = pti["y"]  #   array, depending on Config.have_gpu
+            # iterate over boxes/tiles on level 0
+            for pti in electrons.iterator(level=0):
 
-                # write to all particles in the chunk
-                # note: careful, if you change particle positions, you might need to
-                #       redistribute particles before continuing the simulation step
-                pti["x"][:] = 0.30
-                pti["y"][:] = 0.35
-                pti["z"][:] = 0.40
+                # print position x (one element per particle)
+                print('Position x: ', pti['x'])
 
-                pti["a"][:] = x[:] ** 2
-                pti["b"][:] = x[:] + y[:]
-                pti["c"][:] = 0.50
-                # ...
+                # increment position by a random value
+                # using numpy/cupy syntax
+                pti["x"][:] += xp.random.random( len(pti['x'][:]) )
 
-                # int attributes
-                pti["i1"][:] = 12
-                pti["i2"][:] = 13
-
-        Discuss cupy/numpy
+        In the above example, ``xp`` represents either the ``numpy`` or ``cupy`` package.
+        See :ref:`usage-python-portable` for more details on writing portable Python code.
 
 Adding new particles
 ^^^^^^^^^^^^^^^^^^^^
 
-New particles can be added by using the method ``add_particles`` of the ``WarpXParticleContainer`` object.
-This method takes the following arguments:
+New particles can be added to a given species by using the method ``add_particles`` of the ``WarpXParticleContainer`` object,
+using the following syntax:
 
-
-The method returns the number of added particles.
+.. autofunction:: pywarpx.extensions.WarpXParticleContainer.add_particles
 
 .. dropdown:: See this function used in a full example
 
