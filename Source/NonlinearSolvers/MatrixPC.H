@@ -631,7 +631,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 // from -MM_width[2] to +MM_width[2], is stored as components of m_bcoefs[dir=0] (mass matrices).
                 // Similarly for Jy/Ey (m_bcoefs[dir=1]) and Jz/Ez (m_bcoefs[dir=2]).
                 // The mapping to the components is given by:
-                // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + (MM_comp[0] + MM_comp[1])*(k0 + MM_width[1])
+                // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + (MM_comp[0] + MM_comp[1])*(k0 + MM_width[2])
                 if (m_include_mass_matrices) {
 
                     auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);
