@@ -48,7 +48,7 @@ These different methods differ in their user-friendliness, flexibility and perfo
         .. dropdown:: See some of these methods used in a full example
 
             .. literalinclude:: ../../../../Examples/Physics_applications/spacecraft_charging/inputs_test_rz_spacecraft_charging_picmi.py
-                :language: python3
+                :language: python
                 :caption: You can copy this file from ``Examples/Physics_applications/spacecraft_charging/inputs_test_rz_secondary_ion_emission_picmi.py``.
 
     .. tab-item:: Numpy-like global indexing
@@ -135,7 +135,7 @@ These different methods differ in their user-friendliness, flexibility and perfo
         The example below accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
         This shows how to loop over levels and grid blocks.
 
-        .. code-block:: python3
+        .. code-block:: python
 
             from pywarpx import picmi
             from pywarpx.callbacks import callfromafterstep
@@ -213,5 +213,5 @@ In the example below, a new ``MultiFab`` is created with the same properties as 
 .. dropdown:: See this function used in a full example
 
     .. literalinclude:: ../../../../Examples/Physics_applications/spacecraft_charging/inputs_test_rz_spacecraft_charging_picmi.py
-        :language: python3
+        :language: python
         :caption: You can copy this file from ``Examples/Physics_applications/spacecraft_charging/inputs_test_rz_secondary_ion_emission_picmi.py``.
