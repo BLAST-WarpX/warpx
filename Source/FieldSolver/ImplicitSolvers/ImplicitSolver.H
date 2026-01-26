@@ -114,7 +114,7 @@ public:
      * \brief Return the IntVect number of components for the mass matrices used in
      *        the preconditioner for field direction field_dir
      */
-    amrex::IntVect GetMassMatricesPCNcomp (const int field_dir) const
+    amrex::IntVect GetMassMatricesPCnComp (const int field_dir) const
     {
         if      (field_dir == 0) { return m_ncomp_pc_xx; }
         else if (field_dir == 1) { return m_ncomp_pc_yy; }

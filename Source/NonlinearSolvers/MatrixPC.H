@@ -631,7 +631,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     amrex::GpuArray<int,3> MM_ncomps = {1,1,1};
                     amrex::GpuArray<int,3> MM_width = {0,0,0};
                     for (int space_dir=0; space_dir<AMREX_SPACEDIM; space_dir++) {
-                        MM_ncomps[space_dir] = m_ops->GetMassMatricesPCNcomp(dir)[space_dir];
+                        MM_ncomps[space_dir] = m_ops->GetMassMatricesPCnComp(dir)[space_dir];
                         MM_width[space_dir] = (MM_ncomps[space_dir] - 1)/2;
                     }
 
