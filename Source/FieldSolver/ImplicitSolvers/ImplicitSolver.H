@@ -226,13 +226,7 @@ protected:
      *        used for the preconditioner
      */
     amrex::IntVect m_ncomp_pc_xx = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_xy = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_xz = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_yx = amrex::IntVect{0};
     amrex::IntVect m_ncomp_pc_yy = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_yz = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_zx = amrex::IntVect{0};
-    amrex::IntVect m_ncomp_pc_zy = amrex::IntVect{0};
     amrex::IntVect m_ncomp_pc_zz = amrex::IntVect{0};
 
     /**

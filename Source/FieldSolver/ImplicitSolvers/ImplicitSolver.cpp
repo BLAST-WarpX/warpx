@@ -950,13 +950,13 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
                 amrex::Print() << "    mass matrices pc width:  " << m_mass_matrices_pc_width << "\n";
             }
             amrex::Print() << "    ncomp_xx:  " << m_ncomp_xx << ";  ncomp_pc_xx:  " << m_ncomp_pc_xx << "\n";
-            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << ";  ncomp_pc_xy:  " << m_ncomp_pc_xy << "\n";
-            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << ";  ncomp_pc_xz:  " << m_ncomp_pc_xz << "\n";
-            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << ";  ncomp_pc_yx:  " << m_ncomp_pc_yx << "\n";
+            amrex::Print() << "    ncomp_xy:  " << m_ncomp_xy << ";  ncomp_pc_xy:  " << amrex::IntVect(0) << "\n";
+            amrex::Print() << "    ncomp_xz:  " << m_ncomp_xz << ";  ncomp_pc_xz:  " << amrex::IntVect(0) << "\n";
+            amrex::Print() << "    ncomp_yx:  " << m_ncomp_yx << ";  ncomp_pc_yx:  " << amrex::IntVect(0) << "\n";
             amrex::Print() << "    ncomp_yy:  " << m_ncomp_yy << ";  ncomp_pc_yy:  " << m_ncomp_pc_yy << "\n";
-            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << ";  ncomp_pc_yz:  " << m_ncomp_pc_yz << "\n";
-            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << ";  ncomp_pc_zx:  " << m_ncomp_pc_zx << "\n";
-            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << ";  ncomp_pc_zy:  " << m_ncomp_pc_zy << "\n";
+            amrex::Print() << "    ncomp_yz:  " << m_ncomp_yz << ";  ncomp_pc_yz:  " << amrex::IntVect(0) << "\n";
+            amrex::Print() << "    ncomp_zx:  " << m_ncomp_zx << ";  ncomp_pc_zx:  " << amrex::IntVect(0) << "\n";
+            amrex::Print() << "    ncomp_zy:  " << m_ncomp_zy << ";  ncomp_pc_zy:  " << amrex::IntVect(0) << "\n";
             amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << ";  ncomp_pc_zz:  " << m_ncomp_pc_zz << "\n";
         }
     }
