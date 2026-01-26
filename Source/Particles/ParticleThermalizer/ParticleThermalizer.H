@@ -16,7 +16,6 @@ class WarpXParticleContainer;
 
 class ParticleThermalizer {
 public:
-    enum class Normal { X = 0, Y, Z };
 
     // Construct and read parameters from inputs under the `particle_thermalizer` block.
     ParticleThermalizer ();
@@ -34,11 +33,25 @@ protected:
 
 private:
     bool m_defined;
-    Normal m_normal;
+
+    // The normal direction of the thermalizer ('x', 'y', or 'z')
+    std::string m_normal_str;
+
+    // The normal direction as an integer USING THE AMREX CONVENTION (0, 1, or 2)
+    // in 1D, "z" is 0
+    // in 2D, "x" is 0, "z" is 1
+    // in 3D, "x" is 0, "y" is 1, "z" is 2
+    int m_normal;
+
+    // The start and end positions of the thermalizer region along the normal direction
     amrex::Real m_start;
     amrex::Real m_end;
+
+    // The momentum threshold above which particles are thermalized in normalized units (i.e. u = gamma*beta)
     amrex::Real m_momentum_threshold;
-    amrex::Real m_temperature;
+
+    // dimensionless temperature theta = kB*T/(m*c^2) used to sample thermal momentum distribution
+    amrex::Real m_theta;
 };
 
 #endif // WARPX_PARTICLETHERMALIZER_H

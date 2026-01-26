@@ -55,7 +55,7 @@
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
  *
  *  x, y, z  : position components
- *  ux uy uz : normalized momentum components
+ *  ux uy uz : momentum components, stored as proper velocity, i.e. gamma*v
  *  w        : weight
  *  theta    : azimuthal angle
  *  phi      : polar angle, relative to the x-y plane
