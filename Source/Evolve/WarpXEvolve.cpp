@@ -112,9 +112,6 @@ void
 WarpX::SynchronizeVelocityWithPosition () {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
-    amrex::Print() << "                         SynchronizeVelocityWithPosition() with 0.5_rt*dt[lev] \n";
-
-
     if (!m_is_synchronized) {
         // This assumes that the particle boundary conditions have been checked
         // so that the field gather in PushP will be correct.
@@ -526,8 +523,8 @@ WarpX::OneStep_nosub (
         mypc->doCollisions(a_step, a_cur_time, a_dt);
         ExecutePythonCallback("aftercollisions");
 
-        // push particles (half position)
 
+        // push particles (half position)
         PushParticlesandDeposit(
             a_cur_time,
             /*skip_deposition=*/false,
