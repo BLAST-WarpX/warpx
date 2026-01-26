@@ -95,7 +95,7 @@ jobs:
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build_sp -j 4
+        cmake --build build_sp -j 3
 
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools[core] wheel
