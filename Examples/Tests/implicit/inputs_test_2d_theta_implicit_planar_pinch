@@ -69,6 +69,7 @@ implicit_evolve.particle_tolerance = 1.0e-12
 
 implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
+newton.linear_solver = petsc_ksp
 newton.max_iterations = 100
 newton.relative_tolerance = 1.0e-10
 newton.absolute_tolerance = 0.0
