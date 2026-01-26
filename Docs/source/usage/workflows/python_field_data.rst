@@ -4,7 +4,7 @@ Accessing fields data
 Selecting a given field
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-The simulation's fields are accessed through the ``sim.field`` attribute, where ``sim`` is obtained as shown
+The simulation's fields are accessed through the ``sim.fields`` attribute, where ``sim`` is obtained as shown
 in the :ref:`usage-python-extend-run-simulation` section. Specific fields (e.g. electric field, charge density, etc.)
 are selected with the ``sim.fields.get`` method, as shown in the example below.
 
