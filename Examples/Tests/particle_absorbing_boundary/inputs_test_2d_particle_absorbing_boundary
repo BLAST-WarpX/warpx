@@ -4,11 +4,11 @@
 
 # We only run 100 steps for tests
 # Disable `max_step` below to run until the physical `stop_time`.
-# max_step = 100
+max_step = 100
 stop_time = 5.0e-12            # [s]
 
-amr.n_cell = 128 29056
-
+#amr.n_cell = 128 29056
+amr.n_cell = 128 8192
 
 # simulation box, no MR
 amr.max_level = 0

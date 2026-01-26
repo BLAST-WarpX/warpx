@@ -27,8 +27,8 @@ public:
     // Apply the thermalizer to particles in the provided MultiParticleContainer.
     void applyThermalizer (MultiParticleContainer &mpc);
 
-protected:
     // Per-species overload; operates on a single WarpXParticleContainer.
+    // Should be protected, but can't be because it has an extended __device__ lambda
     void applyThermalizer (WarpXParticleContainer &pcont);
 
 private:
