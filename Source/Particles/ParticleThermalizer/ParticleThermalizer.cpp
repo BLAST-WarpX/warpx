@@ -97,7 +97,7 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
     for (int lev = 0; lev < pc.numLevels(); ++lev) {
         const auto& geom = pc.Geom(lev);
         const auto& dx = geom.CellSizeArray();
-        const auto& problo = geom.ProbLoArray(); 
+        const auto& problo = geom.ProbLoArray();
         int dir = static_cast<int>(m_normal);
 
         // TODO - Handle non-3D
@@ -110,7 +110,7 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
             // early exit for tiles that do not overlap the thermalizer region
             const amrex::Box& tile_box = pti.tilebox();
             const amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, lev);
-            
+
             amrex::RealBox overlap_realbox;
             amrex::Box overlap_box;
             amrex::IntVect shifted;
