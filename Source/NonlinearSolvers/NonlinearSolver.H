@@ -1,6 +1,8 @@
 #ifndef WARPX_NONLINEAR_SOLVER_H_
 #define WARPX_NONLINEAR_SOLVER_H_
 
+#include "PreconditionerLibrary.H"
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
 
@@ -73,9 +75,9 @@ public:
     virtual void GetSolverParams (amrex::Real&, amrex::Real&, int&) = 0;
 
     /**
-     * \brief Whether a preconditioner is used by the nonlinear solver.
+     * \brief Return preconditioner type.
      */
-    virtual bool UsePreconditioner () { return m_usePC; }
+    virtual PreconditionerType GetPreconditionerType () const { return PreconditionerType::none; }
 
     /**
      * \brief Allow caller to dynamically change the verbosity flag. For

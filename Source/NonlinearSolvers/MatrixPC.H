@@ -398,19 +398,25 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
         for (int dir = 0; dir < 3; dir++) {
 
+            const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
+
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 auto bx = mfi.tilebox();
+
+                // BC mask values for in-plane components of curl curl E operator for 2D
+                auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
+
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
 
 #if defined(WARPX_DIM_RCYLINDER)
-                amrex::ignore_unused(dxi);
+                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
-                amrex::ignore_unused(dxi);
+                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RSPHERE");
 #elif defined(WARPX_DIM_RZ)
-                amrex::ignore_unused(dxi);
+                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
 #elif defined(WARPX_DIM_XZ)
                 int tdir = -1;
@@ -456,7 +462,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         if (dir != 2) {
                             {
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
-                                amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0];
+                                amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -465,7 +471,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = dof_arr(i-1,j,k,1);
-                                amrex::Real val = -alpha * dxi[0]*dxi[0];
+                                amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -474,7 +480,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = dof_arr(i+1,j,k,1);
-                                amrex::Real val = -alpha * dxi[0]*dxi[0];
+                                amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -487,11 +493,12 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             int cidx_g_rhs = dof_arr(i,j,k,1);
                             amrex::Real val = 0.0;
                             if (dir == 0) {
-                                val += 2.0_rt*alpha * dxi[1]*dxi[1];
+                                val += 2.0_rt*alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 2) {
-                                val += 2.0_rt*alpha * dxi[0]*dxi[0];
+                                val += 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                             } else {
-                                val += 2.0_rt*alpha *(dxi[0]*dxi[0] + dxi[1]*dxi[1]);
+                                val += 2.0_rt*alpha * ( dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0)
+                                                      + dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,2) );
                             }
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -502,7 +509,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         if ((dir == 0) || (dir == 2)) {
                             {
                                 int cidx_g_rhs = (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
-                                amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
+                                amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -511,7 +518,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
-                                amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0];
+                                amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -523,7 +530,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
                             {
                                 int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
-                                amrex::Real val = alpha * dxi[0] * dxi[1];
+                                amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -532,7 +539,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = dof_tdir_arr(i,j,k,1);
-                                amrex::Real val = -alpha * dxi[0] * dxi[1];
+                                amrex::Real val = -alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -541,7 +548,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
-                                amrex::Real val = -alpha * dxi[0] * dxi[1];
+                                amrex::Real val = -alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -550,7 +557,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                             {
                                 int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
-                                amrex::Real val = alpha * dxi[0] * dxi[1];
+                                amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -561,7 +568,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             for (int jdir = 0; jdir <= 2; jdir+=2) {
                                 {
                                     int cidx_g_rhs = (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
-                                    amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
+                                    amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                             &c_indices_g_ptr[ridx_l*nnz_max],
                                                                             &a_ij_ptr[ridx_l*nnz_max],
@@ -570,7 +577,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 }
                                 {
                                     int cidx_g_rhs = (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
-                                    amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1];
+                                    amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                             &c_indices_g_ptr[ridx_l*nnz_max],
                                                                             &a_ij_ptr[ridx_l*nnz_max],
@@ -584,7 +591,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         amrex::IntVect ic(AMREX_D_DECL(i,j,k));
                         {
                             int cidx_g_rhs = dof_arrays[0](ic,1);
-                            amrex::Real val = 2.0_rt * alpha * (dxi[dvec[1]]*dxi[dvec[1]] + dxi[dvec[2]]*dxi[dvec[2]]);
+                            amrex::Real val = 2.0_rt * alpha * ( dxi[dvec[1]]*dxi[dvec[1]] * BC_mask_Edir_arr(i,j,k,0)
+                                                               + dxi[dvec[2]]*dxi[dvec[2]] * BC_mask_Edir_arr(i,j,k,3) );
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
@@ -595,7 +603,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             for (int tdir = 1; tdir <= 2; tdir++) {
                                 auto iv = ic; iv[dvec[tdir]] += ctr;
                                 int cidx_g_rhs = dof_arrays[0](iv,1);
-                                amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]];
+                                const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
+                                amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -609,7 +618,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                     auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
                                     auto sign = std::copysign(1,ctr_dir) * std::copysign(1,ctr_tdir);
                                     int cidx_g_rhs = dof_arrays[tdir](iv,1);
-                                    amrex::Real val = amrex::Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]];
+                                    const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
+                                    amrex::Real val = amrex::Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+2);
                                     auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                             &c_indices_g_ptr[ridx_l*nnz_max],
                                                                             &a_ij_ptr[ridx_l*nnz_max],
@@ -639,7 +649,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                         {
                             int cidx_g_lhs = dof_arr(i,j,k,1);
-                            amrex::Real val = sigma_ii_arr(i,j,k,0) - 1.0;
+                            amrex::Real val = sigma_ii_arr(i,j,k,0);
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
