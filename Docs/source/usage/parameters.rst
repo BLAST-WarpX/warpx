@@ -927,8 +927,8 @@ Particle initialization
 * ``<species_name>.species_type`` (`string`) optional (default `unspecified`)
     Type of physical species.
     Currently, the accepted species are
-    ``"electron"``, ``"positron"``, ``"muon"``, ``"antimuon"``, ``"photon"``, ``"neutron"``, ``"proton"`` ,
-    ``"hydrogen1"``, ``"hydrogen2"`` (a.k.a. ``"deuterium"``), ``"hydrogen3"`` (a.k.a. ``"tritium"``),
+    ``"electron"``, ``"positron"``, ``"muon"``, ``"antimuon"``, ``"photon"``, ``"neutron"``,
+    ``"hydrogen1"`` (a.k.a. ``"proton"``), ``"hydrogen2"`` (a.k.a. ``"deuterium"``), ``"hydrogen3"`` (a.k.a. ``"tritium"``),
     ``"helium"``, ``"helium3"``, ``"helium4"`` (a.k.a. ``"alpha"``),
     ``"lithium"``, ``"lithium6"``, ``"lithium7"``, ``"beryllium"``, ``"beryllium9"``, ``"boron"``, ``"boron10"``, ``"boron11"``,
     ``"carbon"``, ``"carbon12"``, ``"carbon13"``, ``"carbon14"``, ``"nitrogen"``, ``"nitrogen14"``, ``"nitrogen15"``,
