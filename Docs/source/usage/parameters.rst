@@ -41,6 +41,7 @@ WarpX provides a few pre-defined constants that can be used for any input parame
 ``mu0``      vacuum permeability
 ``clight``   speed of light
 ``kb``       Boltzmann's constant (J/K)
+``hbar``     Reduced Planck constant (J*s)
 ``pi``       math constant pi
 ============ ===================
 
