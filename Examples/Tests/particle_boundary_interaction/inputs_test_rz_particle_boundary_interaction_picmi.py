@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @Eya Dammak supervised by @Remi Lehe, 2024
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
