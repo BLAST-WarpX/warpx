@@ -91,7 +91,7 @@ python -m pip install --upgrade numpy
 python -m pip install --upgrade scipy
 
 # Extra packages for python ######################################################################
-# 
+#
 python -m pip install --upgrade pandas
 CC="mpicc -shared" CXX="mpicxx -shared" python -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py -v
 # This installs openpmd-api with MPI support
