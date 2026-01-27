@@ -934,10 +934,12 @@ Particle initialization
     ``"carbon"``, ``"carbon12"``, ``"carbon13"``, ``"carbon14"``, ``"nitrogen"``, ``"nitrogen14"``, ``"nitrogen15"``,
     ``"oxygen"``, ``"oxygen16"``, ``"oxygen17"``, ``"oxygen18"``, ``"fluorine"``, ``"fluorine19"``, ``"neon"``, ``"neon20"``,
     ``"neon21"``, ``"neon22"``, ``"aluminium"``, ``"argon"``, ``"copper"``, ``"xenon"`` and ``"gold"``.
-    When only the name of an element is specified, the mass is a weighted average of the masses
-    of the stable isotopes. For all the elements with ``Z < 11`` we provide
-    also the stable isotopes as an option for ``species_type`` (e.g., ``"helium3"`` and ``"helium4"``).
-    Either ``species_type`` or both ``mass`` and ``charge`` have to be specified.
+    When an atomic element is specified (e.g. ``oxygen``), the species will be assumed to be fully ionized
+    (e.g., with charge :math:`+8 e` for ``oxygen``). When only the name of an element is specified
+    (e.g. ``oxygen`` instead of ``oxygen16``), the mass is a weighted average of the masses
+    of the stable isotopes. When ``species_type`` is specified, ``mass`` and ``charge`` do not need to be specified.
+    In that case, the mass will be taken from pre-defined values `here <https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=&ascii=ascii2&isotype=some>`__.
+    If ``mass`` and/or ``charge`` are nonetheless specified, they will override the pre-defined values for that ``species_type``.
 
 * ``<species_name>.charge`` (`float`) optional (default `NaN`)
     The charge of one `physical` particle of this species.
