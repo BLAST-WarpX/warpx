@@ -627,7 +627,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 // of the mass matrices (https://doi.org/10.1016/j.jcp.2023.112383).
                 //
                 // The coupling of Jx(i,j,k) to Ex(i+i0,j+j0,k+k0), where i0 ranges from
-                // -MM_width[0] to +MM_ncomp[0], j0 ranges from -MM_width[1] to +MM_width[1], and k0 ranges
+                // -MM_width[0] to +MM_width[0], j0 ranges from -MM_width[1] to +MM_width[1], and k0 ranges
                 // from -MM_width[2] to +MM_width[2], is stored as components of m_bcoefs[dir=0] (mass matrices).
                 // Similarly for Jy/Ey (m_bcoefs[dir=1]) and Jz/Ez (m_bcoefs[dir=2]).
                 // The mapping to the components is given by:
