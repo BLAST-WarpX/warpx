@@ -32,12 +32,12 @@ namespace {
         {"photon"     , PhysicalSpecies::photon},
         {"neutron"    , PhysicalSpecies::neutron},
         {"hydrogen"   , PhysicalSpecies::hydrogen},
-        {"hydrogen1"  , PhysicalSpecies::hydrogen1},
+        {"hydrogen1"  , PhysicalSpecies::proton},
         {"hydrogen2"  , PhysicalSpecies::hydrogen2},
         {"deuterium"  , PhysicalSpecies::hydrogen2},
         {"hydrogen3"  , PhysicalSpecies::hydrogen3},
         {"tritium"    , PhysicalSpecies::hydrogen3},
-        {"proton"     , PhysicalSpecies::hydrogen1},
+        {"proton"     , PhysicalSpecies::proton},
         {"helium"     , PhysicalSpecies::helium},
         {"helium3"    , PhysicalSpecies::helium3},
         {"helium4"    , PhysicalSpecies::helium4},
@@ -83,7 +83,7 @@ namespace {
         {PhysicalSpecies::photon     , "photon"},
         {PhysicalSpecies::neutron    , "neutron"},
         {PhysicalSpecies::hydrogen   , "hydrogen"},
-        {PhysicalSpecies::hydrogen1  , "hydrogen1"},
+        {PhysicalSpecies::proton     , "proton"},
         {PhysicalSpecies::hydrogen2  , "hydrogen2"},
         {PhysicalSpecies::hydrogen3  , "hydrogen3"},
         {PhysicalSpecies::helium     , "helium"},
@@ -150,11 +150,11 @@ namespace {
         {PhysicalSpecies::neutron, Properties{
             amrex::Real(1.0013784193052508) * PhysConst::m_p,
             amrex::Real(0.0)}},
+        {PhysicalSpecies::proton, Properties{
+            PhysConst::m_p,
+            PhysConst::q_e}},
         {PhysicalSpecies::hydrogen, Properties{
              amrex::Real(1.00797) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
-             amrex::Real(1) * PhysConst::q_e}},
-        {PhysicalSpecies::hydrogen1, Properties{
-             amrex::Real(1.00782503223) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},
         {PhysicalSpecies::hydrogen2, Properties{
              amrex::Real(2.01410177812) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
