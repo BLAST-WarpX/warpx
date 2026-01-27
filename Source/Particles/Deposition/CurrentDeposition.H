@@ -295,6 +295,9 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param m_collisions_split_position_push Whether the position push is split for collision handling.
+ *                                         If true, the deposition is performed in two half-steps (dt/2) with Q/2 each to avoid double counting.
+ *                                         If false, a standard full-step deposition over dt is performed.
  */
 template <int depos_order>
 void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -674,6 +677,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
  * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ * \param m_collisions_split_position_push Whether the position push is split for collision handling.
+ *                                         If true, the deposition is performed in two half-steps (dt/2) with Q/2 each to avoid double counting.
+ *                                         If false, a standard full-step deposition over dt is performed.
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -2188,6 +2194,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
+* \param m_collisions_split_position_push Whether the position push is split for collision handling.
+ *                                         If true, the deposition is performed in two half-steps (dt/2) with Q/2 each to avoid double counting.
+ *                                         If false, a standard full-step deposition over dt is performed.
  */
 template <int depos_order>
 void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetPosition,
@@ -2386,6 +2395,9 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
  * \param[in] lo           Dimension-agnostic lower bounds of index domain
  * \param[in] q            Species charge
  * \param[in] n_rz_azimuthal_modes Number of azimuthal modes in RZ geometry
+ * \param[in] m_collisions_split_position_push Whether the position push is split for collision handling.
+ *                                         If true, the deposition is performed in two half-steps (dt/2) with Q/2 each to avoid double counting.
+ *                                         If false, a standard full-step deposition over dt is performed.
  */
 template <int depos_order>
 void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
