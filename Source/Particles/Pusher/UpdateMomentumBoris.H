@@ -17,12 +17,17 @@ void UpdateMomentumBoris(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt )
+    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type)
 {
     using namespace amrex::literals;
 
     const amrex::ParticleReal econst = 0.5_prt*q*dt/m;
-
+    if (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::Full) {
+        // First half-push for E
+        ux += econst*Ex;
+        uy += econst*Ey;
+        uz += econst*Ez;
+    }
     // First half-push for E
     ux += econst*Ex;
     uy += econst*Ey;
@@ -46,10 +51,13 @@ void UpdateMomentumBoris(
     ux += uy_p*sz - uz_p*sy;
     uy += uz_p*sx - ux_p*sz;
     uz += ux_p*sy - uy_p*sx;
+
+    if (momentum_push_type == MomentumPushType::SecondHalf || momentum_push_type == MomentumPushType::Full) {
     // Second half-push for E
     ux += econst*Ex;
     uy += econst*Ey;
     uz += econst*Ez;
+    }
 }
 
 #endif // WARPX_PARTICLES_PUSHER_UPDATEMOMENTUM_BORIS_H_

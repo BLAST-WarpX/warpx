@@ -1123,7 +1123,8 @@ PhysicalParticleContainer::SplitParticles (int lev)
 void
 PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                  const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                                  const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                  MomentumPushType momentum_push_type)
 {
     WARPX_PROFILE("PhysicalParticleContainer::PushP()");
 
@@ -1240,19 +1241,19 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                     if (ion_lev) { qp *= ion_lev[ip]; }
                     UpdateMomentumBorisWithRadiationReaction(ux[ip], uy[ip], uz[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, mass, dt);
+                                                             Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     amrex::ParticleReal qp = q;
                     if (ion_lev) { qp *= ion_lev[ip]; }
                     UpdateMomentumBoris( ux[ip], uy[ip], uz[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, mass, dt);
+                                         Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     amrex::ParticleReal qp = q;
                     if (ion_lev){ qp *= ion_lev[ip]; }
                     UpdateMomentumVay( ux[ip], uy[ip], uz[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, mass, dt);
+                                       Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     amrex::ParticleReal qp = q;
                     if (ion_lev){ qp *= ion_lev[ip]; }
@@ -1483,6 +1484,11 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             copyAttribs(ip);
         }
 
+        amrex::Real position_dt = dt;
+        if ( collisions_split_position_push && (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf)) {
+            position_dt *= 0.5_rt;
+        }
+
 #ifdef WARPX_QED
         if (momentum_push_type != MomentumPushType::None) {
             if (!do_sync) {
@@ -1491,7 +1497,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
-                                          dt);
+                                          position_dt, momentum_push_type);
             } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -1499,7 +1505,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
-                                              dt);
+                                              position_dt, momentum_push_type);
                 }
             }
         }
@@ -1509,7 +1515,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt);
+                                      position_dt, momentum_push_type);
         }
 #endif
         if (collisions_split_position_push) {
@@ -1520,21 +1526,15 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                 uz_avg[ip] = uz[ip];
             }
             else { // The momentum was updated during collisions
-                ux_avg[ip] += ux[ip];
-                uy_avg[ip] += uy[ip];
-                uz_avg[ip] += uz[ip];
-                ux_avg[ip] *= 0.5_rt;
-                uy_avg[ip] *= 0.5_rt;
-                uz_avg[ip] *= 0.5_rt;
+                ux_avg[ip] = ux[ip];
+                uy_avg[ip] = uy[ip];
+                uz_avg[ip] = uz[ip];
             }
         }
-
-        amrex::Real position_dt = dt;
-        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
-            position_dt *= 0.5_rt;
+        if (momentum_push_type == MomentumPushType::SecondHalf) {
+            UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
+            setPosition(ip, xp, yp, zp);
         }
-        UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], position_dt, mass);
-        setPosition(ip, xp, yp, zp);
 
 #ifdef WARPX_QED
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;

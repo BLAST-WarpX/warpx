@@ -22,7 +22,7 @@ void UpdateMomentumBorisWithRadiationReaction(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt )
+    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type)
 {
     using namespace amrex::literals;
 
@@ -39,7 +39,7 @@ void UpdateMomentumBorisWithRadiationReaction(
         ux, uy, uz,
         Ex, Ey, Ez,
         Bx, By, Bz,
-        q, m, dt );
+        q, m, dt, momentum_push_type);
 
     //Estimation of the normalized momentum at intermediate (integer) time
     const amrex::ParticleReal ux_n = (ux+ux_old)*0.5_prt;

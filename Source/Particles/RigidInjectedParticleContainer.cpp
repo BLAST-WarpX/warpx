@@ -315,7 +315,8 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
 void
 RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                       MomentumPushType momentum_push_type)
 {
     WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
 
@@ -441,15 +442,15 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 if (do_crr) {
                     UpdateMomentumBorisWithRadiationReaction(uxpp[ip], uypp[ip], uzpp[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, mass, dt);
+                                                             Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     UpdateMomentumBoris( uxpp[ip], uypp[ip], uzpp[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, mass, dt);
+                                         Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     UpdateMomentumVay( uxpp[ip], uypp[ip], uzpp[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, mass, dt);
+                                       Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( uxpp[ip], uypp[ip], uzpp[ip],
                                                Exp, Eyp, Ezp, Bxp,

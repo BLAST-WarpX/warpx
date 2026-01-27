@@ -54,7 +54,8 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
 #ifdef WARPX_QED
                             const amrex::Real t_chi_max,
 #endif
-                            const amrex::Real dt)
+                            const amrex::Real dt,
+                            MomentumPushType momentum_push_type)
 {
     amrex::ParticleReal qp = a_q;
     qp *= ion_lev;
@@ -69,12 +70,12 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
             if (chi < t_chi_max) {
                 UpdateMomentumBorisWithRadiationReaction(ux, uy, uz,
                                                          Ex, Ey, Ez, Bx,
-                                                         By, Bz, qp, m, dt);
+                                                         By, Bz, qp, m, dt, momentum_push_type);
             }
             else {
                 UpdateMomentumBoris( ux, uy, uz,
                                      Ex, Ey, Ez, Bx,
-                                     By, Bz, qp, m, dt);
+                                     By, Bz, qp, m, dt, momentum_push_type);
             }
         } else
 #endif
@@ -82,16 +83,16 @@ void doParticleMomentumPush(amrex::ParticleReal& ux,
 
             UpdateMomentumBorisWithRadiationReaction(ux, uy, uz,
                                                      Ex, Ey, Ez, Bx,
-                                                     By, Bz, qp, m, dt);
+                                                     By, Bz, qp, m, dt, momentum_push_type);
         }
     } else if (pusher_algo == ParticlePusherAlgo::Boris) {
         UpdateMomentumBoris( ux, uy, uz,
                              Ex, Ey, Ez, Bx,
-                             By, Bz, qp, m, dt);
+                             By, Bz, qp, m, dt, momentum_push_type);
     } else if (pusher_algo == ParticlePusherAlgo::Vay) {
         UpdateMomentumVay( ux, uy, uz,
                            Ex, Ey, Ez, Bx,
-                           By, Bz, qp, m, dt);
+                           By, Bz, qp, m, dt, momentum_push_type);
     } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
         UpdateMomentumHigueraCary( ux, uy, uz,
                                    Ex, Ey, Ez, Bx,

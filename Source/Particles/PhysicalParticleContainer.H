@@ -160,7 +160,8 @@ public:
                          amrex::Real dt,
                          long & num_unconverged_particles,
                          amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
 
     void ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                   ablastr::fields::MultiFabRegister& fields,
@@ -181,7 +182,8 @@ public:
                                   bool skip_deposition,
                                   long num_unconverged_particles,
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -189,7 +191,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
