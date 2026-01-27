@@ -403,12 +403,9 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::FirstHalf,
-                    MomentumPushType::Full
+                    PositionPushType::None,
+                    MomentumPushType::FirstHalf
                 );
-
-                // communicate particle data
-                mypc->Redistribute();
 
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
@@ -419,8 +416,8 @@ void WarpX::OneStep (
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::SecondHalf,
-                    MomentumPushType::None
+                    PositionPushType::Full,
+                    MomentumPushType::SecondHalf
                 );
             }
             // with collisions placed before the position and momentum push, or without collisions
@@ -510,13 +507,9 @@ WarpX::OneStep_nosub (
         PushParticlesandDeposit(
             a_cur_time,
             /*skip_deposition=*/true,
-            PositionPushType::FirstHalf,
-            MomentumPushType::Full
+            PositionPushType::None,
+            MomentumPushType::FirstHalf
         );
-
-        // perform essential particle house keeping at the boundaries
-        // (inject, communicate, scrape, sort, etc.)
-        HandleParticlesAtBoundaries(a_step, a_cur_time, /*num_moved=*/0);
 
         // perform particle collisions
         ExecutePythonCallback("beforecollisions");
@@ -527,8 +520,8 @@ WarpX::OneStep_nosub (
         PushParticlesandDeposit(
             a_cur_time,
             /*skip_deposition=*/false,
-            PositionPushType::SecondHalf,
-            MomentumPushType::None
+            PositionPushType::Full,
+            MomentumPushType::SecondHalf
         );
     }
     // with collisions placed before the position and momentum push, or without collisions
