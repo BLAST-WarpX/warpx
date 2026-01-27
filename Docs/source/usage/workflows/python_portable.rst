@@ -13,7 +13,11 @@ This functionality is provided by the function :func:`load_cupy`, which can be u
 .. code-block:: python
 
       from pywarpx.LoadThirdParty import load_cupy
-      xp, _ = load_cupy()
+      xp, status = load_cupy()
+
+      # optional: print a warning if an issue occurs when loading cupy
+      if status is not None:
+          print(status)
 
 In this example, the ``xp`` variable is either ``numpy`` (often abbreviated as ``np``) or ``cupy`` (often abbreviated as ``cp``), depending on whether WarpX is running with GPU support or not.
 
