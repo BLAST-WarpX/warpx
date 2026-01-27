@@ -33,16 +33,16 @@ WarpX constants
 WarpX provides a few pre-defined constants that can be used for any input parameter that consists of one or more floats.
 
 =============  ==================================
-``q_e``        elementary charge (C)
-``m_e``        electron mass (kg)
-``m_p``        proton mass (kg)
-``m_u``        unified atomic mass unit (kg)
-``epsilon0``   vacuum permittivity (F/m)
-``mu0``        vacuum permeability (H/m)
-``clight``     vacuum speed of light (m/s)
+``q_e``        Elementary charge (C)
+``m_e``        Electron mass (kg)
+``m_p``        Proton mass (kg)
+``m_u``        Unified atomic mass unit (kg)
+``epsilon0``   Vacuum permittivity (F/m)
+``mu0``        Vacuum permeability (H/m)
+``clight``     Vacuum speed of light (m/s)
 ``kb``         Boltzmann's constant (J/K)
 ``hbar``       Reduced Planck constant (J*s)
-``pi``         mathematical constant :math:`\pi`
+``pi``         Mathematical constant :math:`\pi`
 =============  ==================================
 
 The numerical values of these constants are set in `Source/ablastr/constant.H <https://github.com/BLAST-WarpX/warpx/blob/development/Source/ablastr/constant.H>`__.
