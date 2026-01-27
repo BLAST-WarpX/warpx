@@ -56,8 +56,16 @@ These different methods differ in their user-friendliness, flexibility and perfo
         The field data in a ``MultiFab`` object can also be accessed via global indexing.
         Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the ``MultiFab`` and across processors).
         When the data is fetched the result is a ``numpy`` array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
-        For indices within the domain, values from valid cells are always returned.
-        The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
+
+        .. warning::
+
+            Global indexing is convenient and user-friendly, but has significant performance overheads,
+            since it potentially incurs MPI communications and CPU-GPU copies under the hood.
+            This method is thus mostly meant for debugging and visualization purposes,
+            and not for performance-critical operations.
+
+        For indices within the domain, values from valid cells are always returned. The ghost cells at the exterior of the domain are
+        accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
         This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
 
         .. code-block:: python
@@ -116,13 +124,6 @@ These different methods differ in their user-friendliness, flexibility and perfo
         and an optional ``include_ghosts`` parameter (default ``False``) to include ghost cell coordinates.
         The returned array contains the physical coordinates of the mesh points along the specified direction,
         properly accounting for the field's cell-centered or face-centered staggering.
-
-        .. note::
-
-            Global indexing is convenient and user-friendly, but has significant performance overheads,
-            since it potentially incurs MPI communications and CPU-GPU copies under the hood.
-            This method is thus mostly meant for debugging and visualization purposes,
-            and not for performance-critical operations.
 
     .. tab-item:: Explicit loop over boxes
 
