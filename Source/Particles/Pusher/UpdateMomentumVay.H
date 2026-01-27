@@ -22,10 +22,9 @@ void UpdateMomentumVay(
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
     const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt,
-    MomentumPushType momentum_push_type)
+    MomentumPushType momentum_push_type = MomentumPushType::Full)
 {
     using namespace amrex::literals;
-
     // Constants
     const amrex::ParticleReal econst = q*dt/m;
     const amrex::ParticleReal bconst = 0.5_prt*q*dt/m;

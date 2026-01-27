@@ -17,7 +17,7 @@ void UpdateMomentumBoris(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type)
+    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type = MomentumPushType::Full)
 {
     using namespace amrex::literals;
 
@@ -28,10 +28,6 @@ void UpdateMomentumBoris(
         uy += econst*Ey;
         uz += econst*Ez;
     }
-    // First half-push for E
-    ux += econst*Ex;
-    uy += econst*Ey;
-    uz += econst*Ez;
     // Compute temporary gamma factor
     constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
@@ -54,9 +50,9 @@ void UpdateMomentumBoris(
 
     if (momentum_push_type == MomentumPushType::SecondHalf || momentum_push_type == MomentumPushType::Full) {
     // Second half-push for E
-    ux += econst*Ex;
-    uy += econst*Ey;
-    uz += econst*Ez;
+        ux += econst*Ex;
+        uy += econst*Ey;
+        uz += econst*Ez;
     }
 }
 
