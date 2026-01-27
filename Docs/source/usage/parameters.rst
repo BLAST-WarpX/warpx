@@ -264,7 +264,11 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
           When `true`, the plasma response is captured in the preconditioner.
-          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).
+
+        - ``implicit_evolve.mass_matrices_pc_width`` (`integer`, default: 0).
+          If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
+          In most cases, a width of 1 is sufficient for good GMRES performance.
 
         - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
 
