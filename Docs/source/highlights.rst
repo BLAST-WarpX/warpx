@@ -181,7 +181,7 @@ Scientific works in astrophysical plasma modeling.
 
 #. Zhang Z P, Zhao Z H, Jin X X, Zhu X W, Wang Y S, Zhu X Y, Qiao B.
    **Multispecies Ion Acceleration in the Interaction of Multiple Reconnection Current Sheets**.
-   The Astrophysical Journal, **997** 196, 2025.
+   The Astrophysical Journal, **997** 196, 2026.
    `10.3847/1538-4357/ae2320 <https://doi.org/10.3847/1538-4357/ae2320>`__
 
 #. Wu Y, Shi C, Tao X, Zhao J
