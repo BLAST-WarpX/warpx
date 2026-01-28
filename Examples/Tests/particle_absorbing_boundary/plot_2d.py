@@ -11,6 +11,7 @@
 
 
 import sys
+
 import yt
 
 fn = sys.argv[1]
@@ -25,11 +26,11 @@ ds.coordinates.x_axis[2] = 1
 ds.coordinates.y_axis["z"] = 0
 ds.coordinates.y_axis[2] = 0
 
-sl = yt.SlicePlot(ds, "z", field, aspect=100, origin='native')
-sl.set_zlim(field, -1.e7, 1.e7)
+sl = yt.SlicePlot(ds, "z", field, aspect=100, origin="native")
+sl.set_zlim(field, -1.0e7, 1.0e7)
 sl.set_log(field, log=False)
 sl.set_ylabel(r"x  $\mathrm{(\mu m)}$")
 sl.set_xlabel(r"z  $\mathrm{(\mu m)}$")
-#sl.annotate_grids()
+# sl.annotate_grids()
 
-sl.save("particle_absorbing_boundary_2d_"+field+".png")
+sl.save("particle_absorbing_boundary_2d_" + field + ".png")
