@@ -41,7 +41,6 @@ This section documents quick-start guides for a selection of supercomputers that
    hpc/hpc3
    hpc/juwels
    hpc/karolina
-   hpc/lassen
    hpc/lawrencium
    hpc/leonardo
    hpc/lonestar6
@@ -52,7 +51,6 @@ This section documents quick-start guides for a selection of supercomputers that
    hpc/pitzer
    hpc/polaris
    hpc/dane
-   hpc/summit
    hpc/taurus
    hpc/tuolumne
 
