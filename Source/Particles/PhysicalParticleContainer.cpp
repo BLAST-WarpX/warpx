@@ -1478,7 +1478,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
-                                          position_dt, momentum_push_type);
+                                          dt, momentum_push_type);
             } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -1486,7 +1486,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
-                                              position_dt, momentum_push_type);
+                                              dt, momentum_push_type);
                 }
             }
         }
@@ -1496,7 +1496,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      position_dt, momentum_push_type);
+                                      dt, momentum_push_type);
         }
 #endif
         if (momentum_push_type == MomentumPushType::SecondHalf || momentum_push_type == MomentumPushType::Full) {
