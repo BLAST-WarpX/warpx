@@ -15,6 +15,108 @@ Examples of inputs files can be found in the :ref:`Examples <usage-examples>` se
 
    The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand side of all input parameters that consist of one or more integers or floats. Expressions like ``<species_name>.density_max = "0.1+2.3"`` and expressions that include user-defined constants are accepted.
 
+.. _running-cpp-parameters-parser:
+
+Parsers and constants
+---------------------
+
+WarpX uses AMReX's math parser that reads expressions in the input file.
+It can be used in all input parameters that consist of one or more integers or floats.
+Integer input parameters expecting boolean, 0 or 1, are not parsed.
+Note that when multiple values are expected, the expressions are space delimited.
+For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
+See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
+
+WarpX constants
+^^^^^^^^^^^^^^^
+
+WarpX provides a few pre-defined constants that can be used for any input parameter that consists of one or more floats.
+
+=============  ==================================
+``q_e``        Elementary charge (C)
+``m_e``        Electron mass (kg)
+``m_p``        Proton mass (kg)
+``m_u``        Unified atomic mass unit (kg)
+``epsilon0``   Vacuum permittivity (F/m)
+``mu0``        Vacuum permeability (H/m)
+``clight``     Vacuum speed of light (m/s)
+``kb``         Boltzmann's constant (J/K)
+``hbar``       Reduced Planck constant (J*s)
+``pi``         Mathematical constant :math:`\pi`
+=============  ==================================
+
+The numerical values of these constants are set in `Source/ablastr/constant.H <https://github.com/BLAST-WarpX/warpx/blob/development/Source/ablastr/constant.H>`__.
+
+User-defined constants
+^^^^^^^^^^^^^^^^^^^^^^
+
+Users can define their own constants in the inputs file.
+These constants can be used for any input parameter that consists of one or more integers or floats.
+User-defined constant names can contain only letters, numbers and the character ``_``.
+The name of each constant has to begin with a letter.
+The following names are used by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
+The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
+For example:
+
+* ``my_constants.a0 = 3.0``
+* ``my_constants.z_plateau = 150e-6``
+* ``my_constants.n0 = 1e22``
+* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
+
+Spatial coordinates
+^^^^^^^^^^^^^^^^^^^
+
+For profiles that depend on spatial coordinates (e.g., the plasma momentum distribution or the laser field, see below :ref:`Particle initialization <running-cpp-parameters-particle>` and :ref:`Laser initialization <running-cpp-parameters-laser>`), the parser interprets some variables as spatial coordinates.
+These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
+
+The parser reads Python-style expressions between double quotes.
+For example, ``"a0*x**2 * (1-y*1e2) * (x>0)"`` is a valid expression, where ``a0`` is a user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates.
+The names are case sensitive.
+The factor ``(x>0)`` equals ``1`` where ``x>0`` and ``0`` where ``x<=0``.
+It allows the user to define functions by intervals.
+Alternatively, the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1e2), 0)``.
+
+Time intervals
+^^^^^^^^^^^^^^
+
+WarpX can parse time step interval expressions of the form ``start:stop:period``, e.g., ``1:2:3, 4::, 5:6, :, ::10``.
+A comma is used as a separator between groups of intervals, which we call slices.
+The resulting time intervals are the `union set <https://en.wikipedia.org/wiki/Union_(set_theory)>`__ of all given slices.
+White spaces are ignored.
+A single slice can have 0, 1 or 2 colons ``:``, just as `NumPy slices <https://numpy.org/doc/stable/reference/generated/numpy.s_.html>`__, but with inclusive upper bound for ``stop``:
+
+* With no colon, the given value is the period.
+
+* With 1 colon, the given string is of the type ``start:stop``.
+
+* With 2 colons, the given string is of the type ``start:stop:period``.
+
+Any value that is not given is set to default.
+Default is ``0`` for the start, ``std::numeric_limits<int>::max()`` for the stop, and ``1`` for the period.
+For the syntax with 1 or 2 colons, having values in the string is optional (e.g., ``::5``, ``100 ::10``, and ``100 :`` are all valid).
+
+All values can be expressions that are parsed in the same way as other integer input parameters.
+
+Here are some examples of valid time interval expressions and their meaning:
+
+* ``something_intervals = 50``: do something at time steps 0, 50, 100, 150, etc. (equivalent to ``something_intervals = ::50``).
+
+* ``something_intervals = 300:600:100``: do something at time steps 300, 400, 500 and 600.
+
+* ``something_intervals = 300::50``: do something at time steps 300, 350, 400, 450, etc.
+
+* ``something_intervals = 105:108,205:208``: do something at time steps 105, 106, 107, 108, 205, 206, 207 and 208 (equivalent to ``something_intervals = 105 : 108 : , 205 : 208 :``).
+
+* ``something_intervals = :`` or  ``something_intervals = ::``: do something at every time step.
+
+* ``something_intervals = 167:167,253:253,275:425:50`` do something at time steps 167, 253, 275, 325, 375 and 425.
+
+This is similar to the Python slicing syntax, except that the stop is inclusive (e.g., ``0:100`` contains 100) and that no colon means that the given value is the period.
+
+Note that if a given period is zero or negative, the corresponding slice is disregarded.
+For example, ``something_intervals = -1`` deactivates ``something`` and ``something_intervals = ::-1,100:1000:25`` is equivalent to ``something_intervals = 100:1000:25``.
+
+
 .. _running-cpp-parameters-overall:
 
 Overall simulation parameters
@@ -162,7 +264,11 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_pc`` (`bool`, default: false).
           When `true`, the plasma response is captured in the preconditioner.
-          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg`` or ``pc_jacobi``).
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).
+
+        - ``implicit_evolve.mass_matrices_pc_width`` (`integer`, default: 0).
+          If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
+          In most cases, a width of 1 is sufficient for good GMRES performance.
 
         - ``jacobian.pc_type`` (`string`, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
 
@@ -681,7 +787,7 @@ Distribution across MPI ranks and parallelization
     of the coarsest level, but also to any of the finer level.
 
 * ``algo.load_balance_intervals`` (`string`) optional (default `0`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which
     WarpX should try to redistribute the work across MPI ranks, in order to have
     better load balancing.
     Use 0 to disable load_balancing.
@@ -795,64 +901,6 @@ Distribution across MPI ranks and parallelization
     During splitting high density boxes, if a Box's longest side is already
     less than or equal to this number, it will not be split.
 
-.. _running-cpp-parameters-parser:
-
-Math parser and user-defined constants
---------------------------------------
-
-WarpX uses AMReX's math parser that reads expressions in the input file.
-It can be used in all input parameters that consist of one or more integers or floats.
-Integer input expecting boolean, 0 or 1, are not parsed.
-Note that when multiple values are expected, the expressions are space delimited.
-For integer input values, the expressions are evaluated as real numbers and the final result rounded to the nearest integer.
-See `this section <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parser>`__ of the AMReX documentation for a complete list of functions supported by the math parser.
-
-WarpX constants
-^^^^^^^^^^^^^^^
-
-WarpX provides a few pre-defined constants, that can be used for any parameter that consists of one or more floats.
-
-======== ===================
-q_e      elementary charge
-m_e      electron mass
-m_p      proton mass
-m_u      unified atomic mass unit (Dalton)
-epsilon0 vacuum permittivity
-mu0      vacuum permeability
-clight   speed of light
-kb       Boltzmann's constant (J/K)
-pi       math constant pi
-======== ===================
-
-See ``Source/Utils/WarpXConst.H`` for the values.
-
-User-defined constants
-^^^^^^^^^^^^^^^^^^^^^^
-
-Users can define their own constants in the input file.
-These constants can be used for any parameter that consists of one or more integers or floats.
-User-defined constant names can contain only letters, numbers and the character ``_``.
-The name of each constant has to begin with a letter. The following names are used
-by WarpX, and cannot be used as user-defined constants: ``x``, ``y``, ``z``, ``X``, ``Y``, ``t``.
-The values of the constants can include the predefined WarpX constants listed above as well as other user-defined constants.
-For example:
-
-* ``my_constants.a0 = 3.0``
-* ``my_constants.z_plateau = 150.e-6``
-* ``my_constants.n0 = 1.e22``
-* ``my_constants.wp = sqrt(n0*q_e**2/(epsilon0*m_e))``
-
-Coordinates
-^^^^^^^^^^^
-
-Besides, for profiles that depend on spatial coordinates (the plasma momentum distribution or the laser field, see below `Particle initialization` and `Laser initialization`), the parser will interpret some variables as spatial coordinates. These are specified in the input parameter, i.e., ``density_function(x,y,z)`` and ``field_function(X,Y,t)``.
-
-The parser reads python-style expressions between double quotes, for instance
-``"a0*x**2 * (1-y*1.e2) * (x>0)"`` is a valid expression where ``a0`` is a
-user-defined constant (see above) and ``x`` and ``y`` are spatial coordinates. The names are case sensitive. The factor
-``(x>0)`` is ``1`` where ``x>0`` and ``0`` where ``x<=0``. It allows the user to
-define functions by intervals.
-Alternatively the expression above can be written as ``if(x>0, a0*x**2 * (1-y*1.e2), 0)``.
 
 .. _running-cpp-parameters-particle:
 
@@ -1483,7 +1531,7 @@ Particle initialization
     than this parameter.
 
 * ``<species_name>.resampling_trigger_intervals`` (`string`) optional (default `0`)
-    Using the `Intervals parser`_ syntax, this string defines timesteps at which resampling is
+    Using the `Time intervals`_ syntax, this string defines timesteps at which resampling is
     performed.
 
 * ``<species_name>.resampling_trigger_max_avg_ppc`` (`float`) optional (default `infinity`)
@@ -2826,7 +2874,7 @@ Additional parameters
     https://ieeexplore.ieee.org/document/8659392.
 
 * ``warpx.override_sync_intervals`` (`string`) optional (default `1`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which
     synchronization of sources (`rho` and `J`) and fields (`E` and `B`) on grid nodes at box
     boundaries is performed. Since the grid nodes at the interface between two neighbor boxes are
     duplicated in both boxes, an instability can occur if they have too different values.
@@ -2839,7 +2887,7 @@ Additional parameters
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
 
 * ``warpx.sort_intervals`` (`string`) optional (defaults: ``-1`` on CPU; ``4`` on GPU)
-     Using the `Intervals parser`_ syntax, this string defines the timesteps at which particles are
+     Using the `Time intervals`_ syntax, this string defines the timesteps at which particles are
      sorted.
      If ``<=0``, do not sort particles.
      It is turned on on GPUs for performance reasons (to improve memory locality).
@@ -2946,7 +2994,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     example: ``diagnostics.diags_names = diag1 my_second_diag``.
 
 * ``<diag_name>.intervals`` (`string`)
-    Using the `Intervals parser`_ syntax, this string defines the timesteps at which data is dumped.
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which data is dumped.
     Use a negative number or 0 to disable data dumping.
     example: ``diag1.intervals = 10,20:25:1``.
     Note that by default the last timestep is dumped regardless of this parameter. This can be
@@ -2990,21 +3038,21 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     When WarpX is compiled with openPMD support, the first available backend in the order given above is taken.
 
 * ``<diag_name>.openpmd_encoding`` (optional, ``v`` (variable based), ``f`` (file based) or ``g`` (group based) ) only read if ``<diag_name>.format = openpmd``.
-     openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.16.1/usage/concepts.html#iteration-and-series>`__.
+     openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.17.0/usage/concepts.html#iteration-and-series>`__.
      File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-     ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.16.1/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
+     ``variable based`` is an `experimental feature with ADIOS2 BP5 <https://openpmd-api.readthedocs.io/en/0.17.0/backends/adios2.html#experimental-new-adios2-schema>`__ that will replace ``g``.
      Default: ``f`` (full diagnostics)
 
 * ``<diag_name>.buffer_flush_limit_btd`` (`integer`; defaults to 5) optional, only read if ``<diag_name>.diag_type = BackTransformed``
     This parameter is intended for ADIOS backend to group every N buffers (N is the value of this parameter) and then flush to disk.
 
 * ``<diag_name>.adios2_operator.type`` (``zfp``, ``blosc``) optional,
-    `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 I/O operator type <https://openpmd-api.readthedocs.io/en/0.17.0/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
 * ``<diag_name>.adios2_operator.parameters.*`` optional,
-    `ADIOS2 I/O operator parameters <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 I/O operator parameters <https://openpmd-api.readthedocs.io/en/0.17.0/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
-    A typical example for `ADIOS2 output using lossless compression <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ with ``blosc`` using the ``zstd`` compressor and 6 CPU treads per MPI Rank (e.g. for a `GPU run with spare CPU resources <https://arxiv.org/abs/1706.00522>`__):
+    A typical example for `ADIOS2 output using lossless compression <https://openpmd-api.readthedocs.io/en/0.17.0/details/backendconfig.html#adios2>`__ with ``blosc`` using the ``zstd`` compressor and 6 CPU treads per MPI Rank (e.g. for a `GPU run with spare CPU resources <https://arxiv.org/abs/1706.00522>`__):
 
     .. code-block:: text
 
@@ -3030,11 +3078,11 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
        <diag_name>.adios2_engine.parameters.FlattenSteps = on
 
 * ``<diag_name>.adios2_engine.type`` (``bp5``, ``bp4``, ``sst``, ``ssc``, ``dataman``) optional,
-    `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 Engine type <https://openpmd-api.readthedocs.io/en/0.17.0/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
     See full list of engines at `ADIOS2 readthedocs <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
 
 * ``<diag_name>.adios2_engine.parameters.*`` optional,
-    `ADIOS2 Engine parameters <https://openpmd-api.readthedocs.io/en/0.16.1/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
+    `ADIOS2 Engine parameters <https://openpmd-api.readthedocs.io/en/0.17.0/details/backendconfig.html#adios2>`__ for `openPMD <https://www.openPMD.org>`_ data dumps.
 
     An example for parameters for the BP engine are setting the number of writers (``NumAggregators``), transparently redirecting data to burst buffers etc.
     A detailed list of engine-specific parameters are available at the official `ADIOS2 documentation <https://adios2.readthedocs.io/en/latest/engines/engines.html>`__
@@ -3246,7 +3294,7 @@ BackTransformed Diagnostics
 
 * ``<diag_name>.intervals`` (`string`)
     Only used when ``<diag_name>.diag_type`` is ``BackTransformed``.
-    Using the `Intervals parser`_ syntax, this string defines the lab frame times at which data is dumped,
+    Using the `Time intervals`_ syntax, this string defines the lab frame times at which data is dumped,
     given as multiples of the step size ``dt_snapshots_lab`` or ``dz_snapshots_lab`` described below.
     Example: ``btdiag1.intervals = 10:11,20:24:2`` and ``btdiag1.dt_snapshots_lab = 1.e-12``
     indicate to dump at lab times ``1e-11``, ``1.1e-11``, ``2e-11``, ``2.2e-11``, and ``2.4e-11`` seconds.
@@ -3899,7 +3947,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         This type outputs the simulation's physical timestep (in seconds) at each mesh refinement level.
 
 * ``reduced_diags.intervals`` (`string`)
-    Using the `Intervals Parser`_ syntax, this string defines the timesteps at which reduced
+    Using the `Time intervals`_ syntax, this string defines the timesteps at which reduced
     diagnostics are written to the file.
     This can also be specified for the specific diagnostic by setting ``<reduced_diags_name>.intervals``.
 
@@ -4121,54 +4169,6 @@ The checkpoint capability can be turned with regular diagnostics: ``<diag_name>.
 
 * ``warpx.write_diagnostics_on_restart`` (`bool`) optional (default `false`)
     When `true`, write the diagnostics after restart at the time of the restart.
-
-Intervals parser
-----------------
-
-WarpX can parse time step interval expressions of the form ``start:stop:period``, e.g.
-``1:2:3, 4::, 5:6, :, ::10``.
-A comma is used as a separator between groups of intervals, which we call slices.
-The resulting time steps are the `union set <https://en.wikipedia.org/wiki/Union_(set_theory)>`_ of all given slices.
-White spaces are ignored.
-A single slice can have 0, 1 or 2 colons ``:``, just as `numpy slices <https://numpy.org/doc/stable/reference/generated/numpy.s_.html>`_, but with inclusive upper bound for ``stop``.
-
-* For 0 colon the given value is the period
-
-* For 1 colon the given string is of the type ``start:stop``
-
-* For 2 colons the given string is of the type ``start:stop:period``
-
-Any value that is not given is set to default.
-Default is ``0`` for the start, ``std::numeric_limits<int>::max()`` for the stop and ``1`` for the
-period.
-For the 1 and 2 colon syntax, actually having values in the string is optional
-(this means that ``::5``, ``100 ::10`` and ``100 :`` are all valid syntaxes).
-
-All values can be expressions that will be parsed in the same way as other integer input parameters.
-
-**Examples**
-
-* ``something_intervals = 50`` -> do something at timesteps 0, 50, 100, 150, etc.
-  (equivalent to ``something_intervals = ::50``)
-
-* ``something_intervals = 300:600:100`` -> do something at timesteps 300, 400, 500 and 600.
-
-* ``something_intervals = 300::50`` -> do something at timesteps 300, 350, 400, 450, etc.
-
-* ``something_intervals = 105:108,205:208`` -> do something at timesteps 105, 106, 107, 108,
-  205, 206, 207 and 208. (equivalent to ``something_intervals = 105 : 108 : , 205 : 208 :``)
-
-* ``something_intervals = :`` or  ``something_intervals = ::`` -> do something at every timestep.
-
-* ``something_intervals = 167:167,253:253,275:425:50`` do something at timesteps 167, 253, 275,
-  325, 375 and 425.
-
-This is essentially the python slicing syntax except that the stop is inclusive
-(``0:100`` contains 100) and that no colon means that the given value is the period.
-
-Note that if a given period is zero or negative, the corresponding slice is disregarded.
-For example, ``something_intervals = -1`` deactivates ``something`` and
-``something_intervals = ::-1,100:1000:25`` is equivalent to ``something_intervals = 100:1000:25``.
 
 
 .. _running-cpp-parameters-test-debug:
