@@ -540,7 +540,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
             if (mass_is_specified) {
                 ablastr::warn_manager::WMRecordWarning("Species",
                     "Both '" + ps_name + ".mass' and '" +
-                        ps_name + ".injection_file' specify a charge.\n'" +
+                        ps_name + ".injection_file' specify a mass.\n'" +
                         ps_name + ".mass' will take precedence.\n");
             }
             else if (species_is_specified) {
