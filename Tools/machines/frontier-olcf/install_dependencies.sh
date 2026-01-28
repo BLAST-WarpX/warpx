@@ -95,7 +95,7 @@ CC=cc CXX=CC \
 CUPY_INSTALL_USE_HIP=1  \
 ROCM_HOME=${ROCM_PATH}  \
 HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
-  python3 -m pip install -v git+https://github.com/cupy/cupy.git@e669b994f976565bf2da4b1f82de51e10b58fbe1
+  python3 -m pip install -v git+https://github.com/cupy/cupy.git@66a29e2329b123ee5ce3bc89ba7ff1c49b9de2d1
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade h5py
 python3 -m pip install --upgrade pandas
