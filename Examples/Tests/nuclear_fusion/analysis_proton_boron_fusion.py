@@ -63,10 +63,12 @@ keV_to_Joule = scc.e * 1e3
 MeV_to_Joule = scc.e * 1e6
 barn_to_square_meter = 1.0e-28
 m_p = scc.m_p  # Proton mass
-m_b = 11.00930536 * scc.m_u - 5 * scc.m_e # Boron 11 mass
+m_b = 11.00930536 * scc.m_u - 5 * scc.m_e  # Boron 11 mass
 m_reduced = m_p * m_b / (m_p + m_b)
-m_a = 4.00260325413 * scc.m_u - 2 * scc.m_e # Alpha (He4) mass
-m_be = (8.0053095729 + 0.00325283863) * scc.m_u - 4 * scc.m_e # Be8* mass (3.03 MeV ex. state)
+m_a = 4.00260325413 * scc.m_u - 2 * scc.m_e  # Alpha (He4) mass
+m_be = (
+    8.0053095729 + 0.00325283863
+) * scc.m_u - 4 * scc.m_e  # Be8* mass (3.03 MeV ex. state)
 Z_boron = 5.0
 Z_proton = 1.0
 E_Gamow = (

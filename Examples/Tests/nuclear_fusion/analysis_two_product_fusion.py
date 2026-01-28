@@ -75,7 +75,7 @@ else:
     E_fusion = 3.268911e6 * MeV_to_Joule
 
 mass = {
-    "deuterium": 2.01410177812 * scc.m_u -  scc.m_e,
+    "deuterium": 2.01410177812 * scc.m_u - scc.m_e,
     "hydrogen2": 2.01410177812 * scc.m_u - scc.m_e,
     "tritium": 3.0160492779 * scc.m_u - scc.m_e,
     "helium3": 3.016029 * scc.m_u - 2 * scc.m_e,
