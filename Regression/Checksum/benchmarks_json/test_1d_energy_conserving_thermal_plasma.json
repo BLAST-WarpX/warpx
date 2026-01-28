@@ -5,23 +5,23 @@
     "Bz": 0.0,
     "Ex": 0.0,
     "Ey": 0.0,
-    "Ez": 1843559918247.6265,
-    "jx": 7.023706407806784e+17,
-    "jy": 1.5451722266199665e+18,
-    "jz": 1.4550256785222282e+18
+    "Ez": 1843559918507.4597,
+    "jx": 7.023706407853532e+17,
+    "jy": 1.5451722266112904e+18,
+    "jz": 1.4550256783909258e+18
   },
   "electrons": {
     "particle_momentum_x": 9.376211171425484e-23,
     "particle_momentum_y": 9.839757496156745e-23,
-    "particle_momentum_z": 9.990231703337602e-23,
-    "particle_position_x": 8.26715567480198e-07,
+    "particle_momentum_z": 9.990231703148866e-23,
+    "particle_position_x": 8.267155674804417e-07,
     "particle_weight": 5.314093266999432e+22
   },
   "protons": {
-    "particle_momentum_x": 5.176581626490212e-21,
-    "particle_momentum_y": 4.0479325154037156e-21,
-    "particle_momentum_z": 4.919705572788935e-21,
-    "particle_position_x": 8.50698939192174e-07,
+    "particle_momentum_x": 5.176581699739823e-21,
+    "particle_momentum_y": 4.047932572682727e-21,
+    "particle_momentum_z": 4.91970564256278e-21,
+    "particle_position_x": 8.506989391921748e-07,
     "particle_weight": 5.314093266999432e+22
   }
 }
