@@ -10,9 +10,12 @@
 # This script plots the fields from the 2D particle absorbing boundary test case.
 
 
+import sys
 import yt
 
-ds = yt.load("diags/diagInst001000/")
+fn = sys.argv[1]
+
+ds = yt.load(fn)
 
 field = "Ez"
 

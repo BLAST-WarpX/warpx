@@ -4,7 +4,7 @@
 
 # We only run 100 steps for tests
 # Disable `max_step` below to run until the physical `stop_time`.
-max_step = 100
+max_step = 100000
 stop_time = 5.0e-12            # [s]
 
 #amr.n_cell = 128 29056
@@ -40,12 +40,6 @@ amr.max_grid_size_y = 2048  # this is confusingly named and means z in 2D
 #   to allow efficient load-balancing as the simulation evolves
 #algo.load_balance_intervals = 100
 #algo.load_balance_costs_update = Heuristic
-
-# particle bin-sorting on GPU (ideal defaults not investigated in 2D)
-#   Try larger values than the defaults below and report back! :)
-#warpx.sort_intervals = 4    # default on CPU: -1 (off); on GPU: 4
-#warpx.sort_bin_size = 1 1 1
-
 
 #################################
 # Target Profile
@@ -85,33 +79,26 @@ hydrogen.density_function(x,y,z) = "nc*n0*(
 # Laser Pulse Profile
 #
 lasers.names        = laser1
-laser1.position     = 0. 0. -774.156e-6 # point the laser plane (antenna)
+laser1.position     = 0. 0. -773.156e-6 # point the laser plane (antenna)
 laser1.direction    = 0. 0. 1.          # the plane's (antenna's) normal direction
 laser1.polarization = 1. 0. 0.          # the main polarization vector
 laser1.a0           = 3.0              # maximum normalized amplitude of the laser field
 laser1.wavelength   = 1.0e-6            # central wavelength of the laser pulse [m]
 laser1.profile      = Gaussian
-laser1.profile_waist = 4.e-6            # beam waist (E(w_0)=E_0/e) [m]
-laser1.profile_duration = 30.e-15       # pulse length (E(tau)=E_0/e; tau=tau_E=FWHM_I/1.17741) [s]
-laser1.profile_t_peak = 50.e-15         # time until peak intensity reached at the laser plane [s]
-laser1.profile_focal_distance = 4.0e-6  # focal distance from the antenna [m]
+laser1.profile_waist = 3.e-6            # beam waist (E(w_0)=E_0/e) [m]
+laser1.profile_duration = 3.e-12       # pulse length (E(tau)=E_0/e; tau=tau_E=FWHM_I/1.17741) [s]
+laser1.profile_t_peak = 5.e-12         # time until peak intensity reached at the laser plane [s]
+laser1.profile_focal_distance = 773.156e-6  # focal distance from the antenna [m]
 
 # #################################
 # # Diagnostics
 # #
-# diagnostics.diags_names = diagInst diagTimeAvg openPMDfw openPMDbw
+diagnostics.diags_names = diagInst
+#diagnostics.diags_names = diagInst diagTimeAvg openPMDfw openPMDbw
 
 # # instantaneous field and particle diagnostic
-# diagInst.intervals = 100,96:100  # second interval only for CI testing the time-averaged diags
-# diagInst.diag_type = Full
-# diagInst.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
-# # reduce resolution of output fields
-# diagInst.coarsening_ratio = 4 4
-# # demonstration of a spatial and momentum filter
-# diagInst.electrons.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-# diagInst.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-# diagInst.format = openpmd
-# diagInst.openpmd_backend = h5
+diagInst.intervals = 1000  # second interval only for CI testing the time-averaged diags
+diagInst.diag_type = Full
 
 # # time-averaged particle and field diagnostic
 # diagTimeAvg.intervals = 100

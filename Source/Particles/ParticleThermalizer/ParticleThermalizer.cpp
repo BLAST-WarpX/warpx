@@ -1,3 +1,10 @@
+/* Copyright 2026 Andrew Myers
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+
 #include "ParticleThermalizer.H"
 #include <AMReX_REAL.H>
 #include <AMReX_ParmParse.H>
