@@ -912,23 +912,25 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     // are not included in the mass matrices.
 
     const int diag_comp_xx = (AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2])-1)/2;
-#if !defined(WARPX_EM_TEY)
-    const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
-#endif
     const int diag_comp_zz = (AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2])-1)/2;
     int MM_PC_ncomp_xx[3] = {1, 1, 1};
-    int MM_PC_ncomp_yy[3] = {1, 1, 1};
     int MM_PC_ncomp_zz[3] = {1, 1, 1};
     int MM_PC_width_xx[3] = {0, 0, 0};
-    int MM_PC_width_yy[3] = {0, 0, 0};
     int MM_PC_width_zz[3] = {0, 0, 0};
+#if !defined(WARPX_EM_TEY)
+    const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
+    int MM_PC_ncomp_yy[3] = {1, 1, 1};
+    int MM_PC_width_yy[3] = {0, 0, 0};
+#endif
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
         MM_PC_ncomp_xx[dir]  = m_ncomp_pc_xx[dir];
-        MM_PC_ncomp_yy[dir]  = m_ncomp_pc_yy[dir];
         MM_PC_ncomp_zz[dir]  = m_ncomp_pc_zz[dir];
         MM_PC_width_xx[dir]  = (m_ncomp_pc_xx[dir] - 1)/2;
-        MM_PC_width_yy[dir]  = (m_ncomp_pc_yy[dir] - 1)/2;
         MM_PC_width_zz[dir]  = (m_ncomp_pc_zz[dir] - 1)/2;
+#if !defined(WARPX_EM_TEY)
+        MM_PC_ncomp_yy[dir]  = m_ncomp_pc_yy[dir];
+        MM_PC_width_yy[dir]  = (m_ncomp_pc_yy[dir] - 1)/2;
+#endif
     }
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
