@@ -1465,11 +1465,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             copyAttribs(ip);
         }
 
-        amrex::Real position_dt = dt;
-        if ( collisions_split_position_push && (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf)) {
-            position_dt *= 0.5_rt;
-        }
-
 #ifdef WARPX_QED
         if (momentum_push_type != MomentumPushType::None) {
             if (!do_sync) {
