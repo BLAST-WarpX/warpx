@@ -12,6 +12,8 @@
 #include "ablastr/constant.H"
 
 #include <AMReX_Math.H>
+#include <AMReX_REAL.H>
+#include <AMReX_RealVect.H>
 
     /**
      * The interface of the ABLASTR QED library supports 2 unit systems
@@ -147,6 +149,7 @@ namespace ablastr::qed
             fact<quantity::E, double>*ablastr::constant::SI::c_v<double>);
     }
 
+    /*
     // Using SFINAE this version of the function applies only
     // to types that have a value_type attribute (i.e., vectors)
     template
@@ -169,6 +172,32 @@ namespace ablastr::qed
         else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
         {
             constexpr auto fact = static_cast<RealType>(
+                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
+            return value*fact;
+        }
+        else
+        {
+            return value;
+        }
+    }*/
+
+    template
+    <
+        unit_system From,
+        unit_system To,
+        quantity Quantity
+    >
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    constexpr amrex::RealVectND<3>
+    convert_from_to (const amrex::RealVectND<3>& value) noexcept
+    {
+        if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
+        {
+            return value*detail::SI_to_HL_factors::fact<Quantity, amrex::Real>;
+        }
+        else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
+        {
+            constexpr auto fact = static_cast<amrex::Real>(
                 1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
             return value*fact;
         }
