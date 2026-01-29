@@ -2626,7 +2626,7 @@ class LoadAppliedFieldFromPython(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
-        # Base class requires read_fields_from_path -> enforce it by a hack for now
+        # Base class requires read_fields_from_path -> enforce it with a hack
         kw["read_fields_from_path"] = ""
 
         super().__init__(**kw)
