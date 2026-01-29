@@ -37,9 +37,9 @@
 
 template <int do_sync>
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void doParticleMomentumPush(amrex::ParticleReal& ux,
-                            amrex::ParticleReal& uy,
-                            amrex::ParticleReal& uz,
+void doParticleMomentumPush (amrex::ParticleReal & AMREX_RESTRICT ux,
+                            amrex::ParticleReal & AMREX_RESTRICT uy,
+                            amrex::ParticleReal & AMREX_RESTRICT uz,
                             const amrex::ParticleReal Ex,
                             const amrex::ParticleReal Ey,
                             const amrex::ParticleReal Ez,
