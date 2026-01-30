@@ -33,6 +33,7 @@
  * \param do_crr                    Whether to do the classical radiation reaction
  * \param t_chi_max                 Cutoff chi for QSR
  * \param dt                        Time step size
+ * \param momentum_push_type        Type of momentum push: FirstHalf, SecondHalf, Full
  */
 
 template <int do_sync>
