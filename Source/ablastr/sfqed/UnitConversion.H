@@ -15,37 +15,36 @@
 #include <AMReX_REAL.H>
 #include <AMReX_RealVect.H>
 
-    /**
-     * The interface of the ABLASTR QED library supports 2 unit systems
-     * (Internally all the calculations are performed in Natural
-     * Heaviside-Lorentz units):
-     *
-     * > SI units (International System of Units)
-     *
-     * > Natural Heaviside Lorentz units, a unit system frequently used in
-     *   particle phyics where c (speed of light) = hbar (reduced Plank constant)
-     *   = epsilon_0 (vacuum permittivity) = mu_0 (vacuum_permeability) = 1.
-     *   In addition, we choose to measure the energy in MeV units
-     *   (1 MeV = 1.0e6 * e0 * 1 V (Volt) = 1.60218e-13 J ).
-     *   As a consequence:
-     *   - mass is in MeV units (m --> mc^2 [MeV])
-     *   - length is in 1/MeV units (l --> l / (hbar*c) [MeV^-1])
-     *   - time is in 1/MeV units (t --> t / (hbar) [MeV^-1])
-     *   - momentum is in MeV units (p --> p*c [MeV])
-     *   - energy is simply expressed in MeV
-     *   - velocity is normalized with respect to the speed of light
-     *   - electric charge is dimensionless (q --> q*sqrt(4.0*pi*fine_structure)/e0)
-     *   - electric field is in MeV^2 units (E --> e0*hbar*c*E/sqrt(4*pi*fine_structure) [MeV^2])
-     *   - magnetic field is in MeV^2 (B --> e0*hbar*c^2*E/sqrt(4*pi*fine_structure) [MeV^2])
-     *
-     * The helper functions provided by this module are used internally by the
-     * library to convert the input values of a function to Natural units and to
-     * convert the output from Natural units to the desired unit system.
-     *
-     * Inside these helper functions, calculations of constexpr constants are
-     * carried out in double precision.
-     */
-
+/**
+ * The interface of the ABLASTR QED library supports 2 unit systems
+ * (Internally all the calculations are performed in Natural
+ * Heaviside-Lorentz units):
+ *
+ * > SI units (International System of Units)
+ *
+ * > Natural Heaviside Lorentz units, a unit system frequently used in
+ *   particle phyics where c (speed of light) = hbar (reduced Plank constant)
+ *   = epsilon_0 (vacuum permittivity) = mu_0 (vacuum_permeability) = 1.
+ *   In addition, we choose to measure the energy in MeV units
+ *   (1 MeV = 1.0e6 * e0 * 1 V (Volt) = 1.60218e-13 J ).
+ *   As a consequence:
+ *   - mass is in MeV units (m --> mc^2 [MeV])
+ *   - length is in 1/MeV units (l --> l / (hbar*c) [MeV^-1])
+ *   - time is in 1/MeV units (t --> t / (hbar) [MeV^-1])
+ *   - momentum is in MeV units (p --> p*c [MeV])
+ *   - energy is simply expressed in MeV
+ *   - velocity is normalized with respect to the speed of light
+ *   - electric charge is dimensionless (q --> q*sqrt(4.0*pi*fine_structure)/e0)
+ *   - electric field is in MeV^2 units (E --> e0*hbar*c*E/sqrt(4*pi*fine_structure) [MeV^2])
+ *   - magnetic field is in MeV^2 (B --> e0*hbar*c^2*E/sqrt(4*pi*fine_structure) [MeV^2])
+ *
+ * The helper functions provided by this module are used internally by the
+ * library to convert the input values of a function to Natural units and to
+ * convert the output from Natural units to the desired unit system.
+ *
+ * Inside these helper functions, calculations of constexpr constants are
+ * carried out in double precision.
+ */
 namespace ablastr::qed
 {
 
@@ -84,10 +83,13 @@ namespace ablastr::qed
         B
     };
 
+    /**
+     * Conversion factors between SI units and heaviside_lorentz units
+     */
     namespace detail::SI_to_HL_factors
     {
         template <quantity Quantity, typename T>
-        constexpr T fact = static_cast<T>(1.0);
+        constexpr T fact;
 
         template <typename T>
         constexpr auto fact<quantity::mass, T> = static_cast<T>(
@@ -149,64 +151,18 @@ namespace ablastr::qed
             fact<quantity::E, double>*ablastr::constant::SI::c_v<double>);
     }
 
-    /*
-    // Using SFINAE this version of the function applies only
-    // to types that have a value_type attribute (i.e., vectors)
-    template
-    <
-        unit_system From,
-        unit_system To,
-        quantity Quantity,
-        typename T,
-        typename T::value_type TV = 0
-    >
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    constexpr T
-    convert_from_to (const T& value) noexcept
-    {
-        using RealType = typename T::value_type;
-        if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
-        {
-            return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
-        }
-        else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
-        {
-            constexpr auto fact = static_cast<RealType>(
-                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
-            return value*fact;
-        }
-        else
-        {
-            return value;
-        }
-    }*/
 
-    template
-    <
-        unit_system From,
-        unit_system To,
-        quantity Quantity
-    >
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    constexpr amrex::RealVectND<3>
-    convert_from_to (const amrex::RealVectND<3>& value) noexcept
-    {
-        if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
-        {
-            return value*detail::SI_to_HL_factors::fact<Quantity, amrex::Real>;
-        }
-        else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
-        {
-            constexpr auto fact = static_cast<amrex::Real>(
-                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
-            return value*fact;
-        }
-        else
-        {
-            return value;
-        }
-    }
-
+    /** Converts the value of a physical quantity
+     * from one unit system to the other
+     *
+     * \tparam From     unit system to convert from
+     * \tparam To       unit system to convert to
+     * \tparam Quantity the physical quantity (mass, energy, length...)
+     * \tparam T        the type used to express the value of the physical quantity (e.g., float, double)
+     *
+     * @param[in] value the value of the physical quantity to be converted
+     * @return          the converted value of the physical quantity
+     */
     template
     <
         unit_system From,
@@ -225,6 +181,44 @@ namespace ablastr::qed
         else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
         {
             constexpr auto fact = static_cast<T>(
+                1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
+            return value*fact;
+        }
+        else
+        {
+            return value;
+        }
+    }
+
+    /** Converts the value of a physical quantity
+     * from one unit system to the other (specialization for amrex::RealVectND<3>)
+     *
+     * \tparam From     unit system to convert from
+     * \tparam To       unit system to convert to
+     * \tparam Quantity the physical quantity (mass, energy, length...)
+     *
+     * @param[in] value the amrex::RealVectND<3> to be converted
+     * @return          the converted amrex::RealVectND<3>
+     */
+    template
+    <
+        unit_system From,
+        unit_system To,
+        quantity Quantity
+    >
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    constexpr amrex::RealVectND<3>
+    convert_from_to (const amrex::RealVectND<3>& value) noexcept
+    {
+        using RealType = amrex::RealVectND<3>::value_type;
+
+        if constexpr ((From == unit_system::SI) && (To == unit_system::heaviside_lorentz))
+        {
+            return value*detail::SI_to_HL_factors::fact<Quantity, RealType>;
+        }
+        else if constexpr ((From == unit_system::heaviside_lorentz) && (To == unit_system::SI))
+        {
+            constexpr auto fact = static_cast<RealType>(
                 1.0/detail::SI_to_HL_factors::fact<Quantity, double>);
             return value*fact;
         }
