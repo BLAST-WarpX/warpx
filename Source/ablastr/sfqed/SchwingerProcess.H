@@ -63,7 +63,7 @@ namespace ablastr::qed::schwinger
             const auto ff = (em_e_2 - em_b_2)*0.5_rt;
             const auto gg = em_e.dotProduct(em_b);
 
-            const auto inner = std::sqrt(ff*ff+ gg*gg);
+            const auto inner = std::sqrt(ff*ff + gg*gg);
 
             const auto epsi = std::sqrt(std::fabs(inner + ff))*one_over_schwinger;
             const auto eta = std::sqrt(std::fabs(inner - ff))*one_over_schwinger;
