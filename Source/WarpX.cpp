@@ -530,8 +530,8 @@ WarpX::WarpX ()
 
 WarpX::~WarpX ()
 {
-    const int nlevs_max = maxLevel() +1;
-    for (int lev = 0; lev < nlevs_max; ++lev) {
+    const int nlevs = finestLevel() +1;
+    for (int lev = 0; lev < nlevs; ++lev) {
         ClearLevel(lev);
     }
 }
@@ -2546,7 +2546,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
             ngRho, lev, "m_eb_reduce_particle_shape");
 
         // EB info are needed only at the finest level
-        if (lev == maxLevel()) {
+        if (lev == finestLevel()) {
 
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
@@ -3422,7 +3422,7 @@ WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
 void
 WarpX::BuildBufferMasks ()
 {
-    for (int lev = 1; lev <= maxLevel(); ++lev)
+    for (int lev = 1; lev <= finestLevel(); ++lev)
     {
         for (int ipass = 0; ipass < 2; ++ipass)
         {

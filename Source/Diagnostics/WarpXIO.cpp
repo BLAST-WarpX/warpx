@@ -403,7 +403,7 @@ WarpX::InitFromCheckpoint ()
         }
     }
 
-    if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
+    if (EB::enabled()) { InitializeEBGridData(finestLevel()); }
 
     reduced_diags->ReadCheckpointData(restart_chkfile);
 

@@ -1642,7 +1642,7 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
     if (m_resampler.triggered(timestep, global_numparts))
     {
         Redistribute();
-        for (int lev = 0; lev <= maxLevel(); lev++)
+        for (int lev = 0; lev <= finestLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
             {
