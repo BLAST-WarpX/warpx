@@ -2131,6 +2131,9 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_max_dt: float, optional
         The maximum allowable timestep when `warpx_dt_update_interval > 0`.
 
+    warpx_skip_domain_bc_value_update: bool, default=False
+        Flag to skip updating the domain boundary values during the simulation.
+        Only applicable if Dirichlet boundaries are used.
     """
 
     def init(self, kw):
@@ -2160,6 +2163,9 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
         self.max_dt = kw.pop("warpx_max_dt", None)
+        self.skip_domain_bc_value_update = kw.pop(
+            "warpx_skip_domain_bc_value_update", None
+        )
 
     def solver_initialize_inputs(self):
         # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
@@ -2171,6 +2177,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         pywarpx.warpx.cfl = self.cfl
         pywarpx.warpx.dt_update_interval = self.dt_update_interval
         pywarpx.warpx.max_dt = self.max_dt
+        pywarpx.warpx.skip_domain_bc_value_update = self.skip_domain_bc_value_update
 
         if self.relativistic:
             pywarpx.warpx.do_electrostatic = "relativistic"
