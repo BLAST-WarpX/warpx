@@ -162,7 +162,7 @@ namespace {
         amrex::ParticleReal s12 = 0;
         // Define minimum theta in radians
         amrex::ParticleReal const theta_min = minimum_scattering_angle; //This must be set from the configuration. Also check ElasticBhabhaMollerCollisionFunc.H
-            
+
         if (p1sm > std::numeric_limits<amrex::ParticleReal>::min()) {
 
             s12 = TreeLevelElasticBhabhaCrossSectionAngularPart(theta_min);
@@ -190,10 +190,10 @@ namespace {
             amrex::ParticleReal const df = -TreeLevelElasticBhabhaCrossSectionAngularPartDerivative(theta_guess_old);
             //For theta_min = 0.05, sample_point must range from 0 to 31.5
             theta_guess_new = theta_guess_old - f/df;
-            
+
             rel_error = std::abs(theta_guess_new-theta_guess_old)/std::abs(theta_guess_old);
             theta_guess_old = theta_guess_new;
-            
+
         }
         cosXs = std::cos(theta_guess_old);
         sinXs = std::sin(theta_guess_old);
