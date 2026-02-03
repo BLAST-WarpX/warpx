@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# @Eya Dammak supervised by @Remi Lehe, 2024
 """
 This script tests the last coordinate after adding an electron.
 The sphere is centered on O and has a radius of 0.2 (EB)
