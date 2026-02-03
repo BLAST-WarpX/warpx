@@ -196,6 +196,48 @@ class FiniteDifferenceSolver
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
             int lev );
 
+        /**
+          * \brief Calculation of the gradient of the given scalar field.
+          *
+          * \param[out] out_field  vector of output MultiFabs at a given level
+          * \param[in] in_field   vector of input MultiFabs at a given level
+          * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
+          * \param[in] lev  level number for the calculation
+          */
+        void ComputeGradient (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev );
+
+        /**
+          * \brief Calculation of the Laplacian of the given scalar field.
+          *
+          * \param[out] out_field  scalar output MultiFab at a given level
+          * \param[in] in_field   scalar input MultiFab at a given level
+          * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
+          * \param[in] lev  level number for the calculation
+          */
+        void ComputeLaplacian (
+            ablastr::fields::ScalarField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev );
+
+        /**
+          * \brief Calculation of the vector Laplacian of the given vector field.
+          *
+          * \param[out] out_field  vector of output MultiFabs at a given level
+          * \param[in] in_field   vector of input MultiFabs at a given level
+          * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
+          * \param[in] lev  level number for the calculation
+          */
+        void ComputeVectorLaplacian (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev );
+
     private:
 
         ElectromagneticSolverAlgo m_fdtd_algo;
@@ -288,6 +330,30 @@ class FiniteDifferenceSolver
             int lev
         );
 
+        template<typename T_Algo>
+        void ComputeGradientCylindrical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeLaplacianCylindrical (
+            ablastr::fields::ScalarField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorLaplacianCylindrical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
 #elif defined(WARPX_DIM_RSPHERE)
         template< typename T_Algo >
         void EvolveBSpherical (
@@ -342,6 +408,30 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeGradientSpherical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeLaplacianSpherical (
+            ablastr::fields::ScalarField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorLaplacianSpherical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
             int lev
         );
 
@@ -454,6 +544,30 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField & Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeGradientCartesian (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeLaplacianCartesian (
+            ablastr::fields::ScalarField& out_field,
+            ablastr::fields::ScalarField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorLaplacianCartesian (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
             int lev
         );
 #endif

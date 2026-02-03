@@ -150,10 +150,6 @@ computeEffectivePotentialPhi (
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
-
     const amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
@@ -231,7 +227,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {

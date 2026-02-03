@@ -12,6 +12,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/WarpX_Complex.H"
+#include "Utils/ParticleUtils.H"
 
 #include <AMReX.H>
 
@@ -838,6 +839,8 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
  * \param Bx_type,By_type,Bz_type         IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
+ * \param domain_double             The domain boundary indicies cast to double values
+ * \param do_cropping               Whether to crop particle orbits at domain boundaries
  * \param lo                        Index lower bounds of domain.
  * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
  */
@@ -870,6 +873,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
                      [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
+                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes)
 {
@@ -902,7 +907,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
     amrex::Real const xp_new = xp_np1;
@@ -915,24 +920,45 @@ void doGatherShapeNEsirkepovStencilImplicit (
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #else
 #if !defined(WARPX_DIM_1D_Z)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+    double x_new = (xp_np1 - xyzmin.x)*dinv.x;
     double const x_old = (xp_n - xyzmin.x)*dinv.x;
 #endif
 #endif
 #if defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
-    double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
+    double y_new = (yp_np1 - xyzmin.y)*dinv.y;
     double const y_old = (yp_n - xyzmin.y)*dinv.y;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // Keep these double to avoid bug in single precision
-    double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
+    double z_new = (zp_np1 - xyzmin.z)*dinv.z;
     double const z_old = (zp_n - xyzmin.z)*dinv.z;
+#endif
+
+    // Crop the particles at the boundaries if it is absorbing.
+    // Calculate the change in the length of the trajectory
+    // so that the time step size can be appropriately scaled.
+#if defined(WARPX_DIM_3D)
+    ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
     // Shape factor arrays
@@ -1352,6 +1378,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
  * \param Bx_type,By_type,Bz_type   IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
+ * \param domain_double             The domain boundary indicies cast to double values
+ * \param do_cropping               Whether to crop particle orbits at domain boundaries
  * \param lo                        Index lower bounds of domain.
  * \param n_rz_azimuthal_modes      Number of azimuthal modes when using RZ geometry
  */
@@ -1384,6 +1412,8 @@ void doGatherPicnicShapeN (
                      const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
+                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes)
 {
@@ -1425,7 +1455,7 @@ void doGatherPicnicShapeN (
 #endif
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
     amrex::Real const xp_new = xp_np1;
@@ -1448,22 +1478,50 @@ void doGatherPicnicShapeN (
     amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #elif !defined(WARPX_DIM_1D_Z)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+    double x_new = (xp_np1 - xyzmin.x)*dinv.x;
     double const x_old = (xp_n - xyzmin.x)*dinv.x;
 #endif
 #if defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
-    double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
+    double y_new = (yp_np1 - xyzmin.y)*dinv.y;
     double const y_old = (yp_n   - xyzmin.y)*dinv.y;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // Keep these double to avoid bug in single precision
-    double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
+    double z_new = (zp_np1 - xyzmin.z)*dinv.z;
     double const z_old = (zp_n   - xyzmin.z)*dinv.z;
+#endif
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+#if !defined(WARPX_DIM_1D_Z)
+    const double dxp = x_new - x_old;
+#endif
+#if defined(WARPX_DIM_3D)
+    const double dyp = y_new - y_old;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    const double dzp = z_new - z_old;
+#endif
+
+#if defined(WARPX_DIM_3D)
+    ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new, domain_double[1][0], domain_double[1][1], do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
     // 1) Determine the number of segments.
@@ -1501,11 +1559,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 7) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
-    const double dxp = x_new - x_old;
-    const double dyp = y_new - y_old;
-    const double dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -1684,10 +1738,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 5) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
-    const double dxp = x_new - x_old;
-    const double dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Xcell = 0., Zcell = 0.;
@@ -1855,8 +1906,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dzp and the initial cell location used to find the cell crossings.
-    double const dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
 
@@ -1940,8 +1990,7 @@ void doGatherPicnicShapeN (
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dxp and the initial cell location used to find the cell crossings.
-    double const dxp = x_new - x_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
 
@@ -2025,6 +2074,9 @@ void doGatherPicnicShapeN (
 #endif
 
     // Gather magnetic field
+    // This passes in the uncropped values of the half step position.
+    // A future fix could pass in the average of the cropped values so
+    // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
     doDirectGatherVectorField<depos_order_perp,depos_order_para>(
@@ -2143,6 +2195,8 @@ void doGatherShapeN (const amrex::ParticleReal xp,
  * \param bx_type,by_type,bz_type IndexType of the magnetic field
  * \param dinv                    3D cell size inverse
  * \param xyzmin                  The lower bounds of the domain
+ * \param domain_double           The domain boundary indicies cast to double values
+ * \param do_cropping             Whether to crop particle orbits at domain boundaries
  * \param lo                      Index lower bounds of domain.
  * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
  * \param nox                     order of the particle shape function
@@ -2176,6 +2230,8 @@ void doGatherShapeNImplicit (
                      const amrex::IndexType bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
+                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                      const amrex::Dim3& lo,
                      const int n_rz_azimuthal_modes,
                      const int nox,
@@ -2187,25 +2243,25 @@ void doGatherShapeNImplicit (
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                                      dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                                      dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherShapeNEsirkepovStencilImplicit<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                                      dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                                      dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherShapeNEsirkepovStencilImplicit<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                                      dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                                      dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherShapeNEsirkepovStencilImplicit<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                                      dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                                      dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Villasenor) {
@@ -2214,25 +2270,25 @@ void doGatherShapeNImplicit (
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                     ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                                    dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         }
     }
     else if (depos_type == CurrentDepositionAlgo::Direct) {

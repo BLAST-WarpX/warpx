@@ -265,6 +265,17 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         pp_species_name.get("qed_quantum_sync_phot_product_species",
             m_qed_quantum_sync_phot_product_name);
     }
+
+    pp_species_name.query("do_qed_virtual_photons", m_do_qed_virtual_photons);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (!m_do_qed_virtual_photons) ||
+        AmIA<PhysicalSpecies::electron>() ||
+        AmIA<PhysicalSpecies::positron>(),
+        "can't enable virtual photons for non lepton species '"
+            + species_name + "'.");
+    if (m_do_qed_virtual_photons) {
+        pp_species_name.query("qed_virtual_photon_species_name", m_qed_virtual_photon_species_name);
+    }
 #endif
 
     // User-defined integer attributes
@@ -1684,6 +1695,15 @@ bool PhysicalParticleContainer::has_quantum_sync () const
 bool PhysicalParticleContainer::has_breit_wheeler () const
 {
     return m_do_qed_breit_wheeler;
+}
+
+bool PhysicalParticleContainer::has_virtual_photons () const
+{
+    return m_do_qed_virtual_photons;
+}
+
+int PhysicalParticleContainer::getVirtualPhotonSpeciesIndex() const{
+    return m_qed_virtual_photon_species;
 }
 
 void
