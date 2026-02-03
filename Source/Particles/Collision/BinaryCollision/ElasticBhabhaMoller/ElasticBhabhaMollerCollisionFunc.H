@@ -236,6 +236,7 @@ public:
         bool m_isSameSpecies;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
     };
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
