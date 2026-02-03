@@ -47,7 +47,6 @@ particles.B_external_particle = 0. 5000. 0.
 ########### PARTICLES ###########
 #################################
 particles.species_names = pho beam_p beam_e
-particles.photon_species = pho
 
 beam_e.species_type = electron
 beam_e.injection_style = MultipleParticles

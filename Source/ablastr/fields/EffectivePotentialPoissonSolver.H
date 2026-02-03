@@ -150,17 +150,13 @@ computeEffectivePotentialPhi (
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
-
     const amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
 
         // Use the Multigrid (MLMG) solver but first scale rho appropriately
         using namespace ablastr::constant::SI;
-        rho[lev]->mult(-1._rt/ep0);
+        rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
         // In the presence of EB or RZ the EB enabled linear solver is used
@@ -231,7 +227,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -267,7 +263,7 @@ computeEffectivePotentialPhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-epsilon_0);  // Multiply rho by epsilon again
     } // loop over lev(els)
 }
 

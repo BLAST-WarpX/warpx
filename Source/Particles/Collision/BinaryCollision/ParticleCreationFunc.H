@@ -13,7 +13,7 @@
 #include "Particles/Collision/BinaryCollision/NuclearFusion/TwoProductFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/NuclearFusion/ProtonBoronFusionInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/ElasticBhabhaMoller/ElasticBhabhaMollerInitializeMomentum.H"
-#include "Particles/Collision/BinaryCollision/LinearBreitWheeler/TwoProductInitializeMomentum.H"
+#include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerInitializeMomentum.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonInitializeMomentum.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/MultiParticleContainer.H"
@@ -108,7 +108,8 @@ public:
                     const SmartCopy* AMREX_RESTRICT copy_species2,
                     const index_type* AMREX_RESTRICT p_pair_indices_1,
                     const index_type* AMREX_RESTRICT p_pair_indices_2,
-                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight
+                    const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+                    const amrex::ParticleReal* /*p_product_data*/
                     ) const
     {
         using namespace amrex::literals;
@@ -228,7 +229,7 @@ public:
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
-                    TwoProductInitializeMomentum(soa_1, soa_2,
+                    LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
@@ -328,7 +329,8 @@ public:
                     const index_type* /*p_mask*/, const amrex::Vector<index_type>& /*products_np*/,
                     const SmartCopy* /*copy_species1*/, const SmartCopy* /*copy_species2*/,
                     const index_type* /*p_pair_indices_1*/, const index_type* /*p_pair_indices_2*/,
-                    const amrex::ParticleReal* /*p_pair_reaction_weight*/
+                    const amrex::ParticleReal* /*p_pair_reaction_weight*/,
+                    const amrex::ParticleReal* AMREX_RESTRICT /*p_product_data*/
                     ) const
     {
         return {};

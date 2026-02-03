@@ -11,7 +11,8 @@ my_constants.bunch_sigma_z = 1.e-6
 my_constants.laser_energy = 1. # Joule
 my_constants.laser_radius = 10.e-6 # meters
 my_constants.laser_duration = 0.2e-12 # seconds
-my_constants.photon_energy = q_e # 1 eV
+my_constants.omega = 1.519267447878626e15  # rad/s
+my_constants.photon_energy = hbar * omega  # 1 eV
 my_constants.N_photons = laser_energy / photon_energy # Number of photons in the laser pulse
 # time
 my_constants.T = laser_duration + Lz / clight
@@ -45,7 +46,6 @@ warpx.const_dt = dt
 ####### PARTICLES #######
 #########################
 particles.species_names = photon1 electron1 photon2 electron2
-particles.photon_species = photon1 photon2
 
 # laser
 photon1.species_type = photon

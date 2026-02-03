@@ -73,6 +73,7 @@ option(WarpX_APP           "Build the WarpX executable application"     ON)
 option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
 option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
 option(WarpX_EB            "Embedded boundary support"                  ON)
+option(WarpX_PETSC         "PETSc linear/nonlinear solvers via AMReX"   OFF)
 option(WarpX_LIB           "Build WarpX as a library"                   OFF)
 option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
 option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
@@ -672,11 +673,6 @@ foreach(D IN LISTS WarpX_DIMS)
 endforeach()
 
 
-# Warnings ####################################################################
-#
-set_cxx_warnings()
-
-
 # Generate Configuration and .pc Files ########################################
 #
 get_source_version(WarpX_${WarpX_DIMS_LAST} ${WarpX_SOURCE_DIR})
@@ -855,6 +851,13 @@ if(BUILD_TESTING)
         add_subdirectory(Examples)
     endif()
 endif()
+
+
+# Warnings ####################################################################
+#
+foreach(warpx_tgt IN LISTS _ALL_TARGETS)
+    warpx_set_compile_warnings(${warpx_tgt})
+endforeach()
 
 
 # Status Summary for Build Options ############################################

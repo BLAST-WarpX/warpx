@@ -26,7 +26,17 @@ jobs:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - name: Free More Disk Space
+      uses: ax3l/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false  # apt takes ~1:30min
+        docker-images: true
+        swap-storage: false
+    - uses: actions/checkout@v6
     - uses: actions/setup-python@v5
       name: Install Python
       with:
@@ -56,7 +66,7 @@ jobs:
         which nvcc || echo "nvcc not in PATH!"
 
         cmake-easyinstall --prefix=/usr/local \
-          git+https://github.com/openPMD/openPMD-api.git@0.16.1 \
+          git+https://github.com/openPMD/openPMD-api.git@0.17.0 \
           -DopenPMD_USE_PYTHON=OFF    \
           -DBUILD_TESTING=OFF         \
           -DBUILD_EXAMPLES=OFF        \
@@ -85,7 +95,7 @@ jobs:
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build_sp -j 4
+        cmake --build build_sp -j 3
 
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools[core] wheel
@@ -105,7 +115,17 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - name: Free More Disk Space
+      uses: ax3l/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false  # apt takes ~1:30min
+        docker-images: true
+        swap-storage: false
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc.sh 11.7
@@ -145,9 +165,20 @@ jobs:
     #  # For NVHPC, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - name: Free More Disk Space
+      uses: ax3l/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false  # apt takes ~1:30min
+        docker-images: true
+        swap-storage: false
+    - uses: actions/checkout@v6
     - name: Dependencies
-      run: .github/workflows/dependencies/nvhpc.sh 25.1
+      run: |
+        .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
       uses: actions/cache@v4
       with:

@@ -376,10 +376,13 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const amrex::Real y_cut = plasma_injector.y_cut;
     const amrex::Real z_cut = plasma_injector.z_cut;
     const amrex::Real q_tot = plasma_injector.q_tot;
+    const amrex::Real N_tot = plasma_injector.N_tot;
     long npart = plasma_injector.npart;
     const int do_symmetrize = plasma_injector.do_symmetrize;
     const int symmetrization_order = plasma_injector.symmetrization_order;
     const amrex::Real focal_distance = plasma_injector.focal_distance;
+    const amrex::Real rotation_angle = plasma_injector.rotation_angle;
+    const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
 
     // Declare temporary vectors on the CPU
     amrex::Gpu::HostVector<ParticleReal> particle_x;
@@ -397,24 +400,28 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
         if (do_symmetrize){
             npart /= symmetrization_order;
         }
+        // compute the weight from N_tot if the user specified npart_real = N_tot
+        // compute the weight from q_tot if the user specified q_tot
+        // note that npart is the number of macroparticles
+        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*charge));
         for (long i = 0; i < npart; ++i) {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-            const amrex::Real weight = q_tot/(npart*charge);
+            const amrex::Real weight = weight_3d;
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             amrex::Real y = amrex::RandomNormal(y_m, y_rms);
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_XZ)
-            const amrex::Real weight = q_tot/(npart*charge*y_rms);
+            const amrex::Real weight = weight_3d/y_rms;
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             constexpr amrex::Real y = 0._prt;
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_1D_Z)
-            const amrex::Real weight = q_tot/(npart*charge*x_rms*y_rms);
+            const amrex::Real weight = weight_3d/(x_rms*y_rms);
             constexpr amrex::Real x = 0._prt;
             constexpr amrex::Real y = 0._prt;
             amrex::Real z = amrex::RandomNormal(z_m, z_rms);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            const amrex::Real weight = q_tot/(npart*charge*y_rms*z_rms);
+            const amrex::Real weight = weight_3d/(y_rms*z_rms);
             amrex::Real x = amrex::RandomNormal(x_m, x_rms);
             constexpr amrex::Real y = 0._prt;
             constexpr amrex::Real z = 0._prt;
@@ -462,6 +469,56 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 x = x - (v_x - v_dot_n*n_x) * t;
 #endif
             }
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+            if (plasma_injector.do_rotation){
+
+                    // normalize the rotation axis
+                    const Real k_norm = std::sqrt(rotation_axis[0]*rotation_axis[0] + rotation_axis[1]*rotation_axis[1] + rotation_axis[2]*rotation_axis[2]);
+                    const Real kx = rotation_axis[0]/k_norm;
+                    const Real ky = rotation_axis[1]/k_norm;
+                    const Real kz = rotation_axis[2]/k_norm;
+
+                    // compute rotated vector:
+                    // v_rot = v * cos + (k x v) sin + k (k * v) (1 - cos)
+
+                    // dot product
+                    const Real k_dot_x = kx*(x-x_m) + ky*(y-y_m) + kz*(z-z_m);
+
+                    // cross product
+                    const Real k_cross_x = ky*(z-z_m) - kz*(y-y_m);
+                    const Real k_cross_y = kz*(x-x_m) - kx*(z-z_m);
+                    const Real k_cross_z = kx*(y-y_m) - ky*(x-x_m);
+
+                    // rotate positions around the centroid
+#if defined(WARPX_DIM_3D)
+                    x = x_m + (x-x_m)*std::cos(rotation_angle) + k_cross_x*std::sin(rotation_angle) + kx*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    y = y_m + (y-y_m)*std::cos(rotation_angle) + k_cross_y*std::sin(rotation_angle) + ky*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    z = z_m + (z-z_m)*std::cos(rotation_angle) + k_cross_z*std::sin(rotation_angle) + kz*k_dot_x*(1._rt - std::cos(rotation_angle));
+#elif defined(WARPX_DIM_XZ)
+                    x = x_m + (x-x_m)*std::cos(rotation_angle) + k_cross_x*std::sin(rotation_angle) + kx*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    z = z_m + (z-z_m)*std::cos(rotation_angle) + k_cross_z*std::sin(rotation_angle) + kz*k_dot_x*(1._rt - std::cos(rotation_angle));
+                    ignore_unused(k_cross_y);
+#endif
+                    if (plasma_injector.do_rotation_momenta){
+
+                        // dot product
+                        const Real k_dot_u = kx*u.x + ky*u.y + kz*u.z;
+
+                        // cross product
+                        const Real k_cross_u_x = ky*u.z - kz*u.y;
+                        const Real k_cross_u_y = kz*u.x - kx*u.z;
+                        const Real k_cross_u_z = kx*u.y - ky*u.x;
+
+                        // rotate momenta
+                        u.x = u.x * std::cos(rotation_angle) + k_cross_u_x * std::sin(rotation_angle) + kx * k_dot_u * (1._rt - std::cos(rotation_angle));
+                        u.y = u.y * std::cos(rotation_angle) + k_cross_u_y * std::sin(rotation_angle) + ky * k_dot_u * (1._rt - std::cos(rotation_angle));
+                        u.z = u.z * std::cos(rotation_angle) + k_cross_u_z * std::sin(rotation_angle) + kz * k_dot_u * (1._rt - std::cos(rotation_angle));
+                    }
+                }
+#else
+                ignore_unused(rotation_angle, rotation_axis);
+#endif
+
                 u.x *= PhysConst::c;
                 u.y *= PhysConst::c;
                 u.z *= PhysConst::c;
@@ -641,11 +698,15 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 #endif
 
             if (plasma_injector.insideBounds(x, y, z)) {
-                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass;
-                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass;
+
+                // The normalized momentum is u = p / m = gamma beta c
+                // with m = m_e for photons, m the particle mass otherwise.
+                amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
+                amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
+                amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
                 if (ps["momentum"].contains("y")) {
-                    uy = ptr_uy.get()[i]*momentum_unit_y/mass;
+                    uy = ptr_uy.get()[i]*momentum_unit_y/mass_eff;
                 }
                 CheckAndAddParticle(x, y, z, ux, uy, uz, weight,
                                     particle_x,  particle_y,  particle_z,
@@ -682,13 +743,19 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 }
 
 void
-PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox)
+PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox)
 {
     WARPX_PROFILE("PhysicalParticleContainer::AddPlasma()");
 
     // If no part_realbox is provided, initialize particles in the whole domain
     const Geometry& geom = Geom(lev);
-    if (!part_realbox.ok()) { part_realbox = geom.ProbDomain(); }
+    bool initial_injection;
+    if (!part_realbox.ok()) {
+        part_realbox = geom.ProbDomain();
+        initial_injection = true;
+    } else {
+        initial_injection = false;
+    }
 
     const int num_ppc = plasma_injector.num_particles_per_cell;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -708,8 +775,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
-    InjectorDensity*  inj_rho = plasma_injector.getInjectorDensity();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
+    InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
     const amrex::Real t = WarpX::GetInstance().gett_new(lev);
@@ -730,13 +797,31 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
 
+    auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+    {
+        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
+                                        gamma_boost, beta_boost, t);
+    };
+
+    if (initial_injection) {
+        // Initial particle injection
+        plasma_injector.prepare(this->ParticleBoxArray(lev),
+                                this->ParticleDistributionMap(lev), IntVect(0),
+                                get_zlab);
+    } else {
+        // Continuous particle injection due to moving window
+        int moving_dir = WarpX::moving_window_dir;
+        int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
+        plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
+    }
+
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
         info.EnableTiling(tile_size);
     }
-#ifdef AMREX_USE_OMP
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
     info.SetDynamic(true);
-#pragma omp parallel if (not WarpX::serialize_initial_conditions)
+#pragma omp parallel if (not WarpX::serialize_initial_conditions && amrex::Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi = MakeMFIter(lev, info); mfi.isValid(); ++mfi)
     {
@@ -758,6 +843,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector const& plasma_injector, int
         if (no_overlap) {
             continue; // Go to the next tile
         }
+
+        auto* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
@@ -1364,6 +1451,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
 #endif
 
+        // local copy for device lambda capture
+        amrex::ParticleReal const mass = m_mass;
+
         // Loop over all new particles and inject them (creates too many
         // particles, in particular does not consider xmin, xmax etc.).
         // The invalid ones are given negative ID and are deleted during the
@@ -1400,7 +1490,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Determine the position of the particle within the cell
                 XDim3 pos;
-                XDim3 r;
+                auto r = XDim3{0.0_rt,0.0_rt,0.0_rt};
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
                     auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
@@ -1638,7 +1728,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Update particle position by a random `t_fract`
                 // so as to produce a continuous-looking flow of particles
                 const amrex::Real t_fract = amrex::Random(engine)*dt;
-                UpdatePosition(ppos.x, ppos.y, ppos.z, pu.x, pu.y, pu.z, t_fract);
+                UpdatePosition(ppos.x, ppos.y, ppos.z, pu.x, pu.y, pu.z, t_fract, mass);
 
 #if defined(WARPX_DIM_3D)
                 pa[PIdx::x][ip] = ppos.x;
@@ -1664,7 +1754,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             }
         });
 
-        amrex::Gpu::synchronize();
+        amrex::Gpu::synchronize(); // If this is removed, we need to make sure inj_rho is async safe.
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {

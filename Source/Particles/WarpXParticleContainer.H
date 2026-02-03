@@ -13,8 +13,6 @@
 #include "WarpXParticleContainer_fwd.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
@@ -55,55 +53,41 @@
 #include <utility>
 
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
+ *
+ *  x, y, z  : position components
+ *  ux uy uz : normalized momentum components
+ *  w        : weight
+ *  theta    : azimuthal angle
+ *  phi      : polar angle, relative to the x-y plane
+ *  nattribs : number of compile-time attributes
  */
 struct PIdx
 {
-    enum {
-#if !defined (WARPX_DIM_1D_Z)
-        x,
+#if defined(WARPX_DIM_1D_Z)
+    enum                          { z ,  w ,  ux ,  uy ,  uz,                      nattribs};
+    static constexpr auto names = {"z", "w", "ux", "uy", "uz"};
+#elif defined(WARPX_DIM_XZ)
+    enum                          { x ,  z ,  w ,  ux ,  uy ,  uz,                 nattribs};
+    static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz"};
+#elif defined(WARPX_DIM_RZ)
+    enum                          { x ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
+    static constexpr auto names = {"r", "z", "w", "ux", "uy", "uz", "theta"};
+#elif defined(WARPX_DIM_RCYLINDER)
+    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
+    static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta"};
+#elif defined(WARPX_DIM_RSPHERE)
+    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
+    static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta", "phi"};
+#elif defined(WARPX_DIM_3D)
+    enum                          { x ,  y,   z,   w,   ux,   uy,   uz,            nattribs};
+    static constexpr auto names = {"x", "y", "z", "w", "ux", "uy", "uz"};
+#else
+  #error WarpX dimension is not correctly set!
 #endif
-#if defined (WARPX_DIM_3D)
-        y,
-#endif
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-        z,
-#endif
-        w,      ///< weight
-        ux, uy, uz,
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        theta,      ///< RZ needs all three position components
-#endif
-#if defined(WARPX_DIM_RSPHERE)
-        phi,      ///< 1D Sphere needs all three position components
-#endif
-        nattribs    ///< number of compile-time attributes
-    };
-
-    //! component names
-    static constexpr auto names = {
-#if !defined (WARPX_DIM_1D_Z)
-                                   "x",
-#endif
-#if defined (WARPX_DIM_3D)
-                                   "y",
-#endif
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-                                   "z",
-#endif
-                                   "w",
-                                   "ux",
-                                   "uy",
-                                   "uz",
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                   "theta",  // azimuthal angle
-#endif
-#if defined(WARPX_DIM_RSPHERE)
-                                   "phi", // polar angle, relative to the x-y plane
-#endif
-    };
 
     static_assert(names.size() == nattribs);
 };
+
 
 struct IntIdx {
     enum
@@ -112,6 +96,15 @@ struct IntIdx {
         };
 
     static constexpr std::initializer_list<char const *> names = {};
+};
+
+struct DiagIdx
+{
+    enum {
+        w = 0,
+        x, y, z, ux, uy, uz,
+        nattribs
+    };
 };
 
 class WarpXParIter
@@ -232,14 +225,14 @@ public:
     virtual PlasmaInjector* GetPlasmaInjector (const int /*i*/) { return nullptr; }
 
     /**
-     * Evolve is the central WarpXParticleContainer function that advances
-     * particles for a time dt (typically one timestep). It is a pure virtual
-     * function for flexibility.
+     * \brief Pure virtual function to advance particles (typically by one time step).
      */
     virtual void Evolve (ablastr::fields::MultiFabRegister& fields,
                          int lev,
                          const std::string& current_fp_string,
-                         amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full, bool skip_deposition=false,
+                         amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     virtual void PostRestart () = 0;
@@ -530,10 +523,9 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    //amrex::Real getCharge () {return charge;}
     amrex::ParticleReal getCharge () const {return charge;}
-    //amrex::Real getMass () {return mass;}
-    amrex::ParticleReal getMass () const {return mass;}
+
+    amrex::ParticleReal getMass () const {return m_mass;}
 
     int DoFieldIonization() const { return do_field_ionization; }
 
@@ -541,7 +533,8 @@ public:
     //Species for which QED effects are relevant should override these methods
     virtual bool has_quantum_sync() const {return false;}
     virtual bool has_breit_wheeler() const {return false;}
-
+    virtual bool has_virtual_photons() const {return false;}
+    virtual int getVirtualPhotonSpeciesIndex() const { return -1; }
     int DoQED() const { return has_quantum_sync() || has_breit_wheeler(); }
 #else
     int DoQED() const { return false; }
@@ -590,6 +583,8 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    void setDoNotGather (int flag) { do_not_gather = flag; }
+    void setDoNotDeposit (int flag) { do_not_deposit = flag; }
 
     bool HasiAttrib (const std::string& name)
     {
@@ -602,11 +597,15 @@ protected:
     int species_id;
 
     amrex::ParticleReal charge;
-    amrex::ParticleReal mass;
+    amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
     // Controls boundaries for particles exiting the domain
     ParticleBoundaries m_boundary_conditions;
+
+    // Controls whether particle trajectoris are cropped when particles
+    // cross a PEC boundary
+    bool m_crop_on_PEC_boundary = false;
 
     //! instead of depositing (current, charge) on the finest patch level, deposit to the coarsest grid
     bool m_deposit_on_main_grid = false;
@@ -656,7 +655,9 @@ protected:
     std::string m_qed_breit_wheeler_pos_product_name;
     int m_qed_quantum_sync_phot_product;
     std::string m_qed_quantum_sync_phot_product_name;
-
+    int m_qed_virtual_photon_species;
+    std::string m_qed_virtual_photon_species_name;
+    amrex::Real m_qed_virtual_photon_min_energy;
 #endif
     amrex::Vector<amrex::FArrayBox> local_rho;
     amrex::Vector<amrex::FArrayBox> local_jx;
@@ -675,7 +676,6 @@ protected:
     amrex::Vector<amrex::FArrayBox> local_Szz;
 
 public:
-    using PairIndex = std::pair<int, int>;
 
     int getIonizationInitialLevel () const noexcept {return ionization_initial_level;}
 

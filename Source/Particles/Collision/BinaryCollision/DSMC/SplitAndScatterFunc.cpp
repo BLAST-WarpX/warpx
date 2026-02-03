@@ -18,11 +18,11 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
         const amrex::ParmParse pp_collision_name(collision_name);
 
         // Check if the scattering processes include reactions that produce macroparticles in new species
-        // (i.e. not in the incident species list), i.e. if it contains ionization or charge exchange
+        // (i.e. not in the incident species list), i.e. if it contains ionization, charge exchange or two-product reaction
         amrex::Vector<std::string> scattering_processes;
         pp_collision_name.queryarr("scattering_processes", scattering_processes);
         const bool reaction_produces_new_species = std::any_of(scattering_processes.begin(), scattering_processes.end(), [](const std::string& process) {
-            return process == "ionization" || process == "charge_exchange";
+            return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction";
         });
 
         if (reaction_produces_new_species) {
@@ -40,17 +40,21 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                 m_num_products_host.push_back(1); // first product species
                 m_num_products_host.push_back(1); // second product species
 
-                // get the ionization energy
-                pp_collision_name.get("ionization_energy", m_ionization_energy);
+                // get the reaction energy
+                pp_collision_name.get("ionization_energy", m_reaction_energy);
             }
 
-            // For charge exchange:
-            if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end()) {
+            // For charge exchange or two-product reaction:
+            if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end() ||
+                std::find(scattering_processes.begin(), scattering_processes.end(), "two_product_reaction") != scattering_processes.end()) {
                 m_num_product_species = 4;
                 m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
                 m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
                 m_num_products_host.push_back(1); // first product species
                 m_num_products_host.push_back(1); // second product species
+
+                // get the reaction energy, assuming zero energy for charge exchange
+                pp_collision_name.query("two_product_reaction_energy", m_reaction_energy);
             }
 
         } else {

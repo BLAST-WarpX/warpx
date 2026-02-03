@@ -142,7 +142,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                 Complex const divE = kr*(Ep_old - Em_old) + I*kz*Ez_old;
                 Complex const divJ = kr*(Jp - Jm) + I*kz*Jz;
 
-                auto const myeps0 = PhysConst::ep0;  // temporary for NVCC
+                auto const myeps0 = PhysConst::epsilon_0;  // temporary for NVCC
                 rho_diff = T2*(X2 - X3)*myeps0*divE + T_rho*X2*divJ;
             }
 
@@ -157,7 +157,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                         + T2*S_ck*(c2*I*kr*Bp_old + c2*I*kr*Bm_old)
                         + X4*Jz - I*kz*rho_diff;
             // Update B (see WarpX online documentation: theory section)
-            // Note: here X1 is T2*x1/(ep0*c*c*k_norm*k_norm), where
+            // Note: here X1 is T2*x1/(epsilon_0*c*c*k_norm*k_norm), where
             // x1 has the same definition as in the original paper
             fields(i,j,k,Bp_m) = T2*C*Bp_old
                         - T2*S_ck*(-I*kr/2._rt*Ez_old + kz*Ep_old)
@@ -209,7 +209,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int mode) noexcept
         {
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
 
             // Calculate norm of vector

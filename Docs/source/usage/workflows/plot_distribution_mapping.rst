@@ -1,7 +1,7 @@
 Visualizing a distribution mapping
 ==================================
 
-WarpX provides via :ref:`reduced diagnostics <dataanalysis-reduced-diagnostics>` an output
+WarpX provides via :ref:`reduced diagnostics <dataanalysis-formats-reduced>` an output
 :ref:`LoadBalanceCosts <running-cpp-parameters-diagnostics>`, which
 allows for visualization of a simulation's distribution mapping and computational
 costs. Here we demonstrate the workflow for generating this data and using it to
@@ -13,7 +13,7 @@ Generating the data
 
 To generate 'Load Balance Costs' reduced diagnostics output, WarpX should be run
 with the following lines added to the input file (the name of the reduced diagnostics
-file, `LBC`, and interval in steps to output reduced diagnostics data, `100`, may
+file, ``LBC``, and interval in steps to output reduced diagnostics data, ``100``, may
 be changed as needed):
 
 .. code-block:: python
@@ -22,16 +22,16 @@ be changed as needed):
     LBC.type = LoadBalanceCosts
     LBC.intervals = 100
 
-The line `warpx.reduced_diags_names = LBC` sets the name of the reduced diagnostics
-output file to `LBC`.  The next line `LBC.type = LoadBalanceCosts` tells WarpX
-that the reduced diagnostics is a `LoadBalanceCosts` diagnostic, and instructs
-WarpX to record costs and rank layouts.  The final line, `LBC.intervals = 100`,
+The line ``warpx.reduced_diags_names = LBC`` sets the name of the reduced diagnostics
+output file to ``LBC``.  The next line ``LBC.type = LoadBalanceCosts`` tells WarpX
+that the reduced diagnostics is a ``LoadBalanceCosts`` diagnostic, and instructs
+WarpX to record costs and rank layouts.  The final line, ``LBC.intervals = 100``,
 controls the interval for output of this reduced diagnostic's data.
 
 Loading and plotting the data
 -----------------------------
 
-After generating data (called `LBC_knapsack.txt` and `LBC_sfc.txt` in the example
+After generating data (called ``LBC_knapsack.txt`` and ``LBC_sfc.txt`` in the example
 below), the following Python code, along with a helper class in
 :download:`plot_distribution_mapping.py <../../../../Tools/PostProcessing/plot_distribution_mapping.py>`
 can be used to read the data:
@@ -144,7 +144,7 @@ This generates plots like in `[fig:knapsack_sfc_distribution_mapping_2D] <#fig:k
    \centering
 
 .. figure:: knapsack_sfc_distribution_mapping_2D.png
-   :alt: Sample distribution mappings from simulations with knapsack (left) and space-filling curve (right) policies for update of the distribution mapping when load balancing.
+   :alt: Comparison of knapsack vs space-filling curve distribution mappings
    :name: fig:knapsack_sfc_distribution_mapping_2D
    :width: 15cm
 
@@ -177,7 +177,7 @@ This generates plots like in `[fig:knapsack_sfc_costs_2D] <#fig:knapsack_sfc_cos
    \centering
 
 .. figure:: knapsack_sfc_costs_2D.png
-   :alt: Sample computational cost per box from simulations with knapsack (left) and space-filling curve (right) policies for update of the distribution mapping when load balancing.
+   :alt: Computational cost comparison between knapsack and space-filling curve methods
    :name: fig:knapsack_sfc_costs_2D
    :width: 15cm
 
@@ -268,7 +268,7 @@ This generates plots like in `[fig:distribution_mapping_3D] <#fig:distribution_m
    \centering
 
 .. figure:: distribution_mapping_3D.png
-   :alt: Sample distribution mappings from 3D simulations, visualized as slices in the :math:`ik` plane along :math:`j`.
+   :alt: 3D distribution mapping slices in the ik plane
    :name: fig:distribution_mapping_3D
    :width: 15cm
 

@@ -9,6 +9,8 @@
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
 #include "Particles/Collision/BackgroundStopping/BackgroundStopping.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollision.H"
+#include "Particles/Collision/BinaryCollision/Bremsstrahlung/BremsstrahlungFunc.H"
+#include "Particles/Collision/BinaryCollision/Bremsstrahlung/PhotonCreationFunc.H"
 #include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/SplitAndScatterFunc.H"
@@ -19,6 +21,10 @@
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
 #include "Utils/TextMsg.H"
 
+#include "Particles/ParticleCreation/SmartCopy.H"
+#ifdef WARPX_QED
+#include "Particles/Collision/BinaryCollision/VirtualPhotonCreation.H"
+#endif
 #include <AMReX_ParmParse.H>
 
 #include <vector>
@@ -71,6 +77,12 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                 );
         }
+        else if (type == "bremsstrahlung") {
+            allcollisions[i] =
+               std::make_unique<BinaryCollision<BremsstrahlungFunc, PhotonCreationFunc>>(
+                    collision_names[i], mypc
+                );
+        }
         else if (type == "linear_breit_wheeler") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<LinearBreitWheelerCollisionFunc, ParticleCreationFunc>>(
@@ -107,6 +119,14 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+#ifdef WARPX_QED
+    // For QED incoherent processes (e.g. Bethe-Heitler, Landau-Lifschitz), the process is mediated by virtual photons.
+    // The virtual photons are newly generated here and participate in the collisions.
+    // Here, the virtual photons are regenerated from scratch, i.e. they are overwritten by new ones at each time step.
+    if(mypc->nSpecies() > 0) {
+        collision::binarycollision::virtualphotons::GenerateVirtualPhotons(mypc);
+    }
+#endif
 
     if (m_use_global_debye_length) {
         mypc->GenerateGlobalDebyeLength();

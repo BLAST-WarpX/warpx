@@ -33,6 +33,9 @@ namespace BinaryCollisionUtils{
             const NuclearFusionType fusion_type = get_nuclear_fusion_type(collision_name, mypc);
             return nuclear_fusion_type_to_collision_type(fusion_type);
         }
+        else if (type == "bremsstrahlung") {
+            return CollisionType::Bremsstrahlung;
+        }
         else if (type == "dsmc") {
             return CollisionType::DSMC;
         }

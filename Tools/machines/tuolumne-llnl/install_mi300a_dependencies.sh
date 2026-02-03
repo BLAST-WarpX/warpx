@@ -53,6 +53,7 @@ cmake \
     --fresh                        \
     -S ${SRC_DIR}/c-blosc2         \
     -B ${build_dir}/c-blosc2-build \
+    -DBUILD_SHARED_LIBS=OFF        \
     -DBUILD_TESTS=OFF              \
     -DBUILD_BENCHMARKS=OFF         \
     -DBUILD_EXAMPLES=OFF           \
@@ -67,6 +68,30 @@ cmake \
     --target install                    \
     --parallel ${build_procs}
 rm -rf ${build_dir}/c-blosc2-build
+
+# HDF5
+if [ -d ${SRC_DIR}/hdf5 ]
+then
+  cd ${SRC_DIR}/hdf5
+  git fetch --prune
+  git checkout hdf5-1_14_1-2
+  cd -
+else
+  git clone -b hdf5-1_14_1-2 https://github.com/HDFGroup/hdf5.git ${SRC_DIR}/hdf5
+fi
+cmake \
+    --fresh                      \
+    -S ${SRC_DIR}/hdf5           \
+    -B ${build_dir}/hdf5-build   \
+    -DBUILD_SHARED_LIBS=OFF        \
+    -DBUILD_TESTING=OFF          \
+    -DHDF5_ENABLE_PARALLEL=ON    \
+    -DCMAKE_INSTALL_PREFIX=${SW_DIR}/hdf5-1.14.1.2
+cmake \
+    --build ${build_dir}/hdf5-build \
+    --target install                \
+    --parallel ${build_procs}
+rm -rf ${build_dir}/hdf5-build
 
 # ADIOS2
 if [ -d ${SRC_DIR}/adios2 ]
@@ -87,6 +112,7 @@ cmake \
     -DADIOS2_USE_Fortran=OFF     \
     -DADIOS2_USE_Python=OFF      \
     -DADIOS2_USE_ZeroMQ=OFF      \
+    -DBUILD_SHARED_LIBS=OFF      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
 cmake \
     --build ${build_dir}/adios2-build \
@@ -110,6 +136,7 @@ cmake \
     -B ${build_dir}/blaspp-tuolumne-mi300a-build \
     -Duse_openmp=OFF                          \
     -Dgpu_backend=hip                         \
+    -DBUILD_SHARED_LIBS=OFF                   \
     -DCMAKE_CXX_STANDARD=17                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
@@ -135,6 +162,7 @@ cmake \
     -DCMAKE_CXX_STANDARD=17                     \
     -Dgpu_backend=hip                           \
     -Dbuild_tests=OFF                           \
+    -DBUILD_SHARED_LIBS=OFF                     \
     -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON      \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake \
@@ -142,6 +170,43 @@ cmake \
     --target install                                 \
     --parallel ${build_procs}
 rm -rf ${build_dir}/lapackpp-tuolumne-mi300a-build
+
+# PETSC
+if [ -d ${SRC_DIR}/petsc ]
+then
+  cd ${SRC_DIR}/petsc
+  git fetch --prune
+  git checkout v3.24.0
+  cd -
+else
+  git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git ${SRC_DIR}/petsc
+fi
+cd ${SRC_DIR}/petsc
+./configure               \
+    COPTFLAGS="-g -O3"    \
+    FOPTFLAGS="-g -O3"    \
+    CXXOPTFLAGS="-g -O2"  \
+    HIPOPTFLAGS="-g -O3"  \
+    LDFLAGS+="${LDFLAGS}" \
+    --prefix=${SW_DIR}/petsc-3.24.0  \
+    --with-batch                     \
+    --with-cmake=1                   \
+    --with-cuda=0                    \
+    --with-hip=1                     \
+    --with-hip-dir=${ROCM_PATH}      \
+    --with-fortran-bindings=0        \
+    --with-fftw=0                    \
+    --download-kokkos                \
+    --download-kokkos-kernels        \
+    --with-make-np=${build_procs}    \
+    --with-mpi-dir=${MPICH_DIR}      \
+    --with-clean=1                   \
+    --with-debugging=0               \
+    --with-x=0                       \
+    --with-zlib=1
+make all
+make install
+cd -
 
 # Python ######################################################################
 #
