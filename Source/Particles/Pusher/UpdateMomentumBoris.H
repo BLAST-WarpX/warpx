@@ -33,7 +33,7 @@ void UpdateMomentumBoris(
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
     // Magnetic rotation
     // - Compute temporary variables
-    const amrex::Real const bconst = (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) ? 0.5_rt*econst : 1.0_rt*econst;
+    const amrex::Real bconst = (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) ? 0.5_rt*econst : 1.0_rt*econst;
     const amrex::ParticleReal tx = bconst*inv_gamma*Bx;
     const amrex::ParticleReal ty = bconst*inv_gamma*By;
     const amrex::ParticleReal tz = bconst*inv_gamma*Bz;
