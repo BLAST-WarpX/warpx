@@ -1409,9 +1409,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     int qed_runtime_flag = no_qed;
 #endif
 
-    // Local copy for device lambda capture
-    bool const collisions_split_position_push = m_collisions_split_position_push;
-
     // Loop over the particles and update their momentum.
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
