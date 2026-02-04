@@ -500,19 +500,30 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                     ignore_unused(k_cross_y);
 #endif
                     if (plasma_injector.do_rotation_momenta){
-
-                        // dot product
+                        // Rotate full momentum (bulk + fluctuation)
                         const Real k_dot_u = kx*u.x + ky*u.y + kz*u.z;
-
-                        // cross product
                         const Real k_cross_u_x = ky*u.z - kz*u.y;
                         const Real k_cross_u_y = kz*u.x - kx*u.z;
                         const Real k_cross_u_z = kx*u.y - ky*u.x;
-
-                        // rotate momenta
                         u.x = u.x * std::cos(rotation_angle) + k_cross_u_x * std::sin(rotation_angle) + kx * k_dot_u * (1._rt - std::cos(rotation_angle));
                         u.y = u.y * std::cos(rotation_angle) + k_cross_u_y * std::sin(rotation_angle) + ky * k_dot_u * (1._rt - std::cos(rotation_angle));
                         u.z = u.z * std::cos(rotation_angle) + k_cross_u_z * std::sin(rotation_angle) + kz * k_dot_u * (1._rt - std::cos(rotation_angle));
+                    } else {
+                        // Rotate only the fluctuation and keep bulk velocity unrotated
+                        const XDim3 u_bulk = plasma_injector.getInjectorMomentumHost()->getBulkMomentum(x, y, z);
+                        Real u_fluc_x = u.x - u_bulk.x;
+                        Real u_fluc_y = u.y - u_bulk.y;
+                        Real u_fluc_z = u.z - u_bulk.z;
+                        const Real k_dot_u_fluc = kx*u_fluc_x + ky*u_fluc_y + kz*u_fluc_z;
+                        const Real k_cross_x = ky*u_fluc_z - kz*u_fluc_y;
+                        const Real k_cross_y = kz*u_fluc_x - kx*u_fluc_z;
+                        const Real k_cross_z = kx*u_fluc_y - ky*u_fluc_x;
+                        u_fluc_x = u_fluc_x * std::cos(rotation_angle) + k_cross_x * std::sin(rotation_angle) + kx * k_dot_u_fluc * (1._rt - std::cos(rotation_angle));
+                        u_fluc_y = u_fluc_y * std::cos(rotation_angle) + k_cross_y * std::sin(rotation_angle) + ky * k_dot_u_fluc * (1._rt - std::cos(rotation_angle));
+                        u_fluc_z = u_fluc_z * std::cos(rotation_angle) + k_cross_z * std::sin(rotation_angle) + kz * k_dot_u_fluc * (1._rt - std::cos(rotation_angle));
+                        u.x = u_bulk.x + u_fluc_x;
+                        u.y = u_bulk.y + u_fluc_y;
+                        u.z = u_bulk.z + u_fluc_z;
                     }
                 }
 #else
