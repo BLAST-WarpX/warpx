@@ -26,7 +26,7 @@ void UpdateMomentumVay(
 {
     using namespace amrex::literals;
     // Constants
-    const amrex::ParticleReal econst = q*dt/m;
+    const amrex::ParticleReal econst = q*dt/m * ((momentum_push_type == MomentumPushType::Full) ? 1.0_prt : 0.5_prt);
     const amrex::ParticleReal bconst = 0.5_prt*q*dt/m;
     // Compute initial gamma
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*PhysConst::inv_c2_v<amrex::ParticleReal>);
@@ -36,27 +36,37 @@ void UpdateMomentumVay(
     const amrex::ParticleReal tauz = bconst*Bz;
     const amrex::ParticleReal tausq = taux*taux+tauy*tauy+tauz*tauz;
     // Get U', gamma'^2
-    const amrex::ParticleReal uxpr = ux + econst*Ex + (uy*tauz-uz*tauy)*inv_gamma;
-    const amrex::ParticleReal uypr = uy + econst*Ey + (uz*taux-ux*tauz)*inv_gamma;
-    const amrex::ParticleReal uzpr = uz + econst*Ez + (ux*tauy-uy*taux)*inv_gamma;
-    const amrex::ParticleReal gprsq = (1._prt + (uxpr*uxpr + uypr*uypr + uzpr*uzpr)*PhysConst::inv_c2_v<amrex::ParticleReal>);
-    // Get u*
-    const amrex::ParticleReal ust = (uxpr*taux + uypr*tauy + uzpr*tauz)*PhysConst::inv_c_v<amrex::ParticleReal>;
-    // Get new gamma
-    const amrex::ParticleReal sigma = gprsq-tausq;
-    const amrex::ParticleReal gisq = 2._prt/(sigma + std::sqrt(sigma*sigma + 4._prt*(tausq + ust*ust)) );
-    // Get t, s
-    const amrex::ParticleReal bg = bconst*std::sqrt(gisq);
-    const amrex::ParticleReal tx = bg*Bx;
-    const amrex::ParticleReal ty = bg*By;
-    const amrex::ParticleReal tz = bg*Bz;
-    const amrex::ParticleReal s = 1._prt/(1._prt+tausq*gisq);
-    // Get t.u'
-    const amrex::ParticleReal tu = tx*uxpr + ty*uypr + tz*uzpr;
-    // Get new U
-    ux = s*(uxpr+tx*tu+uypr*tz-uzpr*ty);
-    uy = s*(uypr+ty*tu+uzpr*tx-uxpr*tz);
-    uz = s*(uzpr+tz*tu+uxpr*ty-uypr*tx);
+    const amrex::ParticleReal uxpr = ux + econst*Ex + ((momentum_push_type == MomentumPushType::SecondHalf) ? 0.0_prt : (uy*tauz-uz*tauy)*inv_gamma);
+    const amrex::ParticleReal uypr = uy + econst*Ey + ((momentum_push_type == MomentumPushType::SecondHalf) ? 0.0_prt : (uz*taux-ux*tauz)*inv_gamma);
+    const amrex::ParticleReal uzpr = uz + econst*Ez + ((momentum_push_type == MomentumPushType::SecondHalf) ? 0.0_prt : (ux*tauy-uy*taux)*inv_gamma);
+
+    if (momentum_push_type !=  MomentumPushType::FirstHalf) {
+        // Get gamma'^2
+        const amrex::ParticleReal gprsq = (1._prt + (uxpr*uxpr + uypr*uypr + uzpr*uzpr)*PhysConst::inv_c2_v<amrex::ParticleReal>);
+        // Get u*
+        const amrex::ParticleReal ust = (uxpr*taux + uypr*tauy + uzpr*tauz)*PhysConst::inv_c_v<amrex::ParticleReal>;
+        // Get new gamma
+        const amrex::ParticleReal sigma = gprsq-tausq;
+        const amrex::ParticleReal gisq = 2._prt/(sigma + std::sqrt(sigma*sigma + 4._prt*(tausq + ust*ust)) );
+        // Get t, s
+        const amrex::ParticleReal bg = bconst*std::sqrt(gisq);
+        const amrex::ParticleReal tx = bg*Bx;
+        const amrex::ParticleReal ty = bg*By;
+        const amrex::ParticleReal tz = bg*Bz;
+        const amrex::ParticleReal s = 1._prt/(1._prt+tausq*gisq);
+        // Get t.u'
+        const amrex::ParticleReal tu = tx*uxpr + ty*uypr + tz*uzpr;
+        // Get new U
+        ux = s*(uxpr+tx*tu+uypr*tz-uzpr*ty);
+        uy = s*(uypr+ty*tu+uzpr*tx-uxpr*tz);
+        uz = s*(uzpr+tz*tu+uxpr*ty-uypr*tx);
+    }
+    else {
+        ux = uxpr;
+        uy = uypr;
+        uz = uzpr;
+    }
+
 }
 
 #endif // WARPX_PARTICLES_PUSHER_UPDATEMOMENTUM_VAY_H_
