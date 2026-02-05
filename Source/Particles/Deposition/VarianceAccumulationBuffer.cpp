@@ -10,6 +10,7 @@
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 #include "Particles/Deposition/TemperatureDeposition.H"
 #include "Fields.H"
+#include "WarpX.H"
 
 #include <ablastr/utils/Communication.H>
 

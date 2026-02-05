@@ -21,8 +21,6 @@
 #   include "Utils/WarpX_Complex.H"
 #endif
 
-#include "WarpX.H" // todo: remove include and pass globals as args
-
 #include "TemperatureDepositionTypes.H"
 
 #include <AMReX.H>

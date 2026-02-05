@@ -1925,6 +1925,13 @@ WarpX::ReadParameters ()
     }
 }
 
+int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
+                                    const int  bdry_side ) const
+{
+    return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
+}
+
+
 void
 WarpX::BackwardCompatibility ()
 {
