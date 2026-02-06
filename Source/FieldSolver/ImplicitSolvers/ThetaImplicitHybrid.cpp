@@ -8,6 +8,7 @@
 #include "ThetaImplicitHybrid.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/ExternalVectorPotential.H"
 #include "WarpX.H"
 #include <ablastr/utils/Communication.H>
 
@@ -29,6 +30,9 @@ void ThetaImplicitHybrid::Define ( WarpX* const a_WarpX )
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_hybrid_pic_model != nullptr,
         "ThetaImplicitHybrid solver requires hybrid PIC model to be defined");
+
+    /// Set flag for external fields from vector potentials
+    m_add_external_fields = m_hybrid_pic_model->m_add_external_fields;
 
     m_E.Define( m_WarpX, "Efield_fp" );
     m_Eold.Define( m_E );
@@ -83,6 +87,14 @@ void ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
 
     m_dt = a_dt;
 
+    // Handle external field splitting: work with internal fields during the solve
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            start_time, 0.5_rt * m_dt);
+        SubtractExternalEfield();
+        SubtractExternalBfield();
+    }
+
     // Save particle state at t^n
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
@@ -127,9 +139,24 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     // Update B^{n+θ} from current E estimate via Faraday's law
     UpdateWarpXFields( a_E, start_time );
 
-    // Advance particles and deposit J^{n+1/2}, ρ^{n+1/2}
     const amrex::Real theta_time = start_time + m_theta * m_dt;
+
+    // Add external fields for particle push (particles need total fields)
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            theta_time, 0.5_rt * m_dt);
+        AddExternalBfield();
+        AddExternalEfield();
+    }
+
+    // Advance particles and deposit J^{n+1/2}, ρ^{n+1/2}
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+
+    // Remove external fields after particle push (Ohm's law handles them internally)
+    if (m_add_external_fields) {
+        SubtractExternalBfield();
+        SubtractExternalEfield();
+    }
 
     // Get field arrays at all levels
     ablastr::fields::MultiLevelVectorField Efield_fp = 
@@ -154,6 +181,9 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         m_WarpX->GetEBUpdateEFlag(),
         true  // solve_for_Faraday
     );
+
+    // Apply boundary conditions to E_ohm
+    m_WarpX->FillBoundaryE_and_ApplyBCs(0, PatchType::fine, theta_time);
 
     // Return RHS = E_ohm - E_old
     // Framework computes residual = E - E_old - RHS = E - E_ohm
@@ -195,4 +225,75 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
     ablastr::fields::MultiLevelVectorField const& B_old = 
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
+
+    // Add external fields to get total fields at t^{n+1}
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            end_time, 0.5_rt * m_dt);
+        AddExternalBfield();
+        AddExternalEfield();
+    }
+
+    // Apply boundary conditions to final E field at t^{n+1}
+    m_WarpX->FillBoundaryE_and_ApplyBCs(0, PatchType::fine, end_time);
+}
+
+void ThetaImplicitHybrid::AddExternalBfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Add(
+                *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractExternalBfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::AddExternalEfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Add(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractExternalEfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
 }

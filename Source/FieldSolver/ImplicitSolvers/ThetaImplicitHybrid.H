@@ -96,6 +96,12 @@ private:
     HybridPICModel* m_hybrid_pic_model = nullptr;
 
     /**
+     * \brief Flag indicating whether external fields from vector potentials
+     * should be included. When true, field splitting is used: B_total = B_internal + B_external.
+     */
+    bool m_add_external_fields = false;
+
+    /**
      * \brief Solver vectors for the electric field.
      * m_E: E field at time n+theta (during solve), then n+1 (after FinishFieldUpdate)
      * m_Eold: E field at time n (saved at start of timestep)
@@ -121,6 +127,26 @@ private:
      * This is applied to both E and B fields.
      */
     void FinishFieldUpdate ( amrex::Real end_time );
+
+    /**
+     * \brief Add external B field to Bfield_fp: B_fp += B_external
+     */
+    void AddExternalBfield ();
+
+    /**
+     * \brief Subtract external B field from Bfield_fp: B_fp -= B_external
+     */
+    void SubtractExternalBfield ();
+
+    /**
+     * \brief Add external E field to Efield_fp: E_fp += E_external
+     */
+    void AddExternalEfield ();
+
+    /**
+     * \brief Subtract external E field from Efield_fp: E_fp -= E_external
+     */
+    void SubtractExternalEfield ();
 
 };
 

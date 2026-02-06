@@ -786,7 +786,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor)) {
+                if (include_external_fields) {
                     Er(i, j, 0) -= Er_ext(i, j, 0);
                 }
             },
@@ -860,7 +860,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor)) {
+                if (include_external_fields) {
                     Etheta(i, j, 0) -= Etheta_ext(i, j, 0);
                 }
             },
@@ -933,7 +933,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
                 }
 
-                if (include_external_fields && (rho_val >= rho_floor)) {
+                if (include_external_fields) {
                     Ez(i, j, 0) -= Ez_ext(i, j, 0);
                 }
             }
