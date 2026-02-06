@@ -122,6 +122,9 @@ public:
         return field_boundary_hi;
     }
 
+    [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
+                                               const int  bdry_side ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -847,7 +850,7 @@ public:
      */
     void ReadExternalFieldFromFile (
          const std::string& read_fields_from_path, amrex::MultiFab* mf,
-         const std::string& F_name, const std::string& F_component);
+         const std::string& F_name, const std::string& F_component, int dest_comp = 0);
 
     /**
      * \brief

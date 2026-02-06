@@ -127,6 +127,7 @@ def nps_per_rank(rank):
 
 
 def add_particles():
+    global electrons
     nps = nps_per_rank(my_id)
     x = np.linspace(0.005, 0.025, nps)
     y = np.zeros(nps)
@@ -180,5 +181,4 @@ for pti in electrons.iterator(level=0):
 
 sim.step(1)
 
-if not sim.amr_restart:
-    del electrons
+del electrons

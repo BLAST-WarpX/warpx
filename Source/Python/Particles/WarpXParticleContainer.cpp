@@ -129,6 +129,13 @@ void init_WarpXParticleContainer (py::module& m)
             },
             py::arg("lev"), py::arg("local")
         )
+        .def("get_number_density",
+            [](WarpXParticleContainer& pc, int lev)
+            {
+                return pc.GetNumberDensity(lev);
+            },
+            py::arg("lev")
+        )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
             py::arg("flag")

@@ -39,9 +39,7 @@ class ParticleContainerWrapper(object):
         if self._particle_container is None:
             try:
                 mypc = libwarpx.warpx.multi_particle_container()
-                self._particle_container = mypc.get_particle_container_from_name(
-                    self.name
-                )
+                self._particle_container = mypc.get(self.name)
             except AttributeError as e:
                 msg = "You must initialize WarpX before accessing a ParticleContainerWrapper's particle_container."
                 raise AttributeError(msg) from e
@@ -724,7 +722,7 @@ class ParticleBoundaryBufferWrapper(object):
         The data for the arrays are not copied, but share the underlying
         memory buffer with WarpX. The arrays are fully writeable.
 
-        You can find `here https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py`
+        You can find `here <https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py>`_
         an example of a simple case of particle-boundary interaction (reflection).
 
         Parameters
