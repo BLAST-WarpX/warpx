@@ -1,11 +1,10 @@
-# --- This input defines 3D ion-beam extraction from plasma source:
-# --- Problem set-up: the volume of the simulation region is initially
-# --- filled with a thermal plasma of positive Deuterium ions and electrons.
-# --- To maintain plasma density during extraction, additional ions and
-# --- electrons are injected from the simulation box boundaries.
-# --- The ions are accelerated by a prescribed electrostatic potential set via
-# --- embedded boundaries (EB), forming a focused ion beam with a target energy
-# --- of approximately 40 kEv and a defined transverse geometry (e.g., single or multiple beamlets).
+# --- This example simulates the extraction of a high-energy ion beam from a plasma source.
+# --- The simulation box region at z<0 represents the plasma source, initially filled
+# --- with a plasma of positive Deuterium ions and electrons.
+# --- To maintain plasma density during extraction, ions and electrons are continuously
+# --- injected from the simulation boundaries in the region z<0.
+# --- Electrodes held at fixed electrostatic potentials extract and accelerate some of
+# --- the plasma ions, forming a continuous ion beam with a final energy of approximately 40 keV.
 #############################
 # User-defined constants for this problem
 
