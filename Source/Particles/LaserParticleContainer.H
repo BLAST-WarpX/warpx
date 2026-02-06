@@ -42,13 +42,14 @@ class LaserParticleContainer
     : public WarpXParticleContainer
 {
 public:
-    LaserParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
+    LaserParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name,
+                           bool collisions_split_position_push = false);
     ~LaserParticleContainer () override = default;
 
     LaserParticleContainer ( LaserParticleContainer const &)             = delete;
     LaserParticleContainer& operator= ( LaserParticleContainer const & ) = delete;
     LaserParticleContainer ( LaserParticleContainer&& )                  = default;
-    LaserParticleContainer& operator= ( LaserParticleContainer&& )       = default;
+    LaserParticleContainer& operator= ( LaserParticleContainer&& )       = delete;
 
     void InitData () final;
 
@@ -143,6 +144,8 @@ private:
 
     // Flag to disable the laser (e.g., if e_max is 0)
     bool m_enabled = true;
+    // Whether to use split-position push semantics for collisions
+    bool m_collisions_split_position_push;
 };
 
 #endif

@@ -117,7 +117,8 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core, bool const co
     }
 
     for (int i = nspecies; i < nspecies+nlasers; ++i) {
-        allcontainers[i] = std::make_unique<LaserParticleContainer>(amr_core, i, lasers_names[i-nspecies]);
+        allcontainers[i] = std::make_unique<LaserParticleContainer>(
+            amr_core, i, lasers_names[i-nspecies], collisions_split_position_push);
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
     }
 

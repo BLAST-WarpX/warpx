@@ -79,9 +79,10 @@ namespace
     }
 }
 
-LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies, const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
-      m_laser_name{name}
+LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies, const std::string& name, bool const collisions_split_position_push)
+        : WarpXParticleContainer(amr_core, ispecies),
+            m_laser_name{name},
+            m_collisions_split_position_push(collisions_split_position_push)
 {
     charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
@@ -561,7 +562,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
                                 Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
-                                PositionPushType /*position_push_type*/,
+                                PositionPushType position_push_type,
                                 MomentumPushType /*momentum_push_type*/,
                                 ImplicitOptions const * implicit_options)
 {
@@ -605,6 +606,25 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
         Gpu::DeviceVector<Real> plane_Xp, plane_Yp, amplitude_E;
 
+        // Auxiliary booleans
+        bool const deposit_charge_old = (
+            has_rho &&
+            !skip_deposition &&
+            !do_not_deposit &&
+            (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::FirstHalf)
+        );
+        bool const deposit_charge_new = (
+            has_rho &&
+            !skip_deposition &&
+            !do_not_deposit &&
+            (position_push_type == PositionPushType::Full || position_push_type == PositionPushType::SecondHalf)
+        );
+        bool const deposit_current = (
+            !skip_deposition &&
+            !do_not_deposit &&
+            !(implicit_options && implicit_options->evolve_suborbit_particles_only)
+        );
+
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
@@ -631,7 +651,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 np_to_deposit = 0;
             }
 
-            if (has_rho && ! skip_deposition && ! do_not_deposit) {
+            if (deposit_charge_old) {
+                // Deposit charge before particle push, in component 0 of MultiFab rho.
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
@@ -666,7 +687,11 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             // Current Deposition
             using ablastr::fields::Direction;
-            if (!skip_deposition)
+            amrex::Real position_dt = dt;
+            if (m_collisions_split_position_push) {
+                position_dt *= 0.5_rt;
+                }
+            if (deposit_current)
             {
                 // Deposit at t_{n+1/2}
                 const amrex::Real relative_time = -0.5_rt * dt;
@@ -676,9 +701,11 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
                 amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                 amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
+                amrex::Print() << "Depositing laser with dt " << dt << " at time "  << "\n";
+
                 DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                0, np_to_deposit, thread_num,
-                               lev, lev, dt, relative_time, push_type);
+                               lev, lev, position_dt, relative_time, push_type, m_collisions_split_position_push);
 
                 if (has_buffer)
                 {
@@ -688,12 +715,12 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                     DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                    np_to_deposit, np-np_to_deposit, thread_num,
-                                   lev, lev-1, dt, relative_time, push_type);
+                                   lev, lev-1, position_dt, relative_time, push_type, m_collisions_split_position_push);
                 }
             }
 
 
-            if (has_rho && ! skip_deposition && ! do_not_deposit) {
+            if (deposit_charge_new) {
                 int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 1, 0,
