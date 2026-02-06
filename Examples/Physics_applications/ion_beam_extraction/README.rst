@@ -27,7 +27,7 @@ The plasma source is set in two steps:
 A longitudinal electrostatic potential applied at the embedded-boundary surfaces defines the extraction voltage, accelerating ions from the plasma source to a target energy of :math:`\sim 40\,\mathrm{keV}`
 and forming single (or multiple) beamlet(s) with a defined transverse profile.
 
-The figure below shows color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as kinetic energy of the extracted ion beam.
+The figure below shows a color map of the electrostatic potential (:math:`\phi`) overlaid with contours of the embedded boundary (eb_covered field) and ion (:math:`D^{+}`) macroparticles, as well as the kinetic energy of the extracted ion beam.
 
 .. _ion_beam:
 
@@ -49,5 +49,5 @@ Note: For the CI test, we intentionally specified very high values for `self_fie
 Visualize
 ---------
 
-To visualize the results, you can use the provided plotting script, which reads the output diagnostics in openpmd format and generates plots of the electrostatic potential, ion beam macroparticles, as well as ion beam energy distribution.
-It also checks if particle energies tail is within relative tolerance of target energy of :math:`40\,\mathrm{keV}`.
+To visualize the results, you can use the provided plotting script, which reads the output diagnostics in openpmd format and generates plots of the electrostatic potential, ion beam macroparticles, as well as the ion beam energy distribution.
+It also checks if the particle energies tail is within a relative tolerance of the target energy of :math:`40\,\mathrm{keV}`.
