@@ -5,11 +5,8 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import yt
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, e
-
-yt.funcs.mylog.setLevel(0)
 
 filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
