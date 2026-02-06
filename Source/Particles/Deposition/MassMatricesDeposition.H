@@ -1197,12 +1197,22 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     if constexpr (full_mass_matrices) {
 
+    const int Ncomp_xx0 = 1 + 2*(depos_order - 1) + 2*max_crossings;
+    const int Ncomp_xz0 = 2*depos_order + 2*max_crossings;
+    const int Ncomp_zx0 = 2*depos_order + 2*max_crossings;
+    const int Ncomp_zz0 = 1 + 2*depos_order + 2*max_crossings;
+    const int Ncomp_xy0 = 2*depos_order + 2*max_crossings;
+    const int Ncomp_yx0 = 2*depos_order + 2*max_crossings;
+    const int Ncomp_yz0 = 1 + 2*depos_order + 2*max_crossings;
+    const int Ncomp_yy0 = 1 + 2*depos_order + 2*max_crossings;
+    const int Ncomp_zy0 = 1 + 2*depos_order + 2*max_crossings;
+
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
 
         // Deposit Sxx, Sxz, and Sxy for this segment
-        for (int i=0; i<=depos_order-1; i++) {
-            for (int k=0; k<=depos_order; k++) {
+        for (int i = 0; i <= depos_order - 1; i++) {
+            for (int k = 0; k <= depos_order; k++) {
                 const int i_J = lo.x + i0_cell[ns] + i;
                 const int k_J = lo.y + k0_node[ns] + k;
                 const amrex::Real weight_J = weight_cellX_nodeZ[ns][i][k];
@@ -1210,31 +1220,30 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                     const int SegShiftX = max_crossings + SegNumX[ms] - SegNumX[ns];
                     const int SegShiftZ = max_crossings + SegNumZ[ms] - SegNumZ[ns];
                     // Deposit Sxx
-                    const int Ncomp_xx0 = 1 + 2*(depos_order-1) + 2*max_crossings;
-                    for (int iE=0; iE<=depos_order-1; iE++) {
-                        for (int kE=0; kE<=depos_order; kE++) {
+                    for (int kE = 0; kE <= depos_order; kE++) {
+                        const int row_xx = depos_order - k + kE + SegShiftZ;
+                        for (int iE = 0; iE <= depos_order - 1; iE++) {
+                            const int col_xx = depos_order - 1 - i + iE + SegShiftX;
+                            if (col_xx > Ncomp_xx0 - row_xx) { break; } // Reduced deposit for diagonal mass matrices
+                            const int comp_xx = col_xx + Ncomp_xx0*row_xx;
                             const amrex::Real weight_E = weight_cellX_nodeZ[ms][iE][kE];
-                            const int comp_xx = depos_order-1 - i + iE + SegShiftX
-                                  +  Ncomp_xx0*(depos_order - k + kE + SegShiftZ);
                             amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(i_J, k_J, 0, comp_xx), fpxx*weight_J*weight_E);
                         }
                     }
                     // Deposit Sxz
-                    const int Ncomp_xz0 = 2*depos_order + 2*max_crossings;
-                    for (int iE=0; iE<=depos_order; iE++) {
-                        for (int kE=0; kE<=depos_order-1; kE++) {
+                    for (int iE = 0; iE <= depos_order; iE++) {
+                        for (int kE = 0; kE <= depos_order - 1; kE++) {
                             const amrex::Real weight_E = weight_nodeX_cellZ[ms][iE][kE];
-                            const int comp_xz = depos_order-1 - i + iE + SegShiftX
+                            const int comp_xz = depos_order - 1 - i + iE + SegShiftX
                                    + Ncomp_xz0*(depos_order - k + kE + SegShiftZ);
                             amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(i_J, k_J, 0, comp_xz), fpxz*weight_J*weight_E);
                         }
                     }
                     // Deposit Sxy
-                    const int Ncomp_xy0 = 2*depos_order + 2*max_crossings;
-                    for (int iE=0; iE<=depos_order; iE++) {
-                        for (int kE=0; kE<=depos_order; kE++) {
+                    for (int iE = 0; iE <= depos_order; iE++) {
+                        for (int kE = 0; kE <= depos_order; kE++) {
                             const amrex::Real weight_E = weight_nodeX_nodeZ[ms][iE][kE];
-                            const int comp_xy = depos_order-1 - i + iE + SegShiftX
+                            const int comp_xy = depos_order - 1 - i + iE + SegShiftX
                                    + Ncomp_xy0*(depos_order - k + kE + SegShiftZ);
                             amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(i_J, k_J, 0, comp_xy), fpxy*weight_J*weight_E);
                         }
@@ -1254,7 +1263,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                     const int SegShiftX = max_crossings + SegNumX[ms] - SegNumX[ns];
                     const int SegShiftZ = max_crossings + SegNumZ[ms] - SegNumZ[ns];
                     // Deposit Szx
-                    const int Ncomp_zx0 = 2*depos_order + 2*max_crossings;
                     for (int iE=0; iE<=depos_order-1; iE++) {
                         for (int kE=0; kE<=depos_order; kE++) {
                             const amrex::Real weight_E = weight_cellX_nodeZ[ms][iE][kE];
@@ -1264,17 +1272,17 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                         }
                     }
                     // Deposit Szz
-                    const int Ncomp_zz0 = 1 + 2*depos_order + 2*max_crossings;
-                    for (int iE=0; iE<=depos_order; iE++) {
-                        for (int kE=0; kE<=depos_order-1; kE++) {
+                    for (int kE=0; kE<=depos_order-1; kE++) {
+                        const int row_zz = depos_order - 1 - k + kE + SegShiftZ;
+                        for (int iE=0; iE<=depos_order; iE++) {
+                            const int col_zz = depos_order - i + iE + SegShiftX;
+                            if (col_zz > Ncomp_zz0 - 2 - row_zz) { break; } // Reduced deposit for diagonal mass matrices
+                            const int comp_zz = col_zz + Ncomp_zz0*row_zz;
                             const amrex::Real weight_E = weight_nodeX_cellZ[ms][iE][kE];
-                            const int comp_zz = depos_order - i + iE + SegShiftX
-                                   + Ncomp_zz0*(depos_order-1 - k + kE + SegShiftZ);
                             amrex::Gpu::Atomic::AddNoRet( &Szz_arr(i_J, k_J, 0, comp_zz), fpzz*weight_J*weight_E);
                         }
                     }
                     // Deposit Szy
-                    const int Ncomp_zy0 = 1 + 2*depos_order + 2*max_crossings;
                     for (int iE=0; iE<=depos_order; iE++) {
                         for (int kE=0; kE<=depos_order; kE++) {
                             const amrex::Real weight_E = weight_nodeX_nodeZ[ms][iE][kE];
@@ -1298,7 +1306,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                     const int SegShiftX = max_crossings + SegNumX[ms] - SegNumX[ns];
                     const int SegShiftZ = max_crossings + SegNumZ[ms] - SegNumZ[ns];
                     // Deposit Syx
-                    const int Ncomp_yx0 = 2*depos_order + 2*max_crossings;
                     for (int iE=0; iE<=depos_order-1; iE++) {
                         for (int kE=0; kE<=depos_order; kE++) {
                             const amrex::Real weight_E = weight_cellX_nodeZ[ms][iE][kE];
@@ -1308,7 +1315,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                         }
                     }
                     // Deposit Syz
-                    const int Ncomp_yz0 = 1 + 2*depos_order + 2*max_crossings;
                     for (int iE=0; iE<=depos_order; iE++) {
                         for (int kE=0; kE<=depos_order-1; kE++) {
                             const amrex::Real weight_E = weight_nodeX_cellZ[ms][iE][kE];
@@ -1318,12 +1324,13 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                         }
                     }
                     // Deposit Syy
-                    const int Ncomp_yy0 = 1 + 2*depos_order + 2*max_crossings;
-                    for (int iE=0; iE<=depos_order; iE++) {
-                        for (int kE=0; kE<=depos_order; kE++) {
+                    for (int kE=0; kE<=depos_order; kE++) {
+                        const int row_yy = depos_order - k + kE + SegShiftZ;
+                        for (int iE=0; iE<=depos_order; iE++) {
+                            const int col_yy = depos_order - i + iE + SegShiftX;
+                            if (col_yy > Ncomp_yy0 - 2 - row_yy) { break; } // Reduced deposit for diagonal mass matrices
+                            const int comp_yy = col_yy + Ncomp_yy0*row_yy;
                             const amrex::Real weight_E = weight_nodeX_nodeZ[ms][iE][kE];
-                            const int comp_yy = depos_order - i + iE + SegShiftX
-                                   + Ncomp_yy0*(depos_order - k + kE + SegShiftZ);
                             amrex::Gpu::Atomic::AddNoRet( &Syy_arr(i_J, k_J, 0, comp_yy), fpyy*weight_J*weight_E);
                         }
                     }
