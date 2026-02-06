@@ -61,8 +61,9 @@ Visualize
 ---------
 
 The provided plotting script reads the output diagnostics in openPMD format and generates plots of:
+
 - The electrostatic potential
-- Ion beam macroparticles
+- The ion beam macroparticles
 - The ion beam energy distribution
 
 The script also verifies that the particle energy tail is within a relative tolerance of the target energy of :math:`40\,\mathrm{keV}`.
