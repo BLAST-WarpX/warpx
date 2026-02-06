@@ -1578,7 +1578,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const int comp_zz = depos_order - 1 - k + kE + SegShift;
-                    if (comp_zz < width_zz) { break; } // Reduced deposit for diagonal mass matrices
+                    if (comp_zz > width_zz) { break; } // Reduced deposit for diagonal mass matrices
                     const amrex::Real weight_E = weight_cell[ms][kE];
                     amrex::Gpu::Atomic::AddNoRet(&Szz_arr(k_J, 0, 0, comp_zz), fpzz*weight_J*weight_E);
                 }
