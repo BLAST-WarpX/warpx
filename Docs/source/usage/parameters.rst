@@ -120,17 +120,31 @@ For example, ``something_intervals = -1`` deactivates ``something`` and ``someth
 Simulation Time
 ---------------
 
-* ``max_step`` (`integer`)
+* ``max_step``
+    :Type: Integer
+    :Units: None
+    :Required: No
+    :Default: ``std::numeric_limits<int>::max()``
+
     The number of PIC cycles to perform.
 
-* ``stop_time`` (`float`; in seconds)
+* ``stop_time``
+    :Type: Float
+    :Units: s
+    :Required: No
+    :Default: ``std::numeric_limits<amrex::Real>::max()``
+
     The maximum physical time of the simulation. Can be provided instead of ``max_step``. If both
     ``max_step`` and ``stop_time`` are provided, both criteria are used and the simulation stops
     when the first criterion is hit.
-
     Note: in boosted-frame simulations, ``stop_time`` refers to the time in the boosted frame.
 
-* ``warpx.zmax_plasma_to_compute_max_step`` (`float`) optional
+* ``warpx.zmax_plasma_to_compute_max_step``
+    :Type: Float
+    :Units: m
+    :Required: No
+    :Default: None
+
     Can be useful when running in a boosted frame. If specified, automatically
     calculates the number of iterations required in the boosted frame for the
     lower `z` end of the simulation domain to reach
@@ -139,7 +153,12 @@ Simulation Time
     printed to standard output. Currently only works if the Lorentz boost and
     the moving window are along the z direction.
 
-* ``warpx.compute_max_step_from_btd`` (`integer`; 0 by default) optional
+* ``warpx.compute_max_step_from_btd``
+    :Type: Integer
+    :Units: None
+    :Required: No
+    :Default: 0
+
     Can be useful when computing back-transformed diagnostics.  If specified,
     automatically calculates the number of iterations required in the boosted
     frame for all back-transformed diagnostics to be completed. If ``max_step``,
