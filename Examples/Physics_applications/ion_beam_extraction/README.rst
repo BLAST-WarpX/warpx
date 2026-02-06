@@ -1,23 +1,26 @@
-.. _examples-pierce-diode:
+.. _examples-ion-beam-extraction:
 
 Ion-Beam Extraction from a Plasma Source
-==========================================================
+========================================
 
+This test simulates the extraction of a high-energy (:math:`\sim 40\,\mathrm{keV}`) ion beam from a plasma source, using the same physical setup as in `this paper <https://pubs.aip.org/aip/rsi/article-abstract/81/2/02B108/1071759/Characterization-of-1-MW-40-keV-1-s-neutral-beam>`__.
 
-This test simulates the extraction of a high-energy (:math:`\sim 40\,\mathrm{keV}`) ion beam from a plasma source.
-The volume of the simulation region is initially filled with a thermal plasma of positive Deuterium ions and electrons.
-To maintain plasma density during extraction, additional ions and electrons are injected from the simulation box boundaries.
-Without this boundary injection, the plasma would deplete as ions are accelerated out of the source region.
+The volume of the simulation box located at :math:`z<0` represents the plasma source, and is initially filled with a plasma of positive Deuterium ions and electrons.
+To maintain plasma density during extraction, additional ions and electrons are injected from the boundaries of the simulation box.
+(Without this boundary injection, the plasma would deplete as ions are accelerated out of the source region, and both ions and electrons with thermal motion are absorbed by the simulation boundaries.)
 The ions are accelerated by a prescribed electrostatic potential set via embedded boundaries (EB), forming a focused ion beam with a target energy of approximately :math:`40\,\mathrm{keV}`
 and a defined transverse geometry (e.g., single or multiple beamlets).
+
+# Mention STL file
 
 The purpose of this test is to verify that WarpX can correctly model ion beam extraction from a plasma source and subsequent electrostatic acceleration.
 
 Plasma Source Setup
---------
-Plasma source is set in two steps:
+-------------------
 
-1) Initial plasma injection in the volume of the simulation box: plasma is filling the box with Deuterium ions and electrons of density :math:`1.22\times10^{18} \, \mathrm{m}^{-3}` and temperature :math:`10` eV, randomly distributed with a constant profile.
+The plasma source is set in two steps:
+
+1) Initial plasma injection in the volume of the simulation box: the plasma fills the box with Deuterium ions and electrons of density :math:`1.22\times10^{18} \, \mathrm{m}^{-3}` and temperature :math:`10` eV, randomly distributed with a constant profile.
 
 2) Boundary plasma injection: Deuterium ions and electrons of the same density and temperature, injected from the simulation box boundaries -- from the :math:`\pm x`, :math:`\pm y` and  :math:`-z`.
 
