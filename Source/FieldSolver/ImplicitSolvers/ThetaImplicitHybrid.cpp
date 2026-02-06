@@ -152,7 +152,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
         m_WarpX->GetEBUpdateEFlag(),
-        true  // solve_for_Faraday
+        false  // solve_for_Faraday
     );
 
     // Return RHS = E_ohm - E_old
