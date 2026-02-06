@@ -799,7 +799,10 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         options.deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
         CumulateJ();
-        if (m_use_mass_matrices_jacobian) { SaveE(); }
+        if (m_use_mass_matrices_jacobian) {
+            FinishMassMatrices();
+            SaveE();
+        }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
            const amrex::Real theta_dt = m_theta*m_dt;
@@ -930,6 +933,156 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
         }
     }
 
+}
+
+void ImplicitSolver::FinishMassMatrices ()
+{
+    BL_PROFILE("ImplicitSolver::FinishMassMatrices()");
+
+    // The MM deposit routine takes advantage of symmetry for the diagonal mass
+    // matrices to only deposit roughly half of the values. The remainder are
+    // computed via copy here in this routine.
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+#if AMREX_SPACEDIM == 2
+    const int ncomp_tot_xx = AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2]);
+    const int ncomp_tot_yy = AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2]);
+    const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
+#endif
+
+    amrex::IntVect Sxx_width, Syy_width, Szz_width;
+    for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+        Sxx_width[dir] = (m_ncomp_xx[dir] - 1)/2;
+        Syy_width[dir] = (m_ncomp_yy[dir] - 1)/2;
+        Szz_width[dir] = (m_ncomp_zz[dir] - 1)/2;
+    }
+
+#if AMREX_SPACEDIM == 2
+    const amrex::IntVect ncomp_xx = m_ncomp_xx;
+    const amrex::IntVect ncomp_yy = m_ncomp_yy;
+    const amrex::IntVect ncomp_zz = m_ncomp_zz;
+#endif
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
+        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+        ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( amrex::MFIter mfi(*SX[0], false); mfi.isValid(); ++mfi )
+        {
+
+            amrex::Array4<amrex::Real> const& Sxx = SX[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Syy = SY[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Szz = SZ[2]->array(mfi);
+
+            // Use grown boxes here with all S guard cells
+            amrex::Box Sbx = amrex::convert(mfi.validbox(),SX[0]->ixType());
+            amrex::Box Sby = amrex::convert(mfi.validbox(),SY[1]->ixType());
+            amrex::Box Sbz = amrex::convert(mfi.validbox(),SZ[2]->ixType());
+            Sbx.grow(SX[0]->nGrowVect());
+            Sbz.grow(SZ[2]->nGrowVect());
+            Sby.grow(SY[1]->nGrowVect());
+
+            amrex::ParallelFor(
+            Sbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+#if AMREX_SPACEDIM == 1
+                const int idx[3] = {i, j, k};
+                const int width = std::min(Sxx_width[0],Sbx.bigEnd(0)-idx[0]);
+                // Symmetry for diagonal MM: Sxx(i,d + n) = Sxx(i+n,d - n),
+                // where d = width is the diagonal component
+                for (int n = 1; n <= width; n++) {
+                    const int dst_comp = Sxx_width[0] + n;
+                    const int src_comp = Sxx_width[0] - n;
+                    Sxx(i,j,k,dst_comp) = Sxx(i+n,j,k,src_comp);
+                }
+#elif AMREX_SPACEDIM == 2
+                const int row_start = std::max(0,ncomp_xx[1] - ncomp_xx[0]);
+                for (int m = row_start; m < ncomp_xx[1]; m++) {
+                    const int jj = m - Sxx_width[1];
+                    if (j+jj < Sbx.smallEnd(1) || j+jj > Sbx.bigEnd(1)) { continue; }
+                    const int above_diag_extra = (m > Sxx_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    int width0 = std::min(m + above_diag_extra - row_start + 1, ncomp_xx[0]);
+                    for (int n = 0; n < width0; n++) {
+                        const int ii = Sxx_width[0] - n;
+                        if (i+ii < Sbx.smallEnd(0) || i+ii > Sbx.bigEnd(0)) { continue; }
+                        const int dst_comp = ncomp_xx[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_xx - 1 - dst_comp;
+                        Sxx(i,j,k,dst_comp) = Sxx(i+ii,j+jj,k,src_comp);
+                    }
+                }
+#endif
+            });
+
+            amrex::ParallelFor(
+            Sby, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+#if AMREX_SPACEDIM == 1
+                const int idx[3] = {i, j, k};
+                const int width = std::min(Syy_width[0],Sby.bigEnd(0)-idx[0]);
+                // Symmetry for diagonal MM: Syy(i,d + n) = Syy(i+n,d - n),
+                // where d = width is the diagonal component
+                for (int n = 1; n <= width; n++) {
+                    const int dst_comp = Syy_width[0] + n;
+                    const int src_comp = Syy_width[0] - n;
+                    Syy(i,j,k,dst_comp) = Syy(i+n,j,k,src_comp);
+                }
+#elif AMREX_SPACEDIM == 2
+                const int row_start = 1;
+                for (int m = row_start; m < ncomp_yy[1]; m++) {
+                    const int jj = m - Syy_width[1];
+                    if (j+jj < Sby.smallEnd(1) || j+jj > Sby.bigEnd(1)) { continue; }
+                    const int above_diag_extra = (m > Syy_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    int width0 = std::min(m + above_diag_extra - row_start + 1, ncomp_yy[0]);
+                    for (int n = 0; n < width0; n++) {
+                        const int ii = Syy_width[0] - n;
+                        if (i+ii < Sby.smallEnd(0) || i+ii > Sby.bigEnd(0)) { continue; }
+                        const int dst_comp = ncomp_yy[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_yy - 1 - dst_comp;
+                        Syy(i,j,k,dst_comp) = Syy(i+ii,j+jj,k,src_comp);
+                    }
+                }
+#endif
+            });
+
+            amrex::ParallelFor(
+            Sbz, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+#if AMREX_SPACEDIM == 1
+                const int idx[3] = {i, j, k};
+                const int width_zz = std::min(Szz_width[0],Sbz.bigEnd(0)-idx[0]);
+                // Symmetry for diagonal MM: Szz(i,d + n) = Szz(i+n,d - n),
+                // where d = width is the diagonal component
+                for (int n = 1; n <= width_zz; n++) {
+                    const int dst_comp = Szz_width[0] + n;
+                    const int src_comp = Szz_width[0] - n;
+                    Szz(i,j,k,dst_comp) = Szz(i+n,j,k,src_comp);
+                }
+#elif AMREX_SPACEDIM == 2
+                const int row_start = std::max(0,ncomp_zz[1] - ncomp_zz[0]);
+                for (int m = row_start; m < ncomp_zz[1]; m++) {
+                    const int jj = m - Szz_width[1];
+                    if (j+jj < Sbz.smallEnd(1) || j+jj > Sbz.bigEnd(1)) { continue; }
+                    const int above_diag_extra = (m > Szz_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    int width0 = std::min(m - row_start + above_diag_extra + 1, ncomp_zz[0]);
+                    for (int n = 0; n < width0; n++) {
+                        const int ii = Szz_width[0] - n;
+                        if (i+ii < Sbz.smallEnd(0) || i+ii > Sbz.bigEnd(0)) { continue; }
+                        const int dst_comp = ncomp_zz[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_zz - 1 - dst_comp;
+                        Szz(i,j,k,dst_comp) = Szz(i+ii,j+jj,k,src_comp);
+                    }
+                }
+#endif
+            });
+        }
+    }
 }
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
