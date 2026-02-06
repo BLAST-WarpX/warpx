@@ -41,6 +41,8 @@ warpx.self_fields_required_precision = 1e-1
 # Simulation time
 max_step = 1000
 stop_time = 2.8*device_length/beam_beta/clight # 9*device_length/beam_beta/clight
+# For numerical stability, the timestep needs to resolve the electron plasma frequency
+# (more specifically, dt < 2/wpe)
 my_constants.dt = 1.95/wpe
 warpx.const_dt = dt
 
