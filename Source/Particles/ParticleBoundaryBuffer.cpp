@@ -1,5 +1,4 @@
-/* Copyright 2021 Andrew Myers
- * modified by Remi Lehe, Eya Dammak 2023
+/* Copyright 2021 Andrew Myers, Eya Dammak
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
