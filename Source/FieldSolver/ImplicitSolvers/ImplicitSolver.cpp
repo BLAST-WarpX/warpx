@@ -800,7 +800,9 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
         CumulateJ();
         if (m_use_mass_matrices_jacobian) {
+#if AMREX_SPACEDIM < 3
             FinishMassMatrices();
+#endif
             SaveE();
         }
         if (m_use_mass_matrices_pc) {
@@ -935,6 +937,7 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
+#if AMREX_SPACEDIM < 3
 void ImplicitSolver::FinishMassMatrices ()
 {
     BL_PROFILE("ImplicitSolver::FinishMassMatrices()");
@@ -1084,6 +1087,7 @@ void ImplicitSolver::FinishMassMatrices ()
         }
     }
 }
+#endif
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
