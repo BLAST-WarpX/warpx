@@ -11,6 +11,7 @@
 #include "HybridPICModel.H"
 
 #include <ablastr/utils/Communication.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
@@ -35,8 +36,13 @@ void HybridPICModel::ReadParameters ()
     // of sub steps can be specified by the user.
     utils::parser::queryWithParser(pp_hybrid, "substeps", m_substeps);
     if (m_substeps % 2 != 0) {
-        Abort("hybrid_pic_model.substeps must be divisible by 2. "
-              "The value " + std::to_string(m_substeps) + " is not valid.");
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.substeps must be divisible by 2. "
+            "The value " + std::to_string(m_substeps) + " is not valid. "
+            "Automatically adjusting to " + std::to_string(m_substeps + 1) + ".",
+            ablastr::warn_manager::WarnPriority::medium);
+        m_substeps += 1;
     }
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
