@@ -955,18 +955,20 @@ void ImplicitSolver::FinishMassMatrices ()
     const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
 #endif
 
-    amrex::IntVect Sxx_width, Syy_width, Szz_width;
-    for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-        Sxx_width[dir] = (m_ncomp_xx[dir] - 1)/2;
-        Syy_width[dir] = (m_ncomp_yy[dir] - 1)/2;
-        Szz_width[dir] = (m_ncomp_zz[dir] - 1)/2;
+    amrex::GpuArray<int,3> ncomp_xx = {0,0,0};
+    amrex::GpuArray<int,3> ncomp_yy = {0,0,0};
+    amrex::GpuArray<int,3> ncomp_zz = {0,0,0};
+    amrex::GpuArray<int,3> Sxx_width = {0,0,0};
+    amrex::GpuArray<int,3> Syy_width = {0,0,0};
+    amrex::GpuArray<int,3> Szz_width = {0,0,0};
+    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+        ncomp_xx[dir] = m_ncomp_xx[dir];
+        ncomp_yy[dir] = m_ncomp_yy[dir];
+        ncomp_zz[dir] = m_ncomp_zz[dir];
+        Sxx_width[dir] = (ncomp_xx[dir] - 1)/2;
+        Syy_width[dir] = (ncomp_yy[dir] - 1)/2;
+        Szz_width[dir] = (ncomp_zz[dir] - 1)/2;
     }
-
-#if AMREX_SPACEDIM == 2
-    const amrex::IntVect ncomp_xx = m_ncomp_xx;
-    const amrex::IntVect ncomp_yy = m_ncomp_yy;
-    const amrex::IntVect ncomp_zz = m_ncomp_zz;
-#endif
 
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
@@ -1010,7 +1012,8 @@ void ImplicitSolver::FinishMassMatrices ()
                 for (int m = row_start; m < ncomp_xx[1]; m++) {
                     const int jj = m - Sxx_width[1];
                     if (j+jj < Sbx.smallEnd(1) || j+jj > Sbx.bigEnd(1)) { continue; }
-                    const int above_diag_extra = (m > Sxx_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    // Increase width by 1 when above row with diagonal term
+                    const int above_diag_extra = (m > Sxx_width[1] ? 1:0);
                     int width0 = std::min(m + above_diag_extra - row_start + 1, ncomp_xx[0]);
                     for (int n = 0; n < width0; n++) {
                         const int ii = Sxx_width[0] - n;
@@ -1041,7 +1044,8 @@ void ImplicitSolver::FinishMassMatrices ()
                 for (int m = row_start; m < ncomp_yy[1]; m++) {
                     const int jj = m - Syy_width[1];
                     if (j+jj < Sby.smallEnd(1) || j+jj > Sby.bigEnd(1)) { continue; }
-                    const int above_diag_extra = (m > Syy_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    // Increase width by 1 when above row with diagonal term
+                    const int above_diag_extra = (m > Syy_width[1] ? 1:0);
                     int width0 = std::min(m + above_diag_extra - row_start + 1, ncomp_yy[0]);
                     for (int n = 0; n < width0; n++) {
                         const int ii = Syy_width[0] - n;
@@ -1072,7 +1076,8 @@ void ImplicitSolver::FinishMassMatrices ()
                 for (int m = row_start; m < ncomp_zz[1]; m++) {
                     const int jj = m - Szz_width[1];
                     if (j+jj < Sbz.smallEnd(1) || j+jj > Sbz.bigEnd(1)) { continue; }
-                    const int above_diag_extra = (m > Szz_width[1] ? 1:0); // width increases by 1 when above row with diagonal term
+                    // Increase width by 1 when above row with diagonal term
+                    const int above_diag_extra = (m > Szz_width[1] ? 1:0);
                     int width0 = std::min(m - row_start + above_diag_extra + 1, ncomp_zz[0]);
                     for (int n = 0; n < width0; n++) {
                         const int ii = Szz_width[0] - n;
