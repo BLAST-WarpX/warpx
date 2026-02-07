@@ -263,12 +263,10 @@ protected:
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
-#if AMREX_SPACEDIM < 3
     /**
      * \brief Finish filling the mass matrices after deposit
      */
     void FinishMassMatrices ();
-#endif
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
