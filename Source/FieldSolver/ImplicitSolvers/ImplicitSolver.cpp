@@ -943,6 +943,7 @@ void ImplicitSolver::FinishMassMatrices ()
     // matrices to only deposit roughly half of the values. The remainder are
     // computed via copy here in this routine.
 
+#if AMREX_SPACEDIM < 3
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
@@ -1031,37 +1032,6 @@ void ImplicitSolver::FinishMassMatrices ()
 
                 }
 
-#elif AMREX_SPACEDIM == 3
-                const int plane_start = amrex::max(0, ncomp_xx[2] - ncomp_xx[1]);
-
-                for (int l = plane_start; l < ncomp_xx[2]; ++l) {
-                    const int kk = l - Sxx_width[2];
-
-                    const int above_diag_k = (l > Sxx_width[2]) ? 1 : 0;
-                    const int width1 = amrex::min(l + above_diag_k - plane_start + 1, ncomp_xx[1]);
-                    const int row_start = ncomp_xx[1] - width1;
-
-                    for (int m = row_start; m < ncomp_xx[1]; ++m) {
-                        const int jj = m - Sxx_width[1];
-
-                        const int above_diag_j = (m > Sxx_width[1]) ? 1 : 0;
-                        const int width0 = amrex::min(m + above_diag_j - row_start + 1, ncomp_xx[0]);
-
-                        for (int n = 0; n < width0; ++n) {
-                            const int ii = Sxx_width[0] - n;
-
-                            const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,kk));
-                            if (!Sbx.contains(iv_src)) { continue; }
-
-                            const int dst_comp = ncomp_xx[0]*(m + ncomp_xx[1]*l +  1) - (n + 1);
-                            const int src_comp = ncomp_tot_xx - 1 - dst_comp;
-
-                            Sxx(iv_dst,dst_comp) = Sxx(iv_src,src_comp);
-                        }
-
-                    }
-
-                }
 #endif
             });
 
@@ -1104,8 +1074,6 @@ void ImplicitSolver::FinishMassMatrices ()
                     }
                 }
 
-#elif AMREX_SPACEDIM == 3
-
 #endif
             });
 
@@ -1147,10 +1115,12 @@ void ImplicitSolver::FinishMassMatrices ()
                         Szz(iv_dst,dst_comp) = Szz(iv_src,src_comp);
                     }
                 }
+
 #endif
             });
         }
     }
+#endif
 }
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
