@@ -955,9 +955,9 @@ void ImplicitSolver::FinishMassMatrices ()
     const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
 #endif
 
-    amrex::GpuArray<int,3> ncomp_xx = {0,0,0};
-    amrex::GpuArray<int,3> ncomp_yy = {0,0,0};
-    amrex::GpuArray<int,3> ncomp_zz = {0,0,0};
+    amrex::GpuArray<int,3> ncomp_xx = {1,1,1};
+    amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
+    amrex::GpuArray<int,3> ncomp_zz = {1,1,1};
     amrex::GpuArray<int,3> Sxx_width = {0,0,0};
     amrex::GpuArray<int,3> Syy_width = {0,0,0};
     amrex::GpuArray<int,3> Szz_width = {0,0,0};
