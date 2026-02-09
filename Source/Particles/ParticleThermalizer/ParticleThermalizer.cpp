@@ -169,7 +169,7 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
                   if (amrex::Math::abs(unorm[ip]) > u_threshold*PhysConst::c) {
                       // assign new momentum from thermal distribution
                       amrex::Real vave = std::sqrt(theta);
-                      unorm[ip] = std::copysign(unorm[ip], amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c);
+                      unorm[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, unorm[ip]);
                   }
                 }
             });
