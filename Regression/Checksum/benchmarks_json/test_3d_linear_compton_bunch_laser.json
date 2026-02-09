@@ -24,10 +24,10 @@
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
-    "particle_position_x": 7.810529085905394e-06,
-    "particle_position_y": 3.0588244214844662e-06,
-    "particle_position_z": 3.953021420882662e-06,
-    "particle_weight": 9398496240601504.0
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
+    "particle_weight": 0.0
   },
   "photon2": {
     "particle_momentum_x": 0.0,
