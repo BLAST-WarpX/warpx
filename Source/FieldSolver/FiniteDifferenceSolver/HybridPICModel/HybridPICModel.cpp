@@ -662,6 +662,10 @@ void HybridPICModel::FieldPush (
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
+    // Call FillBoundary if a collocated grid is used
+    if (Bz_IndexType[0] == Ez_IndexType[0]) {
+        warpx.FillBoundaryE(ng, nodal_sync);
+    }
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);
