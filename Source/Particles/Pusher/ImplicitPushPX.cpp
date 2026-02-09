@@ -112,9 +112,9 @@ namespace {
         amrex::ParticleReal const & mass,
         amrex::ParticleReal const & q,
         ParticlePusherAlgo const & pusher_algo,
-        bool const & do_crr
+        bool const & do_crr,
 #ifdef WARPX_QED
-        , bool const & do_sync,
+        bool const & do_sync,
         amrex::Real t_chi_max,
         amrex::ParticleReal * p_optical_depth_QSR,
         QuantumSynchrotronEvolveOpticalDepth const & evolve_opt,
