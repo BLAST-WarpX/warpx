@@ -30,12 +30,18 @@ jobs:
       run: .github/workflows/source/hasEOLwhiteSpace
     - name: Check test input files
       run: .github/workflows/source/check_inputs.py
+
+  documentation:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
     - name: Doxygen
       run: |
         sudo apt update
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
-        .github/workflows/source/sphinx
+    - name: Compile the documentation
+      run: .github/workflows/source/sphinx
 
   zenodo:
     runs-on: ubuntu-latest
