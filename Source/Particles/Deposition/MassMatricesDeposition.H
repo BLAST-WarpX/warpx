@@ -1197,19 +1197,20 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     if constexpr (full_mass_matrices) {
 
-    const int Ncomp_xx0 = 1 + 2*(depos_order - 1) + 2*max_crossings;
-    const int Ncomp_xz0 = 2*depos_order + 2*max_crossings;
-    const int Ncomp_zx0 = 2*depos_order + 2*max_crossings;
-    const int Ncomp_zz0 = 1 + 2*depos_order + 2*max_crossings;
-    const int Ncomp_xy0 = 2*depos_order + 2*max_crossings;
-    const int Ncomp_yx0 = 2*depos_order + 2*max_crossings;
-    const int Ncomp_yz0 = 1 + 2*depos_order + 2*max_crossings;
-    const int Ncomp_yy0 = 1 + 2*depos_order + 2*max_crossings;
-    const int Ncomp_zy0 = 1 + 2*depos_order + 2*max_crossings;
+    const int Ncomp_base = 2*depos_order + 2*max_crossings;
+    const int Ncomp_xx0 = Ncomp_base - 1;
+    const int Ncomp_xz0 = Ncomp_base;
+    const int Ncomp_zx0 = Ncomp_base;
+    const int Ncomp_zz0 = 1 + Ncomp_base;
+    const int Ncomp_xy0 = Ncomp_base;
+    const int Ncomp_yx0 = Ncomp_base;
+    const int Ncomp_yz0 = 1 + Ncomp_base;
+    const int Ncomp_yy0 = 1 + Ncomp_base;
+    const int Ncomp_zy0 = 1 + Ncomp_base;
 
-    const int width_xx1 = depos_order + max_crossings;     // (Ncomp_xx[1] - 1)/2
-    const int width_zz1 = depos_order - 1 + max_crossings; // (Ncomp_zz[1] - 1)/2
-    const int width_yy1 = depos_order + max_crossings;     // (Ncomp_yy[1] - 1)/2
+    const int width_xx1 = depos_order + max_crossings;  // (Ncomp_xx[1] - 1)/2
+    const int width_zz1 = width_xx1 - 1;                // (Ncomp_zz[1] - 1)/2
+    const int width_yy1 = width_xx1;                    // (Ncomp_yy[1] - 1)/2
 
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
