@@ -231,12 +231,10 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             amrex::ignore_unused(qed_control);
 #endif
 
-            amrex::Real position_dt = dt;
-            if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
-                position_dt *= 0.5_rt;
+            if (position_push_type == PositionPushType::Full) {
+                UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
+                SetPosition(i, x, y, z);
             }
-            UpdatePosition(x, y, z, ux[i], uy[i], uz[i], position_dt, mass);
-            SetPosition(i, x, y, z);
         }
     );
 }
