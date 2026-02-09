@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# Copyright 2026 The WarpX Community
+#
+# License: BSD-3-Clause-LBNL
+# Authors: Luca Fedeli
+
+set -eu -o pipefail
+
+cd Docs
+
+python3 -m pip install -r requirements.txt
+
+make html

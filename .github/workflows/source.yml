@@ -35,6 +35,7 @@ jobs:
         sudo apt update
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
+        .github/workflows/source/sphinx
 
   zenodo:
     runs-on: ubuntu-latest
