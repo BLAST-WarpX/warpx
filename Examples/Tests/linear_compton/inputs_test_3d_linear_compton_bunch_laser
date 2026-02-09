@@ -21,7 +21,7 @@ my_constants.sigma_kn_max = 6.65e-29 # Maximum value of Klein-Nishina cross-sect
 my_constants.v_rel = 2 *clight
 my_constants.probability_target_value = 0.05
 my_constants.dt =  probability_target_value / (sigma_kn_max * dens * v_rel )
-my_constants.N_step = floor(T / dt)
+my_constants.N_step = floor(T / dt) + 1
 # space
 my_constants.Lz = 8 * bunch_sigma_z
 my_constants.zmin = -0.5*Lz
