@@ -174,6 +174,7 @@ AMREX_ENUM(PushType,
 /** \brief For advanced collision algorithms that split the particle push in substeps */
 AMREX_ENUM(
     PositionPushType,
+    None,
     Full,
     FirstHalf,
     SecondHalf,
@@ -185,6 +186,8 @@ AMREX_ENUM(
     MomentumPushType,
     None,
     Full,
+    FirstHalf,
+    SecondHalf,
     Default = Full
 );
 
