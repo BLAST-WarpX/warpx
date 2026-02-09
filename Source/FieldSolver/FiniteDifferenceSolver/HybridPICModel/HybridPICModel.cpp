@@ -492,7 +492,6 @@ void HybridPICModel::BfieldEvolveRK (
             Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 2,
             Bfield[lev][ii]->nGrowVect()
         );
-        K[ii].setVal(0.0);
     }
 
     // The Runge-Kutta scheme begins here.
@@ -557,24 +556,59 @@ void HybridPICModel::BfieldEvolveRK (
     // The Bfield is now given by:
     // B_new = B_old + dt * K2 + 0.5 * dt * [-curl x E(B_old + dt * K2)]
     //       = B_old + dt * K2 + 0.5 * dt * K3
-    for (int ii = 0; ii < 3; ii++)
-    {
-        // Subtract B_old from the Bfield for each direction, to get
-        // B = dt * K2 + 0.5 * dt * K3.
-        MultiFab::Subtract(*Bfield[lev][ii], B_old[ii], 0, 0, 1, ng);
+    //
+    // index 0 of K = 0.5 * dt * K0
+    // index 1 of K = 0.5 * dt * K1
+    //
+    // We calculate:
+    //     K = 0.5 * dt * K0 + dt * K1 + dt * K2 + 0.5 * dt * K3
+    // then update B with the Runge-Kutta sum:
+    //     B = B_old + 1/3 * K
 
-        // Add dt * K2 + 0.5 * dt * K3 to index 0 of K (= 0.5 * dt * K0).
-        MultiFab::Add(K[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
-        // Add 2 * 0.5 * dt * K1 to index 0 of K.
-        MultiFab::LinComb(
-            K[ii], 1.0, K[ii], 0, 2.0, K[ii], 1, 0, 1, ng
-        );
+        // Extract field data for this grid/tile
+        Array4<Real> const &Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const &By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const &Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const &Kx = K[0].array(mfi);
+        Array4<Real> const &Ky = K[1].array(mfi);
+        Array4<Real> const &Kz = K[2].array(mfi);
+        Array4<Real const> const &Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const &By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const &Bz_old = B_old[2].const_array(mfi);
 
-        // Overwrite the Bfield with the Runge-Kutta sum:
-        // B_new = B_old + 1/3 * dt * (0.5 * K0 + K1 + K2 + 0.5 * K3).
-        MultiFab::LinComb(
-            *Bfield[lev][ii], 1.0, B_old[ii], 0, 1.0/3.0, K[ii], 0, 0, 1, ng
+        // Extract tileboxes for which to loop
+        Box const& tjx  = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy  = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz  = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+
+        amrex::ParallelFor(tjx, tjy, tjz,
+
+            // Bx calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                Kx(i, j, k, 0) += Bx(i, j, k) - Bx_old(i, j, k) + 2.0 * Kx(i, j, k, 1);
+                Bx(i, j, k) = Bx_old(i, j, k) + 1.0/3.0 * Kx(i, j, k, 0);
+            },
+
+            // By calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                Ky(i, j, k, 0) += By(i, j, k) - By_old(i, j, k) + 2.0 * Ky(i, j, k, 1);
+                By(i, j, k) = By_old(i, j, k) + 1.0/3.0 * Ky(i, j, k, 0);
+            },
+
+            // Bz calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                Kz(i, j, k, 0) += Bz(i, j, k) - Bz_old(i, j, k) + 2.0 * Kz(i, j, k, 1);
+                Bz(i, j, k) = Bz_old(i, j, k) + 1.0/3.0 * Kz(i, j, k, 0);
+            }
         );
     }
 }
@@ -597,7 +631,6 @@ void HybridPICModel::FieldPush (
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
-    warpx.FillBoundaryE(ng, nodal_sync);
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);
