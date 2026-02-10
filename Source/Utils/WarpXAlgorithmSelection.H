@@ -176,8 +176,6 @@ AMREX_ENUM(
     PositionPushType,
     None,
     Full,
-    FirstHalf,
-    SecondHalf,
     Default = Full
 );
 
