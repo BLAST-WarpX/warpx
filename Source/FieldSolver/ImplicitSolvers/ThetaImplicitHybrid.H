@@ -33,11 +33,23 @@ class HybridPICModel;
  *
  *  where f^{n+theta} = (1.0-theta)*f^{n} + theta*f^{n+1} with 0.5 <= theta <= 1.0
  *
- *  The key difference from fully electromagnetic implicit solvers is that E is computed from Ohm's law at each
- *  nonlinear iteration. The nonlinear solver finds the self-consistent E^{n+theta}
- *  such that:
- *     E^{n+theta} = Ohm(B^{n+theta}, Ji^{n+1/2}, rho^{n+1/2})
- *  where B^{n+theta} depends on E^{n+theta} through Faraday's law.
+ *  The key difference from fully electromagnetic implicit solvers is that E is computed
+ *  from the generalized Ohm's law at each nonlinear iteration. The nonlinear solver finds
+ *  the self-consistent E^{n+theta} such that:
+ *
+ *     E = (J_e x B) / (n_e * e)          (Hall term)
+ *       - grad(P_e) / (n_e * e)          (Electron pressure)
+ *       + eta * J                         (Resistivity)
+ *       - eta_H * laplacian(J_e)          (Hyper-resistivity)
+ *
+ *  where the electron current is:
+ *     J_e = J_plasma - J_ion
+ *
+ *  and the plasma current is computed from Ampere's law:
+ *     J_plasma = curl(B) / mu_0
+ *
+ *  The nonlinear solver iterates to find the self-consistent solution
+ *  E^{n+theta} = Ohm(B^{n+theta}, J_i^{n+1/2}, rho^{n+1/2}).
  *
  *  The user-specified time-biasing parameter theta is bounded between 0.5 and 1.0.
  *  Significant damping of high-k modes will occur as theta approaches 1.0. Since
