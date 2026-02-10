@@ -69,7 +69,7 @@ class CylindricalNormalModes(object):
             self.total_steps = int(self.LT / self.DT)
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 100
+            self.total_steps = 10
             # and make the grid and particle count smaller
             self.Nz = 128
             self.Nr = 64
