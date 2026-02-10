@@ -992,8 +992,9 @@ void ImplicitSolver::FinishMassMatrices ()
             Sbz.grow(SZ[2]->nGrowVect());
             Sby.grow(SY[1]->nGrowVect());
 
-            amrex::ParallelFor(
-            Sbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            amrex::ParallelFor( Sbx, Sby, Sbz,
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
 
@@ -1033,10 +1034,9 @@ void ImplicitSolver::FinishMassMatrices ()
                 }
 
 #endif
-            });
+            },
 
-            amrex::ParallelFor(
-            Sby, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
 
@@ -1075,10 +1075,9 @@ void ImplicitSolver::FinishMassMatrices ()
                 }
 
 #endif
-            });
+            },
 
-            amrex::ParallelFor(
-            Sbz, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
 
