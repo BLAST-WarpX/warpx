@@ -740,9 +740,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
-                        : 0._rt;
+                    // const Real grad_Pe = (!solve_for_Faraday) ?
+                    //     T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
+                    //     : 0._rt;
+                    const Real grad_Pe =
+                        T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0);
 
                     // interpolate the nodal neE values to the Yee grid
                     const auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
@@ -754,7 +756,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // if (solve_for_Faraday) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -784,7 +786,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                         Er(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jr;
                     }
-                }
+                // }
 
                 if (include_external_fields) {
                     Er(i, j, 0) -= Er_ext(i, j, 0);
@@ -825,7 +827,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // if (solve_for_Faraday) {
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -858,7 +860,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                         Etheta(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jtheta;
                     }
-                }
+                // }
 
                 if (include_external_fields) {
                     Etheta(i, j, 0) -= Etheta_ext(i, j, 0);
@@ -879,9 +881,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
-                        : 0._rt;
+                    // const Real grad_Pe = (!solve_for_Faraday) ?
+                    //     T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
+                    //     : 0._rt;
+                    const Real grad_Pe =
+                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0);
 
                     // interpolate the nodal neE values to the Yee grid
                     const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
@@ -893,7 +897,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 }
 
                 // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // if (solve_for_Faraday) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -931,7 +935,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                         Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
                     }
-                }
+                // }
 
                 if (include_external_fields) {
                     Ez(i, j, 0) -= Ez_ext(i, j, 0);
