@@ -142,7 +142,7 @@ web::MarkUpdateCellsStairCase (
 #endif
         for (amrex::MFIter mfi(*field[idim]); mfi.isValid(); ++mfi) {
 
-            const amrex::Box& box = mfi.tilebox();
+            const amrex::Box& box = mfi.tilebox().grow(1);
             amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
 
             // Check if the box (including one layer of guard cells) contains a mix of covered and regular cells
