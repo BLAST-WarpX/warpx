@@ -31,33 +31,31 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
 
     const amrex::ParmParse pp_collision_name(collision_name);
 
-    // Get the product electron and ion species
+    // Get the product species
     pp_collision_name.queryarr("product_species", m_product_species);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_product_species.size() == 2,
         "PulsedIonization: product_species size must be equal to two");
 
-    auto& product_species_0 = mypc->GetParticleContainerFromName(m_product_species[0]);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(product_species_0.AmIA<PhysicalSpecies::electron>(),
-        "PulsedIonization: The first product species must be an electron");
+    auto& parent_species = mypc->GetParticleContainerFromName(m_species_names[0]);
+    auto& productA = mypc->GetParticleContainerFromName(m_product_species[0]);
+    auto& productB = mypc->GetParticleContainerFromName(m_product_species[1]);
 
     // Verify that the total charge of the product species matches the charge of the parent species
-    auto& parent_species = mypc->GetParticleContainerFromName(m_species_names[0]);
-    auto& product_species_1 = mypc->GetParticleContainerFromName(m_product_species[1]);
 
     const int Z_P = static_cast<int>(amrex::Math::round(parent_species.getCharge() / PhysConst::q_e));
-    const int Z_E = static_cast<int>(amrex::Math::round(product_species_0.getCharge() / PhysConst::q_e));
-    const int Z_I = static_cast<int>(amrex::Math::round(product_species_1.getCharge() / PhysConst::q_e));
+    const int Z_A = static_cast<int>(amrex::Math::round(productA.getCharge() / PhysConst::q_e));
+    const int Z_B = static_cast<int>(amrex::Math::round(productB.getCharge() / PhysConst::q_e));
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Z_P == Z_E + Z_I,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Z_P == Z_A + Z_B,
         "PulsedIonizationFunc: total charge of product species must match the parent species charge");
 
     // Verify that the total mass of the product species matches the mass of the parent species
     const amrex::ParticleReal Mass_P = parent_species.getMass();
-    const amrex::ParticleReal Mass_E = product_species_0.getMass();
-    const amrex::ParticleReal Mass_I = product_species_1.getMass();
+    const amrex::ParticleReal Mass_A = productA.getMass();
+    const amrex::ParticleReal Mass_B = productB.getMass();
 
-    const amrex::ParticleReal mass_ratio = (Mass_E + Mass_I) / Mass_P;
+    const amrex::ParticleReal mass_ratio = (Mass_A + Mass_B) / Mass_P;
     const amrex::ParticleReal mass_error = amrex::Math::abs(mass_ratio - 1.0_prt);
 
     const amrex::ParticleReal eps = std::numeric_limits<amrex::ParticleReal>::epsilon();
@@ -66,52 +64,52 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( mass_error <= rtol,
         "PulsedIonizationFunc: total mass of product species must match the parent species mass");
 
-    // Get the product electron and ion particle weight
+    // Get the fixed product particle weight
     pp_collision_name.get("fixed_product_weight", m_fixed_product_weight);
 
-    // Parse the direction-dependent electron temperature
-    amrex::Vector<amrex::ParticleReal> Te_tmp;
-    pp_collision_name.getarr("electron_temperature_eV", Te_tmp);
+    // Parse the direction-dependent temperature for product species A
+    amrex::Vector<amrex::ParticleReal> TA_tmp;
+    pp_collision_name.getarr("productA_temperature_eV", TA_tmp);
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Te_tmp.size() == 3,
-        "PulsedIonizationFunc: electron_temperature_eV must have exactly 3 values");
-
-    for (int i = 0; i < 3; ++i) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Te_tmp[i] >= 0.0,
-            "PulsedIonizationFunc: electron_temperature_eV must be greater than or equal to zero");
-    }
-
-    // Set the direction-dependent electron thermal speed
-    const amrex::ParticleReal Vtex = std::sqrt(PhysConst::q_e*Te_tmp[0] / product_species_0.getMass());
-    const amrex::ParticleReal Vtey = std::sqrt(PhysConst::q_e*Te_tmp[1] / product_species_0.getMass());
-    const amrex::ParticleReal Vtez = std::sqrt(PhysConst::q_e*Te_tmp[2] / product_species_0.getMass());
-    m_electron_thermal_speed = {Vtex, Vtey, Vtez};
-
-    // Parse the direction-dependent ion temperature
-    amrex::Vector<amrex::ParticleReal> Ti_tmp;
-    pp_collision_name.getarr("ion_temperature_eV", Ti_tmp);
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Ti_tmp.size() == 3,
-        "PulsedIonizationFunc: ion_temperature_eV must have exactly 3 values");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp.size() == 3,
+        "PulsedIonizationFunc: productA_temperature_eV must have exactly 3 values");
 
     for (int i = 0; i < 3; ++i) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Ti_tmp[i] >= 0.0,
-            "PulsedIonizationFunc: ion_temperature_eV must be greater than or equal to zero");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp[i] >= 0.0,
+            "PulsedIonizationFunc: productA_temperature_eV must be greater than or equal to zero");
     }
 
-    // Set the direction-dependent ion thermal speed
-    const amrex::ParticleReal Vtix = std::sqrt(PhysConst::q_e*Ti_tmp[0] / product_species_1.getMass());
-    const amrex::ParticleReal Vtiy = std::sqrt(PhysConst::q_e*Ti_tmp[1] / product_species_1.getMass());
-    const amrex::ParticleReal Vtiz = std::sqrt(PhysConst::q_e*Ti_tmp[2] / product_species_1.getMass());
-    m_ion_thermal_speed = {Vtix, Vtiy, Vtiz};
+    // Set the direction-dependent thermal speed for product species A
+    const amrex::ParticleReal VtAx = std::sqrt(PhysConst::q_e*TA_tmp[0] / productA.getMass());
+    const amrex::ParticleReal VtAy = std::sqrt(PhysConst::q_e*TA_tmp[1] / productA.getMass());
+    const amrex::ParticleReal VtAz = std::sqrt(PhysConst::q_e*TA_tmp[2] / productA.getMass());
+    m_productA_thermal_speed = {VtAx, VtAy, VtAz};
 
-    // Parse the ionization rate
-    std::string ionization_rate_str;
-    utils::parser::Store_parserString(pp_collision_name, "ionization_rate(x,y,z,t)", ionization_rate_str);
-    m_ionization_rate_parser = utils::parser::makeParser(ionization_rate_str, {"x", "y", "z", "t"});
+    // Parse the direction-dependent temperature for product species B
+    amrex::Vector<amrex::ParticleReal> TB_tmp;
+    pp_collision_name.getarr("productB_temperature_eV", TB_tmp);
 
-    // Compile the ionization rate parser
-    m_ionization_rate_func = m_ionization_rate_parser.compile<4>();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp.size() == 3,
+        "PulsedIonizationFunc: productB_temperature_eV must have exactly 3 values");
+
+    for (int i = 0; i < 3; ++i) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp[i] >= 0.0,
+            "PulsedIonizationFunc: productB_temperature_eV must be greater than or equal to zero");
+    }
+
+    // Set the direction-dependent thermal speed for product species B
+    const amrex::ParticleReal VtBx = std::sqrt(PhysConst::q_e*TB_tmp[0] / productB.getMass());
+    const amrex::ParticleReal VtBy = std::sqrt(PhysConst::q_e*TB_tmp[1] / productB.getMass());
+    const amrex::ParticleReal VtBz = std::sqrt(PhysConst::q_e*TB_tmp[2] / productB.getMass());
+    m_productB_thermal_speed = {VtBx, VtBy, VtBz};
+
+    // Parse the decay rate
+    std::string decay_rate_str;
+    utils::parser::Store_parserString(pp_collision_name, "decay_rate(x,y,z,t)", decay_rate_str);
+    m_decay_rate_parser = utils::parser::makeParser(decay_rate_str, {"x", "y", "z", "t"});
+
+    // Compile the decay rate parser
+    m_decay_rate_func = m_decay_rate_parser.compile<4>();
 
 }
 
@@ -130,35 +128,35 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
 
     // Get handles to species particle containters
     auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
-    auto& product_ele = mypc->GetParticleContainerFromName(m_product_species[0]);
-    auto& product_ion = mypc->GetParticleContainerFromName(m_product_species[1]);
+    auto& productA = mypc->GetParticleContainerFromName(m_product_species[0]);
+    auto& productB = mypc->GetParticleContainerFromName(m_product_species[1]);
 
-    const SmartCopyFactory copy_factory_ele(species1, product_ele);
-    const SmartCopyFactory copy_factory_ion(species1, product_ion);
-    const SmartCopy CopyEle = copy_factory_ele.getSmartCopy();
-    const SmartCopy CopyIon = copy_factory_ion.getSmartCopy();
+    const SmartCopyFactory copy_factory_A(species1, productA);
+    const SmartCopyFactory copy_factory_B(species1, productB);
+    const SmartCopy CopyA = copy_factory_A.getSmartCopy();
+    const SmartCopy CopyB = copy_factory_B.getSmartCopy();
 
 #ifdef AMREX_USE_GPU
-    amrex::Gpu::DeviceScalar<SmartCopy> d_CopyEle(CopyEle);
-    amrex::Gpu::DeviceScalar<SmartCopy> d_CopyIon(CopyIon);
+    amrex::Gpu::DeviceScalar<SmartCopy> d_CopyA(CopyA);
+    amrex::Gpu::DeviceScalar<SmartCopy> d_CopyB(CopyB);
 
-    SmartCopy const* AMREX_RESTRICT CopyElePtr = d_CopyEle.dataPtr();
-    SmartCopy const* AMREX_RESTRICT CopyIonPtr = d_CopyIon.dataPtr();
+    SmartCopy const* AMREX_RESTRICT CopyAPtr = d_CopyA.dataPtr();
+    SmartCopy const* AMREX_RESTRICT CopyBPtr = d_CopyB.dataPtr();
 #else
-    SmartCopy const* AMREX_RESTRICT CopyElePtr = &CopyEle;
-    SmartCopy const* AMREX_RESTRICT CopyIonPtr = &CopyIon;
+    SmartCopy const* AMREX_RESTRICT CopyAPtr = &CopyA;
+    SmartCopy const* AMREX_RESTRICT CopyBPtr = &CopyB;
 #endif
 
-    // get parsers for the ionization rate
-    auto nu_func = m_ionization_rate_func;
+    // get parsers for the decay rate
+    auto nu_func = m_decay_rate_func;
 
     const amrex::ParticleReal fixed_product_weight = m_fixed_product_weight;
-    const amrex::ParticleReal ele_Vtherm_x = m_electron_thermal_speed[0];
-    const amrex::ParticleReal ele_Vtherm_y = m_electron_thermal_speed[1];
-    const amrex::ParticleReal ele_Vtherm_z = m_electron_thermal_speed[2];
-    const amrex::ParticleReal ion_Vtherm_x = m_ion_thermal_speed[0];
-    const amrex::ParticleReal ion_Vtherm_y = m_ion_thermal_speed[1];
-    const amrex::ParticleReal ion_Vtherm_z = m_ion_thermal_speed[2];
+    const amrex::ParticleReal VtA_x = m_productA_thermal_speed[0];
+    const amrex::ParticleReal VtA_y = m_productA_thermal_speed[1];
+    const amrex::ParticleReal VtA_z = m_productA_thermal_speed[2];
+    const amrex::ParticleReal VtB_x = m_productB_thermal_speed[0];
+    const amrex::ParticleReal VtB_y = m_productB_thermal_speed[1];
+    const amrex::ParticleReal VtB_z = m_productB_thermal_speed[2];
 
     // Loop over refinement levels
     const int flvl = species1.finestLevel();
@@ -230,27 +228,27 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
             const index_type total_new = amrex::Scan::ExclusiveSum(n_cells, num_products_vec.dataPtr(), offsets.dataPtr());
 
             // Resize product species arrays
-            ParticleTileType& ptile_ele = product_ele.ParticlesAt(lev, mfi);
-            ParticleTileType& ptile_ion = product_ion.ParticlesAt(lev, mfi);
-            const index_type old_np_ele = ptile_ele.numParticles();
-            const index_type old_np_ion = ptile_ion.numParticles();
-            ptile_ele.resize(old_np_ele + total_new);
-            ptile_ion.resize(old_np_ion + total_new);
+            ParticleTileType& ptileA = productA.ParticlesAt(lev, mfi);
+            ParticleTileType& ptileB = productB.ParticlesAt(lev, mfi);
+            const index_type old_npA = ptileA.numParticles();
+            const index_type old_npB = ptileB.numParticles();
+            ptileA.resize(old_npA + total_new);
+            ptileB.resize(old_npB + total_new);
 
             // Host-side SoA handles for the product species
-            SoaData_type soa_product_ele = ptile_ele.getParticleTileData();
-            SoaData_type soa_product_ion = ptile_ion.getParticleTileData();
+            SoaData_type soa_productA = ptileA.getParticleTileData();
+            SoaData_type soa_productB = ptileB.getParticleTileData();
 
 #ifdef AMREX_USE_GPU
             // Make device copies so the kernel sees device-resident handles
-            amrex::Gpu::DeviceScalar<SoaData_type> d_soa_ele(soa_product_ele);
-            amrex::Gpu::DeviceScalar<SoaData_type> d_soa_ion(soa_product_ion);
+            amrex::Gpu::DeviceScalar<SoaData_type> d_soaA(soa_productA);
+            amrex::Gpu::DeviceScalar<SoaData_type> d_soaB(soa_productB);
 
-            SoaData_type const* AMREX_RESTRICT soa_ele_ptr = d_soa_ele.dataPtr();
-            SoaData_type const* AMREX_RESTRICT soa_ion_ptr = d_soa_ion.dataPtr();
+            SoaData_type const* AMREX_RESTRICT soaA_ptr = d_soaA.dataPtr();
+            SoaData_type const* AMREX_RESTRICT soaB_ptr = d_soaB.dataPtr();
 #else
-            SoaData_type const* AMREX_RESTRICT soa_ele_ptr = &soa_product_ele;
-            SoaData_type const* AMREX_RESTRICT soa_ion_ptr = &soa_product_ion;
+            SoaData_type const* AMREX_RESTRICT soaA_ptr = &soa_productA;
+            SoaData_type const* AMREX_RESTRICT soaB_ptr = &soa_productB;
 #endif
 
             const index_type* AMREX_RESTRICT offsets_ptr = offsets.dataPtr();
@@ -265,13 +263,15 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
             amrex::ParticleReal const* AMREX_RESTRICT uy1  = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal const* AMREX_RESTRICT uz1  = soa_1.m_rdata[PIdx::uz];
 
-            amrex::ParticleReal* AMREX_RESTRICT uxe  = soa_product_ele.m_rdata[PIdx::ux];
-            amrex::ParticleReal* AMREX_RESTRICT uye  = soa_product_ele.m_rdata[PIdx::uy];
-            amrex::ParticleReal* AMREX_RESTRICT uze  = soa_product_ele.m_rdata[PIdx::uz];
+            amrex::ParticleReal* AMREX_RESTRICT wA  = soa_productA.m_rdata[PIdx::w];
+            amrex::ParticleReal* AMREX_RESTRICT uAx = soa_productA.m_rdata[PIdx::ux];
+            amrex::ParticleReal* AMREX_RESTRICT uAy = soa_productA.m_rdata[PIdx::uy];
+            amrex::ParticleReal* AMREX_RESTRICT uAz = soa_productA.m_rdata[PIdx::uz];
 
-            amrex::ParticleReal* AMREX_RESTRICT uxi  = soa_product_ion.m_rdata[PIdx::ux];
-            amrex::ParticleReal* AMREX_RESTRICT uyi  = soa_product_ion.m_rdata[PIdx::uy];
-            amrex::ParticleReal* AMREX_RESTRICT uzi  = soa_product_ion.m_rdata[PIdx::uz];
+            amrex::ParticleReal* AMREX_RESTRICT wB  = soa_productB.m_rdata[PIdx::w];
+            amrex::ParticleReal* AMREX_RESTRICT uBx = soa_productB.m_rdata[PIdx::ux];
+            amrex::ParticleReal* AMREX_RESTRICT uBy = soa_productB.m_rdata[PIdx::uy];
+            amrex::ParticleReal* AMREX_RESTRICT uBz = soa_productB.m_rdata[PIdx::uz];
 
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
@@ -281,11 +281,8 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
 
                     const index_type start = offsets_ptr[i_cell];
 
-                    auto& ele = *soa_ele_ptr;
-                    auto& ion = *soa_ion_ptr;
-
-                    auto const& CopyIonF = *CopyIonPtr;
-                    auto const& CopyEleF = *CopyElePtr;
+                    auto const& CopyBF = *CopyBPtr;
+                    auto const& CopyAF = *CopyAPtr;
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -298,8 +295,8 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
                     for (index_type j = 0; j < num_products_in_cell; ++j) {
 
                         const index_type new_idx = start + j;
-                        const index_type i_ele = old_np_ele + new_idx;
-                        const index_type i_ion = old_np_ion + new_idx;
+                        const index_type ip_A = old_npA + new_idx;
+                        const index_type ip_B = old_npB + new_idx;
 
                         // Get a random particle from species 1 in this cell
                         const index_type k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
@@ -326,28 +323,28 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
                         ))
 
                         // Create product particles at position of particle from species 1
-                        CopyIonF(ion, soa_1, ip, static_cast<int>(i_ion), engine);
-                        CopyEleF(ele, soa_1, ip, static_cast<int>(i_ele), engine);
+                        CopyAF(*soaA_ptr, soa_1, ip, static_cast<int>(ip_A), engine);
+                        CopyBF(*soaB_ptr, soa_1, ip, static_cast<int>(ip_B), engine);
 
-                        // Set electron velocity to parent particle velocity plus thermal
-                        uxe[i_ele] = ux1[ip];
-                        uye[i_ele] = uy1[ip];
-                        uze[i_ele] = uz1[ip];
-                        uxe[i_ele] += ele_Vtherm_x*RandomNormal(0_prt, 1.0_prt, engine);
-                        uye[i_ele] += ele_Vtherm_y*RandomNormal(0_prt, 1.0_prt, engine);
-                        uze[i_ele] += ele_Vtherm_z*RandomNormal(0_prt, 1.0_prt, engine);
+                        // Set product species A particle velocity to parent particle velocity plus thermal
+                        uAx[ip_A] = ux1[ip];
+                        uAy[ip_A] = uy1[ip];
+                        uAz[ip_A] = uz1[ip];
+                        uAx[ip_A] += VtA_x*RandomNormal(0_prt, 1.0_prt, engine);
+                        uAy[ip_A] += VtA_y*RandomNormal(0_prt, 1.0_prt, engine);
+                        uAz[ip_A] += VtA_z*RandomNormal(0_prt, 1.0_prt, engine);
 
-                        // Set ion velocity to parent particle velocity plus thermal
-                        uxi[i_ion] = ux1[ip];
-                        uyi[i_ion] = uy1[ip];
-                        uzi[i_ion] = uz1[ip];
-                        uxi[i_ion] += ion_Vtherm_x*RandomNormal(0_prt, 1.0_prt, engine);
-                        uyi[i_ion] += ion_Vtherm_y*RandomNormal(0_prt, 1.0_prt, engine);
-                        uzi[i_ion] += ion_Vtherm_z*RandomNormal(0_prt, 1.0_prt, engine);
+                        // Set product species B velocity to parent particle velocity plus thermal
+                        uBx[ip_B] = ux1[ip];
+                        uBy[ip_B] = uy1[ip];
+                        uBz[ip_B] = uz1[ip];
+                        uBx[ip_B] += VtB_x*RandomNormal(0_prt, 1.0_prt, engine);
+                        uBy[ip_B] += VtB_y*RandomNormal(0_prt, 1.0_prt, engine);
+                        uBz[ip_B] += VtB_z*RandomNormal(0_prt, 1.0_prt, engine);
 
                         // Set the weight of the product particles
-                        ion.m_rdata[PIdx::w][i_ion] = wpEI;
-                        ele.m_rdata[PIdx::w][i_ele] = wpEI;
+                        wA[ip_A] = wpEI;
+                        wB[ip_B] = wpEI;
 
                         // Remove product weight from species 1
                         amrex::ParticleReal wp_remove = amrex::min(wpEI, w1[ip]);
@@ -376,9 +373,9 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
 
             // Initialize the user runtime components
             if (total_new > 0) {
-                amrex::GpuArray<index_type, 2> products_np{old_np_ele, old_np_ion};
-                amrex::GpuArray<ParticleTileType*, 2> tile_products{&ptile_ele, &ptile_ion};
-                amrex::GpuArray<WarpXParticleContainer*, 2> pc_products{&product_ele, &product_ion};
+                amrex::GpuArray<index_type, 2> products_np{old_npA, old_npB};
+                amrex::GpuArray<ParticleTileType*, 2> tile_products{&ptileA, &ptileB};
+                amrex::GpuArray<WarpXParticleContainer*, 2> pc_products{&productA, &productB};
                 for (int i = 0; i < 2; i++) {
                     const auto start_index = int(products_np[i]);
                     const auto stop_index  = int(products_np[i] + total_new);
@@ -401,8 +398,8 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
             amrex::Gpu::synchronize();
 
             // Set new particle IDs
-            setNewParticleIDs(ptile_ele, old_np_ele, total_new);
-            setNewParticleIDs(ptile_ion, old_np_ion, total_new);
+            setNewParticleIDs(ptileA, old_npA, total_new);
+            setNewParticleIDs(ptileB, old_npB, total_new);
 
         }
 

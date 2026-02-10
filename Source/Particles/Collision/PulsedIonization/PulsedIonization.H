@@ -19,14 +19,14 @@
 #include <string>
 
 /**
- * \brief This class performs ionization of a species via a user-specified rate.
- *        dne/dt = +nu(t)*n1(t)
+ * \brief This class performs the decay of species 1 into species A and B via a user-specified rate.
+ *        dnA/dt = +nu(t)*n1(t)= dnB/dt
  *        dn1/dt = -nu(t)*n1(t)
- *        ==> ne(t+dt) - ne(t) = n1(t)*(1 - exp(-nu(t)*t))
- *        For example, this can represent ionization from a laser pulse.
- *        The user-specified ionization rate nu is a function of space and time.
- *        The ion velocity is obtained from a random parent species particle.
- *        The electron velocity is obtained from a user-specified normal distribution.
+ *        ==> nA(t+dt) - nA(t) = n1(t)*(1 - exp(-nu(t)*t))
+ *        For example, this can represent ionization of species 1 from a laser pulse.
+ *        The user-specified decay rate nu is a function of space and time.
+ *        The velocity of the product particles is set to a random parent species particle plus
+ *        a direction-dependent thermal part obtained from a user-specified normal distribution.
  */
 
 class PulsedIonization final
@@ -56,11 +56,11 @@ private:
     amrex::Vector<std::string> m_product_species;
 
     amrex::ParticleReal m_fixed_product_weight;
-    amrex::GpuArray<amrex::ParticleReal,3> m_ion_thermal_speed;
-    amrex::GpuArray<amrex::ParticleReal,3> m_electron_thermal_speed;
+    amrex::GpuArray<amrex::ParticleReal,3> m_productA_thermal_speed;
+    amrex::GpuArray<amrex::ParticleReal,3> m_productB_thermal_speed;
 
-    amrex::Parser m_ionization_rate_parser;
-    amrex::ParserExecutor<4> m_ionization_rate_func;
+    amrex::Parser m_decay_rate_parser;
+    amrex::ParserExecutor<4> m_decay_rate_func;
 };
 
 #endif // WARPX_PULSED_IONIZATION_H
