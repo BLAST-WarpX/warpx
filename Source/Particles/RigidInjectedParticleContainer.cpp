@@ -242,7 +242,6 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
         constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
-        amrex::Real position_dt = dt;
         if (position_push_type == PositionPushType::Full) {
             amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
                 amrex::ParticleReal xp, yp, zp;
