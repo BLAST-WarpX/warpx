@@ -180,11 +180,7 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
 
                     // Compute number of products macro particles to create in this cell
                     const amrex::ParticleReal num_expected = total_product/fixed_product_weight;
-                    int num_macro_particles = static_cast<int>(std::floor(num_expected));
-                    const amrex::Real rand = amrex::Random(engine);
-                    if (rand < (num_expected - num_macro_particles)) {
-                        num_macro_particles++;
-                    }
+                    int num_macro_particles = static_cast<int>(std::floor(num_expected + amrex::Random(engine)));
 
                     // Do not permit total product weight to exceed wtot1
                     if (num_macro_particles*fixed_product_weight > wtot1) {
