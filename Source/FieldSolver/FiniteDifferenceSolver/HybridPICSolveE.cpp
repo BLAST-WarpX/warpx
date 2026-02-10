@@ -129,7 +129,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
 
-        // Extract tileboxes for which to loop with 1 ghost cell included
+        // Extract tileboxes for which to loop with 1 guard cell included
         Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
         Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
         Box const& tjz  = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
@@ -287,8 +287,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
         Array4<Real> const& Jr = Jfield[0]->array(mfi);
         Array4<Real> const& Jtheta = Jfield[1]->array(mfi);
         Array4<Real> const& Jphi = Jfield[2]->array(mfi);
-        Array4<Real> const& Btheta = Bfield[1]->const_array(mfi);
-        Array4<Real> const& Bphi = Bfield[2]->const_array(mfi);
+        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
+        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
@@ -298,7 +298,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
         Real const dr = m_dr;
         Real const rmin = m_rmin;
 
-        // Extract tileboxes for which to loop with 1 ghost cell included
+        // Extract tileboxes for which to loop with 1 guard cell included
         Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
         Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
         Box const& tjphi  = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
