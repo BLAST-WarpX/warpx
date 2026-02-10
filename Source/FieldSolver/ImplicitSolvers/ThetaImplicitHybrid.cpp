@@ -99,20 +99,20 @@ void ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         }
     }
 
-    // Initial guess: E^{n+θ} = E^n
+    // Initial guess: E^{n+theta} = E^n
     m_E.Copy(m_Eold);
 
-    // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
+    // Solve nonlinear system for E^{n+theta} (and eventually Pe^{n+theta})
     m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
-    // Update WarpX fields to t^{n+θ}
+    // Update WarpX fields to t^{n+theta}
     UpdateWarpXFields( m_E, start_time );
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from t^{n+1/2} to t^{n+1}
     m_WarpX->FinishImplicitParticleUpdate();
 
-    // Advance fields from t^{n+θ} to t^{n+1}
+    // Advance fields from t^{n+theta} to t^{n+1}
     FinishFieldUpdate( start_time + m_dt );
 }
 
@@ -124,10 +124,10 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 {
     BL_PROFILE("ThetaImplicitHybrid::ComputeRHS()");
 
-    // Update B^{n+θ} from current E estimate via Faraday's law
+    // Update B^{n+theta} from current E estimate via Faraday's law
     UpdateWarpXFields( a_E, start_time );
 
-    // Advance particles and deposit J^{n+1/2}, ρ^{n+1/2}
+    // Advance particles and deposit J^{n+1/2}, rho^{n+1/2}
     const amrex::Real theta_time = start_time + m_theta * m_dt;
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
 
@@ -141,13 +141,13 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     ablastr::fields::MultiLevelScalarField rho_fp =
         m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
 
-    // Compute J_plasma = curl(B^{n+θ})/μ₀
+    // Compute J_plasma = curl(B^{n+theta})/mu_0
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
 
     // Compute electron pressure
     m_hybrid_pic_model->CalculateElectronPressure();
 
-    // Solve Ohm's law: E_ohm = f(B^{n+θ}, J_ion^{n+1/2}, ρ^{n+1/2}, Pe)
+    // Solve Ohm's law: E_ohm = f(B^{n+theta}, J_ion^{n+1/2}, rho^{n+1/2}, Pe)
     // Result stored in Efield_fp
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
@@ -169,10 +169,10 @@ void ThetaImplicitHybrid::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
 
     const amrex::Real theta_time = start_time + m_theta * m_dt;
 
-    // Set E^{n+θ} in WarpX
+    // Set E^{n+theta} in WarpX
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, theta_time );
 
-    // Compute B^{n+θ} = B^n - θ·dt·curl(E^{n+θ}) via Faraday's law
+    // Compute B^{n+theta} = B^n - theta*dt*curl(E^{n+theta}) via Faraday's law
     ablastr::fields::MultiLevelVectorField const& B_old =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, m_num_amr_levels - 1);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta * m_dt, start_time );
@@ -182,8 +182,8 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
 {
     BL_PROFILE("ThetaImplicitHybrid::FinishFieldUpdate()");
 
-    // Extrapolate from t^{n+θ} to t^{n+1}:
-    // F^{n+1} = (1/θ)·F^{n+θ} + (1 - 1/θ)·F^n
+    // Extrapolate from t^{n+theta} to t^{n+1}:
+    // F^{n+1} = (1/theta)*F^{n+theta} + (1 - 1/theta)*F^n
     const amrex::Real c0 = 1.0_rt / m_theta;
     const amrex::Real c1 = 1.0_rt - c0;
 
