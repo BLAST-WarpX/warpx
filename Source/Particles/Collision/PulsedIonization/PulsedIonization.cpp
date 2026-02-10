@@ -72,21 +72,9 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     m_electron_drift_velocity = {Vd_tmp[0], Vd_tmp[1], Vd_tmp[2]};
 
     // Parse the ionization rate
-    amrex::ParticleReal ionization_rate = 0;
-    if (utils::parser::queryWithParser(pp_collision_name, "ionization_rate", ionization_rate)) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            (ionization_rate > 0),
-            "The ionization rate must be greater than 0.");
-        m_ionization_rate_parser =
-            utils::parser::makeParser(
-                std::to_string(ionization_rate), {"x", "y", "z", "t"});
-    }
-    else {
-        std::string ionization_rate_str;
-        utils::parser::Store_parserString(pp_collision_name, "ionization_rate(x,y,z,t)", ionization_rate_str);
-        m_ionization_rate_parser =
-            utils::parser::makeParser(ionization_rate_str, {"x", "y", "z", "t"});
-    }
+    std::string ionization_rate_str;
+    utils::parser::Store_parserString(pp_collision_name, "ionization_rate(x,y,z,t)", ionization_rate_str);
+    m_ionization_rate_parser = utils::parser::makeParser(ionization_rate_str, {"x", "y", "z", "t"});
 
     // Compile the ionization rate parser
     m_ionization_rate_func = m_ionization_rate_parser.compile<4>();
