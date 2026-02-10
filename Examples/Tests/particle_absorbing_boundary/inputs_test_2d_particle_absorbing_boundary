@@ -2,13 +2,13 @@
 # Domain, Resolution & Numerics
 #
 
-# We only run 100 steps for tests
+# We only run 1000 steps for tests
 # Disable `max_step` below to run until the physical `stop_time`.
-max_step = 100000
+# max_step = 1000
 stop_time = 5.0e-12            # [s]
 
-#amr.n_cell = 128 29056
-amr.n_cell = 128 8192
+amr.n_cell = 128 29056
+#amr.n_cell = 128 8192
 
 # simulation box, no MR
 amr.max_level = 0
@@ -38,8 +38,8 @@ amr.max_grid_size_y = 2048  # this is confusingly named and means z in 2D
 #   The grid & block parameters above are needed for load balancing:
 #   an average of ~10 grids per MPI rank (and device) are a good granularity
 #   to allow efficient load-balancing as the simulation evolves
-#algo.load_balance_intervals = 100
-#algo.load_balance_costs_update = Heuristic
+algo.load_balance_intervals = 100
+algo.load_balance_costs_update = Heuristic
 
 #################################
 # Target Profile
@@ -75,6 +75,19 @@ electrons.density_function(x,y,z) = "nc*n0*(
 hydrogen.density_function(x,y,z) = "nc*n0*(
     if(z<=zmin, 0.0, 1.0 - exp(-(z - zmin)/L)))"
 
+particle_thermalizer.normal = "z"
+particle_thermalizer.start = 145e-6
+particle_thermalizer.end = 150e-6
+particle_thermalizer.momentum_threshold = 1.0
+particle_thermalizer.theta = 1.0
+
+# definitions used by laser profile
+#my_constants.Emax = 3210701102087.252   # [V/m] a0 = 3 and lambda = 1.0e-6
+my_constants.Emax = 10e12
+my_constants.omega0 = 1883651567308853.2 # [s^-1] angular frequency for lamba = 1.0e-6
+my_constants.t_ramp0 = 0.13e-12
+my_constants.t_ramp1 = 2.87e-12
+
 #################################
 # Laser Pulse Profile
 #
@@ -82,155 +95,40 @@ lasers.names        = laser1
 laser1.position     = 0. 0. -773.156e-6 # point the laser plane (antenna)
 laser1.direction    = 0. 0. 1.          # the plane's (antenna's) normal direction
 laser1.polarization = 1. 0. 0.          # the main polarization vector
-laser1.a0           = 3.0              # maximum normalized amplitude of the laser field
+laser1.e_max        = Emax              # maximum amplitude of the laser field [V/m]
 laser1.wavelength   = 1.0e-6            # central wavelength of the laser pulse [m]
-laser1.profile      = Gaussian
-laser1.profile_waist = 3.e-6            # beam waist (E(w_0)=E_0/e) [m]
-laser1.profile_duration = 3.e-12       # pulse length (E(tau)=E_0/e; tau=tau_E=FWHM_I/1.17741) [s]
-laser1.profile_t_peak = 5.e-12         # time until peak intensity reached at the laser plane [s]
+laser1.profile      = parse_field_function
+laser1.field_function(X,Y,t) = "Emax*cos(omega0*t)*(
+    if (t < t_ramp0, t / t_ramp0, if (t > t_ramp1, 1.0 - ((t - t_ramp1)/t_ramp0), 1.0)))"
 laser1.profile_focal_distance = 773.156e-6  # focal distance from the antenna [m]
 
 # #################################
 # # Diagnostics
 # #
 diagnostics.diags_names = diagInst
-#diagnostics.diags_names = diagInst diagTimeAvg openPMDfw openPMDbw
 
 # # instantaneous field and particle diagnostic
-diagInst.intervals = 1000  # second interval only for CI testing the time-averaged diags
+diagInst.intervals = 10000
 diagInst.diag_type = Full
-
-# # time-averaged particle and field diagnostic
-# diagTimeAvg.intervals = 100
-# diagTimeAvg.diag_type = TimeAveraged
-# diagTimeAvg.time_average_mode = dynamic_start
-# #diagTimeAvg.average_period_time = 2.67e-15  # period of 800 nm light waves
-# diagTimeAvg.average_period_steps = 5  # use only either `time` or `steps`
-# diagTimeAvg.write_species = 0
-# diagTimeAvg.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
-# # reduce resolution of output fields
-# diagTimeAvg.coarsening_ratio = 4 4
-# diagTimeAvg.format = openpmd
-# diagTimeAvg.openpmd_backend = h5
-
-# openPMDfw.intervals = 100
-# openPMDfw.diag_type = Full
-# openPMDfw.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_hydrogen
-# # reduce resolution of output fields
-# openPMDfw.coarsening_ratio = 4 4
-# openPMDfw.format = openpmd
-# openPMDfw.openpmd_backend = h5
-# # demonstration of a spatial and momentum filter
-# openPMDfw.electrons.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-# openPMDfw.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz>=0) * (x<1.0e-6) * (x>-1.0e-6)
-
-# openPMDbw.intervals = 100
-# openPMDbw.diag_type = Full
-# openPMDbw.fields_to_plot = rho_hydrogen
-# # reduce resolution of output fields
-# openPMDbw.coarsening_ratio = 4 4
-# openPMDbw.format = openpmd
-# openPMDbw.openpmd_backend = h5
-# # demonstration of a momentum filter
-# openPMDbw.electrons.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz<0)
-# openPMDbw.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz<0)
-
 
 # #################################
 # # Reduced Diagnostics
 # #
+warpx.reduced_diags_names                   = PhaseSpaceElectrons
 
-# # histograms with 2.0 degree acceptance angle in fw direction
-# # 2 deg * pi / 180 : 0.03490658503 rad
-# # half-angle +/-   : 0.017453292515 rad
-# warpx.reduced_diags_names                   = histuH histue histuzAll FieldProbe_Z FieldProbe_ScatPoint FieldProbe_ScatLine LBC PhaseSpaceIons PhaseSpaceElectrons
-
-# histuH.type                                 = ParticleHistogram
-# histuH.intervals                            = 100
-# histuH.species                              = hydrogen
-# histuH.bin_number                           = 1000
-# histuH.bin_min                              =  0.0
-# histuH.bin_max                              =  0.474  # 100 MeV protons
-# histuH.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
-# histuH.filter_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz / sqrt(u2))) <= 0.017453, 0)"
-
-# histue.type                                 = ParticleHistogram
-# histue.intervals                            = 100
-# histue.species                              = electrons
-# histue.bin_number                           = 1000
-# histue.bin_min                              = 0.0
-# histue.bin_max                              = 197  # 100 MeV electrons
-# histue.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
-# histue.filter_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz / sqrt(u2))) <= 0.017453, 0)"
-
-# # just a test entry to make sure that the histogram filter is purely optional:
-# # this one just records uz of all hydrogen ions, independent of their pointing
-# histuzAll.type                                 = ParticleHistogram
-# histuzAll.intervals                            = 100
-# histuzAll.species                              = hydrogen
-# histuzAll.bin_number                           = 1000
-# histuzAll.bin_min                              = -0.474
-# histuzAll.bin_max                              =  0.474
-# histuzAll.histogram_function(t,x,y,z,ux,uy,uz) = "uz"
-
-# FieldProbe_Z.type = FieldProbe
-# FieldProbe_Z.intervals = 100
-# FieldProbe_Z.integrate = 0
-# FieldProbe_Z.probe_geometry = Line
-# FieldProbe_Z.x_probe = 0.0
-# FieldProbe_Z.z_probe = -5.0e-6
-# FieldProbe_Z.x1_probe = 0.0
-# FieldProbe_Z.z1_probe = 25.0e-6
-# FieldProbe_Z.resolution = 3712
-
-# FieldProbe_ScatPoint.type = FieldProbe
-# FieldProbe_ScatPoint.intervals = 1
-# FieldProbe_ScatPoint.integrate = 0
-# FieldProbe_ScatPoint.probe_geometry = Point
-# FieldProbe_ScatPoint.x_probe = 0.0
-# FieldProbe_ScatPoint.z_probe = 15e-6
-
-# FieldProbe_ScatLine.type = FieldProbe
-# FieldProbe_ScatLine.intervals = 100
-# FieldProbe_ScatLine.integrate = 1
-# FieldProbe_ScatLine.probe_geometry = Line
-# FieldProbe_ScatLine.x_probe = -2.5e-6
-# FieldProbe_ScatLine.z_probe = 15e-6
-# FieldProbe_ScatLine.x1_probe = 2.5e-6
-# FieldProbe_ScatLine.z1_probe = 15e-6
-# FieldProbe_ScatLine.resolution = 201
-
-# # check computational load per box
-# LBC.type = LoadBalanceCosts
-# LBC.intervals = 100
-
-# PhaseSpaceIons.type                                 = ParticleHistogram2D
-# PhaseSpaceIons.intervals                            = 100
-# PhaseSpaceIons.species                              = hydrogen
-# PhaseSpaceIons.bin_number_abs                       = 1000
-# PhaseSpaceIons.bin_number_ord                       = 1000
-# PhaseSpaceIons.bin_min_abs                          = -5.e-6
-# PhaseSpaceIons.bin_max_abs                          = 25.e-6
-# PhaseSpaceIons.bin_min_ord                          = -0.474
-# PhaseSpaceIons.bin_max_ord                          = 0.474
-# PhaseSpaceIons.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"
-# PhaseSpaceIons.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "uz"
-# PhaseSpaceIons.value_function(t,x,y,z,ux,uy,uz,w) = "w"
-# # PhaseSpaceIons.filter_function(t,x,y,z,ux,uy,uz,w) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz / sqrt(u2))) <= 0.017453, 0)"
-
-# PhaseSpaceElectrons.type                                 = ParticleHistogram2D
-# PhaseSpaceElectrons.intervals                            = 100
-# PhaseSpaceElectrons.species                              = electrons
-# PhaseSpaceElectrons.bin_number_abs                       = 1000
-# PhaseSpaceElectrons.bin_number_ord                       = 1000
-# PhaseSpaceElectrons.bin_min_abs                          = -5.e-6
-# PhaseSpaceElectrons.bin_max_abs                          = 25.e-6
-# PhaseSpaceElectrons.bin_min_ord                          = -197
-# PhaseSpaceElectrons.bin_max_ord                          = 197
-# PhaseSpaceElectrons.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"
-# PhaseSpaceElectrons.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "uz"
-# PhaseSpaceElectrons.value_function(t,x,y,z,ux,uy,uz,w) = "w"
-# PhaseSpaceElectrons.filter_function(t,x,y,z,ux,uy,uz,w) = "sqrt(x*x+y*y) < 1e-6"
+PhaseSpaceElectrons.type                                 = ParticleHistogram2D
+PhaseSpaceElectrons.intervals                            = 10000
+PhaseSpaceElectrons.species                              = electrons
+PhaseSpaceElectrons.bin_number_abs                       = 1000
+PhaseSpaceElectrons.bin_number_ord                       = 1000
+PhaseSpaceElectrons.bin_min_abs                          = -100.e-6
+PhaseSpaceElectrons.bin_max_abs                          = 150.e-6
+PhaseSpaceElectrons.bin_min_ord                          = -60
+PhaseSpaceElectrons.bin_max_ord                          = 100
+PhaseSpaceElectrons.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"
+PhaseSpaceElectrons.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "uz"
+PhaseSpaceElectrons.value_function(t,x,y,z,ux,uy,uz,w) = "w"
+PhaseSpaceElectrons.openpmd_backend = h5
 
 #################################
 # Physical Background
