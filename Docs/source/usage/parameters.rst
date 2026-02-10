@@ -3181,14 +3181,14 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     List of particle quantities to write to output.
     Choices are ``x``, ``y``, ``z`` for the particle positions (3D, RZ, RSPHERE), ``x`` and ``z`` in 2D, ``z`` in 1D, ``x`` and ``y`` for RCYLINDER,
     ``w`` for the particle weight and ``ux``, ``uy``, ``uz`` for the particle momenta.
-    The fields can also be obtained, ``Ex``, ``Ey``, ``Ez``, ``Bx``, ``By``, ``Bz``.
+    When writing to the OpenPMD format, the fields can also be obtained, ``Ex``, ``Ey``, ``Ez``, ``Bx``, ``By``, ``Bz``.
     Note that the fields gathered in the same way as during the simulation, and do not include any applied fields.
-    When using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
+    Also, when writing to the OpenPMD format and when using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
     By default, positions, momenta, and weights are written out.
     If ``<diag_name>.<species_name>.variables = none``, no particle data are written.
 
 * ``<diag_name>.<species_name>.additional_variables`` (list of `strings` separated by spaces, optional)
-    List of additional particle quantities to write to output.
+    List of additional particle quantities to write to output, when using the OpenPMD format.
     This allows specifying the additional particle quantities beyond the standard position, momentum, and weight.
     The options are the fields, ``Ex``, ``Ey``, ``Ez``, ``Bx``, ``By``, ``Bz``,
     and when using the lab-frame electrostatic solver, the electrostatic potential ``phi``.
