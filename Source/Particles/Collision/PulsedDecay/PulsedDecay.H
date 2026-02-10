@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PULSED_IONIZATION_H
-#define WARPX_PULSED_IONIZATION_H
+#ifndef WARPX_PULSED_DECAY_H
+#define WARPX_PULSED_DECAY_H
 
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Collision/CollisionBase.H"
@@ -29,18 +29,18 @@
  *        a direction-dependent thermal part obtained from a user-specified normal distribution.
  */
 
-class PulsedIonization final
+class PulsedDecay final
     : public CollisionBase
 {
 public:
-    PulsedIonization (std::string const& collision_name, MultiParticleContainer const * mypc);
+    PulsedDecay (std::string const& collision_name, MultiParticleContainer const * mypc);
 
-    ~PulsedIonization () override = default;
+    ~PulsedDecay () override = default;
 
-    PulsedIonization ( PulsedIonization const &)             = delete;
-    PulsedIonization& operator= ( PulsedIonization const & ) = delete;
-    PulsedIonization ( PulsedIonization&& )                  = delete;
-    PulsedIonization& operator= ( PulsedIonization&& )       = delete;
+    PulsedDecay ( PulsedDecay const &)             = delete;
+    PulsedDecay& operator= ( PulsedDecay const & ) = delete;
+    PulsedDecay ( PulsedDecay&& )                  = delete;
+    PulsedDecay& operator= ( PulsedDecay&& )       = delete;
 
     /** Perform the collisions
      *
@@ -63,4 +63,4 @@ private:
     amrex::ParserExecutor<4> m_decay_rate_func;
 };
 
-#endif // WARPX_PULSED_IONIZATION_H
+#endif // WARPX_PULSED_DECAY_H

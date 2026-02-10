@@ -6,7 +6,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "PulsedIonization.H"
+#include "PulsedDecay.H"
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
@@ -23,11 +23,11 @@
 
 #include <string>
 
-PulsedIonization::PulsedIonization (std::string const& collision_name, MultiParticleContainer const * mypc)
+PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContainer const * mypc)
     : CollisionBase(collision_name)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
-                                     "Pulsed Ionization must have exactly one species.");
+                                     "pulsed_decay  must have exactly one species.");
 
     const amrex::ParmParse pp_collision_name(collision_name);
 
@@ -35,7 +35,7 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     pp_collision_name.queryarr("product_species", m_product_species);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_product_species.size() == 2,
-        "PulsedIonization: product_species size must be equal to two");
+        "PulsedDecay: product_species size must be equal to two");
 
     auto& parent_species = mypc->GetParticleContainerFromName(m_species_names[0]);
     auto& productA = mypc->GetParticleContainerFromName(m_product_species[0]);
@@ -48,7 +48,7 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     const int Z_B = static_cast<int>(amrex::Math::round(productB.getCharge() / PhysConst::q_e));
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Z_P == Z_A + Z_B,
-        "PulsedIonizationFunc: total charge of product species must match the parent species charge");
+        "PulsedDecayFunc: total charge of product species must match the parent species charge");
 
     // Verify that the total mass of the product species matches the mass of the parent species
     const amrex::ParticleReal Mass_P = parent_species.getMass();
@@ -62,7 +62,7 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     const amrex::ParticleReal rtol = 100.0_prt * eps;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( mass_error <= rtol,
-        "PulsedIonizationFunc: total mass of product species must match the parent species mass");
+        "PulsedDecayFunc: total mass of product species must match the parent species mass");
 
     // Get the fixed product particle weight
     pp_collision_name.get("fixed_product_weight", m_fixed_product_weight);
@@ -72,11 +72,11 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     pp_collision_name.getarr("productA_temperature_eV", TA_tmp);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp.size() == 3,
-        "PulsedIonizationFunc: productA_temperature_eV must have exactly 3 values");
+        "PulsedDecayFunc: productA_temperature_eV must have exactly 3 values");
 
     for (int i = 0; i < 3; ++i) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp[i] >= 0.0,
-            "PulsedIonizationFunc: productA_temperature_eV must be greater than or equal to zero");
+            "PulsedDecayFunc: productA_temperature_eV must be greater than or equal to zero");
     }
 
     // Set the direction-dependent thermal speed for product species A
@@ -90,11 +90,11 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     pp_collision_name.getarr("productB_temperature_eV", TB_tmp);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp.size() == 3,
-        "PulsedIonizationFunc: productB_temperature_eV must have exactly 3 values");
+        "PulsedDecayFunc: productB_temperature_eV must have exactly 3 values");
 
     for (int i = 0; i < 3; ++i) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp[i] >= 0.0,
-            "PulsedIonizationFunc: productB_temperature_eV must be greater than or equal to zero");
+            "PulsedDecayFunc: productB_temperature_eV must be greater than or equal to zero");
     }
 
     // Set the direction-dependent thermal speed for product species B
@@ -114,9 +114,9 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
 }
 
 void
-PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
+PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("PulsedIonization::doCollisions()");
+    WARPX_PROFILE("PulsedDecay::doCollisions()");
 
     using namespace amrex::literals;
 
@@ -318,7 +318,7 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
                         ))
                         AMREX_IF_ON_HOST((
                             if (ip < 0) {
-                                amrex::Abort("Error in PulsedIonization: valid species 1 particle not found!");
+                                amrex::Abort("Error in PulsedDecay: valid species 1 particle not found!");
                             }
                         ))
 

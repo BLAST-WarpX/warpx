@@ -7,7 +7,7 @@
 #include "CollisionHandler.H"
 
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
-#include "Particles/Collision/PulsedIonization/PulsedIonization.H"
+#include "Particles/Collision/PulsedDecay/PulsedDecay.H"
 #include "Particles/Collision/BackgroundStopping/BackgroundStopping.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollision.H"
 #include "Particles/Collision/BinaryCollision/Bremsstrahlung/BremsstrahlungFunc.H"
@@ -62,8 +62,8 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "background_mcc") {
             allcollisions[i] = std::make_unique<BackgroundMCCCollision>(collision_names[i]);
         }
-        else if (type == "pulsed_ionization") {
-            allcollisions[i] = std::make_unique<PulsedIonization>(collision_names[i], mypc);
+        else if (type == "pulsed_decay") {
+            allcollisions[i] = std::make_unique<PulsedDecay>(collision_names[i], mypc);
         }
         else if (type == "background_stopping") {
             allcollisions[i] = std::make_unique<BackgroundStopping>(collision_names[i]);

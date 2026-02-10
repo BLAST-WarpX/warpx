@@ -1,3 +1,0 @@
-CEXE_sources += PulsedIonization.cpp
-
-VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Collision/PulsedIonization
