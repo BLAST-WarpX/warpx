@@ -7,7 +7,7 @@ add_warpx_test(
     2  # nprocs
     "inputs_test_1d_ohm_solver_em_modes_implicit_picmi.py --test --dim 1 --bdir z"  # inputs
     "analysis.py"  # analysis
-    "analysis_default_regression.py --path diags/field_diag000250 --rtol 2e-4"  # checksum
+    "analysis_default_regression.py --path diags/field_diag000100 --rtol 2e-4"  # checksum
     OFF  # dependency
 )
 

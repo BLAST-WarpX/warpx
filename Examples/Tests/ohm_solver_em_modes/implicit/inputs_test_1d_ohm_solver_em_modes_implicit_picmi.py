@@ -86,7 +86,7 @@ class EMModes(object):
             self.total_steps = int(self.LT / self.DT)
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 250
+            self.total_steps = 100
         # output diagnostics 20 times per cyclotron period
         self.diag_steps = int(1.0 / 20 / self.DT)
 
