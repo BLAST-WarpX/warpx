@@ -3,7 +3,7 @@
 Overview
 ========
 
-.. _theory-pi:
+.. _theory-pic:
 
 WarpX simulates the **self-consistent** evolution of **particle species** (e.g., electrons, ions, etc.) in the presence of **electric and magnetic fields**.
 In this context, *self-consistent* indicates that the particle dynamics are influenced by the fields, while the fields themselves evolve in response to the particles' changing charge and current densities.
