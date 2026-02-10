@@ -97,12 +97,12 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
  *
  * \param tmp The particle container on which to store the gathered field
  * \param is_full_diagnostic Whether this diagnostic is a full diagnostic
- * \parame save_Ex Whether the Ex field is saved
- * \parame save_Ey Whether the Ex field is saved
- * \parame save_Ez Whether the Ex field is saved
- * \parame save_Bx Whether the Ex field is saved
- * \parame save_By Whether the Ex field is saved
- * \parame save_Bz Whether the Ex field is saved
+ * \param save_Ex Whether the Ex field is saved
+ * \param save_Ey Whether the Ex field is saved
+ * \param save_Ez Whether the Ex field is saved
+ * \param save_Bx Whether the Ex field is saved
+ * \param save_By Whether the Ex field is saved
+ * \param save_Bz Whether the Ex field is saved
  */
 void
 storeFieldOnParticles (PinnedMemoryParticleContainer& tmp, bool is_full_diagnostic,
