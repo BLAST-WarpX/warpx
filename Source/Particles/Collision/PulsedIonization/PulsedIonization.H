@@ -56,7 +56,7 @@ private:
     amrex::Vector<std::string> m_product_species;
 
     amrex::ParticleReal m_fixed_product_weight;
-    amrex::GpuArray<amrex::ParticleReal,3> m_electron_drift_velocity;
+    amrex::GpuArray<amrex::ParticleReal,3> m_ion_thermal_speed;
     amrex::GpuArray<amrex::ParticleReal,3> m_electron_thermal_speed;
 
     amrex::Parser m_ionization_rate_parser;

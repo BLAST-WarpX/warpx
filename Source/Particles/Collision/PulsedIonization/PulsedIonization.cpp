@@ -87,14 +87,23 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     const amrex::ParticleReal Vtez = std::sqrt(PhysConst::q_e*Te_tmp[2] / product_species_0.getMass());
     m_electron_thermal_speed = {Vtex, Vtey, Vtez};
 
-    // Parse the direction-dependent electron drift velocity [m/s]
-    amrex::Vector<amrex::ParticleReal> Vd_tmp;
-    pp_collision_name.getarr("electron_drift_velocity", Vd_tmp);
+    // Parse the direction-dependent ion temperature
+    amrex::Vector<amrex::ParticleReal> Ti_tmp;
+    pp_collision_name.getarr("ion_temperature_eV", Ti_tmp);
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Vd_tmp.size() == 3,
-        "PulsedIonizationFunc: electron_drift_velocity must have exactly 3 values");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Ti_tmp.size() == 3,
+        "PulsedIonizationFunc: ion_temperature_eV must have exactly 3 values");
 
-    m_electron_drift_velocity = {Vd_tmp[0], Vd_tmp[1], Vd_tmp[2]};
+    for (int i = 0; i < 3; ++i) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Ti_tmp[i] >= 0.0,
+            "PulsedIonizationFunc: ion_temperature_eV must be greater than or equal to zero");
+    }
+
+    // Set the direction-dependent ion thermal speed
+    const amrex::ParticleReal Vtix = std::sqrt(PhysConst::q_e*Ti_tmp[0] / product_species_1.getMass());
+    const amrex::ParticleReal Vtiy = std::sqrt(PhysConst::q_e*Ti_tmp[1] / product_species_1.getMass());
+    const amrex::ParticleReal Vtiz = std::sqrt(PhysConst::q_e*Ti_tmp[2] / product_species_1.getMass());
+    m_ion_thermal_speed = {Vtix, Vtiy, Vtiz};
 
     // Parse the ionization rate
     std::string ionization_rate_str;
@@ -144,12 +153,12 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
     auto nu_func = m_ionization_rate_func;
 
     const amrex::ParticleReal fixed_product_weight = m_fixed_product_weight;
-    const amrex::ParticleReal electron_Vdrift_x = m_electron_drift_velocity[0];
-    const amrex::ParticleReal electron_Vdrift_y = m_electron_drift_velocity[1];
-    const amrex::ParticleReal electron_Vdrift_z = m_electron_drift_velocity[2];
-    const amrex::ParticleReal electron_Vtherm_x = m_electron_thermal_speed[0];
-    const amrex::ParticleReal electron_Vtherm_y = m_electron_thermal_speed[1];
-    const amrex::ParticleReal electron_Vtherm_z = m_electron_thermal_speed[2];
+    const amrex::ParticleReal ele_Vtherm_x = m_electron_thermal_speed[0];
+    const amrex::ParticleReal ele_Vtherm_y = m_electron_thermal_speed[1];
+    const amrex::ParticleReal ele_Vtherm_z = m_electron_thermal_speed[2];
+    const amrex::ParticleReal ion_Vtherm_x = m_ion_thermal_speed[0];
+    const amrex::ParticleReal ion_Vtherm_y = m_ion_thermal_speed[1];
+    const amrex::ParticleReal ion_Vtherm_z = m_ion_thermal_speed[2];
 
     // Loop over refinement levels
     const int flvl = species1.finestLevel();
@@ -252,9 +261,17 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
 
             uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
+            amrex::ParticleReal const* AMREX_RESTRICT ux1  = soa_1.m_rdata[PIdx::ux];
+            amrex::ParticleReal const* AMREX_RESTRICT uy1  = soa_1.m_rdata[PIdx::uy];
+            amrex::ParticleReal const* AMREX_RESTRICT uz1  = soa_1.m_rdata[PIdx::uz];
+
             amrex::ParticleReal* AMREX_RESTRICT uxe  = soa_product_ele.m_rdata[PIdx::ux];
             amrex::ParticleReal* AMREX_RESTRICT uye  = soa_product_ele.m_rdata[PIdx::uy];
             amrex::ParticleReal* AMREX_RESTRICT uze  = soa_product_ele.m_rdata[PIdx::uz];
+
+            amrex::ParticleReal* AMREX_RESTRICT uxi  = soa_product_ion.m_rdata[PIdx::ux];
+            amrex::ParticleReal* AMREX_RESTRICT uyi  = soa_product_ion.m_rdata[PIdx::uy];
+            amrex::ParticleReal* AMREX_RESTRICT uzi  = soa_product_ion.m_rdata[PIdx::uz];
 
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
@@ -312,13 +329,21 @@ PulsedIonization::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParti
                         CopyIonF(ion, soa_1, ip, static_cast<int>(i_ion), engine);
                         CopyEleF(ele, soa_1, ip, static_cast<int>(i_ele), engine);
 
-                        // Set electron velocity from specified normal distribution
-                        uxe[i_ele] = electron_Vdrift_x;
-                        uye[i_ele] = electron_Vdrift_y;
-                        uze[i_ele] = electron_Vdrift_z;
-                        uxe[i_ele] += electron_Vtherm_x*RandomNormal(0_prt, 1.0_prt, engine);
-                        uye[i_ele] += electron_Vtherm_y*RandomNormal(0_prt, 1.0_prt, engine);
-                        uze[i_ele] += electron_Vtherm_z*RandomNormal(0_prt, 1.0_prt, engine);
+                        // Set electron velocity to parent particle velocity plus thermal
+                        uxe[i_ele] = ux1[ip];
+                        uye[i_ele] = uy1[ip];
+                        uze[i_ele] = uz1[ip];
+                        uxe[i_ele] += ele_Vtherm_x*RandomNormal(0_prt, 1.0_prt, engine);
+                        uye[i_ele] += ele_Vtherm_y*RandomNormal(0_prt, 1.0_prt, engine);
+                        uze[i_ele] += ele_Vtherm_z*RandomNormal(0_prt, 1.0_prt, engine);
+
+                        // Set ion velocity to parent particle velocity plus thermal
+                        uxi[i_ion] = ux1[ip];
+                        uyi[i_ion] = uy1[ip];
+                        uzi[i_ion] = uz1[ip];
+                        uxi[i_ion] += ion_Vtherm_x*RandomNormal(0_prt, 1.0_prt, engine);
+                        uyi[i_ion] += ion_Vtherm_y*RandomNormal(0_prt, 1.0_prt, engine);
+                        uzi[i_ion] += ion_Vtherm_z*RandomNormal(0_prt, 1.0_prt, engine);
 
                         // Set the weight of the product particles
                         ion.m_rdata[PIdx::w][i_ion] = wpEI;
