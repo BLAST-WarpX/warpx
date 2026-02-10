@@ -41,6 +41,31 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(product_species_0.AmIA<PhysicalSpecies::electron>(),
         "PulsedIonization: The first product species must be an electron");
 
+    // Verify that the total charge of the product species matches the charge of the parent species
+    auto& parent_species = mypc->GetParticleContainerFromName(m_species_names[0]);
+    auto& product_species_1 = mypc->GetParticleContainerFromName(m_product_species[1]);
+
+    const int Z_P = static_cast<int>(amrex::Math::round(parent_species.getCharge() / PhysConst::q_e));
+    const int Z_E = static_cast<int>(amrex::Math::round(product_species_0.getCharge() / PhysConst::q_e));
+    const int Z_I = static_cast<int>(amrex::Math::round(product_species_1.getCharge() / PhysConst::q_e));
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Z_P == Z_E + Z_I,
+        "PulsedIonizationFunc: total charge of product species must match the parent species charge");
+
+    // Verify that the total mass of the product species matches the mass of the parent species
+    const amrex::ParticleReal Mass_P = parent_species.getMass();
+    const amrex::ParticleReal Mass_E = product_species_0.getMass();
+    const amrex::ParticleReal Mass_I = product_species_1.getMass();
+
+    const amrex::ParticleReal mass_ratio = (Mass_E + Mass_I) / Mass_P;
+    const amrex::ParticleReal mass_error = amrex::Math::abs(mass_ratio - 1.0_prt);
+
+    const amrex::ParticleReal eps = std::numeric_limits<amrex::ParticleReal>::epsilon();
+    const amrex::ParticleReal rtol = 100.0_prt * eps;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE( mass_error <= rtol,
+        "PulsedIonizationFunc: total mass of product species must match the parent species mass");
+
     // Get the product electron and ion particle weight
     pp_collision_name.get("fixed_product_weight", m_fixed_product_weight);
 
@@ -57,9 +82,9 @@ PulsedIonization::PulsedIonization (std::string const& collision_name, MultiPart
     }
 
     // Set the direction-dependent electron thermal speed
-    const amrex::ParticleReal Vtex = std::sqrt(PhysConst::q_e*Te_tmp[0]/product_species_0.getMass());
-    const amrex::ParticleReal Vtey = std::sqrt(PhysConst::q_e*Te_tmp[1]/product_species_0.getMass());
-    const amrex::ParticleReal Vtez = std::sqrt(PhysConst::q_e*Te_tmp[2]/product_species_0.getMass());
+    const amrex::ParticleReal Vtex = std::sqrt(PhysConst::q_e*Te_tmp[0] / product_species_0.getMass());
+    const amrex::ParticleReal Vtey = std::sqrt(PhysConst::q_e*Te_tmp[1] / product_species_0.getMass());
+    const amrex::ParticleReal Vtez = std::sqrt(PhysConst::q_e*Te_tmp[2] / product_species_0.getMass());
     m_electron_thermal_speed = {Vtex, Vtey, Vtez};
 
     // Parse the direction-dependent electron drift velocity [m/s]
