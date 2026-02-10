@@ -24,6 +24,7 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 yt.funcs.mylog.setLevel(50)
 
 import numpy as np
+from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, e, epsilon_0, m_e
 
 # test name
@@ -62,13 +63,17 @@ k = {"Ex": kx, "Ey": ky, "Ez": kz}
 cos = {"Ex": (0, 1, 1), "Ey": (1, 0, 1), "Ez": (1, 1, 0)}
 
 
-def get_contribution(is_cos, k, idim):
-    du = (hi[idim] - lo[idim]) / Ncell[idim]
-    u = lo[idim] + du * (0.5 + np.arange(Ncell[idim]))
+def get_contribution_at_positions(is_cos, k, idim, u):
     if is_cos[idim] == 1:
         return np.cos(k * u)
     else:
         return np.sin(k * u)
+
+
+def get_contribution(is_cos, k, idim):
+    du = (hi[idim] - lo[idim]) / Ncell[idim]
+    u = lo[idim] + du * (0.5 + np.arange(Ncell[idim]))
+    return get_contribution_at_positions(is_cos, k, idim, u)
 
 
 def get_theoretical_field(field, t):
@@ -84,6 +89,18 @@ def get_theoretical_field(field, t):
         * y_contribution[np.newaxis, :, np.newaxis]
         * z_contribution[np.newaxis, np.newaxis, :]
     )
+
+    return E
+
+
+def get_theoretical_field_at_positions(field, t, x, y, z):
+    amplitude = epsilon * (m_e * c**2 * k[field]) / e * np.sin(wp * t)
+    cos_flag = cos[field]
+    x_contribution = get_contribution_at_positions(cos_flag, kx, 0, x)
+    y_contribution = get_contribution_at_positions(cos_flag, ky, 1, y)
+    z_contribution = get_contribution_at_positions(cos_flag, kz, 2, z)
+
+    E = amplitude * x_contribution * y_contribution * z_contribution
 
     return E
 
@@ -125,6 +142,17 @@ for field in ["Ex", "Ey", "Ez"]:
     E_th = get_theoretical_field(field, t0)
     max_error = abs(E_sim - E_th).max() / abs(E_th).max()
     print("%s: Max error: %.2e" % (field, max_error))
+    error_rel = max(error_rel, max_error)
+
+ts = OpenPMDTimeSeries("./diags/openpmd")
+x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=40)
+for field in ["Ex", "Ey", "Ez"]:
+    E_sim_particles = ts.get_particle(
+        [field.lower()], species="electrons", iteration=40
+    )
+    E_th_particles = get_theoretical_field_at_positions(field, t0, x, y, z)
+    max_error = abs(E_sim_particles - E_th_particles).max() / abs(E_th_particles).max()
+    print("%s: Max error at particles: %.2e" % (field, max_error))
     error_rel = max(error_rel, max_error)
 
 # Plot the last field from the loop (Ez at iteration 40)
