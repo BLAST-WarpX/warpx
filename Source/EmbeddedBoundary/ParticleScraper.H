@@ -209,7 +209,7 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
 #elif (defined WARPX_DIM_1D_Z)
                     pos[0] = zp;
 #endif
-                    f(ptd, ip, pos, normal, engine);
+                    f(ptd, ip, pos, normal, phi_value, engine);
 
                 }
             });
