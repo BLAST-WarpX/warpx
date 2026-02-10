@@ -50,7 +50,14 @@ ParticleDiag::ParticleDiag (
                     // the particle container carries, and is only added to particles during output.
                     // Therefore, this case needs to be treated specifically.
                     m_plot_phi = true;
-                } else {
+                }
+                else if (var == "Ex") { m_plot_Ex = true; }
+                else if (var == "Ey") { m_plot_Ey = true; }
+                else if (var == "Ez") { m_plot_Ez = true; }
+                else if (var == "Bx") { m_plot_Bx = true; }
+                else if (var == "By") { m_plot_By = true; }
+                else if (var == "Bz") { m_plot_Bz = true; }
+                else {
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc->HasRealComp(var),
                         "variables argument '" + var
                         +"' is not an existing attribute for this species");
@@ -69,6 +76,22 @@ ParticleDiag::ParticleDiag (
                 diag_name + "." + name + ".variables contains no particle positions!",
                 ablastr::warn_manager::WarnPriority::high
             );
+        }
+    }
+
+    amrex::Vector<std::string> additional_variables;
+    pp_diag_name_species_name.queryarr("additional_variables", additional_variables);
+    for (auto& var : additional_variables) {
+        if (var == "phi") { m_plot_phi = true; }
+        else if (var == "Ex") { m_plot_Ex = true; }
+        else if (var == "Ey") { m_plot_Ey = true; }
+        else if (var == "Ez") { m_plot_Ez = true; }
+        else if (var == "Bx") { m_plot_Bx = true; }
+        else if (var == "By") { m_plot_By = true; }
+        else if (var == "Bz") { m_plot_Bz = true; }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+                "additional_variables argument '" + var + "' is not a valid variable");
         }
     }
 

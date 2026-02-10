@@ -92,4 +92,21 @@ void
 storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
 
+/** \brief Gathers fields from a MultiFab to the macroparticles.
+ *         Adds a runtime component of the particle container to store it.
+ *
+ * \param tmp The particle container on which to store the gathered field
+ * \param is_full_diagnostic Whether this diagnostic is a full diagnostic
+ * \parame save_Ex Whether the Ex field is saved
+ * \parame save_Ey Whether the Ex field is saved
+ * \parame save_Ez Whether the Ex field is saved
+ * \parame save_Bx Whether the Ex field is saved
+ * \parame save_By Whether the Ex field is saved
+ * \parame save_Bz Whether the Ex field is saved
+ */
+void
+storeFieldOnParticles (PinnedMemoryParticleContainer& tmp, bool is_full_diagnostic,
+                       bool save_Ex, bool save_Ey, bool save_Ez,
+                       bool save_Bx, bool save_By, bool save_Bz);
+
 #endif /* WARPX_PARTICLEIO_H_ */
