@@ -559,8 +559,8 @@ for (const auto & particle_diag : particle_diags) {
     }
 
     WarpXParticleContainer::Base tmp = (isBTD || use_pinned_pc) ?
-        pinned_pc->make_alike<amrex::PolymorphicArenaAllocator>() :
-        pc->make_alike<amrex::PolymorphicArenaAllocator>();
+        pinned_pc->make_alike<>() :
+        pc->make_alike<>();
     tmp.SetArena(amrex::The_Pinned_Arena());
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();

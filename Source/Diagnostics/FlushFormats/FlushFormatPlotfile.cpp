@@ -361,8 +361,8 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
         WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
-            pinned_pc->make_alike<amrex::PolymorphicArenaAllocator>() :
-            pc->make_alike<amrex::PolymorphicArenaAllocator>();
+            pinned_pc->make_alike<>() :
+            pc->make_alike<>();
         tmp.SetArena(amrex::The_Pinned_Arena());
 
         Vector<std::string> real_names;

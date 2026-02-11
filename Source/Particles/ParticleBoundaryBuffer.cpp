@@ -406,7 +406,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                 const WarpXParticleContainer& pc = mypc.GetParticleContainer(i);
                 if (!buffer[i].isDefined())
                 {
-                    buffer[i] = pc.make_alike<amrex::PolymorphicArenaAllocator>();
+                    buffer[i] = pc.make_alike<>();
                     buffer[i].SetArena(amrex::The_Pinned_Arena());
                     buffer[i].AddIntComp("stepScraped", true);
                     buffer[i].AddRealComp("deltaTimeScraped", true);
@@ -516,7 +516,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
             const auto& pc = mypc.GetParticleContainer(i);
             if (!buffer[i].isDefined())
             {
-                buffer[i] = pc.make_alike<amrex::PolymorphicArenaAllocator>();
+                buffer[i] = pc.make_alike<>();
                 buffer[i].SetArena(amrex::The_Pinned_Arena());
                 buffer[i].AddIntComp("stepScraped", true);
                 buffer[i].AddRealComp("deltaTimeScraped", true);
