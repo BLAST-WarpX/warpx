@@ -290,6 +290,28 @@ void WarpX::MakeWarpX ()
     std::tie(particle_boundary_lo, particle_boundary_hi) =
         warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
+    // Parse embedded boundary particle boundary condition
+    if (EB::enabled()) {
+        amrex::ParmParse const pp_warpx("warpx");
+        if (pp_warpx.contains("eb_particle_boundary_condition")) {
+            pp_warpx.query_enum_sloppy(
+                "eb_particle_boundary_condition", eb_particle_boundary, "-_");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                eb_particle_boundary == ParticleBoundaryType::Absorbing ||
+                eb_particle_boundary == ParticleBoundaryType::Reflecting,
+                "warpx.eb_particle_boundary_condition must be Absorbing or Reflecting");
+        } else {
+            eb_particle_boundary = ParticleBoundaryType::Absorbing;
+            ablastr::warn_manager::WMRecordWarning(
+                "EmbeddedBoundary",
+                "warpx.eb_particle_boundary_condition is not specified. "
+                "Defaulting to Absorbing. Particles that cross the embedded "
+                "boundary surface will be removed. Set to Reflecting to "
+                "reflect particles instead.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+    }
+
     CheckGriddingForRZSpectral();
 
     m_instance = new WarpX();

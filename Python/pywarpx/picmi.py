@@ -2915,6 +2915,11 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         Whether to cover cells with multiple cuts.
         (If False, this will raise an error if some cells have multiple cuts)
 
+    particle_boundary_condition: string, default='Absorbing'
+        Boundary condition for particles at the embedded boundary surface.
+        Supported values: 'Absorbing' (particles removed on contact)
+        or 'Reflecting' (specular reflection).
+
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
     """
@@ -2928,6 +2933,7 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         stl_reverse_normal=False,
         potential=None,
         cover_multiple_cuts=None,
+        particle_boundary_condition=None,
         **kw,
     ):
         assert stl_file is None or implicit_function is None, Exception(
@@ -2955,6 +2961,12 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         self.potential = potential
 
         self.cover_multiple_cuts = cover_multiple_cuts
+
+        if particle_boundary_condition is not None:
+            assert particle_boundary_condition in ("Absorbing", "Reflecting"), (
+                "particle_boundary_condition must be 'Absorbing' or 'Reflecting'"
+            )
+        self.particle_boundary_condition = particle_boundary_condition
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -2995,6 +3007,11 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
                 self.potential, self.mangle_dict
             )
             pywarpx.warpx.__setattr__("eb_potential(x,y,z,t)", expression)
+
+        if self.particle_boundary_condition is not None:
+            pywarpx.warpx.eb_particle_boundary_condition = (
+                self.particle_boundary_condition
+            )
 
 
 class PlasmaLens(picmistandard.base._ClassWithInit):
