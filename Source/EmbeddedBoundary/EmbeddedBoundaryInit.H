@@ -59,7 +59,8 @@ namespace warpx::embedded_boundary
     void MarkUpdateCellsStairCase (
         std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
         ablastr::fields::VectorField const & field,
-        amrex::EBFArrayBoxFactory const & eb_fact );
+        amrex::EBFArrayBoxFactory const & eb_fact,
+        const amrex::Periodicity& periodicity );
 
     /** \brief Set a flag to indicate on which grid points the E field
      *  should be updated, depending on their position relative to the embedded boundary.

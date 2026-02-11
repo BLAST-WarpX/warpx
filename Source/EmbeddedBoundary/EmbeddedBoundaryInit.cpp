@@ -125,7 +125,8 @@ void
 web::MarkUpdateCellsStairCase (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
     ablastr::fields::VectorField const& field,
-    amrex::EBFArrayBoxFactory const & eb_fact )
+    amrex::EBFArrayBoxFactory const & eb_fact,
+    const amrex::Periodicity& periodicity )
 {
 
     using ablastr::fields::Direction;
@@ -212,7 +213,8 @@ web::MarkUpdateCellsStairCase (
             }
 
         }
-
+        // Populate guard cells
+        eb_update[idim]->FillBoundary(periodicity);
     }
 
 }
