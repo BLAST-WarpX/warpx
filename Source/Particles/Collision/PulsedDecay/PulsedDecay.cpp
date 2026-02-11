@@ -42,7 +42,6 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     auto& productB = mypc->GetParticleContainerFromName(m_product_species[1]);
 
     // Verify that the total charge of the product species matches the charge of the parent species
-
     const int Z_P = static_cast<int>(amrex::Math::round(parent_species.getCharge() / PhysConst::q_e));
     const int Z_A = static_cast<int>(amrex::Math::round(productA.getCharge() / PhysConst::q_e));
     const int Z_B = static_cast<int>(amrex::Math::round(productB.getCharge() / PhysConst::q_e));
@@ -281,8 +280,8 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
                     const index_type start = offsets_ptr[i_cell];
 
-                    auto const& CopyBF = *CopyBPtr;
                     auto const& CopyAF = *CopyAPtr;
+                    auto const& CopyBF = *CopyBPtr;
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -290,7 +289,7 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                     const index_type cell_stop_1  = cell_offsets_1[i_cell+1];
                     const index_type num_in_cell = cell_stop_1 - cell_start_1;
 
-                    const amrex::ParticleReal wpEI = fixed_product_weight;
+                    const amrex::ParticleReal wpAB = fixed_product_weight;
 
                     for (index_type j = 0; j < num_products_in_cell; ++j) {
 
@@ -343,14 +342,14 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         uBz[ip_B] += VtB_z*RandomNormal(0_prt, 1.0_prt, engine);
 
                         // Set the weight of the product particles
-                        wA[ip_A] = wpEI;
-                        wB[ip_B] = wpEI;
+                        wA[ip_A] = wpAB;
+                        wB[ip_B] = wpAB;
 
                         // Remove product weight from species 1
-                        amrex::ParticleReal wp_remove = amrex::min(wpEI, w1[ip]);
+                        amrex::ParticleReal wp_remove = amrex::min(wpAB, w1[ip]);
                         BinaryCollisionUtils::remove_weight_from_colliding_particle(
                             w1[ip], idcpu1[ip], wp_remove);
-                        amrex::ParticleReal wp_remaining = wpEI - wp_remove;
+                        amrex::ParticleReal wp_remaining = wpAB - wp_remove;
                         if (wp_remaining > 0.0_prt) {
                             for (index_type t = 0; t < num_in_cell; ++t) {
                                 ++idx;
