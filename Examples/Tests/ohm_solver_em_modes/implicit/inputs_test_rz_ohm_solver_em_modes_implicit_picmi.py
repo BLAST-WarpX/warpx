@@ -78,7 +78,6 @@ class CylindricalNormalModes(object):
             self.NPPC = 200
             self.diag_steps = 10
 
-
         self.Lz = self.Nz * self.DZ * self.l_i
         self.Lr = self.Nr * self.DR * self.l_i
 

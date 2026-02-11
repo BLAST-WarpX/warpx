@@ -91,7 +91,6 @@ class EMModes(object):
             self.total_steps = 50
             self.diag_steps = 10
 
-
         # dump all the current attributes to a dill pickle file
         if comm.rank == 0:
             with open("sim_parameters.dpkl", "wb") as f:
