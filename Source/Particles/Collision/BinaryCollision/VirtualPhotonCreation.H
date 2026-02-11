@@ -246,7 +246,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         // Beam size effect: displace the virtual photon position according to the virtuality
                         if (do_beam_size_effect){
                             // Find distance at which the photon should be displaced (radius)
-                            // Refer to [ADD REFERENCE]
+                            // Refer to doi.org/10.1103/PhysRevAccelBeams.27.091001
                             // radius = hbar * c / [ e * sqrt( Q2*(1-y) ) ]
                             // where Q2 is the virtuality, y the fractional energy
                             // log(Q2) is uniformly distributed between Q2_min and Q2_max
