@@ -7,7 +7,7 @@ my_constants.GeV   = q_e*1.e9
 # BEAMS
 my_constants.beam_energy = 182.5*GeV
 my_constants.beam_gamma  = beam_energy/mc2
-my_constants.beam_npart  = 155000000000 # [e]
+my_constants.beam_npart  = 1.55e11 # [e]
 my_constants.nmacropart  = 1
 my_constants.beam_charge = q_e * beam_npart
 my_constants.sigmax      = 1 # [m]
