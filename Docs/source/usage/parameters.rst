@@ -1514,7 +1514,8 @@ Particle initialization
 
 * ``<species>.qed_virtual_photons_do_beam_size_effect`` (`boolean`) optional (default `false`)
     Applies the beam size effect on the virtual photons.
-    This effect reduces the radiative Bhabha scattering cross section by approximately half. Virtual photon :math:`x` and :math:`y` coordinates will be randomized around the coordinate
+    This effect reduces the radiative Bhabha scattering cross section by approximately half, by smearing the impact parameter of the virtual photons on a disc around the equivalent primary. This accounts for the finite
+    transverse size of the colliding bunches. Otherwise all virtual photons are assumed the same impact parameter. Virtual photon :math:`x` and :math:`y` coordinates will be randomized around the coordinate
     of the equivalent primary and distributed on a disc of radius :math:`\rho=\frac{\hbar}{\sqrt{Q^2(1-x)}}`, where :math:`Q` is the photon virtuality and :math:`x` is the fractional photon energy.
     See :cite:t:`param-Kicsiny2024` for more details.
 
