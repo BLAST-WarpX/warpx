@@ -312,9 +312,10 @@ guardCellManager::Init (
     }
 #endif
 
-    // For the hybrid-PIC solver an extra guard cell is added to avoid the need
-    // for parallel communication after calculating curl x B.
-    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+    // For the hybrid-PIC solver an extra guard cell is added with collocated grids
+    // to avoid the need for parallel communication after calculating curl x B.
+    if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) &&
+        (grid_type == GridType::Collocated)) {
         ng_FieldSolver += 1;
     }
 
