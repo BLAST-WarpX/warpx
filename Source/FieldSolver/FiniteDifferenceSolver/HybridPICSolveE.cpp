@@ -87,11 +87,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -277,11 +272,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -378,11 +368,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
