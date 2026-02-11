@@ -44,10 +44,14 @@ class CopyPreBuild(build):
                 "PYWARPX_LIB_DIR='{}'".format(PYWARPX_LIB_DIR)
             )
 
-        # copy external libs into collection of files in a temporary build dir
+        # copy Python module artifacts and sources
         dst_path = os.path.join(self.build_lib, "pywarpx")
-        for lib_path in libs_found:
-            shutil.copy(lib_path, dst_path)
+        shutil.copytree(
+            PYWARPX_LIB_DIR,
+            dst_path,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("diags", "diags.*"),
+        )
 
 
 class CMakeExtension(Extension):

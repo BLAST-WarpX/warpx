@@ -178,7 +178,22 @@ Post-Processing
 
 For post-processing, most users use Python via OLCFs's `Jupyter service <https://jupyter.olcf.ornl.gov>`__ (`Docs <https://docs.olcf.ornl.gov/services_and_applications/jupyter/index.html>`__).
 
-Please follow the same guidance as for :ref:`OLCF Summit post-processing <post-processing-summit>`.
+We usually just install our software on-the-fly on Frontier.
+When starting up a post-processing session, run this in your first cells:
+
+.. note::
+
+   The following software packages are installed only into a temporary directory.
+
+.. code-block:: bash
+
+   # work-around for OLCFHELP-4242
+   !jupyter serverextension enable --py --sys-prefix dask_labextension
+
+   # next Jupyter cell: the software you want
+   !mamba install --quiet -c conda-forge -y openpmd-api openpmd-viewer ipympl ipywidgets fast-histogram yt
+
+   # restart notebook
 
 .. _known-frontier-issues:
 
