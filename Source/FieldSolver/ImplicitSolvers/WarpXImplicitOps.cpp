@@ -90,13 +90,6 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
 }
 
 void
-WarpX::FillBoundaryE_and_ApplyBCs (int lev, PatchType patch_type, amrex::Real a_time)
-{
-    FillBoundaryE(guard_cells.ng_alloc_EB, sync_nodal_points);
-    // ApplyEfieldBoundary(lev, patch_type, a_time);
-}
-
-void
 WarpX::SpectralSourceFreeFieldAdvance (amrex::Real start_time)
 {
     using namespace amrex::literals;

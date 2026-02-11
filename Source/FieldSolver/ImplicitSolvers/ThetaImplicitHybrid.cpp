@@ -179,11 +179,13 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
         m_WarpX->GetEBUpdateEFlag(),
-        false  // solve_for_Faraday
+        false,  // solve_for_Faraday, includes resistivity and hyper-resistivity terms
+        true    // solve_for_implicit, include grad(Pe) term
     );
 
-    // Apply boundary conditions to E_ohm
-    m_WarpX->FillBoundaryE_and_ApplyBCs(0, PatchType::fine, theta_time);
+    // Copy result back into solver vec to call apply BCs
+    a_RHS.Copy(FieldType::Efield_fp);
+    m_WarpX->SetElectricFieldAndApplyBCs(a_RHS, theta_time);
 
     // Return RHS = E_ohm - E_old
     // Framework computes residual = E - E_old - RHS = E - E_ohm
@@ -233,9 +235,6 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
         AddExternalBfield();
         AddExternalEfield();
     }
-
-    // Apply boundary conditions to final E field at t^{n+1}
-    m_WarpX->FillBoundaryE_and_ApplyBCs(0, PatchType::fine, end_time);
 }
 
 void ThetaImplicitHybrid::AddExternalBfield ()

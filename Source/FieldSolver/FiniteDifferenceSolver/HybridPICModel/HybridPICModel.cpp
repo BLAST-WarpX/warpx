@@ -329,7 +329,8 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    const bool solve_for_Faraday) const
+    const bool solve_for_Faraday,
+    const bool /*solve_for_implicit*/) const
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
@@ -349,7 +350,8 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::VectorField const& Bfield,
     amrex::MultiFab const& rhofield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
-    const int lev, const bool solve_for_Faraday) const
+    const int lev, const bool solve_for_Faraday,
+    const bool /*solve_for_implicit*/) const
 {
     WARPX_PROFILE("WarpX::HybridPICSolveE()");
 
@@ -371,7 +373,8 @@ void HybridPICModel::HybridPICSolveE (
     amrex::MultiFab const& rhofield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, PatchType patch_type,
-    const bool solve_for_Faraday) const
+    const bool solve_for_Faraday,
+    const bool /*solve_for_implicit*/) const
 {
     auto& warpx = WarpX::GetInstance();
 
