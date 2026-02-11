@@ -400,6 +400,10 @@ public:
      */
     bool has_virtual_photons () const override;
 
+    /**
+    * Tells if beam size effect is enabled for
+    * the virtual photons
+    */
     bool has_virtual_photons_beam_size_effect () const override;
 
     /**
