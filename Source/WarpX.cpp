@@ -1894,7 +1894,7 @@ WarpX::ReadParameters ()
     pp_collisions.queryarr("collision_names", collision_names);
     bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
     if (collisions) {
-        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+        if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;
         }
 
