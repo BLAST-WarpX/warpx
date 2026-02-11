@@ -398,7 +398,7 @@ void WarpX::OneStep (
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
             // with collisions placed in the middle of the position push and after the momentum push
-            if (m_collisions_split_position_push) {
+            if (m_collisions_split_momentum_push) {
                 // push particles (half position and full momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
