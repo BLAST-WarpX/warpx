@@ -1291,7 +1291,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // Auxiliary booleans
     bool const gather_fields = (
         !do_not_gather &&
-        momentum_push_type != MomentumPushType::None
+        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf)
     );
 
     bool const copy_particle_attribs = (
@@ -1451,7 +1451,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 
 #ifdef WARPX_QED
-        if (momentum_push_type != MomentumPushType::None) {
+        if (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
             if (!do_sync) {
                 doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
@@ -1471,7 +1471,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             }
         }
 #else
-        if (momentum_push_type != MomentumPushType::None) {
+        if (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
             doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
