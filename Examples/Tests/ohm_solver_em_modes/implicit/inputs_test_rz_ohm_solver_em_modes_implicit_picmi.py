@@ -67,15 +67,17 @@ class CylindricalNormalModes(object):
 
         if not self.test:
             self.total_steps = int(self.LT / self.DT)
+            # output diagnostics 50 times per cyclotron period
+            self.diag_steps = max(10, int(1.0 / 50 / self.DT))
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 10
+            self.total_steps = 50
             # and make the grid and particle count smaller
             self.Nz = 128
             self.Nr = 64
             self.NPPC = 200
-        # output diagnostics 50 times per cyclotron period
-        self.diag_steps = max(10, int(1.0 / 50 / self.DT))
+            self.diag_steps = 10
+
 
         self.Lz = self.Nz * self.DZ * self.l_i
         self.Lr = self.Nr * self.DR * self.l_i
