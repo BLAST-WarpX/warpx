@@ -738,7 +738,7 @@ class ParticleBoundaryBufferWrapper(object):
             comp_name      : str
                 The component of the array data that will be returned.
                 "x", "y", "z", "ux", "uy", "uz", "w"
-                "stepScraped","deltaTimeScraped",
+                "stepScraped", "deltaTimeScraped", "timeScraped",
                 if boundary='eb': "nx", "ny", "nz"
 
             level          : int
@@ -792,7 +792,7 @@ class ParticleBoundaryBufferWrapper(object):
             comp_name      : str
                 The component of the array data that will be returned.
                 "x", "y", "z", "ux", "uy", "uz", "w"
-                "stepScraped","deltaTimeScraped",
+                "stepScraped", "deltaTimeScraped", "timeScraped",
                 if boundary='eb': "nx", "ny", "nz"
 
             level          : int

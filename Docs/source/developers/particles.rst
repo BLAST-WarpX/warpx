@@ -128,6 +128,11 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         when the particle hits the                     interaction.
                                         boundary.                                      Saved in the boundary
                                                                                        buffers.
+``timeScraped``        ``real``         The exact time when the particle    SoA   RT   Added when there is
+                                        hits the boundary.                             particle-boundary
+                                                                                       interaction.
+                                                                                       Saved in the boundary
+                                                                                       buffers.
 ``n_x/y/z``            ``real``         Normal components to the boundary   SoA   RT   Added when there is
                                         on the position where the particle             particle-boundary
                                         hits the boundary.                             interaction.
