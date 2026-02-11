@@ -59,10 +59,21 @@ A package for WarpX is available via `conda-forge <https://conda-forge.org/downl
       conda config --add channels conda-forge
       conda config --set channel_priority strict
 
-.. code-block:: bash
+.. tab-set::
 
-   mamba create -n warpx -c conda-forge warpx
-   mamba activate warpx
+   .. tab-item:: Without MPI
+
+      .. code-block:: bash
+
+         mamba create -n warpx -c conda-forge warpx
+         mamba activate warpx
+
+   .. tab-item:: With MPI (only Linux/macOS)
+
+      .. code-block:: bash
+
+         mamba create -n warpx-mpi -c conda-forge "warpx=*=mpi_mpich*"
+         mamba activate warpx-mpi
 
 .. note::
 
@@ -110,8 +121,23 @@ If you have the :ref:`WarpX dependencies <install-dependencies>` installed, you 
    python3 -m pip install -U build packaging setuptools[core] wheel
    python3 -m pip install -U cmake
 
-   python3 -m pip wheel -v git+https://github.com/BLAST-WarpX/warpx.git
-   python3 -m pip install *whl
+.. tab-set::
+
+   .. tab-item:: Without MPI
+
+      .. code-block:: bash
+
+         python3 -m pip wheel -v git+https://github.com/BLAST-WarpX/warpx.git
+         python3 -m pip install *whl
+
+   .. tab-item:: With MPI (only Linux/macOS)
+
+      .. code-block:: bash
+
+         python3 -m pip install -U mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
+
+         WARPX_MPI=ON python3 -m pip wheel -v git+https://github.com/BLAST-WarpX/warpx.git
+         python3 -m pip install *whl
 
 Pre-compiled binary packages will be published on `PyPI <https://pypi.org/>`__ in the future for faster installs.
 Please consider using :ref:`conda <install-methods-conda>` in the meantime.
