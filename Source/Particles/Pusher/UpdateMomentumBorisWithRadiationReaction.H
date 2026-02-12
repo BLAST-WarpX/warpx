@@ -84,9 +84,10 @@ void UpdateMomentumBorisWithRadiationReaction(
         RRcoeff*(PhysConst::c*(flx_q*By - fly_q*Bx) + bdotE*Ez - coeff*bz_n);
 
     //Update momentum using the RR force
-    ux += frx*dt;
-    uy += fry*dt;
-    uz += frz*dt;
+    const amrex::ParticleReal dt_multiplier = ((momentum_push_type == MomentumPushType::Full) ? 1.0_prt : 0.5_prt);
+    ux += frx*dt_multiplier*dt;
+    uy += fry*dt_multiplier*dt;
+    uz += frz*dt_multiplier*dt;
 }
 
 #endif // WARPX_PARTICLES_PUSHER_UPDATEMOMENTUM_BORIS_WITHRR_H_
