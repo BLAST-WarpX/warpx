@@ -12,10 +12,10 @@ Demonstrates automatic memory estimation before simulation initialization,
 allowing users to adjust parameters based on memory constraints.
 """
 
-from pywarpx import picmi
-
 # Import memory estimator
 from memory_calculator_picmi import estimate_from_picmi
+
+from pywarpx import picmi
 
 # ============================================================================
 # Setup PICMI simulation
@@ -50,12 +50,14 @@ sim = picmi.Simulation(
 
 # Species
 electrons = picmi.Species(
-    particle_type="electron", name="electrons", initial_distribution=picmi.UniformDistribution(
+    particle_type="electron",
+    name="electrons",
+    initial_distribution=picmi.UniformDistribution(
         density=1e25,
         lower_bound=[xmin, ymin, zmin],
         upper_bound=[xmax, ymax, zmax],
         directed_velocity=[0.0, 0.0, 0.0],
-    )
+    ),
 )
 
 ions = picmi.Species(
@@ -96,7 +98,7 @@ target_memory_gb = 10.0  # Example: 10 GB per device
 target_memory_bytes = target_memory_gb * 1e9
 
 if mem_info["total"] > target_memory_bytes:
-    print(f"\n⚠️  WARNING: Estimated memory ({mem_info['total']/1e9:.2f} GB) ")
+    print(f"\n⚠️  WARNING: Estimated memory ({mem_info['total'] / 1e9:.2f} GB) ")
     print(f"   exceeds target ({target_memory_gb:.2f} GB)")
     print("\n   Consider:")
     print("   - Reducing grid resolution")
@@ -104,7 +106,7 @@ if mem_info["total"] > target_memory_bytes:
     print("   - Using fewer species")
     print("   - Increasing number of MPI ranks")
 else:
-    print(f"\n✓ Memory estimate ({mem_info['total']/1e9:.2f} GB) within target")
+    print(f"\n✓ Memory estimate ({mem_info['total'] / 1e9:.2f} GB) within target")
     print(f"  ({target_memory_gb:.2f} GB)")
 
 # ============================================================================
@@ -124,7 +126,7 @@ print(f"Total fields: {sum(field_breakdown.values())} MultiFabs")
 # Species breakdown
 print("\nSpecies breakdown:")
 for species_name, mem in mem_info["species"].items():
-    print(f"  {species_name:<20s}: {mem/1e6:>10.2f} MB")
+    print(f"  {species_name:<20s}: {mem / 1e6:>10.2f} MB")
 
 # ============================================================================
 # Now initialize if memory is acceptable

@@ -334,7 +334,9 @@ class MemoryCalculator:
             field_breakdown["B_field"] = 3  # Bx, By, Bz
             field_breakdown["J_current"] = 3  # Jx, Jy, Jz
             field_breakdown["rho_charge"] = 1  # Charge density
-            field_breakdown["electron_pressure"] = self.sim_dim  # Electron pressure tensor
+            field_breakdown["electron_pressure"] = (
+                self.sim_dim
+            )  # Electron pressure tensor
             field_breakdown["electron_temp"] = 1  # Electron temperature (if isothermal)
 
         # Sum total field components
@@ -556,9 +558,9 @@ class MemoryCalculator:
         MB = 1e6
         GB = 1e9
 
-        print("="*60)
+        print("=" * 60)
         print("Memory Requirement Summary")
-        print("="*60)
+        print("=" * 60)
 
         components = {}
         total = 0.0
@@ -575,14 +577,20 @@ class MemoryCalculator:
                 print("  Components:")
                 for name, count in breakdown.items():
                     component_mem = count * self.value_size * self.local_cells
-                    print(f"    - {name:<20s}: {count:>2d} x {component_mem / MB:>8.2f} MB")
+                    print(
+                        f"    - {name:<20s}: {count:>2d} x {component_mem / MB:>8.2f} MB"
+                    )
 
                 if hasattr(self, "last_field_multipliers"):
                     mult = self.last_field_multipliers
                     if mult["mesh_refinement"] > 1.0:
-                        print(f"    * Mesh refinement multiplier: {mult['mesh_refinement']:.2f}x")
+                        print(
+                            f"    * Mesh refinement multiplier: {mult['mesh_refinement']:.2f}x"
+                        )
                     if mult["psatd_spectral"] > 1.0:
-                        print(f"    * PSATD spectral multiplier: {mult['psatd_spectral']:.2f}x")
+                        print(
+                            f"    * PSATD spectral multiplier: {mult['psatd_spectral']:.2f}x"
+                        )
 
         # Species
         if species_mems:
@@ -601,17 +609,17 @@ class MemoryCalculator:
 
         # Custom components
         if custom_components:
-            print(f"\n+ Other components:")
+            print("\n+ Other components:")
             for name, mem in custom_components.items():
                 components[name] = mem
                 total += mem
                 print(f"    - {name:<20s}: {mem / MB:>8.2f} MB")
 
         # Total
-        print("\n" + "-"*60)
+        print("\n" + "-" * 60)
         print(f"Total memory per box: {total / MB:>10.2f} MB")
         print(f"                      {total / GB:>10.4f} GB")
-        print("="*60)
+        print("=" * 60)
 
         return total
 
@@ -676,18 +684,23 @@ class MemoryCalculator:
 
         # GPU specifications: [num_multiprocessors, max_threads_per_multiprocessor]
         multProc_num_and_maxThreads_d = {
-            "A100": [108, 2048],   # NVIDIA A100
-            "H100": [132, 2048],   # NVIDIA H100
-            "V100": [80, 2048],    # NVIDIA V100
-            "MI250X": [110, 2048], # AMD MI250X
+            "A100": [108, 2048],  # NVIDIA A100
+            "H100": [132, 2048],  # NVIDIA H100
+            "V100": [80, 2048],  # NVIDIA V100
+            "MI250X": [110, 2048],  # AMD MI250X
         }
 
         # Use custom GPU specs if provided, otherwise use model lookup
-        if gpu_multiprocessors is not None and gpu_threads_per_multiprocessor is not None:
+        if (
+            gpu_multiprocessors is not None
+            and gpu_threads_per_multiprocessor is not None
+        ):
             num_multiprocessors = gpu_multiprocessors
             threads_per_mp = gpu_threads_per_multiprocessor
         elif gpu_model in multProc_num_and_maxThreads_d:
-            num_multiprocessors, threads_per_mp = multProc_num_and_maxThreads_d[gpu_model]
+            num_multiprocessors, threads_per_mp = multProc_num_and_maxThreads_d[
+                gpu_model
+            ]
         else:
             raise ValueError(
                 f"GPU model '{gpu_model}' not recognized. "

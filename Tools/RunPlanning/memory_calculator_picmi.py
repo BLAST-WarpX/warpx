@@ -13,7 +13,6 @@ PICMI Simulation objects and estimate memory requirements.
 """
 
 import numpy as np
-
 from memory_calculator import MemoryCalculator
 
 
@@ -56,7 +55,7 @@ def estimate_from_picmi(sim, verbose=True):
     >>>
     >>> # Check if memory is acceptable
     >>> if mem_info['total'] > target_memory:
-    >>>     # Adjust parameters
+    >>> # Adjust parameters
     >>>     ...
     >>>
     >>> # Now initialize
@@ -256,7 +255,9 @@ def _extract_species_info(species, sim, grid_info):
 
     # Extract particles per cell from layout
     if hasattr(species, "layout"):
-        layouts = species.layout if isinstance(species.layout, list) else [species.layout]
+        layouts = (
+            species.layout if isinstance(species.layout, list) else [species.layout]
+        )
 
         # Sum particles from all layouts
         total_ppc = 0

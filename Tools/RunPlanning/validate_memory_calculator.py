@@ -16,8 +16,6 @@ Usage:
     python validate_memory_calculator.py
 """
 
-import numpy as np
-
 from memory_calculator import MemoryCalculator as MC
 
 
@@ -131,7 +129,9 @@ def demonstrate_gpu_variants():
         gpu_multiprocessors=100,
         gpu_threads_per_multiprocessor=2048,
     )
-    print(f"  {'Custom':<10s}: {custom_rng_mem / 1e6:>8.2f} MB  (100 MPs, 2048 threads/MP)")
+    print(
+        f"  {'Custom':<10s}: {custom_rng_mem / 1e6:>8.2f} MB  (100 MPs, 2048 threads/MP)"
+    )
 
     print("=" * 60)
 
@@ -164,10 +164,14 @@ def demonstrate_advanced_features():
     print("\nField Memory Comparison (256^3 cells):")
     print("-" * 60)
     print(f"  Base (no MR, FDTD):  {base_field / 1e6:>8.2f} MB")
-    print(f"  With 2-level MR:     {mr_field / 1e6:>8.2f} MB  (+{(mr_field/base_field-1)*100:.1f}%)")
-    print(f"  With PSATD:          {psatd_field / 1e6:>8.2f} MB  (+{(psatd_field/base_field-1)*100:.1f}%)")
     print(
-        f"  With MR + PSATD:     {mr_psatd_field / 1e6:>8.2f} MB  (+{(mr_psatd_field/base_field-1)*100:.1f}%)"
+        f"  With 2-level MR:     {mr_field / 1e6:>8.2f} MB  (+{(mr_field / base_field - 1) * 100:.1f}%)"
+    )
+    print(
+        f"  With PSATD:          {psatd_field / 1e6:>8.2f} MB  (+{(psatd_field / base_field - 1) * 100:.1f}%)"
+    )
+    print(
+        f"  With MR + PSATD:     {mr_psatd_field / 1e6:>8.2f} MB  (+{(mr_psatd_field / base_field - 1) * 100:.1f}%)"
     )
 
     # Particle features
@@ -184,10 +188,10 @@ def demonstrate_advanced_features():
     print("-" * 60)
     print(f"  Base:                {base_species / 1e6:>8.2f} MB")
     print(
-        f"  With QED:            {qed_species / 1e6:>8.2f} MB  (+{(qed_species/base_species-1)*100:.1f}%)"
+        f"  With QED:            {qed_species / 1e6:>8.2f} MB  (+{(qed_species / base_species - 1) * 100:.1f}%)"
     )
     print(
-        f"  With ionization:     {ion_species / 1e6:>8.2f} MB  (+{(ion_species/base_species-1)*100:.1f}%)"
+        f"  With ionization:     {ion_species / 1e6:>8.2f} MB  (+{(ion_species / base_species - 1) * 100:.1f}%)"
     )
 
     print("=" * 60)
@@ -248,7 +252,9 @@ def demonstrate_solver_types():
     # With PML
     pml = mc.mem_req_by_fields(Nx, Ny, Nz, pml_ncell=10, dive_cleaning=True)
 
-    print(f"  Base (E,B,J):        {base / 1e6:>8.2f} MB - {list(base_breakdown.keys())}")
+    print(
+        f"  Base (E,B,J):        {base / 1e6:>8.2f} MB - {list(base_breakdown.keys())}"
+    )
     print(
         f"  + div(E) cleaning:   {dive / 1e6:>8.2f} MB - {list(dive_breakdown.keys())}"
     )
