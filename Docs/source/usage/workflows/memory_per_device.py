@@ -73,17 +73,10 @@ species_H_mem = mc.mem_req_by_species(
 # memory allocated mainly for the states of RNGs
 rng_mem = mc.mem_req_by_rng(warpx_compute="CUDA", gpu_model="A100")
 
-
-megabyte = 1e6
-print("Memory requirement per box:")
-print(r" + fields:")
-print(r"   - total: {:.2f} MB".format(field_mem / megabyte))
-print(" + species:")
-print(r"   - e: {:.2f} MB".format(species_e_mem / megabyte))
-print(r"   - H: {:.2f} MB".format(species_H_mem / megabyte))
-print(r" + random number generation: states:")
-print(r"   - states: {:.2f} MB".format(rng_mem / megabyte))
-print(r"---------")
-print(r"Total sum")
-mem_sum = species_e_mem + species_H_mem + field_mem + rng_mem
-print(r" {:.2f} MB".format(mem_sum / megabyte))
+# Print formatted summary with automatic field breakdown
+total_mem = mc.print_summary(
+    field_mem=field_mem,
+    species_mems={"electrons": species_e_mem, "H ions": species_H_mem},
+    rng_mem=rng_mem,
+    show_breakdown=True,
+)

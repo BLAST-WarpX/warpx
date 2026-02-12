@@ -522,6 +522,99 @@ class MemoryCalculator:
 
         return req_mem
 
+    def print_summary(
+        self,
+        field_mem=None,
+        species_mems=None,
+        rng_mem=None,
+        custom_components=None,
+        show_breakdown=True,
+    ):
+        """
+        Print a formatted summary of memory requirements.
+
+        Parameters
+        ----------
+        field_mem : float, optional
+            Field memory in bytes (from mem_req_by_fields)
+        species_mems : dict, optional
+            Dictionary of species name -> memory in bytes
+            Example: {'electrons': mem1, 'ions': mem2}
+        rng_mem : float, optional
+            RNG memory in bytes (from mem_req_by_rng)
+        custom_components : dict, optional
+            Additional custom memory components
+            Example: {'diagnostics': mem, 'other': mem}
+        show_breakdown : bool, optional
+            Show detailed field breakdown if available (default: True)
+
+        Returns
+        -------
+        float
+            Total memory in bytes
+        """
+        MB = 1e6
+        GB = 1e9
+
+        print("="*60)
+        print("Memory Requirement Summary")
+        print("="*60)
+
+        components = {}
+        total = 0.0
+
+        # Fields
+        if field_mem is not None:
+            components["Fields"] = field_mem
+            total += field_mem
+            print(f"\n+ Fields: {field_mem / MB:>10.2f} MB")
+
+            # Show field breakdown if available and requested
+            if show_breakdown and hasattr(self, "last_field_breakdown"):
+                breakdown = self.last_field_breakdown
+                print("  Components:")
+                for name, count in breakdown.items():
+                    component_mem = count * self.value_size * self.local_cells
+                    print(f"    - {name:<20s}: {count:>2d} x {component_mem / MB:>8.2f} MB")
+
+                if hasattr(self, "last_field_multipliers"):
+                    mult = self.last_field_multipliers
+                    if mult["mesh_refinement"] > 1.0:
+                        print(f"    * Mesh refinement multiplier: {mult['mesh_refinement']:.2f}x")
+                    if mult["psatd_spectral"] > 1.0:
+                        print(f"    * PSATD spectral multiplier: {mult['psatd_spectral']:.2f}x")
+
+        # Species
+        if species_mems:
+            species_total = sum(species_mems.values())
+            components["Particles"] = species_total
+            total += species_total
+            print(f"\n+ Particles: {species_total / MB:>10.2f} MB")
+            for species_name, mem in species_mems.items():
+                print(f"    - {species_name:<20s}: {mem / MB:>8.2f} MB")
+
+        # RNG
+        if rng_mem is not None:
+            components["RNG"] = rng_mem
+            total += rng_mem
+            print(f"\n+ RNG states: {rng_mem / MB:>10.2f} MB")
+
+        # Custom components
+        if custom_components:
+            print(f"\n+ Other components:")
+            for name, mem in custom_components.items():
+                components[name] = mem
+                total += mem
+                print(f"    - {name:<20s}: {mem / MB:>8.2f} MB")
+
+        # Total
+        print("\n" + "-"*60)
+        print(f"Total memory per box: {total / MB:>10.2f} MB")
+        print(f"                      {total / GB:>10.4f} GB")
+        print("="*60)
+
+        return total
+
     def mem_req_by_rng(
         self,
         warpx_compute="CUDA",
