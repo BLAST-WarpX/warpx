@@ -2385,7 +2385,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If true, collisions are performed in the middle of the momentum push, which is split into two substeps.
     This improves energy conservation, as demonstrated in (`Vay et al., Phys. Rev. E 111, 2025 <https://doi.org/10.1103/PhysRevE.111.025306>`__).
     This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes, because the implicit
-    formulation is intrinsically energy-conserving when combined with MCC collisions, as demonstated in https://www.sciencedirect.com/science/article/abs/pii/S0021999122000924.
+    formulation is intrinsically energy-conserving when combined with MCC collisions, as demonstated in `Angus et al., J. Comput. Phys. 456, 2022 <https://doi.org/10.1016/j.jcp.2022.111030>`__.
     It is also not available with embedded boundaries.
 
 * ``<collision_name>.correct_energy_momentum`` (`bool`) optional

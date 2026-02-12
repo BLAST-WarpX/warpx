@@ -1290,8 +1290,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     // Auxiliary booleans
     bool const gather_fields = (
-        !do_not_gather &&
-        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf)
+        !do_not_gather
     );
 
     bool const copy_particle_attribs = (
@@ -1451,33 +1450,29 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 
 #ifdef WARPX_QED
-        if (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
-            if (!do_sync) {
-                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+        if (!do_sync) {
+            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                           Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
                                           dt, momentum_push_type);
-            } else {
-                if constexpr (qed_control == has_qed) {
-                    doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
+        } else {
+            if constexpr (qed_control == has_qed) {
+                doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
                                               dt, momentum_push_type);
-                }
             }
         }
 #else
-        if (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+        doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
                                       dt, momentum_push_type);
-        }
 #endif
 
         if (position_push_type == PositionPushType::Full) {
