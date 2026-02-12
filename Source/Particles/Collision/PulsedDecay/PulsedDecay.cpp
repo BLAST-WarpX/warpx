@@ -258,10 +258,6 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
             uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
-            amrex::ParticleReal const* AMREX_RESTRICT ux1  = soa_1.m_rdata[PIdx::ux];
-            amrex::ParticleReal const* AMREX_RESTRICT uy1  = soa_1.m_rdata[PIdx::uy];
-            amrex::ParticleReal const* AMREX_RESTRICT uz1  = soa_1.m_rdata[PIdx::uz];
-
             amrex::ParticleReal* AMREX_RESTRICT wA  = soa_productA.m_rdata[PIdx::w];
             amrex::ParticleReal* AMREX_RESTRICT uAx = soa_productA.m_rdata[PIdx::ux];
             amrex::ParticleReal* AMREX_RESTRICT uAy = soa_productA.m_rdata[PIdx::uy];
