@@ -13,29 +13,42 @@ crosses the EB surface.
 Three files form the critical path:
 
 1. `ParticleBoundaryProcess.H` — only `Absorb` and `NoOp` functors existed;
-   no `Reflect` functor.
+   no reflection capability.
 2. `MultiParticleContainer.cpp:1130` — `ScrapeParticlesAtEB()` hard-codes
    `ParticleBoundaryProcess::Absorb()` for every species.
 3. `WarpXEvolve.cpp:690-696` — domain BCs are applied first
    (`ApplyBoundaryConditions`), then EB scraping unconditionally absorbs.
 
 The scraper template in `ParticleScraper.H` was *already* designed for pluggable
-functors — it just never had a Reflect implementation.
+functors — it just never had a reflection implementation.
 
 ## Changes in This Branch
 
-### 1. Specular Reflect functor (`ParticleBoundaryProcess.H`)
+### 1. Bisection-based specular reflection (`ParticleScraper.H`)
 
-Added `ParticleBoundaryProcess::Reflect` that performs:
-- **Position reflection**: `x_new = x − 2·φ·n̂` (mirrors particle across EB surface)
-- **Velocity reflection**: `v_new = v − 2(v·n̂)n̂` (reverses normal component)
+Added `reflectParticlesAtEB()`, a new function template that handles curved EB
+surfaces correctly using the same bisection algorithm as
+`ParticleBoundaryBuffer::FindEmbeddedBoundaryIntersection`. For each particle
+that crosses into the EB (`phi < 0`):
 
-Handles all dimension variants: 3D, XZ, RZ (with cylindrical ↔ Cartesian velocity
-projection), and 1D_Z.
+1. **Bisect** along the particle trajectory (using `amrex::bisect` + `UpdatePosition`)
+   to find the exact contact point where `phi = 0`.
+2. **Compute normal** at the contact point (not at the penetrated position).
+3. **Reflect velocity** specularly: `v_new = v − 2(v·n̂)n̂`.
+4. **Advance** from the contact point with reflected velocity for the remaining
+   fraction of the timestep.
+
+This replaces the earlier `ParticleBoundaryProcess::Reflect` functor which used
+the simpler approximation `x_new = x − 2·φ·n̂`. That formula is only exact for
+planar surfaces; for curved EBs (the primary use case) it accumulates error
+proportional to the surface curvature.
+
+Handles all dimension variants: 3D, XZ, RZ (with cylindrical → Cartesian normal
+conversion), and 1D_Z.
 
 ### 2. Scraper interface extended (`ParticleScraper.H`)
 
-The functor call was changed from:
+The functor call in `scrapeParticlesAtEB` was changed from:
 ```cpp
 f(ptd, ip, pos, normal, engine);
 ```
@@ -44,9 +57,8 @@ to:
 f(ptd, ip, pos, normal, phi_value, engine);
 ```
 
-`phi_value` (the signed distance, negative inside the EB) is needed so the
-functor can compute the correct reflected position. `NoOp` and `Absorb` accept
-and ignore it.
+`phi_value` (the signed distance, negative inside the EB) is passed to the
+functor for use by future BCs. `NoOp` and `Absorb` accept and ignore it.
 
 ### 3. User-facing configuration
 
@@ -61,14 +73,22 @@ Parsed in `MakeWarpX()` via `query_enum_sloppy`, stored as
 A low-priority warning is emitted when the parameter is unspecified, so existing
 users are informed of the default absorbing behavior.
 
-### 4. Functor dispatch (`MultiParticleContainer::ScrapeParticlesAtEB`)
+### 4. Dispatch (`MultiParticleContainer::ScrapeParticlesAtEB`)
 
 Branches on `WarpX::eb_particle_boundary`:
-- `Reflecting` → `ParticleBoundaryProcess::Reflect()`
-- anything else → `ParticleBoundaryProcess::Absorb()`
+- `Reflecting` → `reflectParticlesAtEB()` (per-level, with dt and mass)
+- anything else → `scrapeParticlesAtEB()` with `ParticleBoundaryProcess::Absorb()`
 
 Injection/reposition call sites (`AddParticles.cpp`, `WarpXParticleContainer.cpp`)
 remain `Absorb` — particles created inside the EB should be removed.
+
+### Why reflection is not a functor
+
+Unlike `Absorb` which only needs the particle ID, specular reflection on curved
+surfaces requires trajectory data (`dt`, `mass`) and the signed distance array
+(`phi`) for bisection — data not available in the functor interface. The
+reflection logic therefore lives directly in `reflectParticlesAtEB()` rather than
+as a functor passed to `scrapeParticlesAtEB()`.
 
 ## Functor Interface — Extensibility Assessment
 
@@ -85,14 +105,14 @@ void operator()(PData& ptd, int i,
 
 | BC Type | What it does | Why the interface is sufficient |
 |---------|-------------|-------------------------------|
-| **Diffuse reflect** | Re-emit with cosine-weighted random direction from surface | `normal` + `engine` generate the random direction; `phi_value` repositions the particle |
-| **Thermal** | Rethermalize velocity at wall temperature | `uth` stored as functor struct member; `normal` orients half-Maxwellian; `engine` samples it; `phi_value` repositions |
+| **Diffuse reflect** | Re-emit with cosine-weighted random direction from surface | `normal` + `engine` generate the random direction; bisection handles position |
+| **Thermal** | Rethermalize velocity at wall temperature | `uth` stored as functor struct member; `normal` orients half-Maxwellian; `engine` samples it |
 | **Stochastic absorb/reflect** | Velocity-dependent reflection probability | Reflection model parser stored as functor member; velocity read from `ptd`; `engine` for random draw |
 | **Accommodation coefficient** | Partial thermalization (mix of specular + diffuse) | `alpha`, `uth` as struct members; everything else available |
 
-Per-BC configuration data belongs on the **functor struct** (e.g., `Thermal{uth=...}`),
-not in the scraper call. The scraper arguments are geometry data; the functor carries
-physics parameters. This separation is clean.
+Note: BCs involving position correction (diffuse, thermal) would also benefit
+from the bisection approach to find the true contact point, similar to what
+`reflectParticlesAtEB` does.
 
 ### Not sufficient for
 
@@ -104,21 +124,13 @@ physics parameters. This separation is clean.
 These would need a different design (likely a post-scrape particle injection step),
 regardless of what data the scraper passes.
 
-### One optional future improvement
-
-`phi_value` approximates the penetration distance at the end of the timestep.
-For more precise intersection timing (needed if a BC depends on exact collision
-energy), the scraper could additionally pass a `dt_fraction` from bisection — the
-`ParticleBoundaryBuffer` already computes this. Not needed for the BCs above, but
-noted for completeness.
-
 ## Files Changed
 
-| File | Lines | Summary |
-|------|-------|---------|
-| `Source/EmbeddedBoundary/ParticleBoundaryProcess.H` | +90 | `Reflect` functor; updated `NoOp`/`Absorb` signatures for `phi_value` |
-| `Source/EmbeddedBoundary/ParticleScraper.H` | +1 −1 | Pass `phi_value` to functor |
-| `Source/Particles/MultiParticleContainer.cpp` | +10 −2 | Dispatch on `WarpX::eb_particle_boundary` |
-| `Source/WarpX.H` | +6 | New `eb_particle_boundary` static member |
-| `Source/WarpX.cpp` | +22 | Parse `warpx.eb_particle_boundary_condition` with validation and warning |
-| `Python/pywarpx/picmi.py` | +17 | `particle_boundary_condition` param on `EmbeddedBoundary` |
+| File | Summary |
+|------|---------|
+| `Source/EmbeddedBoundary/ParticleBoundaryProcess.H` | Updated `NoOp`/`Absorb` signatures for `phi_value`; removed old `Reflect` functor |
+| `Source/EmbeddedBoundary/ParticleScraper.H` | Pass `phi_value` to functor; new `reflectParticlesAtEB()` with bisection |
+| `Source/Particles/MultiParticleContainer.cpp` | Dispatch on `WarpX::eb_particle_boundary` |
+| `Source/WarpX.H` | New `eb_particle_boundary` static member |
+| `Source/WarpX.cpp` | Parse `warpx.eb_particle_boundary_condition` with validation and warning |
+| `Python/pywarpx/picmi.py` | `particle_boundary_condition` param on `EmbeddedBoundary` |
