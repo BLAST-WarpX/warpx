@@ -330,14 +330,14 @@ void HybridPICModel::HybridPICSolveE (
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
     const bool solve_for_Faraday,
-    const bool /*solve_for_implicit*/) const
+    const bool solve_for_implicit) const
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
         HybridPICSolveE(
             Efield[lev], Jfield[lev], Bfield[lev], *rhofield[lev],
-            eb_update_E[lev], lev, solve_for_Faraday
+            eb_update_E[lev], lev, solve_for_Faraday, solve_for_implicit
         );
     }
     // Allow execution of Python callback after E-field push
@@ -351,13 +351,13 @@ void HybridPICModel::HybridPICSolveE (
     amrex::MultiFab const& rhofield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, const bool solve_for_Faraday,
-    const bool /*solve_for_implicit*/) const
+    const bool solve_for_implicit) const
 {
     WARPX_PROFILE("WarpX::HybridPICSolveE()");
 
     HybridPICSolveE(
         Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
-        PatchType::fine, solve_for_Faraday
+        PatchType::fine, solve_for_Faraday, solve_for_implicit
     );
     if (lev > 0)
     {
@@ -374,7 +374,7 @@ void HybridPICModel::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, PatchType patch_type,
     const bool solve_for_Faraday,
-    const bool /*solve_for_implicit*/) const
+    const bool solve_for_implicit) const
 {
     auto& warpx = WarpX::GetInstance();
 
@@ -384,7 +384,7 @@ void HybridPICModel::HybridPICSolveE (
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
         Efield, current_fp_plasma, Jfield, Bfield, rhofield,
-        *electron_pressure_fp, eb_update_E, lev, this, solve_for_Faraday
+        *electron_pressure_fp, eb_update_E, lev, this, solve_for_Faraday, solve_for_implicit
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
