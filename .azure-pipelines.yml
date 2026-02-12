@@ -191,7 +191,6 @@ jobs:
       df -h
       # display ccache hits & size
       ccache -s
-      du -hs ~/.cache/ccache
     displayName: 'CCache Hits'
 
   - bash: |
