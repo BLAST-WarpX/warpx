@@ -56,12 +56,6 @@ struct Reflect {
                      amrex::Real phi_value,
                      amrex::RandomEngine const& /*engine*/) const noexcept
     {
-        if (i == 0) {
-            printf("[ParticleBoundaryProcess::Reflect] EB reflection active  "
-                   "phi=%e  normal=(%e, %e)\n",
-                   phi_value, double(normal[0]), double(normal[1]));
-        }
-
         // --- Reflect position across EB surface ---
         // phi_value < 0 inside EB. The reflected position is
         // x_new = x - 2 * phi * n  (moves particle to the mirror point outside).
