@@ -15,14 +15,21 @@
 
 
 /** \brief Push the particle's positions over one timestep,
- *    given the value of its momenta `ux`, `uy`, `uz` */
+ *    given the value of its momenta `ux`, `uy`, `uz`
+ *    Note that UpdateMomentumVay algorithm can be splitted into FirstHalf and SecondHalf
+ *    momentum updates. FirstHalf and SecondHalf updates are constructed so that
+ *    performing FirstHalf followed by SecondHalf is mathematically
+ *    equivalent to a single Full update.
+ *    For more details, see formulas (9)-(13) in J.L.Vay, "Simulation of beams or plasmas crossing at
+ *    relativistic velocity", Phys. Plasmas 15, 056701 (2008).
+ */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdateMomentumVay(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
     const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt,
-    MomentumPushType momentum_push_type = MomentumPushType::Full)
+    MomentumPushType momentum_push_type)
 {
     using namespace amrex::literals;
 

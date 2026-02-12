@@ -1921,6 +1921,10 @@ WarpX::ReadParameters ()
                     ablastr::warn_manager::WarnPriority::low
                 );
             }
+            if (particle_pusher_algo == ParticlePusherAlgo::HigueraCary) {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Collisions: collisions.split_momentum_push is not yet implemented with Higuera-Cary momentum pusher.");
+            }
         }
     }
 }

@@ -112,14 +112,13 @@ namespace {
         amrex::ParticleReal const & mass,
         amrex::ParticleReal const & q,
         ParticlePusherAlgo const & pusher_algo,
-        bool const & do_crr,
+        bool const & do_crr
 #ifdef WARPX_QED
-        bool const & do_sync,
+        , bool const & do_sync,
         amrex::Real t_chi_max,
         amrex::ParticleReal * p_optical_depth_QSR,
-        QuantumSynchrotronEvolveOpticalDepth const & evolve_opt,
+        QuantumSynchrotronEvolveOpticalDepth const & evolve_opt
 #endif
-        MomentumPushType momentum_push_type
     )
     {
 
@@ -193,7 +192,7 @@ namespace {
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
-                                          dt, momentum_push_type);
+                                          dt, MomentumPushType::Full);
             } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -201,7 +200,7 @@ namespace {
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
-                                              dt, momentum_push_type);
+                                              dt, MomentumPushType::Full);
                 }
             }
 #else
@@ -209,7 +208,7 @@ namespace {
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt, momentum_push_type);
+                                      dt, MomentumPushType::Full);
 #endif
 
 #ifdef WARPX_QED
@@ -408,8 +407,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                                            amrex::Real dt,
                                            long & num_unconverged_particles,
                                            amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
-                                           MomentumPushType momentum_push_type)
+                                           amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
@@ -618,11 +616,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                              do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                              ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                              dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, ion_lev, mass, q, pusher_algo, do_crr,
+                             getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                             do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt,
+                             , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
-                             momentum_push_type);
+                             );
 
         // check if particle did not converge
         if (max_iterations > 1 && !convergence) {
@@ -716,8 +714,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     bool skip_deposition,
                                                     long num_unconverged_particles,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
-                                                    amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights,
-                                                    MomentumPushType momentum_push_type)
+                                                    amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1019,11 +1016,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                  ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                  dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, ion_lev, mass, q, pusher_algo, do_crr,
+                                 getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                                 do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt,
+                                 , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
-                                 momentum_push_type);
+                                 );
 
             // Don't change number of suborbits during linear stage of jfnk
             if (linear_stage_of_jfnk) { convergence = true; }

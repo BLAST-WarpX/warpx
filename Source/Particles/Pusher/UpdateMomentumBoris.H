@@ -11,7 +11,11 @@
 #include <AMReX_REAL.H>
 
 /** \brief Push the particle's positions over one timestep,
- *    given the value of its momenta `ux`, `uy`, `uz` */
+ *    given the value of its momenta `ux`, `uy`, `uz`
+ *    Note that UpdateMomentumBoris algorithm can be splitted into FirstHalf and SecondHalf
+ *    momentum updates. FirstHalf and SecondHalf updates are constructed so that
+ *    performing FirstHalf followed by SecondHalf is mathematically
+ *    equivalent to a single Full update. */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdateMomentumBoris(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
