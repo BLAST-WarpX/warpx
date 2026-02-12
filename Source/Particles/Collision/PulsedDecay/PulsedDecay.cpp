@@ -297,20 +297,20 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         const index_type ip_A = old_npA + new_idx;
                         const index_type ip_B = old_npB + new_idx;
 
-                        // Get a random particle from species 1 in this cell
-                        const index_type k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
-                        index_type idx = cell_start_1 + k;
+                        // Get a random particle index from species 1 in this cell
+                        index_type k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
 
                         // Probe until a valid particle is found (should always be at least one)
-                        index_type ip = -1;
+                        index_type ip  = -1;
                         for (index_type t = 0; t < num_in_cell; ++t) {
-                            const index_type cand = indices_1[idx];
-                            if (idcpu1[cand] != amrex::ParticleIdCpus::Invalid) {
-                                ip = cand;
+                            const index_type cand_k = (k + t) % num_in_cell;
+                            const index_type idx = cell_start_1 + cand_k;
+                            const index_type cand_ip = indices_1[idx];
+                            if (idcpu1[cand_ip] != amrex::ParticleIdCpus::Invalid) {
+                                k  = cand_k;
+                                ip = cand_ip;
                                 break;
                             }
-                            ++idx;
-                            if (idx == cell_stop_1) { idx = cell_start_1; }
                         }
                         AMREX_IF_ON_DEVICE((
                             AMREX_DEVICE_ASSERT(ip >= 0);
@@ -346,23 +346,20 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         wB[ip_B] = wpAB;
 
                         // Remove product weight from species 1
-                        amrex::ParticleReal wp_remove = amrex::min(wpAB, w1[ip]);
-                        BinaryCollisionUtils::remove_weight_from_colliding_particle(
-                            w1[ip], idcpu1[ip], wp_remove);
-                        amrex::ParticleReal wp_remaining = wpAB - wp_remove;
-                        if (wp_remaining > 0.0_prt) {
-                            for (index_type t = 0; t < num_in_cell; ++t) {
-                                ++idx;
-                                if (idx == cell_stop_1) { idx = cell_start_1; }
-                                const index_type ip2 = indices_1[idx];
-                                if (idcpu1[ip2] != amrex::ParticleIdCpus::Invalid) {
-                                    wp_remove = amrex::min(wp_remaining, w1[ip2]);
-                                    BinaryCollisionUtils::remove_weight_from_colliding_particle(
-                                        w1[ip2], idcpu1[ip2], wp_remove);
-                                    wp_remaining -= wp_remove;
-                                }
-                                if (wp_remaining <= 0.0_prt) { break; }
-                            }
+                        amrex::ParticleReal wp_remaining = wpAB;
+                        for (index_type t = 0; t < num_in_cell; ++t) {
+                            const index_type k2 = (k + t) % num_in_cell;
+                            const index_type idx2 = cell_start_1 + k2;
+                            const index_type ip2 = indices_1[idx2];
+
+                            if (idcpu1[ip2] == amrex::ParticleIdCpus::Invalid) { continue; }
+
+                            const amrex::ParticleReal wp_remove = amrex::min(wp_remaining, w1[ip2]);
+                            BinaryCollisionUtils::remove_weight_from_colliding_particle(
+                                w1[ip2], idcpu1[ip2], wp_remove);
+
+                            wp_remaining -= wp_remove;
+                            if (wp_remaining <= 0.0_prt) { break; }
                         }
 
                     }
