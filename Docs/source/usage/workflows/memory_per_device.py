@@ -58,14 +58,17 @@ species_e_ppc = 2 * 2 * 4
 species_H_ppc = species_e_ppc
 # memory allocated per particle species
 species_e_mem = mc.mem_req_by_species(
-    target_x, target_y, target_z, particles_per_cell=species_e_ppc
+    target_x,
+    target_y,
+    target_z,
+    particles_per_cell=species_e_ppc,
 )
 species_H_mem = mc.mem_req_by_species(
     target_x,
     target_y,
     target_z,
     particles_per_cell=species_H_ppc,
-    num_additional_ints=1,  # ionization state
+    enable_ionization=True,  # H ions can be ionized
 )
 # memory allocated mainly for the states of RNGs
 rng_mem = mc.mem_req_by_rng(warpx_compute="CUDA", gpu_model="A100")

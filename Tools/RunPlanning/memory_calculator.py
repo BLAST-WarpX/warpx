@@ -188,6 +188,8 @@ class MemoryCalculator:
         divb_cleaning=True,
         pml_ncell=10,
         guard_cells_per_dim=[],
+        num_mr_levels=1,
+        use_psatd=False,
     ):
         """
         Memory reserved for fields on each device
@@ -214,6 +216,12 @@ class MemoryCalculator:
         pml_ncell : int
             number of PML cells in each direction
             Set to 0 if boundaries have no PMLs.
+        guard_cells_per_dim : list
+            guard cells per dimension (for PSATD or custom)
+        num_mr_levels : int
+            number of mesh refinement levels (1 = no refinement)
+        use_psatd : bool
+            whether PSATD solver is used (requires additional FFT buffers)
 
 
         Returns
@@ -273,15 +281,36 @@ class MemoryCalculator:
             guard_cells_per_dim=guard_cells_per_dim
         )
 
-        # @TODO: find out how many temporary fields there can be and how much memory they take
-        temporary_field_slots = 1
-        # number of fields: 3 * 3 = x,y,z for E,B,J
-        num_fields = 3 * 3 + temporary_field_slots
-        # double buffer memory
+        # Standard fields: E (3), B (3), J (3) = 9 fields
+        num_fields = 9
+
+        # Add F field if divergence cleaning is enabled
+        # F = div(E) - rho/epsilon0
+        if dive_cleaning or divb_cleaning:
+            num_fields += 1
+
+        # For mesh refinement, we need auxiliary grids
+        # _fp: fine patch, _cp: coarse patch, _aux: auxiliary for gather
+        # Only E and B have _aux grids (not J)
+        mr_multiplier = 1.0
+        if num_mr_levels > 1:
+            # Add coarse patch (_cp) for all fields on fine levels
+            # Add auxiliary grids (_aux) for E and B (6 fields)
+            # Approximate as 1.5x for _cp + 0.67x for _aux ≈ 2.2x total
+            mr_multiplier = 2.2
+
+        # PSATD requires FFT buffers (complex fields)
+        # Roughly 2x memory for FFT transforms of E and B
+        psatd_multiplier = 1.0
+        if use_psatd:
+            psatd_multiplier = 1.5
+
+        # Double buffer memory (guard cells)
         double_buffer_mem = double_buffer_cells * num_fields * self.value_size
 
+        # Total memory
         req_mem = (
-            self.value_size * num_fields * self.local_cells
+            self.value_size * num_fields * self.local_cells * mr_multiplier * psatd_multiplier
             + double_buffer_mem
             + pml_cell_mem
         )
@@ -296,6 +325,9 @@ class MemoryCalculator:
         num_additional_ints=0,
         num_additional_reals=0,
         particles_per_cell=2,
+        enable_qed=False,
+        enable_ionization=False,
+        enable_boundary_scraping=False,
     ):
         """
         Memory reserved for all particles of a species on a device.
@@ -318,11 +350,18 @@ class MemoryCalculator:
         target_n_z : int
             number of cells in z direction containing the target
         num_additional_ints : int
-            number of additional int attributes
+            number of additional int attributes (user-defined)
         num_additional_reals : int
-            number of additional real attributes
+            number of additional real attributes (user-defined)
         particles_per_cell : int
             number of particles of the species per cell
+        enable_qed : bool
+            whether QED physics is enabled (adds opticalDepthQSR, opticalDepthBW)
+        enable_ionization : bool
+            whether ionization is enabled (adds ionizationLevel)
+        enable_boundary_scraping : bool
+            whether particle boundary scraping is enabled
+            (adds stepScraped, deltaTimeScraped, n_x, n_y, n_z)
 
         Returns
         -------
@@ -341,30 +380,59 @@ class MemoryCalculator:
         # memory required by the standard particle attributes
         standard_attribute_mem = np.array(
             [
-                3 * self.value_size,  # momentum
-                self.sim_dim * self.value_size,  # position
-                1 * np.int32().itemsize,  # particle id
+                3 * self.value_size,  # momentum (ux, uy, uz)
+                self.sim_dim * self.value_size,  # position (x, y, z)
+                1 * np.int64().itemsize,  # particle id (amrex::Long = 8 bytes)
                 1 * np.int32().itemsize,  # cpu id
                 1 * self.value_size,  # weighting
             ]
         )
 
-        # memory per particle for additional attributes {unit: byte}
+        # memory for conditional runtime attributes
+        conditional_real_mem = 0
+        conditional_int_mem = 0
+
+        if enable_qed:
+            # QED adds 2 real attributes: opticalDepthQSR, opticalDepthBW
+            conditional_real_mem += 2 * self.value_size
+
+        if enable_ionization:
+            # Ionization adds 1 int attribute: ionizationLevel
+            conditional_int_mem += 1 * np.int32().itemsize
+
+        if enable_boundary_scraping:
+            # Boundary scraping adds 1 int + 4 real attributes:
+            # stepScraped, deltaTimeScraped, n_x, n_y, n_z
+            conditional_int_mem += 1 * np.int32().itemsize
+            conditional_real_mem += (1 + self.sim_dim) * self.value_size
+
+        # memory per particle for user-defined additional attributes {unit: byte}
         additional_int_mem = num_additional_ints * np.int32().itemsize
         additional_real_mem = num_additional_reals * self.value_size
         additional_mem = additional_int_mem + additional_real_mem
 
+        # total memory per particle
+        mem_per_particle = (
+            np.sum(standard_attribute_mem)
+            + conditional_int_mem
+            + conditional_real_mem
+            + additional_mem
+        )
+
         target_cells = target_n_x * target_n_y * target_n_z
 
-        req_mem = (
-            target_cells
-            * particles_per_cell
-            * (np.sum(standard_attribute_mem) + additional_mem)
-        )
+        req_mem = target_cells * particles_per_cell * mem_per_particle
 
         return req_mem
 
-    def mem_req_by_rng(self, warpx_compute="CUDA", gpu_model="A100", omp_num_threads=1):
+    def mem_req_by_rng(
+        self,
+        warpx_compute="CUDA",
+        gpu_model="A100",
+        omp_num_threads=1,
+        gpu_multiprocessors=None,
+        gpu_threads_per_multiprocessor=None,
+    ):
         """
         Memory reserved for the random number generator.
 
@@ -377,8 +445,13 @@ class MemoryCalculator:
             Only valid for `warpx_compute` being either `"CUDA"`, `"HIP"` or `"SYCL"`.
             This influences the number of multiprocessors and the number of threads per multiprocessor.
             These eventually determine the size of the RNG state.
+            Supported models: A100, H100, V100, MI250X
         omp_num_threads : int
             number of OpenMP threads that are working on one box
+        gpu_multiprocessors : int
+            Custom number of multiprocessors (overrides gpu_model)
+        gpu_threads_per_multiprocessor : int
+            Custom threads per multiprocessor (overrides gpu_model)
 
         Returns
         -------
@@ -411,16 +484,33 @@ class MemoryCalculator:
 
         generator_method = generator_method_d[warpx_compute]
 
-        # @TODO perhaps let the user
-        multProc_num_and_maxThreads_d = {"A100": [108, 2048]}
+        # GPU specifications: [num_multiprocessors, max_threads_per_multiprocessor]
+        multProc_num_and_maxThreads_d = {
+            "A100": [108, 2048],   # NVIDIA A100
+            "H100": [132, 2048],   # NVIDIA H100
+            "V100": [80, 2048],    # NVIDIA V100
+            "MI250X": [110, 2048], # AMD MI250X
+        }
+
+        # Use custom GPU specs if provided, otherwise use model lookup
+        if gpu_multiprocessors is not None and gpu_threads_per_multiprocessor is not None:
+            num_multiprocessors = gpu_multiprocessors
+            threads_per_mp = gpu_threads_per_multiprocessor
+        elif gpu_model in multProc_num_and_maxThreads_d:
+            num_multiprocessors, threads_per_mp = multProc_num_and_maxThreads_d[gpu_model]
+        else:
+            raise ValueError(
+                f"GPU model '{gpu_model}' not recognized. "
+                f"Available models: {list(multProc_num_and_maxThreads_d.keys())} "
+                "or provide custom gpu_multiprocessors and gpu_threads_per_multiprocessor."
+            )
 
         req_mem = 0
         if generator_method == "XORWOW":
             # state size: N * sizeof(randstate_t)
             # N = 4 * numMultiProcessors() * maxThreadsPerMultiProcessors()
-            # Perlmutter A100:  108 * 2048
-            num_states = np.prod(multProc_num_and_maxThreads_d[gpu_model])
-            state_size = 6 * 8  # bytes
+            num_states = 4 * num_multiprocessors * threads_per_mp
+            state_size = 6 * 8  # bytes (48 bytes per state)
             req_mem = state_size * num_states
         elif generator_method == "mt19937":
             state_size = np.ceil(19937 / 8)  # bytes
@@ -433,7 +523,7 @@ class MemoryCalculator:
                 pass
         elif generator_method == "Philox4x32x10":
             # 128 Bit counter + 2 * 32 Bit Keys
-            num_states = np.prod(multProc_num_and_maxThreads_d[gpu_model])
+            num_states = 4 * num_multiprocessors * threads_per_mp
             state_size_per_engine = 16 + 2 * 4  # bytes
             req_mem = state_size_per_engine * num_states
         else:

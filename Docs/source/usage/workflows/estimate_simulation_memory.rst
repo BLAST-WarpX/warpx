@@ -32,3 +32,38 @@ This will give the following output:
 .. program-output:: bash -c "PYTHONPATH=$(pwd)/../../../../:$PYTHONPATH ./memory_per_device.py"
 
 Notes:
+
+Limitations
+-----------
+
+The ``MemoryCalculator`` provides **estimates** of simulation memory requirements.
+Actual memory usage may differ due to:
+
+* **AMReX overhead**: Memory management, metadata, and communication buffers
+* **Dynamic load balancing**: Box sizes and distribution may vary at runtime
+* **Particle dynamics**: Particle counts can change due to ionization, pair creation, etc.
+* **Diagnostics**: Output buffers and in-situ visualization can add significant overhead
+* **Operating system**: Memory fragmentation and allocation overhead
+
+Typically, the calculator provides a lower bound estimate that is 70-90% of actual memory usage.
+
+For accurate runtime memory measurements, use the :ref:`LoadBalanceCosts diagnostic <running-cpp-parameters-diagnostics>`.
+
+New Features
+------------
+
+The memory calculator now supports:
+
+* **Mesh refinement**: Account for auxiliary grids with ``num_mr_levels``
+* **QED physics**: Include optical depth attributes with ``enable_qed=True``
+* **Ionization**: Include ionization level with ``enable_ionization=True``
+* **PSATD solver**: Account for FFT buffers with ``use_psatd=True``
+* **Multiple GPU models**: A100, H100, V100, MI250X, or custom specifications
+* **Divergence cleaning**: F field memory automatically included
+
+See Also
+--------
+
+* :ref:`Distribution mapping visualization <plot_distribution_mapping>`
+* :ref:`LoadBalanceCosts diagnostic <running-cpp-parameters-diagnostics>`
+* :ref:`Parallelization workflow <parallelization_warpx>`
