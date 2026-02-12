@@ -28,6 +28,7 @@ class MemoryCalculator:
         build_dim,
         particle_shape_order=3,
         precision="double",
+        solver_type="electromagnetic",
     ):
         """
         Class constructor
@@ -50,6 +51,9 @@ class MemoryCalculator:
             (see algo.particle_shape)
         precision : str
             floating point precision for WarpX (build option, single/double)
+        solver_type : str
+            field solver type: "electromagnetic" (default), "electrostatic",
+            "magnetostatic", or "hybrid" (hybrid-PIC)
         """
         # local device domain size
         self.n_x = n_x
@@ -72,6 +76,14 @@ class MemoryCalculator:
         self.build_dim = build_dim
         self.particle_shape_order = particle_shape_order
         self.precision = precision
+
+        # Validate and store solver type
+        valid_solvers = ["electromagnetic", "electrostatic", "magnetostatic", "hybrid"]
+        if solver_type not in valid_solvers:
+            raise ValueError(
+                f"solver_type must be one of {valid_solvers}, got '{solver_type}'"
+            )
+        self.solver_type = solver_type
 
         if self.precision == "single":
             # value size in bytes
@@ -281,41 +293,126 @@ class MemoryCalculator:
             guard_cells_per_dim=guard_cells_per_dim
         )
 
-        # Standard fields: E (3), B (3), J (3) = 9 fields
-        num_fields = 9
+        # Field memory breakdown - solver-specific allocation
+        field_breakdown = {}
 
-        # Add F field if divergence cleaning is enabled
-        # F = div(E) - rho/epsilon0
-        if dive_cleaning or divb_cleaning:
-            num_fields += 1
+        if self.solver_type == "electromagnetic":
+            # Full electromagnetic solver: E, B, J fields
+            field_breakdown["E_field"] = 3  # Ex, Ey, Ez
+            field_breakdown["B_field"] = 3  # Bx, By, Bz
+            field_breakdown["J_current"] = 3  # Jx, Jy, Jz
 
-        # For mesh refinement, we need auxiliary grids
-        # _fp: fine patch, _cp: coarse patch, _aux: auxiliary for gather
-        # Only E and B have _aux grids (not J)
+            # Optional F field for divergence cleaning
+            if dive_cleaning:
+                field_breakdown["F_dive_clean"] = 1
+
+            # Optional G field for div(B) cleaning
+            if divb_cleaning:
+                field_breakdown["G_divb_clean"] = 1
+
+            # Rho field (charge density) for specific algorithms
+            if use_psatd or dive_cleaning:
+                # PSATD and dive cleaning need rho
+                field_breakdown["rho_charge"] = 2 if not use_psatd else 1
+
+        elif self.solver_type == "electrostatic":
+            # Electrostatic solver: only E and phi, NO time-varying B or J
+            field_breakdown["E_field"] = 3  # Ex, Ey, Ez
+            field_breakdown["phi_potential"] = 1  # Electrostatic potential
+            field_breakdown["rho_charge"] = 1  # Charge density
+
+        elif self.solver_type == "magnetostatic":
+            # Magnetostatic solver: B from currents, E from particles
+            field_breakdown["E_field"] = 3  # Ex, Ey, Ez
+            field_breakdown["B_field"] = 3  # Bx, By, Bz (from currents)
+            field_breakdown["phi_potential"] = 1  # Potential
+            field_breakdown["rho_charge"] = 1  # Charge density
+
+        elif self.solver_type == "hybrid":
+            # Hybrid-PIC: kinetic ions, fluid electrons
+            field_breakdown["E_field"] = 3  # Ex, Ey, Ez
+            field_breakdown["B_field"] = 3  # Bx, By, Bz
+            field_breakdown["J_current"] = 3  # Jx, Jy, Jz
+            field_breakdown["rho_charge"] = 1  # Charge density
+            field_breakdown["electron_pressure"] = self.sim_dim  # Electron pressure tensor
+            field_breakdown["electron_temp"] = 1  # Electron temperature (if isothermal)
+
+        # Sum total field components
+        num_fields = sum(field_breakdown.values())
+
+        # Base memory: all fields at full resolution
+        base_field_mem = self.value_size * num_fields * self.local_cells
+
+        # Mesh refinement multiplier
+        # For MR, we need: _fp (fine), _cp (coarse), _aux (auxiliary for E,B)
         mr_multiplier = 1.0
         if num_mr_levels > 1:
-            # Add coarse patch (_cp) for all fields on fine levels
-            # Add auxiliary grids (_aux) for E and B (6 fields)
-            # Approximate as 1.5x for _cp + 0.67x for _aux ≈ 2.2x total
-            mr_multiplier = 2.2
+            # Electromagnetic needs _aux grids for E and B (6 components)
+            # Electrostatic typically doesn't use _aux grids
+            if self.solver_type in ["electromagnetic", "hybrid"]:
+                # ~1.5x for _cp + ~0.7x for _aux ≈ 2.2x total
+                mr_multiplier = 2.2
+            else:
+                # Electrostatic/magnetostatic: mainly _cp
+                mr_multiplier = 1.5
 
-        # PSATD requires FFT buffers (complex fields)
-        # Roughly 2x memory for FFT transforms of E and B
+        # PSATD spectral solver multiplier (FFT buffers)
         psatd_multiplier = 1.0
         if use_psatd:
-            psatd_multiplier = 1.5
+            if self.solver_type == "electromagnetic":
+                # PSATD needs complex FFT buffers for E and B
+                # Additional ~50% for spectral data structures
+                psatd_multiplier = 1.5
+            else:
+                # PSATD not applicable to electrostatic/magnetostatic
+                pass
 
         # Double buffer memory (guard cells)
         double_buffer_mem = double_buffer_cells * num_fields * self.value_size
 
         # Total memory
         req_mem = (
-            self.value_size * num_fields * self.local_cells * mr_multiplier * psatd_multiplier
+            base_field_mem * mr_multiplier * psatd_multiplier
             + double_buffer_mem
             + pml_cell_mem
         )
 
+        # Store breakdown for transparency (can be accessed after calling this method)
+        self.last_field_breakdown = field_breakdown
+        self.last_field_multipliers = {
+            "mesh_refinement": mr_multiplier,
+            "psatd_spectral": psatd_multiplier,
+        }
+
         return req_mem
+
+    def get_field_breakdown(self, as_memory=False):
+        """
+        Get breakdown of field components after calling mem_req_by_fields().
+
+        Parameters
+        ----------
+        as_memory : bool
+            If True, return memory size in bytes for each component.
+            If False (default), return component counts.
+
+        Returns
+        -------
+        dict
+            Dictionary with field names and their counts or memory usage
+        """
+        if not hasattr(self, "last_field_breakdown"):
+            raise RuntimeError(
+                "Call mem_req_by_fields() first to generate field breakdown"
+            )
+
+        if as_memory:
+            return {
+                name: count * self.value_size * self.local_cells
+                for name, count in self.last_field_breakdown.items()
+            }
+        else:
+            return self.last_field_breakdown.copy()
 
     def mem_req_by_species(
         self,

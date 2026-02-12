@@ -193,9 +193,76 @@ def demonstrate_advanced_features():
     print("=" * 60)
 
 
+def demonstrate_solver_types():
+    """
+    Demonstrate memory differences between solver types.
+    """
+    print("\n" + "=" * 60)
+    print("Solver Type Comparison")
+    print("=" * 60)
+
+    Nx, Ny, Nz = 256, 256, 256
+
+    solver_types = [
+        ("electromagnetic", "Full EM solver (E, B, J)"),
+        ("electrostatic", "Electrostatic (E, phi, rho only)"),
+        ("magnetostatic", "Magnetostatic (E, B from J)"),
+        ("hybrid", "Hybrid-PIC (kinetic ions + fluid e-)"),
+    ]
+
+    print("\nField Memory for different solvers (256^3 cells):")
+    print("-" * 60)
+
+    for solver_type, description in solver_types:
+        mc = MC(Nx, Ny, Nz, build_dim=3, precision="double", solver_type=solver_type)
+
+        # Calculate field memory
+        field_mem = mc.mem_req_by_fields(
+            Nx, Ny, Nz, pml_ncell=0, dive_cleaning=False, divb_cleaning=False
+        )
+
+        # Get detailed breakdown
+        breakdown = mc.get_field_breakdown()
+        total_components = sum(breakdown.values())
+
+        print(f"\n  {solver_type.upper():<20s} {description}")
+        print(f"    Memory: {field_mem / 1e6:>8.2f} MB")
+        print(f"    Components: {total_components} fields")
+        print(f"    Breakdown: {', '.join(f'{k}={v}' for k, v in breakdown.items())}")
+
+    print("\n" + "=" * 60)
+
+    # Detailed example for electromagnetic
+    print("\nDetailed breakdown for ELECTROMAGNETIC solver:")
+    print("-" * 60)
+    mc = MC(Nx, Ny, Nz, build_dim=3, solver_type="electromagnetic")
+
+    # Base case
+    base = mc.mem_req_by_fields(Nx, Ny, Nz, pml_ncell=0)
+    base_breakdown = mc.get_field_breakdown()
+
+    # With dive cleaning (adds F field)
+    dive = mc.mem_req_by_fields(Nx, Ny, Nz, pml_ncell=0, dive_cleaning=True)
+    dive_breakdown = mc.get_field_breakdown()
+
+    # With PML
+    pml = mc.mem_req_by_fields(Nx, Ny, Nz, pml_ncell=10, dive_cleaning=True)
+
+    print(f"  Base (E,B,J):        {base / 1e6:>8.2f} MB - {list(base_breakdown.keys())}")
+    print(
+        f"  + div(E) cleaning:   {dive / 1e6:>8.2f} MB - {list(dive_breakdown.keys())}"
+    )
+    print(f"  + PML (10 cells):    {pml / 1e6:>8.2f} MB")
+
+    print("=" * 60)
+
+
 if __name__ == "__main__":
     # Run validation
     validate_langmuir_2d()
+
+    # Demonstrate solver types
+    demonstrate_solver_types()
 
     # Demonstrate GPU variants
     demonstrate_gpu_variants()

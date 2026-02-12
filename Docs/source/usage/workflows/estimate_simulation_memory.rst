@@ -54,12 +54,40 @@ New Features
 
 The memory calculator now supports:
 
+**Solver Types** (specify via ``solver_type`` parameter):
+
+* **electromagnetic** (default): Full EM-PIC with E, B, J fields (9 components)
+* **electrostatic**: Electrostatic solver with E, phi, rho only (5 components, ~45% less memory)
+* **magnetostatic**: Magnetostatic with B from currents (8 components)
+* **hybrid**: Hybrid-PIC with kinetic ions and fluid electrons (~55% more memory)
+
+**Transparency**: Call ``get_field_breakdown()`` after ``mem_req_by_fields()`` to see exactly
+which field components are allocated and their memory usage.
+
+**Other Features**:
+
 * **Mesh refinement**: Account for auxiliary grids with ``num_mr_levels``
 * **QED physics**: Include optical depth attributes with ``enable_qed=True``
 * **Ionization**: Include ionization level with ``enable_ionization=True``
 * **PSATD solver**: Account for FFT buffers with ``use_psatd=True``
 * **Multiple GPU models**: A100, H100, V100, MI250X, or custom specifications
-* **Divergence cleaning**: F field memory automatically included
+* **Divergence cleaning**: F and G field memory automatically included
+
+Example with solver type::
+
+    from Tools.RunPlanning.memory_calculator import MemoryCalculator as MC
+
+    # Electrostatic simulation
+    mc_es = MC(256, 256, 256, build_dim=3, solver_type="electrostatic")
+    field_mem_es = mc_es.mem_req_by_fields(256, 256, 256, pml_ncell=0)
+    breakdown_es = mc_es.get_field_breakdown()
+    # Shows: {'E_field': 3, 'phi_potential': 1, 'rho_charge': 1}
+
+    # Electromagnetic simulation
+    mc_em = MC(256, 256, 256, build_dim=3, solver_type="electromagnetic")
+    field_mem_em = mc_em.mem_req_by_fields(256, 256, 256, pml_ncell=0)
+    breakdown_em = mc_em.get_field_breakdown()
+    # Shows: {'E_field': 3, 'B_field': 3, 'J_current': 3}
 
 See Also
 --------
