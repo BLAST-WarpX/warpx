@@ -326,17 +326,11 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         CopyBF(*soaB_ptr, soa_1, ip, static_cast<int>(ip_B), engine);
 
                         // Set product species A particle velocity to parent particle velocity plus thermal
-                        uAx[ip_A] = ux1[ip];
-                        uAy[ip_A] = uy1[ip];
-                        uAz[ip_A] = uz1[ip];
                         uAx[ip_A] += VtA_x*RandomNormal(0_prt, 1.0_prt, engine);
                         uAy[ip_A] += VtA_y*RandomNormal(0_prt, 1.0_prt, engine);
                         uAz[ip_A] += VtA_z*RandomNormal(0_prt, 1.0_prt, engine);
 
                         // Set product species B velocity to parent particle velocity plus thermal
-                        uBx[ip_B] = ux1[ip];
-                        uBy[ip_B] = uy1[ip];
-                        uBz[ip_B] = uz1[ip];
                         uBx[ip_B] += VtB_x*RandomNormal(0_prt, 1.0_prt, engine);
                         uBy[ip_B] += VtB_y*RandomNormal(0_prt, 1.0_prt, engine);
                         uBz[ip_B] += VtB_z*RandomNormal(0_prt, 1.0_prt, engine);
