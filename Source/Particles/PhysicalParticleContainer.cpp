@@ -1480,7 +1480,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 #endif
 
-        if (momentum_push_type == MomentumPushType::SecondHalf || momentum_push_type == MomentumPushType::Full) {
+        if (position_push_type == PositionPushType::Full) {
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
             setPosition(ip, xp, yp, zp);
         }
