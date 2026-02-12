@@ -9,11 +9,13 @@
 
 #include "EmbeddedBoundary/DistanceToEB.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/Pusher/UpdatePosition.H"
 
 
 #include <ablastr/particles/NodalFieldGather.H>
 
 #include <AMReX.H>
+#include <AMReX_Algorithm.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Particle.H>
 #include <AMReX_RandomEngine.H>
@@ -214,6 +216,172 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
                 }
             });
         }
+    }
+}
+
+/**
+ * \brief Reflect particles off embedded boundary walls using bisection.
+ *
+ *  For each particle that has crossed into the EB (phi < 0), this function:
+ *  1. Bisects along the particle trajectory to find the contact point on
+ *     the EB surface (where phi = 0).
+ *  2. Computes the surface normal at the exact contact point.
+ *  3. Performs specular velocity reflection: v_new = v - 2*(v . n)*n.
+ *  4. Advances the particle from the contact point with the reflected
+ *     velocity for the remaining fraction of the timestep.
+ *
+ *  This handles curved EB surfaces correctly, unlike the simpler phi-based
+ *  approximation (x_new = x - 2*phi*n) which is only exact for planar
+ *  surfaces. The bisection approach follows the same algorithm used in
+ *  ParticleBoundaryBuffer::FindEmbeddedBoundaryIntersection.
+ *
+ * \tparam PC a type of amrex ParticleContainer
+ *
+ * \param pc the particle container to reflect.
+ * \param distance_to_eb MultiFabs storing the signed distance function.
+ * \param lev the mesh refinement level to work on.
+ * \param dt the timestep size at this level.
+ * \param mass the particle mass for this species.
+ */
+template <class PC, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
+void
+reflectParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& distance_to_eb,
+                      int lev, amrex::Real dt, amrex::ParticleReal mass)
+{
+    BL_PROFILE("reflectParticlesAtEB");
+
+    const auto plo = pc.Geom(lev).ProbLoArray();
+    const auto dxi = pc.Geom(lev).InvCellSizeArray();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for(WarpXParIter pti(pc, lev); pti.isValid(); ++pti)
+    {
+        const auto getPosition = GetParticlePosition<PIdx>(pti);
+        auto setPosition = SetParticlePosition<PIdx>(pti);
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
+        const auto np = tile.numParticles();
+        auto phi = (*distance_to_eb[lev])[pti].array();
+
+        amrex::ParallelForRNG( np,
+        [=] AMREX_GPU_DEVICE (const int ip, amrex::RandomEngine const& engine) noexcept
+        {
+            amrex::ignore_unused(engine);
+
+            if (!amrex::ParticleIDWrapper{ptd.m_idcpu[ip]}.is_valid()) { return; }
+
+            amrex::ParticleReal xp, yp, zp;
+            getPosition(ip, xp, yp, zp);
+
+            int i, j, k;
+            amrex::Real W[AMREX_SPACEDIM][2];
+            ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                xp, yp, zp, plo, dxi, i, j, k, W);
+            amrex::Real const phi_value =
+                ablastr::particles::interp_field_nodal(i, j, k, W, phi);
+
+            if (phi_value < 0.0)
+            {
+                amrex::ParticleReal ux = ptd.m_rdata[PIdx::ux][ip];
+                amrex::ParticleReal uy = ptd.m_rdata[PIdx::uy][ip];
+                amrex::ParticleReal uz = ptd.m_rdata[PIdx::uz][ip];
+
+                // Step 1: Bisect along trajectory to find the fraction of dt
+                // to walk backward from end-of-step to reach the EB surface.
+                amrex::Real const dt_fraction = amrex::bisect(0.0, 1.0,
+                    [=] (amrex::Real dt_frac) {
+                        int bi, bj, bk;
+                        amrex::Real bW[AMREX_SPACEDIM][2];
+                        amrex::ParticleReal x_temp = xp, y_temp = yp, z_temp = zp;
+                        UpdatePosition(x_temp, y_temp, z_temp,
+                                       ux, uy, uz, -dt_frac * dt, mass);
+                        ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                            x_temp, y_temp, z_temp, plo, dxi, bi, bj, bk, bW);
+                        return ablastr::particles::interp_field_nodal(
+                            bi, bj, bk, bW, phi);
+                    });
+
+                // Step 2: Move to contact point on the EB surface
+                amrex::ParticleReal x_c = xp, y_c = yp, z_c = zp;
+                UpdatePosition(x_c, y_c, z_c, ux, uy, uz,
+                               -dt_fraction * dt, mass);
+
+                // Step 3: Compute normal at the contact point
+                int ci, cj, ck;
+                amrex::Real cW[AMREX_SPACEDIM][2];
+                ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                    x_c, y_c, z_c, plo, dxi, ci, cj, ck, cW);
+                int cci, ccj, cck;
+                amrex::Real ccW[AMREX_SPACEDIM][2];
+                ablastr::particles::compute_weights<amrex::IndexType::CELL>(
+                    x_c, y_c, z_c, plo, dxi, cci, ccj, cck, ccW);
+                amrex::RealVect normal = DistanceToEB::interp_normal(
+                    ci, cj, ck, cW, cci, ccj, cck, ccW, phi, dxi);
+                DistanceToEB::normalize(normal);
+
+                // Step 4: Specular velocity reflection  v = v - 2(v.n)n
+                // Normal is in reduced-dimension coordinates;
+                // velocity is always 3D Cartesian.
+#if defined(WARPX_DIM_3D)
+                amrex::ParticleReal const v_dot_n =
+                    ux * amrex::ParticleReal(normal[0]) +
+                    uy * amrex::ParticleReal(normal[1]) +
+                    uz * amrex::ParticleReal(normal[2]);
+                ux -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[0]);
+                uy -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[1]);
+                uz -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[2]);
+#elif defined(WARPX_DIM_XZ)
+                // normal is (n_x, n_z). uy is out-of-plane, unaffected.
+                amrex::ParticleReal const v_dot_n =
+                    ux * amrex::ParticleReal(normal[0]) +
+                    uz * amrex::ParticleReal(normal[1]);
+                ux -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[0]);
+                uz -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[1]);
+#elif defined(WARPX_DIM_RZ)
+                // normal is (n_r, n_z). Convert to 3D Cartesian using
+                // the particle theta at the contact point.
+                amrex::ParticleReal const theta_c = std::atan2(y_c, x_c);
+                amrex::ParticleReal const cos_tc = std::cos(theta_c);
+                amrex::ParticleReal const sin_tc = std::sin(theta_c);
+                amrex::ParticleReal const n3d_x =
+                    amrex::ParticleReal(normal[0]) * cos_tc;
+                amrex::ParticleReal const n3d_y =
+                    amrex::ParticleReal(normal[0]) * sin_tc;
+                amrex::ParticleReal const n3d_z =
+                    amrex::ParticleReal(normal[1]);
+                amrex::ParticleReal const v_dot_n =
+                    ux * n3d_x + uy * n3d_y + uz * n3d_z;
+                ux -= amrex::ParticleReal(2.0) * v_dot_n * n3d_x;
+                uy -= amrex::ParticleReal(2.0) * v_dot_n * n3d_y;
+                uz -= amrex::ParticleReal(2.0) * v_dot_n * n3d_z;
+#elif defined(WARPX_DIM_1D_Z)
+                amrex::ParticleReal const v_dot_n =
+                    uz * amrex::ParticleReal(normal[0]);
+                uz -= amrex::ParticleReal(2.0) * v_dot_n
+                    * amrex::ParticleReal(normal[0]);
+#endif
+
+                // Step 5: Store reflected velocity
+                ptd.m_rdata[PIdx::ux][ip] = ux;
+                ptd.m_rdata[PIdx::uy][ip] = uy;
+                ptd.m_rdata[PIdx::uz][ip] = uz;
+
+                // Step 6: Advance from contact point with reflected velocity
+                // for the remaining fraction of the timestep
+                amrex::ParticleReal x_new = x_c, y_new = y_c, z_new = z_c;
+                UpdatePosition(x_new, y_new, z_new, ux, uy, uz,
+                               dt_fraction * dt, mass);
+
+                // Step 7: Write final position back to particle
+                setPosition(ip, x_new, y_new, z_new);
+            }
+        });
     }
 }
 
