@@ -2095,8 +2095,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_effective_potential_time_filter_param: float, default=0.1
         Time filtering parameter used to filter sigma in the effective
         potential scheme. sigma is updated using:
-        sigma^n = warpx_effective_potential_time_filter_param * sigma^n
-                  + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
 
     warpx_effective_potential_density_floor: float, default=0
         If given, this value will be used as the minimum density during the

@@ -45,6 +45,7 @@ Particle Accelerator & Beam Physics
    examples/gaussian_beam/README.rst
    examples/beam_beam_collision/README.rst
    examples/free_electron_laser/README.rst
+   examples/ion_beam_extraction/README.rst
    examples/thomson_parabola_spectrometer/README.rst
 
 High Energy Astrophysical Plasma Physics
@@ -64,7 +65,6 @@ Fundamental Plasma Physics
    examples/langmuir/README.rst
    examples/capacitive_discharge/README.rst
    examples/pierce_diode/README.rst
-
 
 .. _examples-hybrid-model:
 
