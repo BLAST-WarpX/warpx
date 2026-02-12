@@ -505,12 +505,9 @@ WarpX::OneStep_nosub (
     PushParticlesandDeposit(
         a_cur_time,
         /*skip_current=*/true,
-        PositionPushType::FirstHalf,
-        MomentumPushType::Full
+        PositionPushType::None,
+        MomentumPushType::FirstHalf
     );
-
-    // communicate particle data
-    mypc->Redistribute();
 
     // perform particle collisions
     ExecutePythonCallback("beforecollisions");
@@ -521,8 +518,8 @@ WarpX::OneStep_nosub (
     PushParticlesandDeposit(
         a_cur_time,
         /*skip_current=*/false,
-        PositionPushType::SecondHalf,
-        MomentumPushType::None
+        PositionPushType::Full,
+        MomentumPushType::SecondHalf
     );
 
     ExecutePythonCallback("afterdeposition");
