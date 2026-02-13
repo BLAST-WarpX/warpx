@@ -4,7 +4,7 @@
 
 my_constants.n0 = 2.2e17      # neutral density [1/m^3]
 my_constants.Tn0 = 0.1        # neutral temperature [eV]
-my_constants.Aneu = 160.0     # ion atomic number 
+my_constants.Aneu = 160.0     # ion atomic number
 my_constants.Mneu = Aneu*m_u  # neutral mass [kg]
 my_constants.Vdrift = 430.0   # drift velocity [m/s]
 
