@@ -51,8 +51,10 @@ struct IsOutsideDomainBoundary {
 struct FindEmbeddedBoundaryIntersection {
     int m_step_index;
     int m_delta_index;
+    int m_time_index;
     int m_normal_index;
     int m_step;
+    amrex::Real m_cur_time;
     amrex::Real m_dt;
     amrex::Array4<const amrex::Real> m_phiarr;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_dxi;
@@ -110,6 +112,7 @@ struct FindEmbeddedBoundaryIntersection {
         // Also record the real time on the destination
         dst.m_runtime_idata[m_step_index][dst_i] = m_step;
         dst.m_runtime_rdata[m_delta_index][dst_i] = (1._rt- dt_fraction)*m_dt;
+        dst.m_runtime_rdata[m_time_index][dst_i] = m_cur_time + (1._rt - dt_fraction)*m_dt;
 
         // Now that dt_fraction has be obtained (with bisect)
         // Save the corresponding position of the particle at the boundary
@@ -179,8 +182,10 @@ struct FindEmbeddedBoundaryIntersection {
 struct CopyAndTimestamp {
     int m_step_index;
     int m_delta_index;
+    int m_time_index;
     int m_normal_index;
     int m_step;
+    amrex::Real m_cur_time;
     amrex::Real m_dt;
     int m_idim;
     int m_iside;
@@ -204,6 +209,7 @@ struct CopyAndTimestamp {
 
         dst.m_runtime_idata[m_step_index][dst_i] = m_step;
         dst.m_runtime_rdata[m_delta_index][dst_i] = 0._rt; //delta_fraction is initialized to zero
+        dst.m_runtime_rdata[m_time_index][dst_i] = m_cur_time;
 
         //calculation of the normal to the boundary
         std::array<double, 3> n = {0.0, 0.0, 0.0};
@@ -379,7 +385,7 @@ void ParticleBoundaryBuffer::clearParticles (int const i) {
     }
 }
 
-void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc)
+void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time)
 {
     WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles");
 
@@ -403,6 +409,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                     buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
                     buffer[i].AddIntComp("stepScraped", true);
                     buffer[i].AddRealComp("deltaTimeScraped", true);
+                    buffer[i].AddRealComp("timeScraped", true);
                     buffer[i].AddRealComp("nx", true);
                     buffer[i].AddRealComp("ny", true);
                     buffer[i].AddRealComp("nz", true);
@@ -473,11 +480,13 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           auto & buf = buffer[i];
                           const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
                           const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - PinnedMemoryParticleContainer::NArrayReal;
+                          const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - PinnedMemoryParticleContainer::NArrayReal;
                           const int normal_index = buf.GetRealCompIndex("nx") - PinnedMemoryParticleContainer::NArrayReal;
                           const int step = warpx_instance.getistep(0);
                           amrex::filterAndTransformParticles(ptile_buffer, ptile,
                                                              predicate,
-                                                             CopyAndTimestamp{step_scraped_index, delta_index, normal_index, step, dt, idim, iside},
+                                                             CopyAndTimestamp{step_scraped_index, delta_index, time_scraped_index, normal_index,
+                                                                              step, cur_time, dt, idim, iside},
                                                              0, dst_index);
                         }
                     }
@@ -488,7 +497,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
 }
 
 void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
-    MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb)
+    MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb, amrex::Real cur_time)
 {
     if (EB::enabled()) {
         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB");
@@ -509,6 +518,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                 buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
                 buffer[i].AddIntComp("stepScraped", true);
                 buffer[i].AddRealComp("deltaTimeScraped", true);
+                buffer[i].AddRealComp("timeScraped", true);
                 buffer[i].AddRealComp("nx", true);
                 buffer[i].AddRealComp("ny", true);
                 buffer[i].AddRealComp("nz", true);
@@ -581,15 +591,16 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     auto & buf = buffer[i];
                     const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
                     const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - PinnedMemoryParticleContainer::NArrayReal;
+                    const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - PinnedMemoryParticleContainer::NArrayReal;
                     const int normal_index = buf.GetRealCompIndex("nx") - PinnedMemoryParticleContainer::NArrayReal;
                     const int step = warpx_instance.getistep(0);
 
                     {
                         WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterTransformEB");
                         amrex::filterAndTransformParticles(ptile_buffer, ptile, predicate,
-                                                           FindEmbeddedBoundaryIntersection{step_scraped_index,
-                                                                                            delta_index, normal_index,
-                                                                                            step, dt, phiarr, dxi, plo,
+                                                           FindEmbeddedBoundaryIntersection{step_scraped_index, delta_index,
+                                                                                            time_scraped_index, normal_index,
+                                                                                            step, cur_time, dt, phiarr, dxi, plo,
                                                                                             pc.getMass()},
                                                            0, dst_index);
 

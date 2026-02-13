@@ -52,7 +52,7 @@ class HybridPICBeamInstability(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 1e-7
     # Number of substeps used to update B
-    substeps = 10
+    substeps = 20
 
     # Beam parameters
     n_beam = [0.02, 0.1]
