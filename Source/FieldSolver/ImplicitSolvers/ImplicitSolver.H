@@ -264,6 +264,11 @@ protected:
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
+
+    /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
      */
     void CumulateJ ();

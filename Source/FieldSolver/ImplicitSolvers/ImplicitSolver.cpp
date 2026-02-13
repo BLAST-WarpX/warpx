@@ -799,7 +799,10 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         options.deposit_mass_matrices = true;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
         CumulateJ();
-        if (m_use_mass_matrices_jacobian) { SaveE(); }
+        if (m_use_mass_matrices_jacobian) {
+            FinishMassMatrices();
+            SaveE();
+        }
         if (m_use_mass_matrices_pc) {
            SyncMassMatricesPCAndApplyBCs();
            const amrex::Real theta_dt = m_theta*m_dt;
@@ -930,6 +933,192 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
         }
     }
 
+}
+
+void ImplicitSolver::FinishMassMatrices ()
+{
+    BL_PROFILE("ImplicitSolver::FinishMassMatrices()");
+
+    // The MM deposit routine takes advantage of symmetry for the diagonal mass
+    // matrices to only deposit roughly half of the values. The remainder are
+    // computed via copy here in this routine.
+
+#if AMREX_SPACEDIM < 3
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+#if AMREX_SPACEDIM > 1
+    const int ncomp_tot_xx = AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2]);
+    const int ncomp_tot_yy = AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2]);
+    const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
+#endif
+
+    amrex::GpuArray<int,3> ncomp_xx = {1,1,1};
+    amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
+    amrex::GpuArray<int,3> ncomp_zz = {1,1,1};
+    amrex::GpuArray<int,3> Sxx_width = {0,0,0};
+    amrex::GpuArray<int,3> Syy_width = {0,0,0};
+    amrex::GpuArray<int,3> Szz_width = {0,0,0};
+    for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+        ncomp_xx[dir] = m_ncomp_xx[dir];
+        ncomp_yy[dir] = m_ncomp_yy[dir];
+        ncomp_zz[dir] = m_ncomp_zz[dir];
+        Sxx_width[dir] = (ncomp_xx[dir] - 1)/2;
+        Syy_width[dir] = (ncomp_yy[dir] - 1)/2;
+        Szz_width[dir] = (ncomp_zz[dir] - 1)/2;
+    }
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
+        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+        ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( amrex::MFIter mfi(*SX[0], false); mfi.isValid(); ++mfi )
+        {
+
+            amrex::Array4<amrex::Real> const& Sxx = SX[0]->array(mfi);
+            amrex::Array4<amrex::Real> const& Syy = SY[1]->array(mfi);
+            amrex::Array4<amrex::Real> const& Szz = SZ[2]->array(mfi);
+
+            // Use grown boxes here with all S guard cells
+            amrex::Box Sbx = amrex::convert(mfi.validbox(),SX[0]->ixType());
+            amrex::Box Sby = amrex::convert(mfi.validbox(),SY[1]->ixType());
+            amrex::Box Sbz = amrex::convert(mfi.validbox(),SZ[2]->ixType());
+            Sbx.grow(SX[0]->nGrowVect());
+            Sbz.grow(SZ[2]->nGrowVect());
+            Sby.grow(SY[1]->nGrowVect());
+
+#if AMREX_SPACEDIM == 1
+            amrex::ParallelFor( Sbx, Sby, Sbz,
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                // Sxx(i,d + n) = Sxx(i + n,d - n), where d = Sxx_width[0]
+                const int width = amrex::min(Sxx_width[0],Sbx.bigEnd(0)-i);
+                for (int n = 1; n <= width; ++n) {
+                    const int dst_comp = Sxx_width[0] + n;
+                    const int src_comp = Sxx_width[0] - n;
+                    Sxx(i,j,k,dst_comp) = Sxx(i + n,j,k,src_comp);
+                }
+            },
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                // Syy(i,d + n) = Syy(i + n,d - n), where d = Syy_width[0]
+                const int width = std::min(Syy_width[0], Sby.bigEnd(0) - i);
+                for (int n = 1; n <= width; n++) {
+                    const int dst_comp = Syy_width[0] + n;
+                    const int src_comp = Syy_width[0] - n;
+                    Syy(i,j,k,dst_comp) = Syy(i + n,j,k,src_comp);
+                }
+            },
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                // Szz(i,d + n) = Szz(i + n,d - n), where d = Szz_width[0]
+                const int width_zz = std::min(Szz_width[0],Sbz.bigEnd(0) - i);
+                for (int n = 1; n <= width_zz; n++) {
+                    const int dst_comp = Szz_width[0] + n;
+                    const int src_comp = Szz_width[0] - n;
+                    Szz(i,j,k,dst_comp) = Szz(i + n,j,k,src_comp);
+                }
+            });
+
+#elif AMREX_SPACEDIM == 2
+            amrex::ParallelFor( Sbx, Sby, Sbz,
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                ignore_unused(k);
+                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
+
+                const int row_start = amrex::max(0,ncomp_xx[1] - ncomp_xx[0]);
+
+                for (int m = row_start; m < ncomp_xx[1]; ++m) {
+                    const int jj = m - Sxx_width[1];
+
+                    const int above_diag = (m > Sxx_width[1]) ? 1 : 0;
+                    const int width0 = amrex::min(m + above_diag - row_start + 1, ncomp_xx[0]);
+
+                    for (int n = 0; n < width0; ++n) {
+                        const int ii = Sxx_width[0] - n;
+
+                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
+                        if (!Sbx.contains(iv_src)) { continue; }
+
+                        const int dst_comp = ncomp_xx[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_xx - 1 - dst_comp;
+
+                        Sxx(iv_dst,dst_comp) = Sxx(iv_src,src_comp);
+                    }
+
+                }
+
+            },
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                ignore_unused(k);
+                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
+
+                const int row_start = 1;
+
+                for (int m = row_start; m < ncomp_yy[1]; m++) {
+                    const int jj = m - Syy_width[1];
+
+                    const int above_diag = (m > Syy_width[1]) ? 1 : 0;
+                    const int width0 = std::min(m + above_diag - row_start + 1, ncomp_yy[0]);
+
+                    for (int n = 0; n < width0; n++) {
+                        const int ii = Syy_width[0] - n;
+
+                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
+                        if (!Sby.contains(iv_src)) { continue; }
+
+                        const int dst_comp = ncomp_yy[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_yy - 1 - dst_comp;
+
+                        Syy(iv_dst,dst_comp) = Syy(iv_src,src_comp);
+                    }
+                }
+
+            },
+
+                [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                ignore_unused(k);
+                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
+
+                const int row_start = std::max(0,ncomp_zz[1] - ncomp_zz[0]);
+
+                for (int m = row_start; m < ncomp_zz[1]; m++) {
+                    const int jj = m - Szz_width[1];
+
+                    const int above_diag = (m > Szz_width[1]) ? 1 : 0;
+                    const int width0 = std::min(m - row_start + above_diag + 1, ncomp_zz[0]);
+
+                    for (int n = 0; n < width0; n++) {
+                        const int ii = Szz_width[0] - n;
+
+                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
+                        if (!Sbz.contains(iv_src)) { continue; }
+
+                        const int dst_comp = ncomp_zz[0]*(m + 1) - (n + 1);
+                        const int src_comp = ncomp_tot_zz - 1 - dst_comp;
+
+                        Szz(iv_dst,dst_comp) = Szz(iv_src,src_comp);
+                    }
+                }
+
+            });
+#endif
+        }
+    }
+#endif
 }
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
