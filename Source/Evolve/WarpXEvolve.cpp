@@ -397,9 +397,9 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // with collisions placed in the middle of the position push and after the momentum push
+            // with collisions placed in the middle of the momentum push
             if (m_collisions_split_momentum_push) {
-                // push particles (half position and full momentum)
+                // push particles (half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
@@ -412,7 +412,7 @@ void WarpX::OneStep (
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
@@ -427,7 +427,7 @@ void WarpX::OneStep (
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and full momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
