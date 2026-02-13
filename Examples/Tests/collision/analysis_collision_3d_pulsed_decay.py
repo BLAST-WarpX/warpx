@@ -50,4 +50,4 @@ ion_weight_error = 100 * np.abs(nI_arr[-1] - ion_weight_end) / nI_arr[-1]
 print(f"ion weight (WarpX) = {ion_weight_end}")
 print(f"ion weight (0D)    = {nI_arr[-1]}")
 print(f"weight error       = {ion_weight_error}")
-assert ion_weight_eror < ion_weight_rtol
+assert ion_weight_error < ion_weight_rtol
