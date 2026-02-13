@@ -481,6 +481,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         subcycling_half == SubcyclingHalf::None &&
         position_push_type == PositionPushType::Full
     );
+    bool const deposit_current = (
+        !skip_deposition &&
+        !do_not_deposit &&
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only) &&
+        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::SecondHalf)
+    );
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
