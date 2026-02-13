@@ -199,14 +199,36 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             amrex::Gpu::DeviceVector<index_type> num_products_vec(n_cells, 0);
             index_type* AMREX_RESTRICT p_counts = num_products_vec.dataPtr();
 
+            // Get grid information needed to compute physical cell center coordinates
+            const amrex::Box& box = mfi.tilebox();
+            const amrex::XDim3 xyzmin = WarpX::GetInstance().LowerCorner(box, lev, 0.0_rt);
+            const amrex::Dim3 lo = lbound(box);
+            const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom_lev.CellSizeArray();
+
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
                     const amrex::ParticleReal wtot1 = wtot1_in_each_cell[i_cell];
                     if (wtot1 == 0.0_prt) { return; }
 
+                    // Get physical coordinates at cell center
+                    const amrex::IntVect iv = box.atOffset(i_cell);
+                    amrex::XDim3 xyz_cc = {0.0_rt, 0.0_rt, 0.0_rt};
+#if   defined(WARPX_DIM_1D_Z)
+                    xyz_cc.z = xyzmin.z + (iv[0] - lo.x + 0.5_rt)*dx[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
+                    xyz_cc.z = xyzmin.z + (iv[1] - lo.y + 0.5_rt)*dx[1];
+#elif defined(WARPX_DIM_3D)
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
+                    xyz_cc.y = xyzmin.y + (iv[1] - lo.y + 0.5_rt)*dx[1];
+                    xyz_cc.z = xyzmin.z + (iv[2] - lo.z + 0.5_rt)*dx[2];
+#endif
+
                     // Compute total weight of products to create in this cell
-                    const amrex::ParticleReal nu_izn = nu_func(0.,0.,0.,cur_time);
+                    const amrex::ParticleReal nu_izn = nu_func(xyz_cc.x, xyz_cc.y, xyz_cc.z, cur_time);
                     const amrex::ParticleReal total_product = wtot1*(1.0 - std::exp(-nu_izn*dt));
 
                     // Compute number of products macro particles to create in this cell
