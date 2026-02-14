@@ -214,17 +214,18 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                     // Get physical coordinates at cell center
                     const amrex::IntVect iv = box.atOffset(i_cell);
                     amrex::XDim3 xyz_cc = {0.0_rt, 0.0_rt, 0.0_rt};
+                    const amrex::Real half = 0.5_rt;
 #if   defined(WARPX_DIM_1D_Z)
-                    xyz_cc.z = xyzmin.z + (iv[0] - lo.x + 0.5_rt)*dx[0];
+                    xyz_cc.z = xyzmin.z + (iv[0] - lo.x + half)*dx[0];
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
-                    xyz_cc.z = xyzmin.z + (iv[1] - lo.y + 0.5_rt)*dx[1];
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
+                    xyz_cc.z = xyzmin.z + (iv[1] - lo.y + half)*dx[1];
 #elif defined(WARPX_DIM_3D)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + 0.5_rt)*dx[0];
-                    xyz_cc.y = xyzmin.y + (iv[1] - lo.y + 0.5_rt)*dx[1];
-                    xyz_cc.z = xyzmin.z + (iv[2] - lo.z + 0.5_rt)*dx[2];
+                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
+                    xyz_cc.y = xyzmin.y + (iv[1] - lo.y + half)*dx[1];
+                    xyz_cc.z = xyzmin.z + (iv[2] - lo.z + half)*dx[2];
 #endif
 
                     // Compute total weight of products to create in this cell
