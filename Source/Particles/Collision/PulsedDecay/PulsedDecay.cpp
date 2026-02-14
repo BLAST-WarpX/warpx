@@ -27,7 +27,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     : CollisionBase(collision_name)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
-                                     "pulsed_decay  must have exactly one species.");
+        "PulsedDecay: pulsed_decay must have exactly one species.");
 
     const amrex::ParmParse pp_collision_name(collision_name);
 
@@ -47,7 +47,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     const int Z_B = static_cast<int>(amrex::Math::round(productB.getCharge() / PhysConst::q_e));
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( Z_P == Z_A + Z_B,
-        "PulsedDecayFunc: total charge of product species must match the parent species charge");
+        "PulsedDecay: total charge of product species must match the parent species charge");
 
     // Verify that the total mass of the product species matches the mass of the parent species
     const amrex::ParticleReal Mass_P = parent_species.getMass();
@@ -61,7 +61,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     const amrex::ParticleReal rtol = 100.0_prt * eps;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( mass_error <= rtol,
-        "PulsedDecayFunc: total mass of product species must match the parent species mass");
+        "PulsedDecay: total mass of product species must match the parent species mass");
 
     // Get the fixed product particle weight
     pp_collision_name.get("fixed_product_weight", m_fixed_product_weight);
@@ -71,11 +71,11 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     pp_collision_name.getarr("productA_temperature_eV", TA_tmp);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp.size() == 3,
-        "PulsedDecayFunc: productA_temperature_eV must have exactly 3 values");
+        "PulsedDecay: productA_temperature_eV must have exactly 3 values");
 
     for (int i = 0; i < 3; ++i) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TA_tmp[i] >= 0.0,
-            "PulsedDecayFunc: productA_temperature_eV must be greater than or equal to zero");
+            "PulsedDecay: productA_temperature_eV must be greater than or equal to zero");
     }
 
     // Set the direction-dependent thermal speed for product species A
@@ -89,11 +89,11 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     pp_collision_name.getarr("productB_temperature_eV", TB_tmp);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp.size() == 3,
-        "PulsedDecayFunc: productB_temperature_eV must have exactly 3 values");
+        "PulsedDecay: productB_temperature_eV must have exactly 3 values");
 
     for (int i = 0; i < 3; ++i) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( TB_tmp[i] >= 0.0,
-            "PulsedDecayFunc: productB_temperature_eV must be greater than or equal to zero");
+            "PulsedDecay: productB_temperature_eV must be greater than or equal to zero");
     }
 
     // Set the direction-dependent thermal speed for product species B
