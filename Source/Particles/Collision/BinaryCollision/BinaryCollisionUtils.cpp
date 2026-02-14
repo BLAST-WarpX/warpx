@@ -7,8 +7,7 @@
 
 #include "BinaryCollisionUtils.H"
 
-#include "Particles/MultiParticleContainer.H"
-#include "Particles/WarpXParticleContainer.H"
+#include "Particles/ParticleCreation/DefaultInitialization.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
@@ -18,6 +17,8 @@
 #include "Utils/TextMsg.H"
 
 namespace BinaryCollisionUtils{
+
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * const mypc)
@@ -202,5 +203,26 @@ namespace BinaryCollisionUtils{
         }
         WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
         return CollisionType::Undefined;
+    }
+
+    void DefaultInitializeRuntimeAttributes( ParticleTileType * ptile,
+                                 const WarpXParticleContainer * pc,
+                                 int start_index, int stop_index)
+    {
+
+        ParticleCreation::DefaultInitializeRuntimeAttributes(*ptile,
+            0, 0,
+            pc->getUserRealAttribs(), pc->getUserIntAttribs(),
+            pc->GetRealSoANames(), pc->GetIntSoANames(),
+            pc->getUserRealAttribParser(),
+            pc->getUserIntAttribParser(),
+#ifdef WARPX_QED
+            false, // do not initialize QED quantities, since they were initialized
+                   // when calling the SmartCopy functors
+            pc->get_breit_wheeler_engine_ptr(),
+            pc->get_quantum_sync_engine_ptr(),
+#endif
+            pc->getIonizationInitialLevel(),
+            start_index, stop_index);
     }
 }

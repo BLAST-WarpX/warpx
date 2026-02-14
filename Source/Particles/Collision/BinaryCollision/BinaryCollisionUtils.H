@@ -11,6 +11,7 @@
 #include <string>
 
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 
 #include <AMReX_Math.H>
 
@@ -36,6 +37,8 @@ enum struct NuclearFusionType {
 
 namespace BinaryCollisionUtils{
 
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
                                                MultiParticleContainer const * mypc);
 
@@ -43,6 +46,10 @@ namespace BinaryCollisionUtils{
                                       MultiParticleContainer const * mypc);
 
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type);
+
+    void DefaultInitializeRuntimeAttributes(ParticleTileType * ptile,
+                                            const WarpXParticleContainer * pc,
+                                            int start_index, int stop_index);
 
     /**
      * \brief Return (relativistic) collision energy, collision speed and
