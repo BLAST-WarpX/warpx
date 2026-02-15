@@ -179,23 +179,17 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     if (j_node==j_cell) { shift[0] = 1; }
 
     amrex::Real sx_jx[depos_order + 1] = {0._rt};
-#if !defined(WARPX_EM_TEY)
     amrex::Real sx_jy[depos_order + 1] = {0._rt};
-#endif
     amrex::Real sx_jz[depos_order + 1] = {0._rt};
     for (int ix=0; ix<=depos_order; ix++)
     {
         sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
-#if !defined(WARPX_EM_TEY)
         sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
-#endif
         sx_jz[ix] = ((jz_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
     }
 
     int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
-#if !defined(WARPX_EM_TEY)
     int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
-#endif
     int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
 #endif //!defined(WARPX_DIM_1D_Z)
 
@@ -247,22 +241,16 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
         l_cell = compute_shape_factor(sz_cell, zmid - 0.5);
     }
     amrex::Real sz_jx[depos_order + 1] = {0._rt};
-#if !defined(WARPX_EM_TEY)
     amrex::Real sz_jy[depos_order + 1] = {0._rt};
-#endif
     amrex::Real sz_jz[depos_order + 1] = {0._rt};
     for (int iz=0; iz<=depos_order; iz++)
     {
         sz_jx[iz] = ((jx_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
-#if !defined(WARPX_EM_TEY)
         sz_jy[iz] = ((jy_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
-#endif
         sz_jz[iz] = ((jz_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
     }
     int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
-#if !defined(WARPX_EM_TEY)
     int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
-#endif
     int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
 
     // Set the index shift parameter
@@ -283,9 +271,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
     for (int iz=0; iz<=depos_order; iz++){
         if constexpr (deposit_J) {
             amrex::Gpu::Atomic::AddNoRet(&jx_arr(lo.x+l_jx+iz, 0, 0, 0), sz_jx[iz]*wqx);
-#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet(&jy_arr(lo.x+l_jy+iz, 0, 0, 0), sz_jy[iz]*wqy);
-#endif
             amrex::Gpu::Atomic::AddNoRet(&jz_arr(lo.x+l_jz+iz, 0, 0, 0), sz_jz[iz]*wqz);
         }
 
@@ -302,29 +288,24 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     amrex::Gpu::Atomic::AddNoRet(
                         &Sxx_arr(lo.x+l_jx+iz, 0, 0, Nc),
                         sz_jx[iz]*sz_jx[aa]*fpxx);
-#if !defined(WARPX_EM_TEY)
                     amrex::Gpu::Atomic::AddNoRet(
                         &Syy_arr(lo.x+l_jy+iz, 0, 0, Nc),
                         sz_jy[iz]*sz_jy[aa]*fpyy);
-#endif
                     amrex::Gpu::Atomic::AddNoRet(
                         &Szz_arr(lo.x+l_jz+iz, 0, 0, Nc),
                         sz_jz[iz]*sz_jz[aa]*fpzz);
                 }
 
                 // Deposit off-diagonal mass matrices for X-current
-#if !defined(WARPX_EM_TEY)
                 Nc = col_base + shift[0]*offset_xy[0];
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxy_arr(lo.x+l_jx+iz, 0, 0, Nc),
                     sz_jx[iz]*sz_jy[aa]*fpxy);
-#endif
                 Nc = col_base + shift[0]*offset_xz[0];
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxz_arr(lo.x+l_jx+iz, 0, 0, Nc),
                     sz_jx[iz]*sz_jz[aa]*fpxz);
 
-#if !defined(WARPX_EM_TEY)
                 // Deposit off-diagonal mass matrices for Y-current
                 Nc = col_base + shift[0]*offset_xy[0];
                 amrex::Gpu::Atomic::AddNoRet(
@@ -334,30 +315,25 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syz_arr(lo.x+l_jy+iz, 0, 0, Nc),
                     sz_jy[iz]*sz_jz[aa]*fpyz);
-#endif
 
                 // Deposit off-diagonal mass matrices for Z-current
                 Nc = col_base + 1 - shift[0]*offset_xz[0];
                 amrex::Gpu::Atomic::AddNoRet(
                     &Szx_arr(lo.x+l_jz+iz, 0, 0, Nc),
                     sz_jz[iz]*sz_jx[aa]*fpzx);
-#if !defined(WARPX_EM_TEY)
                 Nc = col_base + 1 - shift[0]*offset_yz[0];
                 amrex::Gpu::Atomic::AddNoRet(
                     &Szy_arr(lo.x+l_jz+iz, 0, 0, Nc),
                     sz_jz[iz]*sz_jy[aa]*fpzy);
-#endif
             }
         }
         else { // Deposit mass matrices for diagonal PC only
             amrex::Gpu::Atomic::AddNoRet(
                 &Sxx_arr(lo.x+l_jx+iz, 0, 0, 0),
                 sz_jx[iz]*fpxx);
-#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet(
                 &Syy_arr(lo.x+l_jy+iz, 0, 0, 0),
                 sz_jy[iz]*fpyy);
-#endif
             amrex::Gpu::Atomic::AddNoRet(
                 &Szz_arr(lo.x+l_jz+iz, 0, 0, 0),
                 sz_jz[iz]*fpzz);
@@ -382,16 +358,12 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
         for (int ix=0; ix<=depos_order; ix++){
 
             const amrex::Real weight_Jx = sx_jx[ix]*sz_jx[iz];
-#if !defined(WARPX_EM_TEY)
             const amrex::Real weight_Jy = sx_jy[ix]*sz_jy[iz];
-#endif
             const amrex::Real weight_Jz = sx_jz[ix]*sz_jz[iz];
 
             if constexpr (deposit_J) {
                 amrex::Gpu::Atomic::AddNoRet(&jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0), weight_Jx*wqx);
-#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet(&jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0), weight_Jy*wqy);
-#endif
                 amrex::Gpu::Atomic::AddNoRet(&jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0), weight_Jz*wqz);
             }
 
@@ -407,9 +379,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                     for (int aa=0; aa<=depos_order; aa++){
                         const int col_base = depos_order + aa - ix;
                         const amrex::Real weight_Ex = sx_jx[aa]*sz_jx[bb];
-#if !defined(WARPX_EM_TEY)
                         const amrex::Real weight_Ey = sx_jy[aa]*sz_jy[bb];
-#endif
                         const amrex::Real weight_Ez = sx_jz[aa]*sz_jz[bb];
 
                         int offset;
@@ -422,11 +392,9 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                             amrex::Gpu::Atomic::AddNoRet(
                                 &Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                                 weight_Jx*weight_Ex*fpxx);
-#if !defined(WARPX_EM_TEY)
                             amrex::Gpu::Atomic::AddNoRet(
                                 &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, Nc),
                                 weight_Jy*weight_Ey*fpyy);
-#endif
                             amrex::Gpu::Atomic::AddNoRet(
                                 &Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
                                 weight_Jz*weight_Ez*fpzz);
@@ -436,11 +404,9 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                         offset = base_offset + offset_xy[0];
                         Nc =  col_base + 1 - shift[0]*offset_xy[0]
                            + (row_base + shift[1]*offset_xy[1])*offset;
-#if !defined(WARPX_EM_TEY)
                         amrex::Gpu::Atomic::AddNoRet(
                             &Sxy_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                             weight_Jx*weight_Ey*fpxy);
-#endif
                         offset = base_offset + offset_xz[0];
                         Nc =  col_base + 1 - shift[0]*offset_xz[0]
                            + (row_base + shift[1]*offset_xz[1])*offset;
@@ -448,7 +414,6 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                             &Sxz_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, Nc),
                             weight_Jx*weight_Ez*fpxz);
 
-#if !defined(WARPX_EM_TEY)
                         // Deposit off-diagonal mass matrices for Y-current
                         offset = base_offset + offset_xy[0];
                         Nc =  col_base + shift[0]*offset_xy[0]
@@ -462,7 +427,6 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                         amrex::Gpu::Atomic::AddNoRet(
                             &Syz_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, Nc),
                             weight_Jy*weight_Ez*fpyz);
-#endif
 
                         // Deposit off-diagonal mass matrices for Z-current
                         offset = base_offset + offset_xz[0];
@@ -471,25 +435,21 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
                         amrex::Gpu::Atomic::AddNoRet(
                             &Szx_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
                             weight_Jz*weight_Ex*fpzx);
-#if !defined(WARPX_EM_TEY)
                         offset = base_offset + offset_yz[0];
                         Nc =  col_base + shift[0]*offset_yz[0]
                            + (row_base + 1 - shift[1]*offset_yz[1])*offset;
                         amrex::Gpu::Atomic::AddNoRet(
                             &Szy_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, Nc),
                             weight_Jz*weight_Ey*fpzy);
-#endif
                     }
 
                 }
 
             }
             else { // Deposit mass matrices for diagonal PC only
-#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet(
                     &Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
                     weight_Jy*fpyy);
-#endif
                 amrex::Gpu::Atomic::AddNoRet(
                     &Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
                     weight_Jx*fpxx);
@@ -732,7 +692,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     using namespace amrex::literals;
 
-#if (AMREX_SPACEDIM > 1) && !defined(WARPX_EM_TEY)
+#if (AMREX_SPACEDIM > 1)
     amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
     amrex::Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
@@ -781,14 +741,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (xp_new - xp_old)/dt;
-#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
-#endif
 #elif defined(WARPX_DIM_1D_Z)
     amrex::Real const vx = uxp_mid*gaminv;
-#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
-#endif
 #elif defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
     double x_new = (xp_new - xyzmin.x)*dinv.x;
@@ -808,9 +764,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 
     // Define velocity kernels to deposit
     amrex::Real const wqx = wq_invvol*vx;
-#if !defined(WARPX_EM_TEY)
     amrex::Real const wqy = wq_invvol*vy;
-#endif
     amrex::Real const wqz = wq_invvol*vz;
 
     // Compute total change in particle position (always do before cropping)
@@ -1091,9 +1045,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     int k0_node[num_segments_max];
     amrex::Real weight_cellX_nodeZ[num_segments_max][depos_order][depos_order+1];
     amrex::Real weight_nodeX_cellZ[num_segments_max][depos_order+1][depos_order];
-#if !defined(WARPX_EM_TEY)
     amrex::Real weight_nodeX_nodeZ[num_segments_max][depos_order+1][depos_order+1];
-#endif
 
     const auto i_mid = static_cast<int>(0.5*(x_new+x_old)-shift);
     const auto k_mid = static_cast<int>(0.5*(z_new+z_old)-shift);
@@ -1192,7 +1144,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
             }
         }
 
-#if !defined(WARPX_EM_TEY)
         // deposit out-of-plane Jy and Sy for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         for (int i=0; i<=depos_order; i++) {
@@ -1212,7 +1163,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 }
             }
         }
-#endif
 
         // deposit Jz and Szz for this segment
         for (int i=0; i<=depos_order; i++) {
@@ -1245,19 +1195,15 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
     const int Ncomp_xz0 = Ncomp_base;
     const int Ncomp_zx0 = Ncomp_base;
     const int Ncomp_zz0 = 1 + Ncomp_base;
-#if !defined(WARPX_EM_TEY)
     const int Ncomp_xy0 = Ncomp_base;
     const int Ncomp_yx0 = Ncomp_base;
     const int Ncomp_yz0 = 1 + Ncomp_base;
     const int Ncomp_yy0 = 1 + Ncomp_base;
     const int Ncomp_zy0 = 1 + Ncomp_base;
-#endif
 
     const int width_xx1 = depos_order + max_crossings;  // (Ncomp_xx[1] - 1)/2
     const int width_zz1 = width_xx1 - 1;                // (Ncomp_zz[1] - 1)/2
-#if !defined(WARPX_EM_TEY)
     const int width_yy1 = width_xx1;                    // (Ncomp_yy[1] - 1)/2
-#endif
 
     // Loop over segments and deposit full mass matrices
     for (int ns=0; ns<num_segments; ns++) {
@@ -1292,7 +1238,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                             amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(i_J, k_J, 0, comp_xz), fpxz*weight_J*weight_E);
                         }
                     }
-#if !defined(WARPX_EM_TEY)
                     // Deposit Sxy
                     for (int iE = 0; iE <= depos_order; iE++) {
                         for (int kE = 0; kE <= depos_order; kE++) {
@@ -1302,7 +1247,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                             amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(i_J, k_J, 0, comp_xy), fpxy*weight_J*weight_E);
                         }
                     }
-#endif
                 }
             }
         }
@@ -1337,7 +1281,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                             amrex::Gpu::Atomic::AddNoRet( &Szz_arr(i_J, k_J, 0, comp_zz), fpzz*weight_J*weight_E);
                         }
                     }
-#if !defined(WARPX_EM_TEY)
                     // Deposit Szy
                     for (int iE=0; iE<=depos_order; iE++) {
                         for (int kE=0; kE<=depos_order; kE++) {
@@ -1347,12 +1290,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                             amrex::Gpu::Atomic::AddNoRet( &Szy_arr(i_J, k_J, 0, comp_zy), fpzy*weight_J*weight_E);
                         }
                     }
-#endif
                 }
             }
         }
 
-#if !defined(WARPX_EM_TEY)
         // Deposit Syx, Syz, and Syy for this segment
         for (int i=0; i<=depos_order; i++) {
             for (int k=0; k<=depos_order; k++) {
@@ -1396,7 +1337,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                 }
             }
         }
-#endif
 
      }
 
@@ -1572,16 +1512,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
             const int k_J = lo.x + k0_node[ns] + k;
             if constexpr (deposit_J) {
                 amrex::Gpu::Atomic::AddNoRet(&Jx_arr(k_J, 0, 0), wqx*weight);
-#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet(&Jy_arr(k_J, 0, 0), wqy*weight);
-#endif
             }
             if constexpr (full_mass_matrices) { weight_node[ns][k] = weight; }
             else {
                 amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(k_J, 0, 0, 0), fpxx*weight*weight);
-#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet(&Syy_arr(k_J, 0, 0, 0), fpyy*weight*weight);
-#endif
             }
         }
 
@@ -1625,22 +1561,16 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                     const int comp_yy = depos_order - k + kE + SegShift;
                     if (comp_yy <= width_yy) { // Reduced deposit for diagonal mass matrices
                         amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(k_J, 0, 0, comp_yy), fpxx*weight_J*weight_E);
-#if !defined(WARPX_EM_TEY)
                         amrex::Gpu::Atomic::AddNoRet(&Syy_arr(k_J, 0, 0, comp_yy), fpyy*weight_J*weight_E);
                     }
                     amrex::Gpu::Atomic::AddNoRet(&Sxy_arr(k_J, 0, 0, comp_yy), fpxy*weight_J*weight_E);
                     amrex::Gpu::Atomic::AddNoRet(&Syx_arr(k_J, 0, 0, comp_yy), fpyx*weight_J*weight_E);
-#else
-                    }
-#endif
                 }
                 for (int kE=0; kE<=depos_order-1; kE++) {
                     const amrex::Real weight_E = weight_cell[ms][kE];
                     const int comp_yz = depos_order - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Sxz_arr(k_J, 0, 0, comp_yz), fpxz*weight_J*weight_E);
-#if !defined(WARPX_EM_TEY)
                     amrex::Gpu::Atomic::AddNoRet(&Syz_arr(k_J, 0, 0, comp_yz), fpyz*weight_J*weight_E);
-#endif
                 }
             }
 
@@ -1663,9 +1593,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
                     const amrex::Real weight_E = weight_node[ms][kE];
                     const int comp_zy = depos_order-1 - k + kE + SegShift;
                     amrex::Gpu::Atomic::AddNoRet(&Szx_arr(k_J, 0, 0, comp_zy), fpzx*weight_J*weight_E);
-#if !defined(WARPX_EM_TEY)
                     amrex::Gpu::Atomic::AddNoRet(&Szy_arr(k_J, 0, 0, comp_zy), fpzy*weight_J*weight_E);
-#endif
                 }
             }
 
