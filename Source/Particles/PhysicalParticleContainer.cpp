@@ -680,23 +680,13 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     // Deposit inside domains
-                    if (implicit_options && implicit_options->deposit_mass_matrices) {
-                        // Note that J for particles included in MM are deposited to current_fp_MM
+                    if (implicit_options) {
                         amrex::MultiFab * jx = fields.get(FieldType::current_fp_MM, Direction{0}, lev);
                         amrex::MultiFab * jy = fields.get(FieldType::current_fp_MM, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(FieldType::current_fp_MM, Direction{2}, lev);
-                        amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
-                        amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
-                        amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
-                        amrex::MultiFab * Syx = fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
-                        amrex::MultiFab * Syy = fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
-                        amrex::MultiFab * Syz = fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
-                        amrex::MultiFab * Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
-                        amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
-                        amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
-                        DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
-                                       Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
-                                       bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
+                        DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
+                                       0, np_to_deposit, thread_num,
+                                       lev, lev, dt, relative_time, push_type);
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -808,6 +798,71 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     if (split_particles) {
         SplitParticles(lev);
     }
+}
+
+void
+PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                                                int lev, Real dt)
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    WARPX_PROFILE("PhysicalParticleContainer::DepositMassMatrices()");
+
+    amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+    amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+    amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+    {
+#ifdef AMREX_USE_OMP
+        const int thread_num = omp_get_thread_num();
+#else
+        const int thread_num = 0;
+#endif
+
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+
+            // Extract particle data
+            auto& attribs = pti.GetAttribs();
+            auto&  wp = attribs[PIdx::w];
+            auto& uxp = attribs[PIdx::ux];
+            auto& uyp = attribs[PIdx::uy];
+            auto& uzp = attribs[PIdx::uz];
+
+            const long np_to_deposit = pti.numParticles();
+
+            // Data on the grid
+            FArrayBox const* bxfab = &Bx[pti];
+            FArrayBox const* byfab = &By[pti];
+            FArrayBox const* bzfab = &Bz[pti];
+
+            // Mass Matrices Deposition
+            // Note that J for particles included in MM are deposited to current_fp_MM
+            amrex::MultiFab * jx = fields.get(FieldType::current_fp_MM, Direction{0}, lev);
+            amrex::MultiFab * jy = fields.get(FieldType::current_fp_MM, Direction{1}, lev);
+            amrex::MultiFab * jz = fields.get(FieldType::current_fp_MM, Direction{2}, lev);
+            amrex::MultiFab * Sxx = fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
+            amrex::MultiFab * Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
+            amrex::MultiFab * Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
+            amrex::MultiFab * Syx = fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
+            amrex::MultiFab * Syy = fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
+            amrex::MultiFab * Syz = fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
+            amrex::MultiFab * Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
+            amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
+            amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
+            const bool deposit_MM_only = true;
+            DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz, deposit_MM_only,
+                              Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
+                              bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
+
+            amrex::Gpu::synchronize();
+        }
+    }
+
 }
 
 void

@@ -111,6 +111,10 @@ public:
                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                              int lev,
+                              amrex::Real dt) override;
+
     /**
      * \brief Gather fields and push particles in one fused kernel.
      */

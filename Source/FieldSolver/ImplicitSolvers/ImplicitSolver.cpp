@@ -759,6 +759,32 @@ void ImplicitSolver::InitializeMassMatrices ()
 
 }
 
+void ImplicitSolver::PreLinearSolve ( const amrex::Real  a_cur_time,
+                                      const int          a_nl_iter )
+{
+    BL_PROFILE("ImplicitSolver::PreLinearSolve()");
+
+    amrex::ignore_unused(a_cur_time,a_nl_iter);
+
+    if (m_use_mass_matrices) {
+
+        m_WarpX->DepositMassMatrices();
+
+        if (m_use_mass_matrices_jacobian) {
+            FinishMassMatrices();
+            SaveE();
+        }
+
+        if (m_use_mass_matrices_pc) {
+            SyncMassMatricesPCAndApplyBCs();
+            const amrex::Real theta_dt = m_theta*m_dt;
+            SetMassMatricesForPC( theta_dt );
+        }
+
+    }
+
+}
+
 void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
                                 const bool         a_from_jacobian )
@@ -782,6 +808,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     ImplicitOptions options;
     options.linear_stage_of_jfnk = a_from_jacobian;
     options.use_mass_matrices_pc = m_use_mass_matrices_pc;
+    options.use_mass_matrices_jacobian = m_use_mass_matrices_jacobian;
     options.evolve_suborbit_particles_only = false;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
@@ -795,23 +822,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         options.particle_tolerance = m_particle_tolerance;
     }
 
-    if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        options.deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
-        CumulateJ();
-        if (m_use_mass_matrices_jacobian) {
-            FinishMassMatrices();
-            SaveE();
-        }
-        if (m_use_mass_matrices_pc) {
-           SyncMassMatricesPCAndApplyBCs();
-           const amrex::Real theta_dt = m_theta*m_dt;
-           SetMassMatricesForPC( theta_dt );
-        }
-    }
-    else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
+    if (m_use_mass_matrices_jacobian && a_from_jacobian) { // Called from linear stage of JFNK and using mass matrices for Jacobian
         if (m_particle_suborbits) {
-            options.deposit_mass_matrices = false;
             options.evolve_suborbit_particles_only = true;
             m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
         }
@@ -819,8 +831,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices( J_from_MM_only );
     }
     else { // Conventional particle-suppressed JFNK
-        options.deposit_mass_matrices = false;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+        CumulateJ();
     }
 
     // Apply BCs to J and communicate
