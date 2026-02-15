@@ -509,8 +509,8 @@ public:
         {
             const int start_index = int(products_np[i]);
             const int stop_index  = int(products_np[i] + num_added_vec[i]);
-            BinaryCollisionUtils::DefaultInitializeRuntimeAttributes(tile_products[i],
-                                      pc_products[i], start_index, stop_index);
+            ParticleCreation::InitializeRuntimeAttributesFromPC(*tile_products[i],
+                                      *pc_products[i], start_index, stop_index);
         }
 
         amrex::Gpu::synchronize();

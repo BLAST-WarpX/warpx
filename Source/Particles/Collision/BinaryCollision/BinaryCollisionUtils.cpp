@@ -205,24 +205,4 @@ namespace BinaryCollisionUtils{
         return CollisionType::Undefined;
     }
 
-    void DefaultInitializeRuntimeAttributes( ParticleTileType * ptile,
-                                 const WarpXParticleContainer * pc,
-                                 int start_index, int stop_index)
-    {
-
-        ParticleCreation::DefaultInitializeRuntimeAttributes(*ptile,
-            0, 0,
-            pc->getUserRealAttribs(), pc->getUserIntAttribs(),
-            pc->GetRealSoANames(), pc->GetIntSoANames(),
-            pc->getUserRealAttribParser(),
-            pc->getUserIntAttribParser(),
-#ifdef WARPX_QED
-            false, // do not initialize QED quantities, since they were initialized
-                   // when calling the SmartCopy functors
-            pc->get_breit_wheeler_engine_ptr(),
-            pc->get_quantum_sync_engine_ptr(),
-#endif
-            pc->getIonizationInitialLevel(),
-            start_index, stop_index);
-    }
 }

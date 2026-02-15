@@ -47,10 +47,6 @@ namespace BinaryCollisionUtils{
 
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type);
 
-    void DefaultInitializeRuntimeAttributes(ParticleTileType * ptile,
-                                            const WarpXParticleContainer * pc,
-                                            int start_index, int stop_index);
-
     /**
      * \brief Return (relativistic) collision energy, collision speed and
      * Lorentz factor for transforming between the lab and center-of-momentum

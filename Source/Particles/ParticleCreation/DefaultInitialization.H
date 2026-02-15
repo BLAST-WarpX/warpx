@@ -291,6 +291,39 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         }
 }
 
+    /**
+     * \brief Wrapper to call DefaultInitializRuntimeAttributes() with fewer arguments.
+     *
+     * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
+     * @tparam DstPC The type of the particle container
+     *
+     * @param[inout] ptile the tile in which attributes are initialized
+     * @param[in]    pc    the particle container
+     * @param[in]    start the index to start initializing particles
+     * @param[in]    stop  the index to stop initializing particles
+     */
+template <typename PTile, typename DstPC>
+void InitializeRuntimeAttributesFromPC (PTile& ptile,
+                                        const DstPC& pc,
+                                        int start, int stop)
+{
+
+    ParticleCreation::DefaultInitializeRuntimeAttributes(ptile,
+                                       0, 0,
+                                       pc.getUserRealAttribs(), pc.getUserIntAttribs(),
+                                       pc.GetRealSoANames(), pc.GetIntSoANames(),
+                                       pc.getUserRealAttribParser(),
+                                       pc.getUserIntAttribParser(),
+#ifdef WARPX_QED
+                                       false, // do not initialize QED quantities, since they were initialized
+                                              // when calling the CreateFunc functor
+                                       pc.get_breit_wheeler_engine_ptr(),
+                                       pc.get_quantum_sync_engine_ptr(),
+#endif
+                                       pc.getIonizationInitialLevel(),
+                                       start, stop);
+}
+
 }
 
 #endif //WARPX_DEFAULTINITIALIZATION_H_
