@@ -222,10 +222,22 @@ class LibWarpX:
 
         # Clear all Bucket parameter state.
         for bucket in [
-            warpx, algo, amr, amrex, boundary, collisions,
-            my_constants, diagnostics, reduced_diagnostics, eb2,
-            geometry, hybridpicmodel, external_vector_potential,
-            interpolation, lasers, psatd,
+            warpx,
+            algo,
+            amr,
+            amrex,
+            boundary,
+            collisions,
+            my_constants,
+            diagnostics,
+            reduced_diagnostics,
+            eb2,
+            geometry,
+            hybridpicmodel,
+            external_vector_potential,
+            interpolation,
+            lasers,
+            psatd,
         ]:
             bucket.clear()
 
