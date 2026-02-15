@@ -203,5 +203,4 @@ namespace BinaryCollisionUtils{
         WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
         return CollisionType::Undefined;
     }
-
 }
