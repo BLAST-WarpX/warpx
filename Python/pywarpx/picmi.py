@@ -3522,6 +3522,7 @@ class Simulation(picmistandard.PICMI_Simulation):
     def finalize(self):
         if self.warpx_initialized:
             self.warpx_initialized = False
+            self.inputs_initialized = False
             pywarpx.warpx.finalize()
 
     @property

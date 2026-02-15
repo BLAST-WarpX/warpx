@@ -169,17 +169,84 @@ class LibWarpX:
     def finalize(self, finalize_mpi=1):
         """
         Call finalize for WarpX and AMReX. Registered to run at program exit.
+
+        After this call the simulation state is fully torn down and a new
+        simulation may be started in the same Python process by calling
+        :meth:`initialize` again.
         """
-        # TODO: simplify, part of pyAMReX already
-        if self.initialized:
-            del self.warpx
-            # The call to warpx_finalize causes a crash - don't know why
-            # self.libwarpx_so.warpx_finalize()
-            self.libwarpx_so.amrex_finalize()
+        if not self.initialized:
+            return
 
-            from pywarpx import callbacks
+        # Clear Python callbacks first, while everything is still alive.
+        from pywarpx import callbacks
 
-            callbacks.clear_all()
+        callbacks.clear_all()
+
+        # Destroy the WarpX C++ singleton (frees all simulation data).
+        self.libwarpx_so.finalize()
+
+        # Drop the Python reference to the (now-destroyed) C++ object.
+        del self.warpx
+
+        # Shut down AMReX.
+        self.libwarpx_so.amrex_finalize()
+
+        self.initialized = False
+
+        # Reset all module-level parameter state so that a fresh simulation
+        # can be configured without inheriting values from the previous run.
+        self._reset_global_state()
+
+    def _reset_global_state(self):
+        """Reset module-level Bucket instances and lists to their initial state.
+
+        This is necessary because the pywarpx parameter objects are module-level
+        singletons.  Without resetting them, a second simulation started in the
+        same interpreter would inherit stale parameters from the first run.
+        """
+        from .Algo import algo
+        from .Amr import amr
+        from .Amrex import amrex
+        from .Boundary import boundary
+        from .Collisions import collisions, collisions_list
+        from .Constants import my_constants
+        from .Diagnostics import diagnostics, reduced_diagnostics
+        from .EB2 import eb2
+        from .Geometry import geometry
+        from .HybridPICModel import external_vector_potential, hybridpicmodel
+        from .Interpolation import interpolation
+        from .Lasers import lasers, lasers_list
+        from .Particles import particles, particles_list
+        from .PSATD import psatd
+        from .WarpX import warpx
+
+        # Clear all Bucket parameter state.
+        for bucket in [
+            warpx, algo, amr, amrex, boundary, collisions,
+            my_constants, diagnostics, reduced_diagnostics, eb2,
+            geometry, hybridpicmodel, external_vector_potential,
+            interpolation, lasers, psatd,
+        ]:
+            bucket.clear()
+
+        # Restore default attributes that other code may expect to exist.
+        particles.clear()
+        particles.species_names = []
+        particles.rigid_injected_species = []
+
+        lasers.names = []
+
+        # Clear accumulated species, laser, and collision lists.
+        particles_list.clear()
+        lasers_list.clear()
+        collisions_list.clear()
+
+        # Clear diagnostic registries.
+        diagnostics._diagnostics_dict.clear()
+        reduced_diagnostics._diagnostics_dict.clear()
+
+        # Clear the dynamic bucket dictionary.
+        warpx._bucket_dict.clear()
 
 
 libwarpx = LibWarpX()

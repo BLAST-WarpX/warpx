@@ -56,6 +56,15 @@ class Bucket(object):
                 self.argvattrs[vname] == value
             ), Exception(errmsg)
 
+    def clear(self):
+        """Reset all parameter attributes, returning the bucket to an empty state.
+
+        This is used when finalizing a simulation so that a subsequent
+        simulation started in the same interpreter does not inherit stale
+        parameter values from the previous run.
+        """
+        self.argvattrs.clear()
+
     def attrlist(self):
         "Concatenate the attributes into a string"
         result = []
