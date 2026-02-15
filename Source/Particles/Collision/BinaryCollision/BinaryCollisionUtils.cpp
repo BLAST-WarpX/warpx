@@ -7,7 +7,8 @@
 
 #include "BinaryCollisionUtils.H"
 
-#include "Particles/ParticleCreation/DefaultInitialization.H"
+#include "Particles/MultiParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
@@ -17,8 +18,6 @@
 #include "Utils/TextMsg.H"
 
 namespace BinaryCollisionUtils{
-
-    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * const mypc)
