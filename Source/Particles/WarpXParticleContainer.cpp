@@ -1101,13 +1101,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
     // local_Sxx[thread_num] is set to zero
     local_Sxx[thread_num].setVal(0.0);
-    local_Sxz[thread_num].setVal(0.0);
     local_Sxy[thread_num].setVal(0.0);
+    local_Sxz[thread_num].setVal(0.0);
     local_Syx[thread_num].setVal(0.0);
     local_Syy[thread_num].setVal(0.0);
     local_Syz[thread_num].setVal(0.0);
-    local_Szy[thread_num].setVal(0.0);
     local_Szx[thread_num].setVal(0.0);
+    local_Szy[thread_num].setVal(0.0);
     local_Szz[thread_num].setVal(0.0);
     Array4<Real> const& Sxx_arr = local_Sxx[thread_num].array();
     Array4<Real> const& Sxy_arr = local_Sxy[thread_num].array();
@@ -1402,13 +1402,13 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     ABLASTR_PROFILE_VAR_START(blp_accumulate);
     // CPU, tiling: atomicAdd local_S<xyz> into S<xyz>
     (*Sxx)[pti].lockAdd(local_Sxx[thread_num], tbx, tbx, 0, 0, Sxx->nComp());
-    (*Sxz)[pti].lockAdd(local_Sxz[thread_num], tbx, tbx, 0, 0, Sxz->nComp());
     (*Sxy)[pti].lockAdd(local_Sxy[thread_num], tbx, tbx, 0, 0, Sxy->nComp());
+    (*Sxz)[pti].lockAdd(local_Sxz[thread_num], tbx, tbx, 0, 0, Sxz->nComp());
     (*Syx)[pti].lockAdd(local_Syx[thread_num], tby, tby, 0, 0, Syx->nComp());
     (*Syy)[pti].lockAdd(local_Syy[thread_num], tby, tby, 0, 0, Syy->nComp());
     (*Syz)[pti].lockAdd(local_Syz[thread_num], tby, tby, 0, 0, Syz->nComp());
-    (*Szy)[pti].lockAdd(local_Szy[thread_num], tbz, tbz, 0, 0, Szy->nComp());
     (*Szx)[pti].lockAdd(local_Szx[thread_num], tbz, tbz, 0, 0, Szx->nComp());
+    (*Szy)[pti].lockAdd(local_Szy[thread_num], tbz, tbz, 0, 0, Szy->nComp());
     (*Szz)[pti].lockAdd(local_Szz[thread_num], tbz, tbz, 0, 0, Szz->nComp());
     ABLASTR_PROFILE_VAR_STOP(blp_accumulate);
 #endif
