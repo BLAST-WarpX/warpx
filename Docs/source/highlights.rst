@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Gardner C and Dollar F.
+   **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
+   New Journal of Physics **27**, 124301, 2025.
+   `DOI:10.1088/1367-2630/ae23f1 <https://doi.org/10.1088/1367-2630/ae23f1>`__
+
 #. Lei B., Zhang H., Bonţoiu C., Bonatto A., Resta-López J., Xia G., Qiao B. and Welsch C.
    **100 TeV/m-level particle accelerators driven by high-density electron beams in micro structured carbon nanotube forest channel**.
    New Journal of Physics **27**, 2025.
@@ -173,6 +178,11 @@ Astrophysical Plasma Physics
 ****************************
 
 Scientific works in astrophysical plasma modeling.
+
+#. Zhang Z P, Zhao Z H, Jin X X, Zhu X W, Wang Y S, Zhu X Y, Qiao B.
+   **Multispecies Ion Acceleration in the Interaction of Multiple Reconnection Current Sheets**.
+   The Astrophysical Journal, **997** 196, 2026.
+   `10.3847/1538-4357/ae2320 <https://doi.org/10.3847/1538-4357/ae2320>`__
 
 #. Wu Y, Shi C, Tao X, Zhao J
    **Kinetic-hybrid Simulations of Counterpropagating Ion Cyclotron Waves and Proton Scattering in the Near-Sun Solar Wind**.

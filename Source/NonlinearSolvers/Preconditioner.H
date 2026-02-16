@@ -7,19 +7,11 @@
 #ifndef WARPX_PRECONDITIONER_H_
 #define WARPX_PRECONDITIONER_H_
 
+#include "PreconditionerLibrary.H"
+
 #include "Utils/TextMsg.H"
 #include <AMReX_Enum.H>
 #include <string>
-
-/**
- * \brief Types for preconditioners for field solvers
- */
-AMREX_ENUM(PreconditionerType,
-    pc_curl_curl_mlmg,
-    pc_jacobi,
-    pc_petsc,
-    none
-);
 
 // Can't wrap pc_petsc inside AMREX_USE_PETSC directives.
 
