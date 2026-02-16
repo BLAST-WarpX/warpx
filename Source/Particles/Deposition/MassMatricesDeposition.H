@@ -503,7 +503,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time n+1/2.
- * \param jx_fab,jy_fab,jz_fab     FArrayBox of current density, either full array or tile.
+ * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
@@ -526,9 +526,9 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                    const amrex::ParticleReal* uxp_nph,
                                    const amrex::ParticleReal* uyp_nph,
                                    const amrex::ParticleReal* uzp_nph,
-                                   amrex::FArrayBox& jx_fab,
-                                   amrex::FArrayBox& jy_fab,
-                                   amrex::FArrayBox& jz_fab,
+                                   amrex::Array4<amrex::Real> const& Jx_arr,
+                                   amrex::Array4<amrex::Real> const& Jy_arr,
+                                   amrex::Array4<amrex::Real> const& Jz_arr,
                                    amrex::Array4<amrex::Real> const& Sxx_arr,
                                    amrex::Array4<amrex::Real> const& Sxy_arr,
                                    amrex::Array4<amrex::Real> const& Sxz_arr,
@@ -538,6 +538,9 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                    amrex::Array4<amrex::Real> const& Szx_arr,
                                    amrex::Array4<amrex::Real> const& Szy_arr,
                                    amrex::Array4<amrex::Real> const& Szz_arr,
+                                   const amrex::IntVect& Jx_type,
+                                   const amrex::IntVect& Jy_type,
+                                   const amrex::IntVect& Jz_type,
                                    const amrex::Array4<amrex::Real const>& Bx_arr,
                                    const amrex::Array4<amrex::Real const>& By_arr,
                                    const amrex::Array4<amrex::Real const>& Bz_arr,
@@ -556,14 +559,7 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    amrex::Array4<amrex::Real> const& jx_arr = jx_fab.array();
-    amrex::Array4<amrex::Real> const& jy_arr = jy_fab.array();
-    amrex::Array4<amrex::Real> const& jz_arr = jz_fab.array();
-    amrex::IntVect const jx_type = jx_fab.box().type();
-    amrex::IntVect const jy_type = jy_fab.box().type();
-    amrex::IntVect const jz_type = jz_fab.box().type();
-
-    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
+    // Loop over particles and deposit J and or S
     amrex::ParallelFor(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
@@ -611,11 +607,11 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                                             fpxx, fpxy, fpxz,
                                                             fpyx, fpyy, fpyz,
                                                             fpzx, fpzy, fpzz,
-                                                            jx_arr, jy_arr, jz_arr,
+                                                            Jx_arr, Jy_arr, Jz_arr,
                                                             Sxx_arr, Sxy_arr, Sxz_arr,
                                                             Syx_arr, Syy_arr, Syz_arr,
                                                             Szx_arr, Szy_arr, Szz_arr,
-                                                            jx_type, jy_type, jz_type,
+                                                            Jx_type, Jy_type, Jz_type,
                                                             dinv, xyzmin, lo );
 
         }
