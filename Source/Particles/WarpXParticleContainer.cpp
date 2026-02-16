@@ -959,15 +959,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
  * \param dt            Time step for particle level
  */
 void
-WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const RealVector& wp,
-                                        const RealVector& uxp, const RealVector& uyp, const RealVector& uzp,
-                                        amrex::MultiFab* jx, amrex::MultiFab* jy, amrex::MultiFab* jz,
-                                        amrex::MultiFab* Sxx, amrex::MultiFab* Sxy, amrex::MultiFab* Sxz,
-                                        amrex::MultiFab* Syx, amrex::MultiFab* Syy, amrex::MultiFab* Syz,
-                                        amrex::MultiFab* Szx, amrex::MultiFab* Szy, amrex::MultiFab* Szz,
-                                        const amrex::FArrayBox* Bx, const amrex::FArrayBox* By, const amrex::FArrayBox* Bz,
-                                        long offset, long np_to_deposit, int thread_num, int lev, int depos_lev,
-                                        amrex::Real dt )
+WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector& wp,
+                                       const RealVector& uxp, const RealVector& uyp, const RealVector& uzp,
+                                       amrex::MultiFab* jx, amrex::MultiFab* jy, amrex::MultiFab* jz,
+                                       amrex::MultiFab* Sxx, amrex::MultiFab* Sxy, amrex::MultiFab* Sxz,
+                                       amrex::MultiFab* Syx, amrex::MultiFab* Syy, amrex::MultiFab* Syz,
+                                       amrex::MultiFab* Szx, amrex::MultiFab* Szy, amrex::MultiFab* Szz,
+                                       const amrex::FArrayBox* Bx, const amrex::FArrayBox* By, const amrex::FArrayBox* Bz,
+                                       long offset, long np_to_deposit, int thread_num, int lev, int depos_lev,
+                                       amrex::Real dt)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
                                      (depos_lev==(lev  )),
@@ -1009,7 +1009,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::IntVect range = ng_J - shape_extent;
 #else
     // Jx, Jy and Jz have the same number of guard cells, hence it is sufficient to check for Jx
-    const amrex::IntVect range = jx->nGrowVect() - shape_extent;
+    const amrex::IntVect range = Sxx->nGrowVect() - shape_extent;
 #endif
     amrex::ignore_unused(range); // for release builds
     AMREX_ASSERT_WITH_MESSAGE(
@@ -1034,9 +1034,9 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
 #ifndef AMREX_USE_GPU
     // Staggered tile boxes (different in each direction)
-    Box tbx = convert( tilebox, jx->ixType().toIntVect() );
-    Box tby = convert( tilebox, jy->ixType().toIntVect() );
-    Box tbz = convert( tilebox, jz->ixType().toIntVect() );
+    Box tbx = convert( tilebox, Sxx->ixType().toIntVect() );
+    Box tby = convert( tilebox, Syy->ixType().toIntVect() );
+    Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
 #endif
 
     tilebox.grow(ng_J);
@@ -1047,9 +1047,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     auto & jx_fab = jx->get(pti);
     auto & jy_fab = jy->get(pti);
     auto & jz_fab = jz->get(pti);
-    Array4<Real> const& jx_arr = jx->array(pti);
-    Array4<Real> const& jy_arr = jy->array(pti);
-    Array4<Real> const& jz_arr = jz->array(pti);
 
     Array4<Real> const& Sxx_arr = Sxx->array(pti);
     Array4<Real> const& Sxy_arr = Sxy->array(pti);
@@ -1073,9 +1070,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     auto & jx_fab = local_jx[thread_num];
     auto & jy_fab = local_jy[thread_num];
     auto & jz_fab = local_jz[thread_num];
-    Array4<Real> const& jx_arr = local_jx[thread_num].array();
-    Array4<Real> const& jy_arr = local_jy[thread_num].array();
-    Array4<Real> const& jz_arr = local_jz[thread_num].array();
 
     // CPU, tiling: S<xyz>_arr point to the local_S<xyz>[thread_num] arrays
     local_Sxx[thread_num].resize(tbx, Sxx->nComp());
@@ -1197,7 +1191,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1209,7 +1203,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1221,7 +1215,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1233,7 +1227,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1245,7 +1239,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1257,7 +1251,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1269,7 +1263,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1281,7 +1275,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    jx_arr, jy_arr, jz_arr, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
@@ -1292,7 +1286,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     } else { // Direct deposition
 
         if        (WarpX::nox == 1 && full_mass_matrices) {
-            doDirectJandSigmaDeposition<1,true,false>(
+            doDirectJandSigmaDeposition<1,true,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1303,7 +1297,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if  (WarpX::nox == 1 && !full_mass_matrices) {
-            doDirectJandSigmaDeposition<1,false,false>(
+            doDirectJandSigmaDeposition<1,false,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1314,7 +1308,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
-            doDirectJandSigmaDeposition<2,true,false>(
+            doDirectJandSigmaDeposition<2,true,/*depsosit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1325,7 +1319,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
-            doDirectJandSigmaDeposition<2,false,false>(
+            doDirectJandSigmaDeposition<2,false,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1336,7 +1330,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
-            doDirectJandSigmaDeposition<3,true,false>(
+            doDirectJandSigmaDeposition<3,true,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1347,7 +1341,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
-            doDirectJandSigmaDeposition<3,false,false>(
+            doDirectJandSigmaDeposition<3,false,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1358,7 +1352,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
-            doDirectJandSigmaDeposition<4,true,false>(
+            doDirectJandSigmaDeposition<4,true,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
@@ -1369,7 +1363,7 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
-            doDirectJandSigmaDeposition<4,false,false>(
+            doDirectJandSigmaDeposition<4,false,/*deposit_J=*/false>(
                     GetPosition, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,

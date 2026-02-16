@@ -1791,9 +1791,6 @@ void doVillasenorSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* x
                                    const amrex::ParticleReal* uxp_nph,
                                    const amrex::ParticleReal* uyp_nph,
                                    const amrex::ParticleReal* uzp_nph,
-                                       amrex::Array4<amrex::Real> const& Jx_arr,
-                                       amrex::Array4<amrex::Real> const& Jy_arr,
-                                       amrex::Array4<amrex::Real> const& Jz_arr,
                                    const int max_crossings,
                                    amrex::Array4<amrex::Real> const& Sxx_arr,
                                    amrex::Array4<amrex::Real> const& Sxy_arr,
@@ -1824,9 +1821,7 @@ void doVillasenorSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* x
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    const bool deposit_J = false;
-
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+    // Loop over particles and deposit Mass matrices
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
@@ -1882,7 +1877,12 @@ void doVillasenorSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* x
             amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
-            doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,deposit_J>(
+            // pass dummy arrays for Jx, Jy, Jz (which will not be used)
+            amrex::Array4<amrex::Real> const dummy_Jx{};
+            amrex::Array4<amrex::Real> const dummy_Jy{};
+            amrex::Array4<amrex::Real> const dummy_Jz{};
+
+            doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
                                                                 xp_n, yp_n, zp_n,
                                                                 xp_np1, yp_np1, zp_np1,
                                                                 wq_invvol,
@@ -1891,7 +1891,7 @@ void doVillasenorSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* x
                                                                 fpxx, fpxy, fpxz,
                                                                 fpyx, fpyy, fpyz,
                                                                 fpzx, fpzy, fpzz,
-                                                                Jx_arr, Jy_arr, Jz_arr,
+                                                                dummy_Jx, dummy_Jy, dummy_Jz,
                                                                 max_crossings,
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,

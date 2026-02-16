@@ -854,7 +854,7 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
             amrex::MultiFab * Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
             amrex::MultiFab * Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
             amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
-            DepositCurrentAndMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
+            WarpXParticleContainer::DepositMassMatrices(pti, wp, uxp, uyp, uzp, jx, jy, jz,
                               Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
                               bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
 
