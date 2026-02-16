@@ -1611,8 +1611,10 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \tparam depos_order             Deposition order
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  *                                 (can only be true for depos_order = 2)
+ * \tparam deposit_J               Whether to deposit the current density
  * \param xp_n_data,yp_n_data,zp_n_data Pointer to arrays of particle position at time level n.
  * \param GetPosition              A functor for returning the particle position.
+ * \param nsuborbits               Pointer to the number of suborbits for this particle.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
@@ -1633,11 +1635,12 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param qs                       Species charge.
  * \param ms                       Species mass.
  */
-template <int depos_order, bool full_mass_matrices>
+template <int depos_order, bool full_mass_matrices, bool deposit_J>
 void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n_data,
                                        [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
                                        [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
                                        const GetParticlePosition<PIdx>& GetPosition,
+                                       [[maybe_unused]] const int* nsuborbits,
                                        const amrex::ParticleReal* wp,
                                        const amrex::ParticleReal* uxp_n,
                                        const amrex::ParticleReal* uyp_n,
@@ -1678,15 +1681,17 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    const bool deposit_J = true;
-
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
+            if constexpr (!deposit_J) {
+                // Skip mass matrix deposition for particles with suborbits.
+                if (nsuborbits && nsuborbits[ip] > 1) { return; }
+            }
+
             // Skip particles with zero weight.
-            // This should only be the case for particles that will be suborbited.
             if (wp[ip] == 0.) { return; }
 
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
@@ -1744,154 +1749,6 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 fpyx, fpyy, fpyz,
                                                                 fpzx, fpzy, fpzz,
                                                                 Jx_arr, Jy_arr, Jz_arr,
-                                                                max_crossings,
-                                                                Sxx_arr, Sxy_arr, Sxz_arr,
-                                                                Syx_arr, Syy_arr, Syz_arr,
-                                                                Szx_arr, Szy_arr, Szz_arr,
-                                                                dt, dinv, xyzmin, domain_double, do_cropping, lo );
-
-    });
-}
-
-/**
- * \brief Villasenor and Buneman deposition of mass matrices for thread thread_num
- * \tparam depos_order             Deposition order
- * \param xp_n_data,yp_n_data,zp_n_data Pointer to arrays of particle position at time level n.
- * \param GetPosition              A functor for returning the particle position.
- * \param wp                       Pointer to array of particle weights.
- * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
- * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
- * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
- * \param max_crossings            Maximum number of particle cell crossings in each dir
- * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
- * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
- * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
- * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
- * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
- * \param np_to_deposit            Number of particles for which current is deposited.
- * \param dt                       Time step for particle level
- * \param dinv                     3D cell size inverse
- * \param xyzmin                   Physical lower bounds of domain.
- * \param domain_double            The domain boundary indicies cast to double values
- * \param do_cropping              Whether to crop particle orbits at domain boundaries
- * \param lo                       Index lower bounds of domain.
- * \param qs                       Species charge.
- * \param ms                       Species mass.
- */
-template <int depos_order, bool full_mass_matrices>
-void doVillasenorSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n_data,
-                                   [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
-                                   [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
-                                   const GetParticlePosition<PIdx>& GetPosition,
-                                   const int* nsuborbits,
-                                   const amrex::ParticleReal* wp,
-                                   const amrex::ParticleReal* uxp_n,
-                                   const amrex::ParticleReal* uyp_n,
-                                   const amrex::ParticleReal* uzp_n,
-                                   const amrex::ParticleReal* uxp_nph,
-                                   const amrex::ParticleReal* uyp_nph,
-                                   const amrex::ParticleReal* uzp_nph,
-                                   const int max_crossings,
-                                   amrex::Array4<amrex::Real> const& Sxx_arr,
-                                   amrex::Array4<amrex::Real> const& Sxy_arr,
-                                   amrex::Array4<amrex::Real> const& Sxz_arr,
-                                   amrex::Array4<amrex::Real> const& Syx_arr,
-                                   amrex::Array4<amrex::Real> const& Syy_arr,
-                                   amrex::Array4<amrex::Real> const& Syz_arr,
-                                   amrex::Array4<amrex::Real> const& Szx_arr,
-                                   amrex::Array4<amrex::Real> const& Szy_arr,
-                                   amrex::Array4<amrex::Real> const& Szz_arr,
-                                   const amrex::Array4<amrex::Real const>& Bx_arr,
-                                   const amrex::Array4<amrex::Real const>& By_arr,
-                                   const amrex::Array4<amrex::Real const>& Bz_arr,
-                                   const amrex::IndexType Bx_type,
-                                   const amrex::IndexType By_type,
-                                   const amrex::IndexType Bz_type,
-                                   const long np_to_deposit,
-                                   const amrex::Real dt,
-                                   const amrex::XDim3& dinv,
-                                   const amrex::XDim3& xyzmin,
-                                   const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                   const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
-                                   const amrex::Dim3 lo,
-                                   const amrex::Real qs,
-                                   const amrex::Real ms )
-{
-    using namespace amrex::literals;
-
-    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
-
-    // Loop over particles and deposit Mass matrices
-    amrex::ParallelFor(
-        np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long const ip) {
-
-            // Skip particles with suborbits zero weight.
-            if (nsuborbits && nsuborbits[ip] > 1) { return; }
-
-            // Skip particles with zero weight.
-            if (wp[ip] == 0.) { return; }
-
-            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
-            GetPosition(ip, xp_nph, yp_nph, zp_nph);
-
-            // Compute magnetic field on particle
-            amrex::ParticleReal Bxp = 0.0;
-            amrex::ParticleReal Byp = 0.0;
-            amrex::ParticleReal Bzp = 0.0;
-            const int depos_order_perp = 1;
-            const int depos_order_para = 1;
-            const int n_rz_azimuthal_modes = 0;
-            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
-                                    xp_nph, yp_nph, zp_nph,
-                                    Bxp, Byp, Bzp,
-                                    Bx_arr, By_arr, Bz_arr,
-                                    Bx_type, By_type, Bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
-
-            // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
-            const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
-                                                                       uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
-
-            // Compute current density kernels to deposit
-            const amrex::Real wq_invvol = qs*wp[ip]*invvol;
-            const amrex::Real rhop = wq_invvol*gaminv;
-
-            // Set the Mass Matrices kernels
-            amrex::ParticleReal fpxx, fpxy, fpxz;
-            amrex::ParticleReal fpyx, fpyy, fpyz;
-            amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels( qs, ms, dt, rhop,
-                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
-                                    Bxp, Byp, Bzp,
-                                    fpxx, fpxy, fpxz,
-                                    fpyx, fpyy, fpyz,
-                                    fpzx, fpzy, fpzz );
-
-            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
-
-            // Compute position at time n + 1
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
-
-            // pass dummy arrays for Jx, Jy, Jz (which will not be used)
-            amrex::Array4<amrex::Real> const dummy_Jx{};
-            amrex::Array4<amrex::Real> const dummy_Jy{};
-            amrex::Array4<amrex::Real> const dummy_Jz{};
-
-            doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
-                                                                xp_n, yp_n, zp_n,
-                                                                xp_np1, yp_np1, zp_np1,
-                                                                wq_invvol,
-                                                                uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
-                                                                gaminv,
-                                                                fpxx, fpxy, fpxz,
-                                                                fpyx, fpyy, fpyz,
-                                                                fpzx, fpzy, fpzz,
-                                                                dummy_Jx, dummy_Jy, dummy_Jz,
                                                                 max_crossings,
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,

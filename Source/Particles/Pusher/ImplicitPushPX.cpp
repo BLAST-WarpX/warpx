@@ -1055,7 +1055,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
-                        doVillasenorJandSigmaDepositionKernel<1,false,true>(
+                        doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1068,7 +1068,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_two) {
-                        doVillasenorJandSigmaDepositionKernel<2,false,true>(
+                        doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1081,7 +1081,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_three) {
-                        doVillasenorJandSigmaDepositionKernel<3,false,true>(
+                        doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1094,7 +1094,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_four) {
-                        doVillasenorJandSigmaDepositionKernel<4,false,true>(
+                        doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
