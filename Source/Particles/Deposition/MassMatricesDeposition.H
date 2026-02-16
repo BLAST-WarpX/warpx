@@ -1677,7 +1677,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+    // Loop over particles and deposit into J and S
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
