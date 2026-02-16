@@ -397,7 +397,6 @@ public:
                                          amrex::MultiFab* jx,
                                          amrex::MultiFab* jy,
                                          amrex::MultiFab* jz,
-                                   const bool deposit_mass_matrices_only,
                                          amrex::MultiFab* Sxx,
                                          amrex::MultiFab* Sxy,
                                          amrex::MultiFab* Sxz,

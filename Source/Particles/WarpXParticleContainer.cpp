@@ -962,7 +962,6 @@ void
 WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const RealVector& wp,
                                         const RealVector& uxp, const RealVector& uyp, const RealVector& uzp,
                                         amrex::MultiFab* jx, amrex::MultiFab* jy, amrex::MultiFab* jz,
-                                        [[maybe_unused]] const bool deposit_mass_matrices_only,
                                         amrex::MultiFab* Sxx, amrex::MultiFab* Sxy, amrex::MultiFab* Sxz,
                                         amrex::MultiFab* Syx, amrex::MultiFab* Syy, amrex::MultiFab* Syz,
                                         amrex::MultiFab* Szx, amrex::MultiFab* Szy, amrex::MultiFab* Szz,
@@ -1021,16 +1020,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
 
     const amrex::ParticleReal qs = this->charge;
     const amrex::ParticleReal mass = this->m_mass;
-
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::FindMaxTilesize",
-            blp_get_max_tilesize);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::DirectCurrentDepKernel",
-            direct_current_dep_kernel);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::EsirkepovCurrentDepKernel",
-            esirkepov_current_dep_kernel);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1172,8 +1161,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::IndexType Bx_type = Bx->box().ixType();
     const amrex::IndexType By_type = By->box().ixType();
     const amrex::IndexType Bz_type = Bz->box().ixType();
-
-    ABLASTR_PROFILE_VAR_START(blp_deposit);
 
     auto& uxp_n = pti.GetAttribs("ux_n");
     auto& uyp_n = pti.GetAttribs("uy_n");
@@ -1395,11 +1382,8 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
         }
 
     }
-    ABLASTR_PROFILE_VAR_STOP(blp_deposit);
 
 #ifndef AMREX_USE_GPU
-    // CPU, tiling: atomicAdd local_j<xyz> into j<xyz>
-    ABLASTR_PROFILE_VAR_START(blp_accumulate);
     // CPU, tiling: atomicAdd local_S<xyz> into S<xyz>
     (*Sxx)[pti].lockAdd(local_Sxx[thread_num], tbx, tbx, 0, 0, Sxx->nComp());
     (*Sxy)[pti].lockAdd(local_Sxy[thread_num], tbx, tbx, 0, 0, Sxy->nComp());
@@ -1410,7 +1394,6 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     (*Szx)[pti].lockAdd(local_Szx[thread_num], tbz, tbz, 0, 0, Szx->nComp());
     (*Szy)[pti].lockAdd(local_Szy[thread_num], tbz, tbz, 0, 0, Szy->nComp());
     (*Szz)[pti].lockAdd(local_Szz[thread_num], tbz, tbz, 0, 0, Szz->nComp());
-    ABLASTR_PROFILE_VAR_STOP(blp_accumulate);
 #endif
 }
 
