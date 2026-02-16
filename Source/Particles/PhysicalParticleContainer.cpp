@@ -809,9 +809,9 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
 
     WARPX_PROFILE("PhysicalParticleContainer::DepositMassMatrices()");
 
-    amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
-    amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
-    amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+    const amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+    const amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+    const amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -827,11 +827,11 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
         {
 
             // Extract particle data
-            auto& attribs = pti.GetAttribs();
-            auto&  wp = attribs[PIdx::w];
-            auto& uxp = attribs[PIdx::ux];
-            auto& uyp = attribs[PIdx::uy];
-            auto& uzp = attribs[PIdx::uz];
+            const auto& attribs = pti.GetAttribs();
+            const auto&  wp = attribs[PIdx::w];
+            const auto& uxp = attribs[PIdx::ux];
+            const auto& uyp = attribs[PIdx::uy];
+            const auto& uzp = attribs[PIdx::uz];
 
             const long np_to_deposit = pti.numParticles();
 
