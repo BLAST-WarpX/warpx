@@ -380,7 +380,9 @@ Overall simulation parameters
     be calculated. More specifically, the space-charge fields are
     computed with an iterative Multi-Level Multi-Grid (MLMG) solver.
     This solver can fail to reach the default precision within a reasonable time.
-    This only applies when warpx.do_electrostatic = labframe.
+    This applies to the labframe electrostatic solvers (``labframe``, ``labframe-electromagnetostatic``,
+    ``labframe-effective-potential``). When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_required_precision``.
 
 * ``warpx.self_fields_absolute_tolerance`` (`float`, default: 0.0)
     The absolute tolerance with which the space-charge fields should be
@@ -390,18 +392,45 @@ Overall simulation parameters
     changes very little between steps it can occur that the initial guess for
     the MLMG solver is so close to the converged value that it fails to improve
     that solution sufficiently to reach the ``self_fields_required_precision``
-    value.
+    value. When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_absolute_tolerance``.
 
 * ``warpx.self_fields_max_iters`` (`integer`, default: 200)
     Maximum number of iterations used for MLMG solver for space-charge
     fields calculation. In case if MLMG converges but fails to reach the desired
     ``self_fields_required_precision``, this parameter may be increased.
-    This only applies when warpx.do_electrostatic = labframe.
+    This applies to the labframe electrostatic solvers (``labframe``, ``labframe-electromagnetostatic``,
+    ``labframe-effective-potential``). When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_max_iters``.
 
 * ``warpx.self_fields_verbosity`` (`integer`, default: 2)
     The verbosity used for MLMG solver for space-charge fields calculation. Currently
     MLMG solver looks for verbosity levels from 0-5. A higher number results in more
-    verbose output.
+    verbose output. When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_verbosity``.
+
+* ``warpx.magnetostatic_solver_required_precision`` (`float`, default: value of ``self_fields_required_precision``)
+    The relative precision with which the magnetostatic (vector Poisson) fields should
+    be calculated when using ``labframe-electromagnetostatic`` mode.
+    This allows setting a different precision for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_absolute_tolerance`` (`float`, default: value of ``self_fields_absolute_tolerance``)
+    The absolute tolerance with which the magnetostatic fields should be
+    calculated when using ``labframe-electromagnetostatic`` mode.
+    This allows setting a different tolerance for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_max_iters`` (`integer`, default: value of ``self_fields_max_iters``)
+    Maximum number of iterations used for the magnetostatic (vector Poisson) MLMG solver
+    when using ``labframe-electromagnetostatic`` mode.
+    This allows setting different iteration limits for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_verbosity`` (`integer`, default: value of ``self_fields_verbosity``)
+    The verbosity used for the magnetostatic MLMG solver when using
+    ``labframe-electromagnetostatic`` mode. Values range from 0-5, with higher
+    numbers producing more verbose output.
 
 * ``amrex.abort_on_out_of_gpu_memory``  (``0`` or ``1``; default is ``1`` for true)
     When running on GPUs, memory that does not fit on the device will be automatically swapped to host memory when this option is set to ``0``.
