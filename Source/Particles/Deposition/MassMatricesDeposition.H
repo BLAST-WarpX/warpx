@@ -495,7 +495,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
 }
 
 /**
- * \brief direct deposition of J and mass matrices for thread thread_num
+ * \brief direct deposition of mass matrices for thread thread_num
  * \tparam depos_order             deposition order
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  * \tparam deposit_J               Whether to deposit J
@@ -503,7 +503,6 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time n+1/2.
- * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
@@ -517,49 +516,46 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \param qs                       Species charge.
  * \param ms                       Species mass.
  */
-template <int depos_order, bool full_mass_matrices, bool deposit_J>
-void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
-                                   const amrex::ParticleReal* wp,
-                                   const amrex::ParticleReal* uxp_n,
-                                   const amrex::ParticleReal* uyp_n,
-                                   const amrex::ParticleReal* uzp_n,
-                                   const amrex::ParticleReal* uxp_nph,
-                                   const amrex::ParticleReal* uyp_nph,
-                                   const amrex::ParticleReal* uzp_nph,
-                                   amrex::Array4<amrex::Real> const& Jx_arr,
-                                   amrex::Array4<amrex::Real> const& Jy_arr,
-                                   amrex::Array4<amrex::Real> const& Jz_arr,
-                                   amrex::Array4<amrex::Real> const& Sxx_arr,
-                                   amrex::Array4<amrex::Real> const& Sxy_arr,
-                                   amrex::Array4<amrex::Real> const& Sxz_arr,
-                                   amrex::Array4<amrex::Real> const& Syx_arr,
-                                   amrex::Array4<amrex::Real> const& Syy_arr,
-                                   amrex::Array4<amrex::Real> const& Syz_arr,
-                                   amrex::Array4<amrex::Real> const& Szx_arr,
-                                   amrex::Array4<amrex::Real> const& Szy_arr,
-                                   amrex::Array4<amrex::Real> const& Szz_arr,
-                                   const amrex::IntVect& Jx_type,
-                                   const amrex::IntVect& Jy_type,
-                                   const amrex::IntVect& Jz_type,
-                                   const amrex::Array4<amrex::Real const>& Bx_arr,
-                                   const amrex::Array4<amrex::Real const>& By_arr,
-                                   const amrex::Array4<amrex::Real const>& Bz_arr,
-                                   const amrex::IndexType Bx_type,
-                                   const amrex::IndexType By_type,
-                                   const amrex::IndexType Bz_type,
-                                   const long np_to_deposit,
-                                   const amrex::Real dt,
-                                   const amrex::XDim3& dinv,
-                                   const amrex::XDim3& xyzmin,
-                                   const amrex::Dim3 lo,
-                                   const amrex::Real qs,
-                                   const amrex::Real ms )
+template <int depos_order, bool full_mass_matrices>
+void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
+                              const amrex::ParticleReal* wp,
+                              const amrex::ParticleReal* uxp_n,
+                              const amrex::ParticleReal* uyp_n,
+                              const amrex::ParticleReal* uzp_n,
+                              const amrex::ParticleReal* uxp_nph,
+                              const amrex::ParticleReal* uyp_nph,
+                              const amrex::ParticleReal* uzp_nph,
+                              amrex::Array4<amrex::Real> const& Sxx_arr,
+                              amrex::Array4<amrex::Real> const& Sxy_arr,
+                              amrex::Array4<amrex::Real> const& Sxz_arr,
+                              amrex::Array4<amrex::Real> const& Syx_arr,
+                              amrex::Array4<amrex::Real> const& Syy_arr,
+                              amrex::Array4<amrex::Real> const& Syz_arr,
+                              amrex::Array4<amrex::Real> const& Szx_arr,
+                              amrex::Array4<amrex::Real> const& Szy_arr,
+                              amrex::Array4<amrex::Real> const& Szz_arr,
+                              const amrex::IntVect& Jx_type,
+                              const amrex::IntVect& Jy_type,
+                              const amrex::IntVect& Jz_type,
+                              const amrex::Array4<amrex::Real const>& Bx_arr,
+                              const amrex::Array4<amrex::Real const>& By_arr,
+                              const amrex::Array4<amrex::Real const>& Bz_arr,
+                              const amrex::IndexType Bx_type,
+                              const amrex::IndexType By_type,
+                              const amrex::IndexType Bz_type,
+                              const long np_to_deposit,
+                              const amrex::Real dt,
+                              const amrex::XDim3& dinv,
+                              const amrex::XDim3& xyzmin,
+                              const amrex::Dim3 lo,
+                              const amrex::Real qs,
+                              const amrex::Real ms)
 {
     using namespace amrex::literals;
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Loop over particles and deposit J and or S
+    // Loop over particles and deposit mass matrices
     amrex::ParallelFor(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
@@ -601,13 +597,18 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
                                     fpyx, fpyy, fpyz,
                                     fpzx, fpzy, fpzz );
 
-            doDirectJandSigmaDepositionKernel<depos_order,full_mass_matrices,deposit_J>(
+            // Pass dummy arrays for Jx, Jy, Jz (which will not be used)
+            amrex::Array4<amrex::Real> const dummy_Jx{};
+            amrex::Array4<amrex::Real> const dummy_Jy{};
+            amrex::Array4<amrex::Real> const dummy_Jz{};
+
+            doDirectJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
                                                             xp_nph, yp_nph, zp_nph,
                                                             wqx, wqy, wqz,
                                                             fpxx, fpxy, fpxz,
                                                             fpyx, fpyy, fpyz,
                                                             fpzx, fpzy, fpzz,
-                                                            Jx_arr, Jy_arr, Jz_arr,
+                                                            dummy_Jx, dummy_Jy, dummy_Jz,
                                                             Sxx_arr, Sxy_arr, Sxz_arr,
                                                             Syx_arr, Syy_arr, Syz_arr,
                                                             Szx_arr, Szy_arr, Szz_arr,
@@ -1603,7 +1604,7 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
 }
 
 /**
- * \brief Villasenor and Buneman deposition of J and mass matrices for thread thread_num
+ * \brief Villasenor and Buneman deposition of mass matrices for thread thread_num
  * \tparam depos_order             Deposition order
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  *                                 (can only be true for depos_order = 2)
@@ -1673,7 +1674,7 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Loop over particles and deposit into J and S
+    // Loop over particles and deposit mass matrices
     amrex::ParallelFor(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
