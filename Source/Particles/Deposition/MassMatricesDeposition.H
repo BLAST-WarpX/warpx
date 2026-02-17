@@ -586,9 +586,9 @@ void doDirectJandSigmaDeposition ( const GetParticlePosition<PIdx>& GetPosition,
 
             // Compute current density kernels to deposit
             const amrex::Real rhop = qs*wp[ip]*invvol*gaminv;
-            amrex::Real wqx  = rhop*uxp_nph[ip];
-            amrex::Real wqy  = rhop*uyp_nph[ip];
-            amrex::Real wqz  = rhop*uzp_nph[ip];
+            const amrex::Real wqx  = rhop*uxp_nph[ip];
+            const amrex::Real wqy  = rhop*uyp_nph[ip];
+            const amrex::Real wqz  = rhop*uzp_nph[ip];
 
             // Set the Mass Matrices kernels
             amrex::ParticleReal fpxx, fpxy, fpxz;
@@ -1614,7 +1614,6 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time level n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time level n + 1/2.
- * \param Jx_arr,Jy_arr,Jz_arr     Array4 of the current density, either full array or tile.
  * \param max_crossings            Maximum number of particle cell crossings in each dir
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
@@ -1631,47 +1630,44 @@ void doVillasenorJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::Parti
  * \param qs                       Species charge.
  * \param ms                       Species mass.
  */
-template <int depos_order, bool full_mass_matrices, bool deposit_J>
-void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleReal* xp_n_data,
-                                       [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
-                                       [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
-                                       const GetParticlePosition<PIdx>& GetPosition,
-                                       [[maybe_unused]] const int* nsuborbits,
-                                       const amrex::ParticleReal* wp,
-                                       const amrex::ParticleReal* uxp_n,
-                                       const amrex::ParticleReal* uyp_n,
-                                       const amrex::ParticleReal* uzp_n,
-                                       const amrex::ParticleReal* uxp_nph,
-                                       const amrex::ParticleReal* uyp_nph,
-                                       const amrex::ParticleReal* uzp_nph,
-                                       amrex::Array4<amrex::Real> const& Jx_arr,
-                                       amrex::Array4<amrex::Real> const& Jy_arr,
-                                       amrex::Array4<amrex::Real> const& Jz_arr,
-                                       const int max_crossings,
-                                       amrex::Array4<amrex::Real> const& Sxx_arr,
-                                       amrex::Array4<amrex::Real> const& Sxy_arr,
-                                       amrex::Array4<amrex::Real> const& Sxz_arr,
-                                       amrex::Array4<amrex::Real> const& Syx_arr,
-                                       amrex::Array4<amrex::Real> const& Syy_arr,
-                                       amrex::Array4<amrex::Real> const& Syz_arr,
-                                       amrex::Array4<amrex::Real> const& Szx_arr,
-                                       amrex::Array4<amrex::Real> const& Szy_arr,
-                                       amrex::Array4<amrex::Real> const& Szz_arr,
-                                       const amrex::Array4<amrex::Real const>& Bx_arr,
-                                       const amrex::Array4<amrex::Real const>& By_arr,
-                                       const amrex::Array4<amrex::Real const>& Bz_arr,
-                                       const amrex::IndexType Bx_type,
-                                       const amrex::IndexType By_type,
-                                       const amrex::IndexType Bz_type,
-                                       const long np_to_deposit,
-                                       const amrex::Real dt,
-                                       const amrex::XDim3& dinv,
-                                       const amrex::XDim3& xyzmin,
-                                       const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
-                                       const amrex::Dim3 lo,
-                                       const amrex::Real qs,
-                                       const amrex::Real ms )
+template <int depos_order, bool full_mass_matrices>
+void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_data,
+                                  [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
+                                  [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
+                                  const GetParticlePosition<PIdx>& GetPosition,
+                                  [[maybe_unused]] const int* nsuborbits,
+                                  const amrex::ParticleReal* wp,
+                                  const amrex::ParticleReal* uxp_n,
+                                  const amrex::ParticleReal* uyp_n,
+                                  const amrex::ParticleReal* uzp_n,
+                                  const amrex::ParticleReal* uxp_nph,
+                                  const amrex::ParticleReal* uyp_nph,
+                                  const amrex::ParticleReal* uzp_nph,
+                                  const int max_crossings,
+                                  amrex::Array4<amrex::Real> const& Sxx_arr,
+                                  amrex::Array4<amrex::Real> const& Sxy_arr,
+                                  amrex::Array4<amrex::Real> const& Sxz_arr,
+                                  amrex::Array4<amrex::Real> const& Syx_arr,
+                                  amrex::Array4<amrex::Real> const& Syy_arr,
+                                  amrex::Array4<amrex::Real> const& Syz_arr,
+                                  amrex::Array4<amrex::Real> const& Szx_arr,
+                                  amrex::Array4<amrex::Real> const& Szy_arr,
+                                  amrex::Array4<amrex::Real> const& Szz_arr,
+                                  const amrex::Array4<amrex::Real const>& Bx_arr,
+                                  const amrex::Array4<amrex::Real const>& By_arr,
+                                  const amrex::Array4<amrex::Real const>& Bz_arr,
+                                  const amrex::IndexType Bx_type,
+                                  const amrex::IndexType By_type,
+                                  const amrex::IndexType Bz_type,
+                                  const long np_to_deposit,
+                                  const amrex::Real dt,
+                                  const amrex::XDim3& dinv,
+                                  const amrex::XDim3& xyzmin,
+                                  const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                  const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
+                                  const amrex::Dim3 lo,
+                                  const amrex::Real qs,
+                                  const amrex::Real ms)
 {
     using namespace amrex::literals;
 
@@ -1682,10 +1678,8 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
-            if constexpr (!deposit_J) {
-                // Skip mass matrix deposition for particles with suborbits.
-                if (nsuborbits && nsuborbits[ip] > 1) { return; }
-            }
+            // Skip mass matrix deposition for particles with suborbits.
+            if (nsuborbits && nsuborbits[ip] > 1) { return; }
 
             // Skip particles with zero weight.
             if (wp[ip] == 0.) { return; }
@@ -1735,7 +1729,12 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
             amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
-            doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,deposit_J>(
+            // Pass dummy arrays for Jx, Jy, Jz (which will not be used)
+            amrex::Array4<amrex::Real> const dummy_Jx{};
+            amrex::Array4<amrex::Real> const dummy_Jy{};
+            amrex::Array4<amrex::Real> const dummy_Jz{};
+
+            doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
                                                                 xp_n, yp_n, zp_n,
                                                                 xp_np1, yp_np1, zp_np1,
                                                                 wq_invvol,
@@ -1744,7 +1743,7 @@ void doVillasenorJandSigmaDeposition ( [[maybe_unused]] const amrex::ParticleRea
                                                                 fpxx, fpxy, fpxz,
                                                                 fpyx, fpyy, fpyz,
                                                                 fpzx, fpzy, fpzz,
-                                                                Jx_arr, Jy_arr, Jz_arr,
+                                                                dummy_Jx, dummy_Jy, dummy_Jz,
                                                                 max_crossings,
                                                                 Sxx_arr, Sxy_arr, Sxz_arr,
                                                                 Syx_arr, Syy_arr, Syz_arr,

@@ -1184,96 +1184,96 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
         int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
         if (WarpX::nox == 1 && full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<1,true,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<1,true>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 1 && !full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<1,false,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<1,false>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<2,true,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<2,true>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<2,false,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<2,false>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<3,true,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<3,true>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<3,false,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<3,false>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<4,true,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<4,true>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
-            doVillasenorJandSigmaDeposition<4,false,/*deposit_J=*/false>(
+            doVillasenorSigmaDeposition<4,false>(
                     xp_n_data, yp_n_data, zp_n_data,
                     GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
-                    dummy_Jx, dummy_Jy, dummy_Jz, WarpX::particle_max_grid_crossings,
+                    WarpX::particle_max_grid_crossings,
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
