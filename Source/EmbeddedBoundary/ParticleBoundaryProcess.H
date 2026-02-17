@@ -7,6 +7,8 @@
 #ifndef WARPX_PARTICLEBOUNDARYPROCESS_H_
 #define WARPX_PARTICLEBOUNDARYPROCESS_H_
 
+#include "Particles/WarpXParticleContainer.H"
+
 #include <AMReX_Particle.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealVect.H>
@@ -20,6 +22,7 @@ struct NoOp {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (const PData& /*ptd*/, int /*i*/,
                      const amrex::RealVect& /*pos*/, const amrex::RealVect& /*normal*/,
+                     amrex::Real /*phi_value*/,
                      amrex::RandomEngine const& /*engine*/) const noexcept
     {}
 };
@@ -29,11 +32,13 @@ struct Absorb {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (PData& ptd, int i,
                      const amrex::RealVect& /*pos*/, const amrex::RealVect& /*normal*/,
+                     amrex::Real /*phi_value*/,
                      amrex::RandomEngine const& /*engine*/) const noexcept
     {
         amrex::ParticleIDWrapper{ptd.m_idcpu[i]}.make_invalid();
     }
 };
+
 }
 
 #endif //WARPX_PARTICLEBOUNDARYPROCESS_H_
