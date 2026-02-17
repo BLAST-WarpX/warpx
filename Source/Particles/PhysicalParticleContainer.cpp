@@ -418,18 +418,11 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
     int n_external_attr_real,
     int n_external_attr_int)
 {
-    ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile,
+    ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile, *this,
                                        n_external_attr_real, n_external_attr_int,
-                                       m_user_real_attribs, m_user_int_attribs,
-                                       GetRealSoANames(), GetIntSoANames(),
-                                       amrex::GetVecOfPtrs(m_user_real_attrib_parser),
-                                       amrex::GetVecOfPtrs(m_user_int_attrib_parser),
 #ifdef WARPX_QED
                                        true,
-                                       m_shr_p_bw_engine.get(),
-                                       m_shr_p_qs_engine.get(),
 #endif
-                                       ionization_initial_level,
                                        0,pinned_tile.numParticles());
 }
 

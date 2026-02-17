@@ -114,25 +114,29 @@ namespace ParticleCreation {
      * @param[in] start the index to start initializing particles
      * @param[in] stop the index to stop initializing particles
      */
-template <typename PTile>
+template <typename PTile, typename DstPC>
 void DefaultInitializeRuntimeAttributes (PTile& ptile,
+                                         const DstPC& pc,
                                          const int n_external_attr_real,
                                          const int n_external_attr_int,
-                                         const std::vector<std::string>& user_real_attribs,
-                                         const std::vector<std::string>& user_int_attribs,
-                                         const std::vector<std::string>& particle_comps,
-                                         const std::vector<std::string>& particle_icomps,
-                                         const std::vector<amrex::Parser*>& user_real_attrib_parser,
-                                         const std::vector<amrex::Parser*>& user_int_attrib_parser,
 #ifdef WARPX_QED
                                          const bool do_qed_comps,
-                                         BreitWheelerEngine* p_bw_engine,
-                                         QuantumSynchrotronEngine* p_qs_engine,
 #endif
-                                         const int ionization_initial_level,
                                          int start, int stop)
 {
         using namespace amrex::literals;
+
+        const std::vector<std::string>& user_real_attribs = pc.getUserRealAttribs();
+        const std::vector<std::string>& user_int_attribs  = pc.getUserIntAttribs();
+        const std::vector<std::string>& particle_comps  = pc.GetRealSoANames();
+        const std::vector<std::string>& particle_icomps = pc.GetIntSoANames();
+        const std::vector<amrex::Parser*>& user_real_attrib_parser = pc.getUserRealAttribParser();
+        const std::vector<amrex::Parser*>& user_int_attrib_parser  = pc.getUserIntAttribParser();
+#ifdef WARPX_QED
+        BreitWheelerEngine*       p_bw_engine = pc.get_breit_wheeler_engine_ptr();
+        QuantumSynchrotronEngine* p_qs_engine = pc.get_quantum_sync_engine_ptr();
+#endif
+        const int ionization_initial_level = pc.getIonizationInitialLevel();
 
         // Preparing data needed for user defined attributes
         const auto n_user_real_attribs = static_cast<int>(user_real_attribs.size());
@@ -310,18 +314,11 @@ void InitializeRuntimeAttributesFromPC (PTile& ptile,
 
     const int n_ext_attr_real_start = 0;
     const int n_ext_attr_int_start  = 0;
-    ParticleCreation::DefaultInitializeRuntimeAttributes(ptile,
+    ParticleCreation::DefaultInitializeRuntimeAttributes(ptile, pc,
                                        n_ext_attr_real_start, n_ext_attr_int_start,
-                                       pc.getUserRealAttribs(), pc.getUserIntAttribs(),
-                                       pc.GetRealSoANames(), pc.GetIntSoANames(),
-                                       pc.getUserRealAttribParser(),
-                                       pc.getUserIntAttribParser(),
 #ifdef WARPX_QED
                                        false, // QED quantities should already be initialized
-                                       pc.get_breit_wheeler_engine_ptr(),
-                                       pc.get_quantum_sync_engine_ptr(),
 #endif
-                                       pc.getIonizationInitialLevel(),
                                        start, stop);
 }
 
