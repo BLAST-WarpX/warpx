@@ -261,10 +261,6 @@ computePhi (
             [](const auto b){return (b<1.0_rt);}),
         "Components of beta_solver must be < 1.");
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
-
     amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
@@ -274,6 +270,9 @@ computePhi (
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
 #if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
+        // determine if rho is zero everywhere
+        const amrex::Real max_norm_b = getMaxNormRho(
+            amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {
@@ -286,7 +285,7 @@ computePhi (
 #endif
         // Use the Multigrid (MLMG) solver if selected or on refined patches
         // but first scale rho appropriately
-        rho[lev]->mult(-1._rt / ablastr::constant::SI::ep0);
+        rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);
 
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
@@ -404,7 +403,7 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -412,6 +411,8 @@ computePhi (
             // ask MLMG to fill BC for us after it solves the problem.
             mlmg.setFinalFillBC(true);
         }
+
+        rho[lev]->OverrideSync(geom[lev].periodicity());
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
@@ -441,7 +442,7 @@ computePhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ablastr::constant::SI::ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
 } // computePhi

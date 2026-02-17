@@ -18,7 +18,6 @@ boundary.field_hi = periodic periodic periodic
 algo.particle_shape = 1
 
 particles.species_names  = p_xp_1 p_xn_1 p_yp_1 p_yn_1 p_zp_1 p_zn_1 p_dp_1 p_dn_1 p_xp_10 p_xn_10 p_yp_10 p_yn_10 p_zp_10 p_zn_10 p_dp_10 p_dn_10
-particles.photon_species = p_xp_1 p_xn_1 p_yp_1 p_yn_1 p_zp_1 p_zn_1 p_dp_1 p_dn_1 p_xp_10 p_xn_10 p_yp_10 p_yn_10 p_zp_10 p_zn_10 p_dp_10 p_dn_10
 
 p_xp_1.species_type = photon
 p_xp_1.injection_style = "SingleParticle"

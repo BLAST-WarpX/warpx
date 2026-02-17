@@ -56,9 +56,7 @@ namespace ParticleUtils {
         using std::sqrt;
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
-
-        gamma = sqrt(1.0_rt + u2 / c2);
+        gamma = sqrt(1.0_rt + u2 * PhysConst::inv_c2);
         energy = (
             2.0_rt * m * M * u2 / (gamma + 1.0_rt)
             / (M + m + sqrt(m*m + M*M + 2.0_rt * m * M * gamma))
@@ -83,10 +81,9 @@ namespace ParticleUtils {
         using namespace amrex::literals;
 
         // precompute repeatedly used quantities
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
         const auto V2 = (Vx*Vx + Vy*Vy + Vz*Vz);
-        const auto gamma_V = 1.0_prt / std::sqrt(1.0_prt - V2 / c2);
-        const auto gamma_u = std::sqrt(1.0_prt + (ux*ux + uy*uy + uz*uz) / c2);
+        const auto gamma_V = 1.0_prt / std::sqrt(1.0_prt - V2 * PhysConst::inv_c2);
+        const auto gamma_u = std::sqrt(1.0_prt + (ux*ux + uy*uy + uz*uz)* PhysConst::inv_c2);
 
         // copy velocity vector values
         const auto vx = ux;
@@ -248,6 +245,125 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version
+     * \param[in] x0 The initial particle position
+     * \param[in/out] x1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double & x1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            x1 = xmin;
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            x1 = xmax;
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 2D version
+     * \param[in] x0, z0 The initial particle position
+     * \param[in/out] x1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double x0, double z0,
+                          double & x1, double & z1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            x1 = xmin;
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            x1 = xmax;
+            z1 = z0 + fx*(z1 - z0);
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 3D version
+     * \param[in] x0, y0, z0 The initial particle position
+     * \param[in/out] x1, y1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double x0, double y0, double z0,
+                          double & x1, double & y1, double & z1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            x1 = xmin;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            x1 = xmax;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
+    }
+
+    /* \brief Check if the particle position is out of bounds at a boundary
+     *        where orbit cropping is being performed.
+     * \param[in] xp, yp, zp      The particle position
+     * \param[in] dinv            3D cell size inverse
+     * \param[in] xyzmin          Physical lower bounds of domain
+     * \param[in] domain_double   The domain boundary indicies cast to double values
+     * \param[in] do_cropping     Whether to crop particle orbits at domain boundaries
+     * return whether position is out of bounds
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool is_out_of_bounds ([[maybe_unused]] double xp,
+                           [[maybe_unused]] double yp,
+                           [[maybe_unused]] double zp,
+                           const amrex::XDim3 & dinv,
+                           const amrex::XDim3 & xyzmin,
+                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping)
+    {
+
+        // Store logical particle position (in grid units) in temporary array
+        amrex::GpuArray<double,AMREX_SPACEDIM> xp_grid;
+#if defined(WARPX_DIM_3D)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (yp - xyzmin.y)*dinv.y;
+        xp_grid[2] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_XZ)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_1D_Z)
+        xp_grid[0] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#if defined(WARPX_DIM_RZ)
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#endif
+
+        // Check if particle's position is out of bounds
+        for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
+            if (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) {
+                return true;
+            }
+            else if (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1]) {
+                return true;
+            }
+        }
+        return false;
+
+    }
 
     /* \brief Add or subtract a small percent of energy from a
      *        pair of particles such that momentum is not disturbed.

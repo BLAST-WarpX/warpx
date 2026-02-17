@@ -53,6 +53,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
 #include <ablastr/math/FiniteDifference.H>
+#include <ablastr/math/RandomSeed.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -666,25 +667,7 @@ WarpX::ReadParameters ()
         // set random seed
         std::string random_seed = "default";
         pp_warpx.query("random_seed", random_seed);
-        if ( random_seed != "default" ) {
-            const unsigned long myproc_1 = ParallelDescriptor::MyProc() + 1;
-            if ( random_seed == "random" ) {
-                std::random_device rd;
-                std::uniform_int_distribution<int> dist(2, INT_MAX);
-                const unsigned long cpu_seed = myproc_1 * dist(rd);
-                const unsigned long gpu_seed = myproc_1 * dist(rd);
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else if ( std::stoi(random_seed) > 0 ) {
-                const unsigned long nprocs = ParallelDescriptor::NProcs();
-                const unsigned long seed_long = std::stoul(random_seed);
-                const unsigned long cpu_seed = myproc_1 * seed_long;
-                const unsigned long gpu_seed = (myproc_1 + nprocs) * seed_long;
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(
-                    "warpx.random_seed must be \"default\", \"random\" or an integer > 0.");
-            }
-        }
+        ablastr::math::set_random_seed(random_seed);
 
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);
@@ -800,6 +783,17 @@ WarpX::ReadParameters ()
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+        if (m_dt_update_interval.isActivated()) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_const_dt.has_value(),
+                "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+                 evolve_scheme == EvolveScheme::ThetaImplicitEM),
+                "For electromagnetic solvers, warpx.dt_update_interval can only be used with algo.evolve_scheme = theta_implicit_em."
+            );
+        }
 
         // Filter defaults to true for the explicit scheme, and false for the implicit schemes
         if (evolve_scheme != EvolveScheme::Explicit) {
@@ -1892,7 +1886,51 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    // Set the default value of m_collisions_split_position_push
+    m_collisions_split_position_push = false;
+    const amrex::ParmParse pp_collisions("collisions");
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    if (collisions) {
+        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+            m_collisions_split_position_push = true;
+        }
+
+        // Override m_collisions_split_position_push if the corresponding input
+        // parameter collisions.split_position_push is set in the input file
+        pp_collisions.query("split_position_push", m_collisions_split_position_push);
+
+        // Warn the user if collisions with split position push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_position_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (EB::enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split position push not implemented with embedded\
+                    boundaries, ignoring collisions.split_position_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+        }
+    }
 }
+
+int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
+                                    const int  bdry_side ) const
+{
+    return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
+}
+
 
 void
 WarpX::BackwardCompatibility ()
@@ -2109,6 +2147,14 @@ WarpX::BackwardCompatibility ()
     if (pp_particles.query("nspecies", nspecies)){
         ablastr::warn_manager::WMRecordWarning("Species",
             "particles.nspecies is ignored. Just use particles.species_names please.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future. "
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
             ablastr::warn_manager::WarnPriority::low);
     }
 
@@ -2779,13 +2825,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Bfield_aux_levl_1 = m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
         auto *Bfield_aux_levl_2 = m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
-        // Same as Bfield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_B = mypc->m_external_particle_fields_metadata.m_nBfields;
+
+        // Same as Bfield_fp for reading external field data, except for allocating as many components as external B fields are provided
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{0}, lev, amrex::convert(ba, Bfield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{1}, lev, amrex::convert(ba, Bfield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{2}, lev, amrex::convert(ba, Bfield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
     }
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero && m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::constant) {
         // These fields will be added directly to the grid, i.e. to fp, and need to match the index type
@@ -2802,13 +2851,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Efield_aux_levl_1 = m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
         auto *Efield_aux_levl_2 = m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
 
-        // Same as Efield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_E = mypc->m_external_particle_fields_metadata.m_nEfields;
+
+        // Same as Efield_fp for reading external field data, except for allocating as many components as external E fields are provided
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{0}, lev, amrex::convert(ba, Efield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{1}, lev, amrex::convert(ba, Efield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{2}, lev, amrex::convert(ba, Efield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
     }
 
     //
@@ -3061,8 +3113,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,
@@ -3479,8 +3530,10 @@ amrex::DistributionMapping
 WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 {
     bool roundrobin_sfc = false;
+    bool split_high_density_boxes = false;
     const ParmParse pp("warpx");
     pp.query("roundrobin_sfc", roundrobin_sfc);
+    pp.query("split_high_density_boxes", split_high_density_boxes);
 
     // If this is true, AMReX's RRSFC strategy is used to make
     // DistributionMapping. Note that the DistributionMapping made by the
@@ -3496,6 +3549,15 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
         amrex::DistributionMapping dm(ba);
         amrex::DistributionMapping::strategy(old_strategy);
         return dm;
+    } else if (split_high_density_boxes &&
+               amrex::DistributionMapping::strategy() == amrex::DistributionMapping::SFC) {
+        // By default, amrex uses box volumes as weights when distributing
+        // boxes. But this would somewhat defeat the purpose of splitting
+        // high density boxes until the next load balance is
+        // performed. Thus, we are going building SFC assuming every boxes
+        // have the same weight.
+        amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
+        return amrex::DistributionMapping::makeSFC(wgt, ba, false);
     } else {
         return amrex::AmrCore::MakeDistributionMap(lev, ba);
     }

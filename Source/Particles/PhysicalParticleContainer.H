@@ -92,6 +92,8 @@ public:
      * \param dt Time Step by which particles are advanced
      * \param subcycling_half Type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition
+     * \param position_push_type Type of time advance for particle position (full, first half, second half, none)
+     * \param momentum_push_type Type of time advance for particle momentum (full, first half, second half, none)
      * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
@@ -105,8 +107,13 @@ public:
                  amrex::Real dt,
                  SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
+    /**
+     * \brief Gather fields and push particles in one fused kernel.
+     */
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
@@ -119,7 +126,9 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         SubcyclingHalf subcycling_half=SubcyclingHalf::None);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
 
     void FindSuborbitParticles (WarpXParIter& pti,
                          long offset,
@@ -220,7 +229,7 @@ public:
      * (this box should correspond to an integer number of cells in each direction,
      * but its boundaries need not be aligned with the actual cells of the simulation)
     */
-    void AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
+    void AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
 
     /**
      * Create new macroparticles for this species, with a fixed
@@ -383,6 +392,20 @@ public:
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
     PairGenerationFilterFunc getPairGenerationFilterFunc ();
+
+    /**
+     * Tells if this PhysicalParticleContainer has
+     * virtual photons enabled
+     * @return true if process is enabled
+     */
+    bool has_virtual_photons () const override;
+
+    /**
+     * Gets the index of the PhysicalParticleContainer
+     * that corresponds to the virtual photons
+     * @return index of the virtual photon species
+     */
+    int getVirtualPhotonSpeciesIndex () const override;
 #endif
 
     std::vector<std::string> getUserIntAttribs () const override {
@@ -476,6 +499,9 @@ protected:
 
     // A smart pointer to an instance of a Breit Wheeler engine [photons only!]
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
+
+    // A flag to enable virtual photons
+    bool m_do_qed_virtual_photons = false;
 #endif
     /* Vector of user-defined integer attributes for species, species_name */
     std::vector<std::string> m_user_int_attribs;

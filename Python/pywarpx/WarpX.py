@@ -160,8 +160,27 @@ class WarpX(Bucket):
         argv = [sys.executable] + self.create_argv_list(**kw)
         libwarpx.initialize(argv, mpi_comm=mpi_comm)
 
-    def evolve(self, nsteps=-1):
+    @property
+    def fields(self):
+        return libwarpx.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        return libwarpx.warpx.multi_particle_container()
+
+    def step(self, nsteps=-1):
         libwarpx.warpx.evolve(nsteps)
+
+    def evolve(self, nsteps=-1):
+        """An alias of step, used in legacy code"""
+        import warnings
+
+        warnings.warn(
+            "warpx.evolve is now obsolete and should not be used. Please use warpx.step.",
+            UserWarning,
+            stacklevel=2,
+        )
+        self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
         libwarpx.finalize(finalize_mpi)

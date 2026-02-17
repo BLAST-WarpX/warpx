@@ -68,7 +68,7 @@ Finally, since Fugaku does not yet provide software modules for some of our depe
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 

@@ -905,6 +905,17 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
             )
 
 
+class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
+    def init(self, kw):
+        pass
+
+    def distribution_initialize_inputs(
+        self, species_number, layout, species, density_scale, source_name
+    ):
+        species.add_new_group_attr(source_name, "injection_style", "external_file")
+        species.add_new_group_attr(source_name, "injection_file", self.file_path)
+
+
 class ParticleDistributionPlanarInjector(
     picmistandard.PICMI_ParticleDistributionPlanarInjector
 ):
@@ -1834,12 +1845,12 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
         self.max_iterations = max_iterations
 
     def linear_solver_initialize_inputs(self):
-        gmres = pywarpx.warpx.get_bucket("gmres")
-        gmres.verbose_int = self.verbose_int
-        gmres.restart_length = self.restart_length
-        gmres.absolute_tolerance = self.absolute_tolerance
-        gmres.relative_tolerance = self.relative_tolerance
-        gmres.max_iterations = self.max_iterations
+        amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
+        amrex_gmres.verbose_int = self.verbose_int
+        amrex_gmres.restart_length = self.restart_length
+        amrex_gmres.absolute_tolerance = self.absolute_tolerance
+        amrex_gmres.relative_tolerance = self.relative_tolerance
+        amrex_gmres.max_iterations = self.max_iterations
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
@@ -1862,10 +1873,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Minimum density used in Ohm's law calculation.
 
     plasma_resistivity: float or str
-        Value or expression to use for the plasma resistivity.
+        Value or expression to use for the plasma resistivity in Ohm*m.
+        Can be a constant value or an expression depending on ``rho`` (charge density)
+        and ``J`` (current density magnitude).
 
     plasma_hyper_resistivity: float or str
-        Value or expression to use for the plasma hyper-resistivity.
+        Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
+        Can be a constant value or an expression depending on ``rho`` (charge density)
+        and ``B`` (magnetic field magnitude).
 
     substeps: int, default=100
         Number of substeps to take when updating the B-field.
@@ -1879,32 +1894,37 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     A_external: dict
         Function of space and time specifying external (non-plasma) vector potential fields.
-        It is expected that a nested dicitonary will be passed
-        into picmi for each field that has different timings
-        e.g.
-        A_external = {
-            '<field_name1>': {
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ay_external_function': <implicit function with (x,y,z) dependence>,
-                'Az_external_function': <implicit function with (x,y,z) dependence>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
-
-        or if fields are to be loaded from an OpenPMD file
-        A_external = {
-            '<field_name1>': {
-                'load_from_file': True,
-                'path': <path to OpenPMD file>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
+        It is expected that a nested dictionary will be passed in for each separate vector potential that may have
+        different spatial configuration or time dependence. Each field entry should contain either implicit functions
+        with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function',
+        'Az_external_function', plus 'A_time_external_function' with (t) dependence, or
+        alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with
+        'A_time_external_function'.
 
     do_external_diva_cleaning: bool (default=True)
         This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
         external A with periodic field boundary conditions.
+
+    Notes
+    -----
+    **Required Parameters:**
+
+    - ``Te`` must be specified when using the hybrid solver.
+    - ``n0`` should be specified if ``gamma != 1``.
+
+    **Best Practices:**
+
+    - *Grid type:* Setting ``warpx_grid_type='collocated'`` is recommended.
+    - *Particle shape:* Linear particles (``algo.particle_shape = 1``) are recommended.
+
+    **Constraints and Limitations:**
+
+    - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if more than one level is used.
+    - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
+    - *External vector potential:* If ``A_external`` is provided, it must be non-empty.
+    - *Time-dependent A fields:* When using expressions for external vector potentials, time variation must be specified via ``A_time_external_function``, not directly in the ``A[x,y,z]_external_function`` expressions.
+
+    For complete parameter documentation, see the `Input Parameters section <https://warpx.readthedocs.io/en/latest/usage/parameters.html#maxwell-solver-kinetic-fluid-hybrid>`_.
     """
 
     def __init__(
@@ -2072,6 +2092,15 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         If the effective potential Poisson solver is used, this sets the value
         of C_EP (the method is marginally stable at C_EP = 1)
 
+    warpx_effective_potential_time_filter_param: float, default=0.1
+        Time filtering parameter used to filter sigma in the effective
+        potential scheme. sigma is updated using:
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+
+    warpx_effective_potential_density_floor: float, default=0
+        If given, this value will be used as the minimum density during the
+        local calculation of sigma.
+
     warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
 
@@ -2091,6 +2120,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.effective_potential = kw.pop("warpx_effective_potential", False)
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
+        )
+        self.effective_potential_time_filter_param = kw.pop(
+            "warpx_effective_potential_time_filter_param", None
+        )
+        self.effective_potential_density_floor = kw.pop(
+            "warpx_effective_potential_density_floor", None
         )
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
@@ -2116,6 +2151,12 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
                 pywarpx.warpx.do_electrostatic = "labframe-effective-potential"
                 pywarpx.warpx.effective_potential_factor = (
                     self.effective_potential_factor
+                )
+                pywarpx.warpx.effective_potential_time_filter_param = (
+                    self.effective_potential_time_filter_param
+                )
+                pywarpx.warpx.effective_potential_density_floor = (
+                    self.effective_potential_density_floor
                 )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"
@@ -2391,12 +2432,40 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     """
-    Load external E/B fields from file (openPMD/plotfile) and optionally
-    apply a time-dependent scalar multiplier parsed on the C++ side.
+    Load external electromagnetic fields (E and/or B) from an openPMD file and
+    optionally apply a time-dependent scaling.
+
+    Multiple external field maps are supported by adding several
+    ``LoadAppliedField`` objects to the simulation via repeated calls to
+    ``Simulation.add_applied_field(...)``. Each instance contributes one
+    independently scaled field map; the resulting fields are summed by WarpX.
+
+    Example (multiple applied fields)::
+
+        applied_field1 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(omega*t)",
+        )
+
+        applied_field2 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(2*omega*t)",
+        )
+
+        sim.add_applied_field(applied_field1)
+        sim.add_applied_field(applied_field2)
+
+    Internally, each object registers a uniquely named external field entry
+    (``particles.<name>.*``), ensuring that multiple applied fields compose
+    without overwriting each other.
 
     Parameters
     ----------
-    read_fields_from_path : str
+    read_fields_from_path : str, optional
         Path to diagnostics containing the external field data to load.
 
     load_E : bool, default=True
@@ -2406,17 +2475,18 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         If True, load the external B field from file.
 
     warpx_E_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded E field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded electric field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_B_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded B field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t + pi/2)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded magnetic field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        Run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based B-field divergence cleaner after loading.
+        (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
         Absolute tolerance for the divergence cleaner solve.
@@ -2424,6 +2494,33 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     warpx_projection_div_cleaner_rtol : float, optional
         Relative tolerance for the divergence cleaner solve.
     """
+
+    _auto_field_counter = 0
+
+    def _next_auto_name(self):
+        LoadAppliedField._auto_field_counter += 1
+        return f"ext_field{LoadAppliedField._auto_field_counter}"
+
+    def _as_list(self, x):
+        if x is None:
+            return []
+        if isinstance(x, (list, tuple)):
+            return list(x)
+        if isinstance(x, str):
+            return [s for s in x.split() if s]
+        return [x]
+
+    def _append_names(self, list_key, new_names):
+        existing = None
+        try:
+            existing = getattr(pywarpx.particles, list_key)
+        except Exception:
+            existing = None
+        existing = self._as_list(existing)
+        for n in new_names:
+            if n not in existing:
+                existing.append(n)
+        pywarpx.particles.__setattr__(list_key, existing)
 
     def __init__(self, **kw):
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
@@ -2433,23 +2530,57 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
+        # Collect user constants for mangle_expression (but keep kw intact)
+        # Exclude base-class params so they don't end up in my_constants.
+        base_keys = {"read_fields_from_path", "load_E", "load_B"}
+        self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
+
+        # Base class requires read_fields_from_path -> enforce it
+        if "read_fields_from_path" not in kw:
+            raise ValueError("LoadAppliedField requires 'read_fields_from_path'.")
+
         super().__init__(**kw)
 
-    def applied_field_initialize_inputs(self):
-        # file path for external fields
-        pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+        # hard-disable unwanted loaders set by the base ctor
+        if not self.load_E:
+            pywarpx.particles.E_ext_particle_init_style = "none"
+        if not self.load_B:
+            pywarpx.particles.B_ext_particle_init_style = "none"
 
-        # enable file-loading styles
+    def applied_field_initialize_inputs(self):
+        mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        if not (self.load_E or self.load_B):
+            pywarpx.particles.E_ext_particle_init_style = "none"
+            pywarpx.particles.B_ext_particle_init_style = "none"
+            return
+
+        # Always register this object as a named external field so that multiple
+        # LoadAppliedField objects compose (no overwrite of global keys).
+        if not hasattr(self, "read_fields_from_path") or not self.read_fields_from_path:
+            raise ValueError("[PICMI] read_fields_from_path must be provided.")
+
+        # construct particles.<fname>.read_fields_from_path as needed for WarpX input
+        fname = self._next_auto_name()
+        pywarpx.particles.__setattr__(
+            f"{fname}.read_fields_from_path", self.read_fields_from_path
+        )
+
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
-            # pass time dependence via parser
-            if self.warpx_E_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_E_dependency(t)", self.warpx_E_time_function
-                )
+            self._append_names("E_ext_particle_fields", [fname])
+
+            dep_raw = self.warpx_E_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_E_dependency(t)", dep)
+        else:
+            pywarpx.particles.E_ext_particle_init_style = "none"
 
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+            self._append_names("B_ext_particle_fields", [fname])
+
+            # div cleaner knobs are global-ish: last set value wins
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "atol", self.div_cleaner_atol
@@ -2457,11 +2588,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "rtol", self.div_cleaner_rtol
             )
-            # pass time dependence via parser
-            if self.warpx_B_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_B_dependency(t)", self.warpx_B_time_function
-                )
+
+            dep_raw = self.warpx_B_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_B_dependency(t)", dep)
+        else:
+            pywarpx.particles.B_ext_particle_init_style = "none"
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
@@ -3042,6 +3174,15 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_collisions: collision instance, optional
         The collision instance specifying the particle collisions
 
+    warpx_collisions_split_position_push: bool, default=1
+        If true, collisions are performed in the middle of the position push,
+        which is split into two substeps.
+        This improves energy conservation, as demonstrated in
+        (Vay et al., Phys. Rev. E 111, 2025).
+        This is only implemented for the explicit evolve scheme
+        and is not available for the implicit evolve schemes.
+        It is also not available with embedded boundaries.
+
     warpx_embedded_boundary: embedded boundary instance, optional
 
     warpx_break_signals: list of strings
@@ -3160,6 +3301,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
 
         self.collisions = kw.pop("warpx_collisions", None)
+        self.collisions_split_position_push = kw.pop(
+            "warpx_collisions_split_position_push", None
+        )
+
         self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
 
         self.break_signals = kw.pop("warpx_break_signals", None)
@@ -3322,6 +3467,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             for collision in self.collisions:
                 pywarpx.collisions.collision_names.append(collision.name)
                 collision.collision_initialize_inputs()
+            pywarpx.collisions.split_position_push = self.collisions_split_position_push
 
         if self.embedded_boundary is not None:
             self.embedded_boundary.embedded_boundary_initialize_inputs(self.solver)
@@ -3371,12 +3517,28 @@ class Simulation(picmistandard.PICMI_Simulation):
                 nsteps = self.max_steps
             else:
                 nsteps = -1
-        pywarpx.warpx.evolve(nsteps)
+        pywarpx.warpx.step(nsteps)
 
     def finalize(self):
         if self.warpx_initialized:
             self.warpx_initialized = False
             pywarpx.warpx.finalize()
+
+    @property
+    def fields(self):
+        """
+        This is a convenience property that returns the MultiFab registry, allowing
+        easy fetching of the MultiFabs.
+        """
+        return self.extension.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        """
+        This is a convenience property that returns the MultiParticleContainer, allowing
+        easy fetching of the WarpXParticleContainer instances.
+        """
+        return self.extension.warpx.multi_particle_container()
 
 
 # ----------------------------
@@ -3722,6 +3884,9 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     warpx_file_min_digits: integer
         Minimum number of digits for the time step number in the checkpoint
         directory name.
+
+    warpx_verbose: int, optional
+        Verbosity level to use for printing diagnostic output information.
     """
 
     def __init__(self, period=1, write_dir=None, name=None, **kw):
@@ -3734,6 +3899,8 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         if self.name is None:
             self.name = "chkpoint"
 
+        self.verbose = kw.pop("warpx_verbose", None)
+
         self.handle_init(kw)
 
     def diagnostic_initialize_inputs(self):
@@ -3743,6 +3910,7 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         self.diagnostic.diag_type = "Full"
         self.diagnostic.format = "checkpoint"
         self.diagnostic.file_min_digits = self.file_min_digits
+        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.set_write_dir()
 

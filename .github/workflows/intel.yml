@@ -24,7 +24,7 @@ jobs:
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
-      CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
+      CXXFLAGS: "-Werror -Wno-deprecated -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
@@ -88,7 +88,7 @@ jobs:
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
-      CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
+      CXXFLAGS: "-Werror -Wno-deprecated -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
