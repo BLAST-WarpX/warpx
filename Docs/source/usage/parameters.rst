@@ -117,14 +117,8 @@ Note that if a given period is zero or negative, the corresponding slice is disr
 For example, ``something_intervals = -1`` deactivates ``something`` and ``something_intervals = ::-1,100:1000:25`` is equivalent to ``something_intervals = 100:1000:25``.
 
 
-.. _running-cpp-parameters-overall:
-
-Overall simulation parameters
------------------------------
-
-* ``authors`` (`string`: e.g. ``"Jane Doe <jane@example.com>, Jimmy Joe <jimmy@example.com>"``)
-    Authors of an input file / simulation setup.
-    When provided, this information is added as metadata to (openPMD) output files.
+Simulation Time
+---------------
 
 * ``max_step`` (`integer`)
     The number of PIC cycles to perform.
@@ -135,22 +129,6 @@ Overall simulation parameters
     when the first criterion is hit.
 
     Note: in boosted-frame simulations, ``stop_time`` refers to the time in the boosted frame.
-
-* ``warpx.used_inputs_file`` (`string`; default: ``warpx_used_inputs``)
-    Name of a file that WarpX writes to archive the used inputs.
-    The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
-
-* ``warpx.gamma_boost`` (`float`)
-    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
-    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
-
-    When using this parameter, the input parameters are interpreted as in the
-    lab-frame and automatically converted to the boosted frame.
-    (See the corresponding documentation of each input parameters for exceptions.)
-
-* ``warpx.boost_direction`` (string: ``x``, ``y`` or ``z``)
-    The direction of the Lorentz-transform for boosted-frame simulations
-    (The direction ``y`` cannot be used in 2D simulations.)
 
 * ``warpx.zmax_plasma_to_compute_max_step`` (`float`) optional
     Can be useful when running in a boosted frame. If specified, automatically
@@ -169,6 +147,32 @@ Overall simulation parameters
     or the current values of ``max_step`` and/or ``stop_time`` are too low to fill
     all BTD snapshots, the values of ``max_step`` and/or ``stop_time`` are
     overwritten with the new values and printed to standard output.
+
+
+.. _running-cpp-parameters-overall:
+
+Overall simulation parameters
+-----------------------------
+
+* ``authors`` (`string`: e.g. ``"Jane Doe <jane@example.com>, Jimmy Joe <jimmy@example.com>"``)
+    Authors of an input file / simulation setup.
+    When provided, this information is added as metadata to (openPMD) output files.
+
+* ``warpx.used_inputs_file`` (`string`; default: ``warpx_used_inputs``)
+    Name of a file that WarpX writes to archive the used inputs.
+    The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+
+* ``warpx.gamma_boost`` (`float`)
+    The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
+    For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
+
+    When using this parameter, the input parameters are interpreted as in the
+    lab-frame and automatically converted to the boosted frame.
+    (See the corresponding documentation of each input parameters for exceptions.)
+
+* ``warpx.boost_direction`` (string: ``x``, ``y`` or ``z``)
+    The direction of the Lorentz-transform for boosted-frame simulations
+    (The direction ``y`` cannot be used in 2D simulations.)
 
 * ``warpx.random_seed`` (`string` or `int` > 0) optional
     If provided ``warpx.random_seed = random``, the random seed will be determined
@@ -376,7 +380,9 @@ Overall simulation parameters
     be calculated. More specifically, the space-charge fields are
     computed with an iterative Multi-Level Multi-Grid (MLMG) solver.
     This solver can fail to reach the default precision within a reasonable time.
-    This only applies when warpx.do_electrostatic = labframe.
+    This applies to the labframe electrostatic solvers (``labframe``, ``labframe-electromagnetostatic``,
+    ``labframe-effective-potential``). When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_required_precision``.
 
 * ``warpx.self_fields_absolute_tolerance`` (`float`, default: 0.0)
     The absolute tolerance with which the space-charge fields should be
@@ -386,18 +392,45 @@ Overall simulation parameters
     changes very little between steps it can occur that the initial guess for
     the MLMG solver is so close to the converged value that it fails to improve
     that solution sufficiently to reach the ``self_fields_required_precision``
-    value.
+    value. When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_absolute_tolerance``.
 
 * ``warpx.self_fields_max_iters`` (`integer`, default: 200)
     Maximum number of iterations used for MLMG solver for space-charge
     fields calculation. In case if MLMG converges but fails to reach the desired
     ``self_fields_required_precision``, this parameter may be increased.
-    This only applies when warpx.do_electrostatic = labframe.
+    This applies to the labframe electrostatic solvers (``labframe``, ``labframe-electromagnetostatic``,
+    ``labframe-effective-potential``). When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_max_iters``.
 
 * ``warpx.self_fields_verbosity`` (`integer`, default: 2)
     The verbosity used for MLMG solver for space-charge fields calculation. Currently
     MLMG solver looks for verbosity levels from 0-5. A higher number results in more
-    verbose output.
+    verbose output. When using ``labframe-electromagnetostatic``, this value
+    is also used as the default for ``magnetostatic_solver_verbosity``.
+
+* ``warpx.magnetostatic_solver_required_precision`` (`float`, default: value of ``self_fields_required_precision``)
+    The relative precision with which the magnetostatic (vector Poisson) fields should
+    be calculated when using ``labframe-electromagnetostatic`` mode.
+    This allows setting a different precision for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_absolute_tolerance`` (`float`, default: value of ``self_fields_absolute_tolerance``)
+    The absolute tolerance with which the magnetostatic fields should be
+    calculated when using ``labframe-electromagnetostatic`` mode.
+    This allows setting a different tolerance for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_max_iters`` (`integer`, default: value of ``self_fields_max_iters``)
+    Maximum number of iterations used for the magnetostatic (vector Poisson) MLMG solver
+    when using ``labframe-electromagnetostatic`` mode.
+    This allows setting different iteration limits for the magnetostatic solver
+    than for the electrostatic solver.
+
+* ``warpx.magnetostatic_solver_verbosity`` (`integer`, default: value of ``self_fields_verbosity``)
+    The verbosity used for the magnetostatic MLMG solver when using
+    ``labframe-electromagnetostatic`` mode. Values range from 0-5, with higher
+    numbers producing more verbose output.
 
 * ``amrex.abort_on_out_of_gpu_memory``  (``0`` or ``1``; default is ``1`` for true)
     When running on GPUs, memory that does not fit on the device will be automatically swapped to host memory when this option is set to ``0``.
@@ -3363,7 +3396,8 @@ This can be important if a large number of particles are lost, avoiding filling 
 In addition to their usual attributes, the saved particles have
    an integer attribute ``stepScraped``, which indicates the PIC iteration at which each particle was absorbed at the boundary,
    a real attribute ``deltaTimeScraped``, which indicates the time between the time associated to `stepScraped`
-   and the exact time when each particle hits the boundary.
+   and the exact time when each particle hits the boundary,
+   a real attribute ``timeScraped``, which indicates the exact time when the paritcle hit the boundary,
    3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary on the point of contact of the particles (not saved if they reach non-EB boundaries)
 
 ``BoundaryScrapingDiagnostics`` can be used with ``<diag_name>.<species_name>.random_fraction``, ``<diag_name>.<species_name>.uniform_stride``, and ``<diag_name>.<species_name>.plot_filter_function``, which have the same behavior as for ``FullDiagnostics``. For ``BoundaryScrapingDiagnostics``, these filters are applied at the time the data is written to file. An implication of this is that more particles may initially be accumulated in memory than are ultimately written. ``t`` in ``plot_filter_function`` refers to the time the diagnostic is written rather than the time the particle crossed the boundary.
