@@ -86,20 +86,8 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
         }
     });
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst,
-                                       0, 0,
-                                       pc.getUserRealAttribs(), pc.getUserIntAttribs(),
-                                       pc.GetRealSoANames(), pc.GetIntSoANames(),
-                                       pc.getUserRealAttribParser(),
-                                       pc.getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the CopyFunc functor
-                                       pc.get_breit_wheeler_engine_ptr(),
-                                       pc.get_quantum_sync_engine_ptr(),
-#endif
-                                       pc.getIonizationInitialLevel(),
-                                       old_np, new_np);
+    ParticleCreation::InitializeRuntimeAttributesFromPC(dst,
+                                       pc, old_np, new_np);
 
     Gpu::synchronize();
     return num_added;
