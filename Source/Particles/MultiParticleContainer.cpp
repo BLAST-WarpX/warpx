@@ -1132,7 +1132,8 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
             amrex::ParticleReal const mass = pc->getMass();
             for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
                 amrex::Real const dt_lev = warpx.getdt(lev);
-                reflectParticlesAtEB(*pc, distance_to_eb, lev, dt_lev, mass);
+                scrapeParticlesAtEB(*pc, distance_to_eb, lev,
+                    ParticleBoundaryProcess::Reflect{dt_lev, mass});
             }
         }
     } else {
