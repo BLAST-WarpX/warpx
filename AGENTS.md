@@ -6,7 +6,7 @@ WarpX is a massively parallel electromagnetic Particle-In-Cell (PIC) code built 
 
 ## Development Environment
 
-If you cannot find the `cmake` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX:
+If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX:
 ```bash
 conda activate warpx-cpu-mpich-dev
 ```
@@ -62,8 +62,8 @@ ctest --test-dir build -LE slow
 
 Test output goes to `build/bin/<test_name>/`.
 
-* When running tests: ignore checksum failures, since they can be platform-dependent.
-* When debugging/fixing tests: do not modify the tolerance of assert statements in the Python analysis files just to make the tests pass (unless explicitly asked to do so).
+- When running tests: ignore checksum failures, since they can be platform-dependent.
+- When debugging/fixing tests: do not modify the tolerance of assert statements in the Python analysis files just to make the tests pass (unless explicitly asked to do so).
 
 ### Adding a Test
 
