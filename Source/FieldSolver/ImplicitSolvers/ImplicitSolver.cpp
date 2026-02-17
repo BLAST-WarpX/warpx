@@ -711,10 +711,6 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
         }
-        // Current from non-suborbit particles are deposited to current_fp_non_suborbit
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
         //
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{0}, lev, ba_Jx, dm, Nc_tot_xx, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{1}, lev, ba_Jx, dm, Nc_tot_xy, ngJ, 0.0_rt);

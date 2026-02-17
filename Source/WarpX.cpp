@@ -2480,6 +2480,17 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     m_fields.alloc_init(FieldType::current_fp, Direction{1}, lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     m_fields.alloc_init(FieldType::current_fp, Direction{2}, lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
 
+    if (m_implicit_solver) {
+        // Current from suborbit particles are deposited to the standard current_fp container.
+        // Current from non-suborbit particles are deposited to current_fp_non_suborbit.
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{0}, lev,
+                            amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{1}, lev,
+                            amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{2}, lev,
+                            amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    }
+
     if (do_current_centering)
     {
         amrex::BoxArray const& nodal_ba = amrex::convert(ba, amrex::IntVect::TheNodeVector());
