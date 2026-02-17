@@ -681,9 +681,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                     // Deposit inside domains
                     if (implicit_options) {
-                        amrex::MultiFab * jx = fields.get(FieldType::current_fp_MM, Direction{0}, lev);
-                        amrex::MultiFab * jy = fields.get(FieldType::current_fp_MM, Direction{1}, lev);
-                        amrex::MultiFab * jz = fields.get(FieldType::current_fp_MM, Direction{2}, lev);
+                        amrex::MultiFab * jx = fields.get(FieldType::current_fp_non_suborbit, Direction{0}, lev);
+                        amrex::MultiFab * jy = fields.get(FieldType::current_fp_non_suborbit, Direction{1}, lev);
+                        amrex::MultiFab * jz = fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
