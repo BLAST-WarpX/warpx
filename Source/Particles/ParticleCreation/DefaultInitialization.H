@@ -119,10 +119,12 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          const DstPC& pc,
                                          const int n_external_attr_real,
                                          const int n_external_attr_int,
+                                         int start, int stop
 #ifdef WARPX_QED
-                                         const bool do_qed_comps,
+                                         , const bool do_qed_comps = false )
+#else
+                                         )
 #endif
-                                         int start, int stop)
 {
         using namespace amrex::literals;
 
@@ -316,9 +318,6 @@ void InitializeRuntimeAttributesFromPC (PTile& ptile,
     const int n_ext_attr_int_start  = 0;
     ParticleCreation::DefaultInitializeRuntimeAttributes(ptile, pc,
                                        n_ext_attr_real_start, n_ext_attr_int_start,
-#ifdef WARPX_QED
-                                       false, // QED quantities should already be initialized
-#endif
                                        start, stop);
 }
 
