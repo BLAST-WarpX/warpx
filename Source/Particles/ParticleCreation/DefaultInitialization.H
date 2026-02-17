@@ -297,30 +297,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         }
 }
 
-    /**
-     * \brief Wrapper to call DefaultInitializRuntimeAttributes() with fewer arguments.
-     *
-     * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
-     * @tparam DstPC The type of the particle container
-     *
-     * @param[inout] ptile the tile in which attributes are initialized
-     * @param[in]    pc    the particle container
-     * @param[in]    start the index to start initializing particles
-     * @param[in]    stop  the index to stop initializing particles
-     */
-    template <typename PTile, typename DstPC>
-    void InitializeRuntimeAttributesFromPC (PTile& ptile,
-                                            const DstPC& pc,
-                                            int start, int stop)
-    {
-
-        const int n_ext_attr_real_start = 0;
-        const int n_ext_attr_int_start  = 0;
-        ParticleCreation::DefaultInitializeRuntimeAttributes(ptile, pc,
-                                           n_ext_attr_real_start, n_ext_attr_int_start,
-                                           start, stop);
-    }
-
 }
 
 #endif //WARPX_DEFAULTINITIALIZATION_H_

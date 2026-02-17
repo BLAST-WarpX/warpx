@@ -142,11 +142,11 @@ Index filterCreateTransformFromFAB (DstPC& pc1, DstPC& pc2,
         }
     });
 
-    ParticleCreation::InitializeRuntimeAttributesFromPC(dst1,
-                                       pc1, old_np1, new_np1);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1,
+                                       pc1, 0, 0, old_np1, new_np1);
 
-    ParticleCreation::InitializeRuntimeAttributesFromPC(dst2,
-                                       pc2, old_np2, new_np2);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
+                                       pc2, 0, 0, old_np2, new_np2);
 
     Gpu::synchronize();
     return num_added;
