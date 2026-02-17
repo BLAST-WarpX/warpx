@@ -83,7 +83,7 @@ namespace warpx::fields
         Bfield_avg_cp,
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
         Efield_fp_save,  // E at start of Newton step used by the implicit solvers
-        current_fp_non_suborbit, // J from non-suborbit particles included used by the implicit solvers
+        current_fp_non_suborbit, // J from non-suborbit particles used by the implicit solvers
         MassMatrices_X,  // Stores full mass matrix elements for Jx used by the implicit solvers
         MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
