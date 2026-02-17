@@ -506,6 +506,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
+ * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
@@ -534,9 +535,9 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
                               amrex::Array4<amrex::Real> const& Szx_arr,
                               amrex::Array4<amrex::Real> const& Szy_arr,
                               amrex::Array4<amrex::Real> const& Szz_arr,
-                              const amrex::IntVect& Jx_type,
-                              const amrex::IntVect& Jy_type,
-                              const amrex::IntVect& Jz_type,
+                              const amrex::IntVect& jx_type,
+                              const amrex::IntVect& jy_type,
+                              const amrex::IntVect& jz_type,
                               const amrex::Array4<amrex::Real const>& Bx_arr,
                               const amrex::Array4<amrex::Real const>& By_arr,
                               const amrex::Array4<amrex::Real const>& Bz_arr,
@@ -612,7 +613,7 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
                                                             Sxx_arr, Sxy_arr, Sxz_arr,
                                                             Syx_arr, Syy_arr, Syz_arr,
                                                             Szx_arr, Szy_arr, Szz_arr,
-                                                            Jx_type, Jy_type, Jz_type,
+                                                            jx_type, jy_type, jz_type,
                                                             dinv, xyzmin, lo );
 
         }
