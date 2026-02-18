@@ -10,6 +10,7 @@ If you cannot find the `cmake` or `ctest` command, activate the conda environmen
 ```bash
 conda activate warpx-cpu-mpich-dev
 ```
+If this environment does not yet exist, create it as described in `Docs/source/install/cmake.rst`.
 
 ## Build Commands
 
@@ -69,6 +70,9 @@ Test output goes to `build/bin/<test_name>/`.
 
 Use `add_warpx_test()` in the test directory's `CMakeLists.txt`. Generate checksums with `CHECKSUM_RESET=ON ctest --test-dir build -R your_test_name`.
 
+Tests must be quick to run on a 2 core CI CPU runner (ideally <30sec) and be written in a CPU/GPU portable way.
+Tests have analysis functions to validate their outputs are as expected.
+
 ## Linting and Formatting
 
 Pre-commit hooks handle formatting:
@@ -80,6 +84,8 @@ pre-commit run -a  # run on all files
 
 - **C++**: clang-format (4 spaces, 100 char line limit)
 - **Python**: Ruff (configured in `pyproject.toml`)
+
+Commits should limit any formatting changes of unchanged code.
 
 ## Code Architecture
 
@@ -123,3 +129,5 @@ In `.cpp` files: (1) corresponding header, (2) WarpX headers, (3) WarpX forward 
 
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
+- Pull requests with features and bug fixes need to add a test for coverage.
+- Pull requests require a clear, helpful, concise pull request description and must pass all existing and new tests.
