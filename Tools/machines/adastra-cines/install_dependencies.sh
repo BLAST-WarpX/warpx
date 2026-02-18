@@ -80,18 +80,20 @@ cmake -S ${SRC_DIR}/c-blosc2 -B ${SRC_DIR}/c-blosc2-ad-build -DBUILD_TESTS=OFF -
 cmake --build ${SRC_DIR}/c-blosc2-ad-build --target install --parallel ${PARALLEL}
 rm -rf ${SRC_DIR}/c-blosc2-ad-build
 
-# c-blosc2 (I/O compression, for OpenPMD)
-if [ -d ${SRC_DIR}/c-blosc2 ]
+# ADIOS2 v. 2.10.2 (for OpenPMD)
+if [ -d ${SRC_DIR}/adios2 ]
 then
-  # git repository is already there
-  :
+  cd ${SRC_DIR}/adios2
+  git fetch --prune
+  git checkout v2.10.2
+  cd -
 else
-  git clone -b v2.23.0 https://github.com/Blosc/c-blosc2.git ${SRC_DIR}/c-blosc2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
-rm -rf ${SRC_DIR}/c-blosc2-ad-build
-cmake -S ${SRC_DIR}/c-blosc2 -B ${SRC_DIR}/c-blosc2-ad-build -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF  -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-2.23.0
-cmake --build ${SRC_DIR}/c-blosc2-ad-build --target install --parallel ${PARALLEL}
-rm -rf ${SRC_DIR}/c-blosc2-ad-build
+rm -rf ${SRC_DIR}/adios2-ad-build
+cmake -S ${SRC_DIR}/adios2 -B ${SRC_DIR}/adios2-ad-build -DADIOS2_USE_Blosc2=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
+cmake --build ${SRC_DIR}/adios2-ad-build --target install -j ${PARALLEL}
+rm -rf ${SRC_DIR}/adios2-ad-build
 
 
 # Python ######################################################################
