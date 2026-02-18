@@ -271,8 +271,8 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
  * mask as input.
  *
  * \tparam N number of particles created in the dst(s) for each filtered src particle
- * \tparam DstPC the dst particle container type
- * \tparam SrcPC the src particle container type
+ * \tparam DstTile the dst particle tile type
+ * \tparam SrcTile the src particle tile type
  * \tparam Index the index type, e.g. unsigned int
  * \tparam Filter the filter function type
  * \tparam TransFunc the transform function type
