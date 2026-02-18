@@ -6,7 +6,6 @@
 #
 # License: BSD-3-Clause-LBNL
 
-import numpy as np
 
 from ._libwarpx import libwarpx
 from .LoadThirdParty import load_cupy
@@ -24,10 +23,28 @@ class ParticleContainerWrapper(object):
 
     def __init__(self, species_name):
         self.name = species_name
+        self._particle_container = None
 
-        # grab the desired particle container
-        mypc = libwarpx.warpx.multi_particle_container()
-        self.particle_container = mypc.get_particle_container_from_name(self.name)
+        import warnings
+
+        warnings.warn(
+            f'ParticleContainerWrapper("{species_name}") is deprecated. '
+            f'Use sim.particles.get("{species_name}") instead.',
+            UserWarning,
+            stacklevel=2,
+        )
+
+    @property
+    def particle_container(self):
+        if self._particle_container is None:
+            try:
+                mypc = libwarpx.warpx.multi_particle_container()
+                self._particle_container = mypc.get(self.name)
+            except AttributeError as e:
+                msg = "You must initialize WarpX before accessing a ParticleContainerWrapper's particle_container."
+                raise AttributeError(msg) from e
+
+        return self._particle_container
 
     def add_particles(
         self,
@@ -46,7 +63,6 @@ class ParticleContainerWrapper(object):
 
         Parameters
         ----------
-
         species_name     : str
             The type of species for which particles will be added
 
@@ -68,125 +84,16 @@ class ParticleContainerWrapper(object):
             Containing an entry for all the extra particle attribute arrays. If
             an attribute is not given it will be set to 0.
         """
-
-        # --- Get length of arrays, set to one for scalars
-        lenx = np.size(x)
-        leny = np.size(y)
-        lenz = np.size(z)
-        lenux = np.size(ux)
-        lenuy = np.size(uy)
-        lenuz = np.size(uz)
-        lenw = np.size(w)
-
-        # --- Find the max length of the parameters supplied
-        maxlen = 0
-        if x is not None:
-            maxlen = max(maxlen, lenx)
-        if y is not None:
-            maxlen = max(maxlen, leny)
-        if z is not None:
-            maxlen = max(maxlen, lenz)
-        if ux is not None:
-            maxlen = max(maxlen, lenux)
-        if uy is not None:
-            maxlen = max(maxlen, lenuy)
-        if uz is not None:
-            maxlen = max(maxlen, lenuz)
-        if w is not None:
-            maxlen = max(maxlen, lenw)
-
-        # --- Make sure that the lengths of the input parameters are consistent
-        assert (
-            x is None or lenx == maxlen or lenx == 1
-        ), "Length of x doesn't match len of others"
-        assert (
-            y is None or leny == maxlen or leny == 1
-        ), "Length of y doesn't match len of others"
-        assert (
-            z is None or lenz == maxlen or lenz == 1
-        ), "Length of z doesn't match len of others"
-        assert (
-            ux is None or lenux == maxlen or lenux == 1
-        ), "Length of ux doesn't match len of others"
-        assert (
-            uy is None or lenuy == maxlen or lenuy == 1
-        ), "Length of uy doesn't match len of others"
-        assert (
-            uz is None or lenuz == maxlen or lenuz == 1
-        ), "Length of uz doesn't match len of others"
-        assert (
-            w is None or lenw == maxlen or lenw == 1
-        ), "Length of w doesn't match len of others"
-        for key, val in kwargs.items():
-            assert (
-                np.size(val) == 1 or len(val) == maxlen
-            ), f"Length of {key} doesn't match len of others"
-
-        # --- Broadcast scalars into appropriate length arrays
-        # --- If the parameter was not supplied, use the default value
-        if lenx == 1:
-            x = np.full(maxlen, (x or 0.0))
-        if leny == 1:
-            y = np.full(maxlen, (y or 0.0))
-        if lenz == 1:
-            z = np.full(maxlen, (z or 0.0))
-        if lenux == 1:
-            ux = np.full(maxlen, (ux or 0.0))
-        if lenuy == 1:
-            uy = np.full(maxlen, (uy or 0.0))
-        if lenuz == 1:
-            uz = np.full(maxlen, (uz or 0.0))
-        if lenw == 1:
-            w = np.full(maxlen, (w or 0.0))
-        for key, val in kwargs.items():
-            if np.size(val) == 1:
-                kwargs[key] = np.full(maxlen, val)
-
-        # --- The number of built in attributes
-        # --- The positions
-        built_in_attrs = libwarpx.dim
-        # --- The three velocities
-        built_in_attrs += 3
-        if libwarpx.geometry_dim == "rz":
-            # --- With RZ, there is also theta
-            built_in_attrs += 1
-
-        # --- The number of extra attributes (including the weight)
-        nattr = self.particle_container.num_real_comps - built_in_attrs
-        attr = np.zeros((maxlen, nattr))
-        attr[:, 0] = w
-
-        # --- Note that the velocities are handled separately and not included in attr
-        # --- (even though they are stored as attributes in the C++)
-        for key, vals in kwargs.items():
-            attr[:, self.particle_container.get_comp_index(key) - built_in_attrs] = vals
-
-        nattr_int = 0
-        attr_int = np.empty([0], dtype=np.int32)
-
-        # TODO: expose ParticleReal through pyAMReX
-        # and cast arrays to the correct types, before calling add_n_particles
-        # x = x.astype(self._numpy_particlereal_dtype, copy=False)
-        # y = y.astype(self._numpy_particlereal_dtype, copy=False)
-        # z = z.astype(self._numpy_particlereal_dtype, copy=False)
-        # ux = ux.astype(self._numpy_particlereal_dtype, copy=False)
-        # uy = uy.astype(self._numpy_particlereal_dtype, copy=False)
-        # uz = uz.astype(self._numpy_particlereal_dtype, copy=False)
-
-        self.particle_container.add_n_particles(
-            0,
-            x.size,
+        self.particle_container.add_particles(
             x,
             y,
             z,
             ux,
             uy,
             uz,
-            nattr,
-            attr,
-            nattr_int,
-            attr_int,
+            w,
             unique_particles,
+            **kwargs,
         )
 
     def get_particle_count(self, local=False):
@@ -253,7 +160,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_comp_index(comp_name)
+        comp_idx = self.particle_container.get_real_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -298,7 +205,7 @@ class ParticleContainerWrapper(object):
         List of arrays
             The requested particle array data
         """
-        comp_idx = self.particle_container.get_icomp_index(comp_name)
+        comp_idx = self.particle_container.get_int_comp_index(comp_name)
 
         data_array = []
         for pti in libwarpx.libwarpx_so.WarpXParIter(self.particle_container, level):
@@ -687,6 +594,18 @@ class ParticleContainerWrapper(object):
         """
         return self.particle_container.sum_particle_charge(local)
 
+    def get_species_energy_sum(self, local=False):
+        """
+        Returns the total kinetic energy in the simulation due to the given species.
+
+        Parameters
+        ----------
+
+        local          : bool
+            If True return total energy per processor
+        """
+        return self.particle_container.sum_particle_energy(local)
+
     def getex(self):
         raise NotImplementedError("Particle E fields not supported")
 
@@ -733,7 +652,8 @@ class ParticleContainerWrapper(object):
         sync_rho       : bool
             If True, perform MPI exchange and properly set boundary cells for rho_fp.
         """
-        rho_fp = libwarpx.warpx.multifab("rho_fp", level)
+        fields = libwarpx.warpx.multifab_register()
+        rho_fp = fields.get("rho_fp", level=level)
 
         if rho_fp is None:
             raise RuntimeError("Multifab `rho_fp` is not allocated.")
@@ -758,7 +678,18 @@ class ParticleBoundaryBufferWrapper(object):
     """
 
     def __init__(self):
-        self.particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+        self._particle_buffer = None
+
+    @property
+    def particle_buffer(self):
+        if self._particle_buffer is None:
+            try:
+                self._particle_buffer = libwarpx.warpx.get_particle_boundary_buffer()
+            except AttributeError as e:
+                msg = "You must initialize WarpX before accessing a ParticleBoundaryBufferWrapper's particle_buffer."
+                raise AttributeError(msg) from e
+
+        return self._particle_buffer
 
     def get_particle_boundary_buffer_size(self, species_name, boundary, local=False):
         """
@@ -791,7 +722,7 @@ class ParticleBoundaryBufferWrapper(object):
         The data for the arrays are not copied, but share the underlying
         memory buffer with WarpX. The arrays are fully writeable.
 
-        You can find `here https://github.com/ECP-WarpX/WarpX/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py`
+        You can find `here <https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py>`_
         an example of a simple case of particle-boundary interaction (reflection).
 
         Parameters
@@ -807,7 +738,7 @@ class ParticleBoundaryBufferWrapper(object):
             comp_name      : str
                 The component of the array data that will be returned.
                 "x", "y", "z", "ux", "uy", "uz", "w"
-                "stepScraped","deltaTimeScraped",
+                "stepScraped", "deltaTimeScraped", "timeScraped",
                 if boundary='eb': "nx", "ny", "nz"
 
             level          : int
@@ -820,16 +751,16 @@ class ParticleBoundaryBufferWrapper(object):
         )
         data_array = []
         # loop over the real attributes
-        if comp_name in part_container.real_comp_names:
-            comp_idx = part_container.real_comp_names[comp_name]
+        if comp_name in part_container.real_soa_names:
+            comp_idx = part_container.get_real_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
                 soa = pti.soa()
                 data_array.append(xp.array(soa.get_real_data(comp_idx), copy=False))
         # loop over the integer attributes
-        elif comp_name in part_container.int_comp_names:
-            comp_idx = part_container.int_comp_names[comp_name]
+        elif comp_name in part_container.int_soa_names:
+            comp_idx = part_container.get_int_comp_index(comp_name)
             for ii, pti in enumerate(
                 libwarpx.libwarpx_so.BoundaryBufferParIter(part_container, level)
             ):
@@ -838,6 +769,51 @@ class ParticleBoundaryBufferWrapper(object):
         else:
             raise RuntimeError("Name %s not found" % comp_name)
         return data_array
+
+    def get_particle_scraped_this_step(self, species_name, boundary, comp_name, level):
+        """
+        This returns a list of numpy or cupy arrays containing the particle array data
+        for particles that have been scraped at the current timestep,
+        for a specific species and simulation boundary.
+
+        The data for the arrays is a view of the underlying boundary buffer in WarpX ;
+        writing to these arrays will therefore also modify the underlying boundary buffer.
+
+        Parameters
+        ----------
+
+            species_name   : str
+                The species name that the data will be returned for.
+
+            boundary       : str
+                The boundary from which to get the scraped particle data in the
+                form x/y/z_hi/lo or eb.
+
+            comp_name      : str
+                The component of the array data that will be returned.
+                "x", "y", "z", "ux", "uy", "uz", "w"
+                "stepScraped", "deltaTimeScraped", "timeScraped",
+                if boundary='eb': "nx", "ny", "nz"
+
+            level          : int
+                Which AMR level to retrieve scraped particle data from.
+        """
+        # Extract the integer number of the current timestep
+        current_step = libwarpx.libwarpx_so.get_instance().getistep(level)
+
+        # Extract the data requested by the user
+        data_array = self.get_particle_boundary_buffer(
+            species_name, boundary, comp_name, level
+        )
+        step_scraped_array = self.get_particle_boundary_buffer(
+            species_name, boundary, "stepScraped", level
+        )
+
+        # Select on the particles from the previous step
+        data_array_this_step = []
+        for data, step in zip(data_array, step_scraped_array):
+            data_array_this_step.append(data[step == current_step])
+        return data_array_this_step
 
     def clear_buffer(self):
         """

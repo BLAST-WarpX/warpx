@@ -17,16 +17,16 @@ module load phdf5/1.10.4
 
 SW_DIR="${WORK}/sw/lonestar6/sw/lonestar6/a100"
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
-export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.8.3:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:${CMAKE_PREFIX_PATH}
 
 export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
-export PATH=${SW_DIR}/adios2-2.8.3/bin:${PATH}
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # optional: CCache
 #module load ccache  # TODO: request from support

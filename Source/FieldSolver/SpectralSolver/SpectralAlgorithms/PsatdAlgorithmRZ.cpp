@@ -25,8 +25,8 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
                                     amrex::Real const dt,
                                     bool const update_with_rho,
                                     const bool time_averaging,
-                                    const JInTime J_in_time,
-                                    const RhoInTime rho_in_time,
+                                    const TimeDependencyJ time_dependency_J,
+                                    const TimeDependencyRho time_dependency_rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning):
     // Initialize members of base class and member variables
@@ -34,11 +34,11 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
     m_dt{dt},
     m_update_with_rho{update_with_rho},
     m_time_averaging{time_averaging},
-    m_J_in_time{J_in_time},
+    m_time_dependency_J{time_dependency_J},
     m_dive_cleaning{dive_cleaning},
     m_divb_cleaning{divb_cleaning}
 {
-    amrex::ignore_unused(rho_in_time);
+    amrex::ignore_unused(time_dependency_rho);
 
     // Allocate the arrays of coefficients
     amrex::BoxArray const & ba = spectral_kspace.spectralspace_ba;
@@ -48,28 +48,28 @@ PsatdAlgorithmRZ::PsatdAlgorithmRZ (SpectralKSpaceRZ const & spectral_kspace,
     X2_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     X3_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
 
-    if (time_averaging && J_in_time == JInTime::Linear)
+    if (time_averaging && time_dependency_J == TimeDependencyJ::Linear)
     {
         X5_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
         X6_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     }
 
-    if (time_averaging && J_in_time != JInTime::Linear)
+    if (time_averaging && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: psatd.do_time_averaging=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: psatd.do_time_averaging=1 implemented only with psatd.time_dependency_J=linear");
     }
 
-    if (dive_cleaning && J_in_time != JInTime::Linear)
+    if (dive_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: warpx.do_dive_cleaning=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: warpx.do_dive_cleaning=1 implemented only with psatd.time_dependency_J=linear");
     }
 
-    if (divb_cleaning && J_in_time != JInTime::Linear)
+    if (divb_cleaning && time_dependency_J != TimeDependencyJ::Linear)
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "RZ PSATD: warpx.do_divb_cleaning=1 implemented only with psatd.J_in_time=linear");
+            "RZ PSATD: warpx.do_divb_cleaning=1 implemented only with psatd.time_dependency_J=linear");
     }
 }
 
@@ -81,7 +81,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
 
     const bool update_with_rho = m_update_with_rho;
     const bool time_averaging = m_time_averaging;
-    const bool J_linear = (m_J_in_time == JInTime::Linear);
+    const bool J_linear = (m_time_dependency_J == TimeDependencyJ::Linear);
     const bool dive_cleaning = m_dive_cleaning;
     const bool divb_cleaning = m_divb_cleaning;
 
@@ -183,8 +183,8 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
             amrex::Real const kz = modified_kz_arr[j];
 
             constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
-            constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
+            constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
             amrex::Real const C = C_arr(i,j,k,mode);
             amrex::Real const S_ck = S_ck_arr(i,j,k,mode);
@@ -199,7 +199,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
                 Complex const divE = kr*(Ep_old - Em_old) + I*kz*Ez_old;
                 Complex const divJ = kr*(Jp - Jm) + I*kz*Jz;
 
-                rho_diff = (X2 - X3)*PhysConst::ep0*divE - X2*dt*divJ;
+                rho_diff = (X2 - X3)*PhysConst::epsilon_0*divE - X2*dt*divJ;
             }
 
             // Update E (see WarpX online documentation: theory section)
@@ -336,7 +336,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
 void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const & f)
 {
     const bool time_averaging = m_time_averaging;
-    const bool J_linear = (m_J_in_time == JInTime::Linear);
+    const bool J_linear = (m_time_dependency_J == TimeDependencyJ::Linear);
 
     // Fill them with the right values:
     // Loop over boxes and allocate the corresponding coefficients
@@ -381,7 +381,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
 
             // Calculate coefficients
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             if (k_norm != 0){
                 C(i,j,k,mode) = std::cos(c*k_norm*dt);
                 S_ck(i,j,k,mode) = std::sin(c*k_norm*dt)/(c*k_norm);

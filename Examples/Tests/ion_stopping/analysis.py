@@ -11,15 +11,11 @@
 # is used in the C++ to check the resulting
 # particle energies.
 
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0, k, m_e, m_p
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Define constants using the WarpX names for the evals below
 q_e = e
@@ -92,7 +88,9 @@ ad0 = ds0.all_data()
 
 Zb = 1.0  # Ion charge state
 
-ne = float(ds0.parameters["stopping_on_electrons_constant.background_density"])
+ne = float(
+    ds0.parameters["stopping_on_electrons_constant.background_density"].split("#")[0]
+)
 Te = (
     eval(ds0.parameters["stopping_on_electrons_constant.background_temperature"])
     * kb
@@ -101,8 +99,10 @@ Te = (
 ion_mass12 = m_p
 
 mi = eval(ds0.parameters["stopping_on_ions_constant.background_mass"])
-Zi = float(ds0.parameters["stopping_on_ions_constant.background_charge_state"])
-ni = float(ds0.parameters["stopping_on_ions_constant.background_density"])
+Zi = float(
+    ds0.parameters["stopping_on_ions_constant.background_charge_state"].split("#")[0]
+)
+ni = float(ds0.parameters["stopping_on_ions_constant.background_density"].split("#")[0])
 Ti = eval(ds0.parameters["stopping_on_ions_constant.background_temperature"]) * kb / e
 ion_mass34 = 4.0 * m_p
 
@@ -193,9 +193,3 @@ assert np.all(error1 < tolerance)
 assert np.all(error2 < tolerance)
 assert np.all(error3 < tolerance)
 assert np.all(error4 < tolerance)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

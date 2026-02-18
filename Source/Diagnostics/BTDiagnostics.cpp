@@ -59,6 +59,10 @@ BTDiagnostics::BTDiagnostics (int i, const std::string& name, DiagTypes diag_typ
     : Diagnostics{i, name, diag_type},
       m_cell_centered_data_name("BTD_cell_centered_data_" + name)
 {
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WARPX_ABORT_WITH_MESSAGE("Back-transformed diagnostic not supported with 1D cylindrical and spherical");
+#endif
+
     ReadParameters();
 }
 
@@ -123,9 +127,8 @@ void BTDiagnostics::DerivedInitData ()
     m_do_back_transformed_particles =
         ((!m_output_species_names.empty()) && (write_species == 1));
 
-    // Turn on do_back_transformed_particles in the particle containers so that
-    // the tmp_particle_data is allocated and the data of the corresponding species is
-    // copied and stored in tmp_particle_data before particles are pushed.
+    // Turn on do_back_transformed_particles in the particle containers so as
+    // the data of the corresponding species is stored in before particles are pushed.
     if (m_do_back_transformed_particles) {
         mpc.SetDoBackTransformedParticles(m_do_back_transformed_particles);
         for (auto const& species : m_output_species_names){
@@ -219,8 +222,10 @@ BTDiagnostics::ReadParameters ()
         "The moving window must not stop when using the boosted frame diagnostic.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::start_moving_window_step == 0,
         "The moving window must start at step zero for the boosted frame diagnostic.");
+#if defined(WARPX_ZINDEX)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( WarpX::moving_window_dir == WARPX_ZINDEX,
            "The boosted frame diagnostic currently only works if the moving window is in the z direction.");
+#endif
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_format == "plotfile" || m_format == "openpmd",
         "<diag>.format must be plotfile or openpmd for back transformed diagnostics");
@@ -610,7 +615,7 @@ BTDiagnostics::UpdateVarnamesForRZopenPMD ()
     auto & warpx = WarpX::GetInstance();
     auto & fields = warpx.m_fields;
     using ablastr::fields::Direction;
-    const int ncomp_multimodefab = fields.get(FieldType::Efield_aux, Direction{0}, 0)->nComp();
+    const int ncomp_multimodefab = fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     const int ncomp = ncomp_multimodefab;
 
 
@@ -672,7 +677,7 @@ BTDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
 
     auto & warpx = WarpX::GetInstance();
     auto & fields = warpx.m_fields;
-    const int ncomp_multimodefab = fields.get(FieldType::Efield_aux, Direction{0}, 0)->nComp();
+    const int ncomp_multimodefab = fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
     const int ncomp = ncomp_multimodefab;
     // Clear any pre-existing vector to release stored data
     // This ensures that when domain is load-balanced, the functors point
@@ -698,23 +703,23 @@ BTDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     const auto m_cell_center_functors_at_lev_size = static_cast<int>(m_cell_center_functors.at(lev).size());
     for (int comp=0; comp<m_cell_center_functors_at_lev_size; comp++){
         if        ( m_cellcenter_varnames_fields[comp] == "Er" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{0}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::r, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "Et" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{1}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::theta, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "Ez" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction{2}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Efield_aux, Direction::z, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "Br" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{0}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::r, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "Bt" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{1}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::theta, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "Bz" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction{2}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::Bfield_aux, Direction::z, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "jr" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction{0}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::r, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "jt" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction{1}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::theta, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "jz" ){
-            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction{2}, lev), lev, m_crse_ratio, false, ncomp);
+            m_cell_center_functors[lev][comp] = std::make_unique<CellCenterFunctor>(fields.get(FieldType::current_fp, Direction::z, lev), lev, m_crse_ratio, false, ncomp);
         } else if ( m_cellcenter_varnames_fields[comp] == "rho" ){
             m_cell_center_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, false, -1, false, ncomp);
         }
@@ -935,7 +940,12 @@ BTDiagnostics::DefineFieldBufferMultiFab (const int i_buffer, const int lev)
     auto ref_ratio = amrex::IntVect(1);
     if (lev > 0 ) { ref_ratio = WarpX::RefRatio(lev-1); }
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        const amrex::Real cellsize = (idim < WARPX_ZINDEX)?
+#if defined(WARPX_ZINDEX)
+        const int zindex = WARPX_ZINDEX;
+#else
+        const int zindex = 0;
+#endif
+        const amrex::Real cellsize = (idim < zindex)?
             warpx.Geom(lev).CellSize(idim):
             dz_lab(warpx.getdt(lev), ref_ratio[m_moving_window_dir]);
         const amrex::Real buffer_lo = m_snapshot_domain_lab[i_buffer].lo(idim)
@@ -1091,7 +1101,7 @@ BTDiagnostics::Flush (int i_buffer, bool force_flush)
         m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
         labtime,
         m_output_species.at(i_buffer), nlev_output, file_name, m_file_min_digits,
-        m_plot_raw_fields, m_plot_raw_fields_guards,
+        m_plot_raw_fields, m_plot_raw_fields_guards, m_verbose,
         use_pinned_pc, isBTD, i_buffer, m_buffer_flush_counter.at(i_buffer),
         m_max_buffer_multifabs.at(i_buffer), m_geom_snapshot.at(i_buffer).at(0), isLastBTDFlush);
 
@@ -1451,17 +1461,26 @@ BTDiagnostics::InitializeParticleFunctors ()
 }
 
 void
-BTDiagnostics::InitializeParticleBuffer ()
+BTDiagnostics::InitializeParticleBuffer (const MultiParticleContainer& mpc)
 {
-    auto& warpx = WarpX::GetInstance();
-    const MultiParticleContainer& mpc = warpx.GetPartContainer();
     for (int i = 0; i < m_num_buffers; ++i) {
         m_particles_buffer[i].resize(m_output_species_names.size());
         m_totalParticles_in_buffer[i].resize(m_output_species_names.size());
         for (int isp = 0; isp < m_particles_buffer[i].size(); ++isp) {
             m_totalParticles_in_buffer[i][isp] = 0;
-            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(WarpX::GetInstance().GetParGDB());
             const int idx = mpc.getSpeciesID(m_output_species_names[isp]);
+            m_particles_buffer[i][isp] = std::make_unique<PinnedMemoryParticleContainer>(mpc.GetParticleContainer(idx).make_alike<amrex::PinnedArenaAllocator>());
+
+            // SoA component names
+            {
+                auto &pc = mpc.GetParticleContainer(idx);
+                auto rn = pc.GetRealSoANames();
+                rn.resize(WarpXParticleContainer::NArrayReal);  // strip runtime comps
+                auto in = pc.GetRealSoANames();
+                in.resize(WarpXParticleContainer::NArrayInt);  // strip runtime comps
+                m_particles_buffer[i][isp]->SetSoACompileTimeNames(rn, in);
+            }
+
             m_output_species[i].push_back(ParticleDiag(m_diag_name,
                                                        m_output_species_names[isp],
                                                        mpc.GetParticleContainerPtr(idx),

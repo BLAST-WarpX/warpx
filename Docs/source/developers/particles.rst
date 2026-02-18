@@ -83,7 +83,7 @@ Main functions
 
 .. doxygenfunction:: PhysicalParticleContainer::PushPX
 
-.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(amrex::Vector<std::array<std::unique_ptr<amrex::MultiFab>, 3>> &J, amrex::Real dt, amrex::Real relative_time)
+.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time)
 
 .. note::
    The current deposition is used both by ``PhysicalParticleContainer`` and ``LaserParticleContainer``, so it is in the parent class ``WarpXParticleContainer``.
@@ -128,6 +128,11 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         when the particle hits the                     interaction.
                                         boundary.                                      Saved in the boundary
                                                                                        buffers.
+``timeScraped``        ``real``         The exact time when the particle    SoA   RT   Added when there is
+                                        hits the boundary.                             particle-boundary
+                                                                                       interaction.
+                                                                                       Saved in the boundary
+                                                                                       buffers.
 ``n_x/y/z``            ``real``         Normal components to the boundary   SoA   RT   Added when there is
                                         on the position where the particle             particle-boundary
                                         hits the boundary.                             interaction.
@@ -139,9 +144,16 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         Synchrotron process                            physics is used.
 ``opticalDepthBW``    ``real``          QED: optical depth of the Breit-    SoA   RT   Added when PICSAR QED
                                         Wheeler process                                physics is used.
+``x/y/z_n``           ``real``          For implicit solver, the position   SoA   RT   Added when implicit solver
+                                        at the start of the time step.                 is used. Not included in diagnostic output.
+``ux/uy/uz_n``        ``real``          For implicit solver, the momentum   SoA   RT   Added when implicit solver
+                                        at the start of the time step.                 is used. Not included in diagnostic output.
+``nsuborbits``        ``int``           For implicit solver, the number of  SoA   RT   Added when implicit solver
+                                        suborbits needed for the particle              is used. Not included in diagnostic output.
+                                        motion to be converged.
 ====================  ================  ==================================  ===== ==== ======================
 
-WarpX allows extra runtime attributes to be added to particle containers (through ``NewRealComp("attrname")`` or ``NewIntComp("attrname")``).
+WarpX allows extra runtime attributes to be added to particle containers (through ``AddRealComp("attrname")`` or ``AddIntComp("attrname")``).
 The attribute name can then be used to access the values of that attribute.
 For example, using a particle iterator, ``pti``, to loop over the particles the command ``pti.GetAttribs(particle_comps["attrname"]).dataPtr();`` will return the values of the ``"attrname"`` attribute.
 

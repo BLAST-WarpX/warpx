@@ -30,7 +30,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 On Great Lakes, you can run either on GPU nodes with `fast V100 GPUs (recommended), the even faster A100 GPUs (only a few available) or CPU nodes <https://arc.umich.edu/greatlakes/configuration/>`__.
 
@@ -105,7 +105,7 @@ On Great Lakes, you can run either on GPU nodes with `fast V100 GPUs (recommende
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 

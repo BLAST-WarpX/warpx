@@ -67,22 +67,39 @@ public:
 
     void PrintParameters () const override;
 
-    void OneStep ( amrex::Real  a_time,
+    /**
+     * \brief Advances the simulation one time step
+     *
+     * \param[in] start_time The time at the start of the time step
+     * \param[in] a_dt The time step size
+     * \param[in] a_step The time step number
+     */
+    void OneStep ( amrex::Real  start_time,
                    amrex::Real  a_dt,
                    int          a_step ) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
-                      amrex::Real      a_time,
+                      amrex::Real      start_time,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
-private:
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
 
     /**
-     * \brief Time-biasing parameter for fields used on RHS to advance system
+     * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
-    amrex::Real m_theta = 0.5;
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
+
+    /**
+     * \brief Inititialize the BC masks for the curl curl operator
+     */
+    void InitializeCurlCurlBCMasks ();
+
+private:
 
     /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the
@@ -98,13 +115,13 @@ private:
      * \brief Update the E and B fields owned by WarpX
      */
     void UpdateWarpXFields ( const WarpXSolverVec&  a_E,
-                             amrex::Real            a_time );
+                             amrex::Real            start_time );
 
     /**
      * \brief Nonlinear solver is for the time-centered values of E. After
      * the solver, need to use m_E and m_Eold to compute E^{n+1}
      */
-    void FinishFieldUpdate ( amrex::Real  a_new_time );
+    void FinishFieldUpdate ( amrex::Real end_time );
 
 };
 

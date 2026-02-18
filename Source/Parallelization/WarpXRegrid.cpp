@@ -127,6 +127,10 @@ WarpX::LoadBalance ()
         ParallelDescriptor::Bcast(&doLoadBalance, 1,
                                   ParallelDescriptor::IOProcessorNumber());
 
+        amrex::Print() << Utils::TextMsg::Info("current LB efficiency = " + std::to_string(currentEfficiency)
+                          + " proposed LB efficiency = " + std::to_string(proposedEfficiency)
+                          + " LoadBalance is set to : " + std::to_string(doLoadBalance) );
+
         if (doLoadBalance)
         {
             Vector<int> pmap;
@@ -174,6 +178,14 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    const auto RemakeMultiFab = [&](auto& mf){
+        if (mf == nullptr) { return; }
+        const IntVect& ng = mf->nGrowVect();
+        auto pmf = std::remove_reference_t<decltype(mf)>{};
+        AllocInitMultiFab(pmf, mf->boxArray(), dm, mf->nComp(), ng, lev, mf->tags()[0]);
+        *mf = std::move(*pmf);
+    };
+
     bool const eb_enabled = EB::enabled();
     if (ba == boxArray(lev))
     {
@@ -186,7 +198,10 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         for (int idim=0; idim < 3; ++idim)
         {
             if (eb_enabled) {
+                RemakeMultiFab( m_eb_reduce_particle_shape[lev] );
                 if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+                    RemakeMultiFab( m_eb_update_E[lev][idim] );
+                    RemakeMultiFab( m_eb_update_B[lev][idim] );
                     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
                         m_borrowing[lev][idim] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(amrex::convert(ba, Bfield_fp[lev][idim]->ixType().toIntVect()), dm);
                     }
@@ -278,14 +293,8 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 #endif
         }
 
-        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
-            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
-                BuildBufferMasks();
-            }
-        }
-
         // Re-initialize the lattice element finder with the new ba and dm.
-        m_accelerator_lattice[lev]->InitElementFinder(lev, ba, dm);
+        m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
         if (costs[lev] != nullptr)
         {
@@ -299,6 +308,18 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         SetDistributionMap(lev, dm);
+
+        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
+            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
+                if (current_buffer_masks[lev]) {
+                    RemakeMultiFab( current_buffer_masks[lev] );
+                }
+                if (gather_buffer_masks[lev]) {
+                    RemakeMultiFab( gather_buffer_masks[lev] );
+                }
+                BuildBufferMasks();
+            }
+        }
 
     } else
     {
@@ -320,7 +341,7 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        const auto & mypc_ref = GetInstance().GetPartContainer();
+        const auto & mypc_ref = GetPartContainer();
         const auto nSpecies = mypc_ref.nSpecies();
 
         // Species loop

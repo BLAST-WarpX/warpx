@@ -23,13 +23,7 @@
 #     Nuclear fusion, 32(4), p.611.
 #     DOI: https://doi.org/10.1088/0029-5515/32/4/I07
 
-import os
-import sys
-
 import numpy as np
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Load data from reduced diagnostics (physical time and neutron weights)
 time = np.loadtxt("./reduced_diags/particle_number.txt", usecols=1)
@@ -48,9 +42,3 @@ tolerance = 2e-2
 print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

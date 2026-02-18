@@ -15,7 +15,6 @@ The final positions are compared to the analytic solutions.
 The motion is slow enough that relativistic effects are ignored.
 """
 
-import os
 import sys
 
 import numpy as np
@@ -23,14 +22,14 @@ import yt
 from scipy.constants import c, e, m_e
 
 yt.funcs.mylog.setLevel(0)
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 ds = yt.load(filename)
 ad = ds.all_data()
 
-gamma_boost = float(ds.parameters.get("warpx.gamma_boost", 1.0))
+gamma_boost = ds.parameters.get("warpx.gamma_boost", 1.0)
+if isinstance(gamma_boost, str):
+    gamma_boost = float(gamma_boost.split("#")[0])
 uz_boost = np.sqrt(gamma_boost * gamma_boost - 1.0) * c
 
 # Fetch the final particle position
@@ -56,13 +55,15 @@ def read_lattice(rootname, z_location):
     for element in lattice_elements:
         element_type = ds.parameters.get(f"{element}.type")
         if element_type == "drift":
-            length = float(ds.parameters.get(f"{element}.ds"))
+            length = float(ds.parameters.get(f"{element}.ds").split("#")[0])
             z_location += length
         elif element_type == "quad":
-            length = float(ds.parameters.get(f"{element}.ds"))
+            length = float(ds.parameters.get(f"{element}.ds").split("#")[0])
             quad_starts.append(z_location)
             quad_lengths.append(length)
-            quad_strengths_E.append(float(ds.parameters.get(f"{element}.dEdx")))
+            quad_strengths_E.append(
+                float(ds.parameters.get(f"{element}.dEdx").split("#")[0])
+            )
             z_location += length
         elif element_type == "line":
             z_location = read_lattice(element, z_location)
@@ -72,8 +73,14 @@ def read_lattice(rootname, z_location):
 read_lattice("lattice", z_location)
 
 # Fetch the initial position of the particle
-x0 = [float(x) for x in ds.parameters.get("electron.single_particle_pos").split()]
-ux0 = [float(x) * c for x in ds.parameters.get("electron.single_particle_u").split()]
+x0 = [
+    float(x)
+    for x in ds.parameters.get("electron.single_particle_pos").split("#")[0].split()
+]
+ux0 = [
+    float(x) * c
+    for x in ds.parameters.get("electron.single_particle_u").split("#")[0].split()
+]
 
 xx = x0[0]
 zz = x0[2]
@@ -121,18 +128,14 @@ vx = ux / gamma
 xx = xx + dt * vx
 
 # Compare the analytic to the simulated final values
-print(f"Error in x position is {abs(np.abs((xx - xx_sim)/xx))}, which should be < 0.01")
 print(
-    f"Error in x velocity is {abs(np.abs((ux - ux_sim)/ux))}, which should be < 0.002"
+    f"Error in x position is {abs(np.abs((xx - xx_sim) / xx))}, which should be < 0.01"
+)
+print(
+    f"Error in x velocity is {abs(np.abs((ux - ux_sim) / ux))}, which should be < 0.002"
 )
 
 assert abs(np.abs((xx - xx_sim) / xx)) < 0.01, Exception("error in x particle position")
 assert abs(np.abs((ux - ux_sim) / ux)) < 0.002, Exception(
     "error in x particle velocity"
-)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
 )

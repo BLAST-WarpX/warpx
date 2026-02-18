@@ -7,15 +7,11 @@ occurs along the angle given by the theoretical Airy pattern, i.e.
 theta_diffraction = 1.22 * lambda / d
 """
 
-import os
 import sys
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.ndimage import gaussian_filter1d
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
@@ -41,10 +37,3 @@ r = np.array([r_first_minimum(iz) for iz in range(len(info.z))])
 # Check that this corresponds to the prediction from the Airy pattern
 theta_diffraction = np.arcsin(1.22 * 0.1 / 0.4) / 2
 assert np.all(abs(r[50:] - theta_diffraction * info.z[50:]) < 0.03)
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    output_format="openpmd",
-)

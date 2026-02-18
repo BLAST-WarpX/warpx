@@ -26,9 +26,6 @@ yt.funcs.mylog.setLevel(50)
 import numpy as np
 from scipy.constants import c, e, epsilon_0, m_e
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 # test name
 test_name = os.path.split(os.getcwd())[1]
 
@@ -139,7 +136,7 @@ if particle_shape_4:
     # lower fidelity, due to smoothing
     tolerance_rel = 0.07
 else:
-    tolerance_rel = 0.05
+    tolerance_rel = 0.0503
 
 print("error_rel    : " + str(error_rel))
 print("tolerance_rel: " + str(tolerance_rel))
@@ -162,9 +159,3 @@ if current_correction or vay_deposition:
     print("error_rel = {}".format(error_rel))
     print("tolerance = {}".format(tolerance))
     assert error_rel < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

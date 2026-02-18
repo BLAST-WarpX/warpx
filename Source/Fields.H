@@ -50,6 +50,8 @@ namespace warpx::fields
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
         hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
+        hybrid_B_fp_external,       /**< Used with Ohm's law solver. Stores external B field */
+        hybrid_E_fp_external,       /**< Used with Ohm's law solver. Stores external E field */
         Efield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         Bfield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         current_cp, /**< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level */
@@ -61,8 +63,8 @@ namespace warpx::fields
         E_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         B_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
-        edge_lengths,   /**< Only used with embedded boundaries (EB). Indicates the length of the cell edge that is covered by the EB, in SI units */
-        face_areas,     /**< Only used with embedded boundaries (EB). Indicates the area of the cell face that is covered by the EB, in SI units */
+        edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
+        face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
         area_mod,
         pml_E_fp,
         pml_B_fp,
@@ -80,8 +82,17 @@ namespace warpx::fields
         Efield_avg_cp,
         Bfield_avg_cp,
         B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
+        Efield_fp_save,  // E at start of Newton step used by the implicit solvers
+        current_fp_MM,   // J from particles included in the mass matrices at start of Newton step used by the implicit solvers
+        MassMatrices_X,  // Stores full mass matrix elements for Jx used by the implicit solvers
+        MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
+        MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
+        MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
+        curl2_BC_mask,   // Masks used to incorporate boundary conditions into the curl curl matrix
         ECTRhofield,
-        Venl
+        Venl,
+        global_debye_length,
+        effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );
 
     /** these are vector fields */
@@ -102,6 +113,8 @@ namespace warpx::fields
         FieldType::hybrid_current_fp_temp,
         FieldType::hybrid_current_fp_plasma,
         FieldType::hybrid_current_fp_external,
+        FieldType::hybrid_B_fp_external,
+        FieldType::hybrid_E_fp_external,
         FieldType::Efield_cp,
         FieldType::Bfield_cp,
         FieldType::current_cp,
@@ -120,6 +133,13 @@ namespace warpx::fields
         FieldType::Efield_avg_cp,
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
+        FieldType::Efield_fp_save,
+        FieldType::current_fp_MM,
+        FieldType::MassMatrices_X,
+        FieldType::MassMatrices_Y,
+        FieldType::MassMatrices_Z,
+        FieldType::MassMatrices_PC,
+        FieldType::curl2_BC_mask,
         FieldType::ECTRhofield,
         FieldType::Venl
     };

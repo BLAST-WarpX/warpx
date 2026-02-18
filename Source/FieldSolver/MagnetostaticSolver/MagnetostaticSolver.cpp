@@ -68,14 +68,6 @@ WarpX::ComputeMagnetostaticField()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(this->max_level == 0,
         "Magnetostatic solver not implemented with mesh refinement.");
 
-#if defined(AMREX_USE_EB)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
-        "Magnetostatic Solver currently requires an embedded boundary to be installed for "
-        "compatibility with AMReX when compiling with EB support. "
-        "Current workaround is to install an EB outside of domain or recompile with EB support off."
-        "Workaround for https://github.com/AMReX-Codes/amrex/issues/4223");
-#endif
-
     AddMagnetostaticFieldLabFrame();
 }
 
@@ -115,7 +107,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
         }
     }
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int lev = 0; lev <= max_level; lev++) {
         ApplyInverseVolumeScalingToCurrentDensity(
             m_fields.get(FieldType::current_fp, Direction{0}, lev),
@@ -134,24 +126,12 @@ WarpX::AddMagnetostaticFieldLabFrame()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !IsPythonCallbackInstalled("poissonsolver"),
         "Python Level Poisson Solve not supported for Magnetostatic implementation.");
 
-    // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
-    // temporary fix!!!
-    const amrex::Real magnetostatic_absolute_tolerance = 0.0;
-    amrex::Real self_fields_required_precision;
-    if constexpr (std::is_same<Real, float>::value) {
-        self_fields_required_precision = 1e-5;
-    }
-    else {
-        self_fields_required_precision = 1e-11;
-    }
-    const int self_fields_max_iters = 200;
-    const int self_fields_verbosity = 2;
-
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
-        self_fields_required_precision, magnetostatic_absolute_tolerance, self_fields_max_iters,
-        self_fields_verbosity);
+        magnetostatic_solver_required_precision, magnetostatic_solver_absolute_tolerance,
+        magnetostatic_solver_max_iters, magnetostatic_solver_verbosity
+    );
 }
 
 /* Compute the vector potential `A` by solving the Poisson equation with `J` as
@@ -305,7 +285,7 @@ WarpX::setVectorPotentialBC (ablastr::fields::MultiLevelVectorField const& A) co
 void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs ( )
 {
     for (int adim = 0; adim < 3; adim++) {
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int dim_start = 0;
         WarpX& warpx = WarpX::GetInstance();
         auto geom = warpx.Geom(0);

@@ -11,6 +11,7 @@
 
 #include "Particles/WarpXParticleContainer_fwd.H"
 
+#include <AMReX_Geometry.H>
 #include <AMReX_REAL.H>
 
 #include <string>
@@ -47,11 +48,14 @@ public:
     /**
      * \brief A method that performs leveling thinning for the considered species.
      *
+     * @param[in] geom_lev the geometry of the current refinement level
      * @param[in] pti WarpX particle iterator of the particles to resample.
      * @param[in] lev the index of the refinement level.
      * @param[in] pc a pointer to the particle container.
      */
-    void operator() (WarpXParIter& pti, int lev, WarpXParticleContainer* pc) const final;
+    void operator() (
+        const amrex::Geometry& geom_lev, WarpXParIter& pti,
+        int lev, WarpXParticleContainer* pc) const final;
 
 private:
     amrex::Real m_target_ratio = amrex::Real(1.5);

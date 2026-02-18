@@ -13,7 +13,6 @@
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
 #include <AMReX_Array.H>
 
@@ -61,7 +60,7 @@ public:
      * dimension according to the desired values from the simulation input file,
      * boundary.potential_lo and boundary.potential_hi.
      * \param[inout] phi The electrostatic potential
-     * \param[in] idim The dimension for which the Dirichlet boundary condition is set
+     * \param[in] t current time
      */
     void setPhiBC (
         ablastr::fields::MultiLevelScalarField const& phi,
@@ -76,14 +75,16 @@ public:
      *  \f[
      *      \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
      *  \f]
-     * \param[out] phi The potential to be computed by this function
      * \param[in] rho The charge density for a given species (relativistic solver)
      *                               or total charge density (labframe solver)
+     * \param[out] phi The potential to be computed by this function
      * \param[in] beta Represents the velocity of the source of `phi`
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
      * \param[in] verbosity The verbosity setting for the MLMG solver
+     * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
+     * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
@@ -92,7 +93,9 @@ public:
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,
         int max_iters,
-        int verbosity
+        int verbosity,
+        bool is_igf_2d_slices,
+        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
     ) const;
 
     /**
@@ -153,6 +156,10 @@ public:
      *  2 : convergence progress at every MLMG iteration
      */
     int self_fields_verbosity = 2;
+
+    /** Parameters for FFT Poisson solver aka IGF */
+    // 0: full 3D, 1: many 2D z-slices (quasi-3D)
+    bool is_igf_2d_slices = false;
 };
 
 #endif // WARPX_ELECTROSTATICSOLVER_H_

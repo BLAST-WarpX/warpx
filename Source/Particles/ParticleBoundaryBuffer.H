@@ -32,18 +32,19 @@ public:
     /** Copy operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( const ParticleBoundaryBuffer & ) = delete;
 
-    /** Move constructor for NamedComponentParticleContainer */
+    /** Move constructor for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer ( ParticleBoundaryBuffer && ) = default;
-    /** Move operator for NamedComponentParticleContainer */
+    /** Move operator for ParticleBoundaryBuffer */
     ParticleBoundaryBuffer& operator= ( ParticleBoundaryBuffer && ) = default;
 
     int numSpecies() const { return static_cast<int>(getSpeciesNames().size()); }
 
     const std::vector<std::string>& getSpeciesNames() const;
 
-    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
+    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time);
     void gatherParticlesFromEmbeddedBoundaries (
-        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb,
+        amrex::Real cur_time
     );
 
     void redistribute ();

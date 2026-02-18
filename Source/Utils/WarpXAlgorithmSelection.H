@@ -62,6 +62,7 @@ AMREX_ENUM(ElectrostaticSolverAlgo,
            Relativistic,
            LabFrameElectroMagnetostatic,
            LabFrame,
+           LabFrameEffectivePotential,
            Default = None);
 
 AMREX_ENUM(PoissonSolverAlgo,
@@ -98,14 +99,16 @@ AMREX_ENUM(PSATDSolutionType,
            SecondOrder,
            Default = SecondOrder);
 
-AMREX_ENUM(JInTime,
+AMREX_ENUM(TimeDependencyJ,
            Constant,
            Linear,
+           Quadratic,
            Default = Constant);
 
-AMREX_ENUM(RhoInTime,
+AMREX_ENUM(TimeDependencyRho,
            Constant,
            Linear,
+           Quadratic,
            Default = Linear);
 
 /** Strategy to compute weights for use in load balance.
@@ -123,11 +126,11 @@ AMREX_ENUM(FieldBoundaryType,
            Periodic,
            PEC,      //!< perfect electric conductor (PEC) with E_tangential=0
            PMC,      //!< perfect magnetic conductor (PMC) with B_tangential=0
+           Neumann = PMC, // For electrostatic, the normal E is set to zero
            Damped,   // Fields in the guard cells are damped for PSATD
                      //in the moving window direction
            Absorbing_SilverMueller, // Silver-Mueller boundary condition
            absorbingsilvermueller = Absorbing_SilverMueller,
-           Neumann, // For electrostatic, the normal E is set to zero
            None,    // The fields values at the boundary are not updated. This is
                     // useful for RZ simulations, at r=0.
            Open,    // Used in the Integrated Green Function Poisson solver
@@ -154,5 +157,35 @@ AMREX_ENUM(ReductionType,
            Minimum,
            Sum,
            Integral = Sum);
+
+/** \brief Subcycling half selector */
+AMREX_ENUM(SubcyclingHalf,
+           FirstHalf,
+           SecondHalf,
+           None,
+           Default = None);
+
+/** \brief Particle push scheme */
+AMREX_ENUM(PushType,
+           Explicit,  //!< Standard leap-frog scheme
+           Implicit,  //!< Crank-Nicolson scheme (e.g., equations (15)-(18) in (Chen et al, JCP 407, 2020))
+           Default = Explicit);
+
+/** \brief For advanced collision algorithms that split the particle push in substeps */
+AMREX_ENUM(
+    PositionPushType,
+    Full,
+    FirstHalf,
+    SecondHalf,
+    Default = Full
+);
+
+/** \brief For advanced collision algorithms that split the particle push in substeps */
+AMREX_ENUM(
+    MomentumPushType,
+    None,
+    Full,
+    Default = Full
+);
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

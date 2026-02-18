@@ -121,17 +121,27 @@ The particle velocity in the COM frame is then isotropically scattered using the
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above expect the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
 
 Excitation
 ^^^^^^^^^^
 
 The process is also the same as for elastic scattering except the excitation energy cost is subtracted from the particle energy. This is done by reducing the velocity before a scattering angle is chosen.
 
+Forward scattering
+^^^^^^^^^^^^^^^^^^
+
+This process operates in two ways:
+
+1. If an excitation energy cost is provided, the energy cost is subtracted from the particle energy and no scattering is performed.
+2. If an excitation energy cost is not provided, the particle is not scattered and the velocity is unchanged (corresponding to a scattering angle of :math:`0` in the elastic scattering process above).
+
+See :cite:t:`b-Janssen2016` for a recommended use of this process.
+
 Benchmarks
 ----------
 
-See the :ref:`MCC example <examples-mcc-turner>` for a benchmark of the MCC
+See the :ref:`MCC example <examples-capacitive-discharge>` for a benchmark of the MCC
 implementation against literature results.
 
 Particle cooling due to elastic collisions
@@ -150,8 +160,10 @@ See for example :cite:t:`b-Lim2007` for a derivation. The result is that given a
 The impact of incorporating relativistic effects in the MCC routine can be seen in the plots below where high energy collisions are considered with both a classical and relativistic implementation of MCC. It is observed that the classical version of MCC reproduces the classical limit of the above equation but especially for ions, this result differs substantially from the fully relativistic result.
 
 .. figure:: https://user-images.githubusercontent.com/40245517/170900079-74e505a5-2790-44f5-ac84-5847eda954e6.png
-   :alt: Classical v relativistic MCC
+   :alt: Comparison of classical and relativistic MCC collision results
    :width: 96%
+
+   Classical v. relativistic MCC.
 
 .. bibliography::
     :keyprefix: b-

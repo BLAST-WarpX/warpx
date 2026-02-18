@@ -29,6 +29,7 @@ Python/dist/
 Python/pywarpx.egg-info/
 _tmppythonbuild/
 pywarpx.egg-info/
+*.ipynb_checkpoints/
 
 ##########
 # Sphinx #
@@ -60,6 +61,11 @@ cmake-build-*/
 # VsCode #
 ##########
 .vscode
+
+#################
+# Warp terminal #
+#################
+WARP.md
 
 # File-based project format:
 *.iws

@@ -35,10 +35,12 @@ MultiFluidContainer::AllocateLevelMFs (ablastr::fields::MultiFabRegister& m_fiel
 }
 
 void
-MultiFluidContainer::InitData (ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev)
+MultiFluidContainer::InitData (
+    ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev,
+    const amrex::Geometry& geom_lev, const amrex::Real gamma_boost, const amrex::Real beta_boost)
 {
     for (auto& fl : allcontainers) {
-        fl->InitData(m_fields, init_box, cur_time, lev);
+        fl->InitData(m_fields, init_box, cur_time, lev, geom_lev, gamma_boost, beta_boost);
     }
 }
 

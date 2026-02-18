@@ -110,7 +110,7 @@ FlushFormatCatalyst::FlushFormatCatalyst() {
     if (err != catalyst_status_ok)
     {
         std::string message = " Error: Failed to initialize Catalyst!\n";
-        std::cerr << message << err << std::endl;
+        std::cerr << message << err << "\n";
         amrex::Print() << message;
         amrex::Abort(message);
     }
@@ -127,6 +127,7 @@ FlushFormatCatalyst::WriteToFile (
     const amrex::Vector<ParticleDiag>& particle_diags, int nlev,
     const std::string prefix, int file_min_digits, bool plot_raw_fields,
     bool plot_raw_fields_guards,
+    int /*verbose*/,
     bool /*use_pinned_pc*/,
     bool isBTD, int /*snapshotID*/, int /*bufferID*/, int /*numBuffers*/,
     const amrex::Geometry& /*full_BTD_snapshot*/,
@@ -179,7 +180,7 @@ FlushFormatCatalyst::WriteToFile (
     if (err != catalyst_status_ok)
     {
         std::string message = " Error: Failed to execute Catalyst!\n";
-        std::cerr << message << err << std::endl;
+        std::cerr << message << err << "\n";
         amrex::Print() << message;
     }
     WARPX_PROFILE_VAR_STOP(prof_catalyst_execute);
@@ -199,7 +200,7 @@ FlushFormatCatalyst::~FlushFormatCatalyst() {
     if (err != catalyst_status_ok)
     {
         std::string message = " Error: Failed to finalize Catalyst!\n";
-        std::cerr << message << err << std::endl;
+        std::cerr << message << err << "\n";
         amrex::Print() << message;
         amrex::Abort(message);
     } else {

@@ -15,7 +15,7 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/Pusher/CopyParticleAttribs.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/Pusher/UpdatePositionPhoton.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
@@ -65,7 +65,7 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
         pp_species_name.query("do_qed_quantum_sync", test_quantum_sync);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         test_quantum_sync == 0,
-        "ERROR: do_qed_quantum_sync can be 1 for species NOT listed in particles.photon_species only!");
+        "ERROR: do_qed_quantum_sync can't be enabled for photon particles!");
         //_________________________________________________________
 #endif
 
@@ -91,7 +91,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  const long offset,
                                  const long np_to_push,
                                  int lev, int gather_lev,
-                                 amrex::Real dt, ScaleFields /*scaleFields*/, DtType a_dt_type)
+                                 amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half,
+                                 PositionPushType position_push_type,
+                                 MomentumPushType /*momentum_push_type*/)
 {
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -122,12 +124,15 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
-        p_optical_depth_BW = pti.GetAttribs(particle_comps["opticalDepthBW"]).dataPtr() + offset;
+        p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
     }
 #endif
 
-    auto copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    const int do_copy = (m_do_back_transformed_particles && (subcycling_half!=SubcyclingHalf::SecondHalf) );
+    CopyParticleAttribs copyAttribs;
+    if (do_copy) {
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
+    }
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
     auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
@@ -176,6 +181,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const int qed_runtime_flag = no_qed;
 #endif
 
+    // local copy for device lambda capture
+    amrex::ParticleReal const mass = m_mass;
+
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
                        {exteb_runtime_flag, qed_runtime_flag},
@@ -222,7 +230,11 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             amrex::ignore_unused(qed_control);
 #endif
 
-            UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
+            amrex::Real position_dt = dt;
+            if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
+                position_dt *= 0.5_rt;
+            }
+            UpdatePosition(x, y, z, ux[i], uy[i], uz[i], position_dt, mass);
             SetPosition(i, x, y, z);
         }
     );
@@ -232,14 +244,18 @@ void
 PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  int lev,
                                  const std::string& current_fp_string,
-                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition,
-                                 PushType push_type)
+                                 Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                 PositionPushType position_push_type,
+                                 MomentumPushType momentum_push_type,
+                                 ImplicitOptions const * /*implicit_options*/)
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons
-    PhysicalParticleContainer::Evolve (fields,
-                                       lev,
-                                       current_fp_string,
-                                       t, dt, a_dt_type, skip_deposition, push_type);
-
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, subcycling_half, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      nullptr);
 }

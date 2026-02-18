@@ -6,9 +6,6 @@ import sys
 import numpy as np
 import yt
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 
 def check_restart(filename, tolerance=1e-12):
     """
@@ -67,17 +64,6 @@ def check_restart(filename, tolerance=1e-12):
     print()
 
 
-# test name (for checksums, remove "_restart") and output file name
-test_name = os.path.split(os.getcwd())[1]
-test_name = test_name.replace("_restart", "")
-output_file = sys.argv[1]
-
 # compare restart results against original results
+output_file = sys.argv[1]
 check_restart(output_file)
-
-# compare restart checksums against original checksums
-evaluate_checksum(
-    test_name=test_name,
-    output_file=output_file,
-    rtol=1e-12,
-)

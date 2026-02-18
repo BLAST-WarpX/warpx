@@ -30,24 +30,18 @@
 # 3) H. Spohn, Dynamics of charged particles and their radiation field
 #   (Cambridge University Press, Cambridge, 2004)
 
-import os
 import sys
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
+from scipy.constants import c, e, m_e, physical_constants
 
 # Input filename
 inputname = "inputs"
 # ________________________________________
 
 # Physical constants
-c = 299792458.0
-m_e = 9.1093837015e-31
-q_0 = 1.602176634e-19
-classical_electron_radius = 2.81794e-15
+classical_electron_radius = physical_constants["classical electron radius"][0]
 reference_length = 1.0e-6
 very_small_dot_product = 1.0e-4
 very_small_weight = 1.0e-8
@@ -74,7 +68,7 @@ p_vals = [50, 200, 1000]
 
 # Field val
 B_val_norm = 300
-B_val = B_val_norm * m_e * 2.0 * np.pi * c / q_0 / reference_length
+B_val = B_val_norm * m_e * 2.0 * np.pi * c / e / reference_length
 B = p_0 * B_val
 # ________________________________________
 
@@ -83,7 +77,7 @@ tolerance_rel = 0.05
 # ________________________________________
 
 # tau_c
-omega_c = q_0 * B_val / m_e
+omega_c = e * B_val / m_e
 t0 = (2.0 / 3.0) * classical_electron_radius / c
 tau_c = 1.0 / omega_c / omega_c / t0
 # ________________________________________
@@ -162,12 +156,6 @@ def check():
         print("tolerance_rel: " + str(tolerance_rel))
 
         assert error_rel < tolerance_rel
-
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-    )
 
 
 def generate():

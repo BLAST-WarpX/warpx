@@ -24,6 +24,7 @@ class FlushFormatCheckpoint final : public FlushFormatPlotfile
         std::string prefix, int file_min_digits,
         bool plot_raw_fields,
         bool plot_raw_fields_guards,
+        int verbose = 2,
         bool use_pinned_pc = false,
         bool isBTD = false, int snapshotID = -1,
         int bufferID = 1, int numBuffers = 1,
@@ -34,6 +35,8 @@ class FlushFormatCheckpoint final : public FlushFormatPlotfile
                               const amrex::Vector<ParticleDiag>& particle_diags) const;
 
     void WriteDMaps (const std::string& dir, int nlev) const;
+
+    void WriteReducedDiagsData (std::string const & dir) const;
 };
 
 #endif // WARPX_FLUSHFORMATCHECKPOINT_H_

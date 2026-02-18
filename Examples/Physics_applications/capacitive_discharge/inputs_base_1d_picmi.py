@@ -11,7 +11,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
-from pywarpx import callbacks, fields, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
@@ -98,11 +98,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         """Function run on every step to perform the required steps to solve
         Poisson's equation."""
         # get rho from WarpX
-        self.rho_data = fields.RhoFPWrapper(0, False)[...]
+        self.rho_data = self.sim.fields.get("rho_fp", level=0)[...]
         # run superLU solver to get phi
         self.solve()
         # write phi to WarpX
-        fields.PhiFPWrapper(0, True)[...] = self.phi[:]
+        self.sim.fields.get("phi_fp", level=0)[()] = self.phi[:]
 
     def solve(self):
         """The solution step. Includes getting the boundary potentials and
@@ -268,32 +268,55 @@ class CapacitiveDischargeExample(object):
         #######################################################################
 
         cross_sec_direc = "../../../../warpx-data/MCC_cross_sections/He/"
-        electron_colls = picmi.MCCCollisions(
-            name="coll_elec",
-            species=self.electrons,
-            background_density=self.gas_density,
-            background_temperature=self.gas_temp,
-            background_mass=self.ions.mass,
-            ndt=self.mcc_subcycling_steps,
-            scattering_processes={
-                "elastic": {
-                    "cross_section": cross_sec_direc + "electron_scattering.dat"
-                },
-                "excitation1": {
-                    "cross_section": cross_sec_direc + "excitation_1.dat",
-                    "energy": 19.82,
-                },
-                "excitation2": {
-                    "cross_section": cross_sec_direc + "excitation_2.dat",
-                    "energy": 20.61,
-                },
-                "ionization": {
-                    "cross_section": cross_sec_direc + "ionization.dat",
-                    "energy": 24.55,
-                    "species": self.ions,
-                },
+
+        electron_scattering_processes = {
+            "elastic": {"cross_section": cross_sec_direc + "electron_scattering.dat"},
+            "excitation1": {
+                "cross_section": cross_sec_direc + "excitation_1.dat",
+                "energy": 19.82,
             },
-        )
+            "excitation2": {
+                "cross_section": cross_sec_direc + "excitation_2.dat",
+                "energy": 20.61,
+            },
+            "ionization": {
+                "cross_section": cross_sec_direc + "ionization.dat",
+                "energy": 24.55,
+                "species": self.ions,
+            },
+        }
+        if self.dsmc:
+            ionization = {"ionization": electron_scattering_processes.pop("ionization")}
+            ionization["ionization"]["target_species"] = self.neutrals
+            ionization["ionization"].pop("species")
+            electron_colls_dsmc = picmi.DSMCCollisions(
+                name="coll_elec_dsmc",
+                species=[self.electrons, self.neutrals],
+                product_species=[self.electrons, self.ions],
+                ndt=4,
+                scattering_processes=ionization,
+            )
+            electron_colls_mcc = picmi.MCCCollisions(
+                name="coll_elec",
+                species=self.electrons,
+                background_density=self.gas_density,
+                background_temperature=self.gas_temp,
+                background_mass=self.ions.mass,
+                ndt=self.mcc_subcycling_steps,
+                scattering_processes=electron_scattering_processes,
+            )
+            electron_colls = [electron_colls_mcc, electron_colls_dsmc]
+        else:
+            electron_colls_mcc = picmi.MCCCollisions(
+                name="coll_elec",
+                species=self.electrons,
+                background_density=self.gas_density,
+                background_temperature=self.gas_temp,
+                background_mass=self.ions.mass,
+                ndt=self.mcc_subcycling_steps,
+                scattering_processes=electron_scattering_processes,
+            )
+            electron_colls = [electron_colls_mcc]
 
         ion_scattering_processes = {
             "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
@@ -316,6 +339,7 @@ class CapacitiveDischargeExample(object):
                 ndt=self.mcc_subcycling_steps,
                 scattering_processes=ion_scattering_processes,
             )
+        ion_colls = [ion_colls]
 
         #######################################################################
         # Initialize simulation                                               #
@@ -325,7 +349,8 @@ class CapacitiveDischargeExample(object):
             solver=self.solver,
             time_step_size=self.dt,
             max_steps=self.max_steps,
-            warpx_collisions=[electron_colls, ion_colls],
+            warpx_collisions=electron_colls + ion_colls,
+            warpx_collisions_split_position_push=0,
             verbose=self.test,
         )
         self.solver.sim = self.sim
@@ -384,36 +409,32 @@ class CapacitiveDischargeExample(object):
         if step % 1000 != 10:
             return
 
-        if not hasattr(self, "neutral_cont"):
-            self.neutral_cont = particle_containers.ParticleContainerWrapper(
-                self.neutrals.name
-            )
-
-        ux_arrays = self.neutral_cont.uxp
-        uy_arrays = self.neutral_cont.uyp
-        uz_arrays = self.neutral_cont.uzp
+        if not hasattr(self, "neutral_particles"):
+            self.neutral_particles = self.sim.particles.get(self.neutrals.name)
 
         xp, _ = load_cupy()
 
         vel_std = np.sqrt(constants.kb * self.gas_temp / self.m_ion)
-        for ii in range(len(ux_arrays)):
-            nps = len(ux_arrays[ii])
-            ux_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uy_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uz_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
+        for pti in self.neutral_particles.iterator(level=0):
+            nps = pti.size
+            pti["ux"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uy"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uz"][:] = xp.array(vel_std * self.rng.normal(size=nps))
 
     def _get_rho_ions(self):
         # deposit the ion density in rho_fp
-        he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-        he_ions_wrapper.deposit_charge_density(level=0)
+        self.rho.set_val(0.0)
+        he_ions = self.sim.particles.get("he_ions")
+        he_ions.deposit_charge(self.rho, lev=0)
+        libwarpx.warpx.sync_rho()
 
-        rho_data = self.rho_wrapper[...]
+        rho_data = self.rho[...]
         self.ion_density_array += rho_data / constants.q_e / self.diag_steps
 
     def run_sim(self):
         self.sim.step(self.max_steps - self.diag_steps)
 
-        self.rho_wrapper = fields.RhoFPWrapper(0, False)
+        self.rho = self.sim.fields.get("rho_fp", level=0)
         callbacks.installafterstep(self._get_rho_ions)
 
         self.sim.step(self.diag_steps)
@@ -423,14 +444,16 @@ class CapacitiveDischargeExample(object):
             assert hasattr(self.solver, "phi")
 
         if libwarpx.amr.ParallelDescriptor.MyProc() == 0:
-            np.save(f"ion_density_case_{self.n+1}.npy", self.ion_density_array)
+            np.save(f"ion_density_case_{self.n + 1}.npy", self.ion_density_array)
 
         # query the particle z-coordinates if this is run during CI testing
         # to cover that functionality
         if self.test:
-            he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-            nparts = he_ions_wrapper.get_particle_count(local=True)
-            z_coords = np.concatenate(he_ions_wrapper.zp)
+            he_ions = self.sim.particles.get("he_ions")
+            nparts = he_ions.number_of_particles(only_local=True)
+            z_coords = np.concatenate(
+                list(pti["z"] for pti in he_ions.iterator(level=0))
+            )
             assert len(z_coords) == nparts
             assert np.all(z_coords >= 0.0) and np.all(z_coords <= self.gap)
 

@@ -109,7 +109,6 @@ diag1.electrons.variables = x z w ux uy uz
 diag1.protons.variables = x z w ux uy uz
 
 warpx.reduced_diags_names = particle_energy field_energy
+reduced_diags.intervals = 1
 particle_energy.type = ParticleEnergy
-particle_energy.intervals = 1
 field_energy.type = FieldEnergy
-field_energy.intervals = 1

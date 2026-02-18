@@ -9,15 +9,11 @@
 ## In this test, we check that leveling thinning works as expected on two simple cases. Each case
 ## corresponds to a different particle species.
 
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.special import erf
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 fn_final = sys.argv[1]
 fn0 = fn_final[:-4] + "0000"
@@ -170,9 +166,3 @@ numparts_unaffected_anticipated = w0.shape[0] - np.argmax(w0 > level_weight)
 assert numparts_unaffected == numparts_unaffected_anticipated
 # Check that particles with weight higher than level weight are unaffected by resampling.
 assert np.all(w[-numparts_unaffected:] == w0[-numparts_unaffected:])
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

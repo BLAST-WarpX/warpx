@@ -16,15 +16,11 @@
 # tolerance: 1.0e-30
 # Possible running time: ~ 1.0 s
 
-import os
 import sys
 from glob import glob
 
 import numpy as np
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 tolerance = 1.0e-15
 
@@ -54,10 +50,3 @@ error = np.max(abs(px1 - px2) + abs(py1 - py2))
 print("error = ", error)
 print("tolerance = ", tolerance)
 assert error < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-    do_particles=False,
-)

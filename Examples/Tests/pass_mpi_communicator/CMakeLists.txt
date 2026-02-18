@@ -10,7 +10,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_pass_mpi_comm_picmi.py  # inputs
-    OFF #analysis.py  # analysis
-    OFF  # output
+    OFF  # analysis
+    OFF  # checksum
     OFF  # dependency
 )

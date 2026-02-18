@@ -34,7 +34,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/lumi_warpx.profile``.
 Create it now:
@@ -91,7 +91,7 @@ Finally, since LUMI does not yet provide software modules for some of our depend
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 

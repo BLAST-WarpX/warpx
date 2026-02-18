@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# @Eya Dammak supervised by @Remi Lehe, 2024
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
-import numpy as np
 
 from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # numerics parameters
@@ -112,14 +111,22 @@ sim.initialize_warpx()
 ##########################
 # python particle data access
 ##########################
+xp, _ = load_cupy()
 
 
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
-        return np.empty(0)
+        return xp.empty(0)
     else:
-        return np.concatenate(list_of_arrays)
+        return xp.concatenate(list_of_arrays)
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return arr
 
 
 def mirror_reflection():
@@ -128,32 +135,45 @@ def mirror_reflection():
     # STEP 1: extract the different parameters of the boundary buffer (normal, time, position)
     lev = 0  # level 0 (no mesh refinement here)
     delta_t = concat(
-        buffer.get_particle_boundary_buffer("electrons", "eb", "deltaTimeScraped", lev)
+        buffer.get_particle_scraped_this_step(
+            "electrons", "eb", "deltaTimeScraped", lev
+        )
     )
-    r = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "x", lev))
-    theta = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "theta", lev))
-    z = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "z", lev))
-    x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-    y = r * np.sin(theta)
-    ux = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "ux", lev))
-    uy = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "uy", lev))
-    uz = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "uz", lev))
-    w = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "w", lev))
-    nx = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "nx", lev))
-    ny = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "ny", lev))
-    nz = concat(buffer.get_particle_boundary_buffer("electrons", "eb", "nz", lev))
+    r = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "r", lev))
+    theta = concat(
+        buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
+    )
+
+    z = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev))
+    x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * xp.sin(theta)
+    ux = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ux", lev))
+    uy = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uy", lev))
+    uz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uz", lev))
+    w = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "w", lev))
+    nx = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nx", lev))
+    ny = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ny", lev))
+    nz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nz", lev))
 
     # STEP 2: use these parameters to inject particle from the same position in the plasma
-    elect_pc = particle_containers.ParticleContainerWrapper(
-        "electrons"
-    )  # general particle container
+    electrons = sim.particles.get("electrons")  # general particle container
 
     ####this part is specific to the case of simple reflection.
     un = ux * nx + uy * ny + uz * nz
     ux_reflect = -2 * un * nx + ux  # for a "mirror reflection" u(sym)=-2(u.n)n+u
     uy_reflect = -2 * un * ny + uy
     uz_reflect = -2 * un * nz + uz
-    elect_pc.add_particles(
+
+    x = to_numpy(x)
+    y = to_numpy(y)
+    z = to_numpy(z)
+    w = to_numpy(w)
+    delta_t = to_numpy(delta_t)
+    ux_reflect = to_numpy(ux_reflect)
+    uy_reflect = to_numpy(uy_reflect)
+    uz_reflect = to_numpy(uz_reflect)
+
+    electrons.add_particles(
         x=x + (dt - delta_t) * ux_reflect,
         y=y + (dt - delta_t) * uy_reflect,
         z=z + (dt - delta_t) * uz_reflect,
@@ -163,8 +183,6 @@ def mirror_reflection():
         w=w,
     )  # adds the particle in the general particle container at the next step
     #### Can be modified depending on the model of interaction.
-
-    buffer.clear_buffer()  # reinitialise the boundary buffer
 
 
 callbacks.installafterstep(

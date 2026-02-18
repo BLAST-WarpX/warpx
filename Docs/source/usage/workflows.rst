@@ -1,7 +1,8 @@
+.. _usage-how-to:
 .. _usage-workflows:
 
-Workflows
-=========
+How-To Guides
+=============
 
 This section collects typical user workflows and best practices for WarpX.
 
@@ -15,6 +16,7 @@ This section collects typical user workflows and best practices for WarpX.
    workflows/generate_lookup_tables_with_tools
    workflows/plot_timestep_duration
    workflows/psatd_stencil
+   workflows/stl_geometry_preparation
    workflows/archiving
    workflows/ml_dataset_training
    workflows/optimas

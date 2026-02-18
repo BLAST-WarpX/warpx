@@ -50,8 +50,8 @@ struct RandomFilter
         return ( (!m_is_active) || (amrex::Random(engine) < m_fraction) );
     }
 private:
-    const bool m_is_active; //! select all particles if false
-    const amrex::Real m_fraction = 1.0; //! range: [0.0:1.0] where 0 is no & 1 is all particles
+    bool m_is_active; //! select all particles if false
+    amrex::Real m_fraction = 1.0; //! range: [0.0:1.0] where 0 is no & 1 is all particles
 };
 
 /**
@@ -77,8 +77,8 @@ struct UniformFilter
         return ( (!m_is_active) || ( p.id()%m_stride == 0 ) );
     }
 private:
-    const bool m_is_active; //! select all particles if false
-    const int m_stride = 0; //! selection of every n-th particle
+    bool m_is_active; //! select all particles if false
+    int m_stride = 0; //! selection of every n-th particle
 };
 
 /**
@@ -134,10 +134,10 @@ struct ParserFilter
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
-    const bool m_is_active;
+    bool m_is_active;
 public:
     /** Parser function with 7 input variables, t,x,y,z,ux,uy,uz */
-    amrex::ParserExecutor<7> const m_function_partparser;
+    amrex::ParserExecutor<7> m_function_partparser;
     /** Mass of particle species */
     amrex::ParticleReal m_mass;
     /** Store physical time on the coarsest level. */
@@ -171,9 +171,9 @@ struct GeometryFilter
     }
 private:
     /** Whether this diagnostics is activated. Select all particles if false */
-    const bool m_is_active;
+    bool m_is_active;
     /** Physical extent of the axis-aligned region used for particle check */
-    const amrex::RealBox m_domain;
+    amrex::RealBox m_domain;
 };
 
 #endif // WARPX_FILTERFUNCTORS_H

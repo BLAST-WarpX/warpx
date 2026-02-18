@@ -11,6 +11,9 @@
 #include "BoundaryConditions/PML.H"
 #include "BoundaryConditions/PMLComponent.H"
 #include "Fields.H"
+#ifdef AMREX_USE_EB
+#   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
+#endif
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #endif
@@ -142,6 +145,144 @@ namespace
         });
     }
 #endif
+
+
+    BoxArray
+    MakeBoxArray_single (
+        const amrex::Box& regular_domain, const amrex::BoxArray& grid_ba,
+        const amrex::IntVect& ncell, const amrex::IntVect& do_pml_Lo,
+        const amrex::IntVect& do_pml_Hi)
+    {
+        BoxList bl;
+        const auto grid_ba_size = static_cast<int>(grid_ba.size());
+        for (int i = 0; i < grid_ba_size; ++i) {
+            Box const& b = grid_ba[i];
+            for (OrientationIter oit; oit.isValid(); ++oit) {
+                // In 3d, a Box has 6 faces.  This iterates over the 6 faces.
+                // 3 of them are on the lower side and the others are on the
+                // higher side.
+                const Orientation ori = oit();
+                const int idim = ori.coordDir(); // either 0 or 1 or 2 (i.e., x, y, z-direction)
+                bool pml_bndry = false;
+                if (ori.isLow() && do_pml_Lo[idim]) {  // This is one of the lower side faces.
+                    pml_bndry = b.smallEnd(idim) == regular_domain.smallEnd(idim);
+                } else if (ori.isHigh() && do_pml_Hi[idim]) { // This is one of the higher side faces.
+                    pml_bndry = b.bigEnd(idim) == regular_domain.bigEnd(idim);
+                }
+                if (pml_bndry) {
+                    Box bbox = amrex::adjCell(b, ori, ncell[idim]);
+                    for (int jdim = 0; jdim < idim; ++jdim) {
+                        if (do_pml_Lo[jdim] &&
+                            bbox.smallEnd(jdim) == regular_domain.smallEnd(jdim)) {
+                            bbox.growLo(jdim, ncell[jdim]);
+                        }
+                        if (do_pml_Hi[jdim] &&
+                            bbox.bigEnd(jdim) == regular_domain.bigEnd(jdim)) {
+                            bbox.growHi(jdim, ncell[jdim]);
+                        }
+                    }
+                    bl.push_back(bbox);
+                }
+            }
+        }
+
+        return BoxArray(std::move(bl));
+    }
+
+
+    BoxArray
+    MakeBoxArray_multiple (
+        const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
+        const amrex::IntVect& ncell, int do_pml_in_domain,
+        const amrex::IntVect& do_pml_Lo, const amrex::IntVect& do_pml_Hi)
+    {
+        Box domain = geom.Domain();
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (do_pml_Lo[idim]){
+                domain.growLo(idim, ncell[idim]);
+            }
+            if (do_pml_Hi[idim]){
+                domain.growHi(idim, ncell[idim]);
+            }
+        }
+        BoxList bl;
+        const auto grid_ba_size = static_cast<int>(grid_ba.size());
+        for (int i = 0; i < grid_ba_size; ++i)
+        {
+            const Box& grid_bx = grid_ba[i];
+            const IntVect& grid_bx_sz = grid_bx.size();
+
+            if (do_pml_in_domain == 0) {
+                // Make sure that, in the case of several distinct refinement patches,
+                //  the PML cells surrounding these patches cannot overlap
+                // The check is only needed along the axis where PMLs are being used.
+                for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    if (do_pml_Lo[idim] || do_pml_Hi[idim]) {
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                            grid_bx.length(idim) > ncell[idim],
+                            "Consider using larger amr.blocking_factor with PMLs");
+                    }
+                }
+            }
+
+            Box bx = grid_bx;
+            bx.grow(ncell);
+            bx &= domain;
+
+            Vector<Box> bndryboxes;
+    #if defined(WARPX_DIM_3D)
+            const int kbegin = -1, kend = 1;
+    #else
+            const int kbegin =  0, kend = 0;
+    #endif
+            for (int kk = kbegin; kk <= kend; ++kk) {
+                for (int jj = -1; jj <= 1; ++jj) {
+                    for (int ii = -1; ii <= 1; ++ii) {
+                        if (ii != 0 || jj != 0 || kk != 0) {
+                            Box b = grid_bx;
+                            b.shift(grid_bx_sz * IntVect{AMREX_D_DECL(ii,jj,kk)});
+                            b &= bx;
+                            if (b.ok()) {
+                                bndryboxes.push_back(b);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const BoxList& noncovered = grid_ba.complementIn(bx);
+            for (const Box& b : noncovered) {
+                for (const auto& bb : bndryboxes) {
+                    const Box ib = b & bb;
+                    if (ib.ok()) {
+                        bl.push_back(ib);
+                    }
+                }
+            }
+        }
+
+        BoxArray ba(bl);
+        ba.removeOverlap(false);
+
+        return ba;
+    }
+
+
+    BoxArray
+    MakeBoxArray (bool is_single_box_domain, const amrex::Box& regular_domain,
+                    const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
+                    const amrex::IntVect& ncell, int do_pml_in_domain,
+                    const amrex::IntVect& do_pml_Lo, const amrex::IntVect& do_pml_Hi)
+    {
+        if (is_single_box_domain) {
+            return MakeBoxArray_single(regular_domain, grid_ba, ncell, do_pml_Lo, do_pml_Hi);
+        } else { // the union of the regular grids is *not* a single rectangular domain
+            return MakeBoxArray_multiple(geom, grid_ba, ncell, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
+        }
+    }
+
+
+
 }
 
 
@@ -506,7 +647,7 @@ SigmaBox::ComputePMLFactorsE (const Real* a_dx, Real dt)
 }
 
 MultiSigmaBox::MultiSigmaBox (const BoxArray& ba, const DistributionMapping& dm,
-                              const BoxArray& grid_ba, const Real* dx,
+                              const BoxArray* grid_ba, const Real* dx,
                               const IntVect& ncell, const IntVect& delta,
                               const amrex::Box& regular_domain, const amrex::Real v_sigma_sb)
     : FabArray<SigmaBox>(ba,dm,1,0,MFInfo(),
@@ -553,12 +694,13 @@ PML::PML (const int lev, const BoxArray& grid_ba,
           ablastr::utils::enums::GridType grid_type,
           int do_moving_window, int /*pml_has_particles*/, int do_pml_in_domain,
           const PSATDSolutionType psatd_solution_type,
-          const JInTime J_in_time, const RhoInTime rho_in_time,
+          const TimeDependencyJ time_dependency_J, const TimeDependencyRho time_dependency_rho,
           const bool do_pml_dive_cleaning, const bool do_pml_divb_cleaning,
           const amrex::IntVect& fill_guards_fields,
           const amrex::IntVect& fill_guards_current,
           bool eb_enabled,
           int max_guard_EB, const amrex::Real v_sigma_sb,
+          ablastr::fields::MultiFabRegister& fields,
           const amrex::IntVect do_pml_Lo, const amrex::IntVect do_pml_Hi)
     : m_dive_cleaning(do_pml_dive_cleaning),
       m_divb_cleaning(do_pml_divb_cleaning),
@@ -612,7 +754,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     }
     Box const domain0 = grid_ba_reduced.minimalBox();
     const bool is_single_box_domain = domain0.numPts() == grid_ba_reduced.numPts();
-    const BoxArray& ba = MakeBoxArray(is_single_box_domain, domain0, *geom, grid_ba_reduced,
+    const BoxArray& ba = ::MakeBoxArray(is_single_box_domain, domain0, *geom, grid_ba_reduced,
                                       IntVect(ncell), do_pml_in_domain, do_pml_Lo, do_pml_Hi);
 
 
@@ -660,6 +802,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         auto ngFFT = IntVect(ngFFt_x, ngFFt_z);
 #elif defined(WARPX_DIM_1D_Z)
         auto ngFFT = IntVect(ngFFt_z);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        auto ngFFT = IntVect(ngFFt_x);
 #endif
 
         // Set the number of guard cells to the maximum of each field
@@ -700,36 +844,35 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     const int ncompe = (m_dive_cleaning) ? 3 : 2;
     const int ncompb = (m_divb_cleaning) ? 3 : 2;
 
-    auto& warpx = WarpX::GetInstance();
     using ablastr::fields::Direction;
 
-    const amrex::BoxArray ba_Ex = amrex::convert(ba, warpx.m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_Ey = amrex::convert(ba, warpx.m_fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_Ez = amrex::convert(ba, warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect());
-    warpx.m_fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Ex, dm, ncompe, nge, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Ey, dm, ncompe, nge, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_E_fp, Direction{2}, lev, ba_Ez, dm, ncompe, nge, 0.0_rt, false, false);
+    const amrex::BoxArray ba_Ex = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_Ey = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_Ez = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect());
+    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Ex, dm, ncompe, nge, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Ey, dm, ncompe, nge, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{2}, lev, ba_Ez, dm, ncompe, nge, 0.0_rt, false, false);
 
-    const amrex::BoxArray ba_Bx = amrex::convert(ba, warpx.m_fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_By = amrex::convert(ba, warpx.m_fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_Bz = amrex::convert(ba, warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect());
-    warpx.m_fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Bx, dm, ncompb, ngb, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_By, dm, ncompb, ngb, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_B_fp, Direction{2}, lev, ba_Bz, dm, ncompb, ngb, 0.0_rt, false, false);
+    const amrex::BoxArray ba_Bx = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_By = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_Bz = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect());
+    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Bx, dm, ncompb, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_By, dm, ncompb, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{2}, lev, ba_Bz, dm, ncompb, ngb, 0.0_rt, false, false);
 
-    const amrex::BoxArray ba_jx = amrex::convert(ba, WarpX::GetInstance().m_fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_jy = amrex::convert(ba, WarpX::GetInstance().m_fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect());
-    const amrex::BoxArray ba_jz = amrex::convert(ba, WarpX::GetInstance().m_fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect());
-    warpx.m_fields.alloc_init(FieldType::pml_j_fp, Direction{0}, lev, ba_jx, dm, 1, ngb, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_j_fp, Direction{1}, lev, ba_jy, dm, 1, ngb, 0.0_rt, false, false);
-    warpx.m_fields.alloc_init(FieldType::pml_j_fp, Direction{2}, lev, ba_jz, dm, 1, ngb, 0.0_rt, false, false);
+    const amrex::BoxArray ba_jx = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_jy = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect());
+    const amrex::BoxArray ba_jz = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect());
+    fields.alloc_init(FieldType::pml_j_fp, Direction{0}, lev, ba_jx, dm, 1, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_j_fp, Direction{1}, lev, ba_jy, dm, 1, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_j_fp, Direction{2}, lev, ba_jz, dm, 1, ngb, 0.0_rt, false, false);
 
 #ifdef AMREX_USE_EB
     if (eb_enabled) {
         const amrex::IntVect max_guard_EB_vect = amrex::IntVect(max_guard_EB);
-        warpx.m_fields.alloc_init(FieldType::pml_edge_lengths, Direction{0}, lev, ba_Ex, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_edge_lengths, Direction{1}, lev, ba_Ey, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_edge_lengths, Direction{2}, lev, ba_Ez, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_edge_lengths, Direction{0}, lev, ba_Ex, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_edge_lengths, Direction{1}, lev, ba_Ey, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_edge_lengths, Direction{2}, lev, ba_Ez, dm, WarpX::ncomps, max_guard_EB_vect, 0.0_rt, false, false);
 
         if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
             WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC ||
@@ -737,9 +880,9 @@ PML::PML (const int lev, const BoxArray& grid_ba,
 
             auto const eb_fact = fieldEBFactory();
 
-            ablastr::fields::VectorField t_pml_edge_lengths = warpx.m_fields.get_alldirs(FieldType::pml_edge_lengths, lev);
-            WarpX::ComputeEdgeLengths(t_pml_edge_lengths, eb_fact);
-            WarpX::ScaleEdges(t_pml_edge_lengths, WarpX::CellSize(lev));
+            ablastr::fields::VectorField t_pml_edge_lengths = fields.get_alldirs(FieldType::pml_edge_lengths, lev);
+            warpx::embedded_boundary::ComputeEdgeLengths(t_pml_edge_lengths, eb_fact);
+            warpx::embedded_boundary::ScaleEdges(t_pml_edge_lengths, WarpX::CellSize(lev));
 
         }
     }
@@ -749,7 +892,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     if (m_dive_cleaning)
     {
         const amrex::BoxArray ba_F_nodal = amrex::convert(ba, amrex::IntVect::TheNodeVector());
-        warpx.m_fields.alloc_init(FieldType::pml_F_fp, lev, ba_F_nodal, dm, 3, ngf, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_F_fp, lev, ba_F_nodal, dm, 3, ngf, 0.0_rt, false, false);
     }
 
     if (m_divb_cleaning)
@@ -759,17 +902,17 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             (grid_type == GridType::Collocated) ? amrex::IntVect::TheNodeVector()
                                                 : amrex::IntVect::TheCellVector();
         const amrex::BoxArray ba_G_nodal = amrex::convert(ba, G_nodal_flag);
-        warpx.m_fields.alloc_init(FieldType::pml_G_fp, lev, ba_G_nodal, dm, 3, ngf, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_G_fp, lev, ba_G_nodal, dm, 3, ngf, 0.0_rt, false, false);
     }
 
     Box single_domain_box = is_single_box_domain ? domain0 : Box();
     // Empty box (i.e., Box()) means it's not a single box domain.
-    sigba_fp = std::make_unique<MultiSigmaBox>(ba, dm, grid_ba_reduced, geom->CellSize(),
+    sigba_fp = std::make_unique<MultiSigmaBox>(ba, dm, &grid_ba_reduced, geom->CellSize(),
                                                IntVect(ncell), IntVect(delta), single_domain_box, v_sigma_sb);
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
 #ifndef WARPX_USE_FFT
-        amrex::ignore_unused(lev, dt, psatd_solution_type, J_in_time, rho_in_time);
+        amrex::ignore_unused(lev, dt, psatd_solution_type, time_dependency_J, time_dependency_rho);
 #   if(AMREX_SPACEDIM!=3)
         amrex::ignore_unused(noy_fft);
 #   endif
@@ -787,10 +930,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
         amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
         realspace_ba.enclosedCells().grow(nge); // cell-centered + guard cells
-        spectral_solver_fp = std::make_unique<SpectralSolver>(lev, realspace_ba, dm,
+        spectral_solver_fp = std::make_unique<SpectralSolver>(realspace_ba, dm,
             nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
             v_comoving_zero, dx, dt, in_pml, periodic_single_box, update_with_rho,
-            fft_do_time_averaging, psatd_solution_type, J_in_time, rho_in_time, m_dive_cleaning, m_divb_cleaning);
+            fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
 #endif
     }
 
@@ -831,7 +974,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         const IntVect cdelta = IntVect(delta)/ref_ratio;
 
         // Assuming that refinement ratio is equal in all dimensions
-        const BoxArray& cba = MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
+        const BoxArray& cba = ::MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
                                            cncells, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
         DistributionMapping cdm;
         if (do_similar_dm_pml) {
@@ -841,24 +984,24 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             cdm.define(cba);
         }
 
-        const amrex::BoxArray cba_Ex = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Efield_cp, Direction{0}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_Ey = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Efield_cp, Direction{1}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_Ez = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Efield_cp, Direction{2}, 1)->ixType().toIntVect());
-        warpx.m_fields.alloc_init(FieldType::pml_E_cp, Direction{0}, lev, cba_Ex, cdm, ncompe, nge, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_E_cp, Direction{1}, lev, cba_Ey, cdm, ncompe, nge, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_E_cp, Direction{2}, lev, cba_Ez, cdm, ncompe, nge, 0.0_rt, false, false);
+        const amrex::BoxArray cba_Ex = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{0}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_Ey = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{1}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_Ez = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{2}, 1)->ixType().toIntVect());
+        fields.alloc_init(FieldType::pml_E_cp, Direction{0}, lev, cba_Ex, cdm, ncompe, nge, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_E_cp, Direction{1}, lev, cba_Ey, cdm, ncompe, nge, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_E_cp, Direction{2}, lev, cba_Ez, cdm, ncompe, nge, 0.0_rt, false, false);
 
-        const amrex::BoxArray cba_Bx = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Bfield_cp, Direction{0}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_By = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Bfield_cp, Direction{1}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_Bz = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::Bfield_cp, Direction{2}, 1)->ixType().toIntVect());
-        warpx.m_fields.alloc_init(FieldType::pml_B_cp, Direction{0}, lev, cba_Bx, cdm, ncompb, ngb, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_B_cp, Direction{1}, lev, cba_By, cdm, ncompb, ngb, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_B_cp, Direction{2}, lev, cba_Bz, cdm, ncompb, ngb, 0.0_rt, false, false);
+        const amrex::BoxArray cba_Bx = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{0}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_By = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{1}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_Bz = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{2}, 1)->ixType().toIntVect());
+        fields.alloc_init(FieldType::pml_B_cp, Direction{0}, lev, cba_Bx, cdm, ncompb, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_B_cp, Direction{1}, lev, cba_By, cdm, ncompb, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_B_cp, Direction{2}, lev, cba_Bz, cdm, ncompb, ngb, 0.0_rt, false, false);
 
         if (m_dive_cleaning)
         {
             const amrex::BoxArray cba_F_nodal = amrex::convert(cba, amrex::IntVect::TheNodeVector());
-            warpx.m_fields.alloc_init(FieldType::pml_F_cp, lev, cba_F_nodal, cdm, 3, ngf, 0.0_rt, false, false);
+            fields.alloc_init(FieldType::pml_F_cp, lev, cba_F_nodal, cdm, 3, ngf, 0.0_rt, false, false);
         }
 
         if (m_divb_cleaning)
@@ -868,18 +1011,18 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                 (grid_type == GridType::Collocated) ? amrex::IntVect::TheNodeVector()
                                                     : amrex::IntVect::TheCellVector();
             const amrex::BoxArray cba_G_nodal = amrex::convert(cba, G_nodal_flag);
-            warpx.m_fields.alloc_init(FieldType::pml_G_cp, lev, cba_G_nodal, cdm, 3, ngf, 0.0_rt, false, false);
+            fields.alloc_init(FieldType::pml_G_cp, lev, cba_G_nodal, cdm, 3, ngf, 0.0_rt, false, false);
         }
 
-        const amrex::BoxArray cba_jx = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::current_cp, Direction{0}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_jy = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::current_cp, Direction{1}, 1)->ixType().toIntVect());
-        const amrex::BoxArray cba_jz = amrex::convert(cba, WarpX::GetInstance().m_fields.get(FieldType::current_cp, Direction{2}, 1)->ixType().toIntVect());
-        warpx.m_fields.alloc_init(FieldType::pml_j_cp, Direction{0}, lev, cba_jx, cdm, 1, ngb, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_j_cp, Direction{1}, lev, cba_jy, cdm, 1, ngb, 0.0_rt, false, false);
-        warpx.m_fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, 1, ngb, 0.0_rt, false, false);
+        const amrex::BoxArray cba_jx = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{0}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_jy = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{1}, 1)->ixType().toIntVect());
+        const amrex::BoxArray cba_jz = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{2}, 1)->ixType().toIntVect());
+        fields.alloc_init(FieldType::pml_j_cp, Direction{0}, lev, cba_jx, cdm, 1, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_j_cp, Direction{1}, lev, cba_jy, cdm, 1, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, 1, ngb, 0.0_rt, false, false);
 
         single_domain_box = is_single_box_domain ? cdomain : Box();
-        sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, grid_cba_reduced, cgeom->CellSize(),
+        sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, &grid_cba_reduced, cgeom->CellSize(),
                                                    cncells, cdelta, single_domain_box, v_sigma_sb);
 
         if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -899,143 +1042,13 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             amrex::Vector<amrex::Real> const v_galilean = WarpX::GetInstance().m_v_galilean;
             amrex::Vector<amrex::Real> const v_comoving_zero = {0., 0., 0.};
             realspace_cba.enclosedCells().grow(nge); // cell-centered + guard cells
-            spectral_solver_cp = std::make_unique<SpectralSolver>(lev, realspace_cba, cdm,
+            spectral_solver_cp = std::make_unique<SpectralSolver>(realspace_cba, cdm,
                 nox_fft, noy_fft, noz_fft, grid_type, v_galilean,
                 v_comoving_zero, cdx, dt, in_pml, periodic_single_box, update_with_rho,
-                fft_do_time_averaging, psatd_solution_type, J_in_time, rho_in_time, m_dive_cleaning, m_divb_cleaning);
+                fft_do_time_averaging, psatd_solution_type, time_dependency_J, time_dependency_rho, m_dive_cleaning, m_divb_cleaning);
 #endif
         }
     }
-}
-
-BoxArray
-PML::MakeBoxArray (bool is_single_box_domain, const amrex::Box& regular_domain,
-                   const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
-                   const amrex::IntVect& ncell, int do_pml_in_domain,
-                   const amrex::IntVect& do_pml_Lo, const amrex::IntVect& do_pml_Hi)
-{
-    if (is_single_box_domain) {
-        return MakeBoxArray_single(regular_domain, grid_ba, ncell, do_pml_Lo, do_pml_Hi);
-    } else { // the union of the regular grids is *not* a single rectangular domain
-        return MakeBoxArray_multiple(geom, grid_ba, ncell, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
-    }
-}
-
-BoxArray
-PML::MakeBoxArray_single (const amrex::Box& regular_domain, const amrex::BoxArray& grid_ba,
-                          const amrex::IntVect& ncell, const amrex::IntVect& do_pml_Lo,
-                          const amrex::IntVect& do_pml_Hi)
-{
-    BoxList bl;
-    const auto grid_ba_size = static_cast<int>(grid_ba.size());
-    for (int i = 0; i < grid_ba_size; ++i) {
-        Box const& b = grid_ba[i];
-        for (OrientationIter oit; oit.isValid(); ++oit) {
-            // In 3d, a Box has 6 faces.  This iterates over the 6 faces.
-            // 3 of them are on the lower side and the others are on the
-            // higher side.
-            const Orientation ori = oit();
-            const int idim = ori.coordDir(); // either 0 or 1 or 2 (i.e., x, y, z-direction)
-            bool pml_bndry = false;
-            if (ori.isLow() && do_pml_Lo[idim]) {  // This is one of the lower side faces.
-                pml_bndry = b.smallEnd(idim) == regular_domain.smallEnd(idim);
-            } else if (ori.isHigh() && do_pml_Hi[idim]) { // This is one of the higher side faces.
-                pml_bndry = b.bigEnd(idim) == regular_domain.bigEnd(idim);
-            }
-            if (pml_bndry) {
-                Box bbox = amrex::adjCell(b, ori, ncell[idim]);
-                for (int jdim = 0; jdim < idim; ++jdim) {
-                    if (do_pml_Lo[jdim] &&
-                        bbox.smallEnd(jdim) == regular_domain.smallEnd(jdim)) {
-                        bbox.growLo(jdim, ncell[jdim]);
-                    }
-                    if (do_pml_Hi[jdim] &&
-                        bbox.bigEnd(jdim) == regular_domain.bigEnd(jdim)) {
-                        bbox.growHi(jdim, ncell[jdim]);
-                    }
-                }
-                bl.push_back(bbox);
-            }
-        }
-    }
-
-    return BoxArray(std::move(bl));
-}
-
-BoxArray
-PML::MakeBoxArray_multiple (const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
-                            const amrex::IntVect& ncell, int do_pml_in_domain,
-                            const amrex::IntVect& do_pml_Lo, const amrex::IntVect& do_pml_Hi)
-{
-    Box domain = geom.Domain();
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if (do_pml_Lo[idim]){
-            domain.growLo(idim, ncell[idim]);
-        }
-        if (do_pml_Hi[idim]){
-            domain.growHi(idim, ncell[idim]);
-        }
-    }
-    BoxList bl;
-    const auto grid_ba_size = static_cast<int>(grid_ba.size());
-    for (int i = 0; i < grid_ba_size; ++i)
-    {
-        const Box& grid_bx = grid_ba[i];
-        const IntVect& grid_bx_sz = grid_bx.size();
-
-        if (do_pml_in_domain == 0) {
-            // Make sure that, in the case of several distinct refinement patches,
-            //  the PML cells surrounding these patches cannot overlap
-            // The check is only needed along the axis where PMLs are being used.
-            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                if (do_pml_Lo[idim] || do_pml_Hi[idim]) {
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        grid_bx.length(idim) > ncell[idim],
-                        "Consider using larger amr.blocking_factor with PMLs");
-                }
-            }
-        }
-
-        Box bx = grid_bx;
-        bx.grow(ncell);
-        bx &= domain;
-
-        Vector<Box> bndryboxes;
-#if defined(WARPX_DIM_3D)
-        const int kbegin = -1, kend = 1;
-#else
-        const int kbegin =  0, kend = 0;
-#endif
-        for (int kk = kbegin; kk <= kend; ++kk) {
-            for (int jj = -1; jj <= 1; ++jj) {
-                for (int ii = -1; ii <= 1; ++ii) {
-                    if (ii != 0 || jj != 0 || kk != 0) {
-                        Box b = grid_bx;
-                        b.shift(grid_bx_sz * IntVect{AMREX_D_DECL(ii,jj,kk)});
-                        b &= bx;
-                        if (b.ok()) {
-                            bndryboxes.push_back(b);
-                        }
-                    }
-                }
-            }
-        }
-
-        const BoxList& noncovered = grid_ba.complementIn(bx);
-        for (const Box& b : noncovered) {
-            for (const auto& bb : bndryboxes) {
-                const Box ib = b & bb;
-                if (ib.ok()) {
-                    bl.push_back(ib);
-                }
-            }
-        }
-    }
-
-    BoxArray ba(bl);
-    ba.removeOverlap(false);
-
-    return ba;
 }
 
 void
@@ -1298,16 +1311,16 @@ PML::PushPSATD (ablastr::fields::MultiFabRegister& fields, const int lev)
 {
     ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, lev);
     ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, lev);
-    ablastr::fields::ScalarField pml_F_fp = fields.get(FieldType::pml_F_fp, lev);
-    ablastr::fields::ScalarField pml_G_fp = fields.get(FieldType::pml_G_fp, lev);
+    ablastr::fields::ScalarField pml_F_fp = (fields.has(FieldType::pml_F_fp, lev)) ? fields.get(FieldType::pml_F_fp, lev) : nullptr;
+    ablastr::fields::ScalarField pml_G_fp = (fields.has(FieldType::pml_G_fp, lev)) ? fields.get(FieldType::pml_G_fp, lev) : nullptr;
 
     // Update the fields on the fine and coarse patch
     PushPMLPSATDSinglePatch(lev, *spectral_solver_fp, pml_E_fp, pml_B_fp, pml_F_fp, pml_G_fp, m_fill_guards_fields);
     if (spectral_solver_cp) {
         ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, lev);
         ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, lev);
-        ablastr::fields::ScalarField pml_F_cp = fields.get(FieldType::pml_F_cp, lev);
-        ablastr::fields::ScalarField pml_G_cp = fields.get(FieldType::pml_G_cp, lev);
+        ablastr::fields::ScalarField pml_F_cp = (fields.has(FieldType::pml_F_cp, lev)) ? fields.get(FieldType::pml_F_cp, lev) : nullptr;
+        ablastr::fields::ScalarField pml_G_cp = (fields.has(FieldType::pml_G_cp, lev)) ? fields.get(FieldType::pml_G_cp, lev) : nullptr;
         PushPMLPSATDSinglePatch(lev, *spectral_solver_cp, pml_E_cp, pml_B_cp, pml_F_cp, pml_G_cp, m_fill_guards_fields);
     }
 }

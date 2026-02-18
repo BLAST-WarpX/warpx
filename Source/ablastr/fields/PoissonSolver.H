@@ -52,6 +52,7 @@
 #   include <AMReX_EBFabFactory.H>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -65,7 +66,6 @@ namespace ablastr::fields {
  * \param[in] rho The charge density a given species
  * \param[in] finest_level The most refined mesh refinement level
  * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[out] max_norm_rho The maximum L-infinity norm of `rho` across all levels
  */
 inline amrex::Real getMaxNormRho (
     ablastr::fields::ConstMultiLevelScalarField const& rho,
@@ -178,12 +178,13 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
  * \param[in] grid_type Integer that corresponds to the type of grid used in the simulation (collocated, staggered, hybrid)
- * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] is_solver_igf_on_lev0 boolean to select the Poisson solver: 1 for FFT on level 0 & Multigrid on other levels, 0 for Multigrid on all levels
+ * \param[in] is_igf_2d boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
+ * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
  * \param[in] eb_farray_box_factory a factory for field data, @see amrex::EBFArrayBoxFactory; required for embedded boundaries (default: none)
  */
@@ -206,11 +207,12 @@ computePhi (
     amrex::Vector<amrex::BoxArray> const& grids,
     utils::enums::GridType grid_type,
     bool is_solver_igf_on_lev0,
+    [[maybe_unused]] bool const is_igf_2d,
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
-    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt, // only used for EB
+    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
     [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
 )
@@ -233,13 +235,13 @@ computePhi (
 #endif
 
 #if !defined(ABLASTR_USE_FFT)
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "Must compile with FFT support to use the IGF solver!");
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "Must compile with FFT support to use the IGF solver!");
 #endif
 
 #if !defined(WARPX_DIM_3D)
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "The FFT Poisson solver is currently only implemented for 3D!");
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "The FFT Poisson solver is currently only implemented for 3D!");
 #endif
 
     // Set the value of beta
@@ -248,13 +250,16 @@ computePhi (
             {{ beta[2] }};  // beta_x and beta_z
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             {{ beta[0], beta[2] }};  // beta_x and beta_z
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            {{ beta[0] }};  // beta_x
 #else
             {{ beta[0], beta[1], beta[2] }};
 #endif
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE (
+        std::all_of(beta_solver.begin(), beta_solver.end(),
+            [](const auto b){return (b<1.0_rt);}),
+        "Components of beta_solver must be < 1.");
 
     amrex::LPInfo info;
 
@@ -265,19 +270,22 @@ computePhi (
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
 #if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
+        // determine if rho is zero everywhere
+        const amrex::Real max_norm_b = getMaxNormRho(
+            amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev] );
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, is_igf_2d);
             }
             continue;
         }
 #endif
         // Use the Multigrid (MLMG) solver if selected or on refined patches
         // but first scale rho appropriately
-        rho[lev]->mult(-1._rt / ablastr::constant::SI::ep0);
+        rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);
 
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
@@ -395,7 +403,7 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setAlwaysUseBNorm((max_norm_b > 0));
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -403,6 +411,8 @@ computePhi (
             // ask MLMG to fill BC for us after it solves the problem.
             mlmg.setFinalFillBC(true);
         }
+
+        rho[lev]->OverrideSync(geom[lev].periodicity());
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
@@ -432,7 +442,7 @@ computePhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ablastr::constant::SI::ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
 } // computePhi

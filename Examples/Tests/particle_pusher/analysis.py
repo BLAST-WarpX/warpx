@@ -22,13 +22,9 @@
 # tolerance: 0.001
 # Possible running time: ~ 4.0 s
 
-import os
 import sys
 
 import yt
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 tolerance = 0.001
 
@@ -40,9 +36,3 @@ x = ad["particle_position_x"].to_ndarray()
 print("error = ", abs(x))
 print("tolerance = ", tolerance)
 assert abs(x) < tolerance
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

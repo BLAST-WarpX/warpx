@@ -2,12 +2,22 @@
 #
 
 add_warpx_test(
+    test_1d_theta_implicit_planar_pinch  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_theta_implicit_planar_pinch  # inputs
+    "analysis_planar_pinch.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_semi_implicit_picard  # name
     1  # dims
     2  # nprocs
     inputs_test_1d_semi_implicit_picard  # inputs
-    analysis_1d.py  # analysis
-    diags/diag1000100  # output
+    "analysis_1d.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 
@@ -16,18 +26,50 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_theta_implicit_picard  # inputs
-    analysis_1d.py  # analysis
-    diags/diag1000100  # output
+    "analysis_1d.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
+
+if(AMReX_PETSC)
+    add_warpx_test(
+        test_2d_curl_curl_petsc_pc  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_curl_curl_petsc_pc  # inputs
+        "analysis_petsc_matrix.py diags/diag1000200"  # analysis
+        "analysis_default_regression.py --path diags/diag1000200"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_2d_theta_implicit_planar_pinch  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_theta_implicit_planar_pinch  # inputs
+        "analysis_planar_pinch.py diags/diag1000020"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+endif()
 
 add_warpx_test(
     test_2d_theta_implicit_jfnk_vandb  # name
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb  # inputs
-    analysis_vandb_jfnk_2d.py  # analysis
-    diags/diag1000020  # output
+    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_theta_implicit_jfnk_vandb_cropping  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_theta_implicit_jfnk_vandb_cropping  # inputs
+    "analysis_vandb_jfnk_2d_cropping.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 
@@ -36,8 +78,8 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_filtered  # inputs
-    analysis_vandb_jfnk_2d.py  # analysis
-    diags/diag1000020  # output
+    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
 
@@ -46,8 +88,18 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_picmi.py  # inputs
-    analysis_vandb_jfnk_2d.py  # analysis
-    diags/diag1000020  # output
+    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_theta_implicit_symmetry  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_theta_implicit_symmetry  # inputs
+    "analysis_implicit.py diags/diag1000400"  # analysis
+    "analysis_default_regression.py --path diags/diag1000400"  # checksum
     OFF  # dependency
 )
 
@@ -55,10 +107,10 @@ if(WarpX_FFT)
     add_warpx_test(
         test_2d_theta_implicit_strang_psatd  # name
         2  # dims
-        2  # nprocs
+        1  # nprocs
         inputs_test_2d_theta_implicit_strang_psatd  # inputs
-        analysis_2d_psatd.py  # analysis
-        diags/diag1000020  # output
+        "analysis_2d_psatd.py"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
         OFF  # dependency
     )
 endif()

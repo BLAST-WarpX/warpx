@@ -9,17 +9,15 @@
 
 #include "Utils/TextMsg.H"
 
-#include <map>
-
 std::string
 WarpXOpenPMDFileType ()
 {
     std::string openPMDFileType;
 #ifdef WARPX_USE_OPENPMD
 #if openPMD_HAVE_ADIOS2==1
-    openPMDFileType = "bp";
+    openPMDFileType = "bp5";
 #elif openPMD_HAVE_ADIOS1==1
-    openPMDFileType = "bp";
+    openPMDFileType = "bp";  // bp3
 #elif openPMD_HAVE_HDF5==1
     openPMDFileType = "h5";
 #else

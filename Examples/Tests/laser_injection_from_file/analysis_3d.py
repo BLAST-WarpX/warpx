@@ -13,7 +13,6 @@
 # - Compute the theory for laser envelope at time T
 # - Compare theory and simulation in 3D, for both envelope and central frequency
 
-import os
 import sys
 
 import matplotlib
@@ -26,9 +25,6 @@ from scipy.constants import c, epsilon_0
 from scipy.signal import hilbert
 
 yt.funcs.mylog.setLevel(50)
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # Maximum acceptable error for this test
 relative_error_threshold = 0.065
@@ -144,9 +140,3 @@ exp_freq = c / wavelength
 relative_error_freq = np.abs(freq - exp_freq) / exp_freq
 print("Relative error frequency: ", relative_error_freq)
 assert relative_error_freq < relative_error_threshold
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

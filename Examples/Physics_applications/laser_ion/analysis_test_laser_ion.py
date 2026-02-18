@@ -6,9 +6,6 @@ import sys
 import numpy as np
 import openpmd_api as io
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
-
 
 def load_field_from_iteration(
     series, iteration: int, field: str, coord: str = None
@@ -67,14 +64,6 @@ def compare_time_avg_with_instantaneous_diags(dir_inst: str, dir_avg: str):
 
 
 if __name__ == "__main__":
-    # NOTE: works only in the example directory due to relative path import
-    # compare checksums
-    evaluate_checksum(
-        test_name=os.path.split(os.getcwd())[1],
-        output_file=sys.argv[1],
-        output_format="openpmd",
-    )
-
     # TODO: implement intervals parser for PICMI that allows more complex output periods
     test_name = os.path.split(os.getcwd())[1]
     if "picmi" not in test_name:

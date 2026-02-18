@@ -7,8 +7,8 @@ if(WarpX_EB)
         RZ  # dims
         2  # nprocs
         inputs_test_rz_embedded_boundary_diffraction  # inputs
-        analysis_fields.py  # analysis
-        diags/diag1/  # output
+        "analysis_fields.py diags/diag1/"  # analysis
+        "analysis_default_regression.py --path diags/diag1/"  # checksum
         OFF  # dependency
     )
 endif()

@@ -21,7 +21,6 @@ velocity distribution (Gaussian or Gaussian-flux depending on the direction
 of space)
 """
 
-import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -29,9 +28,6 @@ import numpy as np
 import yt
 from scipy.constants import c, m_e, m_p
 from scipy.special import erf
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 yt.funcs.mylog.setLevel(0)
 
@@ -146,9 +142,3 @@ compare_gaussian_flux(-uz, w, u_th=0.1, u_m=-0.05, label="u_z")
 
 plt.tight_layout()
 plt.savefig("Distribution.png")
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

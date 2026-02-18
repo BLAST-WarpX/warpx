@@ -29,7 +29,7 @@ Use the following commands to download the WarpX source code and switch to the c
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use the following modules and environments on the system (``$HOME/taurus_warpx.profile``).
 
@@ -53,7 +53,7 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cmake -S . -B build -DWarpX_DIMS="1;2;3" -DWarpX_COMPUTE=CUDA
    cmake --build build -j 16
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The general :ref:`cmake compile-time options <install-build-cmake>` apply as usual.
 
 
 .. _running-cpp-taurus:

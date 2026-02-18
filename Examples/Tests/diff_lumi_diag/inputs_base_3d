@@ -28,6 +28,7 @@ my_constants.dt = sigmaz/clight/10.
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
+
 stop_time = T
 amr.n_cell = nx ny nz
 amr.max_grid_size = 128
@@ -93,11 +94,21 @@ diag1.dump_last_timestep = 1
 diag1.species = beam1 beam2
 
 # REDUCED
-warpx.reduced_diags_names = DifferentialLuminosity_beam1_beam2
+warpx.reduced_diags_names = DifferentialLuminosity_beam1_beam2 DifferentialLuminosity2d_beam1_beam2
 
 DifferentialLuminosity_beam1_beam2.type = DifferentialLuminosity
-DifferentialLuminosity_beam1_beam2.intervals = 5
+DifferentialLuminosity_beam1_beam2.intervals = 80
 DifferentialLuminosity_beam1_beam2.species = beam1 beam2
 DifferentialLuminosity_beam1_beam2.bin_number = 128
 DifferentialLuminosity_beam1_beam2.bin_max = 2.1*beam_energy_eV
-DifferentialLuminosity_beam1_beam2.bin_min = 1.9*beam_energy_eV
+DifferentialLuminosity_beam1_beam2.bin_min = 0
+
+DifferentialLuminosity2d_beam1_beam2.type = DifferentialLuminosity2D
+DifferentialLuminosity2d_beam1_beam2.intervals = 80
+DifferentialLuminosity2d_beam1_beam2.species = beam1 beam2
+DifferentialLuminosity2d_beam1_beam2.bin_number_1 = 128
+DifferentialLuminosity2d_beam1_beam2.bin_max_1 = 1.45*beam_energy_eV
+DifferentialLuminosity2d_beam1_beam2.bin_min_1 = 0
+DifferentialLuminosity2d_beam1_beam2.bin_number_2 = 128
+DifferentialLuminosity2d_beam1_beam2.bin_max_2 = 1.45*beam_energy_eV
+DifferentialLuminosity2d_beam1_beam2.bin_min_2 = 0

@@ -20,8 +20,6 @@
 */
 struct CopyParticleAttribs
 {
-    using TmpParticles = WarpXParticleContainer::TmpParticles;
-
     GetParticlePosition<PIdx> m_get_position;
 
     const amrex::ParticleReal* AMREX_RESTRICT uxp = nullptr;
@@ -41,30 +39,31 @@ struct CopyParticleAttribs
     /** \brief Construct a new functor
      *
      * \param a_pti iterator to the tile containing the macroparticles
-     * \param tmp_particle_data holder for the temporary particle data
      * \param a_offset offset to apply when reading / writing particle data
      *        This is needed because when we use field gather buffers we don't
      *        always start at the particle with index 0.
      */
-    CopyParticleAttribs (const WarpXParIter& a_pti, TmpParticles& tmp_particle_data,
-                         long a_offset = 0) noexcept
+    CopyParticleAttribs (
+        const WarpXParticleContainer& /*pc*/,
+        WarpXParIter& a_pti,
+        long a_offset = 0) noexcept
     {
-        if (tmp_particle_data.empty()) { return; }
-
         const auto& attribs = a_pti.GetAttribs();
 
         uxp = attribs[PIdx::ux].dataPtr() + a_offset;
         uyp = attribs[PIdx::uy].dataPtr() + a_offset;
         uzp = attribs[PIdx::uz].dataPtr() + a_offset;
 
-        const auto lev = a_pti.GetLevel();
-        const auto index = a_pti.GetPairIndex();
-        xpold  = tmp_particle_data[lev].at(index)[TmpIdx::xold ].dataPtr() + a_offset;
-        ypold  = tmp_particle_data[lev].at(index)[TmpIdx::yold ].dataPtr() + a_offset;
-        zpold  = tmp_particle_data[lev].at(index)[TmpIdx::zold ].dataPtr() + a_offset;
-        uxpold = tmp_particle_data[lev].at(index)[TmpIdx::uxold].dataPtr() + a_offset;
-        uypold = tmp_particle_data[lev].at(index)[TmpIdx::uyold].dataPtr() + a_offset;
-        uzpold = tmp_particle_data[lev].at(index)[TmpIdx::uzold].dataPtr() + a_offset;
+#if (AMREX_SPACEDIM >= 2)
+        xpold = a_pti.GetAttribs("x_n_btd").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        ypold = a_pti.GetAttribs("y_n_btd").dataPtr();
+#endif
+        zpold = a_pti.GetAttribs("z_n_btd").dataPtr();
+        uxpold = a_pti.GetAttribs("ux_n_btd").dataPtr();
+        uypold = a_pti.GetAttribs("uy_n_btd").dataPtr();
+        uzpold = a_pti.GetAttribs("uz_n_btd").dataPtr();
 
         m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
     }
@@ -79,8 +78,12 @@ struct CopyParticleAttribs
         AMREX_ASSERT(uyp != nullptr);
         AMREX_ASSERT(uzp != nullptr);
 
+#if (AMREX_SPACEDIM >= 2)
         AMREX_ASSERT(xpold != nullptr);
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         AMREX_ASSERT(ypold != nullptr);
+#endif
         AMREX_ASSERT(zpold != nullptr);
 
         AMREX_ASSERT(uxpold != nullptr);
@@ -90,8 +93,12 @@ struct CopyParticleAttribs
         amrex::ParticleReal x, y, z;
         m_get_position(i, x, y, z);
 
+#if (AMREX_SPACEDIM >= 2)
         xpold[i] = x;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         ypold[i] = y;
+#endif
         zpold[i] = z;
 
         uxpold[i] = uxp[i];

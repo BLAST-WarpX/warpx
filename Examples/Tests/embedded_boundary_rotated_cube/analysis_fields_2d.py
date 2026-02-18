@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import c, mu_0, pi
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 # This is a script that analyses the simulation results from
 # the script `inputs_3d`. This simulates a TMmnp mode in a PEC cubic resonator.
@@ -67,9 +63,3 @@ rel_tol_err = 1e-1
 # Compute relative l^2 error on By
 rel_err_y = np.sqrt(np.sum(np.square(By_sim - By_th)) / np.sum(np.square(By_th)))
 assert rel_err_y < rel_tol_err
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)

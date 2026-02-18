@@ -8,16 +8,10 @@
 # fields recorded by the backtransformed diagnostics have the right amplitude,
 # wavelength, and envelope (i.e. gaussian envelope with the right duration.
 
-import os
-import sys
-
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, e, m_e
 from scipy.optimize import curve_fit
-
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
-from checksumAPI import evaluate_checksum
 
 
 def gaussian_laser(z, a0, z0_phase, z0_prop, ctau, lambda0):
@@ -33,8 +27,6 @@ def gaussian_laser(z, a0, z0_phase, z0_prop, ctau, lambda0):
 def fit_function(z, z0_phase):
     return gaussian_laser(z, a0, z0_phase, z0_b + Lprop_b, ctau0, lambda0)
 
-
-plotfile = sys.argv[1]
 
 # The values must be consistent with the values provided in the simulation input
 t_current = 80e-15  # Time of the snapshot1
@@ -57,9 +49,3 @@ Ex_fit = gaussian_laser(info.z, a0, z0_fit, z0_b + Lprop_b, ctau0, lambda0)
 
 ## Check that the a0 agrees within 5% of the predicted value
 assert np.allclose(Ex, Ex_fit, atol=0.18 * Ex.max())
-
-# compare checksums
-evaluate_checksum(
-    test_name=os.path.split(os.getcwd())[1],
-    output_file=sys.argv[1],
-)
