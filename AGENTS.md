@@ -38,7 +38,6 @@ Key CMake options:
 - `-DWarpX_OPENPMD=ON` — HDF5/ADIOS I/O
 - `-DWarpX_FFT=ON` — spectral solvers (PSATD)
 - `-DWarpX_QED=ON` — QED physics
-- `-DWarpX_EB=ON` — embedded boundaries
 
 ## Testing
 
