@@ -520,15 +520,12 @@ MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& 
 {
     using ablastr::fields::Direction;
 
-    fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Y, Direction{0}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Y, Direction{1}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Y, Direction{2}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
-    fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
+    for (int n = 0; n < 3; ++n) {
+        fields.get(FieldType::MassMatrices_X, Direction{n}, lev)->setVal(0.0);
+        fields.get(FieldType::MassMatrices_Y, Direction{n}, lev)->setVal(0.0);
+        fields.get(FieldType::MassMatrices_Z, Direction{n}, lev)->setVal(0.0);
+    }
+
     for (auto& pc : allcontainers) {
         pc->DepositMassMatrices(fields, lev, dt);
     }
