@@ -67,6 +67,17 @@ cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DGPU_TARG
 cmake --build ${SRC_DIR}/lapackpp-adastra-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
 
+# Boost (QED tables)
+rm -rf ${SRC_DIR}/boost-temp
+mkdir -p ${SRC_DIR}/boost-temp
+curl -Lo ${SRC_DIR}/boost-temp/boost.tar.gz https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.gz
+tar -xzf ${SRC_DIR}/boost-temp/boost.tar.gz -C ${SRC_DIR}/boost-temp
+cd ${SRC_DIR}/boost-temp/boost_1_88_0
+./bootstrap.sh -with-libraries=math  --prefix=${SW_DIR}/boost-1.88.0
+./b2 --with-math cxxflags="-std=c++17" install -j ${PARALLEL}
+cd -
+rm -rf ${SRC_DIR}/boost-temp
+
 # c-blosc2 (I/O compression, for OpenPMD)
 if [ -d ${SRC_DIR}/c-blosc2 ]
 then
