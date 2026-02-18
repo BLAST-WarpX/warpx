@@ -9,7 +9,7 @@ Examples of inputs files can be found in the :ref:`Examples <usage-examples>` se
 
 .. note::
 
-   WarpX's input paramters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
+   WarpX's input parameters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
 
 .. note::
 
@@ -321,7 +321,7 @@ Overall simulation parameters
       In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
       The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
       Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft = 1``. Otherwise,
-      the energy convservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
+      the energy conservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
 .. _param-electrostatic-pic:
@@ -635,7 +635,7 @@ Domain Boundary Conditions
     * ``damped``: This is the recommended option in the moving direction when using the spectral solver with moving window (currently only supported along z). This boundary condition applies a damping factor to the electric and magnetic fields in the outer half of the guard cells, using a sine squared profile. As the spectral solver is by nature periodic, the damping prevents fields from wrapping around to the other end of the domain when the periodicity is not desired. This boundary condition is only valid when using the spectral solver.
 
     * ``pec``: This option can be used to set a Perfect Electric Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pec>` for more details. Note that PEC boundary is invalid at `r=0` for RZ, RCYLINDER, and RSPHERE. Please use ``none`` option. This boundary condition does not work with the spectral solver.
-      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross PEC boundaries, defaulting to false.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whether particle trajectories are cropped when particles cross PEC boundaries, defaulting to false.
 
     * ``pmc``: This option can be used to set a Perfect Magnetic Conductor at the simulation boundary. Please see the :ref:`PEC theory section <theory-bc-pmc>` for more details. This is equivalent to ``Neumann``. This boundary condition does not work with the spectral solver.
 
@@ -645,7 +645,7 @@ Domain Boundary Conditions
       The expressions are given for the low and high boundary on each axis, as listed below. The tangential fields are specified as
       expressions that can depend on the location and time. The tangential fields are in two pairs, the electric fields and the
       magnetic fields. In each pair, if one is specified, the other will be set to zero if not also specified.
-      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whethers particle trajectories are cropped when particles cross pec_insulator boundaries, defaulting to false.
+      There is the additional input parameter ``particles.crop_on_PEC_boundary`` which sets whether particle trajectories are cropped when particles cross pec_insulator boundaries, defaulting to false.
 
       * ``insulator.area_x_lo(y,z)``: For the lower x (or r) boundary, expression specifying the insulator location
 
@@ -1095,7 +1095,7 @@ Particle initialization
 
           * ``<species_name>.gaussian_beam_rotation_angle``: (`double`) angle of rotation around the specified axis, in radians.
 
-      * ``<species_name>.do_gaussian_beam_rotation_momenta`` (`bool`, optional) the momenta of the beam particles are also rotated using the same transformation applied to their positions. The rotation is the same as that for the positions. Momentas cannot be rotated independently; position rotation must be enabled first.
+      * ``<species_name>.do_gaussian_beam_rotation_momenta`` (`bool`, optional) the momenta of the beam particles are also rotated using the same transformation applied to their positions. The rotation is the same as that for the positions. Momenta cannot be rotated independently; position rotation must be enabled first.
 
       Note that the other beam parameters (e.g. ``<species_name>.x/y/z_rms``, etc.) are used in the initialization process `before` performing the rotation.
       Therefore, the user should define the beam size, cuts, and focal distance for the beam pre-rotation, hence aligned to the Cartesian axes.
@@ -2467,7 +2467,7 @@ Filtering
     Whether to use filtering in the simulation.
     With the explicit evolve scheme, the filtering is turned on by default, except for RZ FDTD.
     With the implicit evolve schemes, the filtering is turned off by default.
-    The filtering smoothes the charge and currents on the mesh, after depositing them from the macro-particles.
+    The filtering smooths the charge and currents on the mesh, after depositing them from the macro-particles.
     With implicit schemes, the electric field is also filtered (to maintain consistency for energy conservation).
     This uses a bilinear filter (see the :ref:`filtering section <theory-filter>`).
     With the RZ PSATD solver, the filtering is done in :math:`k`-space.
@@ -2709,7 +2709,7 @@ Maxwell solver: PSATD method
 
 * ``psatd.v_comoving`` (3 floating-point values, in units of the speed of light; default ``0. 0. 0.``)
     Defines the comoving velocity in the comoving PSATD scheme.
-    A non-zero comoving velocity selects the comoving PSATD algorithm, which suppresses the numerical Cherenkov instability (NCI) in boosted-frame simulations, under certain assumptions. This option requires that WarpX is compiled with ``USE_FFT = TRUE``. It also requires the use of direct current deposition (``algo.current_deposition = direct``) and has not been neither implemented nor tested with other current deposition schemes.
+    A non-zero comoving velocity selects the comoving PSATD algorithm, which suppresses the numerical Cherenkov instability (NCI) in boosted-frame simulations, under certain assumptions. This option requires that WarpX is compiled with ``USE_FFT = TRUE``. It also requires the use of direct current deposition (``algo.current_deposition = direct``) and has neither been implemented nor tested with other current deposition schemes.
 
 * ``psatd.do_time_averaging`` (`0` or `1`; default: 0)
     Whether to use an averaged Galilean PSATD algorithm or standard Galilean PSATD.
