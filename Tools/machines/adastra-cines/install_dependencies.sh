@@ -34,6 +34,9 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # General extra dependencies ##################################################
 #
 
+# define how many threads are used for compilation
+PARALLEL=16
+
 # BLAS++ (for PSATD+RZ)
 if [ -d ${SRC_DIR}/blaspp ]
 then
@@ -45,8 +48,8 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
 fi
 rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
-CXX=$(which CC) cmake -S ${SRC_DIR}/blaspp -B ${SRC_DIR}/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
-cmake --build ${SRC_DIR}/blaspp-adastra-gpu-build --target install --parallel 16
+cmake -S ${SRC_DIR}/blaspp -B ${SRC_DIR}/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DGPU_TARGETS=gfx90a  -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+cmake --build ${SRC_DIR}/blaspp-adastra-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
 
 # LAPACK++ (for PSATD+RZ)
@@ -60,37 +63,35 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
 fi
 rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
-cmake --build ${SRC_DIR}/lapackpp-adastra-gpu-build --target install --parallel 16
+cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DGPU_TARGETS=gfx90a  -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+cmake --build ${SRC_DIR}/lapackpp-adastra-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
 
-# c-blosc (I/O compression, for OpenPMD)
-if [ -d ${SRC_DIR}/c-blosc ]
+# c-blosc2 (I/O compression, for OpenPMD)
+if [ -d ${SRC_DIR}/c-blosc2 ]
 then
   # git repository is already there
   :
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git ${SRC_DIR}/c-blosc
+  git clone -b v2.23.0 https://github.com/Blosc/c-blosc2.git ${SRC_DIR}/c-blosc2
 fi
-rm -rf ${SRC_DIR}/c-blosc-ad-build
-cmake -S ${SRC_DIR}/c-blosc -B ${SRC_DIR}/c-blosc-ad-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${SRC_DIR}/c-blosc-ad-build --target install --parallel 16
-rm -rf ${SRC_DIR}/c-blosc-ad-build
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
+cmake -S ${SRC_DIR}/c-blosc2 -B ${SRC_DIR}/c-blosc2-ad-build -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF  -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-2.23.0
+cmake --build ${SRC_DIR}/c-blosc2-ad-build --target install --parallel ${PARALLEL}
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
 
-# ADIOS2 v. 2.10.2 (for OpenPMD)
-if [ -d ${SRC_DIR}/adios2 ]
+# c-blosc2 (I/O compression, for OpenPMD)
+if [ -d ${SRC_DIR}/c-blosc2 ]
 then
-  cd ${SRC_DIR}/adios2
-  git fetch --prune
-  git checkout v2.10.2
-  cd -
+  # git repository is already there
+  :
 else
-  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
+  git clone -b v2.23.0 https://github.com/Blosc/c-blosc2.git ${SRC_DIR}/c-blosc2
 fi
-rm -rf ${SRC_DIR}/adios2-ad-build
-cmake -S ${SRC_DIR}/adios2 -B ${SRC_DIR}/adios2-ad-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
-cmake --build ${SRC_DIR}/adios2-ad-build --target install -j 16
-rm -rf ${SRC_DIR}/adios2-ad-build
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
+cmake -S ${SRC_DIR}/c-blosc2 -B ${SRC_DIR}/c-blosc2-ad-build -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF  -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-2.23.0
+cmake --build ${SRC_DIR}/c-blosc2-ad-build --target install --parallel ${PARALLEL}
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
 
 
 # Python ######################################################################
