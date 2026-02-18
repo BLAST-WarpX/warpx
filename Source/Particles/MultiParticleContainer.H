@@ -332,10 +332,20 @@ public:
 
     std::string m_B_ext_particle_s = "none";
     std::string m_E_ext_particle_s = "none";
+    std::string m_gradB_ext_particle_s = "none";   // used for Blended pusher
+    std::string m_kappa_ext_particle_s = "none";   // used for Blended pusher
     // Parser for B_external on the particle
     std::unique_ptr<amrex::Parser> m_Bx_particle_parser;
     std::unique_ptr<amrex::Parser> m_By_particle_parser;
     std::unique_ptr<amrex::Parser> m_Bz_particle_parser;
+    // Parser for gradB_external on the particle - used for Blended pusher
+    std::unique_ptr<amrex::Parser> m_gradBx_particle_parser;
+    std::unique_ptr<amrex::Parser> m_gradBy_particle_parser;
+    std::unique_ptr<amrex::Parser> m_gradBz_particle_parser;
+    // Parser for kappa_external on the particle - used for Blended pusher
+    std::unique_ptr<amrex::Parser> m_kappax_particle_parser;
+    std::unique_ptr<amrex::Parser> m_kappay_particle_parser;
+    std::unique_ptr<amrex::Parser> m_kappaz_particle_parser;
     // Parser for E_external on the particle
     std::unique_ptr<amrex::Parser> m_Ex_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ey_particle_parser;

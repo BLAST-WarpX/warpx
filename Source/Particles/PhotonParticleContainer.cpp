@@ -212,7 +212,14 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 
             [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB; // workaround for nvcc
             if constexpr (exteb_control == has_exteb) {
-                getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+                // getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+
+                // NEW: extra outputs for blended pusher
+                [[maybe_unused]] amrex::ParticleReal gradBx = 0._prt, gradBy = 0._prt, gradBz = 0._prt;
+                [[maybe_unused]] amrex::ParticleReal kappax = 0._prt, kappay = 0._prt, kappaz = 0._prt;
+
+                getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                    gradBx, gradBy, gradBz, kappax, kappay, kappaz);
             }
 
 #ifdef WARPX_QED

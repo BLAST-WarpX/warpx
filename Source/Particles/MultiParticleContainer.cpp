@@ -148,6 +148,19 @@ MultiParticleContainer::ReadParameters ()
                        m_E_ext_particle_s.begin(),
                        ::tolower);
 
+        // query gradB and kappa init styles for blended pusher
+        pp_particles.query("gradB_ext_particle_init_style", m_gradB_ext_particle_s);
+        std::transform(m_gradB_ext_particle_s.begin(),
+               m_gradB_ext_particle_s.end(),
+               m_gradB_ext_particle_s.begin(),
+               ::tolower);
+               
+        pp_particles.query("kappa_ext_particle_init_style", m_kappa_ext_particle_s);
+        std::transform(m_kappa_ext_particle_s.begin(),
+               m_kappa_ext_particle_s.end(),
+               m_kappa_ext_particle_s.begin(),
+               ::tolower);
+
         // if the input string for B_ext_particle_s is
         // "parse_b_ext_particle_function" then the mathematical expression
         // for the Bx_, By_, Bz_external_particle_function(x,y,z)
@@ -174,6 +187,64 @@ MultiParticleContainer::ReadParameters ()
                utils::parser::makeParser(str_By_ext_particle_function,{"x","y","z","t"}));
            m_Bz_particle_parser = std::make_unique<amrex::Parser>(
                utils::parser::makeParser(str_Bz_ext_particle_function,{"x","y","z","t"}));
+
+        }
+
+        // if the input string for gradB_ext_particle_s is
+        // "parse_gradB_ext_particle_function" then the mathematical expression
+        // for the gradBx_, gradBy_, gradBz_external_particle_function(x,y,z)
+        // must be provided in the input file.
+        if (m_gradB_ext_particle_s == "parse_gradb_ext_particle_function") {
+           // store the mathematical expression as string
+           std::string str_gradBx_ext_particle_function;
+           std::string str_gradBy_ext_particle_function;
+           std::string str_gradBz_ext_particle_function;
+           utils::parser::Store_parserString(
+                pp_particles, "gradBx_external_particle_function(x,y,z,t)",
+                str_gradBx_ext_particle_function);
+           utils::parser::Store_parserString(
+                pp_particles, "gradBy_external_particle_function(x,y,z,t)",
+                str_gradBy_ext_particle_function);
+           utils::parser::Store_parserString(
+                pp_particles, "gradBz_external_particle_function(x,y,z,t)",
+                str_gradBz_ext_particle_function);
+
+           // Parser for gradB_external on the particle
+           m_gradBx_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_gradBx_ext_particle_function,{"x","y","z","t"}));
+           m_gradBy_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_gradBy_ext_particle_function,{"x","y","z","t"}));
+           m_gradBz_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_gradBz_ext_particle_function,{"x","y","z","t"}));
+
+        }
+
+        // if the input string for kappa_ext_particle_s is
+        // "parse_kappa_ext_particle_function" then the mathematical expression
+        // for the kappax_, kappay_, kappaz_external_particle_function(x,y,z)
+        // must be provided in the input file.
+        if (m_kappa_ext_particle_s == "parse_kappa_ext_particle_function") {
+           // store the mathematical expression as string
+           std::string str_kappax_ext_particle_function;
+           std::string str_kappay_ext_particle_function;
+           std::string str_kappaz_ext_particle_function;
+           utils::parser::Store_parserString(
+                pp_particles, "kappax_external_particle_function(x,y,z,t)",
+                str_kappax_ext_particle_function);
+           utils::parser::Store_parserString(
+                pp_particles, "kappay_external_particle_function(x,y,z,t)",
+                str_kappay_ext_particle_function);
+           utils::parser::Store_parserString(
+                pp_particles, "kappaz_external_particle_function(x,y,z,t)",
+                str_kappaz_ext_particle_function);
+
+           // Parser for kappa_external on the particle
+           m_kappax_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_kappax_ext_particle_function,{"x","y","z","t"}));
+           m_kappay_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_kappay_ext_particle_function,{"x","y","z","t"}));
+           m_kappaz_particle_parser = std::make_unique<amrex::Parser>(
+               utils::parser::makeParser(str_kappaz_ext_particle_function,{"x","y","z","t"}));
 
         }
 

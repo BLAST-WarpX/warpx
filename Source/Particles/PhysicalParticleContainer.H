@@ -512,6 +512,10 @@ protected:
     /* Vector of user-defined parser for initializing user-defined real attributes */
     amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_real_attrib_parser;
 
+// declared for blended pusher
+    private:
+    int m_mu_gc_comp    = -1;
+    int m_alpha_gc_comp = -1;
 };
 
 #endif

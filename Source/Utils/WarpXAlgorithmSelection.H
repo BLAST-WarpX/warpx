@@ -75,7 +75,9 @@ AMREX_ENUM(ParticlePusherAlgo,
            Boris,
            Vay,
            HigueraCary,
+           Blended,
            higuera = HigueraCary,
+           blended = Blended,
            Default = Boris);
 
 AMREX_ENUM(CurrentDepositionAlgo,

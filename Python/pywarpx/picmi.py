@@ -301,6 +301,9 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_algorithm_target_weight = kw.pop(
             "warpx_resampling_algorithm_target_weight", None
         )
+        self.warpx_resampling_algorithm_target_ratio = kw.pop(
+            "warpx_resampling_algorithm_target_ratio", None
+        )
         self.resampling_algorithm_velocity_grid_type = kw.pop(
             "warpx_resampling_algorithm_velocity_grid_type", None
         )
@@ -2071,40 +2074,19 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
 
-    The standard PICMI parameters `required_precision` and `maximum_iterations` control the
-    MLMG Poisson solver convergence for the labframe electrostatic solvers. When `warpx_magnetostatic=True`,
-    these parameters are used as defaults for the magnetostatic solver but can be overridden
-    with the explicit `warpx_magnetostatic_*` parameters.
-
     Parameters
     ----------
     warpx_relativistic: bool, default=False
         Whether to use the relativistic solver or lab frame solver
 
     warpx_absolute_tolerance: float, default=0.
-        Absolute tolerance on the labframe electrostatic solver
+        Absolute tolerance on the lab frame solver
 
     warpx_self_fields_verbosity: integer, default=2
-        Level of verbosity for the labframe electrostatic solver
+        Level of verbosity for the lab frame solver
 
     warpx_magnetostatic: bool, default=False
-        Whether to also solve for self-consistent magnetic fields from currents.
-
-    warpx_magnetostatic_required_precision: float, optional
-        Relative precision for the magnetostatic solver. If not specified,
-        defaults to the value of `required_precision`.
-
-    warpx_magnetostatic_absolute_tolerance: float, optional
-        Absolute tolerance for the magnetostatic solver. If not specified,
-        defaults to the value of `warpx_absolute_tolerance`.
-
-    warpx_magnetostatic_max_iters: integer, optional
-        Maximum iterations for the magnetostatic solver. If not specified,
-        defaults to the value of `maximum_iterations`.
-
-    warpx_magnetostatic_verbosity: integer, optional
-        Verbosity level for the magnetostatic solver. If not specified,
-        defaults to the value of `warpx_self_fields_verbosity`.
+        Whether to use the magnetostatic solver
 
     warpx_effective_potential: bool, default=False
         Whether to use the effective potential Poisson solver (EP-PIC)
@@ -2116,7 +2098,8 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_effective_potential_time_filter_param: float, default=0.1
         Time filtering parameter used to filter sigma in the effective
         potential scheme. sigma is updated using:
-        sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n
+                  + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
 
     warpx_effective_potential_density_floor: float, default=0
         If given, this value will be used as the minimum density during the
@@ -2138,15 +2121,6 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
-        # Explicit magnetostatic solver parameters (override self_fields_* defaults)
-        self.magnetostatic_required_precision = kw.pop(
-            "warpx_magnetostatic_required_precision", None
-        )
-        self.magnetostatic_absolute_tolerance = kw.pop(
-            "warpx_magnetostatic_absolute_tolerance", None
-        )
-        self.magnetostatic_max_iters = kw.pop("warpx_magnetostatic_max_iters", None)
-        self.magnetostatic_verbosity = kw.pop("warpx_magnetostatic_verbosity", None)
         self.effective_potential = kw.pop("warpx_effective_potential", False)
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
@@ -2165,6 +2139,9 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
         BC_map["open"] = "open"
 
+        # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
+        BC_map['open'] = 'open'
+        
         self.grid.grid_initialize_inputs()
 
         # set adaptive timestepping parameters
@@ -2194,22 +2171,13 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
-            # Explicit magnetostatic solver parameters (if provided)
-            pywarpx.warpx.magnetostatic_solver_required_precision = (
-                self.magnetostatic_required_precision
-            )
-            pywarpx.warpx.magnetostatic_solver_absolute_tolerance = (
-                self.magnetostatic_absolute_tolerance
-            )
-            pywarpx.warpx.magnetostatic_solver_max_iters = self.magnetostatic_max_iters
-            pywarpx.warpx.magnetostatic_solver_verbosity = self.magnetostatic_verbosity
             pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
             pywarpx.boundary.potential_lo_y = self.grid.potential_ymin
             pywarpx.boundary.potential_lo_z = self.grid.potential_zmin
             pywarpx.boundary.potential_hi_x = self.grid.potential_xmax
             pywarpx.boundary.potential_hi_y = self.grid.potential_ymax
             pywarpx.boundary.potential_hi_z = self.grid.potential_zmax
-
+            
         pywarpx.warpx.poisson_solver = self.method
 
 
@@ -2707,6 +2675,72 @@ class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
                 )
 
 
+class AnalyticGradBAppliedField(picmistandard.PICMI_AnalyticAppliedField):
+    def init(self, kw):
+        # Reuse the same constant-mangling machinery
+        self.mangle_dict = None
+
+    def applied_field_initialize_inputs(self):
+        # lower/upper_bound not used by WarpX
+
+        if self.mangle_dict is None:
+            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        # If any gradB component is set, enable the parser mode
+        if (self.Bx_expression is not None
+            or self.By_expression is not None
+            or self.Bz_expression is not None):
+
+            # This string MUST match what you used in MultiParticleContainer
+            pywarpx.particles.gradB_ext_particle_init_style = (
+                "parse_gradb_ext_particle_function"
+            )
+
+            for sdir, expression in zip(
+                ["x", "y", "z"],
+                [self.Bx_expression, self.By_expression, self.Bz_expression],
+            ):
+                if expression is None:
+                    continue
+                expression = pywarpx.my_constants.mangle_expression(
+                    expression, self.mangle_dict
+                )
+                # Name here must match your C++ Store_parserString key, e.g.
+                # "gradBx_external_particle_function(x,y,z,t)" or similar.
+                pywarpx.particles.__setattr__(
+                    f"gradB{sdir}_external_particle_function(x,y,z,t)", expression
+                )
+
+class AnalyticKappaAppliedField(picmistandard.PICMI_AnalyticAppliedField):
+    def init(self, kw):
+        self.mangle_dict = None
+
+    def applied_field_initialize_inputs(self):
+        if self.mangle_dict is None:
+            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        # For kappa, you might choose to name the PICMI-side components x,y,z
+        if (self.Bx_expression is not None
+            or self.By_expression is not None
+            or self.Bz_expression is not None):
+
+            pywarpx.particles.kappa_ext_particle_init_style = (
+                "parse_kappa_ext_particle_function"
+            )
+
+            for comp, expression in zip(
+                ["x", "y", "z"],
+                [self.Bx_expression, self.By_expression, self.Bz_expression],
+            ):
+                if expression is None:
+                    continue
+                expression = pywarpx.my_constants.mangle_expression(
+                    expression, self.mangle_dict
+                )
+                pywarpx.particles.__setattr__(
+                    f"kappa{comp}_external_particle_function(x,y,z,t)", expression
+                )
+
 class Mirror(picmistandard.PICMI_Mirror):
     def applied_field_initialize_inputs(self):
         try:
@@ -2826,6 +2860,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         background_mass=None,
         max_background_density=None,
         ndt=None,
+        electron_species=None,
         **kw,
     ):
         self.name = name
@@ -2836,6 +2871,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.scattering_processes = scattering_processes
         self.max_background_density = max_background_density
         self.ndt = ndt
+        self.electron_species = electron_species
 
         self.handle_init(kw)
 
@@ -2858,6 +2894,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         collision.background_mass = self.background_mass
         collision.max_background_density = self.max_background_density
         collision.ndt = self.ndt
+        if self.electron_species is not None:
+            collision.electron_species = self.electron_species.name
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():

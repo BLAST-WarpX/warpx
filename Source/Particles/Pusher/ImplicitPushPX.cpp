@@ -177,7 +177,15 @@ namespace {
             // Externally applied E and B-field in Cartesian co-ordinates
             [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
             if constexpr (exteb_control == has_exteb) {
-                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+                // getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+
+                // NEW: extra outputs for blended pusher
+                [[maybe_unused]] amrex::ParticleReal gradBx = 0._prt, gradBy = 0._prt, gradBz = 0._prt;
+                [[maybe_unused]] amrex::ParticleReal kappax = 0._prt, kappay = 0._prt, kappaz = 0._prt;
+
+                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                    gradBx, gradBy, gradBz, kappax, kappay, kappaz);
+
             }
 
             // The momentum push starts with the velocity at the start of the step
