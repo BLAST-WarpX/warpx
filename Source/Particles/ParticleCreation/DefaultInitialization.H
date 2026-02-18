@@ -97,7 +97,7 @@ namespace ParticleCreation {
      * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
      * @tparam DstPC the destination particle container type
      * @param[inout] ptile the tile in which attributes are initialized
-     * @param[in] pc Particle container
+     * @param[in] pc the destination particle container
      * @param[in] n_external_attr_real The number of real attributes that have been externally set.
      * These are NOT initialized by this function.
      * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
