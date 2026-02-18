@@ -37,6 +37,12 @@ Each set of two timers show the exclusive, top, and inclusive, bottom, informati
 
    When creating performance-related issues on the WarpX GitHub repo, please include Tiny Profiler tables (besides the usual issue description, input file and submission script), or (even better) the whole standard output.
 
+.. warning::
+
+   On GPU runs, the Tiny Profiler tables are measuring asynchronously run GPU kernels *from the host side*, which can be misleading.
+   When profiling GPU runs, set the ``warpx.do_device_synchronize=1`` :ref:`option <running-cpp-sync>` flag to synchronize GPU kernels and asynchronous copies explicitly.
+   This can add runtime overheads in excess of 25%, but will give more precise information for profiling.
+
 For more detailed information please visit the `AMReX profiling documentation <https://amrex-codes.github.io/amrex/docs_html/AMReX_Profiling_Tools_Chapter.html>`__.
 There is a script located `here <https://github.com/AMReX-Codes/amrex/tree/development/Tools/TinyProfileParser>`__ that parses the Tiny Profiler output and generates a JSON file that can be used with `Hatchet <https://hatchet.readthedocs.io/en/latest/>`__ in order to analyze performance.
 

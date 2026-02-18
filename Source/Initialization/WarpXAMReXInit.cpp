@@ -62,8 +62,8 @@ namespace {
 
     void set_device_synchronization ()
     {
-        //See https://github.com/AMReX-Codes/amrex/pull/3763
-        auto warpx_do_device_synchronize = amrex_use_gpu;
+        // See https://github.com/BLAST-WarpX/warpx/pull/6593
+        auto warpx_do_device_synchronize = 0;
 
         auto pp_warpx = amrex::ParmParse{"warpx"};
         pp_warpx.query("do_device_synchronize", warpx_do_device_synchronize);
