@@ -166,7 +166,7 @@ python3 -m pip install --upgrade yt
 # install or update WarpX dependencies such as picmistandard
 python3 -m pip install --upgrade -r ${SRC_DIR}/warpx/requirements.txt
 # optional: for libEnsemble
-python3 -m pip install -r ${SRC_DIR}/warpx/Tools/LibEnsemble/requirements.txt
+#python3 -m pip install -r ${SRC_DIR}/warpx/Tools/LibEnsemble/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 #python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/rocm5.4.2
 #python3 -m pip install -r ${SRC_DIR}/warpx/Tools/optimas/requirements.txt

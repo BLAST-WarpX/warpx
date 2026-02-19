@@ -2,9 +2,9 @@
 #export proj="project_..."
 
 # required dependencies
-module load LUMI/24.03  partition/G
-module load rocm/6.0.3
-module load buildtools/24.03
+module load LUMI/25.03  partition/G
+module load rocm/6.3.4
+module load buildtools/25.03
 
 # optional: just an additional text editor
 module load nano
@@ -17,8 +17,7 @@ export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load Boost/1.82.0-cpeCray-23.09
-
+module load Boost/1.88.0-cpeCray-25.03
 # optional: for openPMD support
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
