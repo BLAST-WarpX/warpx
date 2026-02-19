@@ -1354,5 +1354,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
+    amrex::Gpu::synchronize();
 }
 #endif

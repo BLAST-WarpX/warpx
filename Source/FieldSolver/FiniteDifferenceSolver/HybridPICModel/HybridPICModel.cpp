@@ -484,9 +484,11 @@ void HybridPICModel::BfieldEvolveRK (
     amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
+    WARPX_PROFILE("BfieldEvolveRK");
     // Make copies of the B-field multifabs at t = n and create multifabs for
     // each direction to store the Runge-Kutta intermediate terms. Each
     // multifab has 2 components for the different terms that need to be stored.
+    auto val = Gpu::setNoSyncRegion(true);
     std::array< MultiFab, 3 > B_old;
     std::array< MultiFab, 3 > K;
     for (int ii = 0; ii < 3; ii++)
@@ -554,7 +556,6 @@ void HybridPICModel::BfieldEvolveRK (
         Box const& tjx  = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
         Box const& tjy  = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
         Box const& tjz  = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-
         amrex::ParallelFor(tjx, tjy, tjz,
             // x calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
@@ -651,6 +652,9 @@ void HybridPICModel::BfieldEvolveRK (
             }
         );
     }
+    Gpu::setNoSyncRegion(val);
+    Gpu::streamSynchronize();
+
 }
 
 
@@ -663,9 +667,13 @@ void HybridPICModel::FieldPush (
     amrex::Real dt, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
+    WARPX_PROFILE("FieldPush");
+
     auto& warpx = WarpX::GetInstance();
 
     amrex::Real const t_old = warpx.gett_old(0);
+    // Required besause the code above does things non threaded by level
+    amrex::Gpu::synchronize();
 
     // Calculate J = curl x B / mu0 - J_ext
     CalculatePlasmaCurrent(Bfield, eb_update_E);
@@ -673,10 +681,13 @@ void HybridPICModel::FieldPush (
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
     // Call FillBoundary if a collocated grid is used
     if (Bz_IndexType[0] == Ez_IndexType[0]) {
-        warpx.FillBoundaryE(ng, nodal_sync);
+      Gpu::streamSynchronize();
+      warpx.FillBoundaryE(ng, nodal_sync);
     }
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);
+    Gpu::streamSynchronize();
     warpx.FillBoundaryB(ng, nodal_sync);
+    amrex::Gpu::synchronize();
 }

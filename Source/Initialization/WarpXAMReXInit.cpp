@@ -67,7 +67,7 @@ namespace {
 
         auto pp_warpx = amrex::ParmParse{"warpx"};
         pp_warpx.query("do_device_synchronize", warpx_do_device_synchronize);
-        bool do_device_synchronize = warpx_do_device_synchronize;
+        bool do_device_synchronize = false;//warpx_do_device_synchronize;
 
         auto pp_tiny_profiler = amrex::ParmParse{"tiny_profiler"};
         if (pp_tiny_profiler.queryAdd("device_synchronize_around_region", do_device_synchronize) )
