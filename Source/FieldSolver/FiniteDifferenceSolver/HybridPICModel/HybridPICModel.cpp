@@ -72,6 +72,14 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("Jy_external_grid_function(x,y,z,t)", m_Jy_ext_grid_function);
     pp_hybrid.query("Jz_external_grid_function(x,y,z,t)", m_Jz_ext_grid_function);
 
+    // check if external currents are specified
+    if ((m_Jx_ext_grid_function == "0.0") &&
+        (m_Jy_ext_grid_function == "0.0") &&
+        (m_Jz_ext_grid_function == "0.0"))
+    {
+        m_has_external_current = false;
+    }
+
     // external fields
     pp_hybrid.query("add_external_fields", m_add_external_fields);
 
@@ -137,15 +145,17 @@ void HybridPICModel::AllocateLevelMFs (
 
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{0},
-        lev, amrex::convert(ba, jx_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{1},
-        lev, amrex::convert(ba, jy_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{2},
-        lev, amrex::convert(ba, jz_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
+    if (m_has_external_current) {
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+    }
 
     if (m_add_external_fields) {
         m_external_vector_potential->AllocateLevelMFs(
@@ -179,20 +189,22 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
     m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
-    m_J_external_parser[0] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
-    m_J_external_parser[1] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jy_ext_grid_function,{"x","y","z","t"}));
-    m_J_external_parser[2] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jz_ext_grid_function,{"x","y","z","t"}));
-    m_J_external[0] = m_J_external_parser[0]->compile<4>();
-    m_J_external[1] = m_J_external_parser[1]->compile<4>();
-    m_J_external[2] = m_J_external_parser[2]->compile<4>();
+    if (m_has_external_current) {
+        m_J_external_parser[0] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
+        m_J_external_parser[1] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jy_ext_grid_function,{"x","y","z","t"}));
+        m_J_external_parser[2] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jz_ext_grid_function,{"x","y","z","t"}));
+        m_J_external[0] = m_J_external_parser[0]->compile<4>();
+        m_J_external[1] = m_J_external_parser[1]->compile<4>();
+        m_J_external[2] = m_J_external_parser[2]->compile<4>();
 
-    // check if the external current parsers depend on time
-    for (int i=0; i<3; i++) {
-        const std::set<std::string> J_ext_symbols = m_J_external_parser[i]->symbols();
-        m_external_current_has_time_dependence += J_ext_symbols.count("t");
+        // check if the external current parsers depend on time
+        for (int i=0; i<3; i++) {
+            const std::set<std::string> J_ext_symbols = m_J_external_parser[i]->symbols();
+            m_external_current_has_time_dependence += J_ext_symbols.count("t");
+        }
     }
 
     auto& warpx = WarpX::GetInstance();
@@ -248,17 +260,19 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     Ez_IndexType[1]    = 1;
 #endif
 
-    // Initialize external current - note that this approach skips the check
-    // if the current is time dependent which is what needs to be done to
-    // write time independent fields on the first step.
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        warpx.ComputeExternalFieldOnGridUsingParser(
-            FieldType::hybrid_current_fp_external,
-            m_J_external[0],
-            m_J_external[1],
-            m_J_external[2],
-            lev, PatchType::fine,
-            warpx.GetEBUpdateEFlag());
+    if (m_has_external_current) {
+        // Initialize external current - note that this approach skips the check
+        // if the current is time dependent which is what needs to be done to
+        // write time independent fields on the first step.
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            warpx.ComputeExternalFieldOnGridUsingParser(
+                FieldType::hybrid_current_fp_external,
+                m_J_external[0],
+                m_J_external[1],
+                m_J_external[2],
+                lev, PatchType::fine,
+                warpx.GetEBUpdateEFlag());
+        }
     }
 
     if (m_add_external_fields) {
@@ -307,20 +321,15 @@ void HybridPICModel::CalculatePlasmaCurrent (
         current_fp_plasma, Bfield, eb_update_E, lev
     );
 
-    // we shouldn't apply the boundary condition to J since J = J_i - J_e but
-    // the boundary correction was already applied to J_i and the B-field
-    // boundary ensures that J itself complies with the boundary conditions, right?
-    // ApplyJfieldBoundary(lev, Jfield[0].get(), Jfield[1].get(), Jfield[2].get());
-    for (int i=0; i<3; i++) { current_fp_plasma[i]->FillBoundary(warpx.Geom(lev).periodicity()); }
-
-    // Subtract external current from "Ampere" current calculated above. Note
-    // we need to include 1 ghost cell since later we will interpolate the
-    // plasma current to a nodal grid.
-    ablastr::fields::VectorField current_fp_external = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_external, lev);
-    for (int i=0; i<3; i++) {
-        current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
+    if (m_has_external_current) {
+        // Subtract external current from "Ampere" current calculated above. Note
+        // we need to include 1 ghost cell since later we will interpolate the
+        // plasma current to a nodal grid.
+        ablastr::fields::VectorField current_fp_external = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_external, lev);
+        for (int i=0; i<3; i++) {
+            current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
+        }
     }
-
 }
 
 void HybridPICModel::HybridPICSolveE (
