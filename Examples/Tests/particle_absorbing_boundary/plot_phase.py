@@ -7,7 +7,7 @@
 # Authors: Andrew Myers
 # License: BSD-3-Clause-LBNL
 #
-# This script plots the phase space diagram using the reduced diagnostics from the particle absorbing boundary test case.
+# This script plots the phase space diagram using the reduced diagnostics from the 1D particle absorbing boundary test case.
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +20,8 @@ plt.pcolormesh(np.log10(data))
 ax = plt.gca()
 ax.set_yticks([0, 333.33333, 666.666667, 1000])
 ax.set_yticklabels([-20, 0, 20, 40])
-ax.set_xticks([0, 200, 400, 600, 800, 1000])
-ax.set_xticklabels([-100, -50, 0, 50, 100, 150])
+ax.set_xticks([0, 333.33333, 666.66667, 1000])
+ax.set_xticklabels([-100, -50, 0, 50])
+ax.set_xlabel(r"$z (\mu m)$")
 ax.set_ylabel(r"$uz [m c]$")
 plt.savefig("thermalizer")

@@ -7,8 +7,7 @@
 # Authors: Andrew Myers
 # License: BSD-3-Clause-LBNL
 #
-# This script plots the fields from the 2D particle absorbing boundary test case.
-
+# This script plots the fields from the full, 2D version of the particle absorbing boundary case.
 
 import sys
 import yt
