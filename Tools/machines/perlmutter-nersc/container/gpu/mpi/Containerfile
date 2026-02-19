@@ -1,0 +1,307 @@
+# Build this container from its current directory:
+#   podman build --build-arg NJOBS=6 -t warpx-perlmutter .
+# Adjust NJOBS to the number of processes to use for parallel compilation.
+#
+# WarpX executables are installed in /usr/bin/
+# WarpX Python bindings are installed in /opt/venv
+#
+# To push this to the NERSC registry, first tag the full name and version,
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+# and then push
+#   podman login registry.nersc.gov
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+#
+# On Perlmutter, copy your inputs file to your present working directory (PWD) and run WarpX like this:
+#   podman-hpc run --rm --gpu --cuda-mpi --nccl -v $PWD:/opt/pwd --workdir /opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest warpx.2d /opt/pwd/inputs_base_2d
+# Prefix this line with "srun ..." in job scripts, as usual:
+#   srun --cpu-bind=cores bash -c "
+#     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
+#     podman run ... ${INPUTS} ${GPU_AWARE_MPI}" \
+#   > output.txt
+#
+
+# Base System and Essential Tools Installation
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS warpx-dev
+
+# WarpX version
+ARG warpx_version=25.11
+
+# Build parallelism
+ARG NJOBS
+ENV NJOBS=$NJOBS
+
+# Perlmutter GPU: A100
+# Perlmutter CPU: Zen v3
+ENV AMREX_CUDA_ARCH=8.0        \
+    CUDAARCHS=80               \
+    CXXFLAGS="-march=znver3"   \
+    CFLAGS="-march=znver3"
+
+# Ubuntu apt global options
+ENV DEBIAN_FRONTEND=noninteractive
+
+# CMake global options
+ENV CMAKE_GENERATOR="Ninja"
+
+# Autotools global options
+ENV FORCE_UNSAFE_CONFIGURE=1
+
+# Pip global options
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Custom install location
+ENV PATH="/opt/warpx/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/warpx/lib:${LD_LIBRARY_PATH}"
+ENV CMAKE_PREFIX_PATH="/opt/warpx:${CMAKE_PREFIX_PATH}"
+
+# Install essential system dependencies (development)
+# Perlmutter MPICH: cray-mpich/8.1.30 based on MPICH 3.4a2
+# Ubuntu 22.04 ships MPICH 4.0, so we build from source
+RUN apt-get update           && \
+    apt-get install             \
+        -y                      \
+        --no-install-recommends \
+        autoconf                \
+        build-essential         \
+        ca-certificates         \
+        cmake                   \
+        coreutils               \
+        curl                    \
+        g++                     \
+        git                     \
+        pkg-config              \
+        python3                 \
+        python3-pip             \
+        python3-dev             \
+        python3-venv            \
+        unzip                   \
+        libblas-dev             \
+        libbz2-dev              \
+        libpng-dev              \
+        liblapack-dev           \
+        libzstd-dev             \
+        ninja-build             \
+        zlib1g-dev           && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install MPICH 3.4 support from source
+#   after https://docs.nersc.gov/development/containers/shifter/how-to-use/#using-mpi-in-shifter
+# Note:
+#   w/o GPUdirect here, because we will swap out the MPI binaries on Perlmutter using a Podman-HPC
+#   plugin (--mpi/--cuda-mpi). This only works if we do NOT build GPUdirect here, this we skip:
+#     --with-ch4-shmmods=posix,gpudirect
+# Perlmutter MPICH: cray-mpich/8.1.30 based on MPICH 3.4a2
+# TODO: install libfabric from source and depend on it (or expose where embedded libfabric gets installed)
+ARG mpich=3.4.3
+ARG mpich_prefix=mpich-$mpich
+
+RUN \
+    curl -Lo $mpich_prefix.tar.gz https://www.mpich.org/static/downloads/$mpich/$mpich_prefix.tar.gz && \
+    tar xzf $mpich_prefix.tar.gz                                            && \
+    cd $mpich_prefix                                                        && \
+    FFLAGS=-fallow-argument-mismatch FCFLAGS=-fallow-argument-mismatch         \
+      ./configure                                                              \
+        --disable-fortran                                                      \
+        --prefix=/opt/warpx                                                    \
+        --with-device=ch4:ofi                                               && \
+    make -j ${NJOBS}                                                        && \
+    make install                                                            && \
+    make clean                                                              && \
+    cd ..                                                                   && \
+    rm -rf ${mpich_prefix}*
+
+RUN /sbin/ldconfig
+# ENV MPICH_GPU_SUPPORT_ENABLED=1
+
+# Install c-blosc from source
+RUN git clone                               \
+      -b v2.14.4                            \
+      https://github.com/Blosc/c-blosc2.git \
+      /tmp/c-blosc2                      && \
+    cmake                                   \
+      -S /tmp/c-blosc2                      \
+      -B /tmp/c-blosc2-build                \
+      -DCMAKE_INSTALL_PREFIX=/opt/warpx     \
+      -DBUILD_STATIC=OFF                    \
+      -DBUILD_TESTS=OFF                     \
+      -DBUILD_BENCHMARKS=OFF                \
+      -DBUILD_EXAMPLES=OFF                  \
+      -DBUILD_FUZZERS=OFF                   \
+      -DDEACTIVATE_AVX2=OFF                 \
+                                         && \
+    cmake --build /tmp/c-blosc2-build       \
+          --target install                  \
+          -j${NJOBS} &&                     \
+    rm -rf /tmp/c-blosc2*
+
+# Install ADIOS2 from source
+# TODO: install libfabric from source and depend on it (or expose where MPICH-embedded libfabric gets installed)
+# TODO: -DADIOS2_USE_SST=ON
+RUN git clone                                   \
+        -b v2.10.2                              \
+        https://github.com/ornladios/ADIOS2.git \
+        /tmp/adios2                             \
+                                             && \
+    cmake -S /tmp/adios2           \
+          -B /tmp/adios2-build     \
+          -DADIOS2_USE_Blosc2=ON   \
+          -DADIOS2_USE_BZip2=ON    \
+          -DADIOS2_USE_Fortran=OFF \
+          -DADIOS2_USE_SST=OFF     \
+          -DADIOS2_USE_SZ=OFF      \
+          -DADIOS2_USE_MGARD=OFF   \
+          -DADIOS2_USE_PNG=ON      \
+          -DADIOS2_USE_Python=OFF  \
+          -DADIOS2_USE_ZeroMQ=OFF  \
+          -DADIOS2_USE_ZFP=OFF     \
+          -DCMAKE_INSTALL_PREFIX=/opt/warpx \
+                                         && \
+    cmake --build /tmp/adios2-build         \
+          --target install -j${NJOBS}    && \
+    rm -rf /tmp/adios2*
+
+# Install BLAS++ and LAPACK++
+RUN git clone                  \
+        -b v2024.05.31         \
+        https://github.com/icl-utk-edu/blaspp.git \
+        /tmp/blaspp         && \
+    cd /tmp/blaspp &&          \
+    cmake -S /tmp/blaspp       \
+       -B /tmp/blaspp-build    \
+       -Duse_openmp=OFF        \
+       -Dgpu_backend=cuda      \
+       -DCMAKE_CXX_STANDARD=17 \
+       -DCMAKE_INSTALL_PREFIX=/opt/warpx                         \
+       -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libblas.so     \
+       -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \
+                                  && \
+    cmake --build /tmp/blaspp-build  \
+          --target install           \
+          -j${NJOBS}              && \
+    rm -rf /tmp/blaspp*
+
+RUN git clone                     \
+      -b v2024.05.31              \
+      https://github.com/icl-utk-edu/lapackpp.git \
+      /tmp/lapackpp               \
+                               && \
+    cmake -S /tmp/lapackpp        \
+      -B /tmp/lapackpp-build      \
+      -DCMAKE_CXX_STANDARD=17     \
+      -Dbuild_tests=OFF           \
+      -DCMAKE_INSTALL_PREFIX=/opt/warpx \
+      -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \
+                                      && \
+    cmake --build /tmp/lapackpp-build    \
+          --target install               \
+          -j${NJOBS}                  && \
+    rm -rf /tmp/lapackpp*
+
+# Create and activate Python virtual environment
+ENV PATH="/opt/venv/bin:${PATH}"
+RUN python3 -m venv /opt/venv && \
+    pip install          \
+        --no-cache-dir   \
+        --upgrade        \
+        pip              \
+        uv               \
+                      && \
+    uv pip install       \
+        --no-cache-dir   \
+        --upgrade        \
+        build            \
+        cmake            \
+        "nvidia-cuda-runtime-cu12==12.4.*" \
+        cupy-cuda12x     \
+        cython           \
+        h5py             \
+        lasy             \
+        matplotlib       \
+        numpy            \
+        openpmd-api      \
+        pandas           \
+        scipy            \
+        packaging        \
+        setuptools[core] \
+        wheel
+
+# TODO: if we build cupy ourselves, we can likely shrink
+#       the container size
+
+# Optional: PyTorch (can be added on top as well in a warpx-ml container)
+#            \
+#                      && \
+#    uv pip install       \
+#        --no-cache-dir                                      \
+#        --upgrade                                           \
+#        --index-url https://download.pytorch.org/whl/cu126  \
+#        torch
+#        optimas[all]
+
+# Build WarpX
+# TODO: -DWarpX_DIMS="1;2;RCYLINDER;RSPHERE;RZ;3"
+# TODO: -DWarpX_QED_TABLE_GEN=ON (needs boost math)
+RUN git clone                       \
+        -b ${warpx_version}         \
+        https://github.com/BLAST-WarpX/warpx.git \
+        /tmp/warpx-src           && \
+    cmake                           \
+        -S /tmp/warpx-src           \
+        -B /tmp/warpx-build         \
+        -DBUILD_SHARED_LIBS=ON      \
+        -DCMAKE_INSTALL_PREFIX=/opt/warpx \
+        -DWarpX_COMPUTE=CUDA        \
+        -DWarpX_DIMS="1;2;RZ;3"     \
+        -DWarpX_FFT=ON              \
+        -DWarpX_PYTHON=ON           \
+        -DWarpX_QED_TABLE_GEN=OFF   \
+                                 && \
+    cmake --build /tmp/warpx-build  \
+          --target install          \
+          -j${NJOBS}                \
+                                 && \
+    cmake --build /tmp/warpx-build  \
+          --target pip_install      \
+          -j${NJOBS}                \
+                                 && \
+    rm -rf /tmp/warpx*           && \
+    ln -s /opt/warpx/bin/warpx.1d* /opt/warpx/bin/warpx.1d  && \
+    ln -s /opt/warpx/bin/warpx.2d* /opt/warpx/bin/warpx.2d  && \
+    ln -s /opt/warpx/bin/warpx.rz* /opt/warpx/bin/warpx.rz  && \
+    ln -s /opt/warpx/bin/warpx.3d* /opt/warpx/bin/warpx.3d  && \
+    rm -rf /opt/warpx/lib/*.a
+
+# Reduce to runtime
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS warpx
+
+# Install essential system dependencies (runtime)
+RUN apt-get update            && \
+    apt-get install              \
+        -y                       \
+        --no-install-recommends  \
+        ca-certificates     \
+        coreutils           \
+        python3             \
+        python3-pip         \
+        python3-venv        \
+        libblas3            \
+        libbz2-1.0          \
+        libpng16-16         \
+        liblapack3          \
+        libzstd1            \
+        zlib1g           && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy installed software from previous stage
+COPY --from=warpx-dev /opt/warpx /opt/warpx
+COPY --from=warpx-dev /opt/venv /opt/venv
+
+# Set up entrypoint
+COPY entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
+ENTRYPOINT ["/opt/entrypoint.sh"]
+
+# Default command
+CMD ["/bin/bash", "-l"]

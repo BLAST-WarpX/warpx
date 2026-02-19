@@ -122,6 +122,9 @@ public:
         return field_boundary_hi;
     }
 
+    [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
+                                               const int  bdry_side ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -795,6 +798,8 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    amrex::Real magnetostatic_solver_required_precision = amrex::Real(1.e-11);
+    amrex::Real magnetostatic_solver_absolute_tolerance = amrex::Real(0.0);
     int magnetostatic_solver_max_iters = 200;
     int magnetostatic_solver_verbosity = 2;
     void ComputeMagnetostaticField ();
@@ -847,7 +852,7 @@ public:
      */
     void ReadExternalFieldFromFile (
          const std::string& read_fields_from_path, amrex::MultiFab* mf,
-         const std::string& F_name, const std::string& F_component);
+         const std::string& F_name, const std::string& F_component, int dest_comp = 0);
 
     /**
      * \brief

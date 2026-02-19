@@ -877,14 +877,27 @@ WarpX::InitData ()
 
     if (restart_chkfile.empty())
     {
-        // Loop through species and calculate their space-charge field
-        bool const reset_fields = false; // Do not erase previous user-specified values on the grid
         ExecutePythonCallback("beforeInitEsolve");
-        ComputeSpaceChargeField(reset_fields);
-        ExecutePythonCallback("afterInitEsolve");
-        if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
-            ComputeMagnetostaticField();
+        // Loop through species and calculate their space-charge field
+        // Field solve step for electrostatic solvers, or when
+        // any species has initialize_self_fields = true, or when boundary potential is specified
+        bool has_initialize_self_fields = false;
+        for (auto const& species : *mypc) {
+            has_initialize_self_fields |= species->initialize_self_fields;
         }
+        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
+             has_initialize_self_fields ||
+             has_boundary_potential)
+            && WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
+        {
+            bool const reset_fields = false; // Do not erase previous user-specified values on the grid
+            ComputeSpaceChargeField(reset_fields);
+            if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
+                ComputeMagnetostaticField();
+            }
+        }
+        ExecutePythonCallback("afterInitEsolve");
         // Add external fields to the fine patch fields. This makes it so that the
         // net fields are the sum of the field solutions and any external fields.
         for (int lev = 0; lev <= max_level; ++lev) {
@@ -1599,12 +1612,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
                 // Mark on which grid points B should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
             }
 
         }
@@ -1688,59 +1701,75 @@ WarpX::LoadExternalFields (int const lev)
         // Call Python callback which might write values to external field multifabs
         ExecutePythonCallback("loadExternalFields");
     }
-    // External particle fields
 
+    // External particle B fields
     if (mypc->m_B_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
-            "B", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
-            "B", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
-            "B", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
+        if (!metaB.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaB.size()); ++ic) {
+                const std::string& path = metaB[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
+                    "B", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
+                    "B", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
+                    "B", dimnames[2], ic);
+            }
+        }
     }
+
+    //  External particle E fields
     if (mypc->m_E_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
-            "E", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
-            "E", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
-            "E", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
+        if (!metaE.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaE.size()); ++ic) {
+                const std::string& path = metaE[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
+                    "E", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
+                    "E", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
+                    "E", dimnames[2], ic);
+            }
+        }
     }
 }
 
 void
 WarpX::ReadExternalFieldFromFile (
        const std::string& read_fields_from_path, amrex::MultiFab* mf,
-       const std::string& F_name, const std::string& F_component)
+       const std::string& F_name, const std::string& F_component, int dest_comp)
 {
 #if !defined(WARPX_USE_OPENPMD)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile requires OpenPMD support to be enabled");
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile is not supported for 1D RCYLINDER and RSPHERE");
 
 #else
@@ -1757,8 +1786,12 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component);
-    ExternalFieldView const& external_field_view = external_field_reader.getView();
+    Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    bool distributed = true;
+    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
+                                              problo, dx, pbox, distributed);
+    external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
+                                  mf->nGrowVect());
 
     // Loop over boxes
 #if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
@@ -1768,6 +1801,9 @@ WarpX::ReadExternalFieldFromFile (
     {
         const amrex::Box tb = mfi.tilebox(nodal_flag, mf->nGrowVect());
         auto const& mffab = mf->array(mfi);
+
+        // This is thread safe because getView return by value.
+        auto const& external_field_view = external_field_reader.getView(mfi.LocalIndex());
 
         // Start ParallelFor
         amrex::ParallelFor (tb,
@@ -1791,7 +1827,7 @@ WarpX::ReadExternalFieldFromFile (
                     (AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
                                   problo[2] + k *dx[2]));
-                mffab(i,j,k) = external_field_view(pos);
+                mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 
         ); // End ParallelFor

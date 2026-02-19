@@ -14,12 +14,18 @@
 
 #include <AMReX.H>
 #include <AMReX_Array.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_DataAllocator.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_Math.H>
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Vector.H>
 
 #include <cmath>
+#include <functional>
 #include <string>
 
 // struct whose getDensity returns constant density.
@@ -87,7 +93,7 @@ struct InjectorDensityPredefined
             const double rc        = p[4];
             const double n0        = p[5];
             const double kp = PhysConst::q_e/PhysConst::c
-                *std::sqrt( n0/(PhysConst::m_e*PhysConst::ep0) );
+                *std::sqrt( n0/(PhysConst::m_e*PhysConst::epsilon_0) );
             double n;
 
             // Longitudinal profile, normalized to 1
@@ -122,9 +128,30 @@ private:
 // struct whose getDensity returns density from file.
 struct InjectorDensityFromFile
 {
-    InjectorDensityFromFile (std::string const& a_file_name);
+    InjectorDensityFromFile (std::string const& a_file_name, amrex::Geometry const& a_geom, bool a_distributed);
 
     void clear ();
+
+    // This function needs to be called before intializing the density
+    // profile, if the openPMD data are distributed. When the openPMD data
+    // are loaded in the constructor of this class, we do not know the
+    // paricle containers' BoxArray and DistributionMapping yet.
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // This function needs to be called before we do continuous injection of
+    // particles to inform the injector to load the data we need.
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // For distributed data, this function prepares the injector for loading
+    // data in this Box. Here `li` is the local index for the Box in a
+    // particle container.
+    void prepare (int li);
+
+    [[nodiscard]] bool distributed () const;
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -180,9 +207,10 @@ struct InjectorDensity
     { }
 
     // This constructor stores a InjectorDensityFromFile in union object.
-    InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name)
+    InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name,
+                     amrex::Geometry const& a_geom, bool a_distributed)
         : type(Type::fromfile),
-          object(t,a_file_name)
+          object(t,a_file_name,a_geom,a_distributed)
     { }
 
     // Explicitly prevent the compiler from generating copy constructors
@@ -196,6 +224,20 @@ struct InjectorDensity
     ~InjectorDensity () = default;
 
     void clear ();
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (int li, InjectorDensity** inj_rho);
+
+    [[nodiscard]] bool needPreparation () const;
+
+    [[nodiscard]] bool distributed () const;
 
     // call getDensity from the object stored in the union
     // (the union is called Object, and the instance is called object).
@@ -243,14 +285,19 @@ private:
             : parser(a_parser) {}
         Object (InjectorDensityPredefined*, std::string const& a_species_name)
             : predefined(a_species_name) {}
-        Object (InjectorDensityFromFile*, std::string const& a_file_name)
-            : fromfile(a_file_name) {}
+        Object (InjectorDensityFromFile*, std::string const& a_file_name,
+                amrex::Geometry const& a_geom, bool a_distributed)
+            : fromfile(a_file_name, a_geom, a_distributed) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
         InjectorDensityPredefined predefined;
         InjectorDensityFromFile   fromfile;
     };
     Object object;
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+    std::unique_ptr<void,amrex::DataDeleter> inj_rho_data;
+    amrex::Vector<InjectorDensity*> inj_rho_omp;
+#endif
 };
 
 // In order for InjectorDensity to be trivially copyable, its destructor

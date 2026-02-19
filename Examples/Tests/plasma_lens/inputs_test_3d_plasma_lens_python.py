@@ -68,4 +68,4 @@ diag1.diag_type = "Full"
 diag1.electrons.variables = "x", "y", "z", "ux", "uy", "uz"
 
 warpx.init()
-warpx.evolve(max_step)
+warpx.step(max_step)

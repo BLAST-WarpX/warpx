@@ -355,7 +355,7 @@ public:
             amrex::ParticleReal const gamma1_rel = std::sqrt(1.0_prt + u1sq_rel/c2);
             amrex::ParticleReal const KE_eV = m1*u1sq_rel/(1.0_prt + gamma1_rel)/PhysConst::q_e;
 
-            amrex::ParticleReal const wpe = PhysConst::q_e*std::sqrt(n1/(m1*PhysConst::ep0));
+            amrex::ParticleReal const wpe = PhysConst::q_e*std::sqrt(n1/(m1*PhysConst::epsilon_0));
 
             int i0_cut, index;
             amrex::ParticleReal koT1_cut, kdsigdk_cut;

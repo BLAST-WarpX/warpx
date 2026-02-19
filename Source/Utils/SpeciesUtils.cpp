@@ -79,7 +79,8 @@ namespace SpeciesUtils {
     // InjectorPosition[Constant or Predefined or etc.].getDensity.
     void parseDensity (std::string const& species_name, std::string const& source_name,
         std::unique_ptr<InjectorDensity,InjectorDensityDeleter>& h_inj_rho,
-        std::unique_ptr<amrex::Parser>& density_parser)
+        std::unique_ptr<amrex::Parser>& density_parser,
+        amrex::Geometry const& geom)
     {
         const amrex::ParmParse pp_species(species_name);
 
@@ -106,8 +107,10 @@ namespace SpeciesUtils {
                 density_parser->compile<3>()));
         } else if (rho_prof_s == "read_from_file") {
             std::string density_file;
+            bool distributed = true;
             utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file));
+            pp_species.query("read_density_distributed", distributed);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }

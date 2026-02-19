@@ -190,10 +190,9 @@ WarpX::Evolve (int numsteps)
 
         CheckLoadBalance(step);
 
-        // Update timestep for electrostatic solver if a constant dt is not provided
-        // This first synchronizes the position and velocity before setting the new timestep
-        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
-            !m_const_dt.has_value() && m_dt_update_interval.contains(step+1)) {
+        // Update the timestep for solvers that support adaptive timestepping
+        // (electrostatic and theta-implicit EM), provided const_dt is not specified.
+        if (m_dt_update_interval.contains(step+1)) {
             if (verbose_step) {
                 amrex::Print() << Utils::TextMsg::Info("updating timestep");
             }
@@ -270,6 +269,12 @@ WarpX::Evolve (int numsteps)
         }
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
+
+        if (m_implicit_solver) {
+            ExecutePythonCallback("beforecollisions");
+            mypc->doCollisions(step, cur_time, dt[0]);
+            ExecutePythonCallback("aftercollisions");
+        }
 
         // Field solve step for electrostatic or hybrid-PIC solvers
         if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
@@ -384,11 +389,6 @@ void WarpX::OneStep (
 
     // implicit solver
     if (m_implicit_solver) {
-        // perform particle collisions
-        ExecutePythonCallback("beforecollisions");
-        mypc->doCollisions(a_step, a_cur_time, a_dt);
-        ExecutePythonCallback("aftercollisions");
-
         // advance fields and particles by one time step
         m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
     }
@@ -657,7 +657,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
     mypc->ApplyBoundaryConditions();
-    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc);
+    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
     // Non-Maxwell solver: particles can move by an arbitrary number of cells
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
@@ -691,12 +691,12 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         using warpx::fields::FieldType;
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
-            *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
+            *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
         mypc->deleteInvalidParticles();
     }
 
     if (sort_intervals.contains(step+1)) {
-        if (verbose) {
+        if (verbose && !m_limit_verbose_step) {
             amrex::Print() << Utils::TextMsg::Info("re-sorting particles");
         }
         mypc->SortParticlesByBin(

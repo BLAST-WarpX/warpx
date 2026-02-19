@@ -13,6 +13,8 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_BaseFabUtility.H>
+
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include <openPMD/openPMD.hpp>
 #endif
@@ -24,7 +26,6 @@
 
 namespace
 {
-
     enum class EMFieldType{E, B};
 
     template <EMFieldType T>
@@ -189,99 +190,390 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     //___________________________________________________________________________
 }
 
-ExternalFieldReader::ExternalFieldReader (std::string const& read_fields_from_path,
-                                          std::string const& F_name,
-                                          std::string const& F_component)
+ExternalFieldReader::ExternalFieldReader (
+    std::string read_fields_from_path,
+    std::string F_name, std::string F_component,
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& problo,
+    amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& pdx,
+    amrex::Box const& dombox, bool distributed)
+    : m_file(std::move(read_fields_from_path)),
+      m_name(std::move(F_name)),
+      m_component(std::move(F_component)),
+      m_problo(problo),
+      m_probdx(pdx),
+      m_dombox(dombox),
+      m_distributed(distributed)
+{}
+
+void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 {
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    using namespace amrex;
 
-    auto series = openPMD::Series(read_fields_from_path, openPMD::Access::READ_ONLY);
+    auto series = openPMD::Series(m_file, openPMD::Access::READ_ONLY);
     auto iseries = series.iterations.begin()->second;
-    auto F = iseries.meshes[F_name];
+    auto F = iseries.meshes[m_name];
 
-#if (AMREX_SPACEDIM > 1)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(F.getAttribute("dataOrder").get<std::string>() == "C",
-                                     "Reading from files with non-C dataOrder is not implemented");
-#endif
+    bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
+    amrex::ignore_unused(c_order);
 
     auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
     auto fileGeom = F.getAttribute("geometry").get<std::string>();
 
+    bool xyz_order = true;
+
 #if defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z",
-                                     "3D expects axisLabels {x, y, z}");
+    if (axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z") {
+        xyz_order = true;
+    } else if (axisLabels.at(2) == "x" && axisLabels.at(1) == "y" && axisLabels.at(1) == "z") {
+        xyz_order = false;
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("3D expects axisLabels {x, y, z} or {z, y, x}");
+    }
 #elif defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "XZ can only read from files with cartesian geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "x" && axisLabels.at(1) == "z",
-                                     "XZ expects axisLabels {x, z}");
+    if (axisLabels.at(0) == "x" && axisLabels.at(1) == "z") {
+        xyz_order = true;
+    } else if (axisLabels.at(1) == "x" && axisLabels.at(0) == "z") {
+        xyz_order = false;
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("XZ expects axisLabels {x, z} or {z, x}");
+    }
 #elif defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "thetaMode", "RZ can only read from files with 'thetaMode'  geometry");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "r" && axisLabels.at(1) == "z",
-                                     "RZ expects axisLabels {r, z}");
+    if (axisLabels.at(0) == "r" && axisLabels.at(1) == "z") {
+        xyz_order = true;
+    } else if (axisLabels.at(1) == "r" && axisLabels.at(0) == "z") {
+        xyz_order = false;
+    } else {
+        WARPX_ABORT_WITH_MESSAGE("RZ expects axisLabels {r, z} or {z, r}");
+    }
 #elif defined(WARPX_DIM_1D_Z)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "z", "1D3V expects axisLabel {z}");
 #endif
 
     const auto d = F.gridSpacing<long double>();
-    AMREX_D_TERM(m_external_field_view.dx[0] = amrex::Real(d.at(0));,
-                 m_external_field_view.dx[1] = amrex::Real(d.at(1));,
-                 m_external_field_view.dx[2] = amrex::Real(d.at(2)));
+    if (xyz_order) {
+        AMREX_D_TERM(m_dx[0] = Real(d.at(0));,
+                     m_dx[1] = Real(d.at(1));,
+                     m_dx[2] = Real(d.at(2)));
+    } else {
+        AMREX_D_TERM(m_dx[0] = Real(d.at(AMREX_SPACEDIM-1));,
+                     m_dx[1] = Real(d.at(AMREX_SPACEDIM-2));,
+                     m_dx[2] = Real(d.at(AMREX_SPACEDIM-3)));
+    }
 
     const auto offset = F.gridGlobalOffset();
-    AMREX_D_TERM(m_external_field_view.offset[0] = amrex::Real(offset.at(0));,
-                 m_external_field_view.offset[1] = amrex::Real(offset.at(1));,
-                 m_external_field_view.offset[2] = amrex::Real(offset.at(2)));
+    if (xyz_order) {
+        AMREX_D_TERM(m_offset[0] = Real(offset.at(0));,
+                     m_offset[1] = Real(offset.at(1));,
+                     m_offset[2] = Real(offset.at(2)));
+    } else {
+        AMREX_D_TERM(m_offset[0] = Real(offset.at(AMREX_SPACEDIM-1));,
+                     m_offset[1] = Real(offset.at(AMREX_SPACEDIM-2));,
+                     m_offset[2] = Real(offset.at(AMREX_SPACEDIM-3)));
+    }
 
-    // Load the first component if F_component is empty
-    auto FC = F_component.empty() ? F.begin()->second : F[F_component];
+    // Load the first component if m_component is empty
+    auto FC = m_component.empty() ? F.begin()->second : F[m_component];
     const auto extent = FC.getExtent();
-
-    // Determine the chunk data that will be loaded.
-    // Now, the full range of data is loaded.
-    // Loading chunk data can speed up the process.
-    // Thus, `chunk_offset` and `chunk_extent` should be modified accordingly in another PR.
-    const openPMD::Offset chunk_offset(extent.size(), 0);
-    const openPMD::Extent chunk_extent = extent;
-
-    m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
-    series.flush();
-
-#if defined(AMREX_USE_GPU)
-    auto *FC_data_host = m_FC_data_cpu.get();
-    auto const total_extent = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
-                                              1, std::multiplies<std::size_t>());
-    m_FC_data_gpu.resize(total_extent);
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, FC_data_host, FC_data_host + total_extent, m_FC_data_gpu.begin());
-    amrex::Gpu::streamSynchronize();
-    m_FC_data_cpu.reset();
-    auto *FC_data = m_FC_data_gpu.data();
-#else
-    auto *FC_data = m_FC_data_cpu.get();
-#endif
-
+    for (auto ex : extent) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ex < decltype(ex)(std::numeric_limits<int>::max()),
+                                         "The openPMD file is too big");
+    }
 #if defined(WARPX_DIM_RZ)
     // extent[0] is for theta
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent[0] == 1,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == 3 && extent[0] == 1,
                                      "External field reading is not implemented for more than one RZ mode (see #3829)");
-    const auto extent0 = static_cast<int>(extent.at(1));
-    const auto extent1 = static_cast<int>(extent.at(2));
+    if (xyz_order) {
+        m_size[0] = extent[1];
+        m_size[1] = extent[2];
+    } else {
+        m_size[0] = extent[2];
+        m_size[1] = extent[1];
+    }
 #else
-    AMREX_D_TERM(const auto extent0 = static_cast<int>(extent.at(0));,
-                 const auto extent1 = static_cast<int>(extent.at(1));,
-                 const auto extent2 = static_cast<int>(extent.at(2)));
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == AMREX_SPACEDIM,
+                                     "The openPMD file has wrong dimension.");
+    if (xyz_order) {
+        AMREX_D_TERM(m_size[0] = int(extent.at(0));,
+                     m_size[1] = int(extent.at(1));,
+                     m_size[2] = int(extent.at(2)));
+    } else {
+        AMREX_D_TERM(m_size[0] = int(extent.at(AMREX_SPACEDIM-1));,
+                     m_size[1] = int(extent.at(AMREX_SPACEDIM-2));,
+                     m_size[2] = int(extent.at(AMREX_SPACEDIM-3)));
+    }
 #endif
 
-    m_external_field_view.table = decltype(m_external_field_view.table)
-#if (AMREX_SPACEDIM == 1)
-        (FC_data, 0, extent0);
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        m_domain.setLo(idim, m_offset[idim]);
+        m_domain.setHi(idim, m_offset[idim]+(m_size[idim]-1)*m_dx[idim]);
+    }
+
+    // Determine the full extent of the data we need
+    IntVect lo, hi;
+    if (m_distributed) {
+        bool is_empty = false;
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            auto plo = pbox.lo(idim);
+            auto phi = pbox.hi(idim);
+            auto ilo = int(std::floor( (plo-m_offset[idim])/m_dx[idim] ));
+            auto ihi = int(std::floor( (phi-m_offset[idim])/m_dx[idim] ))+1; // +1 for interpolation
+            --ilo; // in case there are roundoff errors
+            ++ihi;
+            lo[idim] = std::max(ilo, 0);
+            hi[idim] = std::min(ihi, m_size[idim]-1);
+            if (hi[idim] < lo[idim]) { is_empty = true; }
+        }
+        if (is_empty) { return; } // The openPMD file does not have the data we need.
+    } else {
+        lo = IntVect(0);
+        hi = m_size-1;
+    }
+
+    // Determine the chunk data that will be loaded.
+    BoxArray grids;
+    DistributionMapping dmap;
+    bool has_load = true;
+    if (m_distributed && !m_moving_window) {
+        // At this point, the data is distributed in an arbitrary way.  For
+        // moving window, the data is loaded in a different way. We
+        // duplicate the data needed for initializing the newly added
+        // region, because the amount of data is relatively small and
+        // because the duplicated approach is much simpler.
+        grids = amrex::decompose(Box(lo,hi), ParallelDescriptor::NProcs());
+        Vector<int> pmap(grids.size());
+        std::iota(pmap.begin(), pmap.end(), 0);
+        dmap.define(std::move(pmap));
+        if (ParallelDescriptor::MyProc() < grids.size()) {
+            auto const& b = grids[ParallelDescriptor::MyProc()];
+            lo = b.smallEnd();
+            hi = b.  bigEnd();
+        } else {
+            has_load = false;
+        }
+    }
+
+    openPMD::Offset chunk_offset(extent.size(),0);
+    openPMD::Extent chunk_extent(extent.size(),1);
+#if defined(WARPX_DIM_RZ)
+    if (xyz_order) {
+        chunk_offset[1] = lo[0];
+        chunk_offset[2] = lo[1];
+        chunk_extent[1] = hi[0]-lo[0]+1;
+        chunk_extent[2] = hi[1]-lo[1]+1;
+    } else {
+        chunk_offset[2] = lo[0];
+        chunk_offset[1] = lo[1];
+        chunk_extent[2] = hi[0]-lo[0]+1;
+        chunk_extent[1] = hi[1]-lo[1]+1;
+    }
 #else
-        (FC_data, {AMREX_D_DECL(0,0,0)}, {AMREX_D_DECL(extent0, extent1, extent2)});
+    if (xyz_order) {
+        AMREX_D_TERM(chunk_offset[0] = lo[0];,
+                     chunk_offset[1] = lo[1];,
+                     chunk_offset[2] = lo[2]);
+        AMREX_D_TERM(chunk_extent[0] = hi[0]-lo[0]+1;,
+                     chunk_extent[1] = hi[1]-lo[1]+1;,
+                     chunk_extent[2] = hi[2]-lo[2]+1);
+    } else {
+        AMREX_D_TERM(chunk_offset[AMREX_SPACEDIM-1] = lo[0];,
+                     chunk_offset[AMREX_SPACEDIM-2] = lo[1];,
+                     chunk_offset[AMREX_SPACEDIM-3] = lo[2]);
+        AMREX_D_TERM(chunk_extent[AMREX_SPACEDIM-1] = hi[0]-lo[0]+1;,
+                     chunk_extent[AMREX_SPACEDIM-2] = hi[1]-lo[1]+1;,
+                     chunk_extent[AMREX_SPACEDIM-3] = hi[2]-lo[2]+1);
+    }
 #endif
 
+    if (has_load) {
+        m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
+    }
+    series.flush();
+
+    if (has_load) {
+        Box box(lo,hi);
+#ifdef AMREX_USE_GPU
+        m_fab.resize(box, 1);
+        Gpu::htod_memcpy_async(m_fab.dataPtr(), m_FC_data_cpu.get(), m_fab.nBytes());
+        Gpu::streamSynchronize();
+        m_FC_data_cpu.reset();
 #else
-    amrex::ignore_unused(read_fields_from_path, F_name, F_component);
+        m_fab = BaseFab<double>(box, 1, m_FC_data_cpu.get());
+#endif
+
+#if (AMREX_SPACEDIM > 1)
+        if ((xyz_order && c_order) || (!xyz_order && !c_order)) {
+            BaseFab<double> tmp(box, 1);
+            amrex::transposeCtoF(m_fab.dataPtr(), tmp.dataPtr(),
+                                 AMREX_D_DECL(box.length(0),
+                                              box.length(1),
+                                              box.length(2)));
+            amrex::Gpu::streamSynchronize();
+            std::swap(m_fab,tmp);
+            m_FC_data_cpu.reset();
+        }
+#endif
+    }
+
+    if (! grids.empty()) {
+        m_mf.define(grids, dmap, 1, 0, MFInfo{}.SetAlloc(false));
+        if (has_load) {
+            m_mf.setFab(ParallelDescriptor::MyProc(),
+                        BaseFab<double>(m_fab,amrex::make_alias,0,1));
+        }
+    }
+
+#else
+    amrex::ignore_unused(pbox);
     WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER and RSPHERE");
 #endif
+}
+
+void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
+                                   amrex::DistributionMapping const& dmap,
+                                   amrex::IntVect const& ngrow,
+                                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_moving_window == false);
+
+    amrex::RealBox rbox;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        rbox.setLo(idim, m_problo[idim] + m_dombox.smallEnd(idim)*m_probdx[idim]);
+        rbox.setHi(idim, m_problo[idim] + m_dombox.  bigEnd(idim)*m_probdx[idim]);
+    }
+    if (get_zlab) {
+        auto zlo = get_zlab(rbox.lo(AMREX_SPACEDIM-1));
+        auto zhi = get_zlab(rbox.hi(AMREX_SPACEDIM-1));
+        rbox.setLo(AMREX_SPACEDIM-1, zlo);
+        rbox.setHi(AMREX_SPACEDIM-1, zhi);
+    }
+    load_data(rbox);
+
+    if (m_distributed) {
+        BoxList bl;
+        bl.reserve(grids.size());
+        for (int ibox = 0; ibox < int(grids.size()); ++ibox) {
+            Box b = grids[ibox];
+            b.surroundingNodes().grow(ngrow);
+            IntVect lo, hi;
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                auto plo = m_problo[idim] + b.smallEnd(idim)*m_probdx[idim];
+                auto phi = m_problo[idim] + b.  bigEnd(idim)*m_probdx[idim];
+                if (get_zlab && (idim == AMREX_SPACEDIM-1)) {
+                    plo = get_zlab(plo);
+                    phi = get_zlab(phi);
+                }
+                auto ilo = int(std::floor( (plo-m_offset[idim])/m_dx[idim] ));
+                auto ihi = int(std::floor( (phi-m_offset[idim])/m_dx[idim] ))+1; // +1 for interpolation
+                --ilo; // in case there are roundoff errors
+                ++ihi;
+                lo[idim] = std::max(ilo, 0);
+                hi[idim] = std::min(ihi, m_size[idim]-1);
+            }
+            Box box(lo, hi);
+            if (box.isEmpty()) {
+                box = Box(IntVect(0),IntVect(0));
+            }
+            bl.push_back(box);
+        }
+        BoxArray ba(std::move(bl));
+        FabArray<BaseFab<double>> tmpmf(ba,dmap,1,0);
+        tmpmf.ParallelCopy(m_mf);
+        m_mf = std::move(tmpmf);
+        m_fab.clear();
+        m_FC_data_cpu.reset();
+    }
+}
+
+void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign)
+{
+    m_cache_domain = pbox;
+    int dir = std::abs(moving_dir);
+    amrex::Real factor = 10.0;
+    if (moving_sign > 0) {
+        amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
+        m_cache_domain.setHi(dir, newhi);
+    } else {
+        amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
+        m_cache_domain.setLo(dir, newlo);
+    }
+    // Grow the box a little bit so that m_cache_domain.contains(pbox) is true.
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        m_cache_domain.setLo(idim, m_cache_domain.lo(idim) - m_dx[idim]);
+        m_cache_domain.setHi(idim, m_cache_domain.hi(idim) + m_dx[idim]);
+    }
+}
+
+void ExternalFieldReader::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    if (! m_distributed) { return; }
+
+    auto pboxz = pbox;
+    if (get_zlab) {
+        auto zlo = get_zlab(pbox.lo(AMREX_SPACEDIM-1));
+        auto zhi = get_zlab(pbox.hi(AMREX_SPACEDIM-1));
+        pboxz.setLo(AMREX_SPACEDIM-1, zlo);
+        pboxz.setHi(AMREX_SPACEDIM-1, zhi);
+    }
+
+    if (!m_moving_window) {
+        m_moving_window = true;
+        m_mf.clear();
+        make_cache_box(pboxz, moving_dir, moving_sign);
+        load_data(m_cache_domain);
+    } else {
+        if (! m_cache_domain.contains(pboxz)) {
+            make_cache_box(pboxz, moving_dir, moving_sign);
+            if (m_cache_domain.intersects(m_domain)) {
+                load_data(m_cache_domain);
+            }
+        }
+    }
+}
+
+ExternalFieldView ExternalFieldReader::getView (int li) const
+{
+    if (m_distributed && !m_moving_window) {
+        return make_view(m_mf.atLocalIdx(li));
+    } else {
+        return make_view(m_fab);
+    }
+}
+
+ExternalFieldView ExternalFieldReader::getView () const
+{
+    return make_view(m_fab);
+}
+
+ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& fab) const
+{
+    ExternalFieldView view;
+    view.dx = m_dx;
+    view.offset = m_offset;
+    view.global_size = m_size;
+
+    auto* p = fab.dataPtr();
+    if (p) {
+        auto const& b = fab.box();
+        view.table = decltype(view.table)(const_cast<double*>(p),
+#if (AMREX_SPACEDIM == 1)
+                                          b.smallEnd(0), b.bigEnd(0)+1
+#else
+                                          {AMREX_D_DECL(b.smallEnd(0),
+                                                        b.smallEnd(1),
+                                                        b.smallEnd(2))},
+                                          {AMREX_D_DECL(b.  bigEnd(0)+1,
+                                                        b.  bigEnd(1)+1,
+                                                        b.  bigEnd(2)+1)}
+#endif
+            );
+    }
+    return view;
 }
