@@ -10,6 +10,7 @@
 # This script plots the fields from the full, 2D version of the particle absorbing boundary case.
 
 import sys
+
 import yt
 
 fn = sys.argv[1]
