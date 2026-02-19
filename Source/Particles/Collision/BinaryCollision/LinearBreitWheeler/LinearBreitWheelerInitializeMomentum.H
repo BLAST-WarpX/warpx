@@ -70,20 +70,14 @@ namespace {
             ux2_out, uy2_out, uz2_out,
             engine);
 
-        // Fill momentum of product species (note that we actually
-        // create 4 products, 2 at the position of each incident particle)
+        // Fill momentum of product species (one macroparticle per species: first product
+        // at first reactant position, second at second reactant position)
         soa1_out.m_rdata[PIdx::ux][idx1_out_start] = ux1_out;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start] = uy1_out;
         soa1_out.m_rdata[PIdx::uz][idx1_out_start] = uz1_out;
-        soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = ux1_out;
-        soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = uy1_out;
-        soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = uz1_out;
         soa2_out.m_rdata[PIdx::ux][idx2_out_start] = ux2_out;
         soa2_out.m_rdata[PIdx::uy][idx2_out_start] = uy2_out;
         soa2_out.m_rdata[PIdx::uz][idx2_out_start] = uz2_out;
-        soa2_out.m_rdata[PIdx::ux][idx2_out_start + 1] = ux2_out;
-        soa2_out.m_rdata[PIdx::uy][idx2_out_start + 1] = uy2_out;
-        soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = uz2_out;
     }
 }
 
