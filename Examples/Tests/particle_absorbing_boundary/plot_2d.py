@@ -11,7 +11,6 @@
 
 
 import sys
-
 import yt
 
 fn = sys.argv[1]
