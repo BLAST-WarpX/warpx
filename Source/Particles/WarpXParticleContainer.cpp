@@ -80,21 +80,22 @@
 using namespace amrex;
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level)
-    : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
+    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
              MFItInfo().SetDynamic(WarpX::do_dynamic_scheduling))
 {
 }
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
-    : amrex::ParIterSoA<PIdx::nattribs, 0>(pc, level,
+    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
                    info.SetDynamic(WarpX::do_dynamic_scheduling))
 {
 }
 
 WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies)
-    : amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>(amr_core->GetParGDB())
+    : amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(amr_core->GetParGDB())
     , species_id(ispecies)
 {
+    SetArena(amrex::The_Arena());
     SetParticleSize();
     SetSoACompileTimeNames(
                            {PIdx::names.begin(), PIdx::names.end()},
@@ -220,11 +221,11 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
     // Redistribute() will move them to proper places.
     auto& particle_tile = DefineAndReturnParticleTile(0, 0, 0);
 
-    using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
+    using PinnedTile = typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType;
     PinnedTile pinned_tile;
     auto soa_rdata_names = GetRealSoANames();
     auto soa_idata_names = GetIntSoANames();
-    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names);
+    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names, amrex::The_Pinned_Arena());
 
     const std::size_t np = iend-ibegin;
 
