@@ -805,6 +805,10 @@ Particle thermalizer
     The normal direction of the thermalizer surface. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive).
     This parameter is optional. If not specified, the thermalizer will not be applied.
 
+* ``particle_thermalizer.species`` (`list of strings`, optional)
+    Names of the species to which the thermalizer is applied. If not specified, the thermalizer
+    is applied to all species.
+
 * ``particle_thermalizer.start`` (`float`)
     Starting coordinate (in SI units) of the thermalization region along the specified normal direction.
     This parameter is required if the thermalizer is enabled.

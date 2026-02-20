@@ -83,6 +83,8 @@ ParticleThermalizer::ParticleThermalizer()
       m_theta >= 0._rt,
       "particle_thermalizer: 'theta' must be non-negative");
 
+  pp.queryarr("species", m_species_names);
+
   m_defined = true;
 }
 
@@ -92,10 +94,17 @@ bool ParticleThermalizer::defined() const {
 
 void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
 {
-  // Iterate over all species/particle containers.
-  for (auto &pc_uptr : mpc) {
-    if (!pc_uptr) continue;
-    applyThermalizer(*pc_uptr);
+  if (m_species_names.empty()) {
+    // No species filter: apply to all species.
+    for (auto &pc_uptr : mpc) {
+      if (!pc_uptr) continue;
+      applyThermalizer(*pc_uptr);
+    }
+  } else {
+    // Apply only to the named species.
+    for (const auto &name : m_species_names) {
+      applyThermalizer(mpc.GetParticleContainerFromName(name));
+    }
   }
 }
 

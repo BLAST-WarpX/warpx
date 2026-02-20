@@ -8,6 +8,7 @@
 #define WARPX_PARTICLETHERMALIZER_H
 
 #include <string>
+#include <vector>
 #include <AMReX_REAL.H>
 
 // Forward declaration to avoid heavy includes in the header
@@ -52,6 +53,9 @@ private:
 
     // dimensionless temperature theta = kB*T/(m*c^2) used to sample thermal momentum distribution
     amrex::Real m_theta;
+
+    // If non-empty, only these species are thermalized; if empty, all species are thermalized.
+    std::vector<std::string> m_species_names;
 };
 
 #endif // WARPX_PARTICLETHERMALIZER_H
