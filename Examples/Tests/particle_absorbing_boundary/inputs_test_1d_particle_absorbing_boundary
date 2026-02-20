@@ -70,6 +70,7 @@ particle_thermalizer.start = 40e-6
 particle_thermalizer.end = 50e-6
 particle_thermalizer.momentum_threshold = 0.1
 particle_thermalizer.theta = 0.02
+particle_thermalizer.species = electrons
 
 # definitions used by laser profile
 my_constants.Emax = 1e13
