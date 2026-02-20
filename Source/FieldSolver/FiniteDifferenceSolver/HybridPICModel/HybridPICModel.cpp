@@ -6,6 +6,7 @@
  *          S. Eric Clark (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
+ * Contributing author: Matt Bettencourt (NVIDIA)
  */
 
 #include "HybridPICModel.H"
