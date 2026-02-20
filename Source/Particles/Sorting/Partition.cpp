@@ -137,7 +137,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
         ParticleTileType ptile_tmp;
         auto soa_rdata_names = GetRealSoANames();
         auto soa_idata_names = GetIntSoANames();
-        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names);
+        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names, amrex::The_Arena());
         ptile_tmp.resize(np);
 
         // Copy and re-order the data of the current particle tile
