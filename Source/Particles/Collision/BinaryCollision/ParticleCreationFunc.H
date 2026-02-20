@@ -58,12 +58,11 @@ public:
     /**
      * \brief operator() of the ParticleCreationFunc class. It creates new particles from binary
      * collisions.
-     * For collisions with two product species (e.g. Linear Compton, Linear Breit-Wheeler, fusion),
-     * one macroparticle per product species is created: the first product at the first reactant
-     * position, the second at the second reactant position. For a single product species
-     * (e.g. proton-boron -> 3 alpha), one product is created at the position of each parent
-     * particle that collided (e.g. 6 alpha particles, 3 at the proton and 3 at the boron) for
-     * exact charge conservation.
+     * For linear Compton only, one macroparticle per product species is created (first product
+     * at the first reactant position, second at the second). For all other binary processes
+     * (Linear Breit-Wheeler, fusion, etc.), one product is created at the position of each
+     * parent particle that collided (e.g. 2 photons and 2 electrons for Breit-Wheeler), allowing
+     * for exact charge conservation.
      * This function also sets the initial weight of the produced particles and subtracts it from
      * the parent particles. If the weight of a parent particle becomes 0, then that particle is
      * deleted.
@@ -121,10 +120,11 @@ public:
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
         const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
-        // For two product species: one macroparticle per product (first at first reactant
-        // position, second at second). For one product species (e.g. Proton-Boron): create
-        // at the position of each source particle (factor 2) for charge conservation.
-        const int products_per_reaction_factor = (m_num_product_species == 2) ? 1 : 2;
+        // Linear Compton: one macroparticle per product species (first at first reactant
+        // position, second at second). All other binary processes: create one product at
+        // the position of each source particle (factor 2) for charge conservation.
+        const int products_per_reaction_factor =
+            (m_num_product_species == 1 || m_collision_type != CollisionType::LinearCompton) ? 2 : 1;
         amrex::Vector<int> num_added_vec(m_num_product_species);
         for (int i = 0; i < m_num_product_species; i++)
         {
@@ -178,10 +178,10 @@ public:
                 {
                     for (int k = 0; k < p_num_products_device[j]; k++)
                     {
-                        if (t_num_product_species == 2)
+                        if (t_collision_type == CollisionType::LinearCompton)
                         {
-                            // One macroparticle per product species: first product at first
-                            // reactant position, second product at second reactant position.
+                            // Linear Compton only: one macroparticle per product species,
+                            // first at first reactant position, second at second.
                             const auto product_index = products_np_data[j] +
                                 (p_offsets[i]*p_num_products_device[j] + k);
                             if (j == 0)
@@ -245,16 +245,16 @@ public:
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
-                        products_np_data[0] + p_offsets[i]*p_num_products_device[0],
-                        products_np_data[1] + p_offsets[i]*p_num_products_device[1],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
                     LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
-                        products_np_data[0] + p_offsets[i]*p_num_products_device[0],
-                        products_np_data[1] + p_offsets[i]*p_num_products_device[1],
+                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         engine);
                 }
                 else if(t_collision_type == CollisionType::LinearCompton){
