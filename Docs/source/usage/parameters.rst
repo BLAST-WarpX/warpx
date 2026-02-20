@@ -802,7 +802,7 @@ Particle thermalizer
 --------------------
 
 * ``particle_thermalizer.normal`` (`string`)
-    The normal direction of the thermalizer surface. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive).
+    The normal direction describing the thermalizer region. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive). Along with the ``start`` and ``stop`` parameters below, this specifies the region in space where particles will be thermalized.
     This parameter is optional. If not specified, the thermalizer will not be applied.
 
 * ``particle_thermalizer.species`` (`list of strings`, optional)
@@ -821,9 +821,11 @@ Particle thermalizer
     Momentum threshold used by the thermalizer. Particles for which the magnitude of their normalized momenta, i.e. :math:`\gamma |\beta|`) is less than this threshold will not be affected.
     This parameter is required if the thermalizer is enabled.
 
-* ``particle_thermalizer.temperature`` (`float`)
-    Temperature value (in Kelvin)used to sample or set the thermalized particle velocities.
-    This parameter is required if the thermalizer is enabled.
+* ``particle_thermalizer.theta`` (`float`)
+    Dimensionless temperature parameter (k*T/m/c^2) used to sample the thermalized particle velocities.
+    This parameter is required if the thermalizer is enabled. The normalized momentum of the selected
+    particles in the ``particle_thermalizer.normal`` direction will be drawn from a Gaussian distribution
+    with mean 0.0 and variance ``theta``.
 
 Example::
 
@@ -831,7 +833,8 @@ Example::
     particle_thermalizer.start = 0.0
     particle_thermalizer.end = 1.0e-6
     particle_thermalizer.momentum_threshold = 0.5
-    particle_thermalizer.temperature = 1.2e-3
+    particle_thermalizer.theta = 0.1
+    partcle_thermalizer.species = electrons hydrogen
 
 .. _running-cpp-parameters-parallelization:
 
