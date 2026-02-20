@@ -56,7 +56,7 @@ public:
      * \brief Method to initialize runtime attributes. Does nothing for LaserParticleContainer.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& /*pinned_tile*/,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& /*pinned_tile*/,
         int /*n_external_attr_real*/,
         int /*n_external_attr_int*/) final {}
 

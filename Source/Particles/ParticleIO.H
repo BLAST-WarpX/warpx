@@ -9,7 +9,6 @@
 
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
 
 #include <ablastr/particles/NodalFieldGather.H>
 
@@ -63,7 +62,7 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
             // - momenta are stored as a struct of array, in `attribs`
             // The GetStructOfArrays is called directly since the convenience routine GetAttribs
             // is only available in WarpXParIter. ParIter is used here since the pc passed in
-            // will sometimes be a PinnedMemoryParticleContainer (not derived from a WarpXParticleContainer).
+            // will sometimes be a WarpXParticleContainer (not derived from a WarpXParticleContainer).
             auto& attribs = pti.GetStructOfArrays().GetRealData();
             ParticleReal* AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
             ParticleReal* AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
@@ -89,7 +88,7 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
  * @param is_full_diagnostic whether this diagnostic is a full diagnostic
  */
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
 
 #endif /* WARPX_PARTICLEIO_H_ */

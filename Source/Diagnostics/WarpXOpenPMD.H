@@ -40,8 +40,8 @@
 class WarpXParticleCounter
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
   WarpXParticleCounter (ParticleContainer* pc);
   [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
@@ -76,8 +76,8 @@ private:
 class WarpXOpenPMDPlot
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
   /** Initialize openPMD I/O routines
    *
