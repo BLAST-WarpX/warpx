@@ -86,8 +86,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
         }
     });
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst, pc, 0, 0,
-                                       old_np, new_np);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst, pc, old_np, new_np);
 
     Gpu::synchronize();
     return num_added;
@@ -247,11 +246,9 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
         }
     });
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1, pc1, 0, 0,
-                                       old_np1, new_np1);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1, pc1, old_np1, new_np1);
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2, pc2, 0, 0,
-                                       old_np2, new_np2);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2, pc2, old_np2, new_np2);
 
     Gpu::synchronize();
     return num_added;

@@ -419,8 +419,8 @@ PhysicalParticleContainer::DefaultInitializeRuntimeAttributes (
     int n_external_attr_int)
 {
     ParticleCreation::DefaultInitializeRuntimeAttributes(pinned_tile, *this,
-                                       n_external_attr_real, n_external_attr_int,
-                                       0, pinned_tile.numParticles()
+                                       0, pinned_tile.numParticles(),
+                                       n_external_attr_real, n_external_attr_int
 #ifdef WARPX_QED
                                        , /*do_qed_comps=*/true );
 #else

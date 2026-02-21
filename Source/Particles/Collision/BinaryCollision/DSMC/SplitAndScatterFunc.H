@@ -510,7 +510,7 @@ public:
             const int start_index = int(products_np[i]);
             const int stop_index  = int(products_np[i] + num_added_vec[i]);
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
-                                      *pc_products[i], 0, 0, start_index, stop_index);
+                                                 *pc_products[i], start_index, stop_index);
         }
 
         amrex::Gpu::synchronize();

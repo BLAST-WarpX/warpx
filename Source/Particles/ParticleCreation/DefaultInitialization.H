@@ -98,21 +98,21 @@ namespace ParticleCreation {
      * @tparam DstPC the destination particle container type
      * @param[inout] ptile the tile in which attributes are initialized
      * @param[in] pc the destination particle container
-     * @param[in] n_external_attr_real The number of real attributes that have been externally set.
-     * These are NOT initialized by this function.
-     * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
-     * These are NOT initialized by this function.
      * @param[in] do_qed_comps whether to initialize the qed components (these are usually handled by
      * SmartCopy, but NOT when adding particles in AddNParticles)
      * @param[in] start the index to start initializing particles
      * @param[in] stop the index to stop initializing particles
+     * @param[in] n_external_attr_real The number of real attributes that have been externally set.
+     * These are NOT initialized by this function.
+     * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
+     * These are NOT initialized by this function.
      */
 template <typename PTile, typename DstPC>
 void DefaultInitializeRuntimeAttributes (PTile& ptile,
                                          const DstPC& pc,
-                                         const int n_external_attr_real,
-                                         const int n_external_attr_int,
-                                         int start, int stop
+                                         int start, int stop,
+                                         const int n_external_attr_real = 0,
+                                         const int n_external_attr_int = 0
 #ifdef WARPX_QED
                                          , const bool do_qed_comps = false )
 #else
