@@ -1,41 +1,41 @@
 {
+  "lev=0": {
+    "rho": 399055.3249141125
+  },
   "electron1": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 3.0006707371376303e-16,
     "particle_position_x": 0.028942514215899,
     "particle_position_y": 0.028747518818078886,
     "particle_position_z": 0.02986857816612365,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 3.0006707371376303e-16,
     "particle_weight": 4541571.858529837
   },
   "electron2": {
-    "particle_momentum_x": 1.401419434954275e-20,
-    "particle_momentum_y": 1.4032766517582226e-20,
-    "particle_momentum_z": 7.647646990096896e-15,
-    "particle_position_x": 1.648707285164886,
-    "particle_position_y": 1.5158631291964768,
-    "particle_position_z": 0.7774324871025631,
+    "particle_position_x": 0.3695679084731829,
+    "particle_position_y": 0.3699141911263326,
+    "particle_position_z": 0.3693067583855171,
+    "particle_momentum_x": 7.007097174771374e-21,
+    "particle_momentum_y": 7.016383258791115e-21,
+    "particle_momentum_z": 3.823823495048447e-15,
     "particle_weight": 57870525.649587184
   },
-  "lev=0": {
-    "rho": 398846.9727460935
-  },
   "photon1": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
     "particle_position_z": 0.0,
-    "particle_weight": 0.0
-  },
-  "photon2": {
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
-    "particle_position_x": 1.648707285164886,
-    "particle_position_y": 1.5158631291964768,
-    "particle_position_z": 0.7774324871025631,
+    "particle_weight": 0.0
+  },
+  "photon2": {
+    "particle_position_x": 1.2791393766917034,
+    "particle_position_y": 1.1459489380701444,
+    "particle_position_z": 0.40812572871704605,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
     "particle_weight": 57870525.649587184
   }
 }
