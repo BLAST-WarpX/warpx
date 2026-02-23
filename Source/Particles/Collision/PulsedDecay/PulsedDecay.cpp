@@ -382,16 +382,17 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
             // Initialize the user runtime components
             if (total_new > 0) {
-                amrex::GpuArray<index_type, 2> products_np{old_npA, old_npB};
-                amrex::GpuArray<ParticleTileType*, 2> tile_products{&ptileA, &ptileB};
-                amrex::GpuArray<WarpXParticleContainer*, 2> pc_products{&productA, &productB};
-                for (int i = 0; i < 2; i++) {
-                    const auto start_index = int(products_np[i]);
-                    const auto stop_index  = int(products_np[i] + total_new);
-                    ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
-                                                         *pc_products[i], start_index, stop_index);
-                }
+                const auto start_indexA = int(old_npA);
+                const auto stop_indexA  = int(old_npA + total_new);
+                ParticleCreation::DefaultInitializeRuntimeAttributes(ptileA,
+                                                     productA, start_indexA, stop_indexA);
+
+                const auto start_indexB = int(old_npB);
+                const auto stop_indexB  = int(old_npB + total_new);
+                ParticleCreation::DefaultInitializeRuntimeAttributes(ptileB,
+                                                     productB, start_indexB, stop_indexB);
             }
+
             amrex::Gpu::synchronize();
 
             // Set new particle IDs
