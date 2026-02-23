@@ -9,9 +9,16 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 module load openmpi/v4.1.6
 
 # missing modules installed here
-# missing modules installed here
 export WORK="/sdf/group/${proj}/${USER}"
 export SW_DIR="${WORK}/sw/warpx/s3df/gpu"
+
+# CUDA toolkit
+export CUDA_HOME=${SW_DIR}/cuda
+export CUDA_PATH=${CUDA_HOME}
+
+export PATH=${CUDA_HOME}/bin:${PATH}
+export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+export CMAKE_PREFIX_PATH=${CUDA_HOME}:${CMAKE_PREFIX_PATH}
 
 # cmake
 export PATH=${SW_DIR}/cmake-4.1.2/bin:$PATH
