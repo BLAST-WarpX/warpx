@@ -226,7 +226,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
     if (axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z") {
         xyz_order = true;
-    } else if (axisLabels.at(2) == "x" && axisLabels.at(1) == "y" && axisLabels.at(1) == "z") {
+    } else if (axisLabels.at(2) == "x" && axisLabels.at(1) == "y" && axisLabels.at(0) == "z") {
         xyz_order = false;
     } else {
         WARPX_ABORT_WITH_MESSAGE("3D expects axisLabels {x, y, z} or {z, y, x}");
