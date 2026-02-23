@@ -51,11 +51,13 @@ PARALLEL=16
 build_dir=$(mktemp -d)
 
 # cuda toolkit and nvcc
-curl -Lo cuda.run https://developer.download.nvidia.com/compute/cuda/13.0.2/local_installers/cuda_13.0.2_580.95.05_linux.run
+# use CUDA toolkit version 12.2 as GPU nodes on s3df have CUDA driver version 12.2 
+curl -Lo cuda.run https://developer.download.nvidia.com/compute/cuda/12.2.2/local_installers/cuda_12.2.2_535.104.05_linux.run
 chmod +x cuda.run
 ./cuda.run --silent --toolkit --toolkitpath=${SW_DIR}/cuda --override
 export PATH=${SW_DIR}/cuda/bin:$PATH
 export LD_LIBRARY_PATH=${SW_DIR}/cuda/lib64:$LD_LIBRARY_PATH
+rm -rf cuda.run
 
 # cmake
 echo "installing cmake..."
