@@ -38,7 +38,8 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
              || (m_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
              || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
              || (m_collision_type == CollisionType::LinearBreitWheeler)
-             || (m_collision_type == CollisionType::LinearCompton))
+             || (m_collision_type == CollisionType::LinearCompton)
+             || (m_collision_type == CollisionType::ElasticBhabhaMoller))
     {
         m_num_product_species = 2;
         m_num_products_host.push_back(1);
