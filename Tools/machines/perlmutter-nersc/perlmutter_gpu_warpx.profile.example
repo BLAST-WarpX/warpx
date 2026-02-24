@@ -12,6 +12,7 @@ module load craype
 module load craype-x86-milan
 module load craype-accel-nvidia80
 module load cudatoolkit
+module load gcc-native/13.2  # default gcc-native/14 breaks pybind11 builds with NVCC 12.9.41
 module load cmake/3.30.2
 
 # missing modules installed here
