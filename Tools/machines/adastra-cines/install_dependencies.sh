@@ -45,7 +45,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
 fi
 rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
-CXX=$(which CC) cmake -S ${SRC_DIR}/blaspp -B ${SRC_DIR}/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+CXX=$(which CC) cmake -S ${SRC_DIR}/blaspp -B ${SRC_DIR}/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${SRC_DIR}/blaspp-adastra-gpu-build --target install --parallel 16
 rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
 
@@ -60,7 +60,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
 fi
 rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build ${SRC_DIR}/lapackpp-adastra-gpu-build --target install --parallel 16
 rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
 
