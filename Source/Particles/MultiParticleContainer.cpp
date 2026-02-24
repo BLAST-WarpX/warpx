@@ -13,18 +13,16 @@
 
 #include "Fields.H"
 #include "Particles/ElementaryProcess/Ionization.H"
+#include "Particles/ElementaryProcess/QEDSchwingerProcess.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDSchwingerProcess.H"
 #   include "Particles/ElementaryProcess/QEDPairGeneration.H"
 #   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #endif
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
-#ifdef WARPX_QED
-#   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
-#endif
+#include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartCreate.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
@@ -365,7 +363,6 @@ MultiParticleContainer::ReadParameters ()
         }
 
 
-#ifdef WARPX_QED
         const ParmParse pp_warpx("warpx");
         pp_warpx.query("do_qed_schwinger", m_do_qed_schwinger);
 
@@ -395,7 +392,6 @@ MultiParticleContainer::ReadParameters ()
             utils::parser::queryWithParser(
                 pp_qed_schwinger, "zmax", m_qed_schwinger_zmax);
         }
-#endif
         initialized = true;
     }
 }
@@ -460,8 +456,8 @@ MultiParticleContainer::InitMultiPhysicsModules ()
     // This is used for ionization and pair creation processes.
     mapSpeciesProduct();
     CheckIonizationProductSpecies();
-#ifdef WARPX_QED
     CheckQEDProductSpecies();
+#ifdef WARPX_QED
     InitQED();
 #endif
 }
@@ -950,14 +946,12 @@ MultiParticleContainer::mapSpeciesProduct ()
 
     }
 
-#ifdef WARPX_QED
     if (m_do_qed_schwinger) {
         m_qed_schwinger_ele_product =
             getSpeciesID(m_qed_schwinger_ele_product_name);
         m_qed_schwinger_pos_product =
             getSpeciesID(m_qed_schwinger_pos_product_name);
     }
-#endif
 }
 
 /* \brief Given a species name, return its ID.
@@ -1467,177 +1461,6 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
     }
 }
 
-void
-MultiParticleContainer::doQEDSchwinger ()
-{
-    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
-
-    if (!m_do_qed_schwinger) {return;}
-
-    auto & warpx = WarpX::GetInstance();
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.grid_type == GridType::Collocated ||
-       warpx.field_gathering_algo == GatheringAlgo::MomentumConserving,
-          "ERROR: Schwinger process only implemented for warpx.grid_type=collocated"
-                                 "or algo.field_gathering = momentum-conserving");
-
-    constexpr int level_0 = 0;
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.maxLevel() == level_0,
-        "ERROR: Schwinger process not implemented with mesh refinement");
-
-#ifdef WARPX_DIM_RZ
-    WARPX_ABORT_WITH_MESSAGE("Schwinger process not implemented in rz geometry");
-#endif
-#if AMREX_SPACEDIM == 1
-    WARPX_ABORT_WITH_MESSAGE("Schwinger process not implemented in 1D geometry");
-#endif
-
-// Get cell volume. In 2D the transverse size is
-// chosen by the user in the input file.
-    amrex::Geometry const & geom = warpx.Geom(level_0);
-#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const auto dV = geom.CellSize(0); // TODO: scale properly
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const auto dV = geom.CellSize(0) * geom.CellSize(1)
-        * m_qed_schwinger_y_size;
-#elif defined(WARPX_DIM_3D)
-    const auto dV = geom.CellSize(0) * geom.CellSize(1)
-        * geom.CellSize(2);
-#endif
-
-    // Get the temporal step
-    const auto dt =  warpx.getdt(level_0);
-
-    auto& pc_product_ele =
-            allcontainers[m_qed_schwinger_ele_product];
-    auto& pc_product_pos =
-            allcontainers[m_qed_schwinger_pos_product];
-
-    pc_product_ele->defineAllParticleTiles();
-    pc_product_pos->defineAllParticleTiles();
-
-    using ablastr::fields::Direction;
-    const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, level_0);
-    const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, level_0);
-    const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, level_0);
-    const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, level_0);
-    const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, level_0);
-    const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, level_0);
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (MFIter mfi(Ex, TilingIfNotGPU()); mfi.isValid(); ++mfi )
-    {
-        // Make the box cell centered to avoid creating particles twice on the tile edges
-        amrex::Box box = enclosedCells(mfi.nodaltilebox());
-
-        // Get the box representing global Schwinger boundaries
-        const amrex::Box global_schwinger_box = ComputeSchwingerGlobalBox();
-
-        // If Schwinger process is not activated anywhere in the current box, we move to the next
-        // one. Otherwise we use the intersection of current box with global Schwinger box.
-        if (!box.intersects(global_schwinger_box)) {continue;}
-        box &= global_schwinger_box;
-
-        const MyFieldList fieldsEB = {
-            Ex[mfi].array(), Ey[mfi].array(), Ez[mfi].array(),
-            Bx[mfi].array(), By[mfi].array(), Bz[mfi].array()};
-
-        auto& dst_ele_tile = pc_product_ele->ParticlesAt(level_0, mfi);
-        auto& dst_pos_tile = pc_product_pos->ParticlesAt(level_0, mfi);
-
-        const auto np_ele_dst = dst_ele_tile.numParticles();
-        const auto np_pos_dst = dst_pos_tile.numParticles();
-
-        const auto Filter  = SchwingerFilterFunc{
-                              m_qed_schwinger_threshold_poisson_gaussian,
-                              dV, dt};
-
-        const SmartCreateFactory create_factory_ele(*pc_product_ele);
-        const SmartCreateFactory create_factory_pos(*pc_product_pos);
-        const auto CreateEle = create_factory_ele.getSmartCreate();
-        const auto CreatePos = create_factory_pos.getSmartCreate();
-
-        const auto Transform = SchwingerTransformFunc{m_qed_schwinger_y_size, PIdx::w};
-
-        const amrex::Geometry& geom_level_zero = warpx.Geom(level_0);
-
-        const auto num_added = filterCreateTransformFromFAB<1>( *pc_product_ele, *pc_product_pos, dst_ele_tile,
-                               dst_pos_tile, box, fieldsEB, np_ele_dst,
-                               np_pos_dst,Filter, CreateEle, CreatePos,
-                               Transform, geom_level_zero);
-
-        setNewParticleIDs(dst_ele_tile, np_ele_dst, num_added);
-        setNewParticleIDs(dst_pos_tile, np_pos_dst, num_added);
-
-    }
-}
-
-amrex::Box
-MultiParticleContainer::ComputeSchwingerGlobalBox () const
-{
-    auto & warpx = WarpX::GetInstance();
-    constexpr int level_0 = 0;
-    amrex::Geometry const & geom = warpx.Geom(level_0);
-
-#if defined(WARPX_DIM_3D)
-    const amrex::Array<amrex::Real,3> schwinger_min{m_qed_schwinger_xmin,
-                                                    m_qed_schwinger_ymin,
-                                                    m_qed_schwinger_zmin};
-    const amrex::Array<amrex::Real,3> schwinger_max{m_qed_schwinger_xmax,
-                                                    m_qed_schwinger_ymax,
-                                                    m_qed_schwinger_zmax};
-#else
-    const amrex::Array<amrex::Real,2> schwinger_min{m_qed_schwinger_xmin,
-                                                    m_qed_schwinger_zmin};
-    const amrex::Array<amrex::Real,2> schwinger_max{m_qed_schwinger_xmax,
-                                                    m_qed_schwinger_zmax};
-#endif
-
-    // Box inside which Schwinger is activated
-    amrex::Box schwinger_global_box;
-
-    for (int dir=0; dir<AMREX_SPACEDIM; dir++)
-    {
-        // Dealing with these corner cases should ensure that we don't overflow on the integers
-        if (schwinger_min[dir] < geom.ProbLo(dir))
-        {
-            schwinger_global_box.setSmall(dir, std::numeric_limits<int>::lowest());
-        }
-        else if (schwinger_min[dir] > geom.ProbHi(dir))
-        {
-            schwinger_global_box.setSmall(dir, std::numeric_limits<int>::max());
-        }
-        else
-        {
-            // Schwinger pairs are currently created on the lower nodes of a cell. Using ceil here
-            // excludes all cells whose lower node is strictly lower than schwinger_min[dir].
-            schwinger_global_box.setSmall(dir, static_cast<int>(std::ceil(
-                               (schwinger_min[dir] - geom.ProbLo(dir)) / geom.CellSize(dir))));
-        }
-
-        if (schwinger_max[dir] < geom.ProbLo(dir))
-        {
-            schwinger_global_box.setBig(dir, std::numeric_limits<int>::lowest());
-        }
-        else if (schwinger_max[dir] > geom.ProbHi(dir))
-        {
-            schwinger_global_box.setBig(dir, std::numeric_limits<int>::max());
-        }
-        else
-        {
-            // Schwinger pairs are currently created on the lower nodes of a cell. Using floor here
-            // excludes all cells whose lower node is strictly higher than schwinger_max[dir].
-            schwinger_global_box.setBig(dir, static_cast<int>(std::floor(
-                               (schwinger_max[dir] - geom.ProbLo(dir)) / geom.CellSize(dir))));
-        }
-    }
-
-    return schwinger_global_box;
-}
-
 void MultiParticleContainer::doQedEvents (int lev,
                                           const MultiFab& Ex,
                                           const MultiFab& Ey,
@@ -1816,8 +1639,12 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
     }
 }
 
+#endif // WARPX_QED
+
 void MultiParticleContainer::CheckQEDProductSpecies()
 {
+
+#ifdef WARPX_QED
     auto const nspecies = static_cast<int>(species_names.size());
     for (int i=0; i<nspecies; i++){
         const auto& pc = allcontainers[i];
@@ -1856,6 +1683,7 @@ void MultiParticleContainer::CheckQEDProductSpecies()
                 "ERROR: virtual photons species has to be a...photon species!");
         }
     }
+#endif
 
     if (m_do_qed_schwinger) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1869,4 +1697,174 @@ void MultiParticleContainer::CheckQEDProductSpecies()
 
 }
 
+
+void
+MultiParticleContainer::doQEDSchwinger ()
+{
+    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
+
+    if (!m_do_qed_schwinger) {return;}
+
+    auto & warpx = WarpX::GetInstance();
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.grid_type == GridType::Collocated ||
+       warpx.field_gathering_algo == GatheringAlgo::MomentumConserving,
+          "ERROR: Schwinger process only implemented for warpx.grid_type=collocated"
+                                 "or algo.field_gathering = momentum-conserving");
+
+    constexpr int level_0 = 0;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.maxLevel() == level_0,
+        "ERROR: Schwinger process not implemented with mesh refinement");
+
+#ifdef WARPX_DIM_RZ
+    WARPX_ABORT_WITH_MESSAGE("Schwinger process not implemented in rz geometry");
 #endif
+#if AMREX_SPACEDIM == 1
+    WARPX_ABORT_WITH_MESSAGE("Schwinger process not implemented in 1D geometry");
+#endif
+
+// Get cell volume. In 2D the transverse size is
+// chosen by the user in the input file.
+    amrex::Geometry const & geom = warpx.Geom(level_0);
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const auto dV = geom.CellSize(0); // TODO: scale properly
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    const auto dV = geom.CellSize(0) * geom.CellSize(1)
+        * m_qed_schwinger_y_size;
+#elif defined(WARPX_DIM_3D)
+    const auto dV = geom.CellSize(0) * geom.CellSize(1)
+        * geom.CellSize(2);
+#endif
+
+    // Get the temporal step
+    const auto dt =  warpx.getdt(level_0);
+
+    auto& pc_product_ele =
+            allcontainers[m_qed_schwinger_ele_product];
+    auto& pc_product_pos =
+            allcontainers[m_qed_schwinger_pos_product];
+
+    pc_product_ele->defineAllParticleTiles();
+    pc_product_pos->defineAllParticleTiles();
+
+    using ablastr::fields::Direction;
+    const MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, level_0);
+    const MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, level_0);
+    const MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, level_0);
+    const MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, level_0);
+    const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, level_0);
+    const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, level_0);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Ex, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    {
+        // Make the box cell centered to avoid creating particles twice on the tile edges
+        amrex::Box box = enclosedCells(mfi.nodaltilebox());
+
+        // Get the box representing global Schwinger boundaries
+        const amrex::Box global_schwinger_box = ComputeSchwingerGlobalBox();
+
+        // If Schwinger process is not activated anywhere in the current box, we move to the next
+        // one. Otherwise we use the intersection of current box with global Schwinger box.
+        if (!box.intersects(global_schwinger_box)) {continue;}
+        box &= global_schwinger_box;
+
+        const MyFieldList fieldsEB = {
+            Ex[mfi].array(), Ey[mfi].array(), Ez[mfi].array(),
+            Bx[mfi].array(), By[mfi].array(), Bz[mfi].array()};
+
+        auto& dst_ele_tile = pc_product_ele->ParticlesAt(level_0, mfi);
+        auto& dst_pos_tile = pc_product_pos->ParticlesAt(level_0, mfi);
+
+        const auto np_ele_dst = dst_ele_tile.numParticles();
+        const auto np_pos_dst = dst_pos_tile.numParticles();
+
+        const auto Filter  = SchwingerFilterFunc{
+                              m_qed_schwinger_threshold_poisson_gaussian,
+                              dV, dt};
+
+        const SmartCreateFactory create_factory_ele(*pc_product_ele);
+        const SmartCreateFactory create_factory_pos(*pc_product_pos);
+        const auto CreateEle = create_factory_ele.getSmartCreate();
+        const auto CreatePos = create_factory_pos.getSmartCreate();
+
+        const auto Transform = SchwingerTransformFunc{m_qed_schwinger_y_size, PIdx::w};
+
+        const amrex::Geometry& geom_level_zero = warpx.Geom(level_0);
+
+        const auto num_added = filterCreateTransformFromFAB<1>( *pc_product_ele, *pc_product_pos, dst_ele_tile,
+                               dst_pos_tile, box, fieldsEB, np_ele_dst,
+                               np_pos_dst,Filter, CreateEle, CreatePos,
+                               Transform, geom_level_zero);
+
+        setNewParticleIDs(dst_ele_tile, np_ele_dst, num_added);
+        setNewParticleIDs(dst_pos_tile, np_pos_dst, num_added);
+
+    }
+}
+
+amrex::Box
+MultiParticleContainer::ComputeSchwingerGlobalBox () const
+{
+    auto & warpx = WarpX::GetInstance();
+    constexpr int level_0 = 0;
+    amrex::Geometry const & geom = warpx.Geom(level_0);
+
+#if defined(WARPX_DIM_3D)
+    const amrex::Array<amrex::Real,3> schwinger_min{m_qed_schwinger_xmin,
+                                                    m_qed_schwinger_ymin,
+                                                    m_qed_schwinger_zmin};
+    const amrex::Array<amrex::Real,3> schwinger_max{m_qed_schwinger_xmax,
+                                                    m_qed_schwinger_ymax,
+                                                    m_qed_schwinger_zmax};
+#else
+    const amrex::Array<amrex::Real,2> schwinger_min{m_qed_schwinger_xmin,
+                                                    m_qed_schwinger_zmin};
+    const amrex::Array<amrex::Real,2> schwinger_max{m_qed_schwinger_xmax,
+                                                    m_qed_schwinger_zmax};
+#endif
+
+    // Box inside which Schwinger is activated
+    amrex::Box schwinger_global_box;
+
+    for (int dir=0; dir<AMREX_SPACEDIM; dir++)
+    {
+        // Dealing with these corner cases should ensure that we don't overflow on the integers
+        if (schwinger_min[dir] < geom.ProbLo(dir))
+        {
+            schwinger_global_box.setSmall(dir, std::numeric_limits<int>::lowest());
+        }
+        else if (schwinger_min[dir] > geom.ProbHi(dir))
+        {
+            schwinger_global_box.setSmall(dir, std::numeric_limits<int>::max());
+        }
+        else
+        {
+            // Schwinger pairs are currently created on the lower nodes of a cell. Using ceil here
+            // excludes all cells whose lower node is strictly lower than schwinger_min[dir].
+            schwinger_global_box.setSmall(dir, static_cast<int>(std::ceil(
+                               (schwinger_min[dir] - geom.ProbLo(dir)) / geom.CellSize(dir))));
+        }
+
+        if (schwinger_max[dir] < geom.ProbLo(dir))
+        {
+            schwinger_global_box.setBig(dir, std::numeric_limits<int>::lowest());
+        }
+        else if (schwinger_max[dir] > geom.ProbHi(dir))
+        {
+            schwinger_global_box.setBig(dir, std::numeric_limits<int>::max());
+        }
+        else
+        {
+            // Schwinger pairs are currently created on the lower nodes of a cell. Using floor here
+            // excludes all cells whose lower node is strictly higher than schwinger_max[dir].
+            schwinger_global_box.setBig(dir, static_cast<int>(std::floor(
+                               (schwinger_max[dir] - geom.ProbLo(dir)) / geom.CellSize(dir))));
+        }
+    }
+
+    return schwinger_global_box;
+}
