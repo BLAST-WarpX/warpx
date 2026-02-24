@@ -129,6 +129,11 @@ public:
 
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
+    /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
+
 protected:
 
     /**
@@ -262,11 +267,6 @@ protected:
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
-
-    /**
-     * \brief Finish filling the mass matrices after deposit
-     */
-    void FinishMassMatrices ();
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
