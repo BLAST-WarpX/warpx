@@ -211,7 +211,7 @@ Overall simulation parameters
 
       - **Numerical stability:**
 
-        - Rhobust to finite-grid instability (does not require cells that resolve the plasma Debye length).
+        - Robust to finite-grid instability (does not require cells that resolve the plasma Debye length).
         - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or satisfying the CFL condition for light waves).
         - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
