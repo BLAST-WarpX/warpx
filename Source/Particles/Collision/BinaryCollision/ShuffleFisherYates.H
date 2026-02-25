@@ -10,6 +10,43 @@
 #include <AMReX_Random.H>
 #include <AMReX_Scan.H>
 
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+int gcd_int(int a, int b) {
+    while (b != 0) {
+        int r = a % b;
+        a = b;
+        b = r;
+    }
+    return a;
+}
+
+template <typename T_index>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void ModulusShuffle (T_index *array, T_index *array_copy, T_index const is, T_index const ie,
+                    amrex::RandomEngine const& engine)
+{
+    int const n = ie - is;
+    int step = 1;
+    if (n > 2) {
+        while (true) {
+            step = 2 + amrex::Random_int(n - 2, engine);
+            if (gcd_int(n, step) == 1) {
+                break;
+            }
+        }
+    }
+
+    for (int i = is ; i < ie ; i++) {
+        array_copy[i] = array[i];
+    }
+
+    int const offset = amrex::Random_int(n, engine);
+    for (int i = is ; i < ie ; i++) {
+        int const i2 = (i*step + offset) % n;
+        array[i] = array_copy[i2];
+    }
+}
+
 /* \brief Shuffle array according to Fisher-Yates algorithm.
  *        Only shuffle the part between is <= i < ie, n = ie-is.
  *        T_index shall be

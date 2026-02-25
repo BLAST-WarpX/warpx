@@ -376,6 +376,9 @@ public:
             const amrex::ParticleReal m1 = species_1.getMass();
             auto get_position_1  = GetParticlePosition<PIdx>(ptile_1, getpos_offset);
 
+            amrex::Gpu::DeviceVector<index_type> indices_copy(np1);
+            index_type* AMREX_RESTRICT indices_copy_ptr = indices_copy.dataPtr();
+
             /*
               The following calculations are only required when creating product particles
             */
@@ -617,10 +620,11 @@ public:
                     index_type const cell_start_1 = cell_offsets_1[i_cell];
                     index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
 
-                    // Do not shuffle if there is only one particle in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+                    // Do not shuffle if there is three or less particles in the cell
+                    if ( cell_stop_1 - cell_start_1 <= 2 ) { return; }
 
-                    ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
+                    /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
+                    ModulusShuffle(indices_1, indices_copy_ptr, cell_start_1, cell_stop_1, engine);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
@@ -826,6 +830,9 @@ public:
             const amrex::ParticleReal q2 = species_2.getCharge();
             const amrex::ParticleReal m2 = species_2.getMass();
             auto get_position_2  = GetParticlePosition<PIdx>(ptile_2, getpos_offset);
+
+            amrex::Gpu::DeviceVector<index_type> indices_copy(std::max(np1, np2));
+            index_type* AMREX_RESTRICT indices_copy_ptr = indices_copy.dataPtr();
 
             /*
               The following calculations are only required when creating product particles
@@ -1187,13 +1194,15 @@ public:
           index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
 
           // Do not collide if one species is missing in the cell
-          if ( cell_stop_1 - cell_start_1 < 1 ||
-               cell_stop_2 - cell_start_2 < 1 ) { return; }
+          if ( cell_stop_1 - cell_start_1 < 2 ||
+               cell_stop_2 - cell_start_2 < 2 ) { return; }
 
           if (i < n_cells) {
-            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
+            /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
+            ModulusShuffle(indices_1, indices_copy_ptr, cell_start_1, cell_stop_1, engine);
           } else {
-            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
+            /* ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine); */
+            ModulusShuffle(indices_2, indices_copy_ptr, cell_start_2, cell_stop_2, engine);
           }
                 }
             );
