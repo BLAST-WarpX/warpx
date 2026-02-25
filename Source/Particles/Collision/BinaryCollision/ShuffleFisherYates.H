@@ -36,10 +36,6 @@ void ModulusShuffle (T_index *array, T_index *array_copy, T_index const is, T_in
         }
     }
 
-    for (int i = is ; i < ie ; i++) {
-        array_copy[i] = array[i];
-    }
-
     int const offset = amrex::Random_int(n, engine);
     for (int i = 0 ; i < n ; i++) {
         int const i2 = (i*step + offset) % n;

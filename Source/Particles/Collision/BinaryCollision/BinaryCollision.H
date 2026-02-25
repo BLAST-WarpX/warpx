@@ -376,8 +376,8 @@ public:
             const amrex::ParticleReal m1 = species_1.getMass();
             auto get_position_1  = GetParticlePosition<PIdx>(ptile_1, getpos_offset);
 
-            amrex::Gpu::DeviceVector<index_type> indices_copy(np1);
-            index_type* AMREX_RESTRICT indices_copy_ptr = indices_copy.dataPtr();
+            amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
+            index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
 
             /*
               The following calculations are only required when creating product particles
@@ -612,6 +612,12 @@ public:
 
             // shuffle
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelFor( np1,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
+                {
+                    indices_1_copy_ptr[ip] = indices_1[ip];
+                });
+
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
@@ -624,7 +630,7 @@ public:
                     if ( cell_stop_1 - cell_start_1 <= 2 ) { return; }
 
                     /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
-                    ModulusShuffle(indices_1, indices_copy_ptr, cell_start_1, cell_stop_1, engine);
+                    ModulusShuffle(indices_1, indices_1_copy_ptr, cell_start_1, cell_stop_1, engine);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
@@ -831,8 +837,10 @@ public:
             const amrex::ParticleReal m2 = species_2.getMass();
             auto get_position_2  = GetParticlePosition<PIdx>(ptile_2, getpos_offset);
 
-            amrex::Gpu::DeviceVector<index_type> indices_copy(std::max(np1, np2));
-            index_type* AMREX_RESTRICT indices_copy_ptr = indices_copy.dataPtr();
+            amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
+            amrex::Gpu::DeviceVector<index_type> indices_2_copy(np2);
+            index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
+            index_type* AMREX_RESTRICT indices_2_copy_ptr = indices_2_copy.dataPtr();
 
             /*
               The following calculations are only required when creating product particles
@@ -1179,6 +1187,17 @@ public:
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
         WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelFor( np1 + np2,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
+                {
+                    if (ip < np1) {
+                        indices_1_copy_ptr[ip] = indices_1[ip];
+                    } else {
+                        int const ip2 = ip - np1;
+                        indices_2_copy_ptr[ip2] = indices_2[ip2];
+                    }
+                });
+
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
@@ -1199,10 +1218,10 @@ public:
 
           if (i < n_cells) {
             /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
-            ModulusShuffle(indices_1, indices_copy_ptr, cell_start_1, cell_stop_1, engine);
+            ModulusShuffle(indices_1, indices_1_copy_ptr, cell_start_1, cell_stop_1, engine);
           } else {
             /* ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine); */
-            ModulusShuffle(indices_2, indices_copy_ptr, cell_start_2, cell_stop_2, engine);
+            ModulusShuffle(indices_2, indices_2_copy_ptr, cell_start_2, cell_stop_2, engine);
           }
                 }
             );
