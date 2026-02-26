@@ -378,6 +378,10 @@ public:
 
             amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
             index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
+            amrex::Gpu::DeviceVector<int> indices_1_step(n_cells);
+            amrex::Gpu::DeviceVector<int> indices_1_offset(n_cells);
+            index_type* AMREX_RESTRICT indices_1_step_ptr = indices_1_step.dataPtr();
+            index_type* AMREX_RESTRICT indices_1_offset_ptr = indices_1_offset.dataPtr();
 
             /*
               The following calculations are only required when creating product particles
@@ -612,25 +616,23 @@ public:
 
             // shuffle
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            amrex::ParallelForRNG( n_cells,
+                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+                {
+                    SetupModulusShuffle(i_cell, cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr, engine);
+                });
+
             amrex::ParallelFor( np1,
                 [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
                     indices_1_copy_ptr[ip] = indices_1[ip];
                 });
 
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+            amrex::ParallelFor( np1,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-                    // Do not shuffle if there is three or less particles in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 2 ) { return; }
-
-                    /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
-                    ModulusShuffle(indices_1, indices_1_copy_ptr, cell_start_1, cell_stop_1, engine);
+                    ModulusShuffle (ip, indices_1, indices_1_copy_ptr, n_cells,
+                                    cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
@@ -838,9 +840,11 @@ public:
             auto get_position_2  = GetParticlePosition<PIdx>(ptile_2, getpos_offset);
 
             amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
-            amrex::Gpu::DeviceVector<index_type> indices_2_copy(np2);
             index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
-            index_type* AMREX_RESTRICT indices_2_copy_ptr = indices_2_copy.dataPtr();
+            amrex::Gpu::DeviceVector<int> indices_1_step(n_cells);
+            amrex::Gpu::DeviceVector<int> indices_1_offset(n_cells);
+            index_type* AMREX_RESTRICT indices_1_step_ptr = indices_1_step.data();
+            index_type* AMREX_RESTRICT indices_1_offset_ptr = indices_1_offset.data();
 
             /*
               The following calculations are only required when creating product particles
@@ -1187,42 +1191,23 @@ public:
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
         WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelFor( np1 + np2,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
+            amrex::ParallelForRNG( n_cells,
+                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
-                    if (ip < np1) {
-                        indices_1_copy_ptr[ip] = indices_1[ip];
-                    } else {
-                        int const ip2 = ip - np1;
-                        indices_2_copy_ptr[ip2] = indices_2[ip2];
-                    }
+                    SetupModulusShuffle(i_cell, cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr, engine);
                 });
 
-            amrex::ParallelForRNG( 2*n_cells,
-                [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+            amrex::ParallelFor( np1,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
-          int i_cell = i < n_cells ? i : i - n_cells;
+                    indices_1_copy_ptr[ip] = indices_1[ip];
+                });
 
-          // The particles from species1 that are in the cell `i_cell` are
-          // given by the `indices_1[cell_start_1:cell_stop_1]`
-          index_type const cell_start_1 = cell_offsets_1[i_cell];
-          index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-          // Same for species 2
-          index_type const cell_start_2 = cell_offsets_2[i_cell];
-          index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-          // Do not collide if one species is missing in the cell
-          if ( cell_stop_1 - cell_start_1 < 2 ||
-               cell_stop_2 - cell_start_2 < 2 ) { return; }
-
-          if (i < n_cells) {
-            /* ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine); */
-            ModulusShuffle(indices_1, indices_1_copy_ptr, cell_start_1, cell_stop_1, engine);
-          } else {
-            /* ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine); */
-            ModulusShuffle(indices_2, indices_2_copy_ptr, cell_start_2, cell_stop_2, engine);
-          }
+            amrex::ParallelFor( np1,
+                [=] AMREX_GPU_DEVICE (int ip) noexcept
+                {
+                    ModulusShuffle (ip, indices_1, indices_1_copy_ptr, n_cells,
+                                    cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr);
                 }
             );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);

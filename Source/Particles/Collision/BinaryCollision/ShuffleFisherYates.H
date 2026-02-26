@@ -22,25 +22,61 @@ int gcd_int(int a, int b) {
 
 template <typename T_index>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void ModulusShuffle (T_index *array, T_index *array_copy, T_index const is, T_index const ie,
-                    amrex::RandomEngine const& engine)
+void SetupModulusShuffle(int i_cell, T_index const * cell_offsets, T_index * indices_step_ptr, T_index * indices_offset_ptr,
+                         amrex::RandomEngine const& engine)
 {
-    int const n = ie - is;
+    T_index const cell_start = cell_offsets[i_cell];
+    T_index const cell_stop  = cell_offsets[i_cell+1];
+
+    int const n = cell_stop - cell_start;
     int step = 1;
     if (n > 2) {
         while (true) {
-            step = 2 + amrex::Random_int(n - 2, engine);
+            step = 1 + amrex::Random_int(n - 1, engine);
             if (gcd_int(n, step) == 1) {
                 break;
             }
         }
     }
+    indices_step_ptr[i_cell] = step;
+    indices_offset_ptr[i_cell] = amrex::Random_int(n, engine);
+}
+
+template <typename T_index>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void ShiftShuffle (T_index *array, T_index *array_copy, T_index const is, T_index const ie,
+                   amrex::RandomEngine const& engine)
+{
+    int const n = ie - is;
+
+    for (int i = is ; i < ie ; i++) {
+        array_copy[i] = array[i];
+    }
 
     int const offset = amrex::Random_int(n, engine);
     for (int i = 0 ; i < n ; i++) {
-        int const i2 = (i*step + offset) % n;
+        int const i2 = (i + offset) % n;
         array[is + i] = array_copy[is + i2];
     }
+}
+
+template <typename T_index>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void ModulusShuffle (int ip, T_index *indices, T_index *indices_copy, int n_cells,
+                     T_index const * cell_offsets, T_index const * indices_step, T_index const * indices_offset)
+{
+    T_index u_ip = (T_index)(ip);
+    int const i_cell = amrex::bisect( cell_offsets, 0, n_cells, u_ip );
+    T_index const cell_start = cell_offsets[i_cell];
+    T_index const cell_stop  = cell_offsets[i_cell+1];
+
+    T_index const n = cell_stop - cell_start;
+    T_index const i = u_ip - cell_start;
+    T_index const step = indices_step[i_cell];
+    T_index const offset = indices_offset[i_cell];
+    T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
+    indices[ip] = indices_copy[cell_start + i2];
+
 }
 
 /* \brief Shuffle array according to Fisher-Yates algorithm.
