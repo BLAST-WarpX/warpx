@@ -134,7 +134,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
     // Since this diagnostic *accumulates* the luminosity in the
     // array d_data, we add contributions at *each timestep*, but
     // we only write the data to file at intervals specified by the user.
-    const Real c_sq = PhysConst::c*PhysConst::c;
+    const Real c_sq = PhysConst::c2;
     const Real c_over_qe = PhysConst::c/PhysConst::q_e;
 
     // get a reference to WarpX instance

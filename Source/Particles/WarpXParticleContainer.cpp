@@ -2327,7 +2327,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
 amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
-    const amrex::ParticleReal inv_clight_sq = 1.0_prt/(PhysConst::c*PhysConst::c);
+    const amrex::ParticleReal inv_clight_sq = 1.0_prt/PhysConst::c2;
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 

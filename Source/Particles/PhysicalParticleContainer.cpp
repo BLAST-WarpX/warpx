@@ -1538,7 +1538,7 @@ PhysicalParticleContainer::InitIonizationModule ()
     constexpr auto a3 = PhysConst::alpha*PhysConst::alpha*PhysConst::alpha;
     constexpr auto a4 = a3 * PhysConst::alpha;
     constexpr Real wa = a3 * PhysConst::c / PhysConst::r_e;
-    constexpr Real Ea = PhysConst::m_e * PhysConst::c*PhysConst::c /PhysConst::q_e *
+    constexpr Real Ea = PhysConst::m_e * PhysConst::c2 /PhysConst::q_e *
         a4/PhysConst::r_e;
     constexpr Real UH = utils::physics::table_ionization_energies[0];
     const Real l_eff = std::sqrt(UH/h_ionization_energies[0]) - 1._rt;

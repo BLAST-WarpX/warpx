@@ -567,7 +567,7 @@ public:
                         // compute local temperature [Joules]
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
                             amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / PhysConst::c2;
                             amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                             amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                             amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
@@ -1102,7 +1102,7 @@ public:
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
                             if (ip < np1) {
                                 amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / PhysConst::c2;
                                 amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
@@ -1112,7 +1112,7 @@ public:
                             }
                             if (ip < np2) {
                                 amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / PhysConst::c2;
                                 amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);

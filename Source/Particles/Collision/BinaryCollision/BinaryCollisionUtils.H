@@ -66,7 +66,7 @@ namespace BinaryCollisionUtils{
         using namespace amrex::Math;
 
         constexpr double c = PhysConst::c;
-        constexpr double c_sq = PhysConst::c * PhysConst::c;
+        constexpr double c_sq = PhysConst::c2;
         constexpr double inv_c = 1./PhysConst::c;
 
         // Cast input parameters to double before computing collision properties

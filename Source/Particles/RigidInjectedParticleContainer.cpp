@@ -113,7 +113,7 @@ RigidInjectedParticleContainer::RemapParticles()
         const ParticleReal t_lab = 0._prt;
 
         const ParticleReal uz_boost = WarpX::gamma_boost*WarpX::beta_boost*PhysConst::c;
-        const ParticleReal csqi = 1._prt/(PhysConst::c*PhysConst::c);
+        const ParticleReal csqi = 1._prt/PhysConst::c2;
 
         vzbeam_ave_boosted = meanParticleVelocity(false)[2];
 
@@ -241,7 +241,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
-        constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
+        constexpr amrex::ParticleReal inv_csq = 1._prt/PhysConst::c2;
         amrex::Real position_dt = dt;
         if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
             position_dt *= 0.5_rt;

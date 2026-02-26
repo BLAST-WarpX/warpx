@@ -913,7 +913,7 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     // The pc_type petsc already has the one from the curl curl operator
     // Note: This should be done after Sync/communication has been called
 
-    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const amrex::Real pc_factor = PhysConst::c2 * PhysConst::mu0 * a_theta_dt;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
         amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);

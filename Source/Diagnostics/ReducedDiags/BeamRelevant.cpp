@@ -204,7 +204,7 @@ void BeamRelevant::ComputeDiags (int step)
     auto const species_names = mypc.GetSpeciesNames();
 
     // inverse of speed of light squared
-    Real constexpr inv_c2 = 1.0_rt / (PhysConst::c * PhysConst::c);
+    Real constexpr inv_c2 = 1.0_rt / PhysConst::c2;
 
     // loop over species
     for (int i_s = 0; i_s < nSpecies; ++i_s)

@@ -79,7 +79,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
-        amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
+        amrex::Real const inv_c2 = 1._rt / PhysConst::c2;
         amrex::Real const mass = primary.getMass();
 
         int const nlevs = std::max(0, primary.finestLevel()+1);
@@ -212,7 +212,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     // This will allow to update the parent lepton if needed
 
                     // Minimum fractional (wrt primary particle) photon energy
-                    amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
+                    amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c2);
                     amrex::Real umin = 0._rt;
                     amrex::Real umax = std::log(y_min) * std::log(y_min);
 

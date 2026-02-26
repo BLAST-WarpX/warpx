@@ -921,7 +921,7 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "quantum_xi", quantum_xi_tmp);
         if (quantum_xi_is_specified) {
             double const quantum_xi = quantum_xi_tmp;
-            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c * PhysConst::c);
+            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c2);
         }
 
         const auto at_least_one_boundary_is_pml =

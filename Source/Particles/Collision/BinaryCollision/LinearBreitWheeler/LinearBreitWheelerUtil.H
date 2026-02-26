@@ -57,7 +57,7 @@ namespace {
     {
         using namespace amrex::literals;
 
-        constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
+        constexpr amrex::ParticleReal c_sq = PhysConst::c2;
         constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
         constexpr amrex::ParticleReal me = PhysConst::m_e;
         auto constexpr pow2 = [](double const x) { return x*x; };

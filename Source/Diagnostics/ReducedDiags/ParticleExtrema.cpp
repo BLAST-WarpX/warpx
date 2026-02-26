@@ -167,7 +167,7 @@ void ParticleExtrema::ComputeDiags (int step)
     const auto species_names = mypc.GetSpeciesNames();
 
     // inverse of speed of light squared
-    amrex::Real constexpr inv_c2 = 1.0_rt / (PhysConst::c * PhysConst::c);
+    amrex::Real constexpr inv_c2 = 1.0_rt / PhysConst::c2;
 
     // loop over species
     for (int i_s = 0; i_s < nSpecies; ++i_s)
