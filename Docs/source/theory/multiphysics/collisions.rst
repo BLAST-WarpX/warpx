@@ -64,13 +64,11 @@ rate equations on a cell-by-cell basis:
     .. math::
 
        \begin{aligned}
-        \ n_1 &\Rightarrow n_A + n_B, \\
         \frac{dn_1}{dt} &= -\nu(t)n_1, \\
         \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
        \end{aligned}
-where `n_1` is the parent species density, `n_A` and `n_B` are the product species densities,
-and `\nu` is the user-specified decay rate. Using the parser, `\nu = \nu(x,y,z,t)` can be specified
-as a function of space and time.
+where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
+and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
 
 This can be used, for example, to represent ionization of a parent species by an externally applied laser pulse.
 
