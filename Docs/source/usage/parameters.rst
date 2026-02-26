@@ -363,12 +363,12 @@ Overall simulation parameters
           * ``warpx.use_2d_slices_fft_solver`` (`bool`) optional (default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
             If 1, solve Poisson equation in a quasi 3D geometry, neglecting the :math:`z` derivatives in the Laplacian of the Poisson equation.
-            In practice, in this case, the code performes many 2D Poisson solves on all :math:`(x,y)` slices, each slice at a given :math:`z`.
+            In practice, in this case, the code performs many 2D Poisson solves on all :math:`(x,y)` slices, each slice at a given :math:`z`.
             This is often a good approximation for ultra-relativistic beams propagating along the :math:`z` direction, with the relativistic solver.
             As a consequence, this solver does not need to do an FFT along the :math:`z` direction,
             and instead uses only transverse FFTs (along :math:`x` and :math:`y`) at each :math:`z` position (or :math:`z` "slice").
 
-          * ``ablastr.nprocs_igf_fft`` (`int`) optional (default: number of MPI ranks): Number of MPI ranks used to parallalelize the FFT solver.
+          * ``ablastr.nprocs_igf_fft`` (`int`) optional (default: number of MPI ranks): Number of MPI ranks used to parallelize the FFT solver.
             This can be less or equal than then number of MPI ranks that are used to run the overall simulation.
             It can be useful if the auxiliary simulation boxes fit within a single process, so to avoid extra communications.
             The auxiliary boxes are extended boxes in real and spectral space that are used to perform the necessary FFTs.
@@ -1563,7 +1563,7 @@ Particle initialization
     performed.
 
 * ``<species_name>.resampling_trigger_max_avg_ppc`` (`float`) optional (default `infinity`)
-    Resampling is performed everytime the number of macroparticles per cell of the species
+    Resampling is performed every time the number of macroparticles per cell of the species
     averaged over the whole simulation domain exceeds this parameter.
 
 * ``<species_name>.do_temperature_deposition`` (`boolean`) optional (default `false`)
@@ -1620,7 +1620,7 @@ Laser initialization
     and ``<laser_name>.direction``.
 
     ``<laser_name>.position`` also corresponds to the origin of the coordinates system
-    for the laser tranverse profile. For instance, for a Gaussian laser profile,
+    for the laser transverse profile. For instance, for a Gaussian laser profile,
     the peak of intensity will be at the position given by ``<laser_name>.position``.
     This variable can thus be used to shift the position of the laser pulse
     transversally.
@@ -1766,7 +1766,7 @@ Laser initialization
     The distance from ``laser_position`` to the focal plane.
     (where the distance is defined along the direction given by ``<laser_name>.direction``.)
 
-    Use a negative number for a defocussing laser instead of a focussing laser.
+    Use a negative number for a defocusing laser instead of a focusing laser.
 
     When running a **boosted-frame simulation**, provide the value of
     ``<laser_name>.profile_focal_distance`` in the laboratory frame, and use ``warpx.gamma_boost``
