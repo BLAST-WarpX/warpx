@@ -212,7 +212,7 @@ public:
                 {
                     const amrex::ParticleReal mass_before = m1 + m2;
                     const amrex::ParticleReal mass_after = products_mass_data[0] + products_mass_data[1];
-                    const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c*PhysConst::c;
+                    const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
