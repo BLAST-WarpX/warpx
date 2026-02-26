@@ -78,8 +78,8 @@ mass = {
     "deuterium": 2.01410177812 * scc.m_u - scc.m_e,
     "hydrogen2": 2.01410177812 * scc.m_u - scc.m_e,
     "tritium": 3.0160492779 * scc.m_u - scc.m_e,
-    "helium3": 3.016029 * scc.m_u - 2*scc.m_e,
-    "helium4": 4.00260325413 * scc.m_u - 2*scc.m_e,
+    "helium3": 3.016029 * scc.m_u - 2 * scc.m_e,
+    "helium4": 4.00260325413 * scc.m_u - 2 * scc.m_e,
     "neutron": 1.0013784193052508 * scc.m_p,
 }
 m_reduced = np.prod([mass[s] for s in reactant_species]) / np.sum(
