@@ -67,6 +67,7 @@ rate equations on a cell-by-cell basis:
         \frac{dn_1}{dt} &= -\nu(t)n_1, \\
         \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
        \end{aligned}
+
 where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
 and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
 
