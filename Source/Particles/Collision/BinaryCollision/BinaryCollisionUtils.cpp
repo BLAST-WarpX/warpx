@@ -183,6 +183,72 @@ namespace BinaryCollisionUtils{
         return NuclearFusionType::Undefined;
     }
 
+    amrex::ParticleReal get_nuclear_fusion_energy (const std::string& collision_name,
+                                                   const NuclearFusionType fusion_type,
+                                              MultiParticleContainer const * const mypc)
+    {
+        using namespace amrex::literals;
+
+        const amrex::ParmParse pp_collision_name(collision_name);
+
+        amrex::Vector<std::string> species_names;
+        pp_collision_name.getarr("species", species_names);
+        amrex::ParticleReal mass_before = 0.0_prt;
+        for (const auto& name : species_names) {
+            const auto& species = mypc->GetParticleContainerFromName(name);
+            mass_before += species.getMass();
+        }
+
+        amrex::Vector<std::string> product_species_names;
+        pp_collision_name.getarr("product_species", product_species_names);
+        amrex::ParticleReal mass_after = 0.0_prt;
+        for (const auto& name : product_species_names) {
+            const auto& product_species = mypc->GetParticleContainerFromName(name);
+            mass_after += product_species.getMass();
+        }
+
+        amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
+
+        const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2 * PhysConst::q_e;
+        if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
+            const amrex::ParticleReal expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
+            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                energy_error < energy_tolerance,
+                "ERROR: D + T -> He4 + n fusion energy error is too large. Make sure species mass are set properly.");
+        }
+        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
+            const amrex::ParticleReal expected_fusion_energy = 4.032653948e6_prt * PhysConst::q_e;
+            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                energy_error < energy_tolerance,
+                "ERROR: D + D -> T + p fusion energy error is too large. Make sure species mass are set properly.");
+        }
+        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
+            const amrex::ParticleReal expected_fusion_energy = 3.26891111e6_prt * PhysConst::q_e;
+            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                energy_error < energy_tolerance,
+                "ERROR: D + D -> He3 + n fusion energy error is too large. Make sure species mass are set properly.");
+        }
+        if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
+            const amrex::ParticleReal expected_fusion_energy = 18.35303980e6_prt * PhysConst::q_e;
+            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                energy_error < energy_tolerance,
+                "ERROR: D + He3 -> He4 + p fusion energy error is too large. Make sure species mass are set properly.");
+        }
+        if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
+            const amrex::ParticleReal expected_fusion_energy = 8.68212502e6_prt * PhysConst::q_e;
+            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                energy_error < energy_tolerance,
+                "ERROR: p +  -> He4 + He4 + He4 fusion energy error is too large. Make sure species mass are set properly.");
+        }
+
+        return fusion_energy;
+    }
+
     CollisionType nuclear_fusion_type_to_collision_type (const NuclearFusionType fusion_type)
     {
         if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
