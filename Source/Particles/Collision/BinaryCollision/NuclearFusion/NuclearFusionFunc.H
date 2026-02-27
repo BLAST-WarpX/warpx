@@ -68,8 +68,6 @@ public:
         WARPX_ABORT_WITH_MESSAGE("Nuclear fusion module does not currently work with single precision");
 #endif
 
-        m_fusion_energy = BinaryCollisionUtils::get_nuclear_fusion_energy(collision_name, m_fusion_type, mypc);
-
         const amrex::ParmParse pp_collision_name(collision_name);
         utils::parser::queryWithParser(
             pp_collision_name, "event_multiplier", m_fusion_multiplier);
@@ -83,7 +81,6 @@ public:
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
         m_exe.m_fusion_type = m_fusion_type;
-        m_exe.m_fusion_energy = m_fusion_energy;
         m_exe.m_isSameSpecies = m_isSameSpecies;
     }
 
@@ -240,7 +237,6 @@ public:
         amrex::ParticleReal m_fusion_multiplier;
         amrex::ParticleReal m_probability_threshold;
         amrex::ParticleReal m_probability_target_value;
-        amrex::ParticleReal m_fusion_energy;
         NuclearFusionType m_fusion_type;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
@@ -264,7 +260,6 @@ private:
     // the fusion multiplier should be reduced.
     amrex::ParticleReal m_probability_threshold;
     amrex::ParticleReal m_probability_target_value;
-    amrex::ParticleReal m_fusion_energy;
     NuclearFusionType m_fusion_type;
     bool m_isSameSpecies;
 

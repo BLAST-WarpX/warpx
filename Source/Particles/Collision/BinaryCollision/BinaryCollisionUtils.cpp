@@ -183,14 +183,30 @@ namespace BinaryCollisionUtils{
         return NuclearFusionType::Undefined;
     }
 
+    amrex::ParticleReal get_reaction_energy (const std::string& collision_name,
+                                             const CollisionType collision_type,
+                                             MultiParticleContainer const * const mypc)
+    {
+        amrex::ParticleReal reaction_energy = 0.0;
+        if (is_fusion_type(collision_type)) {
+            reaction_energy = get_nuclear_fusion_energy(collision_name,
+                                                        collision_type, mypc);
+        }
+        return reaction_energy;
+    }
+
     amrex::ParticleReal get_nuclear_fusion_energy (const std::string& collision_name,
-                                                   const NuclearFusionType fusion_type,
+                                                   const CollisionType collision_type,
                                               MultiParticleContainer const * const mypc)
     {
         using namespace amrex::literals;
 
+        // Check if collision type is fusion type
+        if (!is_fusion_type(collision_type)) { return 0.0; }
+
         const amrex::ParmParse pp_collision_name(collision_name);
 
+        // Compute the total mass of the colliding species
         amrex::Vector<std::string> species_names;
         pp_collision_name.getarr("species", species_names);
         amrex::ParticleReal mass_before = 0.0_prt;
@@ -199,6 +215,7 @@ namespace BinaryCollisionUtils{
             mass_before += species.getMass();
         }
 
+        // Compute the total mass of the product species
         amrex::Vector<std::string> product_species_names;
         pp_collision_name.getarr("product_species", product_species_names);
         amrex::ParticleReal mass_after = 0.0_prt;
@@ -207,38 +224,40 @@ namespace BinaryCollisionUtils{
             mass_after += product_species.getMass();
         }
 
+        // Compute the fusion energy
         amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
+        // Verify that the fusion energy is close to what is exected
         const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2 * PhysConst::q_e;
-        if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
+        if (collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) {
             const amrex::ParticleReal expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 energy_error < energy_tolerance,
                 "ERROR: D + T -> He4 + n fusion energy error is too large. Make sure species mass are set properly.");
         }
-        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
+        if (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) {
             const amrex::ParticleReal expected_fusion_energy = 4.032653948e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 energy_error < energy_tolerance,
                 "ERROR: D + D -> T + p fusion energy error is too large. Make sure species mass are set properly.");
         }
-        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
+        if (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) {
             const amrex::ParticleReal expected_fusion_energy = 3.26891111e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 energy_error < energy_tolerance,
                 "ERROR: D + D -> He3 + n fusion energy error is too large. Make sure species mass are set properly.");
         }
-        if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
+        if (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion) {
             const amrex::ParticleReal expected_fusion_energy = 18.35303980e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 energy_error < energy_tolerance,
                 "ERROR: D + He3 -> He4 + p fusion energy error is too large. Make sure species mass are set properly.");
         }
-        if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
+        if (collision_type == CollisionType::ProtonBoronToAlphasFusion) {
             const amrex::ParticleReal expected_fusion_energy = 8.68212502e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -268,5 +287,20 @@ namespace BinaryCollisionUtils{
         }
         WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
         return CollisionType::Undefined;
+    }
+
+    bool is_fusion_type (const CollisionType collision_type)
+    {
+        if ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
+            (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) ||
+            (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) ||
+            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion) ||
+            (collision_type == CollisionType::ProtonBoronToAlphasFusion))
+        {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 }

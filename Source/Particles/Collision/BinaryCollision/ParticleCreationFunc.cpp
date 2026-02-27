@@ -35,10 +35,11 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
 #endif
     }
     else if ((m_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion)
-             || (m_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
-             || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
-             || (m_collision_type == CollisionType::LinearBreitWheeler)
-             || (m_collision_type == CollisionType::LinearCompton))
+          || (m_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
+          || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
+          || (m_collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion)
+          || (m_collision_type == CollisionType::LinearBreitWheeler)
+          || (m_collision_type == CollisionType::LinearCompton))
     {
         m_num_product_species = 2;
         m_num_products_host.push_back(1);
@@ -53,6 +54,9 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
     {
         WARPX_ABORT_WITH_MESSAGE("Unknown collision type in ParticleCreationFunc");
     }
+
+    // This value is currently only used by the fusion modules
+    m_reaction_energy = BinaryCollisionUtils::get_reaction_energy(collision_name, m_collision_type, mypc);
 
 #ifdef AMREX_USE_GPU
      m_num_products_device.resize(m_num_product_species);

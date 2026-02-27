@@ -167,6 +167,7 @@ public:
         const int t_num_product_species = m_num_product_species;
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
+        const amrex::ParticleReal t_reaction_energy = m_reaction_energy;
 
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -208,17 +209,15 @@ public:
                 }
                 else if ((t_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion)
                       || (t_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
-                      || (t_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion))
+                      || (t_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
+                      || (t_collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion))
                 {
-                    const amrex::ParticleReal mass_before = m1 + m2;
-                    const amrex::ParticleReal mass_after = products_mass_data[0] + products_mass_data[1];
-                    const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
-                        m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy, engine);
+                        m1, m2, products_mass_data[0], products_mass_data[1], t_reaction_energy, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
                     LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
@@ -261,6 +260,7 @@ private:
     // for device) which is necessary with GPUs but redundant on CPU.
     amrex::Gpu::DeviceVector<int> m_num_products_device;
     amrex::Gpu::HostVector<int> m_num_products_host;
+    amrex::ParticleReal m_reaction_energy = 0.0;
     CollisionType m_collision_type;
 };
 
