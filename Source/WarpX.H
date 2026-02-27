@@ -1600,6 +1600,9 @@ private:
      *        is set in WarpX::ReadParameters().
      */
     bool m_collisions_split_position_push;
+
+    //Parameter to remove the fine patch at a given time step
+    int m_end_fine_patch_step = -1;
 };
 
 #endif

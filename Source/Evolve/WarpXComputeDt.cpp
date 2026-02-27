@@ -21,6 +21,7 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
+#include <AMReX_AmrMesh.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_Print.H>
@@ -101,7 +102,7 @@ WarpX::ComputeDt ()
     dt.resize(max_level+1,deltat);
 
     if (m_do_subcycling) {
-        for (int lev = max_level-1; lev >= 0; --lev) {
+        for (int lev = finestLevel()-1; lev >= 0; --lev) {
             dt[lev] = dt[lev+1] * refRatio(lev)[0];
         }
     }
@@ -114,7 +115,7 @@ WarpX::ComputeDt ()
 void
 WarpX::UpdateDtFromParticleSpeeds ()
 {
-    const amrex::Real* dx = geom[max_level].CellSize();
+    const amrex::Real* dx = geom[finestLevel()].CellSize();
     const amrex::Real dx_min = minDim(dx);
 
     const amrex::ParticleReal max_v = mypc->maxParticleVelocity();

@@ -609,7 +609,7 @@ Diagnostics::ComputeAndPack ()
 
     // compute the necessary fields and store result in m_mf_output.
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
-        for(int lev=0; lev<nlev_output; lev++){
+        for(int lev=0; lev < warpx.finestLevel() + 1; lev++){
             int icomp_dst = 0;
             const auto n = static_cast<int>(m_all_field_functors[lev].size());
             for (int icomp=0; icomp<n; icomp++){
@@ -653,6 +653,13 @@ Diagnostics::FilterComputePackFlush (int step, bool force_flush)
 {
     WARPX_PROFILE("Diagnostics::FilterComputePackFlush()");
     MovingWindowAndGalileanDomainShift (step);
+
+    const auto& warpx = WarpX::GetInstance();
+    const auto finest_level = warpx.finestLevel();
+
+    for (auto& buf : m_mf_output){
+        if(buf.size() > finest_level+1) buf.resize(finest_level+1);
+    }
 
     if ( DoComputeAndPack (step, force_flush) ) {
         ComputeAndPack();

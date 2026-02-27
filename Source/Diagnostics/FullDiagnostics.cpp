@@ -246,6 +246,8 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
     // is supported for BackTransformed Diagnostics, in BTDiagnostics class.
     auto & warpx = WarpX::GetInstance();
 
+    const auto output_levels = warpx.finestLevel() + 1;
+
     // Get the time step on coarsest level.
     const int step = warpx.getistep(0);
     // For time-averaged diagnostics, we still write out an instantaneous diagnostic on step 0
@@ -261,7 +263,7 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
             m_flush_format->WriteToFile(
                     m_varnames, m_sum_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
                     warpx.gett_new(0),
-                    m_output_species.at(i_buffer), nlev_output, m_file_prefix,
+                    m_output_species.at(i_buffer), output_levels, m_file_prefix,
                     m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards,
                     m_verbose);
 
@@ -282,7 +284,7 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
         m_flush_format->WriteToFile(
             m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
             warpx.gett_new(0),
-            m_output_species.at(i_buffer), nlev_output, m_file_prefix,
+            m_output_species.at(i_buffer), output_levels, m_file_prefix,
             m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards,
             m_verbose);
     }
