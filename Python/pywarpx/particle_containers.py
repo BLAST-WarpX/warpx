@@ -722,7 +722,7 @@ class ParticleBoundaryBufferWrapper(object):
         The data for the arrays are not copied, but share the underlying
         memory buffer with WarpX. The arrays are fully writeable.
 
-        You can find `here https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py`
+        You can find `here <https://github.com/BLAST-WarpX/warpx/blob/319e55b10ad4f7c71b84a4fb21afbafe1f5b65c2/Examples/Tests/particle_boundary_interaction/PICMI_inputs_rz.py>`_
         an example of a simple case of particle-boundary interaction (reflection).
 
         Parameters
@@ -738,7 +738,7 @@ class ParticleBoundaryBufferWrapper(object):
             comp_name      : str
                 The component of the array data that will be returned.
                 "x", "y", "z", "ux", "uy", "uz", "w"
-                "stepScraped","deltaTimeScraped",
+                "stepScraped", "deltaTimeScraped", "timeScraped",
                 if boundary='eb': "nx", "ny", "nz"
 
             level          : int
@@ -792,7 +792,7 @@ class ParticleBoundaryBufferWrapper(object):
             comp_name      : str
                 The component of the array data that will be returned.
                 "x", "y", "z", "ux", "uy", "uz", "w"
-                "stepScraped","deltaTimeScraped",
+                "stepScraped", "deltaTimeScraped", "timeScraped",
                 if boundary='eb': "nx", "ny", "nz"
 
             level          : int
