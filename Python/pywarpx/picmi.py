@@ -2071,19 +2071,40 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
 
+    The standard PICMI parameters `required_precision` and `maximum_iterations` control the
+    MLMG Poisson solver convergence for the labframe electrostatic solvers. When `warpx_magnetostatic=True`,
+    these parameters are used as defaults for the magnetostatic solver but can be overridden
+    with the explicit `warpx_magnetostatic_*` parameters.
+
     Parameters
     ----------
     warpx_relativistic: bool, default=False
         Whether to use the relativistic solver or lab frame solver
 
     warpx_absolute_tolerance: float, default=0.
-        Absolute tolerance on the lab frame solver
+        Absolute tolerance on the labframe electrostatic solver
 
     warpx_self_fields_verbosity: integer, default=2
-        Level of verbosity for the lab frame solver
+        Level of verbosity for the labframe electrostatic solver
 
     warpx_magnetostatic: bool, default=False
-        Whether to use the magnetostatic solver
+        Whether to also solve for self-consistent magnetic fields from currents.
+
+    warpx_magnetostatic_required_precision: float, optional
+        Relative precision for the magnetostatic solver. If not specified,
+        defaults to the value of `required_precision`.
+
+    warpx_magnetostatic_absolute_tolerance: float, optional
+        Absolute tolerance for the magnetostatic solver. If not specified,
+        defaults to the value of `warpx_absolute_tolerance`.
+
+    warpx_magnetostatic_max_iters: integer, optional
+        Maximum iterations for the magnetostatic solver. If not specified,
+        defaults to the value of `maximum_iterations`.
+
+    warpx_magnetostatic_verbosity: integer, optional
+        Verbosity level for the magnetostatic solver. If not specified,
+        defaults to the value of `warpx_self_fields_verbosity`.
 
     warpx_effective_potential: bool, default=False
         Whether to use the effective potential Poisson solver (EP-PIC)
@@ -2117,6 +2138,15 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        # Explicit magnetostatic solver parameters (override self_fields_* defaults)
+        self.magnetostatic_required_precision = kw.pop(
+            "warpx_magnetostatic_required_precision", None
+        )
+        self.magnetostatic_absolute_tolerance = kw.pop(
+            "warpx_magnetostatic_absolute_tolerance", None
+        )
+        self.magnetostatic_max_iters = kw.pop("warpx_magnetostatic_max_iters", None)
+        self.magnetostatic_verbosity = kw.pop("warpx_magnetostatic_verbosity", None)
         self.effective_potential = kw.pop("warpx_effective_potential", False)
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
@@ -2164,6 +2194,15 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
+            # Explicit magnetostatic solver parameters (if provided)
+            pywarpx.warpx.magnetostatic_solver_required_precision = (
+                self.magnetostatic_required_precision
+            )
+            pywarpx.warpx.magnetostatic_solver_absolute_tolerance = (
+                self.magnetostatic_absolute_tolerance
+            )
+            pywarpx.warpx.magnetostatic_solver_max_iters = self.magnetostatic_max_iters
+            pywarpx.warpx.magnetostatic_solver_verbosity = self.magnetostatic_verbosity
             pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
             pywarpx.boundary.potential_lo_y = self.grid.potential_ymin
             pywarpx.boundary.potential_lo_z = self.grid.potential_zmin
