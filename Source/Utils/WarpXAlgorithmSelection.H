@@ -188,4 +188,13 @@ AMREX_ENUM(
     Default = Full
 );
 
+/** \brief Particle shuffling method for binary collisions */
+AMREX_ENUM(
+    ParticleShufflingMethod,
+    None,
+    FisherYates,
+    Modulus,
+    Default = FisherYates
+);
+
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

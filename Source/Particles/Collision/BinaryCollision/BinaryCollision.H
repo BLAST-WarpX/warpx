@@ -15,7 +15,7 @@
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/Collision/CollisionBase.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
@@ -108,6 +108,7 @@ public:
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
+        pp_collision_name.query_enum_sloppy("shuffling_method", shuffling_method, "-_");
 
         if (collision_type == CollisionType::PairwiseCoulomb) {
             // Input parameter set for all pairwise Coulomb collisions
@@ -376,13 +377,6 @@ public:
             const amrex::ParticleReal m1 = species_1.getMass();
             auto get_position_1  = GetParticlePosition<PIdx>(ptile_1, getpos_offset);
 
-            amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
-            index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
-            amrex::Gpu::DeviceVector<int> indices_1_step(n_cells);
-            amrex::Gpu::DeviceVector<int> indices_1_offset(n_cells);
-            index_type* AMREX_RESTRICT indices_1_step_ptr = indices_1_step.dataPtr();
-            index_type* AMREX_RESTRICT indices_1_offset_ptr = indices_1_offset.dataPtr();
-
             /*
               The following calculations are only required when creating product particles
             */
@@ -616,25 +610,12 @@ public:
 
             // shuffle
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-                {
-                    SetupModulusShuffle(i_cell, cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr, engine);
-                });
+            if (shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, cell_offsets_1, indices_1);
+            } else if (shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
+            }
 
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    indices_1_copy_ptr[ip] = indices_1[ip];
-                });
-
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    ModulusShuffle (ip, indices_1, indices_1_copy_ptr, n_cells,
-                                    cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr);
-                }
-            );
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
@@ -838,13 +819,6 @@ public:
             const amrex::ParticleReal q2 = species_2.getCharge();
             const amrex::ParticleReal m2 = species_2.getMass();
             auto get_position_2  = GetParticlePosition<PIdx>(ptile_2, getpos_offset);
-
-            amrex::Gpu::DeviceVector<index_type> indices_1_copy(np1);
-            index_type* AMREX_RESTRICT indices_1_copy_ptr = indices_1_copy.dataPtr();
-            amrex::Gpu::DeviceVector<int> indices_1_step(n_cells);
-            amrex::Gpu::DeviceVector<int> indices_1_offset(n_cells);
-            index_type* AMREX_RESTRICT indices_1_step_ptr = indices_1_step.data();
-            index_type* AMREX_RESTRICT indices_1_offset_ptr = indices_1_offset.data();
 
             /*
               The following calculations are only required when creating product particles
@@ -1191,25 +1165,12 @@ public:
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
         WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-                {
-                    SetupModulusShuffle(i_cell, cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr, engine);
-                });
-
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    indices_1_copy_ptr[ip] = indices_1[ip];
-                });
-
-            amrex::ParallelFor( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
-                {
-                    ModulusShuffle (ip, indices_1, indices_1_copy_ptr, n_cells,
-                                    cell_offsets_1, indices_1_step_ptr, indices_1_offset_ptr);
-                }
-            );
+            if (shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, cell_offsets_1, indices_1);
+            } else if (shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
+                FisherYatesShuffle(n_cells, cell_offsets_2, indices_2);
+            }
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
 
         WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures);
@@ -1483,6 +1444,8 @@ private:
 
     bool m_isSameSpecies;
     bool m_have_product_species;
+
+    ParticleShufflingMethod shuffling_method;
 
     bool m_correct_energy_momentum = false;
     amrex::ParticleReal m_beta_weight_exponent = 1.;

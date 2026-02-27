@@ -4,78 +4,120 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PARTICLES_COLLISION_SHUFFLE_FISHER_YATES_H_
-#define WARPX_PARTICLES_COLLISION_SHUFFLE_FISHER_YATES_H_
+#ifndef WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
+#define WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
 
 #include <AMReX_Random.H>
 #include <AMReX_Scan.H>
 
+/* \brief Calculate the greatest common denominator of the two integers.
+ *        This does the same thing as std::gcd, but that routine is not
+ *        reliably available on GPU.
+ *        As a comment, this is a fast operation with roughly
+ *        the complexity of log(max(a,b)).
+ * \param a, b Two integers, both greater than zero.
+ * \result The greatest common denominator
+ */
+template <typename T_index>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-int gcd_int(int a, int b) {
+T_index gcd_int(T_index a, T_index b) {
     while (b != 0) {
-        int r = a % b;
+        T_index r = a % b;
         a = b;
         b = r;
     }
     return a;
 }
 
+/* \brief Generate the step for the modulus shuffle
+ *        In order for the shuffle to include all particles, the step
+ *        and the number of particles must not have any common factors
+ *        except 1, they are coprime.
+ *        As a comment, the likelyhood that two integers are coprime
+ *        is roughly 60%, so the while loop should succeed in a small
+ *        number of attempts.
+ *
+ * \param n The number of particles
+ * \param engine The random number generator engine
+ * \result The generated step value
+ */
 template <typename T_index>
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void SetupModulusShuffle(int i_cell, T_index const * cell_offsets, T_index * indices_step_ptr, T_index * indices_offset_ptr,
-                         amrex::RandomEngine const& engine)
+T_index generate_modulus_step(T_index n, amrex::RandomEngine const& engine)
 {
-    T_index const cell_start = cell_offsets[i_cell];
-    T_index const cell_stop  = cell_offsets[i_cell+1];
-
-    int const n = cell_stop - cell_start;
-    int step = 1;
+    T_index step = 1;
     if (n > 2) {
         while (true) {
-            step = 1 + amrex::Random_int(n - 1, engine);
+            // The step will be greater than 0 and less than n
+            step = 1 + amrex::Random_int(n - 2, engine);
             if (gcd_int(n, step) == 1) {
                 break;
             }
         }
     }
-    indices_step_ptr[i_cell] = step;
-    indices_offset_ptr[i_cell] = amrex::Random_int(n, engine);
+    return step;
 }
 
+/* \brief Shuffles the indices using a modulus shuffle.
+ *        For each particle i, move it to (i*step + offset) % n,
+ *        where i and n are relative to the grid cell.
+ *        This will work for all particles if step and n are coprime.
+ *
+ * \param n_cell The number of grid cells
+ * \param np The number of particles (the length of indices)
+ * \param cell_offsets The particle number offset for each cell
+ *                     (The cumulative integral of the number of particles in each cell.)
+ * \param indices The indices to the particles that is to be shuffled
+ */
 template <typename T_index>
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void ShiftShuffle (T_index *array, T_index *array_copy, T_index const is, T_index const ie,
-                   amrex::RandomEngine const& engine)
+void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_index * indices)
 {
-    int const n = ie - is;
+    amrex::Gpu::DeviceVector<T_index> indices_copy_vector(np);
+    amrex::Gpu::DeviceVector<int> indices_step_vector(n_cells);
+    amrex::Gpu::DeviceVector<int> indices_offset_vector(n_cells);
+    T_index* AMREX_RESTRICT indices_copy = indices_copy_vector.dataPtr();
+    T_index* AMREX_RESTRICT indices_step = indices_step_vector.dataPtr();
+    T_index* AMREX_RESTRICT indices_offset = indices_offset_vector.dataPtr();
 
-    for (int i = is ; i < ie ; i++) {
-        array_copy[i] = array[i];
-    }
+    // For each grid cell, calculates the step size and offset
+    // that are used in the suffle.
+    amrex::ParallelForRNG(n_cells,
+        [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+        {
+            T_index const cell_start = cell_offsets[i_cell];
+            T_index const cell_stop  = cell_offsets[i_cell+1];
 
-    int const offset = amrex::Random_int(n, engine);
-    for (int i = 0 ; i < n ; i++) {
-        int const i2 = (i + offset) % n;
-        array[is + i] = array_copy[is + i2];
-    }
-}
+            T_index const n = cell_stop - cell_start;
+            indices_step[i_cell] = generate_modulus_step(n, engine);
+            indices_offset[i_cell] = amrex::Random_int(n, engine);
+        });
 
-template <typename T_index>
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void ModulusShuffle (int ip, T_index *indices, T_index *indices_copy, int n_cells,
-                     T_index const * cell_offsets, T_index const * indices_step, T_index const * indices_offset)
-{
-    T_index u_ip = (T_index)(ip);
-    int const i_cell = amrex::bisect( cell_offsets, 0, n_cells, u_ip );
-    T_index const cell_start = cell_offsets[i_cell];
-    T_index const cell_stop  = cell_offsets[i_cell+1];
+    // A copy is needed of the indices
+    amrex::ParallelFor(np,
+        [=] AMREX_GPU_DEVICE (int ip) noexcept
+        {
+            indices_copy[ip] = indices[ip];
+        });
 
-    T_index const n = cell_stop - cell_start;
-    T_index const i = u_ip - cell_start;
-    T_index const step = indices_step[i_cell];
-    T_index const offset = indices_offset[i_cell];
-    T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
-    indices[ip] = indices_copy[cell_start + i2];
+    // Do the shuffle.
+    amrex::ParallelFor(np,
+        [=] AMREX_GPU_DEVICE (int ip) noexcept
+        {
+            T_index u_ip = (T_index)(ip);
+            int const i_cell = amrex::bisect( cell_offsets, 0, n_cells, u_ip );
+            T_index const cell_start = cell_offsets[i_cell];
+            T_index const cell_stop  = cell_offsets[i_cell+1];
+
+            T_index const n = cell_stop - cell_start;
+            T_index const i = u_ip - cell_start;
+            T_index const step = indices_step[i_cell];
+            T_index const offset = indices_offset[i_cell];
+
+            // A long is needed since the product i*step can exceed the range of
+            // standard ints
+            T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
+            indices[ip] = indices_copy[cell_start + i2];
+        }
+    );
 
 }
 
@@ -99,6 +141,32 @@ void ShuffleFisherYates (T_index *array, T_index const is, T_index const ie,
         array[i] = array[j];
         array[j] = buf;
     }
+}
+
+/* \brief Shuffle array according to Fisher-Yates algorithm.
+ *
+ * \param n_cell The number of grid cells
+ * \param cell_offsets The particle number offset for each cell
+ *                     (The cumulative integral of the number of particles in each cell.)
+ * \param indices The indices to the particles that is to be shuffled
+*/
+template <typename T_index>
+void FisherYatesShuffle (int n_cells, T_index const * cell_offsets, T_index *indices)
+{
+    amrex::ParallelForRNG(n_cells,
+        [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+        {
+            // The particles from species1 that are in the cell `i_cell` are
+            // given by the `indices[cell_start:cell_stop]`
+            T_index const cell_start = cell_offsets[i_cell];
+            T_index const cell_stop  = cell_offsets[i_cell+1];
+
+            // Do not shuffle if there is only one particle in the cell
+            if ( cell_stop - cell_start <= 1 ) { return; }
+
+            ShuffleFisherYates(indices, cell_start, cell_stop, engine);
+        }
+    );
 }
 
 /* \brief A helper class for computing and looping over the independent pairs of
@@ -210,4 +278,4 @@ struct IndependentPairHelper
     const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
 };
 
-#endif // WARPX_PARTICLES_COLLISION_SHUFFLE_FISHER_YATES_H_
+#endif // WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
