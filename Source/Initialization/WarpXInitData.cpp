@@ -821,7 +821,6 @@ WarpX::InitData ()
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
-        WarpX::PrintDtDxDyDz();
         InitDiagnostics();
     }
     else
