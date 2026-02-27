@@ -243,7 +243,7 @@ namespace BinaryCollisionUtils{
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 energy_error < energy_tolerance,
-                "ERROR: p +  -> He4 + He4 + He4 fusion energy error is too large. Make sure species mass are set properly.");
+                "ERROR: p + B11 -> He4 + He4 + He4 fusion energy error is too large. Make sure species mass are set properly.");
         }
 
         return fusion_energy;
