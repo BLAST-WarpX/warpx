@@ -324,7 +324,7 @@ sim = picmi.Simulation(
     time_step_size=DT,
     max_steps=max_steps,
     warpx_collisions=[mcc_electrons, mcc_ions],
-    warpx_collisions_split_momentum_push=0,
+    warpx_collisions_split_momentum_push=1,
 )
 
 sim.add_species(

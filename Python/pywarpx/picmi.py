@@ -3220,7 +3220,6 @@ class Simulation(picmistandard.PICMI_Simulation):
         (Vay et al., Phys. Rev. E 111, 2025).
         This is only implemented for the explicit evolve scheme
         and is not available for the implicit evolve schemes.
-        It is also not available with embedded boundaries.
 
     warpx_embedded_boundary: embedded boundary instance, optional
 
