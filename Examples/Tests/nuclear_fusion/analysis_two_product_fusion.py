@@ -65,7 +65,7 @@ if re.search("tritium", warpx_used_inputs):
     reactant_species = ["deuterium", "tritium"]
     product_species = ["helium4", "neutron"]
     ntests = 2
-    E_fusion = 17.58929696 * MeV_to_Joule  # Energy released during the fusion reaction
+    E_fusion = 17.58929696 * MeV_to_Joule
 else:
     # else, this is the D+D test
     reaction_type = "DD"
