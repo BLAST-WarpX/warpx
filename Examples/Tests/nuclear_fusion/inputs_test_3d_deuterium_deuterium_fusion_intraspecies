@@ -69,14 +69,9 @@ geometry.prob_hi =  1e-3  1e-3  1e-3
 geometry.prob_lo = -1e-3 -1e-3 -1e-3
 
 # helium3
-helium3.mass = 3.01602932243*m_u - 2*m_e
-helium3.charge = 2*q_e
 helium3.do_not_deposit = 1
 helium3.do_not_push = 1
 helium3.species_type = helium3
-
-deuterium.mass = 2.01410177812*m_u - m_e
-deuterium.charge = q_e
 
 # max_step
 max_step = 10
