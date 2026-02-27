@@ -32,8 +32,8 @@ algo.particle_shape = 1
 particles.species_names = proton1 boron1 alpha1 proton2 boron2 alpha2 proton3 boron3 alpha3 \
                           proton4 boron4 alpha4 proton5 boron5 alpha5
 
-my_constants.m_b11 = 11.00930536*m_u # Boron 11 mass
-my_constants.m_h = 1.00782503223*m_u # Hydrogen 1 mass
+my_constants.m_b11 = 11.00930536*m_u - 5*m_e # Boron 11 mass
+my_constants.m_h = m_p # Hydrogen 1 mass
 my_constants.m_reduced = m_h*m_b11/(m_h+m_b11)
 my_constants.keV_to_J = 1.e3*q_e
 my_constants.Energy_step = 22. * keV_to_J
