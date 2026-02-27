@@ -2247,7 +2247,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
     amrex::Long np_total = 0;
 
-    const amrex::ParticleReal inv_clight_sq = 1.0_prt/PhysConst::c/PhysConst::c;
+    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/PhysConst::c2;
 
     const int nLevels = finestLevel();
 
@@ -2272,7 +2272,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
                                {
                                    amrex::ParticleReal usq = (uxp[i]*uxp[i] +
                                                               uyp[i]*uyp[i] +
-                                                              uzp[i]*uzp[i])*inv_clight_sq;
+                                                              uzp[i]*uzp[i])*inv_c2;
                                    const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq);
                                    return {uxp[i]*gaminv,  uyp[i]*gaminv, uzp[i]*gaminv};
                                });
@@ -2300,7 +2300,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
                 np_total += pti.numParticles();
 
                 for (unsigned long i = 0; i < ux.size(); i++) {
-                    const amrex::ParticleReal usq = (ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i])*inv_clight_sq;
+                    const amrex::ParticleReal usq = (ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i])*inv_c2;
                     const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq);
                     vx_total += ux[i]*gaminv;
                     vy_total += uy[i]*gaminv;
@@ -2327,7 +2327,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
 amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
-    const amrex::ParticleReal inv_clight_sq = 1.0_prt/PhysConst::c2;
+    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/PhysConst::c2;
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 
@@ -2345,7 +2345,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
             reduce_op.eval(pti.numParticles(), reduce_data,
                 [=] AMREX_GPU_DEVICE (int ip)
-                { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_clight_sq; });
+                { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_c2; });
         }
     }
 

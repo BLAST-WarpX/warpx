@@ -95,12 +95,12 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
+    const amrex::Real inv_c2 = 1.0_rt/PhysConst::c2;
 
     // --- Get particle quantities
-    const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
-                                                + uyp[ip]*uyp[ip]*clightsq
-                                                + uzp[ip]*uzp[ip]*clightsq);
+    const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                + uyp[ip]*uyp[ip]*inv_c2
+                                                + uzp[ip]*uzp[ip]*inv_c2);
     amrex::Real wq  = q*wp[ip];
     if (do_ionization){
         wq *= ion_lev[ip];

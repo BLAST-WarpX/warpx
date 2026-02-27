@@ -293,7 +293,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
         Box const& tet  = mfi.tilebox(Efield[1]->ixType().toIntVect());
         Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
-        Real const c2 = PhysConst::c2;
+        Real constexpr c2 = PhysConst::c2;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(ter, tet, tez,
@@ -503,7 +503,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
         Box const& tet  = mfi.tilebox(Efield[1]->ixType().toIntVect());
         Box const& tep  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
-        Real const c2 = PhysConst::c2;
+        Real constexpr c2 = PhysConst::c2;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(ter, tet, tep,

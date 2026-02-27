@@ -150,7 +150,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
     // Since this diagnostic *accumulates* the luminosity in the
     // table m_d_data_2D, we add contributions at *each timestep*, but
     // we only write the data to file at intervals specified by the user.
-    const Real c_sq = PhysConst::c2;
+    constexpr Real c2 = PhysConst::c2;
     const Real c_over_qe = PhysConst::c/PhysConst::q_e;
 
     // output table data
@@ -276,7 +276,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         p1y = PhysConst::m_e*u1y[j_1];
                         p1z = PhysConst::m_e*u1z[j_1];
                     } else {
-                        p1t = m1*std::sqrt( c_sq + u1_sq );
+                        p1t = m1*std::sqrt( c2 + u1_sq );
                         p1x = m1*u1x[j_1];
                         p1y = m1*u1y[j_1];
                         p1z = m1*u1z[j_1];
@@ -291,7 +291,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         p2y = PhysConst::m_e*u2y[j_2];
                         p2z = PhysConst::m_e*u2z[j_2];
                     } else {
-                        p2t = m2*std::sqrt( c_sq + u2_sq );
+                        p2t = m2*std::sqrt( c2 + u2_sq );
                         p2x = m2*u2x[j_2];
                         p2y = m2*u2y[j_2];
                         p2z = m2*u2z[j_2];

@@ -462,7 +462,7 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     );
 #endif
 
-    const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
+    const amrex::Real inv_c2 = 1.0_rt/PhysConst::c2;
 
     const amrex::Array4<int> & nx_arr = nx_iab.array();
     const amrex::Array4<int> & ny_arr = ny_iab.array();
@@ -488,9 +488,9 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             GetPosition(ip, xp, yp, zp);
 
             // --- Get particle quantities
-            const amrex::ParticleReal gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
-                                                        + uyp[ip]*uyp[ip]*clightsq
-                                                        + uzp[ip]*uzp[ip]*clightsq);
+            const amrex::ParticleReal gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                        + uyp[ip]*uyp[ip]*inv_c2
+                                                        + uzp[ip]*uzp[ip]*inv_c2);
             const amrex::ParticleReal vx  = uxp[ip]*gaminv;
             const amrex::ParticleReal vy  = uyp[ip]*gaminv;
             const amrex::ParticleReal vz  = uzp[ip]*gaminv;

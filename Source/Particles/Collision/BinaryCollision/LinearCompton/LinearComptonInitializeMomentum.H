@@ -84,7 +84,7 @@ namespace {
         using namespace amrex::literals;
 
         constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / PhysConst::c2;
+        constexpr amrex::ParticleReal inv_c2 = 1._prt / PhysConst::c2;
 
         // Extract the momenta of the incident particles
         amrex::ParticleReal const photon_ux = soa1_in.m_rdata[PIdx::ux][idx1_in];
@@ -98,7 +98,7 @@ namespace {
         // - Prepare parameters of the Lorentz transformation
         amrex::ParticleReal const lepton_u2 = (lepton_ux*lepton_ux + lepton_uy*lepton_uy + lepton_uz*lepton_uz);
         amrex::ParticleReal const lepton_u = std::sqrt(lepton_u2);
-        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_csq);
+        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_c2);
         amrex::ParticleReal const lepton_beta = lepton_u / lepton_gamma * inv_c;
         amrex::ParticleReal const lepton_nx = lepton_ux / lepton_u;
         amrex::ParticleReal const lepton_ny = lepton_uy / lepton_u;

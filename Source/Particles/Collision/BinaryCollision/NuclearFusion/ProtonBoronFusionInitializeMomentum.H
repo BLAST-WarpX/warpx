@@ -89,7 +89,7 @@ namespace {
         // mass of the Be8 excited state (3.03 MeV above ground state)
         constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt);
         constexpr double mBe_sq = m_beryllium*m_beryllium;
-        constexpr amrex::ParticleReal c_sq = PhysConst::c2;
+        constexpr amrex::ParticleReal c2 = PhysConst::c2;
 
         // Compute the resulting momenta of the alpha and beryllium particles
         // produced in the fusion reaction
@@ -115,7 +115,7 @@ namespace {
 
         // Compute momentum norm of second and third alphas in Beryllium rest frame
         // Factor 0.5 is here because each alpha only gets half of the decay energy
-        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c_sq));
+        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c2));
         constexpr amrex::ParticleReal gamma_Bestar_sq_minus_one = gamma_Bestar*gamma_Bestar - 1._prt;
         const amrex::ParticleReal p_Bestar = static_cast<amrex::ParticleReal>(m_alpha)*PhysConst::c*std::sqrt(gamma_Bestar_sq_minus_one);
 
@@ -127,7 +127,7 @@ namespace {
         amrex::ParticleReal px_alpha2, py_alpha2, pz_alpha2;
         // Preliminary calculation: compute Beryllium velocity v_Be
         const amrex::ParticleReal p_Be_sq   = px_Be*px_Be + py_Be*py_Be + pz_Be*pz_Be;
-        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (static_cast<amrex::ParticleReal>(mBe_sq)*c_sq));
+        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (static_cast<amrex::ParticleReal>(mBe_sq)*c2));
         const amrex::ParticleReal mg_Be     = static_cast<amrex::ParticleReal>(m_beryllium)*g_Be;
         const amrex::ParticleReal v_Bex     = px_Be / mg_Be;
         const amrex::ParticleReal v_Bey     = py_Be / mg_Be;

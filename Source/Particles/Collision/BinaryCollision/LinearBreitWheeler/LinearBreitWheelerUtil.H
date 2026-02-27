@@ -57,8 +57,8 @@ namespace {
     {
         using namespace amrex::literals;
 
-        constexpr amrex::ParticleReal c_sq = PhysConst::c2;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
+        constexpr amrex::ParticleReal c2 = PhysConst::c2;
+        constexpr amrex::ParticleReal inv_c2 = 1._prt / c2;
         constexpr amrex::ParticleReal me = PhysConst::m_e;
         auto constexpr pow2 = [](double const x) { return x*x; };
         constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
@@ -79,15 +79,15 @@ namespace {
 
         // Energy squared of each of the two colliding photons in the center of momentum frame,
         // calculated using the Lorentz invariance of the total four-momentum norm
-        const amrex::ParticleReal E_star_sq = one_half_pr*c_sq*p1_in*p2_in*(one_pr - cos_ang);
+        const amrex::ParticleReal E_star_sq = one_half_pr*c2*p1_in*p2_in*(one_pr - cos_ang);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle:
-        // p_star_sq = E_star_sq/c_sq - me*me*c_sq;
+        // p_star_sq = E_star_sq/c2 - me*me*c2;
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const amrex::ParticleReal E_ratio = std::sqrt(E_star_sq)/(2._prt*me*c_sq);
-        const amrex::ParticleReal p_star_sq = me*me*c_sq * ( pow2(2._prt*E_ratio) - 1._prt );
+        const amrex::ParticleReal E_ratio = std::sqrt(E_star_sq)/(2._prt*me*c2);
+        const amrex::ParticleReal p_star_sq = me*me*c2 * ( pow2(2._prt*E_ratio) - 1._prt );
 
         // Compute momentum of first product in the center of mass frame, assuming isotropic
         // distribution
@@ -108,8 +108,8 @@ namespace {
         // Phys.Plasmas.19.083104 (2012) (which is a regular Lorentz transformation)
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
         {
-            const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
-            const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_sq / (me*me*c_sq));
+            const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_c2 );
+            const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_sq / (me*me*c2));
             const amrex::ParticleReal vcDps = vcx*px_star + vcy*py_star + vcz*pz_star;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
             const amrex::ParticleReal factor = factor0*vcDps + me*g_star*gc;
