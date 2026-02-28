@@ -71,6 +71,11 @@ T_index generate_modulus_step(T_index n, amrex::RandomEngine const& engine)
 template <typename T_index>
 void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_index * indices)
 {
+#ifdef AMREX_USE_GPU
+
+    // Doing the ParallelFor loops over the particles is substantially faster
+    // than looping over cells on the GPU.
+
     amrex::Gpu::DeviceVector<T_index> indices_copy_vector(np);
     amrex::Gpu::DeviceVector<int> indices_step_vector(n_cells);
     amrex::Gpu::DeviceVector<int> indices_offset_vector(n_cells);
@@ -119,6 +124,33 @@ void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_in
         }
     );
 
+#else
+
+    // This is faster on CPU, putting it all in a single loop
+
+    amrex::Gpu::DeviceVector<T_index> indices_copy_vector(np);
+    T_index* AMREX_RESTRICT indices_copy = indices_copy_vector.dataPtr();
+
+    amrex::ParallelForRNG(n_cells,
+        [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+        {
+            T_index const cell_start = cell_offsets[i_cell];
+            T_index const cell_stop  = cell_offsets[i_cell+1];
+            T_index const n = cell_stop - cell_start;
+
+            for (T_index i = cell_start ; i < cell_stop ; i++) {
+                indices_copy[i] = indices[i];
+            }
+
+            T_index const step = generate_modulus_step(n, engine);
+            T_index const offset = amrex::Random_int(n, engine);
+            for (T_index i = 0 ; i < n ; i++) {
+                T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
+                indices[cell_start + i] = indices_copy[cell_start + i2];
+            }
+    });
+
+#endif
 }
 
 /* \brief Shuffle array according to Fisher-Yates algorithm.
