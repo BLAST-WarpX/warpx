@@ -95,7 +95,7 @@ def check_gh_available():
     if shutil.which("gh") is None:
         print(
             "Error: the 'gh' CLI is not installed or not on PATH.\n"
-            "Install it from https://cli.github.com/ and re-run this script.",
+            "Install it from https://cli.github.com/ or with `conda`, and re-run this script.",
             file=sys.stderr,
         )
         sys.exit(1)
