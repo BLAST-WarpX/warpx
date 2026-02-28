@@ -42,8 +42,7 @@ amrex::ParticleReal ProtonBoronFusionCrossSectionTentori (const amrex::ParticleR
     // Boron 11 mass: subtract 5 electron masses to get nuclear mass
     constexpr amrex::ParticleReal m_boron = 11.00930536_prt * PhysConst::m_u - 5.0_prt * PhysConst::m_e;
     // Hydrogen 1 mass: subtract 1 electron mass to get nuclear mass (proton mass)
-    constexpr amrex::ParticleReal m_hydrogen = PhysConst::m_p;
-    constexpr amrex::ParticleReal m_reduced = m_boron / (one_pr + m_boron/m_hydrogen);
+    constexpr amrex::ParticleReal m_reduced = m_boron / (one_pr + m_boron/PhysConst::m_p);
     constexpr amrex::ParticleReal gamow_factor = m_reduced / 2._prt *
                         (PhysConst::q_e*PhysConst::q_e * Z_boron /
                            (2._prt*PhysConst::epsilon_0*PhysConst::hbar)) *
