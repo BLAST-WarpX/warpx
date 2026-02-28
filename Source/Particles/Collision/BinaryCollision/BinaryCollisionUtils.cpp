@@ -15,6 +15,7 @@
 
 #include <string>
 #include <sstream>
+#include <limits>
 
 #include "Utils/TextMsg.H"
 
@@ -235,7 +236,8 @@ namespace BinaryCollisionUtils{
 
         // Verify that the fusion energy is close to what is exected
         std::ostringstream error_msg;
-        amrex::ParticleReal expected_fusion_energy, energy_error;
+        amrex::ParticleReal expected_fusion_energy = 0.0_prt;
+        amrex::ParticleReal energy_error = std::numeric_limits<amrex::ParticleReal>::max();
         const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2;
         if (collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) {
             expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
