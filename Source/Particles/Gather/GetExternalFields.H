@@ -22,6 +22,8 @@
 struct GetExternalEBField
 {
     enum ExternalFieldInitType { None, Parser, RepeatedPlasmaLens, Unknown };
+    enum class ExternalGradBInitType { None, Parser, FromGrid, Unknown }; // Used for blended pusher
+    enum class ExternalKappaInitType { None, Parser, FromGrid, Unknown }; // Used for curvature drift in blended pusher
 
     GetExternalEBField () = default;
 
@@ -29,6 +31,8 @@ struct GetExternalEBField
 
     ExternalFieldInitType m_Etype;
     ExternalFieldInitType m_Btype;
+    ExternalGradBInitType m_gradBtype = ExternalGradBInitType::None; // new member for blended pusher
+    ExternalKappaInitType m_kappatype = ExternalKappaInitType::None; // new member for blended pusher
 
     amrex::ParticleReal m_gamma_boost;
     amrex::ParticleReal m_uz_boost;
@@ -39,6 +43,16 @@ struct GetExternalEBField
     amrex::ParserExecutor<4> m_Bxfield_partparser;
     amrex::ParserExecutor<4> m_Byfield_partparser;
     amrex::ParserExecutor<4> m_Bzfield_partparser;
+
+    //new parsers for blended pusher - gradB
+    amrex::ParserExecutor<4> m_gradBxfield_partparser;
+    amrex::ParserExecutor<4> m_gradByfield_partparser;
+    amrex::ParserExecutor<4> m_gradBzfield_partparser;
+
+    //new parsers for blended pusher - kappa
+    amrex::ParserExecutor<4> m_kappaxfield_partparser;
+    amrex::ParserExecutor<4> m_kappayfield_partparser;
+    amrex::ParserExecutor<4> m_kappazfield_partparser;
 
     GetParticlePosition<PIdx> m_get_position;
     amrex::Real m_time;
@@ -57,7 +71,10 @@ struct GetExternalEBField
     LatticeElementFinderDevice d_lattice_element_finder;
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    bool isNoOp () const { return (m_Etype == None && m_Btype == None && !d_lattice_element_finder.m_initialized); }
+    bool isNoOp () const { return (m_Etype == None && m_Btype == None 
+        && m_gradBtype == ExternalGradBInitType::None
+        && m_kappatype == ExternalKappaInitType::None
+        && !d_lattice_element_finder.m_initialized); }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator () (long i,
@@ -66,7 +83,13 @@ struct GetExternalEBField
                       amrex::ParticleReal& field_Ez,
                       amrex::ParticleReal& field_Bx,
                       amrex::ParticleReal& field_By,
-                      amrex::ParticleReal& field_Bz) const noexcept
+                      amrex::ParticleReal& field_Bz,
+                      amrex::ParticleReal& gradBx,
+                      amrex::ParticleReal& gradBy,
+                      amrex::ParticleReal& gradBz,
+                      amrex::ParticleReal& kappax,
+                      amrex::ParticleReal& kappay,
+                      amrex::ParticleReal& kappaz) const noexcept
     {
         using namespace amrex::literals;
 
@@ -75,7 +98,9 @@ struct GetExternalEBField
                                         field_Bx, field_By, field_Bz);
         }
 
-        if (m_Etype == None && m_Btype == None) { return; }
+        if (m_Etype == None && m_Btype == None &&  
+            m_gradBtype == ExternalGradBInitType::None 
+            && m_kappatype == ExternalKappaInitType::None) { return; }
 
         amrex::ParticleReal Ex = 0._prt;
         amrex::ParticleReal Ey = 0._prt;
@@ -83,6 +108,15 @@ struct GetExternalEBField
         amrex::ParticleReal Bx = 0._prt;
         amrex::ParticleReal By = 0._prt;
         amrex::ParticleReal Bz = 0._prt;
+
+
+        gradBx = 0._prt;
+        gradBy = 0._prt;
+        gradBz = 0._prt;
+
+        kappax = 0._prt;
+        kappay = 0._prt;
+        kappaz = 0._prt;
 
         constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
@@ -112,6 +146,37 @@ struct GetExternalEBField
             Bx = m_Bxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
             By = m_Byfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
             Bz = m_Bzfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+        }
+
+        //
+        if (m_gradBtype == ExternalGradBInitType::Parser)
+        {
+            amrex::ParticleReal x, y, z;
+            m_get_position(i, x, y, z);
+            amrex::Real lab_time = m_time;
+            if (m_gamma_boost > 1._prt) {
+                lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
+                z = m_gamma_boost*z + m_uz_boost*m_time;
+            }
+            // gradB fields used for blended pusher - these are passed back by reference
+            gradBx = m_gradBxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            gradBy = m_gradByfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            gradBz = m_gradBzfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+        }
+
+        if (m_kappatype == ExternalKappaInitType::Parser)
+        {
+            amrex::ParticleReal x, y, z;
+            m_get_position(i, x, y, z);
+            amrex::Real lab_time = m_time;
+            if (m_gamma_boost > 1._prt) {
+                lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
+                z = m_gamma_boost*z + m_uz_boost*m_time;
+            }
+            // kappa uses for curvature drift in blended pusher - these are passed back by reference
+            kappax = m_kappaxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            kappay = m_kappayfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
+            kappaz = m_kappazfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
         }
 
         if (m_Etype == RepeatedPlasmaLens ||

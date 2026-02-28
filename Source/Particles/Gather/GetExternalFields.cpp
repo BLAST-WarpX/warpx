@@ -43,7 +43,9 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
     if (mypc.m_E_ext_particle_s == "parse_e_ext_particle_function" ||
         mypc.m_B_ext_particle_s == "parse_b_ext_particle_function" ||
         mypc.m_E_ext_particle_s == "repeated_plasma_lens" ||
-        mypc.m_B_ext_particle_s == "repeated_plasma_lens")
+        mypc.m_B_ext_particle_s == "repeated_plasma_lens" ||
+        mypc.m_gradB_ext_particle_s == "parse_gradb_ext_particle_function" ||
+        mypc.m_kappa_ext_particle_s == "parse_kappa_ext_particle_function")
     {
         m_time = warpx.gett_new(a_pti.GetLevel());
         m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
@@ -64,6 +66,25 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
         m_Byfield_partparser = mypc.m_By_particle_parser->compile<4>();
         m_Bzfield_partparser = mypc.m_Bz_particle_parser->compile<4>();
     }
+
+    //new parsers for blended pusher - gradB
+    if (mypc.m_gradB_ext_particle_s == "parse_gradb_ext_particle_function")
+    {
+        m_gradBtype = ExternalGradBInitType::Parser;
+        m_gradBxfield_partparser = mypc.m_gradBx_particle_parser->compile<4>();
+        m_gradByfield_partparser = mypc.m_gradBy_particle_parser->compile<4>();
+        m_gradBzfield_partparser = mypc.m_gradBz_particle_parser->compile<4>();
+    }
+
+    //new parsers for blended pusher - kappa
+    if (mypc.m_kappa_ext_particle_s == "parse_kappa_ext_particle_function")
+    {
+        m_kappatype = ExternalKappaInitType::Parser;
+        m_kappaxfield_partparser = mypc.m_kappax_particle_parser->compile<4>();
+        m_kappayfield_partparser = mypc.m_kappay_particle_parser->compile<4>();
+        m_kappazfield_partparser = mypc.m_kappaz_particle_parser->compile<4>();
+    }
+
 
     if (mypc.m_E_ext_particle_s == "repeated_plasma_lens" ||
         mypc.m_B_ext_particle_s == "repeated_plasma_lens")
