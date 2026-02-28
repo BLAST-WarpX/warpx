@@ -228,7 +228,7 @@ namespace BinaryCollisionUtils{
         amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
         // Verify that the fusion energy is close to what is exected
-        const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2 * PhysConst::q_e;
+        const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2;
         if (collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) {
             const amrex::ParticleReal expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
             const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
