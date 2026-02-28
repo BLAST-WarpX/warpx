@@ -551,16 +551,17 @@ WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
 for (const auto & particle_diag : particle_diags) {
     WarpXParticleContainer* pc = particle_diag.getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
+    WarpXParticleContainer::Base* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
         }
     }
 
-    PinnedMemoryParticleContainer tmp = (isBTD || use_pinned_pc) ?
-        pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-        pc->make_alike<amrex::PinnedArenaAllocator>();
+    WarpXParticleContainer::Base tmp = (isBTD || use_pinned_pc) ?
+        pinned_pc->make_alike<>() :
+        pc->make_alike<>();
+    tmp.SetArena(amrex::The_Pinned_Arena());
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
     RandomFilter const random_filter(particle_diag.m_do_random_filter,

@@ -16,7 +16,7 @@ using namespace amrex;
 
 ParticleDiag::ParticleDiag (
     const std::string& diag_name, const std::string& name,
-    WarpXParticleContainer* pc, PinnedMemoryParticleContainer* pinned_pc):
+    WarpXParticleContainer* pc, WarpXParticleContainer::Base* pinned_pc):
     m_diag_name(diag_name), m_name(name), m_pc(pc), m_pinned_pc(pinned_pc)
 {
     //variable to set m_plot_flags size

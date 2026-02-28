@@ -8,7 +8,6 @@
 #define WARPX_COMPUTEPARTICLEDIAGFUNCTOR_H_
 
 #include "Particles/WarpXParticleContainer.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
 #include <AMReX.H>
 #include <AMReX_AmrParticles.H>
 
@@ -59,7 +58,7 @@ public:
      *  \param[out] totalParticlesInBuffer total number of particles in the container
      *  \param[in] i_buffer snapshot index for which the particle buffer is processed
      */
-    virtual void operator () (PinnedMemoryParticleContainer& pc_dst, int &totalParticlesInBuffer, int i_buffer = 0) const = 0;
+    virtual void operator () (WarpXParticleContainer::Base& pc_dst, int &totalParticlesInBuffer, int i_buffer = 0) const = 0;
     virtual void InitData () {}
 };
 
