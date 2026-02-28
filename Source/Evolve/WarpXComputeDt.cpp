@@ -57,7 +57,7 @@ WarpX::ComputeDt ()
     }
 
     // Determine the appropriate timestep as limited by the speed of light
-    const amrex::Real* dx = geom[max_level].CellSize();
+    const amrex::Real* dx = geom[finestLevel()].CellSize();
     amrex::Real deltat = 0.;
 
     if (m_const_dt.has_value()) {
