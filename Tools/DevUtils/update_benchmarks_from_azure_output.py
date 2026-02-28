@@ -100,9 +100,7 @@ def check_gh_available():
         )
         sys.exit(1)
 
-    result = subprocess.run(
-        ["gh", "auth", "status"], capture_output=True, text=True
-    )
+    result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     if result.returncode != 0:
         print(
             "Error: 'gh' is not authenticated.\n"
