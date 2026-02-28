@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -89,6 +90,29 @@ def update_benchmarks_from_log_text(log_text):
     return updated
 
 
+def check_gh_available():
+    """Verify that ``gh`` is installed and authenticated; exit with a helpful message if not."""
+    if shutil.which("gh") is None:
+        print(
+            "Error: the 'gh' CLI is not installed or not on PATH.\n"
+            "Install it from https://cli.github.com/ and re-run this script.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    result = subprocess.run(
+        ["gh", "auth", "status"], capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(
+            "Error: 'gh' is not authenticated.\n"
+            "Run 'gh auth login' to authenticate, then re-run this script.\n"
+            f"Details: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def get_azure_build_info(pr_number, repo):
     """Use ``gh`` to find the Azure Pipelines build URL for a PR.
 
@@ -119,7 +143,9 @@ def get_azure_build_info(pr_number, repo):
     azure_url = None
     for check in checks:
         details_url = check.get("link", "")
-        if check["name"] == "BLAST-WarpX.CI" and "dev.azure.com" in details_url:
+        if check["name"] == "BLAST-WarpX.CI" and details_url.startswith(
+            "https://dev.azure.com/"
+        ):
             azure_url = details_url
             break
 
@@ -222,6 +248,7 @@ def main():
 
     args = parser.parse_args()
 
+    check_gh_available()
     org, project, build_id = get_azure_build_info(args.pr_number, args.repo)
     failing_log_ids = get_failing_test_log_ids(org, project, build_id)
 
