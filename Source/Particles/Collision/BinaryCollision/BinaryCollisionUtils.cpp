@@ -14,6 +14,7 @@
 #include <AMReX_Vector.H>
 
 #include <string>
+#include <sstream>
 
 #include "Utils/TextMsg.H"
 
@@ -224,46 +225,54 @@ namespace BinaryCollisionUtils{
             mass_after += product_species.getMass();
         }
 
+        // pB11 fusion only has one product species, but 3 are created
+        if (collision_type == CollisionType::ProtonBoronToAlphasFusion) {
+            mass_after *= 3.0_prt;
+        }
+
         // Compute the fusion energy
         amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
         // Verify that the fusion energy is close to what is exected
+        std::ostringstream error_msg;
+        amrex::ParticleReal expected_fusion_energy, energy_error;
         const amrex::ParticleReal energy_tolerance = PhysConst::m_e * PhysConst::c2;
         if (collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) {
-            const amrex::ParticleReal expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
-            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                energy_error < energy_tolerance,
-                "ERROR: D + T -> He4 + n fusion energy error is too large. Make sure species mass are set properly.");
+            expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
+            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            error_msg << "Fusion energy mismatch in D + T -> He4 + n\n";
         }
         if (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) {
-            const amrex::ParticleReal expected_fusion_energy = 4.032653948e6_prt * PhysConst::q_e;
-            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                energy_error < energy_tolerance,
-                "ERROR: D + D -> T + p fusion energy error is too large. Make sure species mass are set properly.");
+            expected_fusion_energy = 4.032653948e6_prt * PhysConst::q_e;
+            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            error_msg << "Fusion energy mismatch in D + D -> T + p\n";
         }
         if (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) {
-            const amrex::ParticleReal expected_fusion_energy = 3.26891111e6_prt * PhysConst::q_e;
-            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                energy_error < energy_tolerance,
-                "ERROR: D + D -> He3 + n fusion energy error is too large. Make sure species mass are set properly.");
+            expected_fusion_energy = 3.26891111e6_prt * PhysConst::q_e;
+            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            error_msg << "Fusion energy mismatch in D + D -> He3 + n\n";
         }
         if (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion) {
-            const amrex::ParticleReal expected_fusion_energy = 18.35303980e6_prt * PhysConst::q_e;
-            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                energy_error < energy_tolerance,
-                "ERROR: D + He3 -> He4 + p fusion energy error is too large. Make sure species mass are set properly.");
+            expected_fusion_energy = 18.35303980e6_prt * PhysConst::q_e;
+            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            error_msg << "Fusion energy mismatch in D + He3 -> He3 + p\n";
         }
         if (collision_type == CollisionType::ProtonBoronToAlphasFusion) {
-            const amrex::ParticleReal expected_fusion_energy = 8.68212502e6_prt * PhysConst::q_e;
-            const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                energy_error < energy_tolerance,
-                "ERROR: p + B11 -> He4 + He4 + He4 fusion energy error is too large. Make sure species mass are set properly.");
+            expected_fusion_energy = 8.68212502e6_prt * PhysConst::q_e;
+            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+            error_msg << "Fusion energy mismatch in p + B11 -> 3 He4\n";
         }
+
+        error_msg << "  energy error [eV]           = " << energy_error / PhysConst::q_e << "\n"
+                  << "  energy tolerance [eV]       = " << energy_tolerance / PhysConst::q_e << "\n"
+                  << "  expected fusion energy [eV] = " << expected_fusion_energy / PhysConst::q_e << "\n"
+                  << "  computed fusion energy [eV] = " << fusion_energy / PhysConst::q_e<< "\n"
+                  << "Check that species masses are set correctly.";
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            energy_error < energy_tolerance,
+            error_msg.str()
+        );
 
         return fusion_energy;
     }
