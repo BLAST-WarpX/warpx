@@ -214,32 +214,6 @@ Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/d
 This requires the `GitHub CLI <https://cli.github.com/>`__ (``gh``) to be installed and authenticated.
 The script will automatically find the failing Azure Pipelines jobs for the pull request, download their logs, and update all checksum benchmark files that did not pass the checksum analysis.
 
-.. dropdown:: Legacy mode (manual log download)
-
-   If the automatic mode does not work (e.g., because ``gh`` is not available), you can also reset the checksums manually by downloading the Azure log files yourself and passing them to the script.
-
-   #. On the GitHub page of the pull request, find (one of) the pipeline(s) failing due to checksum regressions and click on "Details" (highlighted in blue).
-
-      .. figure:: https://gist.github.com/user-attachments/assets/09db91b9-5711-4250-8b36-c52a6049e38e
-
-   #. In the new page that opens up, click on "View more details on Azure pipelines" (highlighted in blue).
-
-      .. figure:: https://gist.github.com/user-attachments/assets/ab0c9a24-5518-4da7-890f-d79fa1c8de4c
-
-   #. In the new page that opens up, select the group of tests for which you want to reset the checksum files (e.g., ``cartesian_3d``) and click on "View raw log".
-
-      .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
-
-   #. Save the raw log as a text file on your computer (e.g., with the ``curl`` command, ``curl https://dev.azure.com/BLAST-WarpX/... > raw_log.txt``).
-
-   #. Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script passing the path of the raw log text file as a command line argument:
-
-      .. code:: bash
-
-           python update_benchmarks_from_azure_output.py path/to/raw_log.txt
-
-      This will update the checksum files for all the tests in the raw log that did not pass the checksum analysis.
-
 .. _developers-testing-naming:
 
 Naming conventions for automated tests

@@ -5,20 +5,15 @@
 # License: BSD-3-Clause-LBNL
 
 """
-This Python script updates the Azure benchmarks automatically.
+This Python script updates the Azure benchmarks automatically using a GitHub
+PR number.  It fetches the failing Azure Pipelines logs and updates the
+checksum benchmark JSON files.
 
-It can be run in two ways:
+Usage::
 
-1. Automatic mode (recommended): pass a GitHub PR number, and the script
-   fetches the failing Azure Pipelines logs automatically.
+    python update_benchmarks_from_azure_output.py --pr-number 1234
 
-       python update_benchmarks_from_azure_output.py --pr-number 1234
-
-   The ``gh`` CLI must be installed and authenticated (available via conda base).
-
-2. Legacy mode: pass a raw Azure log text file downloaded manually.
-
-       python update_benchmarks_from_azure_output.py path/to/raw_log.txt
+The ``gh`` CLI must be installed and authenticated.
 """
 
 import argparse
@@ -92,11 +87,6 @@ def update_benchmarks_from_log_text(log_text):
                 failing_test = ""
 
     return updated
-
-
-# ---------------------------------------------------------------------------
-# Automatic mode: fetch logs from Azure via GitHub PR number
-# ---------------------------------------------------------------------------
 
 
 def get_azure_build_info(pr_number, repo):
@@ -204,9 +194,35 @@ def download_azure_log(org, project, build_id, log_id):
         return resp.read().decode("utf-8", errors="replace")
 
 
-def process_pr(pr_number, repo):
-    """Fetch Azure logs for a PR and update all failing checksum benchmarks."""
-    org, project, build_id = get_azure_build_info(pr_number, repo)
+def main():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Update WarpX checksum benchmarks from Azure Pipelines output. "
+            "Fetches failing test logs for the given GitHub PR number and "
+            "updates the benchmark JSON files automatically."
+        )
+    )
+    parser.add_argument(
+        "--pr-number",
+        type=int,
+        required=True,
+        metavar="PR",
+        help=(
+            "GitHub PR number. The script will automatically fetch the failing "
+            "Azure Pipelines logs and update the checksum benchmark files. "
+            "Requires the 'gh' CLI to be installed and authenticated."
+        ),
+    )
+    parser.add_argument(
+        "--repo",
+        default="BLAST-WarpX/warpx",
+        metavar="OWNER/REPO",
+        help="GitHub repository (default: BLAST-WarpX/warpx).",
+    )
+
+    args = parser.parse_args()
+
+    org, project, build_id = get_azure_build_info(args.pr_number, args.repo)
     failing_log_ids = get_failing_test_log_ids(org, project, build_id)
 
     if not failing_log_ids:
@@ -226,68 +242,6 @@ def process_pr(pr_number, repo):
             print(f"  {f}")
     else:
         print("\nNo checksum files needed updating.")
-
-
-# ---------------------------------------------------------------------------
-# Legacy mode: process a downloaded Azure log file
-# ---------------------------------------------------------------------------
-
-
-def process_file(azure_output):
-    """Parse a manually downloaded Azure log file and update checksum benchmarks."""
-    with open(azure_output, "r") as f:
-        log_text = f.read()
-    update_benchmarks_from_log_text(log_text)
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Update WarpX checksum benchmarks from Azure Pipelines output. "
-            "Either provide a GitHub PR number (automatic mode) or a path to "
-            "a raw Azure log file (legacy mode)."
-        )
-    )
-    parser.add_argument(
-        "--pr-number",
-        type=int,
-        metavar="PR",
-        help=(
-            "GitHub PR number. The script will automatically fetch the failing "
-            "Azure Pipelines logs and update the checksum benchmark files. "
-            "Requires the 'gh' CLI to be installed and authenticated."
-        ),
-    )
-    parser.add_argument(
-        "--repo",
-        default="BLAST-WarpX/warpx",
-        metavar="OWNER/REPO",
-        help="GitHub repository (default: BLAST-WarpX/warpx).",
-    )
-    parser.add_argument(
-        "azure_output",
-        nargs="?",
-        metavar="LOG_FILE",
-        help="Path to a raw Azure log text file (legacy mode).",
-    )
-
-    args = parser.parse_args()
-
-    if args.pr_number is not None and args.azure_output is not None:
-        parser.error("Provide either --pr-number or a log file path, not both.")
-
-    if args.pr_number is not None:
-        process_pr(args.pr_number, args.repo)
-    elif args.azure_output is not None:
-        process_file(args.azure_output)
-    else:
-        parser.print_help()
-        sys.exit(1)
 
 
 if __name__ == "__main__":
