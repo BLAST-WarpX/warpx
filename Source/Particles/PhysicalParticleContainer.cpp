@@ -1382,6 +1382,9 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
+    enum shape_order_flags : int { shape_order_1 = 1, shape_order_2, shape_order_3, shape_order_4 };
+    enum galerkin_flags : int { no_galerkin = 0, has_galerkin = 1 };
+    enum pusher_flags : int { pusher_boris = 0, pusher_vay = 1, pusher_higuera = 2 };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -1389,16 +1392,25 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #else
     int qed_runtime_flag = no_qed;
 #endif
+    const int shape_order_runtime_flag = nox;
+    const int galerkin_runtime_flag = galerkin_interpolation ? has_galerkin : no_galerkin;
+    const int pusher_runtime_flag = static_cast<int>(pusher_algo);
 
     // Loop over the particles and update their momentum.
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
-    // register pressure.
+    // register pressure. Adding shape_order, galerkin, and pusher as compile-time
+    // options eliminates runtime branching inside the particle loop.
     amrex::ParallelFor(
-        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>>{},
-        {exteb_runtime_flag, qed_runtime_flag},
+        TypeList<CompileTimeOptions<no_exteb, has_exteb>,
+                 CompileTimeOptions<no_qed, has_qed>,
+                 CompileTimeOptions<shape_order_1, shape_order_2, shape_order_3, shape_order_4>,
+                 CompileTimeOptions<no_galerkin, has_galerkin>,
+                 CompileTimeOptions<pusher_boris, pusher_vay, pusher_higuera>>{},
+        {exteb_runtime_flag, qed_runtime_flag, shape_order_runtime_flag, galerkin_runtime_flag, pusher_runtime_flag},
         np_to_push,
-        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control)
+        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control,
+                              auto shape_order_control, auto galerkin_control, auto pusher_control)
     {
         amrex::ParticleReal xp, yp, zp;
         getPosition(ip, xp, yp, zp);
@@ -1424,11 +1436,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
         if (gather_fields) {
             // first gather E and B to the particle positions
-            doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+            // Use compile-time template parameters for shape order and galerkin interpolation
+            doGatherShapeN<shape_order_control, galerkin_control>(
+                           xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                            ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                           dinv, xyzmin, lo, n_rz_azimuthal_modes,
-                           nox, galerkin_interpolation);
+                           dinv, xyzmin, lo, n_rz_azimuthal_modes);
         }
 
         [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
@@ -1445,30 +1458,30 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
 #ifdef WARPX_QED
         if (momentum_push_type != MomentumPushType::None) {
-            if (!do_sync) {
-                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          mass, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt);
-            } else {
+            if (do_sync) {
                 if constexpr (qed_control == has_qed) {
-                    doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
+                    doParticleMomentumPush<1, pusher_control>(ux[ip], uy[ip], uz[ip],
                                               Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                               ion_lev ? ion_lev[ip] : 1,
-                                              mass, q, pusher_algo, do_crr,
+                                              mass, q, do_crr,
                                               t_chi_max,
                                               dt);
                 }
+            } else {
+                doParticleMomentumPush<0, pusher_control>(ux[ip], uy[ip], uz[ip],
+                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                          ion_lev ? ion_lev[ip] : 1,
+                                          mass, q, do_crr,
+                                          t_chi_max,
+                                          dt);
             }
         }
 #else
         if (momentum_push_type != MomentumPushType::None) {
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+            doParticleMomentumPush<0, pusher_control>(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
-                                      mass, q, pusher_algo, do_crr,
+                                      mass, q, do_crr,
                                       dt);
         }
 #endif

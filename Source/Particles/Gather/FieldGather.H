@@ -350,27 +350,27 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      [[maybe_unused]] const amrex::ParticleReal zp,
-                     amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
-                     amrex::ParticleReal& Ezp,
-                     amrex::ParticleReal& Bxp,
-                     amrex::ParticleReal& Byp,
-                     amrex::ParticleReal& Bzp,
-                     amrex::Array4<amrex::Real const> const& ex_arr,
-                     amrex::Array4<amrex::Real const> const& ey_arr,
-                     amrex::Array4<amrex::Real const> const& ez_arr,
-                     amrex::Array4<amrex::Real const> const& bx_arr,
-                     amrex::Array4<amrex::Real const> const& by_arr,
-                     amrex::Array4<amrex::Real const> const& bz_arr,
+                     amrex::ParticleReal& AMREX_RESTRICT Exp,
+                     amrex::ParticleReal& AMREX_RESTRICT Eyp,
+                     amrex::ParticleReal& AMREX_RESTRICT Ezp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bxp,
+                     amrex::ParticleReal& AMREX_RESTRICT Byp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bzp,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ex_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ey_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ez_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bx_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT by_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bz_arr,
                      const amrex::IndexType ex_type,
                      const amrex::IndexType ey_type,
                      const amrex::IndexType ez_type,
                      const amrex::IndexType bx_type,
                      const amrex::IndexType by_type,
                      const amrex::IndexType bz_type,
-                     const amrex::XDim3 & dinv,
-                     const amrex::XDim3 & xyzmin,
-                     const amrex::Dim3& lo,
+                     const amrex::XDim3 & AMREX_RESTRICT dinv,
+                     const amrex::XDim3 & AMREX_RESTRICT xyzmin,
+                     const amrex::Dim3 & AMREX_RESTRICT lo,
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
@@ -523,6 +523,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Eyp from field on grid ey_arr
     // Gather field on particle Exp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
+    AMREX_PRAGMA_SIMD
     for (int iz=0; iz<=depos_order; iz++){
         Eyp += sz_ey[iz]*
             ey_arr(lo.x+l_ey+iz, 0, 0, 0);
@@ -535,6 +536,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Byp from field on grid by_arr
     // Gather field on particle Ezp from field on grid ez_arr
     // Gather field on particle Bxp from field on grid bx_arr
+    AMREX_PRAGMA_SIMD
     for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
         Ezp += sz_ez[iz]*
             ez_arr(lo.x+l_ez+iz, 0, 0, 0);
@@ -547,6 +549,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #elif defined(WARPX_DIM_XZ)
     // Gather field on particle Eyp from field on grid ey_arr
     for (int iz=0; iz<=depos_order; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order; ix++){
             Eyp += sx_ey[ix]*sz_ey[iz]*
                 ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 0);
@@ -555,6 +558,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Exp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
             Exp += sx_ex[ix]*sz_ex[iz]*
                 ex_arr(lo.x+j_ex+ix, lo.y+l_ex+iz, 0, 0);
@@ -565,6 +569,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Ezp from field on grid ez_arr
     // Gather field on particle Bxp from field on grid bx_arr
     for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order; ix++){
             Ezp += sx_ez[ix]*sz_ez[iz]*
                 ez_arr(lo.x+j_ez+ix, lo.y+l_ez+iz, 0, 0);
@@ -574,6 +579,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     }
     // Gather field on particle Byp from field on grid by_arr
     for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
             Byp += sx_by[ix]*sz_by[iz]*
                 by_arr(lo.x+j_by+ix, lo.y+l_by+iz, 0, 0);
@@ -589,6 +595,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 
     // Gather field on particle Ethetap from field on grid ey_arr
     for (int iz=0; iz<=depos_order; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order; ix++){
             Ethetap += sx_ey[ix]*sz_ey[iz]*
                 ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 0);
@@ -597,6 +604,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
             Erp += sx_ex[ix]*sz_ex[iz]*
                 ex_arr(lo.x+j_ex+ix, lo.y+l_ex+iz, 0, 0);
@@ -607,6 +615,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Ezp from field on grid ez_arr
     // Gather field on particle Brp from field on grid bx_arr
     for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order; ix++){
             Ezp += sx_ez[ix]*sz_ez[iz]*
                 ez_arr(lo.x+j_ez+ix, lo.y+l_ez+iz, 0, 0);
@@ -616,6 +625,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     }
     // Gather field on particle Bthetap from field on grid by_arr
     for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+        AMREX_PRAGMA_SIMD
         for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
             Bthetap += sx_by[ix]*sz_by[iz]*
                 by_arr(lo.x+j_by+ix, lo.y+l_by+iz, 0, 0);
@@ -638,6 +648,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 
         // Gather field on particle Ethetap from field on grid ey_arr
         for (int iz=0; iz<=depos_order; iz++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order; ix++){
                 const amrex::Real dEy = (+ ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 2*imode-1)*xy.real()
                                          - ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 2*imode)*xy.imag());
@@ -647,6 +658,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         // Gather field on particle Erp from field on grid ex_arr
         // Gather field on particle Bzp from field on grid bz_arr
         for (int iz=0; iz<=depos_order; iz++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
                 const amrex::Real dEx = (+ ex_arr(lo.x+j_ex+ix, lo.y+l_ex+iz, 0, 2*imode-1)*xy.real()
                                          - ex_arr(lo.x+j_ex+ix, lo.y+l_ex+iz, 0, 2*imode)*xy.imag());
@@ -659,6 +671,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         // Gather field on particle Ezp from field on grid ez_arr
         // Gather field on particle Brp from field on grid bx_arr
         for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order; ix++){
                 const amrex::Real dEz = (+ ez_arr(lo.x+j_ez+ix, lo.y+l_ez+iz, 0, 2*imode-1)*xy.real()
                                          - ez_arr(lo.x+j_ez+ix, lo.y+l_ez+iz, 0, 2*imode)*xy.imag());
@@ -670,6 +683,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         }
         // Gather field on particle Bthetap from field on grid by_arr
         for (int iz=0; iz<=depos_order-galerkin_interpolation; iz++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
                 const amrex::Real dBy = (+ by_arr(lo.x+j_by+ix, lo.y+l_by+iz, 0, 2*imode-1)*xy.real()
                                          - by_arr(lo.x+j_by+ix, lo.y+l_by+iz, 0, 2*imode)*xy.imag());
@@ -693,22 +707,26 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::ParticleReal Bthetap = 0.;
 
     // Gather field on particle Ethetap from field on grid ey_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order; ix++){
         Ethetap += sx_ey[ix]*ey_arr(lo.x+j_ey+ix, 0, 0, 0);
     }
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
         Erp += sx_ex[ix]*ex_arr(lo.x+j_ex+ix, 0, 0, 0);
         Bzp += sx_bz[ix]*bz_arr(lo.x+j_bz+ix, 0, 0, 0);
     }
     // Gather field on particle Ezp from field on grid ez_arr
     // Gather field on particle Brp from field on grid bx_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order; ix++){
         Ezp += sx_ez[ix]*ez_arr(lo.x+j_ez+ix, 0, 0, 0);
         Brp += sx_bx[ix]*bx_arr(lo.x+j_bx+ix, 0, 0, 0);
     }
     // Gather field on particle Bthetap from field on grid by_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
         Bthetap += sx_by[ix]*by_arr(lo.x+j_by+ix, 0, 0, 0);
     }
@@ -732,22 +750,26 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::ParticleReal Bphip = 0.;
 
     // Gather field on particle Ethetap from field on grid ey_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order; ix++){
         Ethetap += sx_ey[ix]*ey_arr(lo.x+j_ey+ix, 0, 0, 0);
     }
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bphip from field on grid bz_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
         Erp += sx_ex[ix]*ex_arr(lo.x+j_ex+ix, 0, 0, 0);
         Bphip += sx_bz[ix]*bz_arr(lo.x+j_bz+ix, 0, 0, 0);
     }
     // Gather field on particle Ephip from field on grid ez_arr
     // Gather field on particle Brp from field on grid bx_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order; ix++){
         Ephip += sx_ez[ix]*ez_arr(lo.x+j_ez+ix, 0, 0, 0);
         Brp += sx_bx[ix]*bx_arr(lo.x+j_bx+ix, 0, 0, 0);
     }
     // Gather field on particle Bthetap from field on grid by_arr
+    AMREX_PRAGMA_SIMD
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
         Bthetap += sx_by[ix]*by_arr(lo.x+j_by+ix, 0, 0, 0);
     }
@@ -770,6 +792,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Exp from field on grid ex_arr
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<=depos_order; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<= depos_order - galerkin_interpolation; ix++){
                 Exp += sx_ex[ix]*sy_ex[iy]*sz_ex[iz]*
                     ex_arr(lo.x+j_ex+ix, lo.y+k_ex+iy, lo.z+l_ex+iz);
@@ -779,6 +802,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Eyp from field on grid ey_arr
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<= depos_order - galerkin_interpolation; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order; ix++){
                 Eyp += sx_ey[ix]*sy_ey[iy]*sz_ey[iz]*
                     ey_arr(lo.x+j_ey+ix, lo.y+k_ey+iy, lo.z+l_ey+iz);
@@ -788,6 +812,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Ezp from field on grid ez_arr
     for (int iz=0; iz<= depos_order - galerkin_interpolation; iz++){
         for (int iy=0; iy<=depos_order; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order; ix++){
                 Ezp += sx_ez[ix]*sy_ez[iy]*sz_ez[iz]*
                     ez_arr(lo.x+j_ez+ix, lo.y+k_ez+iy, lo.z+l_ez+iz);
@@ -797,6 +822,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
         for (int iy=0; iy<= depos_order - galerkin_interpolation; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<= depos_order - galerkin_interpolation; ix++){
                 Bzp += sx_bz[ix]*sy_bz[iy]*sz_bz[iz]*
                     bz_arr(lo.x+j_bz+ix, lo.y+k_bz+iy, lo.z+l_bz+iz);
@@ -806,6 +832,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Byp from field on grid by_arr
     for (int iz=0; iz<= depos_order - galerkin_interpolation; iz++){
         for (int iy=0; iy<=depos_order; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<= depos_order - galerkin_interpolation; ix++){
                 Byp += sx_by[ix]*sy_by[iy]*sz_by[iz]*
                     by_arr(lo.x+j_by+ix, lo.y+k_by+iy, lo.z+l_by+iz);
@@ -815,6 +842,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Bxp from field on grid bx_arr
     for (int iz=0; iz<= depos_order - galerkin_interpolation; iz++){
         for (int iy=0; iy<= depos_order - galerkin_interpolation; iy++){
+            AMREX_PRAGMA_SIMD
             for (int ix=0; ix<=depos_order; ix++){
                 Bxp += sx_bx[ix]*sy_bx[iy]*sz_bx[iz]*
                     bx_arr(lo.x+j_bx+ix, lo.y+k_bx+iy, lo.z+l_bx+iz);
@@ -853,29 +881,29 @@ void doGatherShapeNEsirkepovStencilImplicit (
                      [[maybe_unused]] const amrex::ParticleReal xp_nph,
                      [[maybe_unused]] const amrex::ParticleReal yp_nph,
                      [[maybe_unused]] const amrex::ParticleReal zp_nph,
-                     amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
-                     amrex::ParticleReal& Ezp,
-                     amrex::ParticleReal& Bxp,
-                     amrex::ParticleReal& Byp,
-                     amrex::ParticleReal& Bzp,
-                     amrex::Array4<amrex::Real const> const& Ex_arr,
-                     amrex::Array4<amrex::Real const> const& Ey_arr,
-                     amrex::Array4<amrex::Real const> const& Ez_arr,
-                     amrex::Array4<amrex::Real const> const& Bx_arr,
-                     amrex::Array4<amrex::Real const> const& By_arr,
-                     amrex::Array4<amrex::Real const> const& Bz_arr,
+                     amrex::ParticleReal & AMREX_RESTRICT Exp,
+                     amrex::ParticleReal & AMREX_RESTRICT Eyp,
+                     amrex::ParticleReal & AMREX_RESTRICT Ezp,
+                     amrex::ParticleReal & AMREX_RESTRICT Bxp,
+                     amrex::ParticleReal & AMREX_RESTRICT Byp,
+                     amrex::ParticleReal & AMREX_RESTRICT Bzp,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT Ex_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT Ey_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT Ez_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT Bx_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT By_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT Bz_arr,
                      [[maybe_unused]] const amrex::IndexType Ex_type,
                      [[maybe_unused]] const amrex::IndexType Ey_type,
                      [[maybe_unused]] const amrex::IndexType Ez_type,
                      [[maybe_unused]] const amrex::IndexType Bx_type,
                      [[maybe_unused]] const amrex::IndexType By_type,
                      [[maybe_unused]] const amrex::IndexType Bz_type,
-                     const amrex::XDim3 & dinv,
-                     const amrex::XDim3 & xyzmin,
-                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
-                     const amrex::Dim3& lo,
+                     const amrex::XDim3 & AMREX_RESTRICT dinv,
+                     const amrex::XDim3 & AMREX_RESTRICT xyzmin,
+                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & AMREX_RESTRICT domain_double,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & AMREX_RESTRICT do_cropping,
+                     const amrex::Dim3& AMREX_RESTRICT lo,
                      const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
@@ -2109,27 +2137,27 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doGatherShapeN (const amrex::ParticleReal xp,
                      const amrex::ParticleReal yp,
                      const amrex::ParticleReal zp,
-                     amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
-                     amrex::ParticleReal& Ezp,
-                     amrex::ParticleReal& Bxp,
-                     amrex::ParticleReal& Byp,
-                     amrex::ParticleReal& Bzp,
-                     amrex::Array4<amrex::Real const> const& ex_arr,
-                     amrex::Array4<amrex::Real const> const& ey_arr,
-                     amrex::Array4<amrex::Real const> const& ez_arr,
-                     amrex::Array4<amrex::Real const> const& bx_arr,
-                     amrex::Array4<amrex::Real const> const& by_arr,
-                     amrex::Array4<amrex::Real const> const& bz_arr,
+                     amrex::ParticleReal& AMREX_RESTRICT Exp,
+                     amrex::ParticleReal& AMREX_RESTRICT Eyp,
+                     amrex::ParticleReal& AMREX_RESTRICT Ezp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bxp,
+                     amrex::ParticleReal& AMREX_RESTRICT Byp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bzp,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ex_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ey_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ez_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bx_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT by_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bz_arr,
                      const amrex::IndexType ex_type,
                      const amrex::IndexType ey_type,
                      const amrex::IndexType ez_type,
                      const amrex::IndexType bx_type,
                      const amrex::IndexType by_type,
                      const amrex::IndexType bz_type,
-                     const amrex::XDim3 & dinv,
-                     const amrex::XDim3 & xyzmin,
-                     const amrex::Dim3& lo,
+                     const amrex::XDim3 & AMREX_RESTRICT dinv,
+                     const amrex::XDim3 & AMREX_RESTRICT xyzmin,
+                     const amrex::Dim3& AMREX_RESTRICT lo,
                      const int n_rz_azimuthal_modes,
                      const int nox,
                      const bool galerkin_interpolation)
@@ -2210,29 +2238,29 @@ void doGatherShapeNImplicit (
                      const amrex::ParticleReal xp_nph,
                      const amrex::ParticleReal yp_nph,
                      const amrex::ParticleReal zp_nph,
-                     amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
-                     amrex::ParticleReal& Ezp,
-                     amrex::ParticleReal& Bxp,
-                     amrex::ParticleReal& Byp,
-                     amrex::ParticleReal& Bzp,
-                     amrex::Array4<amrex::Real const> const& ex_arr,
-                     amrex::Array4<amrex::Real const> const& ey_arr,
-                     amrex::Array4<amrex::Real const> const& ez_arr,
-                     amrex::Array4<amrex::Real const> const& bx_arr,
-                     amrex::Array4<amrex::Real const> const& by_arr,
-                     amrex::Array4<amrex::Real const> const& bz_arr,
+                     amrex::ParticleReal& AMREX_RESTRICT Exp,
+                     amrex::ParticleReal& AMREX_RESTRICT Eyp,
+                     amrex::ParticleReal& AMREX_RESTRICT Ezp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bxp,
+                     amrex::ParticleReal& AMREX_RESTRICT Byp,
+                     amrex::ParticleReal& AMREX_RESTRICT Bzp,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ex_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ey_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT ez_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bx_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT by_arr,
+                     amrex::Array4<amrex::Real const> const& AMREX_RESTRICT bz_arr,
                      const amrex::IndexType ex_type,
                      const amrex::IndexType ey_type,
                      const amrex::IndexType ez_type,
                      const amrex::IndexType bx_type,
                      const amrex::IndexType by_type,
                      const amrex::IndexType bz_type,
-                     const amrex::XDim3 & dinv,
-                     const amrex::XDim3 & xyzmin,
-                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
-                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
-                     const amrex::Dim3& lo,
+                     const amrex::XDim3 & AMREX_RESTRICT dinv,
+                     const amrex::XDim3 & AMREX_RESTRICT xyzmin,
+                     const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & AMREX_RESTRICT domain_double,
+                     const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & AMREX_RESTRICT do_cropping,
+                     const amrex::Dim3& AMREX_RESTRICT lo,
                      const int n_rz_azimuthal_modes,
                      const int nox,
                      const CurrentDepositionAlgo depos_type )

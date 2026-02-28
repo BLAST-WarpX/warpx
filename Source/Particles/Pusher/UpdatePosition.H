@@ -21,10 +21,12 @@
  *         using the standard leapfrog algorithm x(t+dt) = x(t) + v(t+dt/2)*dt.
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
-                     [[maybe_unused]] amrex::ParticleReal& y,
-                     [[maybe_unused]] amrex::ParticleReal& z,
-                     const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
+void UpdatePosition ([[maybe_unused]] amrex::ParticleReal & AMREX_RESTRICT x,
+                     [[maybe_unused]] amrex::ParticleReal & AMREX_RESTRICT y,
+                     [[maybe_unused]] amrex::ParticleReal & AMREX_RESTRICT z,
+                     const amrex::ParticleReal ux,
+                     const amrex::ParticleReal uy,
+                     const amrex::ParticleReal uz,
                      const amrex::Real dt,
                      amrex::ParticleReal const mass)
 {
