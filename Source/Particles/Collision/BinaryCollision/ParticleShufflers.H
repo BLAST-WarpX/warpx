@@ -42,6 +42,7 @@ T_index gcd_int(T_index a, T_index b) {
  * \result The generated step value
  */
 template <typename T_index>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
 T_index generate_modulus_step(T_index n, amrex::RandomEngine const& engine)
 {
     T_index step = 1;
