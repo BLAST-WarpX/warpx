@@ -210,16 +210,9 @@ public:
                       || (t_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
                       || (t_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion))
                 {
-                    amrex::ParticleReal fusion_energy = 0.0_prt;
-                    if (t_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) {
-                        fusion_energy = 17.5893e6_prt * PhysConst::q_e;
-                    }
-                    else if (t_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) {
-                        fusion_energy = 4.032667e6_prt * PhysConst::q_e;
-                    }
-                    else if (t_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) {
-                        fusion_energy = 3.268911e6_prt * PhysConst::q_e;
-                    }
+                    const amrex::ParticleReal mass_before = m1 + m2;
+                    const amrex::ParticleReal mass_after = products_mass_data[0] + products_mass_data[1];
+                    const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
