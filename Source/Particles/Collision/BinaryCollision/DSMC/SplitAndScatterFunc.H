@@ -49,7 +49,7 @@ public:
      * to binary collisions.
      *
      * Product species are arranged in slots 0 through m_num_product_species-1.
-     * Slots 0 and 1 always correspond to the first and other reactant species, respectively. For reaction
+     * Slots 0 and 1 always correspond to the first and second reactant species, respectively. For reaction
      * events that produce new species (ionization, charge exchange, two-product
      * reaction), slots 2 and 3 hold the true output species.
      *
@@ -144,7 +144,7 @@ public:
         for (int i = 0; i < 2; i++)
         {
             // Record the number of non-reaction events that lead to new particles
-            // for the first and other reactant species (slots 0 and 1). Only 1
+            // for the first and second reactant species (slots 0 and 1). Only 1
             // weight-split particle is created per reactant per event.
             num_added_vec[i] = static_cast<int>(no_product_total);
         }
