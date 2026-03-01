@@ -330,18 +330,18 @@ public:
             // Next perform all product-producing collisions
             else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
             {
-                // create a copy of the first product species at the location of the first reactant species
-                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
+                // create a particle of the first product species at the position of the second reactant species
+                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
                 const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
-                copy_species0[2](soa_products_data[2], soa_0, src0_idx,
+                copy_species0[2](soa_products_data[2], soa_1, src1_idx,
                                 static_cast<int>(slot2_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][slot2_idx] = p_pair_reaction_weight[i];
 
-                // create a copy of the other product species at the location of the other reactant species
-                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
+                // create a particle of the other second species at the position of the first reactant species
+                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto slot3_idx = products_np_data[3] + with_product_offsets_data[i];
-                copy_species1[3](soa_products_data[3], soa_1, src1_idx,
+                copy_species1[3](soa_products_data[3], soa_0, src0_idx,
                                 static_cast<int>(slot3_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
