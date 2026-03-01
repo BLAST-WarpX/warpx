@@ -1,6 +1,7 @@
 ---
 name: new-paper-highlight
 description: Add a new paper to the WarpX science highlights documentation (`Docs/source/highlights.rst`).
+disable-model-invocation: true
 ---
 
 # New Paper Highlight
