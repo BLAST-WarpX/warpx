@@ -182,45 +182,4 @@ namespace BinaryCollisionUtils{
                         species2.getSpeciesTypeName());
         return NuclearFusionType::Undefined;
     }
-
-    CollisionType nuclear_fusion_type_to_collision_type (const NuclearFusionType fusion_type)
-    {
-        if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
-            return CollisionType::DeuteriumTritiumToNeutronHeliumFusion;
-        }
-        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
-            return CollisionType::DeuteriumDeuteriumToProtonTritiumFusion;
-        }
-        if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
-            return CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion;
-        }
-        if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
-            return CollisionType::DeuteriumHeliumToProtonHeliumFusion;
-        }
-        if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
-            return CollisionType::ProtonBoronToAlphasFusion;
-        }
-        WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
-        return CollisionType::Undefined;
-    }
-
-    bool is_two_product_fusion_type (const CollisionType collision_type)
-    {
-        if ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
-            (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) ||
-            (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) ||
-            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion))
-        {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-
-    bool is_two_product_fusion_type (const NuclearFusionType fusion_type)
-    {
-        CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
-        return is_two_product_fusion_type(collision_type);
-    }
 }
