@@ -737,11 +737,13 @@ namespace ablastr::fields
          * If redistribute is true, we also copy from the old data into the new.
          *
          * @param other_level the MR level to erase all MultiFabs from
+         * @param new_ba new box array
          * @param new_dm new distribution mapping
          */
         void
         remake_level (
             int other_level,
+            amrex::BoxArray const & new_ba,
             amrex::DistributionMapping const & new_dm
         );
 
