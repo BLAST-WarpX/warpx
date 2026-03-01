@@ -42,6 +42,10 @@ namespace BinaryCollisionUtils{
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
 
+    bool is_two_product_fusion_type (const CollisionType collision_type);
+
+    bool is_two_product_fusion_type (const NuclearFusionType fusion_type);
+
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type);
 
     /**
