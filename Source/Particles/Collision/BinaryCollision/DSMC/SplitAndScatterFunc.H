@@ -49,14 +49,14 @@ public:
      * to binary collisions.
      *
      * Product species are arranged in slots 0 through m_num_product_species-1.
-     * Slots 0 and 1 always correspond to the two reactant species. For reaction
+     * Slots 0 and 1 always correspond to the first and other reactant species, respectively. For reaction
      * events that produce new species (ionization, charge exchange, two-product
      * reaction), slots 2 and 3 hold the true output species.
      *
      * @param[in]     n_total_pairs         total number of particle pairs across all cells.
-     * @param[in,out] ptile1                particle tile for reactant species occupying slot 0;
+     * @param[in,out] ptile0                particle tile for the first reactant species (slot 0);
      *                                      weights may be reduced by the collision.
-     * @param[in,out] ptile2                particle tile for reactant species occupying slot 1;
+     * @param[in,out] ptile1                particle tile for the other reactant species (slot 1);
      *                                      weights may be reduced by the collision.
      * @param[in]     pc_products           pointers to all product species containers
      *                                      (size m_num_product_species); used for mass queries
@@ -64,8 +64,8 @@ public:
      * @param[in,out] tile_products         array of pointers to product particle tiles
      *                                      (size m_num_product_species); new particles are
      *                                      appended to each tile.
-     * @param[in]     m0                    rest mass of reactant species in slot 0.
-     * @param[in]     m1                    rest mass of reactant species in slot 1.
+     * @param[in]     m0                    rest mass of the first reactant species (slot 0).
+     * @param[in]     m1                    rest mass of the other reactant species (slot 1).
      * @param[in]     mask                  per-pair collision type: 0 = no collision,
      *                                      otherwise cast of ScatteringProcessType to int.
      * @param[in,out] products_np           on input: current particle count of each product
@@ -73,13 +73,13 @@ public:
      *                                      newly added particles can be correctly addressed
      *                                      even when the same container appears in multiple
      *                                      slots (e.g. e- + H -> 2 e- + H+).
-     * @param[in]     copy_species1         array of SmartCopy functors (size m_num_product_species);
-     *                                      copy_species1[k] copies a particle FROM reactant
-     *                                      species in slot 0 INTO product slot k.
-     * @param[in]     copy_species2         same as copy_species1 but copies FROM reactant
-     *                                      species in slot 1.
-     * @param[in]     p_pair_indices_1      per-pair index of the reactant species (slot 0) particle.
-     * @param[in]     p_pair_indices_2      per-pair index of the reactant species (slot 1) particle.
+     * @param[in]     copy_species0         array of SmartCopy functors (size m_num_product_species);
+     *                                      copy_species0[k] copies a particle FROM the first
+     *                                      reactant species (slot 0) INTO product slot k.
+     * @param[in]     copy_species1         same as copy_species0 but copies FROM the other
+     *                                      reactant species (slot 1).
+     * @param[in]     p_pair_indices_0      per-pair index of the first reactant species (slot 0) particle.
+     * @param[in]     p_pair_indices_1      per-pair index of the other reactant species (slot 1) particle.
      * @param[in]     p_pair_reaction_weight per-pair weight assigned to newly created product
      *                                      particles; also the amount subtracted from the
      *                                      colliding macroparticle weights.
@@ -88,25 +88,25 @@ public:
     AMREX_INLINE
     amrex::Vector<int> operator() (
         const index_type& n_total_pairs,
-        ParticleTileType& ptile1, ParticleTileType& ptile2,
+        ParticleTileType& ptile0, ParticleTileType& ptile1,
         const amrex::Vector<WarpXParticleContainer*>& pc_products,
         ParticleTileType** AMREX_RESTRICT tile_products,
         const amrex::ParticleReal m0, const amrex::ParticleReal m1,
         const amrex::Vector<amrex::ParticleReal>& /*products_mass*/,
         const index_type* AMREX_RESTRICT mask,
         amrex::Vector<index_type>& products_np,
+        const SmartCopy* AMREX_RESTRICT copy_species0,
         const SmartCopy* AMREX_RESTRICT copy_species1,
-        const SmartCopy* AMREX_RESTRICT copy_species2,
+        const index_type* AMREX_RESTRICT p_pair_indices_0,
         const index_type* AMREX_RESTRICT p_pair_indices_1,
-        const index_type* AMREX_RESTRICT p_pair_indices_2,
         const amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
         const amrex::ParticleReal* /*p_product_data*/ ) const
     {
         using namespace amrex::literals;
 
         // Product species slot layout (m_num_product_species slots total):
-        //   Slot 0: copy of reactant species 1, i.e. the species from ptile1 (always present)
-        //   Slot 1: copy of reactant species 2, i.e. the species from ptile2 (always present)
+        //   Slot 0: copy of the first reactant species, i.e. the species from ptile0 (always present)
+        //   Slot 1: copy of the other reactant species, i.e. the species from ptile1 (always present)
         //   Slot 2: first true output species   (only when m_num_product_species == 4)
         //   Slot 3: second true output species  (only when m_num_product_species == 4)
         //
@@ -143,10 +143,9 @@ public:
         amrex::Vector<int> num_added_vec(m_num_product_species, 0);
         for (int i = 0; i < 2; i++)
         {
-            // Record the number of non product producing events lead to new
-            // particles for species1 and 2. Only 1 particle is created for
-            // each species (the piece that breaks off to have equal weight)
-            // particles.
+            // Record the number of non-reaction events that lead to new particles
+            // for the first and other reactant species (slots 0 and 1). Only 1
+            // weight-split particle is created per reactant per event.
             num_added_vec[i] = static_cast<int>(no_product_total);
         }
 
@@ -186,8 +185,8 @@ public:
             tile_products[i]->resize(products_np[i] + num_added_vec[i]);
         }
 
-        const auto soa_0 = ptile1.getParticleTileData();
-        const auto soa_1 = ptile2.getParticleTileData();
+        const auto soa_0 = ptile0.getParticleTileData();
+        const auto soa_1 = ptile1.getParticleTileData();
 
         // Create necessary GPU vectors, that will be used in the kernel below
         amrex::Vector<SoaData_type> soa_products;
@@ -232,15 +231,15 @@ public:
             if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
-                // Make a copy of the particle from species 1
-                copy_species1[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_1[i]),
+                // Make a copy of the particle from the first reactant species
+                copy_species0[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_0[i]),
                                 static_cast<int>(slot0_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][slot0_idx] = p_pair_reaction_weight[i];
 
                 const auto slot1_idx = products_np_data[1] + no_product_offsets_data[i];
-                // Make a copy of the particle from species 2
-                copy_species2[1](soa_products_data[1], soa_1, static_cast<int>(p_pair_indices_2[i]),
+                // Make a copy of the particle from the other reactant species
+                copy_species1[1](soa_products_data[1], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(slot1_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[1].m_rdata[PIdx::w][slot1_idx] = p_pair_reaction_weight[i];
@@ -331,18 +330,18 @@ public:
             // Next perform all product-producing collisions
             else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
             {
-                // create a copy of the first product species at the location of species 1
-                const auto src0_idx = static_cast<int>(p_pair_indices_1[i]);
+                // create a copy of the first product species at the location of the first reactant species
+                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
-                copy_species1[2](soa_products_data[2], soa_0, src0_idx,
+                copy_species0[2](soa_products_data[2], soa_0, src0_idx,
                                 static_cast<int>(slot2_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][slot2_idx] = p_pair_reaction_weight[i];
 
-                // create a copy of the other product species at the location of species 2
-                const auto src1_idx = static_cast<int>(p_pair_indices_2[i]);
+                // create a copy of the other product species at the location of the other reactant species
+                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
                 const auto slot3_idx = products_np_data[3] + with_product_offsets_data[i];
-                copy_species2[3](soa_products_data[3], soa_1, src1_idx,
+                copy_species1[3](soa_products_data[3], soa_1, src1_idx,
                                 static_cast<int>(slot3_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
@@ -372,24 +371,24 @@ public:
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_total + with_product_offsets_data[i];
-                // Make a copy of the particle from species 1 (incident species, slot 0)
-                copy_species1[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_1[i]),
+                // Make a copy of the particle from the first reactant species (incident species, slot 0)
+                copy_species0[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_0[i]),
                                static_cast<int>(slot0_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][slot0_idx] = p_pair_reaction_weight[i];
 
-                // create a copy of the first product species at the location of species 2
-                // (species in slot 1 is the "target species", i.e. the species that is ionized)
+                // create a copy of the first product species at the location of the other reactant species
+                // (the other reactant species in slot 1 is the "target species", i.e. the species that is ionized)
                 const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
-                copy_species2[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_2[i]),
+                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(slot2_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[2].m_rdata[PIdx::w][slot2_idx] = p_pair_reaction_weight[i];
 
-                // create a copy of the other product species at the location of species 2
-                // (species in slot 1 is the "target species", i.e. the species that is ionized)
+                // create a copy of the other product species at the location of the other reactant species
+                // (the other reactant species in slot 1 is the "target species", i.e. the species that is ionized)
                 const auto slot3_idx = products_np_data[3] + with_product_offsets_data[i];
-                copy_species2[3](soa_products_data[3], soa_1, static_cast<int>(p_pair_indices_2[i]),
+                copy_species1[3](soa_products_data[3], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(slot3_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
