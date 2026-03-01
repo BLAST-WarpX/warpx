@@ -1,5 +1,5 @@
 ---
-name: explain-code
+name: new-paper-highlight
 description:
 disable-model-invocation: true
 ---
