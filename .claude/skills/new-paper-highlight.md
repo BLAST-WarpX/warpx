@@ -1,3 +1,9 @@
+---
+name: explain-code
+description:
+disable-model-invocation: true
+---
+
 # New Paper Highlight
 
 Add a new paper to the WarpX science highlights documentation (`Docs/source/highlights.rst`).
@@ -78,23 +84,14 @@ Formatting rules:
 
 4. Show the user a diff of the change (use `git diff Docs/source/highlights.rst`).
 
-## Step 6 — Commit the change
-
-Stage and commit the file:
-
-```bash
-git add Docs/source/highlights.rst
-git commit -m "Doc: new paper in highlights – <Short title or first author + year>"
-```
-
-## Step 7 — Offer to open a PR
+## Step 6 — Offer to open a PR
 
 Ask the user:
 
 > Would you like me to push this branch and open a pull request against `development`?
 
 If the user agrees:
-1. Push the user's personal fork:
+1. Commit the change and push the user's personal fork:
 2. Open the PR with `gh`:
    ```bash
    source ~/miniconda3/etc/profile.d/conda.sh && conda activate base && \
