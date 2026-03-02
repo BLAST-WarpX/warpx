@@ -20,7 +20,7 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <ablastr/fields/MultiFabRegister.H>
 
@@ -73,8 +73,8 @@ WarpX::CheckLoadBalance (int step)
 void
 WarpX::LoadBalance ()
 {
-    WARPX_PROFILE_REGION("LoadBalance");
-    WARPX_PROFILE("WarpX::LoadBalance()");
+    ABLASTR_PROFILE_REGION("LoadBalance");
+    ABLASTR_PROFILE("WarpX::LoadBalance()");
 
     AMREX_ALWAYS_ASSERT(!costs.empty());
     AMREX_ALWAYS_ASSERT(costs[0] != nullptr);

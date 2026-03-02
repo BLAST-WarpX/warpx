@@ -8,7 +8,7 @@
 #include "Filter.H"
 
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 #include <AMReX_Array4.H>
@@ -37,7 +37,7 @@ using namespace amrex;
 void
 Filter::ApplyStencil (MultiFab& dstmf, const MultiFab& srcmf, const int lev, int scomp, int dcomp, int ncomp)
 {
-    WARPX_PROFILE("Filter::ApplyStencil(MultiFab)");
+    ABLASTR_PROFILE("Filter::ApplyStencil(MultiFab)");
     ncomp = std::min(ncomp, srcmf.nComp());
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
@@ -78,7 +78,7 @@ void
 Filter::ApplyStencil (FArrayBox& dstfab, const FArrayBox& srcfab,
                       const Box& tbx, int scomp, int dcomp, int ncomp)
 {
-    WARPX_PROFILE("Filter::ApplyStencil(FArrayBox)");
+    ABLASTR_PROFILE("Filter::ApplyStencil(FArrayBox)");
     ncomp = std::min(ncomp, srcfab.nComp());
     const auto& src = srcfab.array();
     const auto& dst = dstfab.array();
@@ -197,7 +197,7 @@ void Filter::DoFilter (const Box& tbx,
 void
 Filter::ApplyStencil (amrex::MultiFab& dstmf, const amrex::MultiFab& srcmf, const int lev, int scomp, int dcomp, int ncomp)
 {
-    WARPX_PROFILE("Filter::ApplyStencil(MultiFab)");
+    ABLASTR_PROFILE("Filter::ApplyStencil(MultiFab)");
     ncomp = std::min(ncomp, srcmf.nComp());
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
@@ -251,7 +251,7 @@ void
 Filter::ApplyStencil (amrex::FArrayBox& dstfab, const amrex::FArrayBox& srcfab,
                       const amrex::Box& tbx, int scomp, int dcomp, int ncomp)
 {
-    WARPX_PROFILE("Filter::ApplyStencil(FArrayBox)");
+    ABLASTR_PROFILE("Filter::ApplyStencil(FArrayBox)");
     ncomp = std::min(ncomp, srcfab.nComp());
     FArrayBox tmpfab;
     const Box& gbx = amrex::grow(tbx,stencil_length_each_dir-1);

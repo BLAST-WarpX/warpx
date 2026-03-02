@@ -22,7 +22,7 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_ParmParse.H>

@@ -19,7 +19,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -345,7 +345,7 @@ WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 void
 WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
-    WARPX_PROFILE("WarpX::ImplicitComputeRHSE()");
+    ABLASTR_PROFILE("WarpX::ImplicitComputeRHSE()");
     ImplicitComputeRHSE(lev, PatchType::fine, a_dt, a_Erhs_vec);
     if (lev > 0)
     {

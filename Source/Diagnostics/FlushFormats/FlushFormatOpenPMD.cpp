@@ -1,7 +1,7 @@
 #include "FlushFormatOpenPMD.H"
 
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "Diagnostics/OpenPMDHelpFunction.H"
 #include "WarpX.H"
 
@@ -138,7 +138,7 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Geometry& full_BTD_snapshot,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         if (!isBTD)

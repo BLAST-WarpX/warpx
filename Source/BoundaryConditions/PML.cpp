@@ -20,7 +20,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
@@ -1130,7 +1130,7 @@ void
 PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
                 int do_pml_in_domain)
 {
-    WARPX_PROFILE("PML::Exchange");
+    ABLASTR_PROFILE("PML::Exchange");
 
     const IntVect& ngr = reg.nGrowVect();
     const IntVect& ngp = pml.nGrowVect();

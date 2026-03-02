@@ -21,7 +21,7 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -315,7 +315,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
                                        MomentumPushType momentum_push_type)
 {
-    WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
+    ABLASTR_PROFILE("RigidInjectedParticleContainer::PushP");
 
     if (do_not_push) { return; }
 

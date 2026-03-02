@@ -7,7 +7,7 @@
  */
 #include "BilinearFilter.H"
 
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Config.H>
 #include <AMReX_Dim3.H>
@@ -61,7 +61,7 @@ namespace {
 }
 
 void BilinearFilter::ComputeStencils(){
-    WARPX_PROFILE("BilinearFilter::ComputeStencils()");
+    ABLASTR_PROFILE("BilinearFilter::ComputeStencils()");
     int i = 0;
     for (const auto& el : npass_each_dir ) {
         stencil_length_each_dir[i++] = static_cast<int>(el) + 1;

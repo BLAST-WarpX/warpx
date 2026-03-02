@@ -9,19 +9,19 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 
 #include "Fields.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 
 void WarpX::ComputeSpaceChargeField (bool const reset_fields)
 {
-    WARPX_PROFILE("WarpX::ComputeSpaceChargeField");
+    ABLASTR_PROFILE("WarpX::ComputeSpaceChargeField");
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     if (reset_fields) {
         // Reset all E and B fields to 0, before calculating space-charge fields
-        WARPX_PROFILE("WarpX::ComputeSpaceChargeField::reset_fields");
+        ABLASTR_PROFILE("WarpX::ComputeSpaceChargeField::reset_fields");
         for (int lev = 0; lev <= max_level; lev++) {
             for (int comp=0; comp<3; comp++) {
                 m_fields.get(FieldType::Efield_fp, Direction{comp}, lev)->setVal(0);

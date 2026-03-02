@@ -13,7 +13,7 @@
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -27,7 +27,7 @@ void WarpX::HybridPICEvolveFields ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::HybridPICEvolveFields()");
+    ABLASTR_PROFILE("WarpX::HybridPICEvolveFields()");
 
     // The below deposition is hard coded for a single level simulation
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -348,7 +348,7 @@ void WarpX::HybridPICInitializeRhoJandB ()
 
 void
 WarpX::CalculateExternalCurlA() {
-    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
+    ABLASTR_PROFILE("WarpX::CalculateExternalCurlA()");
 
     auto & warpx = WarpX::GetInstance();
 

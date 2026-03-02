@@ -10,7 +10,7 @@
 #define WARPX_PY_CALLBACKS_H_
 
 #include "Utils/export.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <functional>
 #include <map>

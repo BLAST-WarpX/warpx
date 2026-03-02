@@ -34,7 +34,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "Utils/WarpXUtil.H"
 #include "Python/callbacks.H"
 
@@ -785,7 +785,7 @@ WarpX::PrintMainPICparameters ()
 void
 WarpX::InitData ()
 {
-    WARPX_PROFILE("WarpX::InitData()");
+    ABLASTR_PROFILE("WarpX::InitData()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;

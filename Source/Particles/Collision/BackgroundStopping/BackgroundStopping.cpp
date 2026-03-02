@@ -8,7 +8,7 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 #include <AMReX_ParmParse.H>
@@ -88,7 +88,7 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
 void
 BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundStopping::doCollisions()");
+    ABLASTR_PROFILE("BackgroundStopping::doCollisions()");
     using namespace amrex::literals;
 
     auto& species = mypc->GetParticleContainerFromName(m_species_names[0]);

@@ -247,7 +247,7 @@ node, or without a workload management system.
 .. note::
 
    Note the trailing ``/`` at the end of the ``--nvtx-include`` filter (`reference <https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html?highlight=nvtx%2520include#nvtx-filtering>`__).
-   The names are annotations that we add to WarpX via ``WARPX_PROFILE(...)``.
+   The names are annotations that we add to WarpX via ``ABLASTR_PROFILE(...)``.
 
 .. note::
 
