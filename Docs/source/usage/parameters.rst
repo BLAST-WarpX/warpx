@@ -1445,6 +1445,7 @@ Particle initialization
     when the particles are generated.
     If the user-defined integer attribute is ``<int_attrib_name>`` then the
     following required parameter must be specified to initialize the attribute.
+
     * ``<species_name>.attribute.<int_attrib_name>(x,y,z,ux,uy,uz,t)`` (`string`)
     ``t`` represents the physical time in seconds during the simulation.
     ``x``, ``y``, ``z`` represent particle positions in the unit of meter.
@@ -2546,7 +2547,7 @@ Particle push, charge and current deposition, field gathering
      - ``vay``: Vay pusher (see :cite:t:`param-Vaypop2008`)
      - ``higuera``: Higuera-Cary pusher (see :cite:t:`param-HigueraPOP2017`)
 
-     If ``algo.particle_pusher`` is not specified, ``boris`` is the default.
+    If ``algo.particle_pusher`` is not specified, ``boris`` is the default.
 
 * ``algo.particle_shape`` (`integer`; `1`, `2`, `3`, or `4`)
     The order of the shape factors (splines) for the macro-particles along all spatial directions: `1` for linear, `2` for quadratic, `3` for cubic, `4` for quartic.
@@ -2576,7 +2577,7 @@ Two families of Maxwell solvers are implemented in WarpX, based on the Finite-Di
      - ``hybrid``: The E-field will be solved using Ohm's law and a kinetic-fluid hybrid model (see :ref:`theory <theory-kinetic-fluid-hybrid-model>`).
      - ``none``: No field solve will be performed.
 
-     If ``algo.maxwell_solver`` is not specified, ``yee`` is the default.
+    If ``algo.maxwell_solver`` is not specified, ``yee`` is the default.
 
 * ``algo.em_solver_medium`` (`string`, optional)
     The medium for evaluating the Maxwell solver. Available options are :
