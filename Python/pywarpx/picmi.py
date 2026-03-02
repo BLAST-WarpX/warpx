@@ -3202,6 +3202,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_amrex_use_gpu_aware_mpi: bool, optional
         Whether to use GPU-aware MPI communications
 
+    warpx_do_device_synchronize: bool, optional
+        Whether to synchronize GPU threads at ends of profiling regions.
+        Note that if this is set to False, the TinyProfiler table can be
+        misleading.
+
     warpx_zmax_plasma_to_compute_max_step: float, optional
         Sets the simulation run time based on the maximum z value
 
@@ -3327,6 +3332,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         self.amrex_the_arena_init_size = kw.pop("warpx_amrex_the_arena_init_size", None)
         self.amrex_use_gpu_aware_mpi = kw.pop("warpx_amrex_use_gpu_aware_mpi", None)
+        self.do_device_synchronize = kw.pop("warpx_do_device_synchronize", None)
         self.zmax_plasma_to_compute_max_step = kw.pop(
             "warpx_zmax_plasma_to_compute_max_step", None
         )
@@ -3534,6 +3540,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         if self.amrex_use_gpu_aware_mpi is not None:
             pywarpx.amrex.use_gpu_aware_mpi = self.amrex_use_gpu_aware_mpi
+
+        if self.do_device_synchronize is not None:
+            pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
 
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:
