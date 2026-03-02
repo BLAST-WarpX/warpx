@@ -81,7 +81,7 @@ public:
                         const amrex::MultiFab& /*Bx*/,
                         const amrex::MultiFab& /*By*/,
                         const amrex::MultiFab& /*Bz*/,
-                        MomentumPushType /*momentum_push_type*/=MomentumPushType::Full) override {}
+                        MomentumPushType /*momentum_push_type*/) override {}
 
 
     // DepositCharge should do nothing for photons
