@@ -469,12 +469,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         has_rho &&
         !skip_deposition &&
         !do_not_deposit &&
-        position_push_type == PositionPushType::Full
+        (position_push_type == PositionPushType::Full)
     );
     bool const split_particles = (
         do_splitting &&
-        subcycling_half == SubcyclingHalf::None &&
-        position_push_type == PositionPushType::Full
+        (subcycling_half == SubcyclingHalf::None || subcycling_half == SubcyclingHalf::SecondHalf) &&
+        (position_push_type == PositionPushType::Full)
     );
 
 #ifdef AMREX_USE_OMP

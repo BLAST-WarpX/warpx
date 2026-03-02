@@ -134,7 +134,8 @@ WarpX::SynchronizeVelocityWithPosition () {
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = true;
@@ -619,7 +620,8 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = false;

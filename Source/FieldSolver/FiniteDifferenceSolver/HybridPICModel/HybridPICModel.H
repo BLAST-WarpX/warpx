@@ -206,6 +206,7 @@ public:
     std::string m_Jz_ext_grid_function = "0.0";
     std::array< std::unique_ptr<amrex::Parser>, 3> m_J_external_parser;
     std::array< amrex::ParserExecutor<4>, 3> m_J_external;
+    bool m_has_external_current = true;
     bool m_external_current_has_time_dependence = false;
 
     /** External E/B fields */
