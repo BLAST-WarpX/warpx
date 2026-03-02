@@ -25,7 +25,7 @@
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
 #include <ablastr/utils/Communication.H>
-#include <Utils/WarpXProfilerWrapper.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <map>
 
