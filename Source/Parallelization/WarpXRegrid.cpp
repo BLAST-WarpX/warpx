@@ -392,7 +392,7 @@ WarpX::RescaleCosts (int step)
         return;
     }
 
-    AMREX_ALWAYS_ASSERT(costs.size() == finest_level + 1);
+    AMREX_ALWAYS_ASSERT(costs.size() >= finest_level+1);
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {

@@ -816,6 +816,8 @@ WarpX::InitData ()
 #endif
     if (restart_chkfile.empty())
     {
+        //finest_level is initialized now to use it in ComputeDt instead of max_level for simulation max_level != finest_level
+        SetFinestLevel(max_level);
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();

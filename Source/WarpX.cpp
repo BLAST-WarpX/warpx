@@ -716,6 +716,20 @@ WarpX::ReadParameters ()
                 "External field reading is not implemented for more than one level");
         }
 
+        if(max_level>0){
+            const auto end_fine_patch_defined = utils::parser::queryWithParser(
+                pp_warpx,"end_fine_patch_step", m_end_fine_patch_step);
+            if(end_fine_patch_defined && m_do_subcycling==0){
+                if(max_step>=m_end_fine_patch_step){
+                    auto ss = std::stringstream{};
+                    ss << "When the fine patch is removed, the max step will be changed."
+                        << "Users are advised to use stop time instead";
+                    ablastr::warn_manager::WMRecordWarning(
+                        "Mesh Refinement", ss.str(), ablastr::warn_manager::WarnPriority::high);
+                }
+            }
+        }
+
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
@@ -3382,7 +3396,7 @@ WarpX::getLoadBalanceEfficiency (const int lev)
 
 
 void
-WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
+WarpX::ErrorEst (int lev, TagBoxArray& tags, Real time, int /*ngrow*/)
 {
     const auto problo = Geom(lev).ProbLoArray();
     const auto dx = Geom(lev).CellSizeArray();
@@ -3421,7 +3435,7 @@ WarpX::ErrorEst (int lev, TagBoxArray& tags, Real /*time*/, int /*ngrow*/)
                 tag_val = (pos > ftlo && pos < fthi);
             }
             if (tag_val) {
-                fab(i,j,k) = TagBox::SET;
+                fab(i,j,k) = (time > Real(0.0)) ? TagBox::CLEAR : TagBox::SET;
             }
         });
     }

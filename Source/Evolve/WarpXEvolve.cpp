@@ -51,6 +51,8 @@
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
 
+#include <AMReX_PlotFileUtil.H>
+
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -490,6 +492,17 @@ WarpX::OneStep_nosub (Real cur_time)
     //               from p^{n-1/2} to p^{n+1/2}
     // Deposit current j^{n+1/2}
     // Deposit charge density rho^{n}
+
+    if(istep[0]+1==m_end_fine_patch_step){
+        SyncCurrent("current_fp");
+        SyncRho();
+        const int coarse_lev = 0;
+        regrid(coarse_lev, cur_time);
+        mypc->Redistribute();
+        ComputeDt();
+        Print() << Utils::TextMsg::Info(
+                    "Remove the patch");
+    }
 
     ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
@@ -1205,6 +1218,17 @@ WarpX::OneStep_sub1 (Real cur_time)
         FillBoundaryB(coarse_lev, PatchType::fine, guard_cells.ng_FieldSolver,
                       WarpX::sync_nodal_points);
     }
+
+    if(istep[0]+1==m_end_fine_patch_step){
+        SyncCurrent("current_fp");
+        SyncRho();
+        regrid(coarse_lev, cur_time);
+        mypc->Redistribute();
+                Print() << Utils::TextMsg::Info(
+                    "Remove the patch");
+        m_do_subcycling=0;
+    }
+
 }
 
 void
