@@ -25,9 +25,21 @@
 #SBATCH -o WarpX.o%j
 #SBATCH -e WarpX.e%j
 
-# executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs
+# python interpreter & script here
+EXE=python3
+INPUTS=run_script.py
+# or executable & inputs file
+#EXE=./warpx
+#INPUTS=inputs
+
+# environment setup
+if [[ -z "${MY_PROFILE}" ]]; then
+    echo "WARNING: FORGOT TO"
+    echo "   source $HOME/perlmutter_gpu_warpx.profile"
+    echo "before submission. Doing that now."
+
+    source $HOME/perlmutter_gpu_warpx.profile
+fi
 
 # pin to closest NIC to GPU
 export MPICH_OFI_NIC_POLICY=GPU
@@ -37,11 +49,11 @@ export MPICH_OFI_NIC_POLICY=GPU
 export OMP_NUM_THREADS=16
 
 # GPU-aware MPI optimizations
-GPU_AWARE_MPI="amrex.use_gpu_aware_mpi=1"
+export AMREX_DEFAULT_INIT="amrex.use_gpu_aware_mpi=1"
 
 # CUDA visible devices are ordered inverse to local task IDs
 #   Reference: nvidia-smi topo -m
 srun --cpu-bind=cores bash -c "
     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
-    ${EXE} ${INPUTS} ${GPU_AWARE_MPI}" \
+    ${EXE} ${INPUTS}" \
   > output.txt

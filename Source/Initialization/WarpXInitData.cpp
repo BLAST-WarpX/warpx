@@ -1615,12 +1615,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
                 // Mark on which grid points B should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
             }
 
         }

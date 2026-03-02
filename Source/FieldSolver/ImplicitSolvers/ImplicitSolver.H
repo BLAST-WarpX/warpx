@@ -129,6 +129,11 @@ public:
 
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
+    /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
+
 protected:
 
     /**
