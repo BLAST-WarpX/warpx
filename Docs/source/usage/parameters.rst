@@ -1466,13 +1466,13 @@ Particle initialization
     If the user-defined real attribute is ``<real_attrib_name>`` then the
     following required parameter must be specified to initialize the attribute.
 
-   * ``<species_name>.attribute.<real_attrib_name>(x,y,z,ux,uy,uz,t)`` (`string`)
-     ``t`` represents the physical time in seconds during the simulation.
-     ``x``, ``y``, ``z`` represent particle positions in the unit of meter.
-     ``ux``, ``uy``, ``uz`` represent the particle momenta in the unit of
-     :math:`\gamma v/c`, where
-     :math:`\gamma` is the Lorentz factor,
-     :math:`v/c` is the particle velocity normalized by the speed of light.
+    * ``<species_name>.attribute.<real_attrib_name>(x,y,z,ux,uy,uz,t)`` (`string`)
+        ``t`` represents the physical time in seconds during the simulation.
+        ``x``, ``y``, ``z`` represent particle positions in the unit of meter.
+        ``ux``, ``uy``, ``uz`` represent the particle momenta in the unit of
+        :math:`\gamma v/c`, where
+        :math:`\gamma` is the Lorentz factor,
+        :math:`v/c` is the particle velocity normalized by the speed of light.
 
 * ``<species_name>.save_particles_at_xlo/ylo/zlo``, ``<species_name>.save_particles_at_xhi/yhi/zhi`` and ``<species_name>.save_particles_at_eb`` (`0` or `1` optional, default `0`)
     If `1` particles of this species will be copied to the scraped particle
