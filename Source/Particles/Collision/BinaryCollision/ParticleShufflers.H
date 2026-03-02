@@ -10,6 +10,9 @@
 #include <AMReX_Random.H>
 #include <AMReX_Scan.H>
 
+#include <algorithm> // std::shuffle
+#include <random>    // std::mt19937, std::random_device
+
 /* \brief Calculate the greatest common denominator of the two integers.
  *        This does the same thing as std::gcd, but that routine is not
  *        reliably available on GPU.
