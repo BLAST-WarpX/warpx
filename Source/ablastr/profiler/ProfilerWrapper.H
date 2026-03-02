@@ -9,7 +9,10 @@
 #define ABLASTR_PROFILERWRAPPER_H_
 
 #include <AMReX_BLProfiler.H>
+#include <AMReX_MFIter.H>
 #include <AMReX_ParmParse.H>
+
+#include "ablastr/warn_manager/WarnManager.H"
 
 namespace ablastr::profiler
 {
@@ -18,24 +21,40 @@ namespace ablastr::profiler
 
     /** Returns true if tiny_profiler.device_synchronize_around_region is enabled.
      *
-     * Result is cached after the first call: call sites are only profiled
-     * accurately without GPU sync when they are outside MFIter/ParIter loops
-     * (which synchronize automatically). Regions inside such loops should use
-     * when::IfSyncEnabled so they are skipped when sync is off.
+     * Call sites are only profiled accurately without GPU sync when they are
+     * outside MFIter/ParIter loops (which synchronize automatically). Regions
+     * inside such loops should use when::IfSyncEnabled so they are skipped
+     * when sync is off.
+     *
+     * For CPU-only builds, this unconditionally returns true since there is
+     * no GPU stream synchronization concern.
      */
     inline bool is_sync_enabled ()
     {
-        static const bool v = [] {
-            int r = 0;
-            amrex::ParmParse{"tiny_profiler"}.query("device_synchronize_around_region", r);
-            return static_cast<bool>(r);
-        }();
-        return v;
+#ifndef AMREX_USE_GPU
+        return true;
+#else
+        int r = 0;
+        amrex::ParmParse{"tiny_profiler"}.query("device_synchronize_around_region", r);
+        return static_cast<bool>(r);
+#endif
     }
 
-    inline bool should_profile (when when)
+    inline bool should_profile (when w)
     {
-        return when == when::Always || is_sync_enabled();
+        if (w == when::Always) {
+#ifdef AMREX_USE_GPU
+            if (amrex::MFIter::currentDepth() > 0 && !is_sync_enabled()) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Performance",
+                    "Profiler region with when::Always used inside an MFIter loop "
+                    "without device synchronization; timings may be inaccurate.",
+                    ablastr::warn_manager::WarnPriority::high);
+            }
+#endif
+            return true;
+        }
+        return is_sync_enabled();
     }
 
 } // namespace ablastr::profiler
