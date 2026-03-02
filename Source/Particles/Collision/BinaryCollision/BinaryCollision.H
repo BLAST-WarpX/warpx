@@ -108,7 +108,12 @@ public:
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
-        pp_collision_name.query_enum_sloppy("shuffling_method", shuffling_method, "-_");
+        pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+
+        if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+            m_modulus_rounds = 4;
+            pp_collision_name.query("modulus_rounds", m_modulus_rounds);
+        }
 
         if (collision_type == CollisionType::PairwiseCoulomb) {
             // Input parameter set for all pairwise Coulomb collisions
@@ -610,11 +615,11 @@ public:
 
             // shuffle
             WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            if (shuffling_method == ParticleShufflingMethod::Modulus) {
-                ModulusShuffle(n_cells, np1, cell_offsets_1, indices_1);
-            } else if (shuffling_method == ParticleShufflingMethod::FisherYates) {
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
-            } else if (shuffling_method == ParticleShufflingMethod::Standard) {
+            } else if (m_shuffling_method == ParticleShufflingMethod::Standard) {
                 StandardShuffle(n_cells, cell_offsets_1, indices_1);
             }
 
@@ -1167,13 +1172,15 @@ public:
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
         WARPX_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            if (shuffling_method == ParticleShufflingMethod::Modulus) {
-                ModulusShuffle(n_cells, np1, cell_offsets_1, indices_1);
-            } else if (shuffling_method == ParticleShufflingMethod::FisherYates) {
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+                /* ModulusShuffle(n_cells, np2, m_modulus_rounds, cell_offsets_2, indices_2); */
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
-                /* FisherYatesShuffle(n_cells, cell_offsets_2, indices_2); */
-            } else if (shuffling_method == ParticleShufflingMethod::Standard) {
+                FisherYatesShuffle(n_cells, cell_offsets_2, indices_2);
+            } else if (m_shuffling_method == ParticleShufflingMethod::Standard) {
                 StandardShuffle(n_cells, cell_offsets_1, indices_1);
+                /* StandardShuffle(n_cells, cell_offsets_2, indices_2); */
             }
             WARPX_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
 
@@ -1449,7 +1456,8 @@ private:
     bool m_isSameSpecies;
     bool m_have_product_species;
 
-    ParticleShufflingMethod shuffling_method;
+    ParticleShufflingMethod m_shuffling_method;
+    int m_modulus_rounds;
 
     bool m_correct_energy_momentum = false;
     amrex::ParticleReal m_beta_weight_exponent = 1.;

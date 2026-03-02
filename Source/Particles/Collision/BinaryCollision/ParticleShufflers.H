@@ -73,7 +73,7 @@ T_index generate_modulus_step(T_index n, amrex::RandomEngine const& engine)
  * \param indices The indices to the particles that is to be shuffled
  */
 template <typename T_index>
-void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_index * indices)
+void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * cell_offsets, T_index * indices)
 {
 #ifdef AMREX_USE_GPU
 
@@ -81,8 +81,8 @@ void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_in
     // than looping over cells on the GPU.
 
     amrex::Gpu::DeviceVector<T_index> indices_copy_vector(np);
-    amrex::Gpu::DeviceVector<int> indices_step_vector(n_cells);
-    amrex::Gpu::DeviceVector<int> indices_offset_vector(n_cells);
+    amrex::Gpu::DeviceVector<int> indices_step_vector(n_cells*nsub);
+    amrex::Gpu::DeviceVector<int> indices_offset_vector(n_cells*nsub);
     T_index* AMREX_RESTRICT indices_copy = indices_copy_vector.dataPtr();
     T_index* AMREX_RESTRICT indices_step = indices_step_vector.dataPtr();
     T_index* AMREX_RESTRICT indices_offset = indices_offset_vector.dataPtr();
@@ -94,10 +94,16 @@ void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_in
         {
             T_index const cell_start = cell_offsets[i_cell];
             T_index const cell_stop  = cell_offsets[i_cell+1];
-
             T_index const n = cell_stop - cell_start;
-            indices_step[i_cell] = generate_modulus_step(n, engine);
-            indices_offset[i_cell] = amrex::Random_int(n, engine);
+
+            for (int isub = 0 ; isub < nsub ; isub++) {
+                // Add nsub/2 to round to the nearest, instead of truncating
+                T_index const istart = (isub*n + nsub/2)/nsub;
+                T_index const iend = ((isub + 1)*n + nsub/2)/nsub;
+                T_index const nnsub = iend - istart;
+                indices_step[isub + i_cell*nsub] = generate_modulus_step(nnsub, engine);
+                indices_offset[isub + i_cell*nsub] = amrex::Random_int(nnsub, engine);
+            }
         });
 
     // A copy is needed of the indices
@@ -115,16 +121,26 @@ void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_in
             int const i_cell = amrex::bisect( cell_offsets, 0, n_cells, u_ip );
             T_index const cell_start = cell_offsets[i_cell];
             T_index const cell_stop  = cell_offsets[i_cell+1];
-
             T_index const n = cell_stop - cell_start;
+
             T_index const i = u_ip - cell_start;
-            T_index const step = indices_step[i_cell];
-            T_index const offset = indices_offset[i_cell];
+            T_index istart = 0;
+            T_index iend = 0;
+            int isub;
+            for (isub = 0 ; isub < nsub ; isub++) {
+                // Add nsub/2 to round to the nearest, instead of truncating
+                istart = (isub*n + nsub/2)/nsub;
+                iend = ((isub + 1)*n + nsub/2)/nsub;
+                if (istart <= i && i < iend) { break; }
+            }
+            T_index const step = indices_step[isub + i_cell*nsub];
+            T_index const offset = indices_offset[isub + i_cell*nsub];
+            T_index const nnsub = iend - istart;
 
             // A long is needed since the product i*step can exceed the range of
             // standard ints
-            T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
-            indices[ip] = indices_copy[cell_start + i2];
+            T_index const i2 = (T_index)(((amrex::Long)(i - istart)*step + offset) % nnsub);
+            indices[ip] = indices_copy[cell_start + istart + i2];
         }
     );
 
@@ -146,15 +162,41 @@ void ModulusShuffle (int n_cells, T_index np, T_index const * cell_offsets, T_in
                 indices_copy[i] = indices[i];
             }
 
-            T_index const step = generate_modulus_step(n, engine);
-            T_index const offset = amrex::Random_int(n, engine);
-            for (T_index i = 0 ; i < n ; i++) {
-                T_index const i2 = (int)(((amrex::Long)i*step + offset) % n);
-                indices[cell_start + i] = indices_copy[cell_start + i2];
+            for (int isub = 0 ; isub < nsub ; isub++) {
+                // Add nsub/2 to round to the nearest, instead of truncating
+                T_index const istart = (isub*n + nsub/2)/nsub;
+                T_index const iend = ((isub + 1)*n + nsub/2)/nsub;
+                T_index const nnsub = iend - istart;
+                T_index const step = generate_modulus_step(nnsub, engine);
+                T_index const offset = amrex::Random_int(nnsub, engine);
+                for (T_index i = 0 ; i < nnsub ; i++) {
+                    T_index const i2 = (int)(((amrex::Long)i*step + offset) % nnsub);
+                    indices[cell_start + istart + i] = indices_copy[cell_start + istart + i2];
+                }
             }
     });
 
 #endif
+}
+
+/* \brief Shuffles the indices using a modulus shuffle.
+ *        For each particle i, move it to (i*step + offset) % n,
+ *        where i and n are relative to the grid cell.
+ *        This will work for all particles if step and n are coprime.
+ *
+ * \param n_cell The number of grid cells
+ * \param np The number of particles (the length of indices)
+ * \param cell_offsets The particle number offset for each cell
+ *                     (The cumulative integral of the number of particles in each cell.)
+ * \param indices The indices to the particles that is to be shuffled
+ */
+template <typename T_index>
+void ModulusShuffle (int n_cells, T_index np, int nrounds, T_index const * cell_offsets, T_index * indices)
+{
+    for (int round = 0 ; round < nrounds ; round++) {
+        int nsub = 1 + amrex::Random_int(4);
+        ModulusShuffleSingle(n_cells, np, nsub, cell_offsets, indices);
+    }
 }
 
 /* \brief Shuffle array using std::shuffle
