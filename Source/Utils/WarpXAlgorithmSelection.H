@@ -194,6 +194,7 @@ AMREX_ENUM(
     None,
     FisherYates,
     Modulus,
+    Standard,
     Default = FisherYates
 );
 
