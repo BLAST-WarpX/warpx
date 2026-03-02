@@ -192,7 +192,7 @@ namespace {
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
-                                          dt);
+                                          dt, MomentumPushType::Full);
             } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -200,7 +200,7 @@ namespace {
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
-                                              dt);
+                                              dt, MomentumPushType::Full);
                 }
             }
 #else
@@ -208,7 +208,7 @@ namespace {
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt);
+                                      dt, MomentumPushType::Full);
 #endif
 
 #ifdef WARPX_QED

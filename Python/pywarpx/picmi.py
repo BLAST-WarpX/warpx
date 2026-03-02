@@ -3218,8 +3218,8 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_collisions: collision instance, optional
         The collision instance specifying the particle collisions
 
-    warpx_collisions_split_position_push: bool, default=1
-        If true, collisions are performed in the middle of the position push,
+    warpx_collisions_split_momentum_push: bool, default=1
+        If true, collisions are performed in the middle of the momentum push,
         which is split into two substeps.
         This improves energy conservation, as demonstrated in
         (Vay et al., Phys. Rev. E 111, 2025).
@@ -3346,8 +3346,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
 
         self.collisions = kw.pop("warpx_collisions", None)
-        self.collisions_split_position_push = kw.pop(
-            "warpx_collisions_split_position_push", None
+        self.collisions_split_momentum_push = kw.pop(
+            "warpx_collisions_split_momentum_push", None
         )
 
         self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
@@ -3512,7 +3512,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             for collision in self.collisions:
                 pywarpx.collisions.collision_names.append(collision.name)
                 collision.collision_initialize_inputs()
-            pywarpx.collisions.split_position_push = self.collisions_split_position_push
+            pywarpx.collisions.split_momentum_push = self.collisions_split_momentum_push
 
         if self.embedded_boundary is not None:
             self.embedded_boundary.embedded_boundary_initialize_inputs(self.solver)

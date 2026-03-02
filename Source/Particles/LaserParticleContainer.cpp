@@ -783,7 +783,8 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
 void
 LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
-                               const MultiFab&, const MultiFab&, const MultiFab&)
+                               const MultiFab&, const MultiFab&, const MultiFab&,
+                               MomentumPushType /*momentum_push_type*/)
 {
     // I don't think we need to do anything.
 }
