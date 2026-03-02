@@ -11,7 +11,7 @@
 #include "TextMsg.H"
 #include "WarpXAlgorithmSelection.H"
 #include "WarpXConst.H"
-#include "WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpXUtil.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
