@@ -83,9 +83,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     {
         fusion_cross_section = ProtonBoronFusionCrossSection(E_coll);
     }
-    else if ((fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium)
-          || (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium)
-          || (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium))
+    else if (BinaryCollisionUtils::is_two_product_fusion_type(fusion_type))
     {
         fusion_cross_section = BoschHaleFusionCrossSection(E_coll, fusion_type, m1, m2);
     }
