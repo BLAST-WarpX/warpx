@@ -19,7 +19,7 @@ int
 main (int argc, char* argv[]) {
     warpx::initialization::initialize_external_libraries(argc, argv);
     {
-        WARPX_PROFILE_VAR("main()", pmain, ablastr::profiler::WhenToProfile::Always);
+        WARPX_PROFILE_VAR("main()", pmain, ablastr::profiler::when::Always);
 
         auto timer = ablastr::utils::timer::Timer{};
         timer.record_start_time();

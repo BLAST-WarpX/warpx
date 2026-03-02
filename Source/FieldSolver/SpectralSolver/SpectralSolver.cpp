@@ -119,7 +119,7 @@ SpectralSolver::ForwardTransform (const int lev,
                                   const int field_index,
                                   const int i_comp)
 {
-    WARPX_PROFILE("SpectralSolver::ForwardTransform", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("SpectralSolver::ForwardTransform", ablastr::profiler::when::Always);
     field_data.ForwardTransform(lev, mf, field_index, i_comp);
 }
 
@@ -130,13 +130,13 @@ SpectralSolver::BackwardTransform( const int lev,
                                    const amrex::IntVect& fill_guards,
                                    const int i_comp )
 {
-    WARPX_PROFILE("SpectralSolver::BackwardTransform", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("SpectralSolver::BackwardTransform", ablastr::profiler::when::Always);
     field_data.BackwardTransform(lev, mf, field_index, fill_guards, i_comp);
 }
 
 void
 SpectralSolver::pushSpectralFields(){
-    WARPX_PROFILE("SpectralSolver::pushSpectralFields", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("SpectralSolver::pushSpectralFields", ablastr::profiler::when::Always);
     // Virtual function: the actual function used here depends
     // on the sub-class of `SpectralBaseAlgorithm` that was
     // initialized in the constructor of `SpectralSolver`

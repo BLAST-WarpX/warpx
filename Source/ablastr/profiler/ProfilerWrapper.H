@@ -14,14 +14,14 @@
 namespace ablastr::profiler
 {
     /** Controls when a profiler region is active */
-    enum class WhenToProfile { Always, IfSyncEnabled };
+    enum class when { Always, IfSyncEnabled };
 
     /** Returns true if tiny_profiler.device_synchronize_around_region is enabled.
      *
      * Result is cached after the first call: call sites are only profiled
      * accurately without GPU sync when they are outside MFIter/ParIter loops
      * (which synchronize automatically). Regions inside such loops should use
-     * WhenToProfile::IfSyncEnabled so they are skipped when sync is off.
+     * when::IfSyncEnabled so they are skipped when sync is off.
      */
     inline bool is_sync_enabled ()
     {
@@ -33,9 +33,9 @@ namespace ablastr::profiler
         return v;
     }
 
-    inline bool should_profile (WhenToProfile when)
+    inline bool should_profile (when when)
     {
-        return when == WhenToProfile::Always || is_sync_enabled();
+        return when == when::Always || is_sync_enabled();
     }
 
 } // namespace ablastr::profiler
@@ -49,7 +49,7 @@ namespace ablastr::profiler
 
 /** Profile the enclosing scope.
  *  \param fname  profiler region name (string literal)
- *  \param when   WhenToProfile::Always or WhenToProfile::IfSyncEnabled
+ *  \param when   when::Always or when::IfSyncEnabled
  */
 #define ABLASTR_PROFILE(fname, when) \
     ABLASTR_PROFILE_IMPL(fname, when, BL_PROFILE_PASTE(ablastr_blp_, __LINE__))
@@ -57,7 +57,7 @@ namespace ablastr::profiler
 /** Profile a named sub-region with explicit start (immediate start version).
  *  \param fname   profiler region name
  *  \param vname   C++ variable name for the profiler object
- *  \param when    WhenToProfile::Always or WhenToProfile::IfSyncEnabled
+ *  \param when    when::Always or when::IfSyncEnabled
  */
 #define ABLASTR_PROFILE_VAR(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -69,7 +69,7 @@ namespace ablastr::profiler
  *  Use ABLASTR_PROFILE_VAR_START / ABLASTR_PROFILE_VAR_STOP to control timing.
  *  \param fname  profiler region name
  *  \param vname  C++ variable name for the profiler object
- *  \param when   WhenToProfile::Always or WhenToProfile::IfSyncEnabled
+ *  \param when   when::Always or when::IfSyncEnabled
  */
 #define ABLASTR_PROFILE_VAR_NS(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -86,7 +86,7 @@ namespace ablastr::profiler
 
 /** Profile the enclosing scope as a named region.
  *  \param rname  region name
- *  \param when   WhenToProfile::Always or WhenToProfile::IfSyncEnabled
+ *  \param when   when::Always or when::IfSyncEnabled
  */
 #define ABLASTR_PROFILE_REGION(rname, when) \
     ABLASTR_PROFILE(rname, when)

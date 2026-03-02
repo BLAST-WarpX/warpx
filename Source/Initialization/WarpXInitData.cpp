@@ -785,7 +785,7 @@ WarpX::PrintMainPICparameters ()
 void
 WarpX::InitData ()
 {
-    WARPX_PROFILE("WarpX::InitData()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("WarpX::InitData()", ablastr::profiler::when::Always);
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;

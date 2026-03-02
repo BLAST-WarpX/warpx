@@ -119,7 +119,7 @@ namespace
 void
 WarpX::UpdateAuxilaryData ()
 {
-    WARPX_PROFILE("WarpX::UpdateAuxilaryData()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("WarpX::UpdateAuxilaryData()", ablastr::profiler::when::Always);
 
     using ablastr::fields::Direction;
 
@@ -1137,7 +1137,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 {
     using ablastr::fields::Direction;
 
-    WARPX_PROFILE("WarpX::SyncCurrent()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("WarpX::SyncCurrent()", ablastr::profiler::when::Always);
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1312,7 +1312,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 void
 WarpX::SyncMassMatricesPC ()
 {
-    WARPX_PROFILE("WarpX::SyncMassMatricesPC()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("WarpX::SyncMassMatricesPC()", ablastr::profiler::when::Always);
 
     ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
@@ -1348,7 +1348,7 @@ WarpX::SyncRho (
     const ablastr::fields::MultiLevelScalarField& charge_cp,
     ablastr::fields::MultiLevelScalarField const & charge_buffer)
 {
-    WARPX_PROFILE("WarpX::SyncRho()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("WarpX::SyncRho()", ablastr::profiler::when::Always);
 
     if (!charge_fp[0]) { return; }
     const int ncomp = charge_fp[0]->nComp();

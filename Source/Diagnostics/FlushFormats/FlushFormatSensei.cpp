@@ -67,7 +67,7 @@ FlushFormatSensei::WriteToFile (
         !isBTD,
         "In-situ visualization is not currently supported for back-transformed diagnostics.");
 
-    WARPX_PROFILE("FlushFormatSensei::WriteToFile()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("FlushFormatSensei::WriteToFile()", ablastr::profiler::when::Always);
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         amrex::Print() << Utils::TextMsg::Info("Writing Sensei file " + filename);

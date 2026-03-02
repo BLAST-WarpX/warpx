@@ -1130,7 +1130,7 @@ void
 PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
                 int do_pml_in_domain)
 {
-    WARPX_PROFILE("PML::Exchange", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("PML::Exchange", ablastr::profiler::when::Always);
 
     const IntVect& ngr = reg.nGrowVect();
     const IntVect& ngp = pml.nGrowVect();

@@ -138,7 +138,7 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Geometry& full_BTD_snapshot,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()", ablastr::profiler::WhenToProfile::Always);
+    WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()", ablastr::profiler::when::Always);
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         if (!isBTD)
