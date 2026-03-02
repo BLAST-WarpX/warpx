@@ -7,6 +7,10 @@
 #ifndef WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
 #define WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
 
+#ifdef AMREX_USE_GPU
+#include <Utils/TextMsg.H>
+#endif
+
 #include <AMReX_Random.H>
 #include <AMReX_Scan.H>
 
@@ -205,6 +209,7 @@ template <typename T_index>
 void StandardShuffle (int n_cells, T_index const * cell_offsets, T_index *indices)
 {
 #ifdef AMREX_USE_GPU
+    amrex::ignore_unused(n_cells, cell_offsets, indices);
     WARPX_ABORT_WITH_MESSAGE("Standard shuffle not supported on GPU");
 #else
     std::random_device rd;
