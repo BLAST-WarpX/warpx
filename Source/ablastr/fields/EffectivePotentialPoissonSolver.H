@@ -123,7 +123,7 @@ computeEffectivePotentialPhi (
 ) {
     using namespace amrex::literals;
 
-    ABLASTR_PROFILE("computeEffectivePotentialPhi");
+    ABLASTR_PROFILE("computeEffectivePotentialPhi", ablastr::profiler::WhenToProfile::Always);
 
     if (!rel_ref_ratio.has_value()) {
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(rho.size() == 1u,

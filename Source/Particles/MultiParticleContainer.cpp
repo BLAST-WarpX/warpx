@@ -1036,7 +1036,7 @@ MultiParticleContainer::doFieldIonization (int lev,
                                            const MultiFab& By,
                                            const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
+    WARPX_PROFILE("MultiParticleContainer::doFieldIonization()", ablastr::profiler::WhenToProfile::Always);
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1096,7 +1096,7 @@ MultiParticleContainer::doFieldIonization (int lev,
 void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
-    WARPX_PROFILE("MultiParticleContainer::doCollisions()");
+    WARPX_PROFILE("MultiParticleContainer::doCollisions()", ablastr::profiler::WhenToProfile::Always);
     collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
@@ -1470,7 +1470,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 void
 MultiParticleContainer::doQEDSchwinger ()
 {
-    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
+    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()", ablastr::profiler::WhenToProfile::Always);
 
     if (!m_do_qed_schwinger) {return;}
 
@@ -1646,7 +1646,7 @@ void MultiParticleContainer::doQedEvents (int lev,
                                           const MultiFab& By,
                                           const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedEvents()");
+    WARPX_PROFILE("MultiParticleContainer::doQedEvents()", ablastr::profiler::WhenToProfile::Always);
 
     doQedBreitWheeler(lev, Ex, Ey, Ez, Bx, By, Bz);
     doQedQuantumSync(lev, Ex, Ey, Ez, Bx, By, Bz);
@@ -1660,7 +1660,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
                                                 const MultiFab& By,
                                                 const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
+    WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()", ablastr::profiler::WhenToProfile::Always);
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1743,7 +1743,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
                                                const MultiFab& By,
                                                const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
+    WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()", ablastr::profiler::WhenToProfile::Always);
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 

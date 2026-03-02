@@ -36,7 +36,7 @@ void RelativisticExplicitES::ComputeSpaceChargeField (
     [[maybe_unused]] MultiFluidContainer* mfl,
     int max_level)
 {
-    WARPX_PROFILE("RelativisticExplicitES::ComputeSpaceChargeField");
+    WARPX_PROFILE("RelativisticExplicitES::ComputeSpaceChargeField", ablastr::profiler::WhenToProfile::Always);
 
     using ablastr::fields::MultiLevelVectorField;
     using warpx::fields::FieldType;
@@ -67,7 +67,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
     ablastr::fields::MultiLevelVectorField& Efield_fp,
     ablastr::fields::MultiLevelVectorField& Bfield_fp)
 {
-    WARPX_PROFILE("RelativisticExplicitES::AddSpaceChargeField");
+    WARPX_PROFILE("RelativisticExplicitES::AddSpaceChargeField", ablastr::profiler::WhenToProfile::Always);
 
     if (pc.getCharge() == 0) { return; }
 
@@ -140,7 +140,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
 
 void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVectorField& Efield_fp)
 {
-    WARPX_PROFILE("RelativisticExplicitES::AddBoundaryField");
+    WARPX_PROFILE("RelativisticExplicitES::AddBoundaryField", ablastr::profiler::WhenToProfile::Always);
 
     auto & warpx = WarpX::GetInstance();
 

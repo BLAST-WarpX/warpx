@@ -424,7 +424,7 @@ void
 PsatdAlgorithmRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
 {
     // Profiling
-    WARPX_PROFILE( "PsatdAlgorithmRZ::CurrentCorrection" );
+    WARPX_PROFILE( "PsatdAlgorithmRZ::CurrentCorrection" , ablastr::profiler::WhenToProfile::Always);
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 

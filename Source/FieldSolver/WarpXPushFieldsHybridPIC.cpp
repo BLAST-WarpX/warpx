@@ -27,7 +27,7 @@ void WarpX::HybridPICEvolveFields ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::HybridPICEvolveFields()");
+    WARPX_PROFILE("WarpX::HybridPICEvolveFields()", ablastr::profiler::WhenToProfile::Always);
 
     // The below deposition is hard coded for a single level simulation
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -348,7 +348,7 @@ void WarpX::HybridPICInitializeRhoJandB ()
 
 void
 WarpX::CalculateExternalCurlA() {
-    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
+    WARPX_PROFILE("WarpX::CalculateExternalCurlA()", ablastr::profiler::WhenToProfile::Always);
 
     auto & warpx = WarpX::GetInstance();
 

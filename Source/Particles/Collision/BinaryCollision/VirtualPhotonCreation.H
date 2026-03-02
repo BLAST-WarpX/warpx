@@ -52,7 +52,7 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
-    WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
+    WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()", ablastr::profiler::WhenToProfile::Always);
 
     // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {

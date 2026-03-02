@@ -84,7 +84,7 @@ namespace
         const bool PMLRZ_flag = false)
     {
         using namespace amrex::literals;
-        WARPX_PROFILE("warpx::shiftMF()");
+        WARPX_PROFILE("warpx::shiftMF()", ablastr::profiler::WhenToProfile::Always);
         const amrex::BoxArray& ba = mf.boxArray();
         const amrex::DistributionMapping& dm = mf.DistributionMap();
         const int nc = mf.nComp();
@@ -356,7 +356,7 @@ namespace
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
-    WARPX_PROFILE("WarpX::MoveWindow");
+    WARPX_PROFILE("WarpX::MoveWindow", ablastr::profiler::WhenToProfile::Always);
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;

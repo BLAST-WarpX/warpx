@@ -651,7 +651,7 @@ Diagnostics::ComputeAndPack ()
 void
 Diagnostics::FilterComputePackFlush (int step, bool force_flush)
 {
-    WARPX_PROFILE("Diagnostics::FilterComputePackFlush()");
+    WARPX_PROFILE("Diagnostics::FilterComputePackFlush()", ablastr::profiler::WhenToProfile::Always);
     MovingWindowAndGalileanDomainShift (step);
 
     if ( DoComputeAndPack (step, force_flush) ) {

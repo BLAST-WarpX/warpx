@@ -79,7 +79,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Geometry& /*full_BTD_snapshot*/,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
+    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()", ablastr::profiler::WhenToProfile::Always);
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {

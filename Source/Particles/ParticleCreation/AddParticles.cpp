@@ -194,7 +194,7 @@ namespace
 void
 PhysicalParticleContainer::AddParticles (int lev)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddParticles()");
+    WARPX_PROFILE("PhysicalParticleContainer::AddParticles()", ablastr::profiler::WhenToProfile::Always);
 
     for (auto const& plasma_injector : plasma_injectors) {
 
@@ -745,7 +745,7 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 void
 PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddPlasma()");
+    WARPX_PROFILE("PhysicalParticleContainer::AddPlasma()", ablastr::profiler::WhenToProfile::Always);
 
     // If no part_realbox is provided, initialize particles in the whole domain
     const Geometry& geom = Geom(lev);
@@ -1238,7 +1238,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 void
 PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()");
+    WARPX_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()", ablastr::profiler::WhenToProfile::Always);
 
     const Geometry& geom = Geom(0);
     const amrex::RealBox& part_realbox = geom.ProbDomain();

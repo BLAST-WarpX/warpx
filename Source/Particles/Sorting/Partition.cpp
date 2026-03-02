@@ -58,7 +58,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     iMultiFab const* current_masks,
     iMultiFab const* gather_masks )
 {
-    WARPX_PROFILE("PhysicalParticleContainer::PartitionParticlesInBuffers");
+    WARPX_PROFILE("PhysicalParticleContainer::PartitionParticlesInBuffers", ablastr::profiler::WhenToProfile::Always);
 
     // Initialize temporary arrays
     Gpu::DeviceVector<int> inexflag;

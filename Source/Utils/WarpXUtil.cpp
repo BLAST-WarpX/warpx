@@ -255,7 +255,7 @@ void NullifyMF (
     amrex::Real zmax
 )
 {
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    WARPX_PROFILE("WarpXUtil::NullifyMF()", ablastr::profiler::WhenToProfile::Always);
     if (!multifab_map.has(mf_name, lev)) { return; }
 
     auto * mf = multifab_map.get(mf_name, lev);
@@ -272,7 +272,7 @@ void NullifyMF (
     amrex::Real zmax
 )
 {
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    WARPX_PROFILE("WarpXUtil::NullifyMF()", ablastr::profiler::WhenToProfile::Always);
     if (!multifab_map.has(mf_name, dir, lev)) { return; }
 
     auto * mf = multifab_map.get(mf_name, dir, lev);
