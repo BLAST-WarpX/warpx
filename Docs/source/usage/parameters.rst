@@ -1447,17 +1447,17 @@ Particle initialization
     following required parameter must be specified to initialize the attribute.
 
     * ``<species_name>.attribute.<int_attrib_name>(x,y,z,ux,uy,uz,t)`` (`string`)
-    ``t`` represents the physical time in seconds during the simulation.
-    ``x``, ``y``, ``z`` represent particle positions in the unit of meter.
-    ``ux``, ``uy``, ``uz`` represent the particle momenta in the unit of
-    :math:`\gamma v/c`, where
-    :math:`\gamma` is the Lorentz factor,
-    :math:`v/c` is the particle velocity normalized by the speed of light.
-    E.g. If ``electrons.addIntegerAttributes = upstream``
-    and ``electrons.upstream(x,y,z,ux,uy,uz,t) = (x>0.0)*1`` is provided
-    then, an integer attribute ``upstream`` is added to all electron particles
-    and when these particles are generated, the particles with position less than ``0``
-    are assigned a value of ``1``.
+        ``t`` represents the physical time in seconds during the simulation.
+        ``x``, ``y``, ``z`` represent particle positions in the unit of meter.
+        ``ux``, ``uy``, ``uz`` represent the particle momenta in the unit of
+        :math:`\gamma v/c`, where
+        :math:`\gamma` is the Lorentz factor,
+        :math:`v/c` is the particle velocity normalized by the speed of light.
+        E.g. If ``electrons.addIntegerAttributes = upstream``
+        and ``electrons.upstream(x,y,z,ux,uy,uz,t) = (x>0.0)*1`` is provided
+        then, an integer attribute ``upstream`` is added to all electron particles
+        and when these particles are generated, the particles with position less than ``0``
+        are assigned a value of ``1``.
 
 * ``<species_name>.addRealAttributes`` (list of `string`)
     User-defined real particle attribute for species, ``species_name``.
