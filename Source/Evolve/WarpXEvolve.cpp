@@ -134,7 +134,8 @@ WarpX::SynchronizeVelocityWithPosition () {
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = true;
@@ -397,30 +398,27 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // with collisions placed in the middle of the position push and after the momentum push
-            if (m_collisions_split_position_push) {
-                // push particles (half position and full momentum)
+            // with collisions placed in the middle of the momentum push
+            if (m_collisions_split_momentum_push) {
+                // push particles (half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::FirstHalf,
-                    MomentumPushType::Full
+                    PositionPushType::None,
+                    MomentumPushType::FirstHalf
                 );
-
-                // communicate particle data
-                mypc->Redistribute();
 
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::SecondHalf,
-                    MomentumPushType::None
+                    PositionPushType::Full,
+                    MomentumPushType::SecondHalf
                 );
             }
             // with collisions placed before the position and momentum push, or without collisions
@@ -430,7 +428,7 @@ void WarpX::OneStep (
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and full momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
@@ -622,7 +620,8 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = false;
