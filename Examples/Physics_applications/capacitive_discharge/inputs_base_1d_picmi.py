@@ -350,7 +350,7 @@ class CapacitiveDischargeExample(object):
             time_step_size=self.dt,
             max_steps=self.max_steps,
             warpx_collisions=electron_colls + ion_colls,
-            warpx_collisions_split_momentum_push=1,
+            warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
         self.solver.sim = self.sim
