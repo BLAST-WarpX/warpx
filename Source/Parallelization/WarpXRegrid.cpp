@@ -73,8 +73,8 @@ WarpX::CheckLoadBalance (int step)
 void
 WarpX::LoadBalance ()
 {
-    WARPX_PROFILE_REGION("LoadBalance");
-    WARPX_PROFILE("WarpX::LoadBalance()");
+    ABLASTR_PROFILE_REGION("LoadBalance");
+    ABLASTR_PROFILE("WarpX::LoadBalance()");
 
     AMREX_ALWAYS_ASSERT(!costs.empty());
     AMREX_ALWAYS_ASSERT(costs[0] != nullptr);

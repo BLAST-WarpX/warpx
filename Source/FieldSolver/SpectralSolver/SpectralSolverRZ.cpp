@@ -83,7 +83,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf, int const field_index,
                                     int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -94,7 +94,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf1, int const field_index1,
                                     amrex::MultiFab const & field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev,
                                 field_mf1, field_index1,
                                 field_mf2, field_index2);
@@ -106,7 +106,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf, int const field_index,
                                      int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -116,7 +116,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf1, int const field_index1,
                                      amrex::MultiFab& field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev,
                                  field_mf1, field_index1,
                                  field_mf2, field_index2);
@@ -125,7 +125,7 @@ SpectralSolverRZ::BackwardTransform (const int lev,
 /* \brief Update the fields in spectral space, over one timestep */
 void
 SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
-    WARPX_PROFILE("SpectralSolverRZ::pushSpectralFields");
+    ABLASTR_PROFILE("SpectralSolverRZ::pushSpectralFields");
     // Virtual function: the actual function used here depends
     // on the sub-class of `SpectralBaseAlgorithm` that was
     // initialized in the constructor of `SpectralSolverRZ`

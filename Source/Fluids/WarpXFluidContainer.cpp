@@ -173,7 +173,7 @@ void WarpXFluidContainer::InitData(
     const amrex::Geometry& geom_lev, const amrex::Real gamma_boost, const amrex::Real beta_boost)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::InitData");
+    ABLASTR_PROFILE("WarpXFluidContainer::InitData");
 
     // Convert initialization box to nodal box
     init_box.surroundingNodes();
@@ -292,7 +292,7 @@ void WarpXFluidContainer::Evolve(
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpXFluidContainer::Evolve");
+    ABLASTR_PROFILE("WarpXFluidContainer::Evolve");
 
     if (fields.has(FieldType::rho_fp,lev) && ! skip_deposition && ! do_not_deposit) {
         // Deposit charge before particle push, in component 0 of MultiFab rho.
@@ -345,7 +345,7 @@ void WarpXFluidContainer::Evolve(
 void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegister& fields, int lev)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::ApplyBcFluidsAndComms");
+    ABLASTR_PROFILE("WarpXFluidContainer::ApplyBcFluidsAndComms");
 
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
@@ -447,7 +447,7 @@ void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegist
 void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister& fields, int lev)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::AdvectivePush_Muscl");
+    ABLASTR_PROFILE("WarpXFluidContainer::AdvectivePush_Muscl");
 
     // Grab the grid spacing
     WarpX &warpx = WarpX::GetInstance();
@@ -1043,7 +1043,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 void WarpXFluidContainer::centrifugal_source_rz (ablastr::fields::MultiFabRegister& fields, int lev)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::centrifugal_source_rz");
+    ABLASTR_PROFILE("WarpXFluidContainer::centrifugal_source_rz");
 
     WarpX &warpx = WarpX::GetInstance();
     const Real dt = warpx.getdt(lev);
@@ -1117,7 +1117,7 @@ void WarpXFluidContainer::GatherAndPush (
     int lev)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::GatherAndPush");
+    ABLASTR_PROFILE("WarpXFluidContainer::GatherAndPush");
 
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Real q = getCharge();
@@ -1396,7 +1396,7 @@ void WarpXFluidContainer::GatherAndPush (
 
 void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fields, amrex::MultiFab &rho, int lev, int icomp)
 {
-    WARPX_PROFILE("WarpXFluidContainer::DepositCharge");
+    ABLASTR_PROFILE("WarpXFluidContainer::DepositCharge");
 
     WarpX &warpx = WarpX::GetInstance();
     const amrex::Geometry &geom = warpx.Geom(lev);
@@ -1436,7 +1436,7 @@ void WarpXFluidContainer::DepositCurrent(
     int lev)
 {
     using ablastr::fields::Direction;
-    WARPX_PROFILE("WarpXFluidContainer::DepositCurrent");
+    ABLASTR_PROFILE("WarpXFluidContainer::DepositCurrent");
 
     // Temporary nodal currents
     amrex::MultiFab tmp_jx_fluid(fields.get(name_mf_N, lev)->boxArray(), fields.get(name_mf_N, lev)->DistributionMap(), 1, 0);

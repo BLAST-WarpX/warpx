@@ -123,7 +123,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     amrex::ignore_unused(step);
 #else
-    WARPX_PROFILE("DifferentialLuminosity::ComputeDiags");
+    ABLASTR_PROFILE("DifferentialLuminosity::ComputeDiags");
 
     using namespace amrex;
     using ParticleTileType = WarpXParticleContainer::ParticleTileType;
