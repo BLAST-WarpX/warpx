@@ -52,7 +52,6 @@ namespace ablastr::profiler
     inline bool should_profile (When w)
     {
         if (w == Always) {
-#ifdef AMREX_USE_GPU
             if (amrex::MFIter::currentDepth() > 0 && !is_sync_enabled()) {
                 ablastr::warn_manager::WMRecordWarning(
                     "Performance",
@@ -60,7 +59,6 @@ namespace ablastr::profiler
                     "without device synchronization; timings may be inaccurate.",
                     ablastr::warn_manager::WarnPriority::high);
             }
-#endif
             return true;
         }
         return is_sync_enabled();
