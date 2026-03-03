@@ -33,8 +33,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -145,8 +145,8 @@ WarpX::SynchronizeVelocityWithPosition () {
 void
 WarpX::Evolve (int numsteps)
 {
-    WARPX_PROFILE_REGION("WarpX::Evolve()");
-    WARPX_PROFILE("WarpX::Evolve()");
+    ABLASTR_PROFILE_REGION("WarpX::Evolve()");
+    ABLASTR_PROFILE("WarpX::Evolve()");
 
     using ablastr::fields::Direction;
 
@@ -163,7 +163,7 @@ WarpX::Evolve (int numsteps)
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
-        WARPX_PROFILE("WarpX::Evolve::step");
+        ABLASTR_PROFILE("WarpX::Evolve::step");
         const auto evolve_time_beg_step = static_cast<Real>(amrex::second());
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
@@ -386,7 +386,7 @@ void WarpX::OneStep (
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStep()");
+    ABLASTR_PROFILE("WarpX::OneStep()");
 
     // implicit solver
     if (m_implicit_solver) {
@@ -482,7 +482,7 @@ void WarpX::OneStep (
 void
 WarpX::OneStep_nosub (Real cur_time)
 {
-    WARPX_PROFILE("WarpX::OneStep_nosub()");
+    ABLASTR_PROFILE("WarpX::OneStep_nosub()");
 
     // Push particle from x^{n} to x^{n+1}
     //               from p^{n-1/2} to p^{n+1/2}
