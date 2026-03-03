@@ -1,7 +1,7 @@
 {
     "version_warpx": "26.03",
-    "version_amrex": "26.02",
-    "version_pyamrex": "26.02",
+"version_amrex": "26.03",
+"version_pyamrex": "26.03",
     "version_picsar": "25.06",
     "version_pybind11": "v3.0.2",
     "version_picmi": "0.34.0",
