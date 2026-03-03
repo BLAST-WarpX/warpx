@@ -1691,6 +1691,7 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
+
 class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
     """
     Sets up the "theta implicit" hybrid-PIC evolve scheme
@@ -1714,6 +1715,7 @@ class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
         implicit_evolve.theta = self.theta
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
 
 class PicardNonlinearSolver(picmistandard.base._ClassWithInit):
     """
