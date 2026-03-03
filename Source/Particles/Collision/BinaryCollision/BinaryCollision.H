@@ -108,6 +108,7 @@ public:
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
+        m_shuffling_method = ParticleShufflingMethod::Default;
         pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
 
         if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
