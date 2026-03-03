@@ -1599,7 +1599,7 @@ private:
      *        or before both the position and momentum push. The default value
      *        is set in WarpX::ReadParameters().
      */
-    bool m_collisions_split_position_push;
+    bool m_collisions_split_momentum_push;
 };
 
 #endif

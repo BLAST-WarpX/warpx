@@ -17,7 +17,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
@@ -44,6 +43,7 @@
 #include <AMReX_Tuple.H>
 #include <AMReX_Vector.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <algorithm>

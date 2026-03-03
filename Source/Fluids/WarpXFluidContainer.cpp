@@ -6,7 +6,6 @@
  */
 #include "Fields.H"
 #include "Particles/Pusher/UpdateMomentumHigueraCary.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include "MusclHancockUtils.H"
 #include "Fluids/WarpXFluidContainer.H"
@@ -16,6 +15,7 @@
 #include "WarpX.H"
 
 #include <ablastr/coarsen/sample.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 using namespace ablastr::utils::communication;

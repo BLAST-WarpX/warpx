@@ -206,9 +206,7 @@ public:
                                                         p_pair_indices_1[i], p_pair_indices_2[i],
                                                         product_start_index, m1, m2, engine);
                 }
-                else if ((t_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion)
-                      || (t_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
-                      || (t_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion))
+                else if (BinaryCollisionUtils::is_two_product_fusion_type(t_collision_type))
                 {
                     const amrex::ParticleReal mass_before = m1 + m2;
                     const amrex::ParticleReal mass_after = products_mass_data[0] + products_mass_data[1];

@@ -10,7 +10,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 
-#include "Utils/WarpXProfilerWrapper.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <blas.hh>
 #include <lapack.hh>

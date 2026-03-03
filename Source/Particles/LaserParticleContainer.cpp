@@ -17,9 +17,9 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -783,7 +783,8 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
 void
 LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
-                               const MultiFab&, const MultiFab&, const MultiFab&)
+                               const MultiFab&, const MultiFab&, const MultiFab&,
+                               MomentumPushType /*momentum_push_type*/)
 {
     // I don't think we need to do anything.
 }

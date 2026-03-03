@@ -24,10 +24,10 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpXPushFieldsEM_K.H"
 #include "WarpX_FDTD.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>

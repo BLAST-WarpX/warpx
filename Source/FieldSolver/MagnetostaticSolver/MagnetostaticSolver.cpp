@@ -17,10 +17,10 @@
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXUtil.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Parallelization/WarpXComm_K.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/VectorPoissonSolver.H>

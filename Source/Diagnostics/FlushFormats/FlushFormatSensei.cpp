@@ -1,6 +1,6 @@
-#include "Utils/WarpXProfilerWrapper.H"
 #include "FlushFormatSensei.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 # include <AMReX_AmrMeshParticleInSituBridge.H>
 #endif

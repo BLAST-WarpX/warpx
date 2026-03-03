@@ -10,11 +10,11 @@
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 
 #include <ablastr/particles/NodalFieldGather.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>

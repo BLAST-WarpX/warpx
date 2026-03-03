@@ -14,10 +14,10 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "PML_current.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX_PML_kernels.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>

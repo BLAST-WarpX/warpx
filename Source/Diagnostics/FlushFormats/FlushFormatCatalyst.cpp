@@ -2,8 +2,8 @@
 
 #include "WarpX.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>

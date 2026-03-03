@@ -34,12 +34,12 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
 #include <ablastr/warn_manager/WarnManager.H>
