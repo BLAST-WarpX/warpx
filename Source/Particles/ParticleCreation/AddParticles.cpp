@@ -19,7 +19,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "Utils/WarpXConst.H"
 #include "EmbeddedBoundary/Enabled.H"
 #ifdef AMREX_USE_EB
@@ -28,6 +27,7 @@
 #endif
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/utils/Communication.H>
 

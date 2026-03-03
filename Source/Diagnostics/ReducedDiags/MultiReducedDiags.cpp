@@ -28,8 +28,8 @@
 #include "RhoMaximum.H"
 #include "Timestep.H"
 #include "Utils/TextMsg.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>

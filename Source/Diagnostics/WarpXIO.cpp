@@ -25,9 +25,9 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/text/StreamUtils.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU

@@ -15,8 +15,8 @@
 #include "SpectralSolver.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Enums.H>
 
 #include <memory>

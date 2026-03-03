@@ -7,8 +7,8 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SortingUtils.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuDevice.H>
 #include <AMReX_GpuLaunch.H>

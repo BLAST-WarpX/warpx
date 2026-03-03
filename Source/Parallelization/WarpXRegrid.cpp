@@ -20,9 +20,9 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_BLassert.H>

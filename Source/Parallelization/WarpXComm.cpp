@@ -16,13 +16,13 @@
 #include "Filter/BilinearFilter.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
 #include "Particles/MultiParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/average.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>

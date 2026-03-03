@@ -13,10 +13,10 @@
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/RelativeCellPosition.H>
 #include <ablastr/warn_manager/WarnManager.H>
 

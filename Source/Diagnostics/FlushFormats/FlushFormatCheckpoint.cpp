@@ -9,10 +9,10 @@
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParticleIO.H>

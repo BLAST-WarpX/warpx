@@ -9,8 +9,8 @@
 #include "WarpX.H"
 
 #include "Initialization/WarpXInit.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/timer/Timer.H>
 
 #include <AMReX_Print.H>

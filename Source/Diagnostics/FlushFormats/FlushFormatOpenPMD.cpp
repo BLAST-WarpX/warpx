@@ -1,10 +1,10 @@
 #include "FlushFormatOpenPMD.H"
 
 #include "Utils/TextMsg.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "Diagnostics/OpenPMDHelpFunction.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>

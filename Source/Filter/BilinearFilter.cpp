@@ -8,7 +8,6 @@
 #include "BilinearFilter.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
-
 #include <AMReX_Config.H>
 #include <AMReX_Dim3.H>
 #include <AMReX_GpuContainers.H>

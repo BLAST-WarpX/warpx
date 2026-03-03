@@ -8,9 +8,9 @@
 #include "Filter.H"
 
 #include "Utils/TextMsg.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>

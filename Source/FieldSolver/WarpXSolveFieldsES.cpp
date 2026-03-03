@@ -9,9 +9,9 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 
 #include "Fields.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 void WarpX::ComputeSpaceChargeField (bool const reset_fields)
 {

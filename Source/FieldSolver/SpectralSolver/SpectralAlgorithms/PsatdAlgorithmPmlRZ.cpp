@@ -8,9 +8,9 @@
 #include "FieldSolver/SpectralSolver/SpectralHankelTransform/HankelTransform.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <cmath>
 
 using namespace amrex::literals;

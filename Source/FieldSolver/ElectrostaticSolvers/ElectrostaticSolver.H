@@ -12,8 +12,8 @@
 #include "PoissonBoundaryHandler.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
-#include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array.H>
 
 
