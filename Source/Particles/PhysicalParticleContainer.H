@@ -191,7 +191,6 @@ public:
                         const amrex::MultiFab& Bz,
                         MomentumPushType momentum_push_type) override;
 
-
     void PartitionParticlesInBuffers (
                         long& nfine_current,
                         long& nfine_gather,
