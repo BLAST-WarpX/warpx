@@ -83,7 +83,6 @@ public:
                         const amrex::MultiFab& /*Bz*/,
                         MomentumPushType /*momentum_push_type*/) override {}
 
-
     // DepositCharge should do nothing for photons
     void DepositCharge (WarpXParIter& /*pti*/,
                                 RealVector const & /*wp*/,
