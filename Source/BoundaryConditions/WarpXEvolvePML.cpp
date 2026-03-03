@@ -14,10 +14,10 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "PML_current.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX_PML_kernels.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -62,7 +62,7 @@ WarpX::DampPML (const int lev, PatchType patch_type)
 {
     if (!do_pml) { return; }
 
-    WARPX_PROFILE("WarpX::DampPML()");
+    ABLASTR_PROFILE("WarpX::DampPML()");
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     if (pml_rz[lev]) {
         using ablastr::fields::Direction;
@@ -253,7 +253,7 @@ WarpX::DampJPML (int lev, PatchType patch_type)
     if (!do_pml_j_damping) { return; }
     if (!pml[lev]) { return; }
 
-    WARPX_PROFILE("WarpX::DampJPML()");
+    ABLASTR_PROFILE("WarpX::DampJPML()");
 
     if (pml[lev]->ok())
     {

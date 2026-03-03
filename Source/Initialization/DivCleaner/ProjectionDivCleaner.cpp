@@ -24,8 +24,8 @@
 #endif
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
-#include <Utils/WarpXProfilerWrapper.H>
 
 #include <map>
 
@@ -395,7 +395,7 @@ ProjectionDivCleaner::correctField ()
 
 void
 WarpX::ProjectionCleanDivB() {
-    WARPX_PROFILE("WarpX::ProjectionDivCleanB()");
+    ABLASTR_PROFILE("WarpX::ProjectionDivCleanB()");
 
     if ( (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC

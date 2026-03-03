@@ -9,9 +9,9 @@
 #include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX_QED_K.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -59,7 +59,7 @@ WarpX::Hybrid_QED_Push (amrex::Vector<amrex::Real> a_dt)
 void
 WarpX::Hybrid_QED_Push (int lev, amrex::Real a_dt)
 {
-    WARPX_PROFILE("WarpX::Hybrid_QED_Push()");
+    ABLASTR_PROFILE("WarpX::Hybrid_QED_Push()");
     Hybrid_QED_Push(lev, PatchType::fine, a_dt);
     if (lev > 0)
     {

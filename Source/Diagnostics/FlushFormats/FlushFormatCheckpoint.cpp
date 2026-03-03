@@ -9,10 +9,10 @@
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParticleIO.H>
@@ -57,7 +57,7 @@ FlushFormatCheckpoint::WriteToFile (
     using ablastr::fields::Direction;
     using WARPX_UNITY_ID::default_level_prefix;
 
-    WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
     auto & warpx = WarpX::GetInstance();
 

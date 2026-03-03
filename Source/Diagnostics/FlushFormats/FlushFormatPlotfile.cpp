@@ -10,10 +10,10 @@
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_Box.H>
@@ -79,7 +79,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Geometry& /*full_BTD_snapshot*/,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {

@@ -11,10 +11,10 @@
 #include "TextMsg.H"
 #include "WarpXAlgorithmSelection.H"
 #include "WarpXConst.H"
-#include "WarpXProfilerWrapper.H"
 #include "WarpXUtil.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -255,7 +255,7 @@ void NullifyMF (
     amrex::Real zmax
 )
 {
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    ABLASTR_PROFILE("WarpXUtil::NullifyMF()");
     if (!multifab_map.has(mf_name, lev)) { return; }
 
     auto * mf = multifab_map.get(mf_name, lev);
@@ -272,7 +272,7 @@ void NullifyMF (
     amrex::Real zmax
 )
 {
-    WARPX_PROFILE("WarpXUtil::NullifyMF()");
+    ABLASTR_PROFILE("WarpXUtil::NullifyMF()");
     if (!multifab_map.has(mf_name, dir, lev)) { return; }
 
     auto * mf = multifab_map.get(mf_name, dir, lev);
