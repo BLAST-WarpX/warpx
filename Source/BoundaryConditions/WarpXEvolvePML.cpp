@@ -62,7 +62,7 @@ WarpX::DampPML (const int lev, PatchType patch_type)
 {
     if (!do_pml) { return; }
 
-    WARPX_PROFILE("WarpX::DampPML()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpX::DampPML()");
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     if (pml_rz[lev]) {
         using ablastr::fields::Direction;
@@ -253,7 +253,7 @@ WarpX::DampJPML (int lev, PatchType patch_type)
     if (!do_pml_j_damping) { return; }
     if (!pml[lev]) { return; }
 
-    WARPX_PROFILE("WarpX::DampJPML()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpX::DampJPML()");
 
     if (pml[lev]->ok())
     {

@@ -39,7 +39,7 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     [[maybe_unused]] MultiFluidContainer* mfl,
     int max_level)
 {
-    WARPX_PROFILE("EffectivePotentialES::ComputeSpaceChargeField", ablastr::profiler::Always);
+    WARPX_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
 
     using ablastr::fields::MultiLevelScalarField;
     using ablastr::fields::MultiLevelVectorField;

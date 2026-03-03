@@ -24,7 +24,7 @@ HankelTransform::HankelTransform (int const hankel_order,
 : m_nr(nr), m_nk(nr)
 {
 
-    WARPX_PROFILE("HankelTransform::HankelTransform", ablastr::profiler::Always);
+    WARPX_PROFILE("HankelTransform::HankelTransform");
 
     // Check that azimuthal_mode has a valid value
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(hankel_order-1 <= azimuthal_mode && azimuthal_mode <= hankel_order+1,
@@ -194,7 +194,7 @@ void
 HankelTransform::HankelForwardTransform (amrex::FArrayBox const& F, int const F_icomp,
                                          amrex::FArrayBox      & G, int const G_icomp)
 {
-    WARPX_PROFILE("HankelTransform::HankelForwardTransform", ablastr::profiler::Always);
+    WARPX_PROFILE("HankelTransform::HankelForwardTransform");
 
     amrex::Box const& F_box = F.box();
     amrex::Box const& G_box = G.box();
@@ -233,7 +233,7 @@ void
 HankelTransform::HankelInverseTransform (amrex::FArrayBox const& G, int const G_icomp,
                                          amrex::FArrayBox      & F, int const F_icomp)
 {
-    WARPX_PROFILE("HankelTransform::HankelInverseTransform", ablastr::profiler::Always);
+    WARPX_PROFILE("HankelTransform::HankelInverseTransform");
 
     amrex::Box const& G_box = G.box();
     amrex::Box const& F_box = F.box();

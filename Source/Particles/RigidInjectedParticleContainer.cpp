@@ -316,7 +316,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
 {
-    WARPX_PROFILE("RigidInjectedParticleContainer::PushP", ablastr::profiler::Always);
+    WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
 
     if (do_not_push) { return; }
 

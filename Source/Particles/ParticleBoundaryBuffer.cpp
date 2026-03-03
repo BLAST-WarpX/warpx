@@ -387,7 +387,7 @@ void ParticleBoundaryBuffer::clearParticles (int const i) {
 
 void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time)
 {
-    WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles", ablastr::profiler::Always);
+    WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles");
 
     using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
     const auto& warpx_instance = WarpX::GetInstance();
@@ -501,7 +501,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
     MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb, amrex::Real cur_time)
 {
     if (EB::enabled()) {
-        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB", ablastr::profiler::Always);
+        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB");
 
 
         using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;

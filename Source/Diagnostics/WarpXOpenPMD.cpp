@@ -411,10 +411,10 @@ void WarpXOpenPMDPlot::seriesFlush (bool isBTD) const
 {
     openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
     if (isBTD) {
-        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD");
         currIteration.seriesFlush("adios2.engine.preferred_flush_target = \"buffer\"");
     } else {
-        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()");
         currIteration.seriesFlush();
     }
 }
@@ -466,7 +466,7 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
 
 void WarpXOpenPMDPlot::CloseStep (bool isBTD, bool isLastBTDFlush)
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::CloseStep()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpXOpenPMDPlot::CloseStep()");
     // default close is true
     bool callClose = true;
     // close BTD file only when isLastBTDFlush is true
@@ -547,7 +547,7 @@ WarpXOpenPMDPlot::WriteOpenPMDParticles (const amrex::Vector<ParticleDiag>& part
                   const bool isLastBTDFlush
 )
 {
-WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()", ablastr::profiler::Always);
+WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
 for (const auto & particle_diag : particle_diags) {
     WarpXParticleContainer* pc = particle_diag.getParticleContainer();
@@ -682,7 +682,7 @@ WarpXOpenPMDPlot::FlushBTDToDisk()
 
     if (flattenSteps)
     {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
         // Here for checkpointing purpose, we ask ADIOS to create to a new step, which
         // triggers writting both data and metadata.
         openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
@@ -690,7 +690,7 @@ WarpXOpenPMDPlot::FlushBTDToDisk()
     }
     else
       {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()::Disk()", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()::Disk()");
         openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
         currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "disk")");
       }
@@ -711,7 +711,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                     const bool isLastBTDFlush
 )
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::DumpToFile()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpXOpenPMDPlot::DumpToFile()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD: series must be initialized");
 
     AMREX_ALWAYS_ASSERT(write_real_comp.size() == pc->NumRealComps());
@@ -811,7 +811,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
     //   BP4 (ADIOS 2.8): last MPI rank's `Put` meta-data wins
     //   BP5 (ADIOS 2.8): everyone has to write an empty block
     if (is_resizing_flush && !contributed_particles && isBTD && m_Series->backend() == "ADIOS2") {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()");
         for( auto & [record_name, record] : currSpecies ) {
             for( auto & [comp_name, comp] : record ) {
                 if (comp.constant()) { continue; }
@@ -1421,7 +1421,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                       const amrex::Geometry& full_BTD_snapshot ) const
 {
     //This is AMReX's tiny profiler. Possibly will apply it later
-    WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD series must be initialized");
 
@@ -1599,7 +1599,7 @@ WarpXParticleCounter::WarpXParticleCounter (ParticleContainer* pc):
     m_MPIRank{amrex::ParallelDescriptor::MyProc()},
     m_MPISize{amrex::ParallelDescriptor::NProcs()}
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::ParticleCounter()", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpXOpenPMDPlot::ParticleCounter()");
     m_ParticleCounterByLevel.resize(pc->finestLevel()+1);
     m_ParticleOffsetAtRank.resize(pc->finestLevel()+1);
     m_ParticleSizeAtRank.resize(pc->finestLevel()+1);

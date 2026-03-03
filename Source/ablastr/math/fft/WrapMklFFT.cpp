@@ -24,7 +24,7 @@ namespace ablastr::math::anyfft
                         Complex * const complex_array, const direction dir, const int dim)
     {
         FFTplan fft_plan;
-        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan", ablastr::profiler::Always);
+        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan");
 
         // Initialize fft_plan.m_plan with the vendor fft plan.
         std::vector<std::int64_t> strides(dim+1);

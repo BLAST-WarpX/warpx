@@ -61,7 +61,7 @@ using namespace amrex;
 void
 WarpX::ComputeMagnetostaticField()
 {
-    WARPX_PROFILE("WarpX::ComputeMagnetostaticField", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpX::ComputeMagnetostaticField");
     // Fields have been reset in Electrostatic solver for this time step, these fields
     // are added into the B fields after electrostatic solve
 
@@ -77,7 +77,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::AddMagnetostaticFieldLabFrame", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpX::AddMagnetostaticFieldLabFrame");
 
     // Store the boundary conditions for the field solver if they haven't been
     // stored yet

@@ -117,7 +117,7 @@ void MultiReducedDiags::LoadBalance () {
 // call functions to compute diags
 void MultiReducedDiags::ComputeDiags (int step)
 {
-    WARPX_PROFILE("MultiReducedDiags::ComputeDiags()", ablastr::profiler::Always);
+    WARPX_PROFILE("MultiReducedDiags::ComputeDiags()");
 
     // loop over all reduced diags
     for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
@@ -131,7 +131,7 @@ void MultiReducedDiags::ComputeDiags (int step)
 // call functions to compute diags at the mid step time level
 void MultiReducedDiags::ComputeDiagsMidStep (int step)
 {
-    WARPX_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()", ablastr::profiler::Always);
+    WARPX_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
 
     // loop over all reduced diags
     for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)

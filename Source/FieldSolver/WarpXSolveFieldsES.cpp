@@ -15,13 +15,13 @@
 
 void WarpX::ComputeSpaceChargeField (bool const reset_fields)
 {
-    WARPX_PROFILE("WarpX::ComputeSpaceChargeField", ablastr::profiler::Always);
+    WARPX_PROFILE("WarpX::ComputeSpaceChargeField");
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     if (reset_fields) {
         // Reset all E and B fields to 0, before calculating space-charge fields
-        WARPX_PROFILE("WarpX::ComputeSpaceChargeField::reset_fields", ablastr::profiler::Always);
+        WARPX_PROFILE("WarpX::ComputeSpaceChargeField::reset_fields");
         for (int lev = 0; lev <= max_level; lev++) {
             for (int comp=0; comp<3; comp++) {
                 m_fields.get(FieldType::Efield_fp, Direction{comp}, lev)->setVal(0);
