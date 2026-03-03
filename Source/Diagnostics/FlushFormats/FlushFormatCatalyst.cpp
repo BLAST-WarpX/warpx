@@ -136,7 +136,7 @@ FlushFormatCatalyst::WriteToFile (
 #ifdef AMREX_USE_CATALYST
     amrex::Print() << Utils::TextMsg::Info("Running Catalyst pipeline scripts...");
 
-    WARPX_PROFILE("FlushFormatCatalyst::WriteToFile()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("FlushFormatCatalyst::WriteToFile()", ablastr::profiler::Always);
     auto & warpx = WarpX::GetInstance();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -144,7 +144,7 @@ FlushFormatCatalyst::WriteToFile (
         "In-situ visualization is not currently supported for back-transformed diagnostics.");
 
     // Mesh data
-    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::MultiLevelToBlueprint", prof_catalyst_mesh_blueprint, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::MultiLevelToBlueprint", prof_catalyst_mesh_blueprint, ablastr::profiler::Always);
     conduit::Node node;
     auto & state = node["catalyst/state"];
     state["timestep"].set(iteration[0]);
@@ -159,7 +159,7 @@ FlushFormatCatalyst::WriteToFile (
     WARPX_PROFILE_VAR_STOP(prof_catalyst_mesh_blueprint);
 
     // Particle data
-    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::WriteParticles", prof_catalyst_particles, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::WriteParticles", prof_catalyst_particles, ablastr::profiler::Always);
     auto& particleChannel = node["catalyst/channels/particles"];
     particleChannel["type"].set_string("multimesh");
     auto& particleData = particleChannel["data"];
@@ -175,7 +175,7 @@ FlushFormatCatalyst::WriteToFile (
     WARPX_PROFILE_VAR_STOP(prof_catalyst_particles);
 
     // Execution
-    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::execute", prof_catalyst_execute, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::execute", prof_catalyst_execute, ablastr::profiler::Always);
     catalyst_status err = catalyst_execute(conduit::c_node(&node));
     if (err != catalyst_status_ok)
     {

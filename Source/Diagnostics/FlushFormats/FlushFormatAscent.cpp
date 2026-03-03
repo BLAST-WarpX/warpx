@@ -25,7 +25,7 @@ FlushFormatAscent::WriteToFile (
     bool /*isLastBTDFlush*/) const
 {
 #ifdef AMREX_USE_ASCENT
-    WARPX_PROFILE("FlushFormatAscent::WriteToFile()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("FlushFormatAscent::WriteToFile()", ablastr::profiler::Always);
     auto & warpx = WarpX::GetInstance();
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -38,13 +38,13 @@ FlushFormatAscent::WriteToFile (
     }
 
     // wrap mesh data
-    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::MultiLevelToBlueprint", prof_ascent_mesh_blueprint, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::MultiLevelToBlueprint", prof_ascent_mesh_blueprint, ablastr::profiler::Always);
     conduit::Node bp_mesh;
     amrex::MultiLevelToBlueprint(
         nlev, amrex::GetVecOfConstPtrs(mf), varnames, geom, time, iteration, warpx.refRatio(), bp_mesh);
     WARPX_PROFILE_VAR_STOP(prof_ascent_mesh_blueprint);
 
-    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::WriteParticles", prof_ascent_particles, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::WriteParticles", prof_ascent_particles, ablastr::profiler::Always);
     WriteParticles(particle_diags, bp_mesh);
     WARPX_PROFILE_VAR_STOP(prof_ascent_particles);
 
@@ -53,7 +53,7 @@ FlushFormatAscent::WriteToFile (
     // const auto step = istep[0];
     // WriteBlueprintFiles(bp_mesh,"bp_export",step,"hdf5");
 
-    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::publish", prof_ascent_publish, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::publish", prof_ascent_publish, ablastr::profiler::Always);
     ascent::Ascent ascent;
     conduit::Node opts;
     opts["exceptions"] = "catch";
@@ -62,7 +62,7 @@ FlushFormatAscent::WriteToFile (
     ascent.publish(bp_mesh);
     WARPX_PROFILE_VAR_STOP(prof_ascent_publish);
 
-    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::execute", prof_ascent_execute, ablastr::profiler::when::Always);
+    WARPX_PROFILE_VAR("FlushFormatAscent::WriteToFile::execute", prof_ascent_execute, ablastr::profiler::Always);
     conduit::Node actions;
     ascent.execute(actions);
     ascent.close();

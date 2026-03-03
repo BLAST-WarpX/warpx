@@ -219,7 +219,7 @@ computePhi (
 {
     using namespace amrex::literals;
 
-    ABLASTR_PROFILE("computePhi", ablastr::profiler::when::Always);
+    ABLASTR_PROFILE("computePhi", ablastr::profiler::Always);
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 

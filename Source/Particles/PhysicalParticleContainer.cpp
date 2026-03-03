@@ -440,8 +440,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("PhysicalParticleContainer::Evolve()", ablastr::profiler::when::Always);
-    WARPX_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg, ablastr::profiler::when::IfSyncEnabled);
+    WARPX_PROFILE("PhysicalParticleContainer::Evolve()", ablastr::profiler::Always);
+    WARPX_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg, ablastr::profiler::OmitUnlessDeviceSynced);
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
@@ -1098,7 +1098,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                   const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::PushP()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::PushP()", ablastr::profiler::Always);
 
     if (do_not_push) { return; }
 
@@ -1595,7 +1595,7 @@ PhysicalParticleContainer::getIonizationFunc (const WarpXParIter& pti,
                                               const amrex::FArrayBox& By,
                                               const amrex::FArrayBox& Bz)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::getIonizationFunc()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::getIonizationFunc()", ablastr::profiler::Always);
 
     return {pti, lev, ngEB, Ex, Ey, Ez, Bx, By, Bz,
                                 m_E_external_particle, m_B_external_particle,
@@ -1625,9 +1625,9 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
     // here is thus useful to avoid confusing time spent waiting for other processes with time
     // spent doing actual resampling.
     WARPX_PROFILE_VAR_NS("MultiParticleContainer::doResampling::MPI_synchronization",
-                         blp_resample_synchronization, ablastr::profiler::when::Always);
+                         blp_resample_synchronization, ablastr::profiler::Always);
     WARPX_PROFILE_VAR_NS("MultiParticleContainer::doResampling::ActualResampling",
-                         blp_resample_actual, ablastr::profiler::when::Always);
+                         blp_resample_actual, ablastr::profiler::Always);
 
     WARPX_PROFILE_VAR_START(blp_resample_synchronization);
     const amrex::Real global_numparts = TotalNumberOfParticles();
@@ -1659,7 +1659,7 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
 bool
 PhysicalParticleContainer::findRefinedInjectionBox (amrex::Box& a_fine_injection_box, amrex::IntVect& a_rrfac)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::findRefinedInjectionBox", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::findRefinedInjectionBox", ablastr::profiler::Always);
 
     // This does not work if the mesh is dynamic.  But in that case, we should
     // not use refined injected either.  We also assume there is only one fine level.
@@ -1718,14 +1718,14 @@ set_quantum_sync_engine_ptr (const std::shared_ptr<QuantumSynchrotronEngine>& pt
 PhotonEmissionFilterFunc
 PhysicalParticleContainer::getPhotonEmissionFilterFunc ()
 {
-    WARPX_PROFILE("PhysicalParticleContainer::getPhotonEmissionFunc()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::getPhotonEmissionFunc()", ablastr::profiler::Always);
     return PhotonEmissionFilterFunc{GetRealCompIndex("opticalDepthQSR") - NArrayReal};
 }
 
 PairGenerationFilterFunc
 PhysicalParticleContainer::getPairGenerationFilterFunc ()
 {
-    WARPX_PROFILE("PhysicalParticleContainer::getPairGenerationFunc()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::getPairGenerationFunc()", ablastr::profiler::Always);
     return PairGenerationFilterFunc{GetRealCompIndex("opticalDepthBW") - NArrayReal};
 }
 
@@ -1762,7 +1762,7 @@ PhysicalParticleContainer::DepositTemperature (
 {
     using ablastr::fields::Direction;
 
-    WARPX_PROFILE("PhysicalParticleContainer::DepositTemperature()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("PhysicalParticleContainer::DepositTemperature()", ablastr::profiler::Always);
 
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }

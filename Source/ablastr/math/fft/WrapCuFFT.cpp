@@ -31,7 +31,7 @@ namespace ablastr::math::anyfft
                        Complex * const complex_array, const direction dir, const int dim)
     {
         FFTplan fft_plan;
-        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan", ablastr::profiler::when::Always);
+        ABLASTR_PROFILE("ablastr::math::anyfft::CreatePlan", ablastr::profiler::Always);
 
         // Initialize fft_plan.m_plan with the vendor fft plan.
         cufftResult result;
@@ -77,12 +77,12 @@ namespace ablastr::math::anyfft
 
     void DestroyPlan(FFTplan& fft_plan)
     {
-        ABLASTR_PROFILE("ablastr::math::anyfft::DestroyPlan", ablastr::profiler::when::Always);
+        ABLASTR_PROFILE("ablastr::math::anyfft::DestroyPlan", ablastr::profiler::Always);
         cufftDestroy( fft_plan.m_plan );
     }
 
     void Execute(FFTplan& fft_plan){
-        ABLASTR_PROFILE("ablastr::math::anyfft::Execute", ablastr::profiler::when::Always);
+        ABLASTR_PROFILE("ablastr::math::anyfft::Execute", ablastr::profiler::Always);
         // make sure that this is done on the same GPU stream as the above copy
         cudaStream_t stream = amrex::Gpu::Device::cudaStream();
         cufftSetStream ( fft_plan.m_plan, stream);

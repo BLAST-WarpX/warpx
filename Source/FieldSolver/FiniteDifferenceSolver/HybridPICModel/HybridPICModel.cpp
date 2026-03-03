@@ -313,7 +313,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev)
 {
-    WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()", ablastr::profiler::Always);
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
@@ -366,7 +366,7 @@ void HybridPICModel::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, const bool solve_for_Faraday) const
 {
-    WARPX_PROFILE("WarpX::HybridPICSolveE()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::HybridPICSolveE()", ablastr::profiler::Always);
 
     HybridPICSolveE(
         Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
@@ -413,7 +413,7 @@ void HybridPICModel::CalculateElectronPressure() const
 
 void HybridPICModel::CalculateElectronPressure(const int lev) const
 {
-    WARPX_PROFILE("WarpX::CalculateElectronPressure()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::CalculateElectronPressure()", ablastr::profiler::Always);
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);

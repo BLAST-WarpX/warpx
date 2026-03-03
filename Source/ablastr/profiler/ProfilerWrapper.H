@@ -16,15 +16,24 @@
 
 namespace ablastr::profiler
 {
-    /** Controls when a profiler region is active */
-    enum class when { Always, IfSyncEnabled };
+    /** Controls when a profiler region is active.
+     *
+     * Always:                  unconditionally profiled.
+     * OmitUnlessDeviceSynced:  skipped unless the expensive GPU device
+     *     synchronization is enabled at runtime via
+     *     tiny_profiler.device_synchronize_around_region (or the WarpX
+     *     alias warpx.do_device_synchronize).  Turning that option on
+     *     makes every profiled region accurate but noticeably slows
+     *     execution due to forced GPU stream synchronization.
+     */
+    enum When { Always, OmitUnlessDeviceSynced };
 
     /** Returns true if tiny_profiler.device_synchronize_around_region is enabled.
      *
      * Call sites are only profiled accurately without GPU sync when they are
      * outside MFIter/ParIter loops (which synchronize automatically). Regions
-     * inside such loops should use when::IfSyncEnabled so they are skipped
-     * when sync is off.
+     * inside such loops should use OmitUnlessDeviceSynced so they are
+     * skipped when sync is off.
      *
      * For CPU-only builds, this unconditionally returns true since there is
      * no GPU stream synchronization concern.
@@ -40,14 +49,14 @@ namespace ablastr::profiler
 #endif
     }
 
-    inline bool should_profile (when w)
+    inline bool should_profile (When w)
     {
-        if (w == when::Always) {
+        if (w == Always) {
 #ifdef AMREX_USE_GPU
             if (amrex::MFIter::currentDepth() > 0 && !is_sync_enabled()) {
                 ablastr::warn_manager::WMRecordWarning(
                     "Performance",
-                    "Profiler region with when::Always used inside an MFIter loop "
+                    "Profiler region with Always used inside an MFIter loop "
                     "without device synchronization; timings may be inaccurate.",
                     ablastr::warn_manager::WarnPriority::high);
             }
@@ -68,7 +77,7 @@ namespace ablastr::profiler
 
 /** Profile the enclosing scope.
  *  \param fname  profiler region name (string literal)
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define ABLASTR_PROFILE(fname, when) \
     ABLASTR_PROFILE_IMPL(fname, when, BL_PROFILE_PASTE(ablastr_blp_, __LINE__))
@@ -76,7 +85,7 @@ namespace ablastr::profiler
 /** Profile a named sub-region with explicit start (immediate start version).
  *  \param fname   profiler region name
  *  \param vname   C++ variable name for the profiler object
- *  \param when    when::Always or when::IfSyncEnabled
+ *  \param when    ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define ABLASTR_PROFILE_VAR(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -88,7 +97,7 @@ namespace ablastr::profiler
  *  Use ABLASTR_PROFILE_VAR_START / ABLASTR_PROFILE_VAR_STOP to control timing.
  *  \param fname  profiler region name
  *  \param vname  C++ variable name for the profiler object
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define ABLASTR_PROFILE_VAR_NS(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -105,7 +114,7 @@ namespace ablastr::profiler
 
 /** Profile the enclosing scope as a named region.
  *  \param rname  region name
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define ABLASTR_PROFILE_REGION(rname, when) \
     ABLASTR_PROFILE(rname, when)

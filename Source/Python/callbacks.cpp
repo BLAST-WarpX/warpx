@@ -29,7 +29,7 @@ bool IsPythonCallbackInstalled ( const std::string& name )
 void ExecutePythonCallback ( const std::string& name )
 {
     if ( IsPythonCallbackInstalled(name) ) {
-        WARPX_PROFILE("warpx_py_" + name, ablastr::profiler::when::Always);
+        WARPX_PROFILE("warpx_py_" + name, ablastr::profiler::Always);
         try {
             warpx_callback_py_map[name]();
         } catch (std::exception &e) {

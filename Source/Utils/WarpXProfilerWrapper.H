@@ -19,7 +19,7 @@
 
 /** Profile the enclosing scope.
  *  \param fname  profiler region name (string literal)
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define WARPX_PROFILE(fname, when) \
     WARPX_PROFILE_IMPL(fname, when, BL_PROFILE_PASTE(warpx_blp_, __LINE__))
@@ -27,7 +27,7 @@
 /** Profile a named sub-region with explicit start (immediate start version).
  *  \param fname   profiler region name
  *  \param vname   C++ variable name for the profiler object
- *  \param when    when::Always or when::IfSyncEnabled
+ *  \param when    ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define WARPX_PROFILE_VAR(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -39,7 +39,7 @@
  *  Use WARPX_PROFILE_VAR_START / WARPX_PROFILE_VAR_STOP to control timing.
  *  \param fname  profiler region name
  *  \param vname  C++ variable name for the profiler object
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define WARPX_PROFILE_VAR_NS(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
@@ -56,7 +56,7 @@
 
 /** Profile the enclosing scope as a named region.
  *  \param rname  region name
- *  \param when   when::Always or when::IfSyncEnabled
+ *  \param when   ablastr::profiler::Always or ablastr::profiler::OmitUnlessDeviceSynced
  */
 #define WARPX_PROFILE_REGION(rname, when) \
     WARPX_PROFILE(rname, when)

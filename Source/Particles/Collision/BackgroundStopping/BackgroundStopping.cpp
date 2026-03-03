@@ -88,7 +88,7 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
 void
 BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundStopping::doCollisions()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("BackgroundStopping::doCollisions()", ablastr::profiler::Always);
     using namespace amrex::literals;
 
     auto& species = mypc->GetParticleContainerFromName(m_species_names[0]);

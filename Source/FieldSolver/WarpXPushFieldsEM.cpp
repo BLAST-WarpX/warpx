@@ -956,7 +956,7 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real st
 void
 WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveB()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::EvolveB()", ablastr::profiler::Always);
     EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
     if (lev > 0)
     {
@@ -1011,7 +1011,7 @@ WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveE()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::EvolveE()", ablastr::profiler::Always);
     EvolveE(lev, PatchType::fine, a_dt, start_time);
     if (lev > 0)
     {
@@ -1108,7 +1108,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 {
     if (!do_dive_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveF()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::EvolveF()", ablastr::profiler::Always);
 
     // Evolve F field in regular cells
     if (patch_type == PatchType::fine) {
@@ -1166,7 +1166,7 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveG()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::EvolveG()", ablastr::profiler::Always);
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1200,7 +1200,7 @@ WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
-    WARPX_PROFILE("WarpX::MacroscopicEvolveE()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::MacroscopicEvolveE()", ablastr::profiler::Always);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         lev == 0,

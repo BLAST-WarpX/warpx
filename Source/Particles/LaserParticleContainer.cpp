@@ -568,8 +568,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("LaserParticleContainer::Evolve()", ablastr::profiler::when::Always);
-    WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp, ablastr::profiler::when::IfSyncEnabled);
+    WARPX_PROFILE("LaserParticleContainer::Evolve()", ablastr::profiler::Always);
+    WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp, ablastr::profiler::OmitUnlessDeviceSynced);
 
     if (!m_enabled) { return; }
 

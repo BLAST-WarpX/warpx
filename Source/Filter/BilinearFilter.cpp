@@ -61,7 +61,7 @@ namespace {
 }
 
 void BilinearFilter::ComputeStencils(){
-    WARPX_PROFILE("BilinearFilter::ComputeStencils()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("BilinearFilter::ComputeStencils()", ablastr::profiler::Always);
     int i = 0;
     for (const auto& el : npass_each_dir ) {
         stencil_length_each_dir[i++] = static_cast<int>(el) + 1;

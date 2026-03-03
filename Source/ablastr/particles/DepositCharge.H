@@ -133,8 +133,8 @@ deposit_charge (typename T_PC::ParIterType& pti,
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for charge deposition");
 
-    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::ChargeDeposition", blp_ppc_chd, ablastr::profiler::when::IfSyncEnabled);
-    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::Accumulate", blp_accumulate, ablastr::profiler::when::IfSyncEnabled);
+    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::ChargeDeposition", blp_ppc_chd, ablastr::profiler::OmitUnlessDeviceSynced);
+    ABLASTR_PROFILE_VAR_NS("ablastr::particles::deposit_charge::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
     // Get tile box where charge is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)

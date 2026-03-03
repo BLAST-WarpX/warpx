@@ -57,7 +57,7 @@ FlushFormatCheckpoint::WriteToFile (
     using ablastr::fields::Direction;
     using WARPX_UNITY_ID::default_level_prefix;
 
-    WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()", ablastr::profiler::Always);
 
     auto & warpx = WarpX::GetInstance();
 

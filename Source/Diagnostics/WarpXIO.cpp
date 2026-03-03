@@ -97,7 +97,7 @@ WarpX::InitFromCheckpoint ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::InitFromCheckpoint()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::InitFromCheckpoint()", ablastr::profiler::Always);
 
     amrex::Print()<< Utils::TextMsg::Info(
         "restart from checkpoint " + restart_chkfile);

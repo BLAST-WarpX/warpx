@@ -449,15 +449,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     const amrex::ParticleReal q = this->charge;
 
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort, ablastr::profiler::when::IfSyncEnabled);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::FindMaxTilesize",
-            blp_get_max_tilesize, ablastr::profiler::when::IfSyncEnabled);
+            blp_get_max_tilesize, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::DirectCurrentDepKernel",
-            direct_current_dep_kernel, ablastr::profiler::when::IfSyncEnabled);
+            direct_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::EsirkepovCurrentDepKernel",
-            esirkepov_current_dep_kernel, ablastr::profiler::when::IfSyncEnabled);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit, ablastr::profiler::when::IfSyncEnabled);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate, ablastr::profiler::when::IfSyncEnabled);
+            esirkepov_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit, ablastr::profiler::OmitUnlessDeviceSynced);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1021,15 +1021,15 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::ParticleReal qs = this->charge;
     const amrex::ParticleReal mass = this->m_mass;
 
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort, ablastr::profiler::when::IfSyncEnabled);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::FindMaxTilesize",
-            blp_get_max_tilesize, ablastr::profiler::when::IfSyncEnabled);
+            blp_get_max_tilesize, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::DirectCurrentDepKernel",
-            direct_current_dep_kernel, ablastr::profiler::when::IfSyncEnabled);
+            direct_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
     WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::EsirkepovCurrentDepKernel",
-            esirkepov_current_dep_kernel, ablastr::profiler::when::IfSyncEnabled);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit, ablastr::profiler::when::IfSyncEnabled);
-    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate, ablastr::profiler::when::IfSyncEnabled);
+            esirkepov_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit, ablastr::profiler::OmitUnlessDeviceSynced);
+    WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1534,9 +1534,9 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 
         const Real q = this->charge;
 
-        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort, ablastr::profiler::when::IfSyncEnabled);
-        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd, ablastr::profiler::when::IfSyncEnabled);
-        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate, ablastr::profiler::when::IfSyncEnabled);
+        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
+        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd, ablastr::profiler::OmitUnlessDeviceSynced);
+        WARPX_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
         // Get tile box where charge is deposited.
         // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1773,7 +1773,7 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
                                        const bool interpolate_across_levels,
                                        const int icomp)
 {
-    WARPX_PROFILE("WarpXParticleContainer::DepositCharge", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpXParticleContainer::DepositCharge", ablastr::profiler::Always);
 
     // Loop over the refinement levels
     auto const finest_level = static_cast<int>(rho.size() - 1);
@@ -2370,7 +2370,7 @@ WarpXParticleContainer::PushX (amrex::Real dt)
 void
 WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 {
-    WARPX_PROFILE("WarpXParticleContainer::PushX()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpXParticleContainer::PushX()", ablastr::profiler::Always);
 
     if (do_not_push) { return; }
 
@@ -2467,7 +2467,7 @@ WarpXParticleContainer::particlePostLocate(ParticleType& p,
 
 void
 WarpXParticleContainer::ApplyBoundaryConditions (){
-    WARPX_PROFILE("WarpXParticleContainer::ApplyBoundaryConditions()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpXParticleContainer::ApplyBoundaryConditions()", ablastr::profiler::Always);
 
     // Periodic boundaries are handled in AMReX code
     if (m_boundary_conditions.CheckAll(ParticleBoundaryType::Periodic)) { return; }

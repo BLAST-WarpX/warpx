@@ -395,7 +395,7 @@ ProjectionDivCleaner::correctField ()
 
 void
 WarpX::ProjectionCleanDivB() {
-    WARPX_PROFILE("WarpX::ProjectionDivCleanB()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("WarpX::ProjectionDivCleanB()", ablastr::profiler::Always);
 
     if ( (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC

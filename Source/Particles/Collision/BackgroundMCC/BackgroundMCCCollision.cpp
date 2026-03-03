@@ -218,7 +218,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
 void
 BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundMCCCollision::doCollisions()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("BackgroundMCCCollision::doCollisions()", ablastr::profiler::Always);
     using namespace amrex::literals;
 
     auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -478,7 +478,7 @@ void BackgroundMCCCollision::doBackgroundIonization
 ( int lev, amrex::LayoutData<amrex::Real>* cost,
   WarpXParticleContainer& species1, WarpXParticleContainer& species2, amrex::Real t)
 {
-    WARPX_PROFILE("BackgroundMCCCollision::doBackgroundIonization()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("BackgroundMCCCollision::doBackgroundIonization()", ablastr::profiler::Always);
 
     const SmartCopyFactory copy_factory_elec(species1, species1);
     const SmartCopyFactory copy_factory_ion(species1, species2);

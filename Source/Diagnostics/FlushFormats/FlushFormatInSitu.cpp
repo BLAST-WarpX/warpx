@@ -20,7 +20,7 @@ using namespace amrex;
 void
 FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_diags, conduit::Node& a_bp_mesh) const
 {
-    WARPX_PROFILE("FlushFormatInSitu::WriteParticles()", ablastr::profiler::when::Always);
+    WARPX_PROFILE("FlushFormatInSitu::WriteParticles()", ablastr::profiler::Always);
 
     // wrap particle data for each species
     // we prefix the fields with "particle_{species_name}" b/c we
