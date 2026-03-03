@@ -84,7 +84,7 @@ namespace ablastr::profiler
 #define ABLASTR_PROFILE_2(fname, when) \
     ABLASTR_PROFILE_IMPL_(fname, when, BL_PROFILE_PASTE(ablastr_blp_, __LINE__))
 #define ABLASTR_PROFILE(...) \
-    ABLASTR_PROFILE_SELECT_2(__VA_ARGS__, ABLASTR_PROFILE_2, ABLASTR_PROFILE_1)(__VA_ARGS__)
+    ABLASTR_PROFILE_SELECT_2(__VA_ARGS__, ABLASTR_PROFILE_2, ABLASTR_PROFILE_1, ignored)(__VA_ARGS__)
 
 /** Profile a named sub-region with explicit start (immediate start version).
  *  \param fname  profiler region name
@@ -101,7 +101,7 @@ namespace ablastr::profiler
         ablastr::profiler::should_profile(when); \
     if (BL_PROFILE_PASTE(vname, _should_profile)) { BL_PROFILE_VAR_START(vname); }
 #define ABLASTR_PROFILE_VAR(...) \
-    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_3, ABLASTR_PROFILE_VAR_2)(__VA_ARGS__)
+    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_3, ABLASTR_PROFILE_VAR_2, ignored)(__VA_ARGS__)
 
 /** Declare a named profiler without starting it yet.
  *  Use ABLASTR_PROFILE_VAR_START / ABLASTR_PROFILE_VAR_STOP to control timing.
@@ -117,7 +117,7 @@ namespace ablastr::profiler
     const bool BL_PROFILE_PASTE(vname, _should_profile) = \
         ablastr::profiler::should_profile(when)
 #define ABLASTR_PROFILE_VAR_NS(...) \
-    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_NS_3, ABLASTR_PROFILE_VAR_NS_2)(__VA_ARGS__)
+    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_NS_3, ABLASTR_PROFILE_VAR_NS_2, ignored)(__VA_ARGS__)
 
 /** Start a profiler declared with ABLASTR_PROFILE_VAR_NS (respects its when). */
 #define ABLASTR_PROFILE_VAR_START(vname) \
