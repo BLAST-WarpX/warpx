@@ -1805,6 +1805,8 @@ class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
         linear_solver=None,
         max_particle_iterations=None,
         particle_tolerance=None,
+        particle_suborbits=None,
+        use_mass_matrices_jacobian=None,
     ):
         self.verbose = verbose
         self.absolute_tolerance = absolute_tolerance
@@ -1814,12 +1816,16 @@ class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
         self.linear_solver = linear_solver
         self.max_particle_iterations = max_particle_iterations
         self.particle_tolerance = particle_tolerance
+        self.particle_suborbits = particle_suborbits
+        self.use_mass_matrices_jacobian = use_mass_matrices_jacobian
 
     def nonlinear_solver_initialize_inputs(self):
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
         implicit_evolve.nonlinear_solver = "newton"
         implicit_evolve.max_particle_iterations = self.max_particle_iterations
         implicit_evolve.particle_tolerance = self.particle_tolerance
+        implicit_evolve.particle_suborbits = self.particle_suborbits
+        implicit_evolve.use_mass_matrices_jacobian = self.use_mass_matrices_jacobian
 
         newton = pywarpx.warpx.get_bucket("newton")
         newton.verbose = self.verbose

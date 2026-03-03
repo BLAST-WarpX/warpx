@@ -136,29 +136,10 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 {
     BL_PROFILE("ThetaImplicitHybrid::ComputeRHS()");
 
-    // Update B^{n+θ} from current E estimate via Faraday's law
     UpdateWarpXFields( a_E, start_time );
 
     const amrex::Real theta_time = start_time + m_theta * m_dt;
 
-    // Add external fields for particle push (particles need total fields)
-    if (m_add_external_fields) {
-        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
-            theta_time, 0.5_rt * m_dt);
-        AddExternalBfield();
-        AddExternalEfield();
-    }
-
-    // Advance particles and deposit J^{n+1/2}, ρ^{n+1/2}
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
-
-    // Remove external fields after particle push (Ohm's law handles them internally)
-    if (m_add_external_fields) {
-        SubtractExternalBfield();
-        SubtractExternalEfield();
-    }
-
-    // Get field arrays at all levels
     ablastr::fields::MultiLevelVectorField Efield_fp = 
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, m_num_amr_levels - 1);
     ablastr::fields::MultiLevelVectorField Bfield_fp = 
@@ -168,28 +149,47 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     ablastr::fields::MultiLevelScalarField rho_fp = 
         m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
 
-    // Compute J_plasma = curl(B^{n+θ})/μ₀
+    // --- Compute resistivity-free E for particle push ---
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
-
-    // Compute electron pressure 
     m_hybrid_pic_model->CalculateElectronPressure();
 
-    // Solve Ohm's law: E_ohm = f(B^{n+θ}, J_ion^{n+1/2}, ρ^{n+1/2}, Pe)
-    // Result stored in Efield_fp
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
         m_WarpX->GetEBUpdateEFlag(),
-        true,  // solve_for_Faraday, includes resistivity and hyper-resistivity terms
-        true    // solve_for_implicit, include grad(Pe) term
+        false  // no resistivity; ∇Pe included
     );
 
-    m_WarpX->ApplyFillBoundaryE();  // Fill ghost cells for E_ohm;
+    m_WarpX->ApplyFillBoundaryE();
 
-    // Return RHS = E_ohm - E_old
-    // Framework computes residual = E - E_old - RHS = E - E_ohm
-    // Convergence: E = E_ohm
-    a_RHS.Copy(FieldType::Efield_fp);         // a_RHS = E_ohm
-    a_RHS.linComb(1.0, a_RHS, -1.0, m_Eold);  // a_RHS = E_ohm - E_old
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            theta_time, 0.5_rt * m_dt);
+        AddExternalBfield();
+        AddExternalEfield();
+    }
+
+    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+
+    if (m_add_external_fields) {
+        SubtractExternalBfield();
+        SubtractExternalEfield();
+    }
+
+    // --- Compute full Ohm's law E for Faraday update ---
+    // J_plasma unchanged (same B), but Pe depends on newly deposited ρ
+    m_hybrid_pic_model->CalculateElectronPressure();
+
+    m_hybrid_pic_model->HybridPICSolveE(
+        Efield_fp, current_fp, Bfield_fp, rho_fp,
+        m_WarpX->GetEBUpdateEFlag(),
+        true, true   // with resistivity and ∇Pe included (∇Pe is curl-free so doesn't affect Faraday, but needed for self-consistent Newton residual)
+    );
+
+    m_WarpX->ApplyFillBoundaryE();
+
+    // RHS = E_ohm - E_old
+    a_RHS.Copy(FieldType::Efield_fp);
+    a_RHS.linComb(1.0, a_RHS, -1.0, m_Eold);
 }
 
 void ThetaImplicitHybrid::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
