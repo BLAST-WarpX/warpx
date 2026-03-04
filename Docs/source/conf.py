@@ -61,33 +61,6 @@ def download_with_headers(url, filename):
         print(f"Could not download {filename} from {url}: {e}")
         print("Continuing build without cross-reference file...")
 
-
-def setup(app: Sphinx):
-    extension: Extension | None
-    FlexVarDomain: type[Domain] | None
-
-    extension = app.extensions.get("flexvar", None)
-    if extension is None:
-        print(f"conf.py setup: failed to find extension flexvar")
-        return
-
-    FlexVarDomain = getattr(extension.module, "FlexVarDomain", None)
-    if FlexVarDomain is None:
-        print(f"conf.py setup: failed to find FlexVarDomain")
-        return
-
-    # Add some convenient aliases to the global domain
-    aliases = [ "warpxparam", "wparam", "param", "wp", "p" ]
-    for alias in aliases:
-        # Add aliases for the fv:var directive
-        app.add_directive_to_domain(
-            domain="std",
-            name=alias,
-            cls=FlexVarDomain.directives["var"],
-            override=False,
-        )
-    print(f"conf.py setup: created aliases = {aliases} for fv:var directive")
-
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -109,6 +82,33 @@ extensions = [
     "sphinxcontrib.googleanalytics",
     "flexvar",
 ]
+
+# Sphinx hook
+def setup(app: Sphinx):
+    """Custom Sphinx setup for WarpX docs."""
+    extension: Extension | None
+    FlexVarDomain: type[Domain] | None
+
+    extension = app.extensions.get("flexvar", None)
+    if extension is None:
+        print(f"conf.py setup: failed to find extension flexvar")
+        return
+    FlexVarDomain = getattr(extension.module, "FlexVarDomain", None)
+    if FlexVarDomain is None:
+        print(f"conf.py setup: failed to find FlexVarDomain")
+        return
+
+    # Add some convenient aliases to the global domain
+    aliases = [ "warpxparam", "wparam", "param", "wp", "p" ]
+    for alias in aliases:
+        # Add aliases for the fv:var directive
+        app.add_directive_to_domain(
+            domain="std",
+            name=alias,
+            cls=FlexVarDomain.directives["var"],
+            override=False,
+        )
+    print(f"conf.py setup: added aliases = {aliases} for fv:var directive")
 
 # Google Analytics
 googleanalytics_id = "G-QZGY5060MZ"
