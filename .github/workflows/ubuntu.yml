@@ -106,7 +106,7 @@ jobs:
 
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
