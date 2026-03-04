@@ -75,22 +75,17 @@ namespace ablastr::profiler
     BL_PROFILE_VAR_NS(fname, uniq); \
     if (ablastr::profiler::should_profile(when)) { BL_PROFILE_VAR_START(uniq); }
 
-/** Profile the enclosing scope.
- *  \param fname  profiler region name (string literal)
- *  \param when   (optional) ablastr::profiler::OmitUnlessDeviceSynced; default: Always
- */
 #define ABLASTR_PROFILE_1(fname) \
     ABLASTR_PROFILE_IMPL_(fname, ablastr::profiler::Always, BL_PROFILE_PASTE(ablastr_blp_, __LINE__))
 #define ABLASTR_PROFILE_2(fname, when) \
     ABLASTR_PROFILE_IMPL_(fname, when, BL_PROFILE_PASTE(ablastr_blp_, __LINE__))
+/** Profile the enclosing scope.
+ *  \param fname  profiler region name (string literal)
+ *  \param when   (optional) ablastr::profiler::OmitUnlessDeviceSynced; default: Always
+ */
 #define ABLASTR_PROFILE(...) \
     ABLASTR_PROFILE_SELECT_2(__VA_ARGS__, ABLASTR_PROFILE_2, ABLASTR_PROFILE_1, ignored)(__VA_ARGS__)
 
-/** Profile a named sub-region with explicit start (immediate start version).
- *  \param fname  profiler region name
- *  \param vname  C++ variable name for the profiler object
- *  \param when   (optional) ablastr::profiler::OmitUnlessDeviceSynced; default: Always
- */
 #define ABLASTR_PROFILE_VAR_2(fname, vname) \
     BL_PROFILE_VAR_NS(fname, vname); \
     [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = true; \
@@ -100,15 +95,14 @@ namespace ablastr::profiler
     [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = \
         ablastr::profiler::should_profile(when); \
     if (BL_PROFILE_PASTE(vname, _should_profile)) { BL_PROFILE_VAR_START(vname); }
-#define ABLASTR_PROFILE_VAR(...) \
-    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_3, ABLASTR_PROFILE_VAR_2, ignored)(__VA_ARGS__)
-
-/** Declare a named profiler without starting it yet.
- *  Use ABLASTR_PROFILE_VAR_START / ABLASTR_PROFILE_VAR_STOP to control timing.
+/** Profile a named sub-region with explicit start (immediate start version).
  *  \param fname  profiler region name
  *  \param vname  C++ variable name for the profiler object
  *  \param when   (optional) ablastr::profiler::OmitUnlessDeviceSynced; default: Always
  */
+#define ABLASTR_PROFILE_VAR(...) \
+    ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_3, ABLASTR_PROFILE_VAR_2, ignored)(__VA_ARGS__)
+
 #define ABLASTR_PROFILE_VAR_NS_2(fname, vname) \
     BL_PROFILE_VAR_NS(fname, vname); \
     [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = true
@@ -116,6 +110,12 @@ namespace ablastr::profiler
     BL_PROFILE_VAR_NS(fname, vname); \
     [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = \
         ablastr::profiler::should_profile(when)
+/** Declare a named profiler without starting it yet.
+ *  Use ABLASTR_PROFILE_VAR_START / ABLASTR_PROFILE_VAR_STOP to control timing.
+ *  \param fname  profiler region name
+ *  \param vname  C++ variable name for the profiler object
+ *  \param when   (optional) ablastr::profiler::OmitUnlessDeviceSynced; default: Always
+ */
 #define ABLASTR_PROFILE_VAR_NS(...) \
     ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_NS_3, ABLASTR_PROFILE_VAR_NS_2, ignored)(__VA_ARGS__)
 
