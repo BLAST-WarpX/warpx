@@ -10,9 +10,11 @@
 
 #include <AMReX_BLProfiler.H>
 #include <AMReX_MFIter.H>
+#include <AMReX_OpenMP.H>
 #include <AMReX_ParmParse.H>
 
 #include "ablastr/warn_manager/WarnManager.H"
+
 
 namespace ablastr::profiler
 {
@@ -52,12 +54,17 @@ namespace ablastr::profiler
     inline bool should_profile (When w)
     {
         if (w == Always) {
-            if (amrex::MFIter::currentDepth() > 0 && !is_sync_enabled()) {
-                ablastr::warn_manager::WMRecordWarning(
-                    "Performance",
-                    "Profiler region with Always used inside an MFIter loop "
-                    "without device synchronization; timings may be inaccurate.",
-                    ablastr::warn_manager::WarnPriority::high);
+#ifdef AMREX_USE_OMP
+            if (omp_get_thread_num() == 0)
+#endif
+            {
+                if (amrex::MFIter::currentDepth() > 0 && !is_sync_enabled()) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "Performance",
+                        "Profiler region with Always used inside an MFIter loop "
+                        "without device synchronization; timings may be inaccurate.",
+                        ablastr::warn_manager::WarnPriority::high);
+                }
             }
             return true;
         }
