@@ -12,7 +12,7 @@
 
 /** \brief Push the particle's positions over one timestep,
  *    given the value of its momenta `ux`, `uy`, `uz`
- *    Note that UpdateMomentumBoris algorithm can be splitted into FirstHalf and SecondHalf
+ *    Note that UpdateMomentumBoris algorithm can be split into FirstHalf and SecondHalf
  *    momentum updates. FirstHalf and SecondHalf updates are constructed so that
  *    performing FirstHalf followed by SecondHalf is mathematically
  *    equivalent to a single Full update. */
@@ -38,7 +38,7 @@ void UpdateMomentumBoris(
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
     // Magnetic rotation
     // - Compute temporary variables
-    const amrex::Real bconst = (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) ? 0.5_rt*econst : 1.0_rt*econst;
+    const amrex::Real bconst = (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) ? 0.5_rt*econst : econst;
     const amrex::ParticleReal tx = bconst*inv_gamma*Bx;
     const amrex::ParticleReal ty = bconst*inv_gamma*By;
     const amrex::ParticleReal tz = bconst*inv_gamma*Bz;

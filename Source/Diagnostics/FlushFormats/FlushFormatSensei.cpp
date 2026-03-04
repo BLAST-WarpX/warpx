@@ -1,6 +1,6 @@
-#include "Utils/WarpXProfilerWrapper.H"
 #include "FlushFormatSensei.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 # include <AMReX_AmrMeshParticleInSituBridge.H>
 #endif
@@ -67,7 +67,7 @@ FlushFormatSensei::WriteToFile (
         !isBTD,
         "In-situ visualization is not currently supported for back-transformed diagnostics.");
 
-    WARPX_PROFILE("FlushFormatSensei::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatSensei::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         amrex::Print() << Utils::TextMsg::Info("Writing Sensei file " + filename);

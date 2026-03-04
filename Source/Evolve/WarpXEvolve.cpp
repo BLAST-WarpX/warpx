@@ -33,8 +33,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -134,7 +134,8 @@ WarpX::SynchronizeVelocityWithPosition () {
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = true;
@@ -144,8 +145,8 @@ WarpX::SynchronizeVelocityWithPosition () {
 void
 WarpX::Evolve (int numsteps)
 {
-    WARPX_PROFILE_REGION("WarpX::Evolve()");
-    WARPX_PROFILE("WarpX::Evolve()");
+    ABLASTR_PROFILE_REGION("WarpX::Evolve()");
+    ABLASTR_PROFILE("WarpX::Evolve()");
 
     using ablastr::fields::Direction;
 
@@ -162,7 +163,7 @@ WarpX::Evolve (int numsteps)
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
-        WARPX_PROFILE("WarpX::Evolve::step");
+        ABLASTR_PROFILE("WarpX::Evolve::step");
         const auto evolve_time_beg_step = static_cast<Real>(amrex::second());
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
@@ -385,7 +386,7 @@ void WarpX::OneStep (
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStep()");
+    ABLASTR_PROFILE("WarpX::OneStep()");
 
     // implicit solver
     if (m_implicit_solver) {
@@ -397,7 +398,7 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // with collisions placed in the middle of the position push and after the momentum push
+            // with collisions placed in the middle of the momentum push
             if (m_collisions_split_momentum_push) {
                 // push particles (half momentum)
                 PushParticlesandDeposit(
@@ -491,7 +492,7 @@ WarpX::OneStep_nosub (
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStep_nosub()");
+    ABLASTR_PROFILE("WarpX::OneStep_nosub()");
 
     // Push particle from x^{n} to x^{n+1}
     //               from p^{n-1/2} to p^{n+1/2}
@@ -664,7 +665,8 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = false;

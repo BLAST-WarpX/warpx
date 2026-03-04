@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-This script analyzes the results of a 2D electrostatic simulation with collisions
-between electrons and protons placed in the middle of the position push. It computes the
+This script analyzes the results of a 2D electrostatic/electromagnetic simulation with collisions
+between electrons and protons placed in the middle of the momentum push. It computes the
 total energy (field + particle) variation over time and verifies that it is conserved
 within a given tolerance, as well as that the final value of the field energy variation
 is close to a reference (so-called equipartition) value. If collisions are placed before
-the position push (standard algorithm), the tolerance on the total energy conservation
+the momentum push (standard algorithm), the tolerance on the total energy conservation
 needs to be relaxed to one order of magnitude higher.
 """
 

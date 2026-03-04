@@ -10,11 +10,11 @@
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 
 #include <ablastr/particles/NodalFieldGather.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
@@ -387,9 +387,9 @@ void ParticleBoundaryBuffer::clearParticles (int const i) {
 
 void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time)
 {
-    WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles");
+    ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles");
 
-    using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
+    using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
     const auto& warpx_instance = WarpX::GetInstance();
     const amrex::Geometry& geom = warpx_instance.Geom(0);
     auto plo = geom.ProbLoArray();
@@ -406,7 +406,8 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                 const WarpXParticleContainer& pc = mypc.GetParticleContainer(i);
                 if (!buffer[i].isDefined())
                 {
-                    buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
+                    buffer[i] = pc.make_alike<>();
+                    buffer[i].SetArena(amrex::The_Pinned_Arena());
                     buffer[i].AddIntComp("stepScraped", true);
                     buffer[i].AddRealComp("deltaTimeScraped", true);
                     buffer[i].AddRealComp("timeScraped", true);
@@ -452,7 +453,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                         amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
                         amrex::ReduceData<int> reduce_data(reduce_op);
                         {
-                          WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::count_out_of_bounds");
+                          ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::count_out_of_bounds");
 #ifdef AMREX_USE_GPU
                           const amrex::RandomEngine rng{nullptr};
 #else
@@ -464,7 +465,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
 
                         auto dst_index = ptile_buffer.numParticles();
                         {
-                          WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
+                          ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
                           auto np_to_add = amrex::get<0>(reduce_data.value());
                           auto new_np = dst_index + np_to_add;
                           amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
@@ -474,14 +475,14 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           ptile_buffer.resize(new_np);
                         }
                         {
-                          WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
+                          ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterAndTransform");
                           auto& warpx = WarpX::GetInstance();
                           const auto dt = warpx.getdt(pti.GetLevel());
                           auto & buf = buffer[i];
-                          const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
-                          const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - PinnedMemoryParticleContainer::NArrayReal;
-                          const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - PinnedMemoryParticleContainer::NArrayReal;
-                          const int normal_index = buf.GetRealCompIndex("nx") - PinnedMemoryParticleContainer::NArrayReal;
+                          const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - WarpXParticleContainer::NArrayInt;
+                          const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - WarpXParticleContainer::NArrayReal;
+                          const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - WarpXParticleContainer::NArrayReal;
+                          const int normal_index = buf.GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
                           const int step = warpx_instance.getistep(0);
                           amrex::filterAndTransformParticles(ptile_buffer, ptile,
                                                              predicate,
@@ -500,10 +501,10 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
     MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb, amrex::Real cur_time)
 {
     if (EB::enabled()) {
-        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB");
+        ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::EB");
 
 
-        using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0>;
+        using PIter = amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
         const auto &warpx_instance = WarpX::GetInstance();
         const amrex::Geometry &geom = warpx_instance.Geom(0);
         auto plo = geom.ProbLoArray();
@@ -515,7 +516,8 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
             const auto& pc = mypc.GetParticleContainer(i);
             if (!buffer[i].isDefined())
             {
-                buffer[i] = pc.make_alike<amrex::PinnedArenaAllocator>();
+                buffer[i] = pc.make_alike<>();
+                buffer[i].SetArena(amrex::The_Pinned_Arena());
                 buffer[i].AddIntComp("stepScraped", true);
                 buffer[i].AddRealComp("deltaTimeScraped", true);
                 buffer[i].AddRealComp("timeScraped", true);
@@ -570,14 +572,14 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
                     amrex::ReduceData<int> reduce_data(reduce_op);
                     {
-                        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::count_out_of_boundsEB");
+                        ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::count_out_of_boundsEB");
                         reduce_op.eval(np, reduce_data,
                                        [=] AMREX_GPU_HOST_DEVICE(int ip) { return predicate(ptile_data, ip) ? 1 : 0; });
                     }
 
                     auto dst_index = ptile_buffer.numParticles();
                     {
-                        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
+                        ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
                         auto np_to_add = amrex::get<0>(reduce_data.value());
                         auto new_np = dst_index + np_to_add;
                         amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
@@ -589,14 +591,14 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     auto &warpx = WarpX::GetInstance();
                     const auto dt = warpx.getdt(pti.GetLevel());
                     auto & buf = buffer[i];
-                    const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - PinnedMemoryParticleContainer::NArrayInt;
-                    const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - PinnedMemoryParticleContainer::NArrayReal;
-                    const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - PinnedMemoryParticleContainer::NArrayReal;
-                    const int normal_index = buf.GetRealCompIndex("nx") - PinnedMemoryParticleContainer::NArrayReal;
+                    const int step_scraped_index = buf.GetIntCompIndex("stepScraped") - WarpXParticleContainer::NArrayInt;
+                    const int delta_index = buf.GetRealCompIndex("deltaTimeScraped") - WarpXParticleContainer::NArrayReal;
+                    const int time_scraped_index = buf.GetRealCompIndex("timeScraped") - WarpXParticleContainer::NArrayReal;
+                    const int normal_index = buf.GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
                     const int step = warpx_instance.getistep(0);
 
                     {
-                        WARPX_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterTransformEB");
+                        ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::filterTransformEB");
                         amrex::filterAndTransformParticles(ptile_buffer, ptile, predicate,
                                                            FindEmbeddedBoundaryIntersection{step_scraped_index, delta_index,
                                                                                             time_scraped_index, normal_index,
@@ -625,7 +627,7 @@ int ParticleBoundaryBuffer::getNumParticlesInContainer(
     }
 }
 
-PinnedMemoryParticleContainer &
+WarpXParticleContainer::Base &
 ParticleBoundaryBuffer::getParticleBuffer(const std::string& species_name, int boundary) {
 
     auto& buffer = m_particle_containers[boundary];
@@ -640,7 +642,7 @@ ParticleBoundaryBuffer::getParticleBuffer(const std::string& species_name, int b
     return buffer[index];
 }
 
-PinnedMemoryParticleContainer *
+WarpXParticleContainer::Base *
 ParticleBoundaryBuffer::getParticleBufferPointer(const std::string& species_name, int boundary) {
 
     auto& buffer = m_particle_containers[boundary];

@@ -47,13 +47,13 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
 #include <ablastr/math/FiniteDifference.H>
 #include <ablastr/math/RandomSeed.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -753,8 +753,17 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
+        // Read magnetostatic solver parameters
+        // First use self_fields_* as defaults for backward compatibility,
+        // then allow explicit magnetostatic_solver_* parameters to override
+        utils::parser::queryWithParser(pp_warpx, "self_fields_required_precision", magnetostatic_solver_required_precision);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_required_precision", magnetostatic_solver_required_precision);
+        utils::parser::queryWithParser(pp_warpx, "self_fields_absolute_tolerance", magnetostatic_solver_absolute_tolerance);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_absolute_tolerance", magnetostatic_solver_absolute_tolerance);
         utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_max_iters", magnetostatic_solver_max_iters);
         utils::parser::queryWithParser(pp_warpx, "self_fields_verbosity", magnetostatic_solver_verbosity);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_verbosity", magnetostatic_solver_verbosity);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (
@@ -1894,7 +1903,7 @@ WarpX::ReadParameters ()
     pp_collisions.queryarr("collision_names", collision_names);
     bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
     if (collisions) {
-        if (evolve_scheme == EvolveScheme::Explicit && !EB::enabled()) {
+        if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;
         }
 
