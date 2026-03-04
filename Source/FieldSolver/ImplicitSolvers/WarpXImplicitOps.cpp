@@ -336,7 +336,7 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 void
 WarpX::DepositMassMatrices ( )
 {
-    WARPX_PROFILE("WarpX::DepositMassMatrices()");
+    ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {

@@ -807,7 +807,7 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("PhysicalParticleContainer::DepositMassMatrices()");
+    ABLASTR_PROFILE("PhysicalParticleContainer::DepositMassMatrices()");
 
     const amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
     const amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
