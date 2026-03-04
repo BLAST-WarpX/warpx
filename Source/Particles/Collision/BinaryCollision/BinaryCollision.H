@@ -263,7 +263,7 @@ public:
 
     /** Perform all binary collisions within a tile
      *
-     * \param[in] dt time step size
+     * \param[in] dt time between collision calls (same for all levels; collisions are invoked once per coarse step).
      * \param[in] lev the mesh-refinement level
      * \param[in] mfi iterator for multifab
      * \param species_1 first species container
@@ -316,6 +316,7 @@ public:
         }
 
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
+        // dV is level-specific: cell volume at this refinement level (smaller on fine levels).
         amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
 #if defined(WARPX_DIM_RZ)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box

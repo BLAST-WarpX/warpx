@@ -114,8 +114,8 @@ public:
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
          * @param[in] soa_1,soa_2 contain the struct of array data of the two species
-         * @param[in] dt is the time step length between two collision calls.
-         * @param[in] dV is the volume of the corresponding cell.
+         * @param[in] dt time between collision calls (level-independent; collisions run once per coarse step).
+         * @param[in] dV volume of the cell at the current refinement level (level-specific).
          * @param[in] coll_idx is the collision number of the cell
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
          * @param[out] p_mask is a mask that will be set to true if a collision occurs for a given
