@@ -33,11 +33,14 @@ import urllib.request
 
 import pybtex.plugin
 import sphinx_rtd_theme  # noqa
+from sphinx.application import Sphinx
 from pybtex.style.formatting.unsrt import Style as UnsrtStyle
 
 module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
 sys.path.insert(0, checksum_path)
+_ext_path = os.path.join(module_path, "_ext")
+sys.path.insert(0, _ext_path)
 
 
 def download_with_headers(url, filename):
@@ -51,6 +54,25 @@ def download_with_headers(url, filename):
         print(f"Could not download {filename} from {url}: {e}")
         print("Continuing build without cross-reference file...")
 
+
+def setup(app: Sphinx):
+
+    print(f"\nconf.py setup: START\n")
+
+    # print(f"app.extensions = {app.extensions}")
+    extension = app.extensions['flexvar']
+    print(f"extension = {extension}")
+    module = extension.module
+    print(f"module = {module}")
+    domain = getattr(extension.module, 'FlexVarDomain')
+    print(f"domain = {domain}")
+
+    # Add some convenient aliases to the global domain
+    aliases = [ "warpxparam", "wparam", "param", "wp", "p" ]
+    for alias in aliases:
+        app.add_directive_to_domain("std", alias, domain.directives["var"])
+
+    print(f"\naliases = {aliases}\n")
 
 # -- General configuration ------------------------------------------------
 
@@ -71,6 +93,7 @@ extensions = [
     "breathe",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "flexvar",
 ]
 
 # Google Analytics
