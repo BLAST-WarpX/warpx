@@ -188,7 +188,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
@@ -229,7 +230,7 @@ public:
      * (this box should correspond to an integer number of cells in each direction,
      * but its boundaries need not be aligned with the actual cells of the simulation)
     */
-    void AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
+    void AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
 
     /**
      * Create new macroparticles for this species, with a fixed
@@ -279,7 +280,7 @@ public:
      * These are NOT initialized by this function.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& pinned_tile,
         int n_external_attr_real,
         int n_external_attr_int) final;
 
@@ -392,6 +393,20 @@ public:
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
     PairGenerationFilterFunc getPairGenerationFilterFunc ();
+
+    /**
+     * Tells if this PhysicalParticleContainer has
+     * virtual photons enabled
+     * @return true if process is enabled
+     */
+    bool has_virtual_photons () const override;
+
+    /**
+     * Gets the index of the PhysicalParticleContainer
+     * that corresponds to the virtual photons
+     * @return index of the virtual photon species
+     */
+    int getVirtualPhotonSpeciesIndex () const override;
 #endif
 
     std::vector<std::string> getUserIntAttribs () const override {
@@ -485,6 +500,9 @@ protected:
 
     // A smart pointer to an instance of a Breit Wheeler engine [photons only!]
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
+
+    // A flag to enable virtual photons
+    bool m_do_qed_virtual_photons = false;
 #endif
     /* Vector of user-defined integer attributes for species, species_name */
     std::vector<std::string> m_user_int_attribs;

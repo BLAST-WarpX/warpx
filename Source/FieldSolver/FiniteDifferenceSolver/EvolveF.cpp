@@ -119,7 +119,7 @@ void FiniteDifferenceSolver::EvolveFCartesian (
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
 
-        Real constexpr inv_epsilon0 = 1._rt/PhysConst::ep0;
+        Real constexpr inv_epsilon0 = 1._rt/PhysConst::epsilon_0;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(tf,
@@ -175,7 +175,7 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
 
-        Real constexpr inv_epsilon0 = 1./PhysConst::ep0;
+        Real constexpr inv_epsilon0 = 1./PhysConst::epsilon_0;
 
         // Use the right shift in components:
         // - the first WarpX::ncomps (2*n_rz_azimuthal_modes-1) components correspond to rho old (i.e. rho_comp=0)
@@ -260,7 +260,7 @@ void FiniteDifferenceSolver::EvolveFSpherical (
         // Extract tileboxes for which to loop
         Box const& tf  = mfi.tilebox(Ffield->ixType().toIntVect());
 
-        Real constexpr inv_epsilon0 = 1./PhysConst::ep0;
+        Real constexpr inv_epsilon0 = 1./PhysConst::epsilon_0;
 
         // Use the right shift in components:
         // - the first component corresponds to rho old (i.e. rho_comp=0)

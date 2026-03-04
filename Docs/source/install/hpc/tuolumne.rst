@@ -177,7 +177,7 @@ For development purposes, you can also limit yourself to the CPU cores of the MI
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 

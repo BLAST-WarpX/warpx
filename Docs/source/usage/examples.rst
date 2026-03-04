@@ -45,6 +45,7 @@ Particle Accelerator & Beam Physics
    examples/gaussian_beam/README.rst
    examples/beam_beam_collision/README.rst
    examples/free_electron_laser/README.rst
+   examples/ion_beam_extraction/README.rst
    examples/thomson_parabola_spectrometer/README.rst
 
 High Energy Astrophysical Plasma Physics
@@ -55,16 +56,6 @@ High Energy Astrophysical Plasma Physics
 
    examples/ohm_solver_magnetic_reconnection/README.rst
 
-
-Microelectronics
-----------------
-
-`ARTEMIS (Adaptive mesh Refinement Time-domain ElectrodynaMIcs Solver) <https://ccse.lbl.gov/Research/Microelectronics/>`__ is based on WarpX and couples the Maxwell's equations implementation in WarpX with classical equations that describe quantum material behavior (such as, LLG equation for micromagnetics and London equation for superconducting materials) for quantifying the performance of `next-generation microelectronics <https://www.lbl.gov/research/microelectronics-and-beyond/>`__.
-
-* `ARTEMIS examples <https://github.com/AMReX-Microelectronics/artemis/tree/development/Examples>`__
-* `ARTEMIS manual <https://artemis-em.readthedocs.io>`__
-
-
 Fundamental Plasma Physics
 --------------------------
 
@@ -74,7 +65,6 @@ Fundamental Plasma Physics
    examples/langmuir/README.rst
    examples/capacitive_discharge/README.rst
    examples/pierce_diode/README.rst
-
 
 .. _examples-hybrid-model:
 

@@ -4,7 +4,7 @@
 #include "ParticleDiag_fwd.H"
 
 #include "Particles/WarpXParticleContainer_fwd.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
@@ -18,9 +18,9 @@ class ParticleDiag
 {
 public:
     ParticleDiag(const std::string& diag_name, const std::string& name,
-        WarpXParticleContainer* pc, PinnedMemoryParticleContainer *pinned_pc = nullptr);
+        WarpXParticleContainer* pc, WarpXParticleContainer::Base *pinned_pc = nullptr);
     [[nodiscard]] WarpXParticleContainer* getParticleContainer() const { return m_pc; }
-    [[nodiscard]] PinnedMemoryParticleContainer* getPinnedParticleContainer() const { return m_pinned_pc; }
+    [[nodiscard]] WarpXParticleContainer::Base* getPinnedParticleContainer() const { return m_pinned_pc; }
     [[nodiscard]] std::string getSpeciesName() const { return m_name; }
     amrex::Vector<int> m_plot_flags;
     bool m_plot_phi = false; // Whether to output the potential phi on the particles
@@ -39,7 +39,7 @@ private:
     std::string m_diag_name;
     std::string m_name;
     WarpXParticleContainer* m_pc;
-    PinnedMemoryParticleContainer* m_pinned_pc;
+    WarpXParticleContainer::Base* m_pinned_pc;
 };
 
 #endif // WARPX_PARTICLEDIAG_H_

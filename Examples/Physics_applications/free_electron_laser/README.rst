@@ -25,7 +25,7 @@ Run
 This example can be run with the WarpX executable using an input file: ``warpx.1d inputs_test_1d_fel``. For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
 .. literalinclude:: inputs_test_1d_fel
-   :language: ini
+   :language: none
    :caption: You can copy this file from ``Examples/Physics_applications/free_electron_laser/inputs_test_1d_fel``.
 
 Visualize
@@ -42,5 +42,5 @@ emitted FEL radiation (red) slipping ahead of the beam.
 This figure was obtained with the script below, which can be run with ``python3 plot_sim.py``.
 
 .. literalinclude:: plot_sim.py
-   :language: ini
+   :language: none
    :caption: You can copy this file from ``Examples/Physics_applications/free_electron_laser/plot_sim.py``.

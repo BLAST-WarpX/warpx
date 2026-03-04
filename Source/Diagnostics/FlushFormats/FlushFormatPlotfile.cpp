@@ -6,14 +6,14 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleIO.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_Box.H>
@@ -79,7 +79,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Geometry& /*full_BTD_snapshot*/,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
@@ -359,10 +359,11 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 {
     for (const auto& part_diag : particle_diags) {
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
-        PinnedMemoryParticleContainer* pinned_pc = part_diag.getPinnedParticleContainer();
+        WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
-            pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-            pc->make_alike<amrex::PinnedArenaAllocator>();
+            pinned_pc->make_alike<>() :
+            pc->make_alike<>();
+        tmp.SetArena(amrex::The_Pinned_Arena());
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;

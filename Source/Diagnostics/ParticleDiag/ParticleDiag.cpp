@@ -16,7 +16,7 @@ using namespace amrex;
 
 ParticleDiag::ParticleDiag (
     const std::string& diag_name, const std::string& name,
-    WarpXParticleContainer* pc, PinnedMemoryParticleContainer* pinned_pc):
+    WarpXParticleContainer* pc, WarpXParticleContainer::Base* pinned_pc):
     m_diag_name(diag_name), m_name(name), m_pc(pc), m_pinned_pc(pinned_pc)
 {
     //variable to set m_plot_flags size
@@ -38,6 +38,7 @@ ParticleDiag::ParticleDiag (
             for (auto& var : variables){
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 // we reconstruct to Cartesian x,y,z for RZ particle output
+                if (var == "x") { var = "r"; }
                 if (var == "y") { var = "theta"; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)

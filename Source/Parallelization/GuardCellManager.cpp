@@ -322,14 +322,6 @@ guardCellManager::Init (
         ng_afterPushPSATD = ng_alloc_EB;
     }
 
-    if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-        evolve_scheme == EvolveScheme::SemiImplicitEM ||
-        evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
-        // For these implicit schemes, the number of ghost cells
-        // for EB must be at least as many as those for J.
-        ng_alloc_EB.max( ng_alloc_J );
-    }
-
     if (safe_guard_cells){
         // Run in safe mode: exchange all allocated guard cells at each
         // call of FillBoundary
@@ -379,4 +371,14 @@ guardCellManager::Init (
             ng_MovingWindow[moving_window_dir] = 1;
         }
     }
+
+    if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+        evolve_scheme == EvolveScheme::SemiImplicitEM ||
+        evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // For these implicit schemes, the number of ghost cells
+        // for EB gather must be consistent with those for J.
+        ng_alloc_EB.max( ng_alloc_J );
+        ng_FieldGather.max( ng_alloc_J );
+    }
+
 }

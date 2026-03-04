@@ -181,7 +181,7 @@ then
 else
   git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git ${SRC_DIR}/petsc
 fi
-cd petsc
+cd ${SRC_DIR}/petsc
 ./configure    \
     CC=${CC}   \
     CXX=${CXX} \

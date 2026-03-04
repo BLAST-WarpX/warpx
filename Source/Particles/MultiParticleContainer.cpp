@@ -37,7 +37,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "EmbeddedBoundary/ParticleScraper.H"
 #include "EmbeddedBoundary/ParticleBoundaryProcess.H"
@@ -45,6 +44,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -205,42 +205,8 @@ MultiParticleContainer::ReadParameters ()
 
         }
 
-        // if the input string for B_ext_particle_s is
-        // "read_from_file" then the mathematical expression
-        // for the time dependency read_fields_B_dependency(t)
-        // can be provided in the input file. If not provided, it defaults to '1.0'
-        if (m_B_ext_particle_s == "read_from_file") {
-            // store the mathematical expression as string
-            std::string str_B_ext_time_function = "1.0";
-            utils::parser::Query_parserString(
-                pp_particles, "read_fields_B_dependency(t)",
-                str_B_ext_time_function);
-
-            // Parser for B_external on the particle
-            m_B_particle_from_file_parser = std::make_unique<amrex::Parser>(
-               utils::parser::makeParser(str_B_ext_time_function,{"t"}));
-
-            m_Bfield_time_partparser = m_B_particle_from_file_parser->compile<1>();
-        }
-
-        // if the input string for E_ext_particle_s is
-        // "read_from_file" then the mathematical expression
-        // for the time dependency read_fields_E_dependency(t)
-        // can be provided in the input file. If not provided, it defaults to '1.0'
-        if (m_E_ext_particle_s == "read_from_file") {
-            // store the mathematical expression as string
-            std::string str_E_ext_time_function = "1.0";
-            utils::parser::Query_parserString(
-                pp_particles, "read_fields_E_dependency(t)",
-                str_E_ext_time_function);
-
-            // Parser for B_external on the particle
-            m_E_particle_from_file_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_E_ext_time_function,{"t"}));
-
-            m_Efield_time_partparser = m_E_particle_from_file_parser->compile<1>();
-
-        }
+        // Read parameters and setup meta data for external particle fields
+        m_external_particle_fields_metadata.ReadParameters();
 
         // if the input string for E_ext_particle_s or B_ext_particle_s is
         // "repeated_plasma_lens" then the plasma lens properties
@@ -556,10 +522,11 @@ MultiParticleContainer::PushX (Real dt)
 void
 MultiParticleContainer::PushP (int lev, Real dt,
                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                               MomentumPushType momentum_push_type)
 {
     for (auto& pc : allcontainers) {
-        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz);
+        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type);
     }
 }
 
@@ -974,6 +941,12 @@ MultiParticleContainer::mapSpeciesProduct ()
                 pc->m_qed_quantum_sync_phot_product_name);
             pc->m_qed_quantum_sync_phot_product = i_product_phot;
         }
+
+        if(pc->has_virtual_photons()){
+            const int i_vphot = getSpeciesID(
+                pc->m_qed_virtual_photon_species_name);
+            pc->m_qed_virtual_photon_species = i_vphot;
+        }
 #endif
 
     }
@@ -1064,7 +1037,7 @@ MultiParticleContainer::doFieldIonization (int lev,
                                            const MultiFab& By,
                                            const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
+    ABLASTR_PROFILE("MultiParticleContainer::doFieldIonization()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1124,7 +1097,7 @@ MultiParticleContainer::doFieldIonization (int lev,
 void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
-    WARPX_PROFILE("MultiParticleContainer::doCollisions()");
+    ABLASTR_PROFILE("MultiParticleContainer::doCollisions()");
     collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
@@ -1498,7 +1471,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 void
 MultiParticleContainer::doQEDSchwinger ()
 {
-    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQEDSchwinger()");
 
     if (!m_do_qed_schwinger) {return;}
 
@@ -1674,7 +1647,7 @@ void MultiParticleContainer::doQedEvents (int lev,
                                           const MultiFab& By,
                                           const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedEvents()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedEvents()");
 
     doQedBreitWheeler(lev, Ex, Ey, Ez, Bx, By, Bz);
     doQedQuantumSync(lev, Ex, Ey, Ez, Bx, By, Bz);
@@ -1688,7 +1661,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
                                                 const MultiFab& By,
                                                 const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1771,7 +1744,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
                                                const MultiFab& By,
                                                const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedQuantumSync()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1876,6 +1849,12 @@ void MultiParticleContainer::CheckQEDProductSpecies()
                 allcontainers[pc->m_qed_quantum_sync_phot_product]->
                     AmIA<PhysicalSpecies::photon>(),
                 "ERROR: Quantum Synchrotron product species is of wrong type");
+        }
+        if(pc->has_virtual_photons()){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                allcontainers[pc->m_qed_virtual_photon_species]->
+                    AmIA<PhysicalSpecies::photon>(),
+                "ERROR: virtual photons species has to be a...photon species!");
         }
     }
 
