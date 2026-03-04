@@ -93,11 +93,11 @@ namespace ablastr::profiler
  */
 #define ABLASTR_PROFILE_VAR_2(fname, vname) \
     BL_PROFILE_VAR_NS(fname, vname); \
-    const bool BL_PROFILE_PASTE(vname, _should_profile) = true; \
+    [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = true; \
     if (BL_PROFILE_PASTE(vname, _should_profile)) { BL_PROFILE_VAR_START(vname); }
 #define ABLASTR_PROFILE_VAR_3(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
-    const bool BL_PROFILE_PASTE(vname, _should_profile) = \
+    [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = \
         ablastr::profiler::should_profile(when); \
     if (BL_PROFILE_PASTE(vname, _should_profile)) { BL_PROFILE_VAR_START(vname); }
 #define ABLASTR_PROFILE_VAR(...) \
@@ -111,10 +111,10 @@ namespace ablastr::profiler
  */
 #define ABLASTR_PROFILE_VAR_NS_2(fname, vname) \
     BL_PROFILE_VAR_NS(fname, vname); \
-    const bool BL_PROFILE_PASTE(vname, _should_profile) = true
+    [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = true
 #define ABLASTR_PROFILE_VAR_NS_3(fname, vname, when) \
     BL_PROFILE_VAR_NS(fname, vname); \
-    const bool BL_PROFILE_PASTE(vname, _should_profile) = \
+    [[maybe_unused]] const bool BL_PROFILE_PASTE(vname, _should_profile) = \
         ablastr::profiler::should_profile(when)
 #define ABLASTR_PROFILE_VAR_NS(...) \
     ABLASTR_PROFILE_SELECT_3(__VA_ARGS__, ABLASTR_PROFILE_VAR_NS_3, ABLASTR_PROFILE_VAR_NS_2, ignored)(__VA_ARGS__)
