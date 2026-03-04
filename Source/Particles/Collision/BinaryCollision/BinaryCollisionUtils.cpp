@@ -245,13 +245,13 @@ namespace BinaryCollisionUtils{
         }
 
         error_msg << "  energy error [eV]           = " << energy_error / PhysConst::q_e << "\n"
-                  << "  energy rel tolerance        = " << energy_rel_tolerance << "\n"
+                  << "  energy tolerance (rel.)     = " << energy_rel_tol << "\n"
                   << "  expected fusion energy [eV] = " << expected_fusion_energy / PhysConst::q_e << "\n"
                   << "  computed fusion energy [eV] = " << fusion_energy / PhysConst::q_e<< "\n"
                   << "Check that species masses are set correctly.";
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            energy_error < energy_rel_tolerance*expected_fusion_energy,
+            energy_error < energy_rel_tol*expected_fusion_energy,
             error_msg.str()
         );
 
