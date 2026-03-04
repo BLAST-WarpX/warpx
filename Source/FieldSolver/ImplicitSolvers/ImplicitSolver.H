@@ -54,6 +54,8 @@ public:
 
     void CreateParticleAttributes () const;
 
+    bool DoParticleSuborbits () { return m_particle_suborbits; }
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -99,12 +101,38 @@ public:
         else { return nullptr; }
     }
 
+    /**
+     * \brief Return reference to the multifabs for curl curl mask
+     */
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int dir) const
+    {
+        amrex::ignore_unused(lev,dir);
+        return nullptr;
+    }
+
+    /**
+     * \brief Return the space_dir number of components for the mass matrices used in
+     *        the preconditioner for field direction field_dir
+     */
+    int GetMassMatricesPCnComp (const int field_dir, const int space_dir) const
+    {
+        if      (field_dir == 0) { return m_ncomp_pc_xx[space_dir]; }
+        else if (field_dir == 1) { return m_ncomp_pc_yy[space_dir]; }
+        else if (field_dir == 2) { return m_ncomp_pc_zz[space_dir]; }
+        else { return -1; }
+    }
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
-    void ComputeJfromMassMatrices ();
+    void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
+
+    /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
 
 protected:
 
@@ -149,6 +177,23 @@ protected:
     int m_max_particle_iterations = 21;
 
     /**
+     * \brief whether to use suborbits for particles that fail to converge in
+     * m_max_particle_iterations iterations
+     */
+    bool m_particle_suborbits = false;
+
+    /**
+     * \brief whether the details of unconverged particles are printed out during
+     * the particle evolve loops
+     */
+    bool m_print_unconverged_particle_details = false;
+
+    /**
+     * \brief whether to skip the full Picard update of particles on the initial newton step
+     */
+    bool m_skip_particle_picard_init = false;
+
+    /**
      * \brief Whether to use mass matrices for the implicit solver
      */
     bool m_use_mass_matrices = false;
@@ -164,6 +209,11 @@ protected:
     bool m_use_mass_matrices_pc = false;
 
     /**
+     * \brief Width for mass matrices in the preconditioner
+     */
+    int m_mass_matrices_pc_width = -1;
+
+    /**
      * \brief Direction-dependent component number of mass matrices elements
      */
     amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
@@ -175,6 +225,14 @@ protected:
     amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     *        used for the preconditioner
+     */
+    amrex::IntVect m_ncomp_pc_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_zz = amrex::IntVect{0};
 
     /**
      * \brief Array of multifab pointers to mass matrix preconditioner
@@ -191,7 +249,7 @@ protected:
      */
     void InitializeMassMatrices ();
 
-    void PrintMassMatricesParameters () const;
+    void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
@@ -211,14 +269,19 @@ protected:
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
 
     /**
-     * \brief Save E and J at start of each Newton step
+     * \brief Add J from particles included in mass matrices at start of each Newton step
      */
-    void SaveEandJ ();
+    void CumulateJ ();
+
+    /**
+     * \brief Save E at start of each Newton step
+     */
+    void SaveE ();
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
-    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, const int bdry_side ) const;
 
 };
 

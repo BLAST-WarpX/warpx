@@ -19,9 +19,9 @@ Dimensions       CMake Option
 **RSPHERE3V**    ``WarpX_DIMS=RSPHERE``
 ===============  ==========================
 
-Note that one can :ref:`build multiple WarpX dimensions at once <building-cmake-options>` via ``-DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"``.
+Note that one can :ref:`build multiple WarpX dimensions at once <install-build-options>` via ``-DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"``.
 
-See :ref:`building from source <install-developers>` for further details.
+See :ref:`building from source <install-build-cmake>` for further details.
 
 Defines
 -------

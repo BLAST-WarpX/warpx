@@ -28,6 +28,3 @@ Python-build:
 
 Doxygen-build:
 	doxygen Doxyfile
-
-Latex-conversion:
-	cd source/latex_theory; make

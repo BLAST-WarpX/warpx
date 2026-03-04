@@ -2,6 +2,7 @@
 #define WARPX_FULLDIAGNOSTICS_H_
 
 #include "Diagnostics.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/Parser/IntervalsParser.H"
 
 #include <AMReX_REAL.H>
@@ -90,7 +91,9 @@ private:
       * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
       */
     void InitializeFieldFunctors (int lev) override;
-    void InitializeParticleBuffer () override;
+
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
+
     /** Prepare field data to be used for diagnostics */
     void PrepareFieldDataForOutput () override;
     /** Prepare particle data to be used for diagnostics. */

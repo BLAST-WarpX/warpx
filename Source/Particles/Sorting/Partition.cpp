@@ -7,8 +7,8 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SortingUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuDevice.H>
 #include <AMReX_GpuLaunch.H>
@@ -58,7 +58,7 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     iMultiFab const* current_masks,
     iMultiFab const* gather_masks )
 {
-    WARPX_PROFILE("PhysicalParticleContainer::PartitionParticlesInBuffers");
+    ABLASTR_PROFILE("PhysicalParticleContainer::PartitionParticlesInBuffers");
 
     // Initialize temporary arrays
     Gpu::DeviceVector<int> inexflag;
@@ -135,7 +135,9 @@ PhysicalParticleContainer::PartitionParticlesInBuffers(
     {
         // Prepare temporary particle tile to copy to
         ParticleTileType ptile_tmp;
-        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps());
+        auto soa_rdata_names = GetRealSoANames();
+        auto soa_idata_names = GetIntSoANames();
+        ptile_tmp.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names, amrex::The_Arena());
         ptile_tmp.resize(np);
 
         // Copy and re-order the data of the current particle tile

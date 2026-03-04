@@ -33,10 +33,10 @@
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SpeciesPhysicalProperties.H"
+#include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "EmbeddedBoundary/ParticleScraper.H"
 #include "EmbeddedBoundary/ParticleBoundaryProcess.H"
@@ -44,6 +44,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -73,6 +74,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <string>
@@ -203,6 +205,9 @@ MultiParticleContainer::ReadParameters ()
 
         }
 
+        // Read parameters and setup meta data for external particle fields
+        m_external_particle_fields_metadata.ReadParameters();
+
         // if the input string for E_ext_particle_s or B_ext_particle_s is
         // "repeated_plasma_lens" then the plasma lens properties
         // must be provided in the input file.
@@ -305,21 +310,32 @@ MultiParticleContainer::ReadParameters ()
                     species_types[i] = PCTypes::RigidInjected;
                 }
             }
+
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            if (!photon_species.empty()) {
-                for (auto const& name : photon_species) {
-                    auto it = std::find(species_names.begin(), species_names.end(), name);
-                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        it != species_names.end(),
-                        "species '" + name
-                        + "' in particles.photon_species must be part of particles.species_names");
-                    const auto i = static_cast<int>(std::distance(species_names.begin(), it));
-                    species_types[i] = PCTypes::Photon;
+            const int spec_size = species_names.size();
+            for (int spec_index = 0; spec_index < spec_size; ++spec_index){
+
+                const auto name = species_names[spec_index];
+
+                bool species_type_is_photon = false;
+                const ParmParse pp_species(name);
+                if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
+                    const auto physical_species =
+                        species::from_string(type_string);
+                    species_type_is_photon =
+                        (physical_species.value() == PhysicalSpecies::photon);
+                }
+
+                //deprecated
+                const bool name_is_in_photon_species =
+                    utils::algorithms::is_in(photon_species, name);
+
+                if (name_is_in_photon_species || species_type_is_photon  ){
+                    species_types[spec_index] = PCTypes::Photon;
                 }
             }
-
         }
         pp_particles.query("use_fdtd_nci_corr", WarpX::use_fdtd_nci_corr);
 #ifdef WARPX_DIM_RZ
@@ -454,7 +470,9 @@ void
 MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 std::string const& current_fp_string,
-                                Real t, Real dt, DtType a_dt_type, bool skip_deposition,
+                                Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                PositionPushType position_push_type,
+                                MomentumPushType momentum_push_type,
                                 ImplicitOptions const * implicit_options)
 {
     if (! skip_deposition) {
@@ -469,6 +487,9 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
         if (implicit_options && implicit_options->deposit_mass_matrices) {
+            fields.get(FieldType::current_fp_MM, Direction{0}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{1}, lev)->setVal(0.0);
+            fields.get(FieldType::current_fp_MM, Direction{2}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
@@ -478,10 +499,15 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
             fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
+            if (implicit_options->use_mass_matrices_pc) {
+                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
+                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
+            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, a_dt_type, skip_deposition, implicit_options);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
     }
 }
 
@@ -496,10 +522,11 @@ MultiParticleContainer::PushX (Real dt)
 void
 MultiParticleContainer::PushP (int lev, Real dt,
                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                               MomentumPushType momentum_push_type)
 {
     for (auto& pc : allcontainers) {
-        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz);
+        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type);
     }
 }
 
@@ -698,7 +725,6 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                         }
                     });
             }
-
         }
 
 #ifdef AMREX_USE_OMP
@@ -718,9 +744,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                     }
                 });
         }
-
     }
-
 }
 
 void
@@ -731,6 +755,7 @@ MultiParticleContainer::SortParticlesByBin (
 {
     for (auto& pc : allcontainers) {
         if (sort_particles_for_deposition) {
+            if (pc->do_not_deposit) { continue; }
             pc->SortParticlesForDeposition(sort_idx_type);
         } else {
             pc->SortParticlesByBin(bin_size);
@@ -1012,7 +1037,7 @@ MultiParticleContainer::doFieldIonization (int lev,
                                            const MultiFab& By,
                                            const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
+    ABLASTR_PROFILE("MultiParticleContainer::doFieldIonization()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1072,7 +1097,7 @@ MultiParticleContainer::doFieldIonization (int lev,
 void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
-    WARPX_PROFILE("MultiParticleContainer::doCollisions()");
+    ABLASTR_PROFILE("MultiParticleContainer::doCollisions()");
     collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
@@ -1343,8 +1368,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1428,8 +1452,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        WarpXUtilIO::WriteBinaryDataOnFile(table_name,
-            Vector<char>{data.begin(), data.end()});
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
     }
 
     ParallelDescriptor::Barrier();
@@ -1448,7 +1471,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 void
 MultiParticleContainer::doQEDSchwinger ()
 {
-    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQEDSchwinger()");
 
     if (!m_do_qed_schwinger) {return;}
 
@@ -1624,7 +1647,7 @@ void MultiParticleContainer::doQedEvents (int lev,
                                           const MultiFab& By,
                                           const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedEvents()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedEvents()");
 
     doQedBreitWheeler(lev, Ex, Ey, Ez, Bx, By, Bz);
     doQedQuantumSync(lev, Ex, Ey, Ez, Bx, By, Bz);
@@ -1638,7 +1661,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
                                                 const MultiFab& By,
                                                 const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1721,7 +1744,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
                                                const MultiFab& By,
                                                const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedQuantumSync()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 

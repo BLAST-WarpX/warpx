@@ -14,8 +14,6 @@
 #include "MultiParticleContainer_fwd.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/Collision/CollisionHandler.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
@@ -26,6 +24,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpXParticleContainer.H"
 #include "ParticleBoundaries.H"
+#include "ExternalParticleFields.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 
@@ -112,8 +111,10 @@ public:
         std::string const& current_fp_string,
         amrex::Real t,
         amrex::Real dt,
-        DtType a_dt_type=DtType::Full,
+        SubcyclingHalf subcycling_half=SubcyclingHalf::None,
         bool skip_deposition=false,
+        PositionPushType position_push_type=PositionPushType::Full,
+        MomentumPushType momentum_push_type=MomentumPushType::Full,
         ImplicitOptions const * implicit_options = nullptr
     );
 
@@ -131,7 +132,8 @@ public:
     */
     void PushP (int lev, amrex::Real dt,
                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
-                const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
+                const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                MomentumPushType momentum_push_type);
 
     /**
     * \brief This returns a MultiFAB filled with zeros. It is used to return the charge density
@@ -339,6 +341,8 @@ public:
     std::unique_ptr<amrex::Parser> m_Ex_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ey_particle_parser;
     std::unique_ptr<amrex::Parser> m_Ez_particle_parser;
+
+    ExternalParticleFields m_external_particle_fields_metadata;
 
     amrex::ParticleReal m_repeated_plasma_lens_period;
     amrex::Vector<amrex::ParticleReal> h_repeated_plasma_lens_starts;

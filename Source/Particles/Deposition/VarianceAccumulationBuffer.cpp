@@ -9,8 +9,8 @@
 
 #include "Particles/Deposition/VarianceAccumulationBuffer.H"
 #include "Particles/Deposition/TemperatureDeposition.H"
-#include "Parallelization/WarpXSumGuardCells.H"
 #include "Fields.H"
+#include "WarpX.H"
 
 #include <ablastr/utils/Communication.H>
 

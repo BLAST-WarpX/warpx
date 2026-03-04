@@ -10,8 +10,6 @@
 #ifndef WARPX_PhysicalParticleContainer_H_
 #define WARPX_PhysicalParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "Particles/ElementaryProcess/Ionization.H"
 #ifdef WARPX_QED
@@ -24,6 +22,7 @@
 #include "Particles/Resampling/Resampling.H"
 #include "WarpXParticleContainer.H"
 #include "Particles/Deposition/TemperatureDepositionTypes.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
@@ -91,8 +90,10 @@ public:
      * \param current_fp_string Current (coarse or fine patch) identifier in fields
      * \param t Current physical time
      * \param dt Time Step by which particles are advanced
-     * \param a_dt_type Type of time step (used for sub-cycling)
+     * \param subcycling_half Type of time step (used for sub-cycling)
      * \param skip_deposition Skip the charge and current deposition
+     * \param position_push_type Type of time advance for particle position (full, first half, second half, none)
+     * \param momentum_push_type Type of time advance for particle momentum (full, first half, second half, none)
      * \param implicit_options Structure with specific options for implicit methods
      *
      * Evolve iterates over particle iterator (each box) and performs filtering,
@@ -104,10 +105,15 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
+    /**
+     * \brief Gather fields and push particles in one fused kernel.
+     */
     virtual void PushPX (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
                          amrex::FArrayBox const * eyfab,
@@ -120,7 +126,23 @@ public:
                          long np_to_push,
                          int lev, int gather_lev,
                          amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                         PositionPushType position_push_type=PositionPushType::Full,
+                         MomentumPushType momentum_push_type=MomentumPushType::Full);
+
+    void FindSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void SetupSuborbitParticles (WarpXParIter& pti,
+                         long offset,
+                         long np_to_push,
+                         long num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void ImplicitPushXP (WarpXParIter& pti,
                          amrex::FArrayBox const * exfab,
@@ -134,8 +156,31 @@ public:
                          long offset,
                          long np_to_push,
                          int lev, int gather_lev,
-                         amrex::Real dt, ScaleFields scaleFields,
-                         DtType a_dt_type=DtType::Full);
+                         amrex::Real dt,
+                         long & num_unconverged_particles,
+                         amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                         amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
+
+    void ImplicitPushXPSubOrbits (WarpXParIter& pti,
+                                  ablastr::fields::MultiFabRegister& fields,
+                                  amrex::FArrayBox const * exfab,
+                                  amrex::FArrayBox const * eyfab,
+                                  amrex::FArrayBox const * ezfab,
+                                  amrex::FArrayBox const * bxfab,
+                                  amrex::FArrayBox const * byfab,
+                                  amrex::FArrayBox const * bzfab,
+                                  ImplicitOptions const * implicit_options,
+                                  amrex::IntVect ngEB,
+                                  amrex::MultiFab * const jx,
+                                  amrex::MultiFab * const jy,
+                                  amrex::MultiFab * const jz,
+                                  long offset,
+                                  int lev, int gather_lev,
+                                  amrex::Real dt,
+                                  bool skip_deposition,
+                                  long num_unconverged_particles,
+                                  amrex::Gpu::DeviceVector<long> & unconverged_indices,
+                                  amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -143,7 +188,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
@@ -184,7 +230,7 @@ public:
      * (this box should correspond to an integer number of cells in each direction,
      * but its boundaries need not be aligned with the actual cells of the simulation)
     */
-    void AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
+    void AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
 
     /**
      * Create new macroparticles for this species, with a fixed
@@ -234,7 +280,7 @@ public:
      * These are NOT initialized by this function.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& pinned_tile,
         int n_external_attr_real,
         int n_external_attr_int) final;
 
@@ -358,7 +404,7 @@ public:
     /**
      * Gets the index of the PhysicalParticleContainer
      * that corresponds to the virtual photons
-     * @return index of the
+     * @return index of the virtual photon species
      */
     int getVirtualPhotonSpeciesIndex () const override;
 #endif
