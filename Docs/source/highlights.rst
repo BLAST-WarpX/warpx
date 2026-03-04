@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Wang J X, Han L Q, Zhao X Y, Ablimit A, Gong Z, Wen H and Yu J Q.
+   **Muon injection and acceleration via ultraintense electron beam-driven plasma wakefield**.
+   Phys. Rev. Accel. Beams **29**, 021302, 2026.
+   `DOI:10.1103/wq5g-mtjq <https://doi.org/10.1103/wq5g-mtjq>`__
+
 #. Gardner C and Dollar F.
    **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
    New Journal of Physics **27**, 124301, 2025.
