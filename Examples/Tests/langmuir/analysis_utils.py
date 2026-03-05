@@ -1,26 +1,24 @@
-import re
+import sys
 
 import numpy as np
 from scipy.constants import epsilon_0
 
+sys.path.append("../../../../warpx/Tools/Parser/")
+from input_file_parser import parse_input_file
+
 
 def check_charge_conservation(data):
-    # Read the file that records which input options were used for this run.
-    with open("./warpx_used_inputs", "r") as f:
-        warpx_used_inputs = f.read()
-
     # Detect specific configuration flags via simple regex searches.
     # These flags determine whether the charge conservation check should run
     # and whether tolerances need to be relaxed.
-    geometry_rz = re.search("geometry.dims = RZ", warpx_used_inputs)
-    current_correction = re.search("psatd.current_correction = 1", warpx_used_inputs)
-    current_deposition_vay = re.search(
-        "algo.current_deposition = vay", warpx_used_inputs
+    input_dict = parse_input_file("./warpx_used_inputs")
+    geometry_rz = input_dict.get("geometry.dims") == "RZ"
+    current_correction = input_dict.get("psatd.current_correction") == 1
+    current_deposition_vay = input_dict.get("algo.current_deposition") == "vay"
+    current_deposition_esirkepov = (
+        input_dict.get("algo.current_deposition") == "esirkepov"
     )
-    current_deposition_esirkepov = re.search(
-        "algo.current_deposition = esirkepov", warpx_used_inputs
-    )
-    maxwell_solver_psatd = re.search("algo.maxwell_solver = psatd", warpx_used_inputs)
+    maxwell_solver_psatd = input_dict.get("algo.maxwell_solver") == "psatd"
 
     # Decide whether to perform the charge conservation check. We check with
     # current correction, Vay current deposition, and Esirkepov current deposition.
