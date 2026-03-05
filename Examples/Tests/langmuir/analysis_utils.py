@@ -7,18 +7,26 @@ sys.path.append("../../../../warpx/Tools/Parser/")
 from input_file_parser import parse_input_file
 
 
+def _get_input_bool(input_dict, key, expected_value):
+    """Extract a boolean from input_dict, checking if key exists and matches expected_value."""
+    value = input_dict.get(key)
+    return value is not None and value[0] == expected_value
+
+
 def check_charge_conservation(data):
     # Detect specific configuration flags via simple regex searches.
     # These flags determine whether the charge conservation check should run
     # and whether tolerances need to be relaxed.
     input_dict = parse_input_file("./warpx_used_inputs")
-    geometry_rz = input_dict.get("geometry.dims") == "RZ"
-    current_correction = input_dict.get("psatd.current_correction") == 1
-    current_deposition_vay = input_dict.get("algo.current_deposition") == "vay"
-    current_deposition_esirkepov = (
-        input_dict.get("algo.current_deposition") == "esirkepov"
+    geometry_dims_rz = _get_input_bool(input_dict, "geometry.dims", "RZ")
+    current_correction = _get_input_bool(input_dict, "psatd.current_correction", "1")
+    current_deposition_vay = _get_input_bool(
+        input_dict, "algo.current_deposition", "vay"
     )
-    maxwell_solver_psatd = input_dict.get("algo.maxwell_solver") == "psatd"
+    current_deposition_esirkepov = _get_input_bool(
+        input_dict, "algo.current_deposition", "esirkepov"
+    )
+    maxwell_solver_psatd = _get_input_bool(input_dict, "algo.maxwell_solver", "psatd")
 
     # Decide whether to perform the charge conservation check. We check with
     # current correction, Vay current deposition, and Esirkepov current deposition.
@@ -27,9 +35,12 @@ def check_charge_conservation(data):
     # We also do not check with Esirkepov deposition combined with the PSATD solver,
     # since that combination does not conserve charge except for spectral order 2.
     check_charge_conservation = (
-        current_correction
+        (
+            current_deposition_esirkepov
+            and not (geometry_dims_rz or maxwell_solver_psatd)
+        )
+        or current_correction
         or current_deposition_vay
-        or (current_deposition_esirkepov and not (geometry_rz or maxwell_solver_psatd))
     )
 
     # Default tolerance for the infinity-norm of the relative error between div(E) and rho/eps0.
