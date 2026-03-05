@@ -15,7 +15,6 @@
 
 #include <string>
 #include <sstream>
-#include <limits>
 
 #include "Utils/TextMsg.H"
 
@@ -210,39 +209,35 @@ namespace BinaryCollisionUtils{
         amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
         // The expected fusion energies are computed using fully ionized species mass
-        // computed as M = A*m_u - Z*m_e, with A the atomic mass numbers found in
+        // computed as M = A*m_u - Z*m_e, with the atomic mass numbers A found in
         // SpeciesPhysicalProperties.cpp
 
-        // Verify that the fusion energy is close to what is exected
+        // Verify that the fusion energy is close to what is expected
         std::ostringstream error_msg;
         amrex::ParticleReal expected_fusion_energy = 0.0_prt;
-        amrex::ParticleReal energy_error = std::numeric_limits<amrex::ParticleReal>::max();
         const amrex::ParticleReal energy_rel_tol = 0.01_prt;
         if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
             expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
-            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             error_msg << "Fusion energy mismatch in D + T -> He4 + n\n";
         }
         if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
             expected_fusion_energy = 4.032653948e6_prt * PhysConst::q_e;
-            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             error_msg << "Fusion energy mismatch in D + D -> T + p\n";
         }
         if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
             expected_fusion_energy = 3.26891111e6_prt * PhysConst::q_e;
-            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             error_msg << "Fusion energy mismatch in D + D -> He3 + n\n";
         }
         if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
             expected_fusion_energy = 18.35303980e6_prt * PhysConst::q_e;
-            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             error_msg << "Fusion energy mismatch in D + He3 -> He3 + p\n";
         }
         if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
             expected_fusion_energy = 8.68212502e6_prt * PhysConst::q_e;
-            energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
             error_msg << "Fusion energy mismatch in p + B11 -> 3 He4\n";
         }
+
+        amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
 
         error_msg << "  energy error [eV]           = " << energy_error / PhysConst::q_e << "\n"
                   << "  energy tolerance (rel.)     = " << energy_rel_tol << "\n"
