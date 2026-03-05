@@ -814,7 +814,7 @@ method used is similar to that of `Miller et al. (Phys. Plasmas 28, 112702 (2021
 
 The user specifies a region in which particles will be thermalized, a normal direction, a temperature, and a
 momentum threshold. Inside the thermalizing region, the probability that a particle will be affected increases
-from 0 to 1 as $(1/(1-x))**(1/4)$. Particles that are affected have their momenta in the normal direction thermalized
+from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta in the normal direction thermalized
 using the temperature paramters ``theta`` if their momenta are over the threshold. The parameters affecting this region
 are as follows:
 
