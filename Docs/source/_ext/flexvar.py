@@ -57,11 +57,10 @@ logger = logging.getLogger(__name__)
 if typing.TYPE_CHECKING:
     _VT = typing.TypeVar("_VT")
 
+
 class ObjectEntry(TypedDict):
     docname: str
     node_id: str
-    type: str
-    default: str
 
 
 class FlexVarDirective(ObjectDescription[str]):
@@ -241,8 +240,6 @@ class FlexVarDirective(ObjectDescription[str]):
             name=name,
             docname=self.env.docname,
             node_id=node_id,
-            type_str=self.options.get("type", ""),
-            default_str=self.options.get("default", ""),
             location=signode,
         )
 
@@ -382,8 +379,6 @@ class FlexVarDomain(Domain):
         name: str,
         docname: str,
         node_id: str,
-        type_str: str = "",
-        default_str: str = "",
         location: Any = None,
     ) -> None:
         if name in self.vars:
@@ -396,8 +391,6 @@ class FlexVarDomain(Domain):
         self.vars[name] = {
             "docname": docname,
             "node_id": node_id,
-            "type": type_str,
-            "default": default_str,
         }
 
     def clear_doc(self, docname: str) -> None:
