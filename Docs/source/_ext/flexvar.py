@@ -40,7 +40,6 @@ import typing
 from typing import Any, Iterator, List, cast, TypedDict
 
 from docutils import nodes
-from docutils.nodes import Node
 from docutils.parsers.rst import directives
 
 from sphinx import addnodes
@@ -111,27 +110,26 @@ class FlexVarDirective(ObjectDescription[str]):
     def _parse_inline_into_node_list(self, text: str) -> list[nodes.Node]:
         """
         Parse *text* as RST inline content and return the resulting nodes.
+
         Do not add directly to signode, as this will render without whitespaces.
         """
-        parsed, messages = self.state.inline_text(text, self.lineno)
+        parsed_nodes, messages = self.state.inline_text(text, self.lineno)
         # Report any parse warnings through the normal directive machinery
         for msg in messages:
             self.state_machine.reporter.system_message(
                 msg["level"], msg.astext(), source=self.get_source_info()[0]
             )
-        return parsed
-        # return [ nodes.inline(text, "", *parsed) ]
+        return parsed_nodes
 
-    def _parse_inline(self, text: str) -> nodes.inline:
+    def parse_inline(self, text: str) -> nodes.inline:
         """
         Parse text and combine into a single inline node.
-        This can added directly to signode to keep whitespace.
 
-        Note that *self._parse_inline might be equivalent to
-        self._parse_inline_into_node_list
+        This can added directly to signode to keep whitespace.
         """
-        parsed_list: list[nodes.Node] = self._parse_inline_into_node_list(text)
-        return nodes.inline(text, "", *parsed_list)
+        parsed_node_list = self._parse_inline_into_node_list(text)
+        inline_node = nodes.inline(text, "", *parsed_node_list)
+        return inline_node
 
     def handle_signature(
         self, sig: str, signode: addnodes.desc_signature,
@@ -158,7 +156,7 @@ class FlexVarDirective(ObjectDescription[str]):
         # The variable name itself
         signode += addnodes.desc_name(
             name, "",
-            self._parse_inline(name),
+            self.parse_inline(name),
         )
 
         helper = FlexVarOptionHelper(
@@ -178,7 +176,7 @@ class FlexVarDirective(ObjectDescription[str]):
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
             if type_:
-                type_node = self._parse_inline(type_)
+                type_node = self.parse_inline(type_)
                 if self.use_emphasis:
                     signode += nodes.emphasis(type_, "", type_node)
                 else:
@@ -189,7 +187,7 @@ class FlexVarDirective(ObjectDescription[str]):
                 signode += nodes.Text("in")
                 signode += addnodes.desc_sig_space()
             if unit:
-                signode += self._parse_inline(unit)
+                signode += self.parse_inline(unit)
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: optional, required, or possibly neither
@@ -207,20 +205,20 @@ class FlexVarDirective(ObjectDescription[str]):
         if value:
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
-            signode += nodes.inline("", "default")
+            signode += nodes.Text("default")
             signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
-            value_node = self._parse_inline(value)
+            value_node = self.parse_inline(value)
             if self.use_emphasis:
                 signode += nodes.emphasis(value, "", value_node)
             else:
-                signode += self._parse_inline(value)
+                signode += value_node
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: <annotation>
         if anno:
             signode += addnodes.desc_sig_space()
-            signode += self._parse_inline(anno)
+            signode += self.parse_inline(anno)
 
         return name
 
