@@ -70,18 +70,31 @@ class FlexVarDirective(ObjectDescription[str]):
 
     Supports variable names containing characters like <, >, /, commas, etc.
     See `handle_signature` for formatting details.
+
+    Specify at most one of the following:
+
+    - `default` and `value` are aliases
+    - `unit` and `units` are aliases
+    - `comment` and `annotation` are aliases
+    - `optional` and `required` are opposite flags
+
+    For example, the "default" and "value" options are equivalent, only specify one.
     """
 
     option_spec = {
         "type": directives.unchanged,
+        # `default` and `value` are aliases
         "default": directives.unchanged,
-        "value": directives.unchanged, # alias of `default`
+        "value": directives.unchanged,
+        # `optional` and `required` flags are opposites. Do not specify both
         "optional": directives.flag,
-        "required": directives.flag, # opposite of `optional`
+        "required": directives.flag,
+        # `unit` and `units` are aliases
         "unit": directives.unchanged,
-        "units": directives.unchanged, # alias of `unit`
+        "units": directives.unchanged,
+        # `comment` and `annotation` are aliases
+        "comment": directives.unchanged,
         "annotation": directives.unchanged,
-        "comment": directives.unchanged, # alias of annotation
         "noindex": directives.flag,
     }
 
@@ -154,7 +167,7 @@ class FlexVarDirective(ObjectDescription[str]):
         )
 
         type_ = helper.get_and_check_aliases("type")
-        value = helper.get_and_check_aliases("value", "default")
+        value = helper.get_and_check_aliases("default", "value")
         unit = helper.get_and_check_aliases("unit", "units")
         anno = helper.get_and_check_aliases("annotation", "comment")
         l_optional = ("optional" in self.options)
