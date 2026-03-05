@@ -37,11 +37,10 @@ from __future__ import annotations
 
 import re
 import typing
-from typing import Any, Iterator, List, cast, TypedDict
+from typing import Any, Iterator, List, TypedDict, cast
 
 from docutils import nodes
 from docutils.parsers.rst import directives
-
 from sphinx import addnodes
 from sphinx.application import Sphinx
 from sphinx.directives import ObjectDescription
@@ -132,7 +131,9 @@ class FlexVarDirective(ObjectDescription[str]):
         return inline_node
 
     def handle_signature(
-        self, sig: str, signode: addnodes.desc_signature,
+        self,
+        sig: str,
+        signode: addnodes.desc_signature,
     ) -> str:
         """
         Build the rendered signature node and return the canonical name.
@@ -155,20 +156,23 @@ class FlexVarDirective(ObjectDescription[str]):
 
         # The variable name itself
         signode += addnodes.desc_name(
-            name, "",
+            name,
+            "",
             self.parse_inline(name),
         )
 
         helper = FlexVarOptionHelper(
-            options=self.options, name=name, signode=signode,
+            options=self.options,
+            name=name,
+            signode=signode,
         )
 
         type_ = helper.get_and_check_aliases("type")
         value = helper.get_and_check_aliases("default", "value")
         unit = helper.get_and_check_aliases("unit", "units")
         anno = helper.get_and_check_aliases("annotation", "comment")
-        l_optional = ("optional" in self.options)
-        l_required = ("required" in self.options)
+        l_optional = "optional" in self.options
+        l_required = "required" in self.options
 
         # Format: (`<type>`; in <unit>)
         if type_ or unit:
@@ -248,7 +252,6 @@ class FlexVarDirective(ObjectDescription[str]):
 
 
 class FlexVarOptionHelper:
-
     def __init__(
         self,
         options: dict[str, Any],
@@ -277,7 +280,8 @@ class FlexVarOptionHelper:
         if sum(blist) > 1:
             logger.warning(
                 "Conflicting options for %s: specify only one of :%s",
-                self.name, keys,
+                self.name,
+                keys,
                 location=self.signode,
             )
 
@@ -384,7 +388,10 @@ class FlexVarDomain(Domain):
             logger.warning(
                 "duplicate object description of %s, "
                 "other instance in %s, use :noindex: for one of them",
-                name, other["docname"], location=location)
+                name,
+                other["docname"],
+                location=location,
+            )
 
         self.vars[name] = {
             "docname": docname,
@@ -427,12 +434,12 @@ class FlexVarDomain(Domain):
     def get_objects(self) -> Iterator[tuple[str, str, str, str, str, int]]:
         for name, info in self.vars.items():
             yield (
-                name,             # name
-                name,             # dispname
-                "var",            # type
+                name,  # name
+                name,  # dispname
+                "var",  # type
                 info["docname"],  # docname
                 info["node_id"],  # anchor
-                1,                # priority
+                1,  # priority
             )
 
 

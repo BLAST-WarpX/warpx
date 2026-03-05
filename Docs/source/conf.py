@@ -31,8 +31,8 @@ import json
 import os
 import subprocess
 import sys
-import urllib.request
 import typing
+import urllib.request
 
 import pybtex.plugin
 import sphinx_rtd_theme  # noqa
@@ -40,8 +40,8 @@ from pybtex.style.formatting.unsrt import Style as UnsrtStyle
 
 if typing.TYPE_CHECKING:
     from sphinx.application import Sphinx
-    from sphinx.extension import Extension
     from sphinx.domains import Domain
+    from sphinx.extension import Extension
 
 module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
@@ -60,6 +60,7 @@ def download_with_headers(url, filename):
     except Exception as e:
         print(f"Could not download {filename} from {url}: {e}")
         print("Continuing build without cross-reference file...")
+
 
 # -- General configuration ------------------------------------------------
 
@@ -83,6 +84,7 @@ extensions = [
     "flexvar",
 ]
 
+
 # Sphinx hook
 def setup(app: Sphinx):
     """Custom Sphinx setup for WarpX docs."""
@@ -91,15 +93,15 @@ def setup(app: Sphinx):
 
     extension = app.extensions.get("flexvar", None)
     if extension is None:
-        print(f"conf.py setup: failed to find extension flexvar")
+        print("conf.py setup: failed to find extension flexvar")
         return
     FlexVarDomain = getattr(extension.module, "FlexVarDomain", None)
     if FlexVarDomain is None:
-        print(f"conf.py setup: failed to find FlexVarDomain")
+        print("conf.py setup: failed to find FlexVarDomain")
         return
 
     # Add some convenient aliases to the global domain
-    aliases = [ "warpxparam", "wparam", "param", "wp", "p" ]
+    aliases = ["warpxparam", "wparam", "param", "wp", "p"]
     for alias in aliases:
         # Add aliases for the fv:var directive
         app.add_directive_to_domain(
@@ -109,6 +111,7 @@ def setup(app: Sphinx):
             override=False,
         )
     print(f"conf.py setup: added aliases = {aliases} for fv:var directive")
+
 
 # Google Analytics
 googleanalytics_id = "G-QZGY5060MZ"
