@@ -208,14 +208,12 @@ namespace BinaryCollisionUtils{
         // Compute the fusion energy
         amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
+        // Verify that the fusion energy is close to what is expected.
         // The expected fusion energies are computed using fully ionized species mass
         // computed as M = A*m_u - Z*m_e, with the atomic mass numbers A found in
         // SpeciesPhysicalProperties.cpp
-
-        // Verify that the fusion energy is close to what is expected
         std::ostringstream error_msg;
         amrex::ParticleReal expected_fusion_energy = 0.0_prt;
-        const amrex::ParticleReal energy_rel_tol = 0.01_prt;
         if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
             expected_fusion_energy = 17.58929696e6_prt * PhysConst::q_e;
             error_msg << "Fusion energy mismatch in D + T -> He4 + n\n";
@@ -237,7 +235,8 @@ namespace BinaryCollisionUtils{
             error_msg << "Fusion energy mismatch in p + B11 -> 3 He4\n";
         }
 
-        amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+        const amrex::ParticleReal energy_error = amrex::Math::abs(fusion_energy - expected_fusion_energy);
+        const amrex::ParticleReal energy_rel_tol = 0.01_prt;
 
         error_msg << "  energy error [eV]           = " << energy_error / PhysConst::q_e << "\n"
                   << "  energy tolerance (rel.)     = " << energy_rel_tol << "\n"
