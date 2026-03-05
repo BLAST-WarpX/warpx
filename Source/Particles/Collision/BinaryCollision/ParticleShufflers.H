@@ -198,7 +198,8 @@ template <typename T_index>
 void ModulusShuffle (int n_cells, T_index np, int nrounds, T_index const * cell_offsets, T_index * indices)
 {
     for (int round = 0 ; round < nrounds ; round++) {
-        int nsub = 1 + amrex::Random_int(4);
+        // On the first round, always shuffle over all particles
+        int const nsub = round == 0 ? 1 : 1 + amrex::Random_int(4);
         ModulusShuffleSingle(n_cells, np, nsub, cell_offsets, indices);
     }
 }
