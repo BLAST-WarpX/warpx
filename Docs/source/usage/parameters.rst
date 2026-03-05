@@ -120,7 +120,7 @@ For example, ``something_intervals = -1`` deactivates ``something`` and ``someth
 Simulation Time
 ---------------
 
-.. wparam:: max_step
+.. fv.var:: max_step
     :type: `integer`
 
     The number of PIC cycles to perform.
