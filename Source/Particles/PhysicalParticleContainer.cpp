@@ -469,7 +469,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         has_rho &&
         !skip_deposition &&
         !do_not_deposit &&
-        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::SecondHalf)
+        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf)
     );
     bool const deposit_charge_new = (
         has_rho &&
