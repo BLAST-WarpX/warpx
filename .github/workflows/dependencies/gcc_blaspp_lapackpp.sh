@@ -12,12 +12,15 @@ set -eu -o pipefail
 #   failed files the given number of times.
 echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
 
+# Parse GCC version from the command line (default: 12)
+GCC_VERSION=${1:-12}
+
 sudo apt-get -qqq update
 sudo apt-get install -y \
     build-essential     \
     ca-certificates     \
     cmake               \
-    g++-12              \
+    g++-${GCC_VERSION}  \
     gnupg               \
     libboost-math-dev   \
     libfftw3-dev        \
