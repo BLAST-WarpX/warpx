@@ -1536,7 +1536,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 if (fab.arena()->isManaged() || fab.arena()->isDevice()) {
                     if (hasADIOS)
                     {
-                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()", ablastr::profiler::OmitUnlessDeviceSynced);
                         auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
                              chunk_offset, chunk_size,
                              [&local_box](size_t /* size */) {
@@ -1548,7 +1548,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                         amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
                     } else
                     {
-                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H()");
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H()", ablastr::profiler::OmitUnlessDeviceSynced);
                         amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
                         std::shared_ptr<amrex::Real> data_pinned(foo.release());
                         amrex::Gpu::dtoh_memcpy_async(data_pinned.get(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
@@ -1560,7 +1560,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 { // CPU
                   if (hasADIOS)
                     {
-                      ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
+                      ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()", ablastr::profiler::OmitUnlessDeviceSynced);
                       auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
                            chunk_offset, chunk_size,
                            [&local_box](size_t /* size */) {
@@ -1574,7 +1574,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                     }
                   else
                     {
-                       ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
+                       ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()", ablastr::profiler::OmitUnlessDeviceSynced);
                        amrex::Real const *local_data = fab.dataPtr(icomp);
                        mesh_comp.storeChunkRaw( local_data, chunk_offset, chunk_size);
                     }

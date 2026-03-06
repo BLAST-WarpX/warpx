@@ -441,7 +441,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using warpx::fields::FieldType;
 
     ABLASTR_PROFILE("PhysicalParticleContainer::Evolve()");
-    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg, ablastr::profiler::OmitUnlessDeviceSynced);
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 

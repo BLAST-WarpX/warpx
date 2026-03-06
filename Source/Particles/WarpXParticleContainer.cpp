@@ -449,15 +449,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     const amrex::ParticleReal q = this->charge;
 
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::FindMaxTilesize",
-            blp_get_max_tilesize);
+            blp_get_max_tilesize, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::DirectCurrentDepKernel",
-            direct_current_dep_kernel);
+            direct_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::EsirkepovCurrentDepKernel",
-            esirkepov_current_dep_kernel);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate);
+            esirkepov_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit, ablastr::profiler::OmitUnlessDeviceSynced);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1021,15 +1021,15 @@ WarpXParticleContainer::DepositCurrentAndMassMatrices ( WarpXParIter& pti, const
     const amrex::ParticleReal qs = this->charge;
     const amrex::ParticleReal mass = this->m_mass;
 
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::FindMaxTilesize",
-            blp_get_max_tilesize);
+            blp_get_max_tilesize, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::DirectCurrentDepKernel",
-            direct_current_dep_kernel);
+            direct_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::EsirkepovCurrentDepKernel",
-            esirkepov_current_dep_kernel);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate);
+            esirkepov_current_dep_kernel, ablastr::profiler::OmitUnlessDeviceSynced);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::CurrentDeposition", blp_deposit, ablastr::profiler::OmitUnlessDeviceSynced);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrentAndMassMatrices::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
     // Get tile box where current is deposited.
     // The tile box is different when depositing in the buffers (depos_lev<lev)
@@ -1534,9 +1534,9 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 
         const Real q = this->charge;
 
-        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort);
-        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd);
-        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate);
+        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort, ablastr::profiler::OmitUnlessDeviceSynced);
+        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd, ablastr::profiler::OmitUnlessDeviceSynced);
+        ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate, ablastr::profiler::OmitUnlessDeviceSynced);
 
         // Get tile box where charge is deposited.
         // The tile box is different when depositing in the buffers (depos_lev<lev)

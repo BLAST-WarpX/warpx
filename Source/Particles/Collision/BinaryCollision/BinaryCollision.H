@@ -283,7 +283,7 @@ public:
         using namespace ParticleUtils;
         using namespace amrex::literals;
 
-        ABLASTR_PROFILE("BinaryCollision::doCollisionsWithinTile");
+        ABLASTR_PROFILE("BinaryCollision::doCollisionsWithinTile", ablastr::profiler::OmitUnlessDeviceSynced);
 
         const auto& binary_collision_functor = m_binary_collision_functor.executor();
         const bool have_product_species = m_have_product_species;
@@ -359,7 +359,7 @@ public:
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell, ablastr::profiler::OmitUnlessDeviceSynced);
             ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
             ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
 
@@ -387,7 +387,7 @@ public:
             // Compute how many pairs in each cell and store in n_pairs_in_each_cell array
             // For a single species, the number of pair in a cell is half the number of particles
             // in that cell, rounded up to the next higher integer.
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelFor( n_cells_products,
                 [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
@@ -529,7 +529,7 @@ public:
 
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures, ablastr::profiler::OmitUnlessDeviceSynced);
 
             if (m_correct_energy_momentum ||
                 binary_collision_functor.m_computeSpeciesDensities ||
@@ -537,7 +537,7 @@ public:
 
                 bool const correct_energy_momentum = m_correct_energy_momentum;
 
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics, ablastr::profiler::OmitUnlessDeviceSynced);
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
                 amrex::ParallelFor( np1,
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
@@ -583,7 +583,7 @@ public:
             }
 
             // Finish temperature calculation
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelFor( n_cells, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
                     // The particles from species1 that are in the cell `i_cell` are
@@ -609,7 +609,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
 
             // shuffle
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
@@ -634,7 +634,7 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -709,7 +709,7 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
                 amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
 
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum, ablastr::profiler::OmitUnlessDeviceSynced);
                 amrex::ParallelFor( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
@@ -800,7 +800,7 @@ public:
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
             // Find the particles that are in each cell of this tile
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell, ablastr::profiler::OmitUnlessDeviceSynced);
             ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
             ParticleBins bins_2 = findParticlesInEachCell( geom_lev, mfi, ptile_2 );
             ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
@@ -838,7 +838,7 @@ public:
             // Compute how many pairs in each cell and store in n_pairs_in_each_cell array
             // For different species, the number of pairs in a cell is the number of particles of
             // the species that has the most particles in that cell
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::computeNumberOfPairs", prof_computeNumberOfPairs, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelFor( n_cells_products,
                 [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                 {
@@ -1034,7 +1034,7 @@ public:
 
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures, ablastr::profiler::OmitUnlessDeviceSynced);
 
             if (m_correct_energy_momentum ||
                 binary_collision_functor.m_computeSpeciesDensities ||
@@ -1043,7 +1043,7 @@ public:
                 bool const correct_energy_momentum = m_correct_energy_momentum;
 
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics, ablastr::profiler::OmitUnlessDeviceSynced);
                 amrex::ParallelFor( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
@@ -1129,7 +1129,7 @@ public:
             }
 
             // Finish temperature calculation - we launch 2*n_cells threads to compute both species simultaneously
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelFor( 2*n_cells, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
                 int i_cell = i < n_cells ? i : i - n_cells;
@@ -1172,7 +1172,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
-        ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+        ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
@@ -1208,7 +1208,7 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions, ablastr::profiler::OmitUnlessDeviceSynced);
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -1291,7 +1291,7 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
                 amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
 
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum, ablastr::profiler::OmitUnlessDeviceSynced);
                 amrex::ParallelFor( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {

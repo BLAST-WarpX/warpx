@@ -2912,9 +2912,18 @@ Additional parameters
     Note that if Perfectly Matched Layers (PML) are used, synchronization of the `E` and `B` fields
     is performed at every timestep regardless of this parameter.
 
-* ``warpx.do_device_synchronize`` (`bool`) optional (default `1`)
+.. _running-cpp-sync:
+
+* ``warpx.do_device_synchronize`` (`bool`) optional (default `0`)
     When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
+
+    .. warning::
+
+       This is only relevant for GPU runs.
+       When set to false (``0``), the TinyProfiler table at the end of simulations can be misleading, because of the asynchronous nature of GPU runs.
+       This is nontheless set to be disabled by default, because overheads of >25% of runtime are typical when synchronizing every profile region, especially with small, fast simulations.
+       Set this flag to ``1`` only for :ref:`profiling <developers-profiling>` WarpX, but disable again in your production runs at scale.
 
 * ``warpx.sort_intervals`` (`string`) optional (defaults: ``-1`` on CPU; ``4`` on GPU)
     Using the `Time intervals`_ syntax, this string defines the timesteps at which particles are
