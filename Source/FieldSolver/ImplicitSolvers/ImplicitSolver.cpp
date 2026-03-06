@@ -828,6 +828,13 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         CumulateJ();
     }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
+        m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
+    }
+#endif
+
     // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
 
