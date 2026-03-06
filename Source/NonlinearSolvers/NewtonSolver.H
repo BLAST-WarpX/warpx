@@ -380,7 +380,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         // Prepare for the linear solve
-        m_ops->PreLinearSolve(a_time, iter);
+        m_ops->PreLinearSolve();
         m_linear_function->setBaseSolution(a_U);
         m_linear_function->setBaseRHS(m_R);
         m_linear_function->updatePreCondMat(a_U);
