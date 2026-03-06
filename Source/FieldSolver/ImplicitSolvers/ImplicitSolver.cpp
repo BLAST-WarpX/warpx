@@ -117,7 +117,7 @@ void ImplicitSolver::CumulateJ ()
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_MM, lev);
+        const ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_non_suborbit, lev);
         amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
         amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
         amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
@@ -153,7 +153,7 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_MM, lev);
+        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_non_suborbit, lev);
         ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
@@ -711,11 +711,7 @@ void ImplicitSolver::InitializeMassMatrices ()
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{1}, lev, ba_Jy, dm, 1, ngE, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::Efield_fp_save, Direction{2}, lev, ba_Jz, dm, 1, ngE, 0.0_rt);
         }
-        if (m_use_mass_matrices) {
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{0}, lev, ba_Jx, dm, 1, ngJ, 0.0_rt);
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{1}, lev, ba_Jy, dm, 1, ngJ, 0.0_rt);
-            m_WarpX->m_fields.alloc_init(FieldType::current_fp_MM, Direction{2}, lev, ba_Jz, dm, 1, ngJ, 0.0_rt);
-        }
+        //
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{0}, lev, ba_Jx, dm, Nc_tot_xx, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{1}, lev, ba_Jx, dm, Nc_tot_xy, ngJ, 0.0_rt);
         m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_X, Direction{2}, lev, ba_Jx, dm, Nc_tot_xz, ngJ, 0.0_rt);
@@ -759,6 +755,29 @@ void ImplicitSolver::InitializeMassMatrices ()
 
 }
 
+void ImplicitSolver::PreLinearSolve ()
+{
+    BL_PROFILE("ImplicitSolver::PreLinearSolve()");
+
+    if (m_use_mass_matrices) {
+
+        m_WarpX->DepositMassMatrices();
+
+        if (m_use_mass_matrices_jacobian) {
+            FinishMassMatrices();
+            SaveE();
+        }
+
+        if (m_use_mass_matrices_pc) {
+            SyncMassMatricesPCAndApplyBCs();
+            const amrex::Real theta_dt = m_theta*m_dt;
+            SetMassMatricesForPC( theta_dt );
+        }
+
+    }
+
+}
+
 void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
                                 const bool         a_from_jacobian )
@@ -782,6 +801,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     ImplicitOptions options;
     options.linear_stage_of_jfnk = a_from_jacobian;
     options.use_mass_matrices_pc = m_use_mass_matrices_pc;
+    options.use_mass_matrices_jacobian = m_use_mass_matrices_jacobian;
     options.evolve_suborbit_particles_only = false;
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
@@ -795,23 +815,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         options.particle_tolerance = m_particle_tolerance;
     }
 
-    if (m_use_mass_matrices && !a_from_jacobian) { // Called from non-linear stage of JFNK and using mass matrices
-        options.deposit_mass_matrices = true;
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
-        CumulateJ();
-        if (m_use_mass_matrices_jacobian) {
-            FinishMassMatrices();
-            SaveE();
-        }
-        if (m_use_mass_matrices_pc) {
-           SyncMassMatricesPCAndApplyBCs();
-           const amrex::Real theta_dt = m_theta*m_dt;
-           SetMassMatricesForPC( theta_dt );
-        }
-    }
-    else if (m_use_mass_matrices_jacobian) { // Called from linear stage of JFNK and using mass matrices
+    if (m_use_mass_matrices_jacobian && a_from_jacobian) { // Called from linear stage of JFNK and using mass matrices for Jacobian
         if (m_particle_suborbits) {
-            options.deposit_mass_matrices = false;
             options.evolve_suborbit_particles_only = true;
             m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
         }
@@ -819,12 +824,26 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         ComputeJfromMassMatrices( J_from_MM_only );
     }
     else { // Conventional particle-suppressed JFNK
-        options.deposit_mass_matrices = false;
         m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+        CumulateJ();
     }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
+        m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
+    }
+#endif
 
     // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
+
+    if (m_nlsolver_type == NonlinearSolverType::petsc_snes && !a_from_jacobian) {
+        // The native Newton solver calls this routine immediately before the linear solve,
+        // and only when a linear solve is required (i.e., the system is not converged).
+        // PETSc's SNES solver does not provide this optimization, so we must call it here.
+        PreLinearSolve();
+    }
 
 }
 

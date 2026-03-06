@@ -85,6 +85,11 @@ public:
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
 
+    /**
+     * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
+     */
+    void PreLinearSolve ();
+
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
     [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
