@@ -447,6 +447,10 @@ void WarpX::OneStep (
                 }
                 // JRhom PIC loop
                 else {
+                    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_collisions_split_momentum_push == 0,
+                        "Collisions with split momentum push not yet implemented for JRhom PIC loop"
+                    );
                     // perform particle collisions
                     ExecutePythonCallback("beforecollisions");
                     mypc->doCollisions(a_step, a_cur_time, a_dt);
@@ -467,7 +471,10 @@ void WarpX::OneStep (
                         finest_level == 1,
                         "Subcycling not implemented with more than 1 mesh refinement level"
                     );
-
+                    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_collisions_split_momentum_push == 0,
+                        "Collisions with split momentum push not yet implemented with subcycling"
+                    );
                     // perform particle collisions
                     ExecutePythonCallback("beforecollisions");
                     mypc->doCollisions(a_step, a_cur_time, a_dt);

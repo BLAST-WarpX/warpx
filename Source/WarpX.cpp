@@ -1922,14 +1922,6 @@ WarpX::ReadParameters ()
                     ablastr::warn_manager::WarnPriority::low
                 );
             }
-            if (EB::enabled()) {
-                ablastr::warn_manager::WMRecordWarning(
-                    "Collisions",
-                    "Collisions with split momentum push not implemented with embedded\
-                    boundaries, ignoring collisions.split_momentum_push.",
-                    ablastr::warn_manager::WarnPriority::low
-                );
-            }
             if (particle_pusher_algo == ParticlePusherAlgo::HigueraCary) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "Collisions: collisions.split_momentum_push is not yet implemented with Higuera-Cary momentum pusher.");
