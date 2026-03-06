@@ -524,6 +524,13 @@ WarpX::WarpX ()
             "The NCI corrector should only be used with Esirkepov deposition");
     }
 
+    if (m_implicit_solver) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            use_fdtd_nci_corr == 0,
+            "The NCI corrector cannot be used with the implicit solver");
+    }
+
+
     m_accelerator_lattice.resize(nlevs_max);
 
 }
