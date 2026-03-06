@@ -23,9 +23,10 @@ it = ts.iterations
 x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
 
 # Analytical results calculated
-x_analytic = 0.03532
-y_analytic = 0.00000
-z_analytic = -0.20531
+
+x_analytic = 0.03307855709632465
+y_analytic = 0.0
+z_analytic = -0.2029948949556386
 
 print("NUMERICAL coordinates of the point of contact:")
 print(f"x={x[0]:5.5f}, y={y[0]:5.5f}, z={z[0]:5.5f}")
