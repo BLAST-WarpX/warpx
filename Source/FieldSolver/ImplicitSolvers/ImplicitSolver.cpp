@@ -831,7 +831,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
 
-    if (m_nlsolver_type == NonlinearSolverType::petsc_snes) {
+    if (m_nlsolver_type == NonlinearSolverType::petsc_snes && !a_from_jacobian) {
         // The native Newton solver calls this routine immediately before the linear solve,
         // and only when a linear solve is required (i.e., the system is not converged).
         // PETSc's SNES solver does not provide this optimization, so we must call it here.
