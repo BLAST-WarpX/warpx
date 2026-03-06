@@ -129,6 +129,13 @@ void init_WarpXParticleContainer (py::module& m)
             },
             py::arg("lev"), py::arg("local")
         )
+        .def("deposit_current",
+            [](WarpXParticleContainer& pc, std::string mf_name, int lev, double dt, double relative_time)
+            {
+                pc.DepositCurrent(mf_name, lev, dt, relative_time);
+            },
+            py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time")
+        )
         .def("get_number_density",
             [](WarpXParticleContainer& pc, int lev)
             {

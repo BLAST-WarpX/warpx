@@ -283,6 +283,8 @@ public:
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time);
+    void DepositCurrent (std::string mf_name, int lev,
+                         amrex::Real dt, amrex::Real relative_time);
 
     /**
      * \brief Deposit charge density.

@@ -1457,6 +1457,18 @@ WarpXParticleContainer::DepositCurrent (
     }
 }
 
+void WarpXParticleContainer::DepositCurrent (
+    std::string mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
+) {
+    auto& warpx = WarpX::GetInstance();
+    // allocate temporary multifab to deposit current density into
+    ablastr::fields::MultiLevelVectorField current_fp_temp {
+        warpx.m_fields.get_alldirs(mf_name, lev)
+    };
+
+    DepositCurrent(current_fp_temp, dt, relative_time);
+}
+
 /* \brief Charge Deposition for thread thread_num
  * \param pti         Particle iterator
  * \param wp          Array of particle weights
