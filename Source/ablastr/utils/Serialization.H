@@ -87,7 +87,7 @@ namespace ablastr::utils::serialization
 
             return str;
         }
-        else if constexpr (std::is_trivially_copyable<T>())
+        else
         {
             auto temp = std::array<char, sizeof(T)>{};
             std::copy(it, it + sizeof(T), temp.begin());
