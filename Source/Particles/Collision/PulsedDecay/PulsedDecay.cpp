@@ -13,9 +13,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
@@ -115,7 +115,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
 void
 PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("PulsedDecay::doCollisions()");
+    ABLASTR_PROFILE("PulsedDecay::doCollisions()");
 
     using namespace amrex::literals;
 
