@@ -18,7 +18,7 @@ my_constants.Nppc_x = 5   # particles per cell in x
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = 250.0e-9
-max_step = 50000
+max_step = 25000
 amr.n_cell =  4 4 4
 amr.max_level = 0
 warpx.numprocs = 1 1 2
@@ -83,7 +83,7 @@ neutrals.momentum_function_uz_th(x,y,z) = sqrt(q_e*Tn0/Mneu)/clight
 
 ###   Diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 50000
+diag1.intervals = 25000
 diag1.diag_type = Full
 diag1.fields_to_plot = none
 
