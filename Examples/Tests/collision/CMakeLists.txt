@@ -56,8 +56,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_collision_pulsed_decay  # inputs
-    "analysis_collision_3d_pulsed_decay.py diags/diag1050000"  # analysis
-    "analysis_default_regression.py --path diags/"  # checksum
+    "analysis_collision_3d_pulsed_decay.py diags/"  # analysis
+    "analysis_default_regression.py --path diags/diag1050000"  # checksum
     OFF  # dependency
 )
 
