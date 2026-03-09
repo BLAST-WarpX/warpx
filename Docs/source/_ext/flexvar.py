@@ -36,8 +36,6 @@ Role::
 from __future__ import annotations
 
 import re
-
-# import typing
 from typing import Any, Iterator, List, TypedDict, cast
 
 from docutils import nodes
@@ -52,10 +50,6 @@ from sphinx.util import logging
 from sphinx.util.nodes import make_id, make_refnode
 
 logger = logging.getLogger(__name__)
-
-# if typing.TYPE_CHECKING:
-#     _VT = typing.TypeVar("_VT")
-
 
 class ObjectEntry(TypedDict):
     docname: str
@@ -278,10 +272,6 @@ class FlexVarOptionHelper:
         self.name: str = name
         self.signode: addnodes.desc_signature = signode
 
-    # @typing.overload
-    # def get_and_check_aliases(self, *keys: str, default=None) -> str | None: ...
-    # @typing.overload
-    # def get_and_check_aliases(self, *keys: str, default: _VT) -> str | _VT: ...
     def get_and_check_aliases(self, *keys: str, default=None) -> Any:
         if len(keys) > 1:
             self.check_conflicting_options(*keys)
