@@ -150,13 +150,6 @@ class FlexVarDirective(ObjectDescription[str]):
 
         ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
-        type_: str | None
-        value: str | None
-        unit: str | None
-        anno: str | None
-        l_optional: bool
-        l_required: bool
-
         name = sig.strip()
 
         signode["fullname"] = name
@@ -175,13 +168,13 @@ class FlexVarDirective(ObjectDescription[str]):
             signode=signode,
         )
 
-        type_ = helper.get_and_check_aliases("type")
-        value = helper.get_and_check_aliases("default", "value")
-        unit = helper.get_and_check_aliases("unit", "units")
-        anno = helper.get_and_check_aliases("annotation", "comment")
-        l_optional = "optional" in self.options
-        l_required = "required" in self.options
+        type_: str | None = helper.get_and_check_aliases("type")
+        value: str | None = helper.get_and_check_aliases("default", "value")
+        unit: str | None = helper.get_and_check_aliases("unit", "units")
+        anno: str | None = helper.get_and_check_aliases("annotation", "comment")
 
+        l_optional: bool = ("optional" in self.options)
+        l_required: bool = ("required" in self.options)
         helper.check_conflicting_options("optional", "required")
 
         # Format: (`<type>`; in <unit>)
