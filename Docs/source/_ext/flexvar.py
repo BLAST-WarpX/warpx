@@ -174,6 +174,8 @@ class FlexVarDirective(ObjectDescription[str]):
         l_optional = "optional" in self.options
         l_required = "required" in self.options
 
+        helper.check_conflicting_options("optional", "required")
+
         # Format: (`<type>`; in <unit>)
         if type_ or unit:
             # signode += addnodes.desc_sig_punctuation("", ":")
