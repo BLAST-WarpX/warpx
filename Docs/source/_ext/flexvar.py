@@ -132,7 +132,7 @@ class FlexVarDirective(ObjectDescription[str]):
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
-        Parse text and combine into a single inline node.
+        Parse *text* as RST inline content and return a single inline node.
 
         This can added directly to signode to keep whitespace.
         """
