@@ -187,8 +187,8 @@ namespace {
             new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz,
             lepton_gamma, lepton_beta, -lepton_nx, -lepton_ny, -lepton_nz);
 
-        // Fill momentum of product species (note that we actually
-        // create 4 products, 2 at the position of each incident particle)
+        // Fill momentum of product species (one macroparticle per species: photon at first
+        // reactant position, electron at second reactant position)
         // - Scattered photon
         soa1_out.m_rdata[PIdx::ux][idx1_out_start] = new_photon_ux;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start] = new_photon_uy;

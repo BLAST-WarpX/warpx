@@ -58,10 +58,11 @@ public:
     /**
      * \brief operator() of the ParticleCreationFunc class. It creates new particles from binary
      * collisions.
-     * One product particle is created at the position of each parent particle that collided,
-     * allowing for exact charge conservation. For example, in the nuclear reaction
-     * "proton + boron -> 3 alpha", we actually create 6 new alpha particles, 3 at the position of
-     * of the proton and 3 at the position of the boron.
+     * For linear Compton only, one macroparticle per product species is created (first product
+     * at the first reactant position, second at the second). For all other binary processes
+     * (Linear Breit-Wheeler, fusion, etc.), one product is created at the position of each
+     * parent particle that collided (e.g. 2 photons and 2 electrons for Breit-Wheeler), allowing
+     * for exact charge conservation.
      * This function also sets the initial weight of the produced particles and subtracts it from
      * the parent particles. If the weight of a parent particle becomes 0, then that particle is
      * deleted.
@@ -119,15 +120,15 @@ public:
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
         const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
+        // Linear Compton: one macroparticle per product species (first at first reactant
+        // position, second at second). All other binary processes: create one product at
+        // the position of each source particle (factor 2) for charge conservation.
+        const int products_per_reaction_factor =
+            (m_num_product_species == 1 || m_collision_type != CollisionType::LinearCompton) ? 2 : 1;
         amrex::Vector<int> num_added_vec(m_num_product_species);
         for (int i = 0; i < m_num_product_species; i++)
         {
-            // How many particles of product species i are created.
-            // Factor 2 is here because we currently create one product species at the position of
-            // each source particle of the binary collision. E.g., if a binary collision produces
-            // one electron, we create two electrons, one at the position of each particle that
-            // collided. This allows for exact charge conservation.
-            const index_type num_added = total * m_num_products_host[i] * 2;
+            const index_type num_added = total * m_num_products_host[i] * products_per_reaction_factor;
             num_added_vec[i] = static_cast<int>(num_added);
             tile_products[i]->resize(products_np[i] + num_added);
         }
@@ -177,22 +178,43 @@ public:
                 {
                     for (int k = 0; k < p_num_products_device[j]; k++)
                     {
-                        // Factor 2 is here because we create one product species at the position
-                        // of each source particle
-                        const auto product_index = products_np_data[j] +
-                                                   2*(p_offsets[i]*p_num_products_device[j] + k);
-                        // Create product particle at position of particle 1
-                        copy_species1[j](soa_products_data[j], soa_1, static_cast<int>(p_pair_indices_1[i]),
-                                      static_cast<int>(product_index), engine);
-                        // Create another product particle at position of particle 2
-                        copy_species2[j](soa_products_data[j], soa_2, static_cast<int>(p_pair_indices_2[i]),
-                                      static_cast<int>(product_index + 1), engine);
-
-                        // Set the weight of the new particles to p_pair_reaction_weight[i]/2
-                        soa_products_data[j].m_rdata[PIdx::w][product_index] =
-                                                p_pair_reaction_weight[i]/amrex::ParticleReal(2.);
-                        soa_products_data[j].m_rdata[PIdx::w][product_index + 1] =
-                                                p_pair_reaction_weight[i]/amrex::ParticleReal(2.);
+                        if (t_collision_type == CollisionType::LinearCompton)
+                        {
+                            // Linear Compton only: one macroparticle per product species,
+                            // first at first reactant position, second at second.
+                            const auto product_index = products_np_data[j] +
+                                (p_offsets[i]*p_num_products_device[j] + k);
+                            if (j == 0)
+                            {
+                                copy_species1[j](soa_products_data[j], soa_1,
+                                    static_cast<int>(p_pair_indices_1[i]),
+                                    static_cast<int>(product_index), engine);
+                            }
+                            else
+                            {
+                                copy_species2[j](soa_products_data[j], soa_2,
+                                    static_cast<int>(p_pair_indices_2[i]),
+                                    static_cast<int>(product_index), engine);
+                            }
+                            soa_products_data[j].m_rdata[PIdx::w][product_index] =
+                                p_pair_reaction_weight[i];
+                        }
+                        else
+                        {
+                            // Create one product at the position of each source particle
+                            const auto product_index = products_np_data[j] +
+                                2*(p_offsets[i]*p_num_products_device[j] + k);
+                            copy_species1[j](soa_products_data[j], soa_1,
+                                static_cast<int>(p_pair_indices_1[i]),
+                                static_cast<int>(product_index), engine);
+                            copy_species2[j](soa_products_data[j], soa_2,
+                                static_cast<int>(p_pair_indices_2[i]),
+                                static_cast<int>(product_index + 1), engine);
+                            soa_products_data[j].m_rdata[PIdx::w][product_index] =
+                                p_pair_reaction_weight[i]/amrex::ParticleReal(2.);
+                            soa_products_data[j].m_rdata[PIdx::w][product_index + 1] =
+                                p_pair_reaction_weight[i]/amrex::ParticleReal(2.);
+                        }
                     }
                 }
 
@@ -230,8 +252,8 @@ public:
                     LinearComptonInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
-                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
-                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        products_np_data[0] + p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + p_offsets[i]*p_num_products_device[1],
                         engine);
                 }
             }
