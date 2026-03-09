@@ -334,6 +334,22 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
+WarpX::DepositMassMatrices ( )
+{
+    ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        mypc->DepositMassMatrices(
+            m_fields,
+            lev,
+            dt[lev]
+        );
+    }
+
+}
+
+void
 WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
