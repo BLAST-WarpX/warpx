@@ -269,13 +269,13 @@ class FlexVarOptionHelper:
 
     def get_and_check_aliases(self, *keys: str, default=None) -> Any:
         if len(keys) > 1:
-            self.warn_conflicting_options(*keys)
+            self.check_conflicting_options(*keys)
         for key in keys:
             if key in self.options:
                 return self.options[key]
         return default
 
-    def warn_conflicting_options(self, *keys: str):
+    def check_conflicting_options(self, *keys: str):
         blist: list[bool] = [(key in self.options) for key in keys]
         if sum(blist) > 1:
             logger.warning(
