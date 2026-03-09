@@ -51,6 +51,7 @@ from sphinx.util.nodes import make_id, make_refnode
 
 logger = logging.getLogger(__name__)
 
+
 class ObjectEntry(TypedDict):
     docname: str
     node_id: str
@@ -173,8 +174,8 @@ class FlexVarDirective(ObjectDescription[str]):
         unit: str | None = helper.get_and_check_aliases("unit", "units")
         anno: str | None = helper.get_and_check_aliases("annotation", "comment")
 
-        l_optional: bool = ("optional" in self.options)
-        l_required: bool = ("required" in self.options)
+        l_optional: bool = "optional" in self.options
+        l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
 
         # Format: (`<type>`; in <unit>)
