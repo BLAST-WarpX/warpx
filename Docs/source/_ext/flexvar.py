@@ -32,9 +32,11 @@ Role::
     # With inline value (value shown in link text, stripped for lookup):
     See :fv:var:`my/variable<T> = [1, 1]` for details.
 """
+
 from __future__ import annotations
 
 import re
+
 # import typing
 from typing import Any, Iterator, List, TypedDict, cast
 
@@ -145,7 +147,9 @@ class FlexVarDirective(ObjectDescription[str]):
         return inline_node
 
     def handle_signature(
-        self, sig: str, signode: addnodes.desc_signature,
+        self,
+        sig: str,
+        signode: addnodes.desc_signature,
     ) -> str:
         """
         Build the rendered signature node and return the canonical name.
