@@ -14,7 +14,7 @@ Directive::
         :default: [0.0, 0.0]
         :unit: seconds
         :optional:
-        :annotation: Inline comments on this variable.
+        :comment: Inline comments on this variable.
 
         Description of the variable.
 
@@ -32,11 +32,10 @@ Role::
     # With inline value (value shown in link text, stripped for lookup):
     See :fv:var:`my/variable<T> = [1, 1]` for details.
 """
-
 from __future__ import annotations
 
 import re
-import typing
+# import typing
 from typing import Any, Iterator, List, TypedDict, cast
 
 from docutils import nodes
@@ -52,8 +51,8 @@ from sphinx.util.nodes import make_id, make_refnode
 
 logger = logging.getLogger(__name__)
 
-if typing.TYPE_CHECKING:
-    _VT = typing.TypeVar("_VT")
+# if typing.TYPE_CHECKING:
+#     _VT = typing.TypeVar("_VT")
 
 
 class ObjectEntry(TypedDict):
@@ -75,7 +74,22 @@ class FlexVarDirective(ObjectDescription[str]):
     - `comment` and `annotation` are aliases
     - `optional` and `required` are opposite flags
 
-    For example, the "default" and "value" options are equivalent, only specify one.
+    Usage::
+
+        .. fv:var:: <name>
+            :type: <type>
+            :default: <default>
+            :unit: <unit>
+            :optional:
+            :comment: <comment>
+
+            <Description body>
+
+    Output format::
+
+        <name>: (<type>; in <unit>) optional (default: <default>) <comment>
+
+        <Description body>
     """
 
     option_spec = {
@@ -136,9 +150,7 @@ class FlexVarDirective(ObjectDescription[str]):
         """
         Build the rendered signature node and return the canonical name.
 
-        Format:
-
-        <name>: (<type>; in <unit>) [optional|required] (default: <value>) <annotation>
+        ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
         type_: str | None
         value: str | None
@@ -205,7 +217,7 @@ class FlexVarDirective(ObjectDescription[str]):
             # Do nothing if neither flag is specified
             pass
 
-        # Format: (default `<value>`)
+        # Format: (default: `<default>`)
         if value:
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
@@ -219,7 +231,7 @@ class FlexVarDirective(ObjectDescription[str]):
                 signode += value_node
             signode += addnodes.desc_sig_punctuation("", ")")
 
-        # Format: <annotation>
+        # Format: <comment>
         if anno:
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(anno)
@@ -262,11 +274,10 @@ class FlexVarOptionHelper:
         self.name: str = name
         self.signode: addnodes.desc_signature = signode
 
-    @typing.overload
-    def get_and_check_aliases(self, *keys: str, default=None) -> str | None: ...
-    @typing.overload
-    def get_and_check_aliases(self, *keys: str, default: _VT) -> str | _VT: ...
-
+    # @typing.overload
+    # def get_and_check_aliases(self, *keys: str, default=None) -> str | None: ...
+    # @typing.overload
+    # def get_and_check_aliases(self, *keys: str, default: _VT) -> str | _VT: ...
     def get_and_check_aliases(self, *keys: str, default=None) -> Any:
         if len(keys) > 1:
             self.check_conflicting_options(*keys)
