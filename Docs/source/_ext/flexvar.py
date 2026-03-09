@@ -131,9 +131,7 @@ class FlexVarDirective(ObjectDescription[str]):
         return inline_node
 
     def handle_signature(
-        self,
-        sig: str,
-        signode: addnodes.desc_signature,
+        self, sig: str, signode: addnodes.desc_signature,
     ) -> str:
         """
         Build the rendered signature node and return the canonical name.
@@ -265,7 +263,7 @@ class FlexVarOptionHelper:
         self.signode: addnodes.desc_signature = signode
 
     @typing.overload
-    def get_and_check_aliases(self, *keys: str, default: None = None) -> str | None: ...
+    def get_and_check_aliases(self, *keys: str, default=None) -> str | None: ...
     @typing.overload
     def get_and_check_aliases(self, *keys: str, default: _VT) -> str | _VT: ...
 
