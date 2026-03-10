@@ -141,14 +141,6 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
             amrex::ParticleReal* ux = pti.GetAttribs(PIdx::ux).data();
             amrex::ParticleReal* uy = pti.GetAttribs(PIdx::uy).data();
             amrex::ParticleReal* uz = pti.GetAttribs(PIdx::uz).data();
-            amrex::ParticleReal* unorm = nullptr;
-            if (m_normal_str == "x") {
-                unorm = ux;
-            } else if (m_normal_str == "y") {
-                unorm = uy;
-            } else if (m_normal_str == "z") {
-                unorm = uz;
-            }
 
             amrex::Real loend = thermalizer_region.lo(dir);
             amrex::Real hiend = thermalizer_region.hi(dir);
@@ -175,11 +167,17 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
                 if (amrex::Random(engine) > prob) {
                     return; // do not thermalize this particle
                 } else {
-                  if (amrex::Math::abs(unorm[ip]) > u_threshold*PhysConst::c) {
-                      // assign new momentum from thermal distribution
-                      amrex::Real vave = std::sqrt(theta);
-                      unorm[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, unorm[ip]);
-                  }
+                    // assign new momentum from thermal distribution
+                    amrex::Real vave = std::sqrt(theta);
+                    if (amrex::Math::abs(ux[ip]) > u_threshold*PhysConst::c) {
+                        ux[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, ux[ip]);
+                    }
+                    if (amrex::Math::abs(uy[ip]) > u_threshold*PhysConst::c) {
+                        uy[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, uy[ip]);
+                    }
+                    if (amrex::Math::abs(uz[ip]) > u_threshold*PhysConst::c) {
+                        uz[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, ux[ip]);
+                    }
                 }
             });
         }
