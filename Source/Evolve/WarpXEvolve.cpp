@@ -449,7 +449,8 @@ void WarpX::OneStep (
                 else {
                     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                         m_collisions_split_momentum_push == 0,
-                        "Collisions with split momentum push not yet implemented for JRhom PIC loop"
+                        "Collisions with split momentum push not yet implemented for JRhom PIC loop."
+                        "Set `collisions.split_momentum_push=0` to use JRhom with standard (pre-v-push collisions placement) collisions model."
                     );
                     // perform particle collisions
                     ExecutePythonCallback("beforecollisions");
@@ -473,7 +474,8 @@ void WarpX::OneStep (
                     );
                     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                         m_collisions_split_momentum_push == 0,
-                        "Collisions with split momentum push not yet implemented with subcycling"
+                        "Collisions with split momentum push not yet implemented with subcycling."
+                        "Set `collisions.split_momentum_push=0` to use subcycling with standard (pre-v-push collisions placement) collisions model."
                     );
                     // perform particle collisions
                     ExecutePythonCallback("beforecollisions");
