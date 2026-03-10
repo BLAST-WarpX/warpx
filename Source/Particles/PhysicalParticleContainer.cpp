@@ -465,13 +465,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
     // Auxiliary booleans
-    bool const deposit_charge_old = (
-        has_rho &&
-        !skip_deposition &&
-        !do_not_deposit &&
-        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::FirstHalf)
-    );
-    bool const deposit_charge_new = (
+    bool const deposit_charge = (
         has_rho &&
         !skip_deposition &&
         !do_not_deposit &&
@@ -564,7 +558,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             const long np_to_deposit = has_J_buf ? nfine_deposit : np;
 
-            if (deposit_charge_old) {
+            if (deposit_charge) {
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
 
                 const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
@@ -770,7 +764,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
             } // end of "if do_not_push"
 
-            if (deposit_charge_new) {
+            if (deposit_charge) {
                 // Deposit charge after particle push, in component 1 of MultiFab rho.
                 // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
                 if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
