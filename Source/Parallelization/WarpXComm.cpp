@@ -808,14 +808,26 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
+    if (do_single_precision_comms)
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryE, requested more guard cells than allocated");
+      for (int i = 0; i < 3; ++i)
+      {
+          WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+              ng.allLE(mf[i]->nGrowVect()),
+              "Error: in FillBoundaryE, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+          const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+          ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+      }
+    } else {
+      amrex::Vector<MultiFab*> vec_mf(mf.begin(),mf.end());
+      if (nodal_sync) {
+	amrex::FillBoundaryAndSync_nowait(vec_mf,period);
+	amrex::FillBoundaryAndSync_finish(vec_mf);
+      } else {
+	amrex::FillBoundary_nowait(vec_mf,period);
+	amrex::FillBoundary_finish(vec_mf);
+      }
     }
 }
 
@@ -873,14 +885,25 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
-    {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryB, requested more guard cells than allocated");
+    if (do_single_precision_comms) {
+      for (int i = 0; i < 3; ++i)
+      {
+          WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+              ng.allLE(mf[i]->nGrowVect()),
+              "Error: in FillBoundaryB, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+          const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+          ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+      }
+    } else {
+      amrex::Vector<MultiFab*> vec_mf(mf.begin(),mf.end());
+      if (nodal_sync) {
+	amrex::FillBoundaryAndSync_nowait(vec_mf,period);
+	amrex::FillBoundaryAndSync_finish(vec_mf);
+      } else {
+	amrex::FillBoundary_nowait(vec_mf,period);
+	amrex::FillBoundary_finish(vec_mf);
+      }
     }
 }
 
