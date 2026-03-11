@@ -110,3 +110,13 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_2d_collisions_split_momentum_push_electromagnetic_vay  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_collisions_split_momentum_push_electromagnetic_vay  # inputs
+    "analysis_test_2d_collisions_split_momentum_push.py --path diags/reducedfiles/"  # analysis
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
+    OFF  # dependency
+)
