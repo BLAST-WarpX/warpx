@@ -468,14 +468,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     bool const deposit_charge = (
         has_rho &&
         !skip_deposition &&
-        !do_not_deposit &&
-        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::SecondHalf)
+        !do_not_deposit
     );
     bool const deposit_current = (
         !skip_deposition &&
         !do_not_deposit &&
-        !(implicit_options && implicit_options->evolve_suborbit_particles_only) &&
-        (momentum_push_type == MomentumPushType::Full || momentum_push_type == MomentumPushType::SecondHalf)
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only)
     );
     bool const split_particles = (
         do_splitting &&
