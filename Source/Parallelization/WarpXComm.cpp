@@ -822,11 +822,11 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
     } else {
       amrex::Vector<MultiFab*> vec_mf(mf.begin(),mf.end());
       if (nodal_sync) {
-	amrex::FillBoundaryAndSync_nowait(vec_mf,period);
-	amrex::FillBoundaryAndSync_finish(vec_mf);
+    amrex::FillBoundaryAndSync_nowait(vec_mf,period);
+    amrex::FillBoundaryAndSync_finish(vec_mf);
       } else {
-	amrex::FillBoundary_nowait(vec_mf,period);
-	amrex::FillBoundary_finish(vec_mf);
+    amrex::FillBoundary_nowait(vec_mf,period);
+    amrex::FillBoundary_finish(vec_mf);
       }
     }
 }
@@ -898,11 +898,11 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
     } else {
       amrex::Vector<MultiFab*> vec_mf(mf.begin(),mf.end());
       if (nodal_sync) {
-	amrex::FillBoundaryAndSync_nowait(vec_mf,period);
-	amrex::FillBoundaryAndSync_finish(vec_mf);
+    amrex::FillBoundaryAndSync_nowait(vec_mf,period);
+    amrex::FillBoundaryAndSync_finish(vec_mf);
       } else {
-	amrex::FillBoundary_nowait(vec_mf,period);
-	amrex::FillBoundary_finish(vec_mf);
+    amrex::FillBoundary_nowait(vec_mf,period);
+    amrex::FillBoundary_finish(vec_mf);
       }
     }
 }
