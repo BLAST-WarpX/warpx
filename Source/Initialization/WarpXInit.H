@@ -39,11 +39,11 @@ namespace warpx::initialization
 
     /** Reads the moving window parameters
      *
-     * @param[out] do_moving_window           if the moving window is enabled
-     * @param[out] start_moving_window_steps  step at which the moving window is started
-     * @param[out] end_moving_window_step     step at which the moving window is stopped
-     * @param[out] moving_window_dir          direction of the moving window
-     * @param[out] moving_window_v            velocity of the moving  window
+     * @param[out] do_moving_window          if the moving window is enabled
+     * @param[out] start_moving_window_step  step at which the moving window is started
+     * @param[out] end_moving_window_step    step at which the moving window is stopped
+     * @param[out] moving_window_dir         direction of the moving window
+     * @param[out] moving_window_v           velocity of the moving  window
     */
     void read_moving_window_parameters (
         int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
