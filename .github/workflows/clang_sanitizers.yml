@@ -142,7 +142,7 @@ jobs:
         # When the Archer library is used and ARCHER_OPTIONS="verbose=1",
         # the following message should be displayed:
         # Archer detected OpenMP application with TSan, supplying OpenMP synchronization semantics
-        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-17/lib/libarcher.so
+        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-18/lib/libarcher.so
         export ARCHER_OPTIONS="verbose=1"
 
         # This option is required to avoid false positive reports from the OpenMP runtime
