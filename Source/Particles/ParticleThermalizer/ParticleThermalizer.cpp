@@ -176,7 +176,7 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
                         uy[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, uy[ip]);
                     }
                     if (amrex::Math::abs(uz[ip]) > u_threshold*PhysConst::c) {
-                        uz[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, ux[ip]);
+                        uz[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, uz[ip]);
                     }
                 }
             });
