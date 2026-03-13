@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from scipy.constants import epsilon_0
 
-sys.path.append("../../../../warpx/Tools/Parser/")
+sys.path.append("../../../Tools/Parser/")
 from input_file_parser import parse_input_file
 
 
