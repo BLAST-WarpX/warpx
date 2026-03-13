@@ -14,7 +14,7 @@ If this environment does not yet exist, create it as described in `Docs/source/i
 
 ## Build Commands
 
-The build directory is always `build/` inside the repository root (or worktree root). Never look for or create a build directory outside of the current working directory.
+The cmake build directory is always inside the repository root (or worktree root). Never look for or create a build directory outside of the current working directory.
 
 ```bash
 # Configure (common development build with Python bindings)
