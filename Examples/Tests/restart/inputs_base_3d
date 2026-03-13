@@ -27,9 +27,9 @@ warpx.cfl = .99
 warpx.do_moving_window = 1
 warpx.moving_window_dir = z
 warpx.moving_window_v = 1. # in units of the speed of light
-my_constants.dens  = 1e+23
-my_constants.pc_rc = 40.e-6
-my_constants.pc_kp = q_e/clight*sqrt(dens/(m_e*epsilon0))
+my_constants.dens = 1e+23
+my_constants.rc   = 40.e-6
+my_constants.kp   = q_e/clight*sqrt(dens/(m_e*epsilon0))
 
 # Order of particle shape factors
 algo.particle_shape = 3
@@ -100,7 +100,9 @@ plasma_e.ymax =  100.e-6
 # Parabolic plasma channel profile with no ramps (step function in z):
 # dens*(1 + 4*(x^2+y^2)/(kp^2*rc^4)) for 0 <= z < 3, else 0
 plasma_e.profile = parse_density_function
-plasma_e.density_function(x,y,z) = if(z<0,0,if(z<3,dens*(1+4*(x*x+y*y)/(pc_kp*pc_kp*pc_rc*pc_rc*pc_rc*pc_rc)),0))
+plasma_e.density_function(x,y,z) = \
+    "if(z<0, 0," \
+    "   if(z<3, dens*(1+4*(x*x+y*y)/(kp*kp*rc*rc*rc*rc)), 0))"
 plasma_e.num_particles_per_cell_each_dim = 1 1 1
 plasma_e.momentum_distribution_type = "at_rest"
 plasma_e.do_continuous_injection = 1
@@ -111,7 +113,9 @@ plasma_p.injection_style = "NUniformPerCell"
 plasma_p.zmin = -100.e-6
 plasma_p.zmax = 0.2
 plasma_p.profile = parse_density_function
-plasma_p.density_function(x,y,z) = if(z<0,0,if(z<3,dens*(1+4*(x*x+y*y)/(pc_kp*pc_kp*pc_rc*pc_rc*pc_rc*pc_rc)),0))
+plasma_p.density_function(x,y,z) = \
+    "if(z<0, 0," \
+    "   if(z<3, dens*(1+4*(x*x+y*y)/(kp*kp*rc*rc*rc*rc)), 0))"
 plasma_p.xmin = -100.e-6
 plasma_p.xmax =  100.e-6
 plasma_p.ymin = -100.e-6

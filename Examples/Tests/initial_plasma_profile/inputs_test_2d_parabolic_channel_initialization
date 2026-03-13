@@ -45,16 +45,22 @@ electrons.zmax = 0.32
 # Parabolic plasma channel profile: n0*(1 + 4*(x^2+y^2)/(kp^2*rc^4)) * n_long(z)
 # with kp = q_e/clight * sqrt(n0/(m_e*epsilon0))
 # and n_long(z) a cosine up-ramp, constant plateau, cosine down-ramp
-my_constants.pc_z_start   = 0.0
-my_constants.pc_ramp_up   = 0.02
-my_constants.pc_plateau   = 0.297
-my_constants.pc_ramp_down = 0.003
-my_constants.pc_rc        = 40.e-6
-my_constants.pc_n0        = 1.7e23
-my_constants.pc_kp        = q_e/clight*sqrt(pc_n0/(m_e*epsilon0))
+my_constants.z_start   = 0.0
+my_constants.ramp_up   = 0.02
+my_constants.plateau   = 0.297
+my_constants.ramp_down = 0.003
+my_constants.rc        = 40.e-6
+my_constants.n0        = 1.7e23
+my_constants.kp        = q_e/clight*sqrt(n0/(m_e*epsilon0))
 
 electrons.profile = parse_density_function
-electrons.density_function(x,y,z) = pc_n0*(1+4*(x*x+y*y)/(pc_kp*pc_kp*pc_rc*pc_rc*pc_rc*pc_rc))*if(z<pc_z_start,0,if(z<pc_z_start+pc_ramp_up,0.5*(1-cos(pi*(z-pc_z_start)/pc_ramp_up)),if(z<pc_z_start+pc_ramp_up+pc_plateau,1,if(z<pc_z_start+pc_ramp_up+pc_plateau+pc_ramp_down,0.5*(1+cos(pi*(z-pc_z_start-pc_ramp_up-pc_plateau)/pc_ramp_down)),0))))
+electrons.density_function(x,y,z) = \
+    "n0*(1+4*(x*x+y*y)/(kp*kp*rc*rc*rc*rc))" \
+    "*if(z<z_start, 0," \
+    "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
+    "   if(z<z_start+ramp_up+plateau, 1," \
+    "   if(z<z_start+ramp_up+plateau+ramp_down, 0.5*(1+cos(pi*(z-z_start-ramp_up-plateau)/ramp_down))," \
+    "   0))))"
 
 #################################
 ########## DIAGNOSTIC ###########
