@@ -76,45 +76,6 @@ void ReadBoostedFrameParameters(Real& gamma_boost, Real& beta_boost,
 #endif
 }
 
-void ReadMovingWindowParameters(
-    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
-    [[maybe_unused]] int& moving_window_dir, amrex::Real& moving_window_v)
-{
-    const ParmParse pp_warpx("warpx");
-    pp_warpx.query("do_moving_window", do_moving_window);
-    if (do_moving_window) {
-        utils::parser::queryWithParser(
-            pp_warpx, "start_moving_window_step", start_moving_window_step);
-        utils::parser::queryWithParser(
-            pp_warpx, "end_moving_window_step", end_moving_window_step);
-        std::string s;
-        pp_warpx.get("moving_window_dir", s);
-
-        if (s == "z" || s == "Z") {
-#ifdef WARPX_ZINDEX
-            moving_window_dir = WARPX_ZINDEX;
-#endif
-        }
-#if defined(WARPX_DIM_3D)
-        else if (s == "y" || s == "Y") {
-            moving_window_dir = 1;
-        }
-#endif
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
-        else if (s == "x" || s == "X") {
-            moving_window_dir = 0;
-        }
-#endif
-        else {
-            WARPX_ABORT_WITH_MESSAGE("Unknown moving_window_dir: "+s);
-        }
-
-        utils::parser::getWithParser(
-            pp_warpx, "moving_window_v", moving_window_v);
-        moving_window_v *= PhysConst::c;
-    }
-}
-
 void ConvertLabParamsToBoost()
 {
     Real gamma_boost = 1., beta_boost = 0.;
