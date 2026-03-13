@@ -18,7 +18,7 @@ The cmake build directory is always inside the repository root (or worktree root
 
 ```bash
 # Configure (common development build with Python bindings)
-cmake -S . -B build -DWarpX_DIMS=3 -DWarpX_PYTHON=ON
+cmake --fresh -S . -B build -DWarpX_DIMS=3 -DWarpX_PYTHON=ON
 
 # Build
 cmake --build build -j 8
