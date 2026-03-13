@@ -4276,8 +4276,8 @@ class LabFrameFieldDiagnostic(
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
+                elif dataname == "rho":
+                    # Add rho diagnostic
                     fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
