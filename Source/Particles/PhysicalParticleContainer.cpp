@@ -404,6 +404,13 @@ PhysicalParticleContainer::BackwardCompatibility ()
         WARPX_ABORT_WITH_MESSAGE("<species>.plot_species is not supported anymore. "
                      "Please use the new syntax for diagnostics, see documentation.");
     }
+
+    std::string backward_string;
+    if (pp_species_name.query("profile", backward_string) && backward_string == "predefined"){
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.profile = predefined is no longer supported. "
+            "Please use <species>.profile = parse_density_function instead.");
+    }
 }
 
 void PhysicalParticleContainer::InitData ()
