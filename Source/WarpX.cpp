@@ -275,7 +275,7 @@ void WarpX::MakeWarpX ()
 {
     warpx::initialization::check_dims();
 
-    ReadMovingWindowParameters(
+    warpx::initialization::read_moving_window_parameters(
         do_moving_window, start_moving_window_step, end_moving_window_step,
         moving_window_dir, moving_window_v);
 
