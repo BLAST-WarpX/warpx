@@ -1332,9 +1332,6 @@ Particle initialization
       to the Maxwell Boltzmann setting, which initializes non-relativistic plasma in their relativistic
       drifting frame.
 
-    * ``radial_expansion``: momentum depends on the radial coordinate linearly. This
-      can be controlled with additional parameter ``u_over_r`` which is the slope (``0.`` by default).
-
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
