@@ -222,12 +222,6 @@ namespace SpeciesUtils {
             const GetVelocity getVel(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
-        } else if (mom_dist_s == "radial_expansion") {
-            amrex::Real u_over_r = 0._rt;
-            utils::parser::queryWithParser(pp_species, source_name, "u_over_r", u_over_r);
-            // Construct InjectorMomentum with InjectorMomentumRadialExpansion.
-            h_inj_mom.reset(new InjectorMomentum
-                            ((InjectorMomentumRadialExpansion*)nullptr, u_over_r));
         } else if (mom_dist_s == "parse_momentum_function") {
             std::string str_momentum_function_ux;
             std::string str_momentum_function_uy;

@@ -513,14 +513,21 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 
         # --- Note that WarpX takes gamma*beta as input
         if np.any(np.not_equal(self.velocity_divergence, 0.0)):
+            u_over_x = self.velocity_divergence[0] / constants.c
+            u_over_y = self.velocity_divergence[1] / constants.c
+            u_over_z = self.velocity_divergence[2] / constants.c
             species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "radial_expansion"
+                source_name, "momentum_distribution_type", "parse_momentum_function"
             )
             species.add_new_group_attr(
-                source_name, "u_over_r", self.velocity_divergence[0] / constants.c
+                source_name, "momentum_function_ux(x,y,z)", f"{u_over_x}*x"
             )
-            # species.add_new_group_attr(source_name, 'u_over_y', self.velocity_divergence[1]/constants.c)
-            # species.add_new_group_attr(source_name, 'u_over_z', self.velocity_divergence[2]/constants.c)
+            species.add_new_group_attr(
+                source_name, "momentum_function_uy(x,y,z)", f"{u_over_y}*y"
+            )
+            species.add_new_group_attr(
+                source_name, "momentum_function_uz(x,y,z)", f"{u_over_z}*z"
+            )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussian"
