@@ -52,6 +52,7 @@ jobs:
 
         ### DEBUG
         ccache -C
+        rm -rf  ~/.cache/ccache/*
         #########
 
         ccache -z
