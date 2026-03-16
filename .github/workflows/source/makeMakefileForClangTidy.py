@@ -18,9 +18,9 @@ def makeMakefileForClangTidy(argv):
     parser.add_argument(
         "--identifier",
         help="Unique identifier for finding compilation line in the log file",
-        default="WarpX/Source",
+        default="warpx/Source",
     )
-    # We assume WarpX/Source can be used as an identifier to distinguish
+    # We assume warpx/Source can be used as an identifier to distinguish
     # WarpX code from amrex, openMPD, and cmake's temporary files like
     # build/CMakeFiles/CMakeScratch/TryCompile-hw3x4m/test_mpi.cpp
     parser.add_argument(
