@@ -72,7 +72,7 @@ my_constants.kp        = q_e/clight*sqrt(n0/(m_e*epsilon0))
 
 electrons.profile = parse_density_function
 electrons.density_function(x,y,z) = \
-    "n0*(1+4*(x*x+y*y)/(kp*kp*rc*rc*rc*rc))" \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
     "*if(z<z_start, 0," \
     "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
     "   if(z<z_start+ramp_up+plateau, 1," \
@@ -91,7 +91,7 @@ ions.zmin = 0.
 ions.zmax = 15000.e-6
 ions.profile = parse_density_function
 ions.density_function(x,y,z) = \
-    "n0*(1+4*(x*x+y*y)/(kp*kp*rc*rc*rc*rc))" \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
     "*if(z<z_start, 0," \
     "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
     "   if(z<z_start+ramp_up+plateau, 1," \

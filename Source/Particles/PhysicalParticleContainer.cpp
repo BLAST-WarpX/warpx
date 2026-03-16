@@ -405,8 +405,8 @@ PhysicalParticleContainer::BackwardCompatibility ()
                      "Please use the new syntax for diagnostics, see documentation.");
     }
 
-    std::string backward_string;
-    if (pp_species_name.query("profile", backward_string) && backward_string == "predefined"){
+    std::string backward_profile_type;
+    if (pp_species_name.query("profile", backward_profile_type) && backward_profile_type == "predefined"){
         WARPX_ABORT_WITH_MESSAGE(
             "<species>.profile = predefined is no longer supported. "
             "Please use <species>.profile = parse_density_function instead.");
