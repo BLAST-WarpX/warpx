@@ -411,6 +411,14 @@ PhysicalParticleContainer::BackwardCompatibility ()
             "<species>.profile = predefined is no longer supported. "
             "Please use <species>.profile = parse_density_function instead.");
     }
+
+    std::string backward_mom_dist;
+    if (pp_species_name.query("momentum_distribution_type", backward_mom_dist) &&
+        backward_mom_dist == "radial_expansion") {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.momentum_distribution_type = radial_expansion is not supported anymore. "
+            "Please use momentum_distribution_type = parse_momentum_function instead.");
+    }
 }
 
 void PhysicalParticleContainer::InitData ()

@@ -386,40 +386,6 @@ private:
     GetTemperature temperature;
 };
 
-/**
- * \brief struct whose getMomentum returns momentum for 1 particle, for
- * radial expansion.
- *
- * Note - u_over_r is expected to be the normalized momentum gamma*beta
- * divided by the physical position in SI units.
-**/
-struct InjectorMomentumRadialExpansion
-{
-    InjectorMomentumRadialExpansion (amrex::Real a_u_over_r) noexcept
-        : u_over_r(a_u_over_r)
-        {}
-
-    [[nodiscard]]
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3
-    getMomentum (amrex::Real x, amrex::Real y, amrex::Real z,
-                 amrex::RandomEngine const&) const noexcept
-    {
-        return {x*u_over_r, y*u_over_r, z*u_over_r};
-    }
-
-    [[nodiscard]]
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3
-    getBulkMomentum (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
-    {
-        return {x*u_over_r, y*u_over_r, z*u_over_r};
-    }
-
-private:
-    amrex::Real u_over_r;
-};
-
 // struct whose getMomentum returns local momentum computed from parser.
 struct InjectorMomentumParser
 {
@@ -496,7 +462,6 @@ struct InjectorMomentumGaussianParser
 // - InjectorMomentumConstant       : to generate constant density;
 // - InjectorMomentumGaussian       : to generate gaussian distribution;
 // - InjectorMomentumGaussianFlux   : to generate v*gaussian distribution;
-// - InjectorMomentumRadialExpansion: to generate radial expansion;
 // - InjectorMomentumParser         : to generate momentum from parser;
 // - InjectorMomentumGaussianParser : to generate momentum and thermal spread from parser;
 // The choice is made at runtime, depending in the constructor called.
@@ -570,13 +535,6 @@ struct InjectorMomentum
            object(t, temperature, velocity)
     { }
 
-    // This constructor stores a InjectorMomentumRadialExpansion in union object.
-    InjectorMomentum (InjectorMomentumRadialExpansion* t,
-                      amrex::Real u_over_r)
-        : type(Type::radial_expansion),
-          object(t, u_over_r)
-    { }
-
     // Explicitly prevent the compiler from generating copy constructors
     // and copy assignment operators.
     InjectorMomentum (InjectorMomentum const&) = delete;
@@ -631,10 +589,6 @@ struct InjectorMomentum
         {
             return object.constant.getMomentum(x,y,z,engine);
         }
-        case Type::radial_expansion:
-        {
-            return object.radial_expansion.getMomentum(x,y,z,engine);
-        }
         default:
         {
             amrex::Abort("InjectorMomentum: unknown type");
@@ -684,10 +638,6 @@ struct InjectorMomentum
         {
             return object.constant.getBulkMomentum(x,y,z);
         }
-        case Type::radial_expansion:
-        {
-            return object.radial_expansion.getBulkMomentum(x,y,z);
-        }
         default:
         {
             amrex::Abort("InjectorMomentum: unknown type");
@@ -696,14 +646,13 @@ struct InjectorMomentum
         }
     }
 
-    enum struct Type { constant, gaussian, gaussianflux, uniform, boltzmann, juttner, radial_expansion, parser, gaussianparser };
+    enum struct Type { constant, gaussian, gaussianflux, uniform, boltzmann, juttner, parser, gaussianparser };
     Type type;
 
 private:
 
     // An instance of union Object constructs and stores any one of
-    // the objects declared (constant or gaussian or
-    // radial_expansion or parser).
+    // the objects declared (constant or gaussian or parser).
     union Object {
         Object (InjectorMomentumConstant*,
                 amrex::Real a_ux, amrex::Real a_uy, amrex::Real a_uz) noexcept
@@ -730,9 +679,6 @@ private:
         Object (InjectorMomentumJuttner*,
                 GetTemperature const& t, GetVelocity const& b) noexcept
             : juttner(t,b) {}
-        Object (InjectorMomentumRadialExpansion*,
-                amrex::Real u_over_r) noexcept
-            : radial_expansion(u_over_r) {}
         Object (InjectorMomentumParser*,
                 amrex::ParserExecutor<3> const& a_ux_parser,
                 amrex::ParserExecutor<3> const& a_uy_parser,
@@ -753,7 +699,6 @@ private:
         InjectorMomentumUniform uniform;
         InjectorMomentumBoltzmann boltzmann;
         InjectorMomentumJuttner juttner;
-        InjectorMomentumRadialExpansion radial_expansion;
         InjectorMomentumParser parser;
         InjectorMomentumGaussianParser gaussianparser;
     };
