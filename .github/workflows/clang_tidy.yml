@@ -49,6 +49,11 @@ jobs:
         export CCACHE_MAXSIZE=300M
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
+
+        ### DEBUG
+        ccache -c
+        #########
+
         ccache -z
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
@@ -64,7 +69,21 @@ jobs:
           -DWarpX_PRECISION=SINGLE          \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build_clang_tidy -j 4
+
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
+
+        ### DEBUG
+        echo "#################################### ccache.log.txt #################################"
+        cat ${{github.workspace}}/ccache.log.txt
+        echo ""
+        echo "#################################### clang-tidy #####################################"
+        cat ${{github.workspace}}/.clang-tidy
+        echo ""
+        echo "#################################### clang-tidy-ccache-misses.mak ###################"
+        cat clang-tidy-ccache-misses.mak
+        echo "_____________________________________________________________________________________"
+        #########
+
         make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
             CLANG_TIDY=clang-tidy-17 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
