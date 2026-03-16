@@ -51,7 +51,7 @@ jobs:
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
 
         ### DEBUG
-        ccache -c
+        ccache -C
         #########
 
         ccache -z
