@@ -52,6 +52,14 @@ jobs:
         ccache -z
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
+
+        ##### CLEAR CACHE: TO BE REMOVED BEFORE MERGING ####
+        # we need to clear the cache in order to run clang-tidy
+        # on every file. Once all the issues are fixed, this
+        # can be removed
+        ccache -C --verbose
+        ####################################################
+
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="${{ matrix.dim }}"  \
