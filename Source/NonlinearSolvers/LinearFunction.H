@@ -113,7 +113,7 @@ class LinearFunction
         virtual void define( const T&, Ops*, const PreconditionerType& ) = 0;
 
         //! returns the preconditioner type
-        virtual PreconditionerType pcType () const = 0;
+        [[nodiscard]] virtual PreconditionerType pcType () const = 0;
 
     protected:
 

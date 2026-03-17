@@ -62,10 +62,10 @@ public:
     virtual void setMaxIters (int niters) = 0;
 
     //! Gets the number of iterations.
-    virtual int getNumIters () const = 0;
+    [[nodiscard]] virtual int getNumIters () const = 0;
 
     //! Gets the solver status.
-    virtual int getStatus () const = 0;
+    [[nodiscard]] virtual int getStatus () const = 0;
 
     //! Gets the 2-norm of the residual.
     virtual RT getResidualNorm () const = 0;

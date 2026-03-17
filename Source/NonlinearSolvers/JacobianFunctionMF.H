@@ -72,7 +72,7 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     T makeVecLHS () const override;
     T makeVecRHS () const override;
 
-    inline
+    [[nodiscard]] inline
     bool isDefined() const { return m_is_defined;  }
 
     [[nodiscard]] inline
@@ -127,7 +127,7 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
 
     void define( const T&, Ops*, const PreconditionerType& ) override;
 
-    inline
+    [[nodiscard]] inline
     PreconditionerType pcType () const override { return m_pc_type; }
 
     private:
