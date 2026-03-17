@@ -138,10 +138,10 @@ namespace ablastr::fields
         }
 
         // e.g., "x"
-        Direction (char const * c) : dir{Direction{c}} {}
+        explicit Direction (char const * c) : dir{Direction{c}} {}
 
         // e.g., 'x'
-        Direction (char const c) : dir{Direction{c}} {}
+        explicit Direction (char const c) : dir{Direction{c}} {}
 
         // rule of five: define default constructors and the destructor
         //   because we defined a special one above for char
