@@ -18,6 +18,8 @@
 
 #include "Utils/TextMsg.H"
 
+using namespace amrex::literals;
+
 namespace BinaryCollisionUtils{
 
     CollisionType get_collision_type (const std::string& collision_name,

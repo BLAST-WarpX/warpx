@@ -34,8 +34,6 @@
 #include <ostream>
 #include <vector>
 
-using warpx::fields::FieldType;
-
 // forward declaration
 class WarpX;
 
@@ -85,8 +83,8 @@ public:
 
     [[nodiscard]] RT dotProduct( const WarpXSolverVec&  a_X ) const;
 
-    void Copy ( FieldType  a_array_type,
-                FieldType  a_scalar_type = FieldType::None,
+    void Copy ( warpx::fields::FieldType  a_array_type,
+                warpx::fields::FieldType  a_scalar_type = warpx::fields::FieldType::None,
                 bool allow_type_mismatch = false);
 
     inline
