@@ -41,11 +41,23 @@ namespace
         amrex::XDim3 result = {0._rt, 0._rt, 0._rt};
 
 #if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-        amrex::Real const shiftx = (nodal[0] ? 0._rt : 0.5_rt);
-        result.x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
+        if constexpr (AMREX_SPACEDIM > 1){
+            amrex::Real const shiftx = (nodal[0] ? 0._rt : 0.5_rt);
+            result.x = xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0];
+        }
+        else{
+            result.x = 0._rt;
+        }
+
 #endif
-        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
-        result.y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
+        if constexpr (AMREX_SPACEDIM == 3){
+            amrex::Real const shifty = nodal[1] ? 0._rt : 0.5_rt;
+            result.y = xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1];
+        }
+        else{
+            result.y = 0._rt;
+        }
+
 #ifndef WARPX_DIM_1D_Z
 #if defined(WARPX_ZINDEX)
         amrex::Real const shiftz = (nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
