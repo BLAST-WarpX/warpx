@@ -114,9 +114,9 @@ namespace ablastr::fields
             return std::to_string(dir);
         }
 
-        Direction (std::string const & s)
+        Direction (std::string const & s) :
+            dir{-1}
         {
-            dir = -1;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             if (s == std::to_string(r)) { dir = r; }
             if (s == std::to_string(theta)) { dir = theta; }
