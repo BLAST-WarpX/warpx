@@ -380,10 +380,10 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
     std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
-    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);

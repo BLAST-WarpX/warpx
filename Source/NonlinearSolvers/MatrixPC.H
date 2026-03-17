@@ -98,7 +98,7 @@ class MatrixPC : public Preconditioner<T,Ops>
         /**
          * \brief Define the preconditioner
          */
-        void Define (const T&, Ops* const) override;
+        void Define (const T&, Ops*) override;
 
         /**
          * \brief Update the preconditioner

@@ -306,8 +306,8 @@ public:
     }
 
     // copy to/from Real-type arrays
-    void copyFrom (const amrex::Real* const);
-    void copyTo   (amrex::Real* const) const;
+    void copyFrom (const amrex::Real*);
+    void copyTo   (amrex::Real*) const;
 
     // return WarpX pointer
     [[nodiscard]] auto getWarpX () const { return m_WarpX; }
