@@ -26,7 +26,7 @@ void EffectivePotentialES::InitData() {
     auto& fields = warpx.GetMultiFabRegister();
     auto* rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
     fields.alloc_init(
-        warpx::fields::FieldType::effective_potential_sigma, /*lev=*/0,
+        warpx::fields::FieldType::effective_potential_sigma, /*level*/ 0,
         convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
         rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
     );
