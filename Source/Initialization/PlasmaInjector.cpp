@@ -52,14 +52,14 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
-    species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom),
     // Unlimited boundaries
     xmin{std::numeric_limits<amrex::Real>::lowest()},
-    ymin{std::numeric_limits<amrex::Real>::lowest()},
-    zmin{std::numeric_limits<amrex::Real>::lowest()},
     xmax{std::numeric_limits<amrex::Real>::max()},
+    ymin{std::numeric_limits<amrex::Real>::lowest()},
     ymax{std::numeric_limits<amrex::Real>::max()},
-    zmax{std::numeric_limits<amrex::Real>::max()}
+    zmin{std::numeric_limits<amrex::Real>::lowest()},
+    zmax{std::numeric_limits<amrex::Real>::max()},
+    species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
 #ifdef AMREX_USE_GPU
