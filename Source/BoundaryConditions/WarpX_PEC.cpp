@@ -393,7 +393,7 @@ namespace
             // Update the cell if the mirror guard cell exists
             if (fabbox.contains(ijk_mirror)) {
                 // Note that this includes the cells on the boundary
-                amrex::Real rscale = 1._rt;
+                constexpr auto rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                 const amrex::Real rvalid = ijk_vec[idim] + rshift;
@@ -484,7 +484,7 @@ namespace
             // Update the cell if the mirror guard cell exists
             // This assumes that the nodal boundary cells are not included in the box.
             if (fabbox.contains(ijk_mirror)) {
-                amrex::Real inv_rscale = 1._rt;
+                const auto inv_rscale = 1._rt;
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 if (idim == 0 && iside == 1) {
                     // Account for different dV at different radii
@@ -566,8 +566,8 @@ PEC::ApplyPECtoEfield (
     }
     const amrex::IntVect domain_lo = domain_box.smallEnd();
     const amrex::IntVect domain_hi = domain_box.bigEnd();
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
+    const auto fbndry_lo = amrex::GpuArray<FieldBoundaryType, 3>{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
+    const auto fbndry_hi = amrex::GpuArray<FieldBoundaryType, 3>{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
     const amrex::IntVect Ex_nodal = Efield[0]->ixType().toIntVect();
     const amrex::IntVect Ey_nodal = Efield[1]->ixType().toIntVect();
     const amrex::IntVect Ez_nodal = Efield[2]->ixType().toIntVect();
@@ -646,8 +646,8 @@ PEC::ApplyPECtoBfield (
     }
     const amrex::IntVect domain_lo = domain_box.smallEnd();
     const amrex::IntVect domain_hi = domain_box.bigEnd();
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_lo{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
-    amrex::GpuArray<FieldBoundaryType, 3> fbndry_hi{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
+    const auto fbndry_lo = amrex::GpuArray<FieldBoundaryType, 3>{{AMREX_D_DECL(field_boundary_lo[0], field_boundary_lo[1], field_boundary_lo[2])}};
+    const auto fbndry_hi = amrex::GpuArray<FieldBoundaryType, 3>{{AMREX_D_DECL(field_boundary_hi[0], field_boundary_hi[1], field_boundary_hi[2])}};
     const amrex::IntVect Bx_nodal = Bfield[0]->ixType().toIntVect();
     const amrex::IntVect By_nodal = Bfield[1]->ixType().toIntVect();
     const amrex::IntVect Bz_nodal = Bfield[2]->ixType().toIntVect();
