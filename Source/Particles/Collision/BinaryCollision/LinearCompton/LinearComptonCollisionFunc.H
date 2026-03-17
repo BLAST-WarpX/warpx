@@ -55,7 +55,7 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     LinearComptonCollisionFunc (
-            const std::string collision_name,
+            const std::string& collision_name,
             MultiParticleContainer const * const /*mypc*/,
             const bool isSameSpecies) :
         m_isSameSpecies(isSameSpecies)
