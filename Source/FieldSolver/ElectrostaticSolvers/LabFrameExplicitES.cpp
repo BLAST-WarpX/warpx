@@ -324,7 +324,7 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
             x(ix,0,0) -= cmod(ix,0,0) * x(ix + 1,0,0);
         }
 
-        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.00 + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
+        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.00_rt + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
 
         /* loop from 0 to nx - 1 inclusive */
         for (int ix = 0; ix < nx; ix++)

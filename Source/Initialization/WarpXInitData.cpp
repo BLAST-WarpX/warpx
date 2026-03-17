@@ -489,7 +489,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             if (new_boxes.size() > ba0.size()) {
                 // If the size is the same as before, we don't need to build
                 // a new BoxArray.
-                ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+                ba0 = BoxArray(new_boxes.data(), static_cast<int>(new_boxes.size()));
             }
         }
     }

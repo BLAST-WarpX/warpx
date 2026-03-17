@@ -512,7 +512,7 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
-                    int const u1x_ni = std::distance(real_names1.begin(), pos1);
+                    auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
                     u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
                     u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
                     u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
@@ -993,7 +993,7 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
-                    int const u1x_ni = std::distance(real_names1.begin(), pos1);
+                    auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
                     u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
                     u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
                     u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];

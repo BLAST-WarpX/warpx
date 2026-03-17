@@ -125,11 +125,11 @@ void WarpXSolverDOF::fill_local_dof (iMultiFab& dof, iMultiFab const& mask)
 
     for (MFIter mfi(dof); mfi.isValid(); ++mfi) {
         Box const& vbx = mfi.validbox();
-        int npts = vbx.numPts();
+        const auto npts = static_cast<int>(vbx.numPts());
         BoxIndexer boxindex(vbx);
         auto const& m = mask.const_array(mfi);
         auto const& d = dof.array(mfi);
-        auto start_id = m_nDoFs_l;
+        const auto start_id = static_cast<int>(m_nDoFs_l);
         auto ndofs = Scan::PrefixSum<int>(
             npts,
             [=] AMREX_GPU_DEVICE (int offset) -> int
