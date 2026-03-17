@@ -118,18 +118,18 @@ namespace ablastr::fields
         {
             dir = -1;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (s == r) { dir = r; }
-            if (s == theta) { dir = theta; }
+            if (s == std::to_string(r)) { dir = r; }
+            if (s == std::to_string(theta)) { dir = theta; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-            if (s == phi) { dir = phi; }
+            if (s == std::to_string(phi)) { dir = phi; }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
-            if (s == x) { dir = x; }
-            if (s == y) { dir = y; }
+            if (s == std::to_string(x)) { dir = x; }
+            if (s == std::to_string(y)) { dir = y; }
 #endif
 #if !defined(WARPX_DIM_RSPHERE)
-            if (s == z) { dir = z; }
+            if (s == std::to_string(z)) { dir = z; }
 #endif
 
             if (dir == -1) {
