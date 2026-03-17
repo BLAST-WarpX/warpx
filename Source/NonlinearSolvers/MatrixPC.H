@@ -365,10 +365,10 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
     m_c_indices_g.resize(n_cols);
     m_a_ij.resize(n_cols);
 
-    auto r_indices_g_ptr = m_r_indices_g.data();
-    auto num_nz_ptr = m_num_nz.data();
-    auto c_indices_g_ptr = m_c_indices_g.data();
-    auto a_ij_ptr = m_a_ij.data();
+    auto* r_indices_g_ptr = m_r_indices_g.data();
+    auto* num_nz_ptr = m_num_nz.data();
+    auto* c_indices_g_ptr = m_c_indices_g.data();
+    auto* a_ij_ptr = m_a_ij.data();
 
     const auto nnz_max = m_pc_mat_nnz;
     auto nnz_actual = nnz_max;
