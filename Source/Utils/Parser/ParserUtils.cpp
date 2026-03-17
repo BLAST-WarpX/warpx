@@ -38,9 +38,9 @@ void utils::parser::Store_parserString(
     std::string const& query_string,
     std::string& stored_string)
 {
-    const bool is_specified_without_group = a_pp.contains(query_string.c_str());
+    const bool is_specified_without_group = a_pp.contains(query_string);
     const std::string grp_str = group + "." + query_string;
-    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
     if (is_specified_without_group && !is_specified_with_group) {
         // If found without the group but not with the group, then use the one without the group.
@@ -56,7 +56,7 @@ bool utils::parser::Query_parserString(
     std::string const& query_string,
     std::string& stored_string)
 {
-    bool const input_specified = pp.contains(query_string.c_str());
+    bool const input_specified = pp.contains(query_string);
     if (input_specified) {
         stored_string.clear();
         utils::parser::Store_parserString(pp, query_string, stored_string);
@@ -68,14 +68,14 @@ int utils::parser::query (const amrex::ParmParse& a_pp, std::string const& group
 {
     const bool is_specified_without_group = a_pp.contains(str);
     const std::string grp_str = group + "." + std::string(str);
-    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
     if (is_specified_without_group && !is_specified_with_group) {
         // If found without the group but not with the group, then use the one without the group.
         return a_pp.query(str, val);
     } else {
         // Otherwise, use the one with the group even if not found, in which case an exception may be raised.
-        return a_pp.query(grp_str.c_str(), val);
+        return a_pp.query(grp_str, val);
     }
 }
 
@@ -83,7 +83,7 @@ void utils::parser::get (const amrex::ParmParse& a_pp, std::string const& group,
 {
     const bool is_specified_without_group = a_pp.contains(str);
     const std::string grp_str = group + "." + std::string(str);
-    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+    const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
     if (is_specified_without_group && !is_specified_with_group) {
         // If found without the group but not with the group, then use the one without the group.
