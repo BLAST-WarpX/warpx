@@ -1472,7 +1472,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        std::ofstream{table_name, std::ios::binary}.write(data.data(), , static_cast<int>(data.size()));
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), static_cast<int>(data.size()));
     }
 
     ParallelDescriptor::Barrier();
