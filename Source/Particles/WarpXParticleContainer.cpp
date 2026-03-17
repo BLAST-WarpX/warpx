@@ -1961,7 +1961,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
                 const amrex::ParticleReal ux = uxp[ip] - sum_array(ii, jj, kk, 1);
                 const amrex::ParticleReal uy = uyp[ip] - sum_array(ii, jj, kk, 2);
                 const amrex::ParticleReal uz = uzp[ip] - sum_array(ii, jj, kk, 3);
-                const amrex::Real usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
+                const auto usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
                 amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), usq);
             });
     }
@@ -2101,8 +2101,8 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     int const ng = 0;
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
-    amrex::Real const rmass = (amrex::Real)(m_mass);
-    amrex::Real const rcharge = (amrex::Real)(charge);
+    auto const rmass = static_cast<amrex::Real>(m_mass);
+    auto const rcharge = static_cast<amrex::Real>(charge);
     amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
 #ifdef AMREX_USE_OMP

@@ -2120,7 +2120,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                     if (nx_arr(i,j,k) > 1) {
                         amrex::Real sumw = wx_arr(i,j,k);
                         amrex::Real sumwv = vxbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nx_arr(i,j,k));
+                        auto n = static_cast<amrex::Real>(nx_arr(i,j,k));
                         amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vxbar_arr(i,j,k) = sumwv/sumw;
@@ -2133,7 +2133,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                     if (ny_arr(i,j,k) > 1) {
                         amrex::Real sumw = wy_arr(i,j,k);
                         amrex::Real sumwv = vybar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(ny_arr(i,j,k));
+                        auto n = static_cast<amrex::Real>(ny_arr(i,j,k));
                         amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vybar_arr(i,j,k) = sumwv/sumw;
@@ -2146,7 +2146,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                     if (nz_arr(i,j,k) > 1) {
                         amrex::Real sumw = wz_arr(i,j,k);
                         amrex::Real sumwv = vzbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nz_arr(i,j,k));
+                        auto n = static_cast<amrex::Real>(nz_arr(i,j,k));
                         amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vzbar_arr(i,j,k) = sumwv/sumw;

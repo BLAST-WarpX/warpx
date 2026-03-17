@@ -123,7 +123,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
                     // `n_photons` must be an integer, but must average to `r_photons` over many realizations
                     // This is achieved by adding a random number between 0 and 1, and taking the integer part.
-                    amrex::Long n_photons = (amrex::Long)( r_photons + amrex::Random(engine) );
+                    auto n_photons = static_cast<amrex::Long>( r_photons + amrex::Random(engine) );
 
                     num_vp_data[i] = n_photons;
                 });

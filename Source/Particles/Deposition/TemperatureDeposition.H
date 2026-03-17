@@ -58,9 +58,9 @@ void varianceDepositionSubKernel(
     const TemperatureDepositionPass pass
 )
 {
-    const amrex::Real vxr = static_cast<amrex::Real>(vx);
-    const amrex::Real vyr = static_cast<amrex::Real>(vy);
-    const amrex::Real vzr = static_cast<amrex::Real>(vz);
+    const auto vxr = static_cast<amrex::Real>(vx);
+    const auto vyr = static_cast<amrex::Real>(vy);
+    const auto vzr = static_cast<amrex::Real>(vz);
 
     if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
     {

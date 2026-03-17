@@ -480,7 +480,7 @@ namespace ParticleUtils {
 
             const amrex::ParticleReal A = Etot - deltaEpair;
             const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-            const amrex::ParticleReal p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
+            const auto p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
             const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
             // Compute coefficients for quadratic equation for alpha.
