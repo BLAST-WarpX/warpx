@@ -94,7 +94,7 @@ namespace ablastr::fields
             return other.dir < this->dir;
         }
 
-        operator std::string() const
+        operator std::string() const // NOLINT(google-explicit-constructor)
         {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             if (dir == r) { return "r"; }
@@ -114,7 +114,7 @@ namespace ablastr::fields
             return std::to_string(dir);
         }
 
-        Direction (std::string const & s) :
+        explicit Direction (std::string const & s) :
             dir{-1}
         {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
