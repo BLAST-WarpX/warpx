@@ -66,7 +66,7 @@ public:
     PhysicalParticleContainer(PhysicalParticleContainer&& )                    = default;
     PhysicalParticleContainer& operator=(PhysicalParticleContainer&& )         = default;
 
-    virtual void AllocData () override;
+    void AllocData () override;
 
     void InitData () override;
 
@@ -433,13 +433,13 @@ public:
     }
 
     // By default this returns false; overridden here to return runtime value
-    virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
+    bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
 
-    virtual void AccumulateVelocitiesAndComputeTemperature (
+    void AccumulateVelocitiesAndComputeTemperature (
         ablastr::fields::MultiLevelVectorField const & T_vf,
         amrex::Real relative_time) override;
 
-    virtual void DepositTemperature (
+    void DepositTemperature (
         WarpXParIter& pti,
         RealVector const & wp, RealVector const & uxp,
         RealVector const & uyp, RealVector const & uzp,

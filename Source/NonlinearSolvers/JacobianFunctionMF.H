@@ -30,7 +30,7 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     using RT = typename T::value_type;
 
     JacobianFunctionMF() = default;
-    ~JacobianFunctionMF() = default;
+    ~JacobianFunctionMF() override = default;
 
     // Default move and copy operations
     JacobianFunctionMF(const JacobianFunctionMF&) = default;
