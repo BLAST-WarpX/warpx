@@ -290,7 +290,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
         IsDefined(),
         "MatrixPC::Update() called on undefined object" );
 
-    while(1) {
+    while(true) {
 
         auto nnz_diff = Assemble(a_U);
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
