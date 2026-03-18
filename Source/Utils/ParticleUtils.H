@@ -342,13 +342,13 @@ namespace ParticleUtils {
 #elif defined(WARPX_DIM_1D_Z)
         xp_grid[0] = (zp - xyzmin.z)*dinv.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+        const double rp = std::sqrt(xp*xp + yp*yp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
-        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        const double rp = std::sqrt(xp*xp + yp*yp + zp*zp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #endif
 
