@@ -34,7 +34,6 @@
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_Vector.H>
-#include <AMReX_LO_BCTYPES.H>
 
 #include <ablastr/utils/Enums.H>
 
