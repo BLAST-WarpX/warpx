@@ -76,16 +76,10 @@ namespace BinaryCollisionUtils{
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     bool is_two_product_fusion_type (const CollisionType collision_type)
     {
-        if ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
+        return ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
             (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) ||
             (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) ||
-            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion))
-        {
-            return true;
-        }
-        else {
-            return false;
-        }
+            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion));
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE

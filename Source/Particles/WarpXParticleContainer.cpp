@@ -1153,7 +1153,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     auto& uyp_n = pti.GetAttribs("uy_n");
     auto& uzp_n = pti.GetAttribs("uz_n");
 
-    const bool full_mass_matrices = (Szz->nComp() > 1 ? true : false);
+    const bool full_mass_matrices = (Szz->nComp() > 1);
 
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {

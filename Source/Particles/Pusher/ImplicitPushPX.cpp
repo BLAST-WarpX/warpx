@@ -990,7 +990,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         // of suborbits is increased and the loop starts over. This proceeds until all
         // suborbits converge. For the linear stage, the number of suborbits are not
         // permitted to change because this can cause non-convergence of GMRES.
-        bool doing_deposition = linear_stage_of_jfnk ? true : false;
+        bool doing_deposition = linear_stage_of_jfnk;
         int isuborbit = 0;
         while (isuborbit < nsuborbits[ip]) {
 

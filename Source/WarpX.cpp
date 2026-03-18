@@ -1908,7 +1908,7 @@ WarpX::ReadParameters ()
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
     pp_collisions.queryarr("collision_names", collision_names);
-    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
+    bool const collisions = (collision_names.size() > 0);
     if (collisions) {
         if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;

@@ -83,10 +83,10 @@ Diagnostics::BaseReadParameters ()
     }
 
     // Sanity check if user requests to plot phi
-    if (utils::algorithms::is_in(m_varnames_fields, "phi") && !(
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential
+    if (utils::algorithms::is_in(m_varnames_fields, "phi") && (
+            warpx.electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrame &&
+            warpx.electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic &&
+            warpx.electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameEffectivePotential
         )
     ){
         ablastr::warn_manager::WMRecordWarning(
