@@ -511,9 +511,9 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             !m_use_mass_matrices_jacobian,
             "Using mass matrices for jacobian can not be used for DIM = 3");
 #endif
-        if ( (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
-              m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
-             (m_WarpX->nox < 2) ) {
+        if ( (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+              WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
+             (WarpX::nox < 2) ) {
             std::stringstream warningMsg;
             warningMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
             warningMsg << "is being used with a charge-conserving deposition (esirkepov or villasenor) and particle_shape = 1.\n";
@@ -555,7 +555,7 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const int shape = m_WarpX->nox;
+    const int shape = WarpX::nox;
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 
@@ -578,7 +578,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 "to be at least as many as those for J.");
         }
 
-        if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
+        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct) {
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 m_ncomp_xx[dir] = 1 + 2*shape;
                 m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
@@ -601,7 +601,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 Nc_tot_zz *= m_ncomp_zz[dir];
             }
         }
-        else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #ifndef WARPX_DIM_3D
             int max_crossings = ngJ[0] - shape + 1;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
@@ -786,7 +786,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     using warpx::fields::FieldType;
 
-    if (m_WarpX->use_filter) {
+    if (WarpX::use_filter) {
         int finest_level = 0;
         m_WarpX->ApplyFilterMF(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
     }

@@ -41,7 +41,7 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
 
     auto& warpx = WarpX::GetInstance();
 
-    m_grid_type = warpx.grid_type;
+    m_grid_type = WarpX::grid_type;
 
     // Only div clean level 0
     if (warpx.finestLevel() > 0) {
