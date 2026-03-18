@@ -58,6 +58,9 @@ After creating a personal account, Context7 is free within limits for open sourc
 Best Practices
 --------------
 
+When working with LLM coding assistants, keep in mind that *"most best practices are based on one constraint: [the] context window fills up fast, and performance degrades as it fills"* (`Claude Code Best Practices <https://code.claude.com/docs/en/best-practices>`__).
+Starting from examples and iterating incrementally — as described below — helps keep sessions focused and productive.
+
 #. **Start from examples.**
    Run your coding existant inside the WarpX source directory.
    Point the assistant to an existing input file or PICMI script from the ``Examples/`` directory and ask it to adapt the setup to your needs.

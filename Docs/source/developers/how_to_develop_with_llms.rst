@@ -21,6 +21,11 @@ This guide documents how the WarpX repository is configured for LLM-based coding
    This section is not understood as an endorsement of any of the listed (or unlisted) coding assistants or MCP services.
    Contributions to this section documenting further services, clients, skills, etc. are encouraged.
 
+.. tip::
+
+   When working with LLM coding assistants, keep in mind that *"most best practices are based on one constraint: [the] context window fills up fast, and performance degrades as it fills"* (`Claude Code Best Practices <https://code.claude.com/docs/en/best-practices>`__).
+   Keep instructions concise (e.g., in ``CLAUDE.md``), break complex tasks into focused sessions, and provide targeted context rather than overwhelming the assistant with information.
+
 
 CLAUDE.md / AGENTS.md
 ---------------------
