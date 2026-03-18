@@ -54,7 +54,7 @@ public:
 
     void CreateParticleAttributes () const;
 
-    bool DoParticleSuborbits () { return m_particle_suborbits; }
+    bool DoParticleSuborbits () const { return m_particle_suborbits; }
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
