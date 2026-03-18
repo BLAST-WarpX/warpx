@@ -70,7 +70,7 @@ class MultiParticleContainer
 
 public:
 
-    MultiParticleContainer (amrex::AmrCore* amr_core);
+    explicit MultiParticleContainer (amrex::AmrCore* amr_core);
 
     ~MultiParticleContainer() = default;
 

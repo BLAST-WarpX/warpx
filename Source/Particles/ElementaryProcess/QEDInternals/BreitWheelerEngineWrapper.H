@@ -209,7 +209,7 @@ public:
      *
      * @param[in] table_view a BW_pair_prod_table_view
      */
-    BreitWheelerGeneratePairs (const BW_pair_prod_table_view table_view):
+    explicit BreitWheelerGeneratePairs (const BW_pair_prod_table_view table_view):
         m_table_view{table_view}{}
 
     /**

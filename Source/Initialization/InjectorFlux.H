@@ -22,7 +22,7 @@
 // struct whose getFlux returns constant flux.
 struct InjectorFluxConstant
 {
-    InjectorFluxConstant (amrex::Real a_flux) noexcept : m_flux(a_flux) {}
+    explicit InjectorFluxConstant (amrex::Real a_flux) noexcept : m_flux(a_flux) {}
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE

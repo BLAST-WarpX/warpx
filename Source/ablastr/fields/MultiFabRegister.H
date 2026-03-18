@@ -152,7 +152,7 @@ namespace ablastr::fields
         Direction& operator= (Direction&&) = default;
 
         /* TODO: just temporary int compatibility */
-        operator int() const { return dir; }
+        operator int() const { return dir; } // NOLINT(google-explicit-constructor)
 
     };
 
