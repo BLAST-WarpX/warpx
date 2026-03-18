@@ -39,7 +39,7 @@ private:
 // struct whose getFlux returns local flux computed from parser.
 struct InjectorFluxParser
 {
-    InjectorFluxParser (amrex::ParserExecutor<4> const& a_parser) noexcept
+    explicit InjectorFluxParser (amrex::ParserExecutor<4> const& a_parser) noexcept
         : m_parser(a_parser) {}
 
     [[nodiscard]]

@@ -402,7 +402,7 @@ public:
      *
      * \param[in] rd_name reduced diags names
      */
-    FieldPoyntingFlux (const std::string& rd_name);
+    explicit FieldPoyntingFlux (const std::string& rd_name);
 
     /**
      * \brief Call the routine to compute the Poynting flux if needed
