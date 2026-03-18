@@ -68,7 +68,7 @@ public:
     [[nodiscard]] virtual int getStatus () const = 0;
 
     //! Gets the 2-norm of the residual.
-    virtual RT getResidualNorm () const = 0;
+    [[nodiscard]] virtual RT getResidualNorm () const = 0;
 
 protected:
 

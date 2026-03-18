@@ -138,7 +138,7 @@ struct IndependentPairHelper
     }
 
     [[nodiscard]] int numIndependentPairs () const {return m_n_independent_pairs;}
-    const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
+    [[nodiscard]] const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
 };
 
 #endif // WARPX_PARTICLES_COLLISION_SHUFFLE_FISHER_YATES_H_
