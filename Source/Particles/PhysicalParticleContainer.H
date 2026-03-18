@@ -178,9 +178,9 @@ public:
                                   amrex::FArrayBox const * bzfab,
                                   ImplicitOptions const * implicit_options,
                                   amrex::IntVect ngEB,
-                                  amrex::MultiFab * const jx,
-                                  amrex::MultiFab * const jy,
-                                  amrex::MultiFab * const jz,
+                                  amrex::MultiFab* jx,
+                                  amrex::MultiFab* jy,
+                                  amrex::MultiFab* jz,
                                   long offset,
                                   int lev, int gather_lev,
                                   amrex::Real dt,
@@ -443,12 +443,12 @@ public:
         WarpXParIter& pti,
         RealVector const & wp, RealVector const & uxp,
         RealVector const & uyp, RealVector const & uzp,
-        amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
-        long const offset, long const np_to_deposit,
-        int const thread_num, const int lev, int const depos_lev,
-        amrex::Real const relative_time, PushType push_type,
-        const warpx::particles::deposition::TemperatureDepositionType type,
-        const warpx::particles::deposition::TemperatureDepositionPass pass) override;
+        amrex::MultiFab* Tx, amrex::MultiFab* Ty, amrex::MultiFab* Tz,
+        long offset, long np_to_deposit,
+        int thread_num, int lev, int depos_lev,
+        amrex::Real relative_time, PushType push_type,
+        warpx::particles::deposition::TemperatureDepositionType type,
+        warpx::particles::deposition::TemperatureDepositionPass pass) override;
 
 protected:
 
