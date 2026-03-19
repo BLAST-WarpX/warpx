@@ -1018,7 +1018,7 @@ public:
                 std::vector<std::string> const & real_names2 = species_2.GetRealSoANames();
                 auto const pos2 = std::find(real_names2.begin(), real_names2.end(), "ux_n");
                 if (pos2 != real_names2.end()) {
-                    int const u2x_ni = std::distance(real_names2.begin(), pos2);
+                    auto const u2x_ni = static_cast<int>(std::distance(real_names2.begin(), pos2));
                     u2x_before_ptr = soa_2.m_runtime_rdata[u2x_ni];
                     u2y_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 1];
                     u2z_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 2];
