@@ -112,7 +112,7 @@ public:
         pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
 
         if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
-            m_modulus_rounds = 4;
+            m_modulus_rounds = 5;
             pp_collision_name.query("modulus_rounds", m_modulus_rounds);
         }
 

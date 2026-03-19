@@ -1,4 +1,4 @@
-/* Copyright 2019 Yinjian Zhao
+/* Copyright 2026 The WarpX Community
  *
  * This file is part of WarpX.
  *
@@ -39,8 +39,8 @@ T_index gcd_int(T_index a, T_index b) {
 /* \brief Generate the step for the modulus shuffle
  *        In order for the shuffle to include all particles, the step
  *        and the number of particles must not have any common factors
- *        except 1, they are coprime.
- *        As a comment, the likelyhood that two integers are coprime
+ *        except 1, they are co-prime.
+ *        As a comment, the likelyhood that two integers are co-prime
  *        is roughly 60%, so the while loop should succeed in a small
  *        number of attempts.
  *
@@ -65,13 +65,16 @@ T_index generate_modulus_step(T_index n, amrex::RandomEngine const& engine)
     return step;
 }
 
-/* \brief Shuffles the indices using a modulus shuffle.
- *        For each particle i, move it to (i*step + offset) % n,
+/* \brief Shuffles the indices using a linear congruential generator based shuffle.
+ *        For each particle i, replace it the particle at (i*step + offset) % n,
  *        where i and n are relative to the grid cell.
- *        This will work for all particles if step and n are coprime.
+ *        This will work for all particles if step and n are co-prime.
+ *        The particles in the cell are divided roughly evenly into nsub subgroups
+ *        and the shuffles are done within each subgroup.
  *
  * \param n_cell The number of grid cells
  * \param np The number of particles (the length of indices)
+ * \param nsub The number of subgroups in the shuffle
  * \param cell_offsets The particle number offset for each cell
  *                     (The cumulative integral of the number of particles in each cell.)
  * \param indices The indices to the particles that is to be shuffled
@@ -84,15 +87,17 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
     // Doing the ParallelFor loops over the particles is substantially faster
     // than looping over cells on the GPU.
 
+    // For all grid cells, precalculate the step size and offset for each subgroup
+    // that are used in the suffle and the shift of where the subgroups start.
     amrex::Gpu::DeviceVector<T_index> indices_copy_vector(np);
     amrex::Gpu::DeviceVector<int> indices_step_vector(n_cells*nsub);
     amrex::Gpu::DeviceVector<int> indices_offset_vector(n_cells*nsub);
+    amrex::Gpu::DeviceVector<int> sub_shift_vector(n_cells);
     T_index* AMREX_RESTRICT indices_copy = indices_copy_vector.dataPtr();
     T_index* AMREX_RESTRICT indices_step = indices_step_vector.dataPtr();
     T_index* AMREX_RESTRICT indices_offset = indices_offset_vector.dataPtr();
+    T_index* AMREX_RESTRICT sub_shift = sub_shift_vector.dataPtr();
 
-    // For each grid cell, calculates the step size and offset
-    // that are used in the suffle.
     amrex::ParallelForRNG(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
         {
@@ -100,6 +105,7 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
             T_index const cell_stop  = cell_offsets[i_cell+1];
             T_index const n = cell_stop - cell_start;
 
+            sub_shift[i_cell] = amrex::Random_int(n, engine);
             for (int isub = 0 ; isub < nsub ; isub++) {
                 // Add nsub/2 to round to the nearest, instead of truncating
                 T_index const istart = (isub*n + nsub/2)/nsub;
@@ -117,7 +123,7 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
             indices_copy[ip] = indices[ip];
         });
 
-    // Do the shuffle.
+    // Do the shuffle
     amrex::ParallelFor(np,
         [=] AMREX_GPU_DEVICE (int ip) noexcept
         {
@@ -139,12 +145,16 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
             }
             T_index const step = indices_step[isub + i_cell*nsub];
             T_index const offset = indices_offset[isub + i_cell*nsub];
+            T_index const shift = sub_shift[i_cell];
             T_index const nnsub = iend - istart;
 
-            // A long is needed since the product i*step can exceed the range of
+            // A long is needed for i2 since the product i*step can exceed the range of
             // standard ints
-            T_index const i2 = (T_index)(((amrex::Long)(i - istart)*step + offset) % nnsub);
-            indices[ip] = indices_copy[cell_start + istart + i2];
+            T_index const i1 = i - istart;
+            T_index const i2 = (T_index)(((amrex::Long)(i1)*step + offset) % nnsub);
+            T_index const ip1 = cell_start + (istart + i1 + shift) % n;
+            T_index const ip2 = cell_start + (istart + i2 + shift) % n;
+            indices[ip1] = indices_copy[ip2];
         }
     );
 
@@ -166,6 +176,9 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
                 indices_copy[i] = indices[i];
             }
 
+            // Apply a shift to the start of the subgroups to give more randomness
+            T_index const shift = amrex::Random_int(n, engine);
+
             for (int isub = 0 ; isub < nsub ; isub++) {
                 // Add nsub/2 to round to the nearest, instead of truncating
                 T_index const istart = (isub*n + nsub/2)/nsub;
@@ -173,9 +186,11 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
                 T_index const nnsub = iend - istart;
                 T_index const step = generate_modulus_step(nnsub, engine);
                 T_index const offset = amrex::Random_int(nnsub, engine);
-                for (T_index i = 0 ; i < nnsub ; i++) {
-                    T_index const i2 = (int)(((amrex::Long)i*step + offset) % nnsub);
-                    indices[cell_start + istart + i] = indices_copy[cell_start + istart + i2];
+                for (T_index i1 = 0 ; i1 < nnsub ; i1++) {
+                    T_index const i2 = (T_index)(((amrex::Long)(i1)*step + offset) % nnsub);
+                    T_index const ip1 = cell_start + (istart + i1 + shift) % n;
+                    T_index const ip2 = cell_start + (istart + i2 + shift) % n;
+                    indices[ip1] = indices_copy[ip2];
                 }
             }
     });
@@ -186,7 +201,7 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
 /* \brief Shuffles the indices using a modulus shuffle.
  *        For each particle i, move it to (i*step + offset) % n,
  *        where i and n are relative to the grid cell.
- *        This will work for all particles if step and n are coprime.
+ *        This will work for all particles if step and n are co-prime.
  *
  * \param n_cell The number of grid cells
  * \param np The number of particles (the length of indices)
