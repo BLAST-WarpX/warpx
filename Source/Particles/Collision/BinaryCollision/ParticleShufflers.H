@@ -259,7 +259,7 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets, T_index *ind
     amrex::ParallelForRNG(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
         {
-            // The particles from species1 that are in the cell `i_cell` are
+            // The particles that are in the cell `i_cell` are
             // given by the `indices[cell_start:cell_stop]`
             T_index const cell_start = cell_offsets[i_cell];
             T_index const cell_stop  = cell_offsets[i_cell+1];
@@ -268,6 +268,51 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets, T_index *ind
             if ( cell_stop - cell_start <= 1 ) { return; }
 
             ShuffleFisherYates(indices, cell_start, cell_stop, engine);
+        }
+    );
+}
+
+/* \brief Shuffle two arrays according to Fisher-Yates algorithm.
+ *
+ * \param n_cell The number of grid cells
+ * \param cell_offsets_1 The particle number offset for each cell for species 1
+ *                       (The cumulative integral of the number of particles in each cell.)
+ * \param indices_1 The indices to the particles that is to be shuffled for species 1
+ * \param cell_offsets_2 The particle number offset for each cell for species 2
+ *                       (The cumulative integral of the number of particles in each cell.)
+ * \param indices_2 The indices to the particles that is to be shuffled for species 2
+*/
+template <typename T_index>
+void FisherYatesShuffle (int n_cells, T_index const * cell_offsets_1, T_index *indices_1,
+                                      T_index const * cell_offsets_2, T_index *indices_2)
+{
+    // Launch 2*n_cells threads to process both species simultaneously.
+    amrex::ParallelForRNG(2*n_cells,
+        [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
+        {
+            if (i < n_cells) {
+                // The particles from species1 that are in the cell `i_cell` are
+                // given by the `indices_1[cell_start:cell_stop]`
+                int const i_cell = i;
+                T_index const cell_start = cell_offsets_1[i_cell];
+                T_index const cell_stop  = cell_offsets_1[i_cell + 1];
+
+                // Do not shuffle if there is only one particle in the cell
+                if ( cell_stop - cell_start <= 1 ) { return; }
+
+                ShuffleFisherYates(indices_1, cell_start, cell_stop, engine);
+            } else {
+                // The particles from species2 that are in the cell `i_cell` are
+                // given by the `indices_2[cell_start:cell_stop]`
+                int const i_cell = i - n_cells;
+                T_index const cell_start = cell_offsets_2[i_cell];
+                T_index const cell_stop  = cell_offsets_2[i_cell + 1];
+
+                // Do not shuffle if there is only one particle in the cell
+                if ( cell_stop - cell_start <= 1 ) { return; }
+
+                ShuffleFisherYates(indices_2, cell_start, cell_stop, engine);
+            }
         }
     );
 }
@@ -346,35 +391,11 @@ struct IndependentPairHelper
     void shuffle (index_type* AMREX_RESTRICT a_indices_1,
           index_type* AMREX_RESTRICT a_indices_2)
     {
-    // shuffle each species.
-    // we launch 2*n_cells threads to process both species simultaneously
-    int n_cells = m_n_cells;
-    index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
-    index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
-    amrex::ParallelForRNG( 2*m_n_cells,
-        [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-    {
-        int i_cell = i < n_cells ? i : i - n_cells;
-
-        // The particles from species1 that are in the cell `i_cell` are
-        // given by the `indices_1[cell_start_1:cell_stop_1]`
-        index_type const cell_start_1 = cell_offsets_1[i_cell];
-        index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-        // Same for species 2
-        index_type const cell_start_2 = cell_offsets_2[i_cell];
-        index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-        // Do not collide if one species is missing in the cell
-        if ( cell_stop_1 - cell_start_1 < 1 ||
-         cell_stop_2 - cell_start_2 < 1 ) { return; }
-
-        if (i < n_cells) {
-        ShuffleFisherYates(a_indices_1, cell_start_1, cell_stop_1, engine);
-        } else {
-        ShuffleFisherYates(a_indices_2, cell_start_2, cell_stop_2, engine);
-        }
-    });
+        // shuffle each species.
+        int n_cells = m_n_cells;
+        index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
+        index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
+        FisherYatesShuffle (n_cells, cell_offsets_1, a_indices_1, cell_offsets_2, a_indices_2);
     }
 
     int numIndependentPairs () const {return m_n_independent_pairs;}
