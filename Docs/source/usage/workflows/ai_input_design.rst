@@ -14,7 +14,7 @@ This workflow is equally applicable to:
 .. note::
 
    LLM-generated input files and scripts should always be reviewed carefully before use.
-   LLMs tend to halluscinate options that do not exist or might miss the mental context of your physics.
+   LLMs tend to hallucinate options that do not exist or might miss the mental context of your physics.
    The guide below tries to improve this situation by providing LLMs all WarpX examples and documentation automatically, but this remains an active and rapidly evolving field of tooling.
 
    Validate physics parameters, boundary conditions, grid resolution, and numerical settings against your domain knowledge and the `WarpX documentation <https://warpx.readthedocs.io>`__.
@@ -62,7 +62,7 @@ When working with LLM coding assistants, keep in mind that *"most best practices
 Starting from examples and iterating incrementally — as described below — helps keep sessions focused and productive.
 
 #. **Start from examples.**
-   Run your coding existant inside the WarpX source directory.
+   Run your coding agent inside the WarpX source directory.
    Point the assistant to an existing input file or PICMI script from the ``Examples/`` directory and ask it to adapt the setup to your needs.
 
 #. **Iterate incrementally.**
