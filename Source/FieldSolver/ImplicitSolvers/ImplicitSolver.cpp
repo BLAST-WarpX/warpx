@@ -266,9 +266,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xx[0],
-                                   + ncomp_xx[0]*( jj+offset_xx[1] ),
-                                   + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xx[0],
+                                         + ncomp_xx[0]*( jj+offset_xx[1] ),
+                                         + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
                             SxxdEx += Sxx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -284,9 +284,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xy[0],
-                                   + ncomp_xy[0]*( jj+offset_xy[1] ),
-                                   + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xy[0],
+                                         + ncomp_xy[0]*( jj+offset_xy[1] ),
+                                         + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
                             SxydEy += Sxy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                    - Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -302,9 +302,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xz[0],
-                                   + ncomp_xz[0]*( jj+offset_xz[1] ),
-                                   + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xz[0],
+                                         + ncomp_xz[0]*( jj+offset_xz[1] ),
+                                         + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
                             SxzdEz += Sxz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                    - Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -329,9 +329,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yx[0],
-                                   + ncomp_yx[0]*( jj+offset_yx[1] ),
-                                   + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yx[0],
+                                         + ncomp_yx[0]*( jj+offset_yx[1] ),
+                                         + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
                             SyxdEx += Syx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -347,9 +347,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yy[0],
-                                   + ncomp_yy[0]*( jj+offset_yy[1] ),
-                                   + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yy[0],
+                                         + ncomp_yy[0]*( jj+offset_yy[1] ),
+                                         + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
                             SyydEy += Syy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                   -  Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -365,9 +365,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yz[0],
-                                   + ncomp_yz[0]*( jj+offset_yz[1] ),
-                                   + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yz[0],
+                                         + ncomp_yz[0]*( jj+offset_yz[1] ),
+                                         + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
                             SyzdEz += Syz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                   -  Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -392,9 +392,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zx[0],
-                                   + ncomp_zx[0]*( jj+offset_zx[1] ),
-                                   + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zx[0],
+                                         + ncomp_zx[0]*( jj+offset_zx[1] ),
+                                         + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
                             SzxdEx += Szx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -410,9 +410,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zy[0],
-                                   + ncomp_zy[0]*( jj+offset_zy[1] ),
-                                   + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zy[0],
+                                         + ncomp_zy[0]*( jj+offset_zy[1] ),
+                                         + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
                             SzydEy += Szy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                   -  Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -428,9 +428,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zz[0],
-                                   + ncomp_zz[0]*( jj+offset_zz[1] ),
-                                   + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zz[0],
+                                         + ncomp_zz[0]*( jj+offset_zz[1] ),
+                                         + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
                             SzzdEz += Szz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                   -  Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -787,7 +787,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     using warpx::fields::FieldType;
 
     if (WarpX::use_filter) {
-        int finest_level = 0;
+        const int finest_level = 0;
         m_WarpX->ApplyFilterMF(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
     }
 

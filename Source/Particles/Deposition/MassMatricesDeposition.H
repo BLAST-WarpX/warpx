@@ -71,8 +71,8 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
     const amrex::ParticleReal bzp = alpha*Bzp;
 
     // Compute Mass Matrix kernels (non-relativistic for now)
-    amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
-    amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
+    const amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
+    const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
 
     fpxx = arogp*(bxp*bxp + 1.0_rt);
     fpxy = arogp*(bxp*byp + bzp);

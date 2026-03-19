@@ -433,8 +433,8 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                              y = problo[1] + (j+Real(0.5))*dx[1];,
                              z = problo[2] + (k+Real(0.5))*dx[2]);
 #endif
-                Real v = density_exe(x,y,z);
-                Real r = (v >= density_min) ? nppc : Real(0);
+                const Real v = density_exe(x,y,z);
+                const Real r = (v >= density_min) ? nppc : Real(0);
                 rhoma[b](i,j,k) += r;
                 return r;
             });

@@ -235,7 +235,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                 auto& x_mf = *(x_mfarrvec[n][dim]);
 
                 for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    Box bx = mfi.tilebox();
+                    const Box bx = mfi.tilebox();
                     auto x_arr = x_mf.array(mfi);
                     auto b_arr = b_mf.const_array(mfi);
                     auto a_arr = a_mf.const_array(mfi);
