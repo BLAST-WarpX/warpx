@@ -373,6 +373,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         // This gets the names correct relative to what WarpX uses, but note that AMReX ignores
         // these names and always writes the particles out with "x" as the first coordinate,
         // "y" as the second, and "z" as the third independent of what geometry is being used.
+        // All that matters here is getting the correct number of positions.
 #if !defined (WARPX_DIM_1D_Z)
         real_names.push_back("position_x");
 #endif
