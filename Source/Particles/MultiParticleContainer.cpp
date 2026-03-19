@@ -697,7 +697,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
     WarpX & warpx = WarpX::GetInstance();
 
-    if (allcontainers.size() == 0) { return; }
+    if (allcontainers.empty()){ return; }
 
     // Is there a nicer way to get the number of levels?
     // This grabs it from the first species.
