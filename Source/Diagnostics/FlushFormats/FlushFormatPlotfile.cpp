@@ -376,7 +376,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 #if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         real_names.push_back("position_y");
 #endif
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
         real_names.push_back("position_z");
 #endif
         real_names.push_back("weight");
