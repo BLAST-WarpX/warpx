@@ -43,7 +43,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         }
 
         // Get the virtual photon species corresponding to this primary species
-        int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
+        const int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
 

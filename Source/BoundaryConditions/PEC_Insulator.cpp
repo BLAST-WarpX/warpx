@@ -844,7 +844,7 @@ PEC_Insulator::ZeroParallelScalarInConductor (
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 
                         amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, S_nodal);
-                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+                        ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
 
