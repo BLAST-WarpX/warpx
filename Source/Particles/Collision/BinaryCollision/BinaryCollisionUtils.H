@@ -39,10 +39,61 @@ namespace BinaryCollisionUtils{
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
                                                MultiParticleContainer const * mypc);
 
+    void CheckFusionEnergy (const NuclearFusionType fusion_type,
+                            const amrex::ParticleReal mass_before,
+                            const amrex::ParticleReal mass_after);
+
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
 
-    CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type);
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type)
+    {
+        CollisionType collision_type = CollisionType::Undefined;
+        if (fusion_type == NuclearFusionType::DeuteriumTritiumToNeutronHelium) {
+            collision_type = CollisionType::DeuteriumTritiumToNeutronHeliumFusion;
+        }
+        else if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToProtonTritium) {
+            collision_type = CollisionType::DeuteriumDeuteriumToProtonTritiumFusion;
+        }
+        else if (fusion_type == NuclearFusionType::DeuteriumDeuteriumToNeutronHelium) {
+            collision_type = CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion;
+        }
+        else if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
+            collision_type = CollisionType::DeuteriumHeliumToProtonHeliumFusion;
+        }
+        else if (fusion_type == NuclearFusionType::ProtonBoronToAlphas) {
+            collision_type = CollisionType::ProtonBoronToAlphasFusion;
+        }
+        else {
+            AMREX_IF_ON_HOST((
+                WARPX_ABORT_WITH_MESSAGE("Invalid nuclear fusion type");
+            ))
+        }
+        return collision_type;
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    bool is_two_product_fusion_type (const CollisionType collision_type)
+    {
+        if ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
+            (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) ||
+            (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) ||
+            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion))
+        {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    bool is_two_product_fusion_type (const NuclearFusionType fusion_type)
+    {
+        CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
+        return is_two_product_fusion_type(collision_type);
+    }
 
     /**
      * \brief Return (relativistic) collision energy, collision speed and

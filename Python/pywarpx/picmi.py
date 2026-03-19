@@ -513,14 +513,21 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 
         # --- Note that WarpX takes gamma*beta as input
         if np.any(np.not_equal(self.velocity_divergence, 0.0)):
+            u_over_x = self.velocity_divergence[0] / constants.c
+            u_over_y = self.velocity_divergence[1] / constants.c
+            u_over_z = self.velocity_divergence[2] / constants.c
             species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "radial_expansion"
+                source_name, "momentum_distribution_type", "parse_momentum_function"
             )
             species.add_new_group_attr(
-                source_name, "u_over_r", self.velocity_divergence[0] / constants.c
+                source_name, "momentum_function_ux(x,y,z)", f"{u_over_x}*x"
             )
-            # species.add_new_group_attr(source_name, 'u_over_y', self.velocity_divergence[1]/constants.c)
-            # species.add_new_group_attr(source_name, 'u_over_z', self.velocity_divergence[2]/constants.c)
+            species.add_new_group_attr(
+                source_name, "momentum_function_uy(x,y,z)", f"{u_over_y}*y"
+            )
+            species.add_new_group_attr(
+                source_name, "momentum_function_uz(x,y,z)", f"{u_over_z}*z"
+            )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussian"
@@ -3202,6 +3209,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_amrex_use_gpu_aware_mpi: bool, optional
         Whether to use GPU-aware MPI communications
 
+    warpx_do_device_synchronize: bool, optional
+        Whether to synchronize GPU threads at ends of profiling regions.
+        Note that if this is set to False, the TinyProfiler table can be
+        misleading.
+
     warpx_zmax_plasma_to_compute_max_step: float, optional
         Sets the simulation run time based on the maximum z value
 
@@ -3213,14 +3225,13 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_collisions: collision instance, optional
         The collision instance specifying the particle collisions
 
-    warpx_collisions_split_position_push: bool, default=1
-        If true, collisions are performed in the middle of the position push,
+    warpx_collisions_split_momentum_push: bool, default=1
+        If true, collisions are performed in the middle of the momentum push,
         which is split into two substeps.
         This improves energy conservation, as demonstrated in
         (Vay et al., Phys. Rev. E 111, 2025).
         This is only implemented for the explicit evolve scheme
         and is not available for the implicit evolve schemes.
-        It is also not available with embedded boundaries.
 
     warpx_embedded_boundary: embedded boundary instance, optional
 
@@ -3327,6 +3338,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         self.amrex_the_arena_init_size = kw.pop("warpx_amrex_the_arena_init_size", None)
         self.amrex_use_gpu_aware_mpi = kw.pop("warpx_amrex_use_gpu_aware_mpi", None)
+        self.do_device_synchronize = kw.pop("warpx_do_device_synchronize", None)
         self.zmax_plasma_to_compute_max_step = kw.pop(
             "warpx_zmax_plasma_to_compute_max_step", None
         )
@@ -3340,8 +3352,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
 
         self.collisions = kw.pop("warpx_collisions", None)
-        self.collisions_split_position_push = kw.pop(
-            "warpx_collisions_split_position_push", None
+        self.collisions_split_momentum_push = kw.pop(
+            "warpx_collisions_split_momentum_push", None
         )
 
         self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
@@ -3506,7 +3518,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             for collision in self.collisions:
                 pywarpx.collisions.collision_names.append(collision.name)
                 collision.collision_initialize_inputs()
-            pywarpx.collisions.split_position_push = self.collisions_split_position_push
+            pywarpx.collisions.split_momentum_push = self.collisions_split_momentum_push
 
         if self.embedded_boundary is not None:
             self.embedded_boundary.embedded_boundary_initialize_inputs(self.solver)
@@ -3534,6 +3546,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         if self.amrex_use_gpu_aware_mpi is not None:
             pywarpx.amrex.use_gpu_aware_mpi = self.amrex_use_gpu_aware_mpi
+
+        if self.do_device_synchronize is not None:
+            pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
 
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:
@@ -4268,8 +4283,8 @@ class LabFrameFieldDiagnostic(
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
+                elif dataname == "rho":
+                    # Add rho diagnostic
                     fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order

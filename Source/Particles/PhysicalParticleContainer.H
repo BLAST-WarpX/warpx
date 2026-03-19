@@ -112,6 +112,13 @@ public:
                  ImplicitOptions const * implicit_options = nullptr) override;
 
     /**
+     * \brief Deposit mass matrices.
+     */
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                              int lev,
+                              amrex::Real dt) override;
+
+    /**
      * \brief Gather fields and push particles in one fused kernel.
      */
     virtual void PushPX (WarpXParIter& pti,
@@ -188,7 +195,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
@@ -279,7 +287,7 @@ public:
      * These are NOT initialized by this function.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& pinned_tile,
         int n_external_attr_real,
         int n_external_attr_int) final;
 
