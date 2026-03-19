@@ -1462,11 +1462,17 @@ void WarpXParticleContainer::DepositCurrent (
 ) {
     auto& warpx = WarpX::GetInstance();
     // allocate temporary multifab to deposit current density into
-    ablastr::fields::MultiLevelVectorField current_fp_temp {
+    ablastr::fields::MultiLevelVectorField current {
         warpx.m_fields.get_alldirs(mf_name, lev)
     };
 
-    DepositCurrent(current_fp_temp, dt, relative_time);
+    DepositCurrent(current, dt, relative_time);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        warpx.ApplyInverseVolumeScalingToCurrentDensity(
+            current[lev][0], current[lev][1], current[lev][2], lev
+        );
+#endif
 }
 
 /* \brief Charge Deposition for thread thread_num
