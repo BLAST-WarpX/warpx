@@ -18,7 +18,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
@@ -50,6 +49,7 @@
 #   include <openPMD/openPMD.hpp>
 #endif
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <algorithm>
@@ -139,7 +139,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 #if defined(WARPX_DIM_RZ)
     amrex::ignore_unused(step);
 #else
-    WARPX_PROFILE("DifferentialLuminosity2D::ComputeDiags");
+    ABLASTR_PROFILE("DifferentialLuminosity2D::ComputeDiags");
 
     using namespace amrex;
     using ParticleTileType = WarpXParticleContainer::ParticleTileType;
@@ -158,10 +158,6 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
-    const Real dt = warpx.getdt(0);
-    // get cell volume
-    Geometry const & geom = warpx.Geom(0);
-    const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
 
     // declare local variables
     auto const num_bins_1 = m_bin_num_1;
@@ -185,6 +181,11 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev < nlevs; ++lev) {
+        // get cell volume and timestep at current level
+        Geometry const & geom = warpx.Geom(lev);
+        const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+        const Real dt = warpx.getdt(lev);
+
         for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
