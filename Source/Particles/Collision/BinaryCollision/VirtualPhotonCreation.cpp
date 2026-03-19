@@ -18,6 +18,7 @@
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 
+#include <AMReX.H>
 #include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Particle.H>
@@ -30,6 +31,8 @@ using namespace amrex::literals;
 using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
+
+#ifdef WARPX_QED
 
     ABLASTR_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
@@ -245,5 +248,13 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
             } // mfi
         } // lev
     } // species
+
+#else
+
+WARPX_ABORT_WITH_MESSAGE("Compiling WarpX with QED support is required to call GenerateVirtualPhotons");
+amrex::ignore_unused(mypc);
+
+#endif //WARPX_QED
+
 } // function
 } // close namespace
