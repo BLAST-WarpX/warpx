@@ -8,9 +8,8 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 # fix system defaults: do not escape $ with a \ on tab completion
 shopt -s direxpand
 
-module load gcc/9.3.0
+module load gcc/14.2.0
 module load openmpi/4.1.2
-module load hdf5/1.12.1 # is parallel enabled already
 module load miniforge3/24.11.3-2
 
 export SW_DIR="${HOME}/sw/andes"
@@ -26,13 +25,16 @@ fi
 # make output group-readable by default
 umask 0027
 
-export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc2-2.23.1:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.3:$CMAKE_PREFIX_PATH
 
-export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc2-2.23.1/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/hdf5-1.14.3/lib:$LD_LIBRARY_PATH
 
 export PATH=${SW_DIR}/adios2-2.10.2/bin:$PATH
+export PATH=${SW_DIR}/hdf5-1.14.3/bin:$PATH
 
 # an alias to request an interactive batch node for one hour
 #   for paralle execution, start on the batch node: srun <command>
