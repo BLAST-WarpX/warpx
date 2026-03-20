@@ -225,8 +225,8 @@ void doDirectGatherVectorField (
         }
     }
 
-    const amrex::Real costheta = (rp > 0._rt ? xp/rp: 1._rt);
-    const amrex::Real sintheta = (rp > 0._rt ? yp/rp: 0._rt);
+    const auto costheta = static_cast<amrex::Real>(rp > 0._rt ? xp/rp: 1._rt);
+    const auto sintheta = static_cast<amrex::Real>(rp > 0._rt ? yp/rp: 0._rt);
     const Complex xy0 = Complex{costheta, -sintheta};
     Complex xy = xy0; // Throughout the following loop, xy takes the value e^{-i m theta}
 
