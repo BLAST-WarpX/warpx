@@ -208,7 +208,7 @@ namespace BinaryCollisionUtils{
                             const amrex::ParticleReal mass_after)
     {
         // Compute the fusion energy
-        amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
+        const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
 
         // Verify that the fusion energy is close to what is expected.
         // The expected fusion energies are computed using fully ionized species mass

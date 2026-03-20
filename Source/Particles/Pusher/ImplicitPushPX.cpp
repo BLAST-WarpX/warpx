@@ -341,7 +341,7 @@ PhysicalParticleContainer::SetupSuborbitParticles (WarpXParIter & pti,
 
     if (nsuborbits) {
         // This looks for the particles that require suborbits to converge.
-        long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
+        const long num_flagged = amrex::Scan::PrefixSum<long>(np_to_push,
             [=] AMREX_GPU_DEVICE (long ip) -> long
                 {
                     return nsuborbits[ip] > 1;
@@ -507,7 +507,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr() + offset;
 
     if (m_do_back_transformed_particles) { //  Copy the old x and u for the BTD
-        CopyParticleAttribs copyAttribs = CopyParticleAttribs(*this, pti, offset);
+        const auto copyAttribs = CopyParticleAttribs{*this, pti, offset};
         amrex::ParallelFor(np_to_push, [copyAttribs] AMREX_GPU_DEVICE (long ip)
         {
             copyAttribs(ip);
@@ -607,20 +607,22 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         amrex::ParticleReal Bzp = 0.0_prt;
         amrex::ParticleReal step_norm = 1._prt;
 
-        bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition, false,
-                             xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
-                             step_norm, particle_tolerance, max_iterations,
-                             Ex_external_particle, Ey_external_particle, Ez_external_particle,
-                             Bx_external_particle, By_external_particle, Bz_external_particle,
-                             Bxp, Byp, Bzp,
-                             do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                             ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                             dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes, depos_order, depos_type,
-                             getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
+        const bool convergence =
+            PushXPSingleStep<exteb_control, qed_control>(
+                ip, dt, setPosition, false,
+                xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
+                step_norm, particle_tolerance, max_iterations,
+                Ex_external_particle, Ey_external_particle, Ez_external_particle,
+                Bx_external_particle, By_external_particle, Bz_external_particle,
+                Bxp, Byp, Bzp,
+                do_gather, ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes, depos_order, depos_type,
+                getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
 #ifdef WARPX_QED
-                             , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
+                , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
 #endif
-                             );
+            );
 
         // check if particle did not converge
         if (max_iterations > 1 && !convergence) {
@@ -927,7 +929,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                                  auto exteb_control, auto qed_control, auto depos_order_control)
     {
 
-        long ip = unconverged_i[i];
+        const long ip = unconverged_i[i];
 
         // Restore the particle weight
         w[ip] = saved_w[i];
@@ -997,9 +999,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
             // Check if initial suborbit position is past an absorbing boundary.
-            bool this_suborbit_out_of_bounds = ParticleUtils::is_out_of_bounds(xp_n, yp_n, zp_n,
-                                                                               dinv, xyzmin,
-                                                                               domain_double, do_cropping);
+            const bool this_suborbit_out_of_bounds =
+                ParticleUtils::is_out_of_bounds(
+                    xp_n, yp_n, zp_n,
+                    dinv, xyzmin,
+                    domain_double, do_cropping);
 
             amrex::ParticleReal Bxp = 0.0_prt;
             amrex::ParticleReal Byp = 0.0_prt;
@@ -1110,7 +1114,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 } else {
 
-                    amrex::ParticleReal wq_n = wq/nsuborbits[ip];
+                    const amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
                     // Only CurrentDepositionAlgo::Villasenor is supported
                     // The ignore_unused is needed so that the variables are not first-captured

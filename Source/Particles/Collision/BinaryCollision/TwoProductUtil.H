@@ -160,11 +160,11 @@ namespace {
                 p1y_star_in = p1y_in;
                 p1z_star_in = p1z_in;
             }
-            amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
+            const amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
 
             // Momentum of the first product in the center of mass frame:
             // same direction as the incident, but scaled to have the magnitude sqrt(p_star_f_sq)
-            amrex::ParticleReal scaling = std::sqrt(p_star_f_sq)/p1_star_in;
+            const amrex::ParticleReal scaling = std::sqrt(p_star_f_sq)/p1_star_in;
             px_star_out = p1x_star_in * scaling;
             py_star_out = p1y_star_in * scaling;
             pz_star_out = p1z_star_in * scaling;

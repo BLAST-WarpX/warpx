@@ -85,7 +85,7 @@ namespace BinaryCollisionUtils{
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     bool is_two_product_fusion_type (const NuclearFusionType fusion_type)
     {
-        CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
+        const CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
         return is_two_product_fusion_type(collision_type);
     }
 

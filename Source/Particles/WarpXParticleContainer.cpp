@@ -1967,7 +1967,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
     }
 
     // Divide the squares by number of particles for average and calculate the temperature
-    amrex::ParticleReal mass = m_mass;
+    const amrex::ParticleReal mass = m_mass;
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
