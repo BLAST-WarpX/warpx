@@ -590,7 +590,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         }
                         for (int ctr = -1; ctr <= 1; ctr += 2) {
                             for (int tdir = 1; tdir <= 2; tdir++) {
-                                const auto iv = ic; iv[dvec[tdir]] += ctr;
+                                auto iv = ic; iv[dvec[tdir]] += ctr;
                                 const int cidx_g_rhs = dof_arrays[0](iv,1);
                                 const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
                                 const amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+1);
@@ -604,7 +604,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         for (int ctr_dir = -1; ctr_dir <= 0; ctr_dir++) {
                             for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
                                 for (int tdir = 1; tdir <= 2; tdir++) {
-                                    const auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
+                                    auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
                                     const auto sign = std::copysign(1,ctr_dir) * std::copysign(1,ctr_tdir);
                                     const int cidx_g_rhs = dof_arrays[tdir](iv,1);
                                     const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
