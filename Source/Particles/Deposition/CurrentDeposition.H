@@ -751,7 +751,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
             // Keep these double to avoid bug in single precision
-            double x_new = (rp_new - xyzmin.x)*dinv.x;
+            double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
@@ -2338,15 +2338,15 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const xp_old = (xp_n_data ? xp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const yp_old = (yp_n_data ? yp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const zp_old = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+            amrex::ParticleReal const xp_new = 2._prt*xp_nph - xp_old;
+            amrex::ParticleReal const yp_new = 2._prt*yp_nph - yp_old;
+            amrex::ParticleReal const zp_new = 2._prt*zp_nph - zp_old;
 
-            VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
+            VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
                                                           dt, dinv, xyzmin, domain_double, do_cropping,

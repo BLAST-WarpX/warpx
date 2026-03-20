@@ -66,7 +66,7 @@ public:
         WARPX_ABORT_WITH_MESSAGE("Linear Breit-Wheeler collision module does not currently work with single precision");
 #endif
 
-        amrex::ParmParse pp_collision_name(collision_name);
+        const amrex::ParmParse pp_collision_name(collision_name);
 
         constexpr auto default_event_multiplier = 1.0_prt;
         m_event_multiplier = default_event_multiplier;

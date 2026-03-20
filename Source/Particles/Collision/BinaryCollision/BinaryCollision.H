@@ -759,7 +759,7 @@ public:
 
                         if (deltaEp1 != 0.) {
                             // Adjust species 1 particles to absorb deltaEp1.
-                            bool correction_failed =
+                            const bool correction_failed =
                                  ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
                                                                      cell_start_1, cell_stop_1, m1,
                                                                      energy_fraction, energy_fraction_max, deltaEp1);

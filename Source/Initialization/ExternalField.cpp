@@ -288,11 +288,11 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == 3 && extent[0] == 1,
                                      "External field reading is not implemented for more than one RZ mode (see #3829)");
     if (xyz_order) {
-        m_size[0] = extent[1];
-        m_size[1] = extent[2];
+        m_size[0] = static_cast<int>(extent[1]);
+        m_size[1] = static_cast<int>(extent[2]);
     } else {
-        m_size[0] = extent[2];
-        m_size[1] = extent[1];
+        m_size[0] = static_cast<int>(extent[2]);
+        m_size[1] = static_cast<int>(extent[1]);
     }
 #else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == AMREX_SPACEDIM,
