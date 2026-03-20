@@ -1124,6 +1124,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 } else {
 
+                    const auto& xp_old = xp_n;
+                    const auto& yp_old = yp_n;
+                    const auto& zp_old = zp_n;
+                    const auto& xp_new = xp_np1;
+                    const auto& yp_new = yp_np1;
+                    const auto& zp_new = zp_np1;
+
                     const amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
                     // Only CurrentDepositionAlgo::Villasenor is supported
