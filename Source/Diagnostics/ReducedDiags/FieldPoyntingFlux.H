@@ -33,12 +33,12 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & Bx_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real EyBx_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j,k-1,comp) + Bx_arr(i,j,k,comp));
-        amrex::Real EyBx_up = Ey_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j,k-1,comp) + Bx_arr(i+1,j,k,comp));
+        const amrex::Real EyBx_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j,k-1,comp) + Bx_arr(i,j,k,comp));
+        const amrex::Real EyBx_up = Ey_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j,k-1,comp) + Bx_arr(i+1,j,k,comp));
         return 0.5_rt*(EyBx_dn + EyBx_up);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        amrex::Real EyBx_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j-1,k,comp) + Bx_arr(i,j,k,comp));
-        amrex::Real EyBx_up = Ey_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j-1,k,comp) + Bx_arr(i+1,j,k,comp));
+        const amrex::Real EyBx_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j-1,k,comp) + Bx_arr(i,j,k,comp));
+        const amrex::Real EyBx_up = Ey_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j-1,k,comp) + Bx_arr(i+1,j,k,comp));
         return 0.5_rt*(EyBx_dn + EyBx_up);
 #elif defined(WARPX_DIM_1D_Z)
         return Ey_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i-1,j,k,comp) + Bx_arr(i,j,k,comp));
@@ -54,8 +54,8 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & By_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real ExBy_dn = Ex_arr(i,j,k,comp)*0.5_rt*(By_arr(i,j,k-1,comp) + By_arr(i,j,k,comp));
-        amrex::Real ExBy_up = Ex_arr(i,j+1,k,comp)*0.5_rt*(By_arr(i,j+1,k-1,comp) + By_arr(i,j+1,k,comp));
+        const amrex::Real ExBy_dn = Ex_arr(i,j,k,comp)*0.5_rt*(By_arr(i,j,k-1,comp) + By_arr(i,j,k,comp));
+        const amrex::Real ExBy_up = Ex_arr(i,j+1,k,comp)*0.5_rt*(By_arr(i,j+1,k-1,comp) + By_arr(i,j+1,k,comp));
         return 0.5_rt*(ExBy_dn + ExBy_up);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z)
         return Ex_arr(i,j,k,comp)*0.5_rt*(By_arr(i-1,j,k,comp) + By_arr(i,j,k,comp));
@@ -71,8 +71,8 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & Bx_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real EzBx_dn = Ez_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j-1,k,comp) + Bx_arr(i,j,k,comp));
-        amrex::Real EzBx_up = Ez_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j-1,k,comp) + Bx_arr(i+1,j,k,comp));
+        const amrex::Real EzBx_dn = Ez_arr(i,j,k,comp)*0.5_rt*(Bx_arr(i,j-1,k,comp) + Bx_arr(i,j,k,comp));
+        const amrex::Real EzBx_up = Ez_arr(i+1,j,k,comp)*0.5_rt*(Bx_arr(i+1,j-1,k,comp) + Bx_arr(i+1,j,k,comp));
         return 0.5_rt*(EzBx_dn + EzBx_up);
 #else
         amrex::ignore_unused(i, j, k, comp, Ez_arr, Bx_arr);
@@ -86,8 +86,8 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & Bz_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real ExBz_dn = Ex_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i,j-1,k,comp) + Bz_arr(i,j,k,comp));
-        amrex::Real ExBz_up = Ex_arr(i,j,k+1,comp)*0.5_rt*(Bz_arr(i,j-1,k+1,comp) + Bz_arr(i,j,k+1,comp));
+        const amrex::Real ExBz_dn = Ex_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i,j-1,k,comp) + Bz_arr(i,j,k,comp));
+        const amrex::Real ExBz_up = Ex_arr(i,j,k+1,comp)*0.5_rt*(Bz_arr(i,j-1,k+1,comp) + Bz_arr(i,j,k+1,comp));
         return 0.5_rt*(ExBz_dn + ExBz_up);
 #else
         amrex::ignore_unused(i, j, k, comp, Ex_arr, Bz_arr);
@@ -101,8 +101,8 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & Bz_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real EyBz_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
-        amrex::Real EyBz_up = Ey_arr(i,j,k+1,comp)*0.5_rt*(Bz_arr(i-1,j,k+1,comp) + Bz_arr(i,j,k+1,comp));
+        const amrex::Real EyBz_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
+        const amrex::Real EyBz_up = Ey_arr(i,j,k+1,comp)*0.5_rt*(Bz_arr(i-1,j,k+1,comp) + Bz_arr(i,j,k+1,comp));
         return 0.5_rt*(EyBz_dn + EyBz_up);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         amrex::Real EyBz_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
@@ -122,8 +122,8 @@ struct PoyntingStaggered {
                             amrex::Array4<const amrex::Real> const & By_arr) {
         using namespace amrex::literals;
 #if defined(WARPX_DIM_3D)
-        amrex::Real EzBy_dn = Ez_arr(i,j,k,comp)*0.5_rt*(By_arr(i-1,j,k,comp) + By_arr(i,j,k,comp));
-        amrex::Real EzBy_up = Ez_arr(i,j+1,k,comp)*0.5_rt*(By_arr(i-1,j+1,k,comp) + By_arr(i,j+1,k,comp));
+        const amrex::Real EzBy_dn = Ez_arr(i,j,k,comp)*0.5_rt*(By_arr(i-1,j,k,comp) + By_arr(i,j,k,comp));
+        const amrex::Real EzBy_up = Ez_arr(i,j+1,k,comp)*0.5_rt*(By_arr(i-1,j+1,k,comp) + By_arr(i,j+1,k,comp));
         return 0.5_rt*(EzBy_dn + EzBy_up);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         return Ez_arr(i,j,k,comp)*0.5_rt*(By_arr(i-1,j,k,comp) + By_arr(i,j,k,comp));
