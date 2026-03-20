@@ -159,7 +159,7 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            int dof = dof_arr(i,j,k,2*v); // local
+                            const  int dof = dof_arr(i,j,k,2*v); // local
                             if (dof >= 0) {
                                 data_arr(i,j,k,v) = a_arr[dof];
                             }
@@ -178,7 +178,7 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        int dof = dof_arr(i,j,k,2*v); // local
+                        const int dof = dof_arr(i,j,k,2*v); // local
                         if (dof >= 0) {
                             data_arr(i,j,k,v) = a_arr[dof];
                         }
@@ -210,7 +210,7 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            int dof = dof_arr(i,j,k,2*v); // local
+                            const int dof = dof_arr(i,j,k,2*v); // local
                             if (dof >= 0) {
                                 a_arr[dof] = data_arr(i,j,k,v);
                             }
@@ -228,7 +228,7 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        int dof = dof_arr(i,j,k,2*v); // local
+                        const int dof = dof_arr(i,j,k,2*v); // local
                         if (dof >= 0) {
                             a_arr[dof] = data_arr(i,j,k,v);
                         }

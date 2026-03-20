@@ -236,9 +236,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
             Jbz.grow(J[2]->nGrowVect());
 
             // Use same box for E as for J (requires ngE >= ngJ)
-            amrex::Box Ebx = Jbx;
-            amrex::Box Eby = Jby;
-            amrex::Box Ebz = Jbz;
+            const amrex::Box Ebx = Jbx;
+            const amrex::Box Eby = Jby;
+            const amrex::Box Ebz = Jbz;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -603,7 +603,7 @@ void ImplicitSolver::InitializeMassMatrices ()
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #ifndef WARPX_DIM_3D
-            int max_crossings = ngJ[0] - shape + 1;
+            const int max_crossings = ngJ[0] - shape + 1;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings == m_WarpX->particle_max_grid_crossings,

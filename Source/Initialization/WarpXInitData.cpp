@@ -468,11 +468,11 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                         // threshold, we split this Box in its longest
                         // direction.
                         int dir;
-                        int len = bx.longside(dir); // longest side of the box
+                        const int len = bx.longside(dir); // longest side of the box
                         if (len <= split_high_density_boxes_min_box_size) { // Box is already very small.
                             new_boxes.push_back(bx);
                         } else {
-                            int chop_pnt = bx.smallEnd(dir) + len/2;
+                            const int chop_pnt = bx.smallEnd(dir) + len/2;
                             auto bx2 = bx.chop(dir, chop_pnt);
                             // bx is now chopped into bx and bx2.
                             test_boxes.push_back(bx);
@@ -886,7 +886,7 @@ WarpX::InitData ()
         for (auto const& species : *mypc) {
             has_initialize_self_fields |= species->initialize_self_fields;
         }
-        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        const bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
         if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
              has_initialize_self_fields ||
              has_boundary_potential)
@@ -1787,8 +1787,8 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
-    bool distributed = true;
+    const Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    const bool distributed = true;
     ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
                                               problo, dx, pbox, distributed);
     external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
@@ -1824,10 +1824,10 @@ WarpX::ReadExternalFieldFromFile (
                 // Physical coordinates of the grid point
                 // 0,1,2 denote x,y,z in 3D xyz.
                 // 0,1 denote r,z in 2D rz.
-                amrex::RealVect pos
-                    (AMREX_D_DECL(problo[0] + ii*dx[0],
+                const auto pos = amrex::RealVect{
+                    AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
-                                  problo[2] + k *dx[2]));
+                                  problo[2] + k *dx[2])};
                 mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 

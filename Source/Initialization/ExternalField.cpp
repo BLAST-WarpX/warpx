@@ -214,13 +214,13 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     auto iseries = series.iterations.begin()->second;
     auto F = iseries.meshes[m_name];
 
-    bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
+    const bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
     amrex::ignore_unused(c_order);
 
     auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
     auto fileGeom = F.getAttribute("geometry").get<std::string>();
 
-    bool xyz_order = true;
+    bool xyz_order = true; //NOLINT (misc-const-correctness)
 
 #if defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
@@ -395,7 +395,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     series.flush();
 
     if (has_load) {
-        Box box(lo,hi);
+        const Box box(lo,hi);
 #ifdef AMREX_USE_GPU
         m_fab.resize(box, 1);
         Gpu::htod_memcpy_async(m_fab.dataPtr(), m_FC_data_cpu.get(), m_fab.nBytes());
@@ -482,7 +482,7 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
             }
             bl.push_back(box);
         }
-        BoxArray ba(std::move(bl));
+        const BoxArray ba(std::move(bl));
         FabArray<BaseFab<double>> tmpmf(ba,dmap,1,0);
         tmpmf.ParallelCopy(m_mf);
         m_mf = std::move(tmpmf);
@@ -494,13 +494,13 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
 void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign)
 {
     m_cache_domain = pbox;
-    int dir = std::abs(moving_dir);
-    amrex::Real factor = 10.0;
+    const int dir = std::abs(moving_dir);
+    const amrex::Real factor = 10.0;
     if (moving_sign > 0) {
-        amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
+        const amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
         m_cache_domain.setHi(dir, newhi);
     } else {
-        amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
+        const amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
         m_cache_domain.setLo(dir, newlo);
     }
     // Grow the box a little bit so that m_cache_domain.contains(pbox) is true.
