@@ -714,7 +714,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         // left and right components (i+/-1,j,k), (i,j+/-1,k), or (i,j,k+/-1) of second derivative operator
                         for (int ctr = -1; ctr <= 1; ctr += 2) {
                             for (int tdir = 1; tdir <= 2; tdir++) {
-                                auto iv = ic; iv[dvec[tdir]] += ctr;
+                                const auto iv = ic; iv[dvec[tdir]] += ctr;
                                 const int cidx_g_rhs = dof_arrays[0](iv,1);
                                 const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
                                 const amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+1);
