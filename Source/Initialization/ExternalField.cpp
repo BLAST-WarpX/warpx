@@ -559,7 +559,7 @@ ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& 
     view.offset = m_offset;
     view.global_size = m_size;
 
-    auto* p = fab.dataPtr();
+    const auto* p = fab.dataPtr();
     if (p) {
         auto const& b = fab.box();
         view.table = decltype(view.table)(const_cast<double*>(p),
