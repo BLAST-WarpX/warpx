@@ -54,7 +54,7 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Default radial_numpercell_power is uniform number of particles per cell
-    radial_numpercell_power{0._rt};
+    radial_numpercell_power{0._rt},
 #endif
     // Unlimited boundaries
     xmin{std::numeric_limits<amrex::Real>::lowest()},
