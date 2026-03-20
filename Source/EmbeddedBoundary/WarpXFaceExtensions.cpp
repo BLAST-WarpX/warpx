@@ -19,7 +19,6 @@
 #include <AMReX_MultiFab.H>
 
 using namespace ablastr::fields;
-using warpx::fields::FieldType;
 
 namespace
 {
@@ -176,6 +175,8 @@ namespace
             "ApplyBCKCorrection only works when EBs are enabled at runtime");
 
 #if defined(AMREX_USE_EB) and !defined(WARPX_DIM_RZ)
+
+        using warpx::fields::FieldType;
 
         const amrex::Real dx = cell_size_max_lev[0];
         const amrex::Real dy = cell_size_max_lev[1];
@@ -495,6 +496,8 @@ WarpX::ComputeFaceExtensions ()
         throw std::runtime_error("ComputeFaceExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
+    using warpx::fields::FieldType;
+
     amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended in x:\t" + std::to_string(N_ext_faces(0)) + "\n"
@@ -581,6 +584,7 @@ WarpX::ComputeOneWayExtensions ()
     }
 #ifdef AMREX_USE_EB
     using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
 #ifndef WARPX_DIM_RZ
     auto const eb_fact = fieldEBFactory(maxLevel());
 
@@ -710,6 +714,7 @@ WarpX::ComputeEightWaysExtensions ()
 #ifdef AMREX_USE_EB
     using namespace amrex::literals;
     using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
 
 #ifndef WARPX_DIM_RZ
     auto const &cell_size = CellSize(maxLevel());

@@ -15,8 +15,6 @@
 #include <AMReX_ParmParse.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
-using amrex::ParmParse;
-
 void
 ExternalParticleFields::ReadParameters () {
     amrex::ParmParse pp_particles("particles");
