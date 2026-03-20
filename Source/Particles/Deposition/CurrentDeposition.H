@@ -2338,13 +2338,13 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const xp_old = (xp_n_data ? xp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const yp_old = (yp_n_data ? yp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const zp_old = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+            amrex::ParticleReal const xp_new = 2._prt*xp_nph - xp_old;
+            amrex::ParticleReal const yp_new = 2._prt*yp_nph - yp_old;
+            amrex::ParticleReal const zp_new = 2._prt*zp_nph - zp_old;
 
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
