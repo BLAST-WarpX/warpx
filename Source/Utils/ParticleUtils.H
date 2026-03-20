@@ -383,10 +383,10 @@ namespace ParticleUtils {
      */
     template <typename T_index>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uyp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uzp,
-                               amrex::ParticleReal * const AMREX_RESTRICT w,
+    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uyp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uzp, //NOLINT(readability-non-const-parameter)
+                               const amrex::ParticleReal * const AMREX_RESTRICT w,
                                T_index const * const AMREX_RESTRICT indices,
                                T_index const cell_start,
                                T_index const cell_stop,
