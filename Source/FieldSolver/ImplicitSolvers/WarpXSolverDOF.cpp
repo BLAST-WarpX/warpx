@@ -63,7 +63,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                                      2*ncomp, // {local, global} for each comp
                                                                      this_array[n]->nGrowVect() );
 
-                auto* mask = a_WarpX->getFieldDotMaskPointer(m_array_type, lev, ablastr::fields::Direction{n});
+                const auto* mask = a_WarpX->getFieldDotMaskPointer(m_array_type, lev, ablastr::fields::Direction{n});
                 fill_local_dof(*m_array[lev][n], *mask);
             }
         }
@@ -85,7 +85,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                                2*ncomp, // {local, global} for each comp
                                                                this_mf->nGrowVect() );
 
-            auto* mask = a_WarpX->getFieldDotMaskPointer(m_scalar_type, lev, ablastr::fields::Direction{0});
+            const auto* mask = a_WarpX->getFieldDotMaskPointer(m_scalar_type, lev, ablastr::fields::Direction{0});
             fill_local_dof(*m_scalar[lev], *mask);
         }
 
