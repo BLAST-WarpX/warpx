@@ -359,6 +359,8 @@ namespace
 
 #ifdef AMREX_USE_EB
 
+#ifndef WARPX_DIM_RZ
+
     /**
     * \brief For the face of cell pointing in direction idim, return the number of faces
     * we need to intrude with the one-way extension. Returns only one or zero: one if the
@@ -484,6 +486,8 @@ namespace
 
         return n_borrow;
     }
+
+    #endif //WARPX_DIM_RZ
 
     #endif //AMREX_USE_EB
 }

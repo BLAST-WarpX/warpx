@@ -105,8 +105,8 @@ struct PoyntingStaggered {
         const amrex::Real EyBz_up = Ey_arr(i,j,k+1,comp)*0.5_rt*(Bz_arr(i-1,j,k+1,comp) + Bz_arr(i,j,k+1,comp));
         return 0.5_rt*(EyBz_dn + EyBz_up);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        amrex::Real EyBz_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
-        amrex::Real EyBz_up = Ey_arr(i,j+1,k,comp)*0.5_rt*(Bz_arr(i-1,j+1,k,comp) + Bz_arr(i,j+1,k,comp));
+        const amrex::Real EyBz_dn = Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
+        const amrex::Real EyBz_up = Ey_arr(i,j+1,k,comp)*0.5_rt*(Bz_arr(i-1,j+1,k,comp) + Bz_arr(i,j+1,k,comp));
         return 0.5_rt*(EyBz_dn + EyBz_up);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         return Ey_arr(i,j,k,comp)*0.5_rt*(Bz_arr(i-1,j,k,comp) + Bz_arr(i,j,k,comp));
