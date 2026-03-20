@@ -111,8 +111,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     m_is_defined = true;
 }
 
-void WarpXSolverVec::Copy ( FieldType  a_array_type,
-                            FieldType  a_scalar_type,
+void WarpXSolverVec::Copy ( warpx::fields::FieldType  a_array_type,
+                            warpx::fields::FieldType  a_scalar_type,
                             bool allow_type_mismatch)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
