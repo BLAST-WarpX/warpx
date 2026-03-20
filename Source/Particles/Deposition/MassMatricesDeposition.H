@@ -1721,14 +1721,14 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
                                     fpyx, fpyy, fpyz,
                                     fpzx, fpzy, fpzz );
 
-            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const xp_old = (xp_n_data ? xp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const yp_old = (yp_n_data ? yp_n_data[ip] : 0._prt);
+            amrex::ParticleReal const zp_old = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
             // Compute position at time n + 1
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+            amrex::ParticleReal const xp_new = 2._prt*xp_nph - xp_old;
+            amrex::ParticleReal const yp_new = 2._prt*yp_nph - yp_old;
+            amrex::ParticleReal const zp_new = 2._prt*zp_nph - zp_old;
 
             // Pass dummy arrays for Jx, Jy, Jz (which will not be used)
             amrex::Array4<amrex::Real> const dummy_Jx{};
@@ -1737,8 +1737,8 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
-                                                                xp_n, yp_n, zp_n,
-                                                                xp_np1, yp_np1, zp_np1,
+                                                                xp_old, yp_old, zp_old,
+                                                                xp_new, yp_new, zp_new,
                                                                 wq_invvol,
                                                                 uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                                                 gaminv,
