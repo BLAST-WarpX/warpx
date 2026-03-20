@@ -49,7 +49,7 @@ DSMCFunc::DSMCFunc (
             scattering_process.find("two_product_reaction") != std::string::npos ) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy, energy);
+                pp_collision_name, kw_energy.c_str(), energy);
         }
 
         ScatteringProcess process(scattering_process, cross_section_file, energy);
