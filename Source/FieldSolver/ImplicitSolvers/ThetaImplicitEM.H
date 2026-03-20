@@ -92,7 +92,7 @@ public:
     /**
      * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
-    [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
+    [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (int lev, int field_dir) const override;
 
     /**
      * \brief Inititialize the BC masks for the curl curl operator

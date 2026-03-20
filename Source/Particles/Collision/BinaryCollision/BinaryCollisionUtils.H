@@ -39,9 +39,9 @@ namespace BinaryCollisionUtils{
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
                                                MultiParticleContainer const * mypc);
 
-    void CheckFusionEnergy (const NuclearFusionType fusion_type,
-                            const amrex::ParticleReal mass_before,
-                            const amrex::ParticleReal mass_after);
+    void CheckFusionEnergy (NuclearFusionType fusion_type,
+                            amrex::ParticleReal mass_before,
+                            amrex::ParticleReal mass_after);
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
