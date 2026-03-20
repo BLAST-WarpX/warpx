@@ -655,7 +655,7 @@ MultiParticleContainer::DepositTemperatures (
 
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
-        ablastr::fields::MultiLevelVectorField T_vf =
+        const ablastr::fields::MultiLevelVectorField T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
         // Clear temperature MF for this species
@@ -709,7 +709,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
             amrex::BoxArray const & ba = warpx.boxArray(lev);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
             int const ncomps = 1;
-            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
             bool const remake = true;
             bool const redistribute_on_remake = false;
             warpx.m_fields.alloc_init(FieldType::global_debye_length, lev, ba, dmap, ncomps, ng, 0.,
@@ -732,7 +732,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
             for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
             {
-                amrex::Box box = mfi.tilebox();
+                const amrex::Box box = mfi.tilebox();
 
                 amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
                 amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
@@ -752,7 +752,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
         for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Box box = mfi.tilebox();
+            const amrex::Box box = mfi.tilebox();
 
             amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
 

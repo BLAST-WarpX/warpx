@@ -422,16 +422,21 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             auto w = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
                               [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
             {
-                Real x = 0, y = 0, z = 0;
 #if defined(WARPX_DIM_1D_Z)
-                z = problo[0] + (i+Real(0.5))*dx[0];
+                const auto x = 0.0_rt;
+                const auto y = 0.0_rt;
+                const auto z = problo[0] + (i+Real(0.5))*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
-                x = problo[0] + (i+Real(0.5))*dx[0];
-                z = problo[1] + (j+Real(0.5))*dx[1];
+                const auto x = problo[0] + (i+Real(0.5))*dx[0];
+                const auto y = 0.0_rt;
+                const auto z = problo[1] + (j+Real(0.5))*dx[1];
 #else
-                AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
-                             y = problo[1] + (j+Real(0.5))*dx[1];,
-                             z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_TERM(const auto x = problo[0] + (i+Real(0.5))*dx[0];,
+                             const auto y = problo[1] + (j+Real(0.5))*dx[1];,
+                             const auto z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_PICK(const auto y = 0.0_rt; const auto z = 0.0_rt;,
+                             const auto z = 0.0_rt;,
+                             /*x,y,z already defined*/);
 #endif
                 const Real v = density_exe(x,y,z);
                 const Real r = (v >= density_min) ? nppc : Real(0);

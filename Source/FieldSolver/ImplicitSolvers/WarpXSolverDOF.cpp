@@ -126,7 +126,7 @@ void WarpXSolverDOF::fill_local_dof (iMultiFab& dof, iMultiFab const& mask)
     for (MFIter mfi(dof); mfi.isValid(); ++mfi) {
         Box const& vbx = mfi.validbox();
         const auto npts = static_cast<int>(vbx.numPts());
-        BoxIndexer boxindex(vbx);
+        const BoxIndexer boxindex(vbx);
         auto const& m = mask.const_array(mfi);
         auto const& d = dof.array(mfi);
         const auto start_id = static_cast<int>(m_nDoFs_l);

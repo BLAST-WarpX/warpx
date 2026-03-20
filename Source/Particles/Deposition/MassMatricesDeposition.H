@@ -279,8 +279,8 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
         if constexpr (full_mass_matrices) {
             for (int aa=0; aa<=depos_order; aa++){
 
-                int col_base = depos_order + aa - iz;
-                int Nc;
+                const int col_base = depos_order + aa - iz;
+                int Nc = 0;
 
                 // Reduced deposit for diagonal mass matrices
                 if (aa <= iz) {

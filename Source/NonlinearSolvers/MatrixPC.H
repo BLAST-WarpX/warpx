@@ -644,7 +644,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
-                        int ridx_l = dof_arr(i,j,k,0);
+                        const int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
 
                         const amrex::IntVect iv_base = IntVect(AMREX_D_DECL(i,j,k));
@@ -659,7 +659,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                     const int ii0 = comp0 - MM_width[0]; // ..., -2, -1, 0, 1, 2, ...
                                     const amrex::IntVect iv_shift = IntVect(AMREX_D_DECL(ii0, jj0, kk0));
                                     if (full_bx.contains(iv_base + iv_shift)) {
-                                        int cidx_g_rhs = dof_arr(iv_base + iv_shift,1);
+                                        const int cidx_g_rhs = dof_arr(iv_base + iv_shift,1);
                                         const amrex::Real val = sigma_ii_arr(iv_base,mm_comp);
                                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
