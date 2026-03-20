@@ -2132,8 +2132,9 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
                         vxbar_arr(i,j,k) = sumwv/sumw;
                         varx_arr(i,j,k) = norm*w2x_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             varx_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
@@ -2145,8 +2146,9 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
                         vybar_arr(i,j,k) = sumwv/sumw;
                         vary_arr(i,j,k) = norm*w2y_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             vary_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
@@ -2158,8 +2160,9 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
                         vzbar_arr(i,j,k) = sumwv/sumw;
                         varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 });
 
