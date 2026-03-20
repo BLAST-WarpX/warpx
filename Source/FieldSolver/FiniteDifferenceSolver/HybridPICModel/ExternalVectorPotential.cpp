@@ -61,7 +61,7 @@ ExternalVectorPotential::ReadParameters ()
     for (int i = 0; i < m_nFields; ++i) {
         bool read_from_file = false;
         utils::parser::queryWithParser(pp_ext_A,
-            (m_field_names[i]+".read_from_file").c_str(), read_from_file);
+            m_field_names[i]+".read_from_file", read_from_file);
         m_read_A_from_file[i] = read_from_file;
 
         if (m_read_A_from_file[i]) {

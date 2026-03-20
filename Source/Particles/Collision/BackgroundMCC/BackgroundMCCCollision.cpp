@@ -105,7 +105,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             scattering_process.find("ionization") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
+                pp_collision_name, kw_energy, energy);
         }
         // if the scattering process is forward scattering get the energy
         // associated with the process if it is given (this allows forward
@@ -113,7 +113,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
         else if (scattering_process.find("forward") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::queryWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
+                pp_collision_name, kw_energy, energy);
         }
 
         ScatteringProcess process(scattering_process, cross_section_file, energy);
