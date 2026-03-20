@@ -61,21 +61,21 @@ ExternalVectorPotential::ReadParameters ()
     for (int i = 0; i < m_nFields; ++i) {
         bool read_from_file = false;
         utils::parser::queryWithParser(pp_ext_A,
-            (m_field_names[i]+".read_from_file").c_str(), read_from_file);
+            m_field_names[i]+".read_from_file", read_from_file);
         m_read_A_from_file[i] = read_from_file;
 
         if (m_read_A_from_file[i]) {
-            pp_ext_A.query((m_field_names[i]+".path").c_str(), m_external_file_path[i]);
+            pp_ext_A.query(m_field_names[i]+".path", m_external_file_path[i]);
         } else {
-            pp_ext_A.query((m_field_names[i]+".Ax_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Ax_external_grid_function(x,y,z)",
                 m_Ax_ext_grid_function[i]);
-            pp_ext_A.query((m_field_names[i]+".Ay_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Ay_external_grid_function(x,y,z)",
                 m_Ay_ext_grid_function[i]);
-            pp_ext_A.query((m_field_names[i]+".Az_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Az_external_grid_function(x,y,z)",
                 m_Az_ext_grid_function[i]);
         }
 
-        pp_ext_A.query((m_field_names[i]+".A_time_external_function(t)").c_str(),
+        pp_ext_A.query(m_field_names[i]+".A_time_external_function(t)",
             m_A_ext_time_function[i]);
     }
 }

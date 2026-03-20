@@ -96,7 +96,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
+        pp_collision_name.query(kw_cross_section, cross_section_file);
 
         amrex::ParticleReal energy = 0.0;
         // if the scattering process is excitation or ionization get the
@@ -105,7 +105,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             scattering_process.find("ionization") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
+                pp_collision_name, kw_energy, energy);
         }
         // if the scattering process is forward scattering get the energy
         // associated with the process if it is given (this allows forward
@@ -113,7 +113,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
         else if (scattering_process.find("forward") != std::string::npos) {
             const std::string kw_energy = scattering_process + "_energy";
             utils::parser::queryWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
+                pp_collision_name, kw_energy, energy);
         }
 
         ScatteringProcess process(scattering_process, cross_section_file, energy);

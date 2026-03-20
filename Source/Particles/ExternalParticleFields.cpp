@@ -31,7 +31,7 @@ ExternalParticleFields::ReadParameters () {
         ParticleFieldMetaData md;
 
         // if the name is specified, so must be the path
-        pp_particles.get((fname + ".read_fields_from_path").c_str(), md.path);
+        pp_particles.get(fname + ".read_fields_from_path", md.path);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !md.path.empty(),
@@ -45,7 +45,7 @@ ExternalParticleFields::ReadParameters () {
         const std::string tf_key =
             isE ? (fname + ".read_fields_E_dependency(t)")
                 : (fname + ".read_fields_B_dependency(t)");
-        pp_particles.query(tf_key.c_str(), md.time_function);
+        pp_particles.query(tf_key, md.time_function);
 
         md.time_parser = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(md.time_function, {"t"}));

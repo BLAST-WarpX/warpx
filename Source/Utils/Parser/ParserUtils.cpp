@@ -24,7 +24,7 @@ void utils::parser::Store_parserString(
     std::string& stored_string)
 {
     std::vector<std::string> f;
-    pp.getarr(query_string.c_str(), f);
+    pp.getarr(query_string, f);
     stored_string.clear();
     for (auto const& s : f) {
         stored_string += s;
@@ -90,7 +90,7 @@ void utils::parser::get (const amrex::ParmParse& a_pp, std::string const& group,
         a_pp.get(str, val);
     } else {
         // Otherwise, use the one with the group even if not found, in which case an exception may be raised.
-        a_pp.get(grp_str.c_str(), val);
+        a_pp.get(grp_str, val);
     }
 }
 

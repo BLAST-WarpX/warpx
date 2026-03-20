@@ -149,7 +149,7 @@ Diagnostics::BaseReadParameters ()
     for (const auto& var : m_pfield_varnames) {
 
         bool do_average = true;
-        pp_diag_pfield.query((var + ".do_average").c_str(), do_average);
+        pp_diag_pfield.query(var + ".do_average", do_average);
         m_pfield_do_average.push_back(do_average);
         utils::parser::Store_parserString(
             pp_diag_pfield, (var + "(x,y,z,ux,uy,uz)"), parser_str);
@@ -163,7 +163,7 @@ Diagnostics::BaseReadParameters ()
 
         // Look for and record filter functions. If one is not found, the empty string will be
         // stored as the filter string, and will be ignored.
-        const bool do_parser_filter = pp_diag_pfield.query((var + ".filter(x,y,z,ux,uy,uz)").c_str(), filter_parser_str);
+        const bool do_parser_filter = pp_diag_pfield.query(var + ".filter(x,y,z,ux,uy,uz)", filter_parser_str);
         m_pfield_dofilter.push_back(do_parser_filter);
         m_pfield_filter_strings.push_back(filter_parser_str);
     }

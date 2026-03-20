@@ -92,7 +92,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefix_len = prefix.size() + 1;
     for (std::string k : entr) {
         std::string v;
-        pp.get(k.c_str(), v);
+        pp.get(k, v);
         k.erase(0, prefix_len);
         operator_parameters.insert({k, v});
     }
@@ -108,7 +108,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefixlen = engine_prefix.size() + 1;
     for (std::string k : eng_entr) {
         std::string v;
-        ppe.get(k.c_str(), v);
+        ppe.get(k, v);
         k.erase(0, prefixlen);
         engine_parameters.insert({k, v});
     }
