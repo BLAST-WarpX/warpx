@@ -110,7 +110,7 @@ namespace
                        injection_style.begin(),
                        ::tolower);
 
-        // NOLINT(bugprone-branch-clone)
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (injection_style == "singleparticle") {
             nppc = 1;
         } else if (injection_style == "multipleparticles") {
