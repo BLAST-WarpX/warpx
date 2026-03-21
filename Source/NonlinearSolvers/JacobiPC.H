@@ -94,7 +94,7 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         bool m_verbose = false;
         int m_max_iter = 200;
-        RT m_omega = RT(2.0/3.0);
+        RT m_omega = RT(1.0);
 
         RT m_atol = 1.0e-16;
         RT m_rtol = 1.0e-4;
