@@ -106,7 +106,10 @@ proton3.num_particles_per_cell = 600
 proton3.profile = constant
 proton3.density = 1.e28
 proton3.momentum_distribution_type = "maxwell_boltzmann"
-proton3.theta = temperature/(m_p*clight**2)
+proton3.maxwellian_u_std_distribution_type = "constant"
+proton3.ux_std = sqrt(temperature/(m_p*clight**2))
+proton3.uy_std = sqrt(temperature/(m_p*clight**2))
+proton3.uz_std = sqrt(temperature/(m_p*clight**2))
 proton3.do_not_push = 1
 proton3.do_not_deposit = 1
 
@@ -116,7 +119,10 @@ boron3.num_particles_per_cell = 1000
 boron3.profile = constant
 boron3.density = 5.e28
 boron3.momentum_distribution_type = "maxwell_boltzmann"
-boron3.theta = temperature/(m_b11*clight**2)
+boron3.maxwellian_u_std_distribution_type = "constant"
+boron3.ux_std = sqrt(temperature/(m_b11*clight**2))
+boron3.uy_std = sqrt(temperature/(m_b11*clight**2))
+boron3.uz_std = sqrt(temperature/(m_b11*clight**2))
 boron3.do_not_push = 1
 boron3.do_not_deposit = 1
 
