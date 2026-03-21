@@ -13,7 +13,7 @@
 #include <AMReX_REAL.H>
 
 /* Type of velocity initialization. Used by VelocityProperties and GetVelocity. */
-enum VelocityInitType {VelConstantValue, VelParserFunction};
+enum VelocityInitType {VelConstantValue, VelParserFunction, VelConstantVector, VelParserFunctionVector};
 
 /**
  * \brief Struct to store velocity properties, for use in momentum initialization.
@@ -48,6 +48,11 @@ struct VelocityProperties
     amrex::Real m_velocity{0};
     /* Storage of the parser function, if m_type == VelParserFunction */
     std::unique_ptr<amrex::Parser> m_ptr_velocity_parser;
+
+    /* Mean velocity components for velocity vector, if m_type == VelConstantVector */
+    amrex::Real m_ux_mean, m_uy_mean, m_uz_mean;
+    /* Storage of the parser functions for velocity vector, if m_type == VelParserFunctionVector */
+    std::unique_ptr<amrex::Parser> m_ptr_ux_mean_parser, m_ptr_uy_mean_parser, m_ptr_uz_mean_parser;
 };
 
 #endif //WARPX_VELOCITY_PROPERTIES_H_

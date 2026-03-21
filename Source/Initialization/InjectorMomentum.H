@@ -25,8 +25,13 @@
 #include <AMReX_Random.H>
 
 #include <AMReX_BaseFwd.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_RealBox.H>
 
 #include <cmath>
+#include <functional>
 #include <string>
 
 // struct whose getMomentum returns constant momentum.
@@ -206,9 +211,11 @@ struct InjectorMomentumBoltzmann
     // Constructor whose inputs are:
     // a reference to the initial temperature container t,
     // a reference to the initial velocity container b
-    InjectorMomentumBoltzmann(GetTemperature const& t, GetVelocity const& b) noexcept
+    InjectorMomentumBoltzmann(GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
         : velocity(b), temperature(t)
         {}
+
+
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -217,50 +224,22 @@ struct InjectorMomentumBoltzmann
                  amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
-
+        const amrex::XDim3 u_std = temperature(x,y,z);
+        const amrex::XDim3 u_mean = velocity(x,y,z);
         // Calculate the local temperature and check if it's too
         // high for Boltzmann or less than zero
-        amrex::Real const theta = temperature(x,y,z);
-        if (theta < 0._rt) {
-            amrex::Abort("Negative temperature parameter theta encountered, which is not allowed");
-        }
+        // if (u_std < 0._rt) {
+        //     amrex::Abort("Negative temperature parameter theta encountered, which is not allowed");
+        // }
         // Calculate local velocity and abort if |beta|>=1
-        amrex::Real const beta = velocity(x,y,z);
-        if (beta <= -1._rt || beta >= 1._rt) {
-            amrex::Abort("beta = v/c magnitude greater than or equal to 1");
-        }
-        // Calculate the value of vave from the local temperature
-        amrex::Real const vave = std::sqrt(theta);
-        int const dir = velocity.direction();
-
-        amrex::Real u[3];
-        u[dir] = amrex::RandomNormal(0._rt, vave, engine);
-        u[(dir+1)%3] = amrex::RandomNormal(0._rt, vave, engine);
-        u[(dir+2)%3] = amrex::RandomNormal(0._rt, vave, engine);
-        amrex::Real const gamma = std::sqrt(1._rt + u[0]*u[0]+u[1]*u[1]+u[2]*u[2]);
-
-        // The following condition is equation 32 in Zenitani 2015
-        // (Phys. Plasmas 22, 042116) , called the flipping method. It
-        // transforms the integral: d3x' -> d3x  where d3x' is the volume
-        // element for positions in the boosted frame. The particle positions
-        // and densities can be initialized in the simulation frame.
-        // The flipping method can transform any symmetric distribution from one
-        // reference frame to another moving at a relative velocity of beta.
-        // An equivalent alternative to this method native to WarpX would be to
-        // initialize the particle positions and densities in the frame moving
-        // at speed beta, and then perform a Lorentz transform on the positions
-        // and MB sampled velocities to the simulation frame.
-        if(-beta*u[dir]/gamma > amrex::Random(engine))
-        {
-          u[dir] = -u[dir];
-        }
-        // This Lorentz transform is equation 17 in Zenitani.
-        // It transforms the integral d3u' -> d3u
-        // where d3u' is the volume element for momentum in the boosted frame.
-        u[dir] = 1._rt/std::sqrt(1._rt-beta*beta)*(u[dir]+gamma*beta);
-        // Note that if beta = 0 then the flipping method and Lorentz transform
-        // have no effect on the u[dir] direction.
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        // amrex::Real const beta = velocity(x,y,z);
+        // if (beta <= -1._rt || beta >= 1._rt) {
+        //     amrex::Abort("beta = v/c magnitude greater than or equal to 1");
+        // }
+        amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
+        amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
+        amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
+        return amrex::XDim3 {ux_std, uy_std, uz_std};
     }
 
     [[nodiscard]]
@@ -269,18 +248,13 @@ struct InjectorMomentumBoltzmann
     getBulkMomentum (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
     {
         using namespace amrex::literals;
-        amrex::Real u[3];
-        for (auto& el : u) { el = 0.0_rt; }
-        const amrex::Real beta = velocity(x,y,z);
-        int const dir = velocity.direction();
-        const auto gamma = 1._rt/std::sqrt(1._rt-beta*beta);
-        u[dir] = gamma*beta;
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        const amrex::XDim3 u_mean = velocity(x,y,z);
+        return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
     }
 
 private:
-    GetVelocity velocity;
-    GetTemperature temperature;
+    GetVelocityVector velocity;
+    GetTemperatureVector temperature;
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
@@ -523,7 +497,7 @@ struct InjectorMomentum
     { }
 
     InjectorMomentum (InjectorMomentumBoltzmann* t,
-                       GetTemperature const& temperature, GetVelocity const& velocity)
+                       GetTemperatureVector const& temperature, GetVelocityVector const& velocity)
          : type(Type::boltzmann),
            object(t, temperature, velocity)
     { }
@@ -546,6 +520,21 @@ struct InjectorMomentum
     ~InjectorMomentum() = default;
 
     void clear ();
+
+    [[nodiscard]] bool hasBoltzmannVelocityMeanFromFile () const noexcept;
+
+    void prepareBoltzmannVelocityMeanFromFile (amrex::BoxArray const& grids,
+                                               amrex::DistributionMapping const& dmap,
+                                               amrex::IntVect const& ngrow,
+                                               std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepareBoltzmannVelocityMeanFromFile (int li, InjectorMomentum** inj_mom);
+
+    void prepareBoltzmannVelocityMeanFromFileMovingWindow (
+        amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+        std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    [[nodiscard]] bool boltzmannVelocityMeanDistributed () const noexcept;
 
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).
@@ -674,7 +663,7 @@ private:
                 amrex::Real a_uy_max, amrex::Real a_uz_max) noexcept
             : uniform(a_ux_min,a_uy_min,a_uz_min,a_ux_max,a_uy_max,a_uz_max) {}
         Object (InjectorMomentumBoltzmann*,
-                GetTemperature const& t, GetVelocity const& b) noexcept
+                GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
             : boltzmann(t,b) {}
         Object (InjectorMomentumJuttner*,
                 GetTemperature const& t, GetVelocity const& b) noexcept

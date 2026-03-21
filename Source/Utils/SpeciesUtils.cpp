@@ -207,11 +207,11 @@ namespace SpeciesUtils {
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwell_boltzmann"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
-            const GetTemperature getTemp(*h_mom_temp);
+            const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
-            const GetVelocity getVel(*h_mom_vel);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumBoltzmann.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumBoltzmann*)nullptr, getTemp, getVel));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumBoltzmann*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperature getTemp(*h_mom_temp);
