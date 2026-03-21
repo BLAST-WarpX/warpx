@@ -42,6 +42,10 @@
  *  components is the product over spatial dimensions. The diagonal
  *  component is at index (nComp-1)/2. The stencil offset for component c
  *  is decoded from the component index using the per-direction counts.
+ *
+ *  Note: WarpXSolverVec MultiFabs have zero ghost cells. This class
+ *  allocates its own ghost-padded temporaries (m_x_ghost) for stencil
+ *  neighbor access. All FillBoundary calls operate on these temporaries.
  */
 
 template <class T, class Ops>
@@ -75,8 +79,10 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         /**
          * \brief Compute ||b - (I+M)*x|| for residual monitoring.
+         *        Uses the ghost-padded m_x_ghost (which must already be
+         *        populated and boundary-filled) for stencil neighbor access.
          *        For diagonal-only mass matrices (ncomp=1), uses the fast
-         *        diagonal formula. Otherwise applies the full stencil.
+         *        diagonal formula from x directly.
          */
         RT computeResidualNorm (const T& a_x, const T& a_b) const;
 
@@ -86,8 +92,8 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         bool m_is_defined = false;
 
-        bool m_verbose = true;
-        int m_max_iter = 10;
+        bool m_verbose = false;
+        int m_max_iter = 200;
         RT m_omega = RT(2.0/3.0);
 
         RT m_atol = 1.0e-16;
@@ -103,8 +109,14 @@ class JacobiPC : public Preconditioner<T,Ops>
         bool m_work_defined = false;
 
         amrex::Vector<amrex::Array<amrex::MultiFab,3>> m_work;
+        amrex::Vector<amrex::Array<amrex::MultiFab,3>> m_x_ghost;
+
+        int m_stencil_width = 0;
 
         void readParameters();
+
+        void copyToGhostAndFill (
+            const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>& a_x_mfarrvec);
 
     private:
 
@@ -134,6 +146,21 @@ void JacobiPC<T,Ops>::readParameters()
 }
 
 template <class T, class Ops>
+void JacobiPC<T,Ops>::copyToGhostAndFill (
+    const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>& a_x_mfarrvec)
+{
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        const auto& geom = m_ops->GetGeometry(n);
+        for (int dim = 0; dim < 3; dim++) {
+            m_x_ghost[n][dim].setVal(RT(0.0));
+            amrex::MultiFab::Copy(m_x_ghost[n][dim], *(a_x_mfarrvec[n][dim]),
+                                  0, 0, 1, amrex::IntVect::TheZeroVector());
+            m_x_ghost[n][dim].FillBoundary(geom.periodicity());
+        }
+    }
+}
+
+template <class T, class Ops>
 auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> RT
 {
     using namespace amrex;
@@ -145,7 +172,6 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
         for (int dim = 0; dim < 3; dim++) {
             const auto& b_mf = *(b_mfarrvec[n][dim]);
             const auto& a_mf = *((*m_bcoefs)[n][dim]);
-            const auto& x_mf = *(x_mfarrvec[n][dim]);
             const int ncomp = a_mf.nComp();
 
             GpuArray<int,3> nc = {1, 1, 1};
@@ -161,13 +187,18 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
             ReduceData<RT> reduce_data(reduce_op);
             using ReduceTuple = typename decltype(reduce_data)::Type;
 
-            for (MFIter mfi(x_mf); mfi.isValid(); ++mfi) {
+            // Use the ghost-padded copy for stencil access when available
+            const auto& xg_mf = (ncomp > 1 && m_work_defined)
+                ? m_x_ghost[n][dim] : *(x_mfarrvec[n][dim]);
+
+            for (MFIter mfi(b_mf); mfi.isValid(); ++mfi) {
                 Box bx = mfi.validbox();
-                auto x_arr = x_mf.const_array(mfi);
+                auto xg_arr = xg_mf.const_array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
 
                 if (ncomp == 1) {
+                    auto x_arr = x_mfarrvec[n][dim]->const_array(mfi);
                     reduce_op.eval(bx, reduce_data,
                         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
                         {
@@ -187,12 +218,12 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
                                     const int jj = j + c1 - w[1];
                                     for (int c0 = 0; c0 < nc[0]; c0++) {
                                         const int ii = i + c0 - w[0];
-                                        mx += a_arr(i,j,k,comp) * x_arr(ii,jj,kk);
+                                        mx += a_arr(i,j,k,comp) * xg_arr(ii,jj,kk);
                                         comp++;
                                     }
                                 }
                             }
-                            RT Ax = x_arr(i,j,k) + mx;
+                            RT Ax = xg_arr(i,j,k) + mx;
                             RT r = b_arr(i,j,k) - Ax;
                             return {r * r};
                         });
@@ -245,15 +276,36 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
     if (m_bcoefs != nullptr && !m_work_defined) {
         auto& u_mfarrvec = a_U.getArrayVec();
         m_work.resize(m_num_amr_levels);
+        m_x_ghost.resize(m_num_amr_levels);
+
+        // Determine max stencil width needed across all dims/levels
+        m_stencil_width = 0;
         for (int n = 0; n < m_num_amr_levels; n++) {
             for (int dim = 0; dim < 3; dim++) {
                 if ((*m_bcoefs)[n][dim]->nComp() > 1) {
                     m_has_offdiag = true;
+                    for (int d = 0; d < AMREX_SPACEDIM; d++) {
+                        int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
+                        int w_d = (nc_d - 1) / 2;
+                        m_stencil_width = std::max(m_stencil_width, w_d);
+                    }
                 }
+            }
+        }
+
+        const amrex::IntVect nghost(m_stencil_width);
+        for (int n = 0; n < m_num_amr_levels; n++) {
+            for (int dim = 0; dim < 3; dim++) {
                 m_work[n][dim].define(
                     u_mfarrvec[n][dim]->boxArray(),
                     u_mfarrvec[n][dim]->DistributionMap(),
                     1, 0);
+                if (m_has_offdiag) {
+                    m_x_ghost[n][dim].define(
+                        u_mfarrvec[n][dim]->boxArray(),
+                        u_mfarrvec[n][dim]->DistributionMap(),
+                        1, nghost);
+                }
             }
         }
         m_work_defined = true;
@@ -318,44 +370,30 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
         if (m_verbose) {
             RT bnorm = a_b.norm2();
             RT res = computeResidualNorm(a_x, a_b);
-            amrex::Print() << "  pc_jacobi: diagonal-only, ||b|| = " << bnorm
-                           << ", ||b-(I+M)x|| = " << res
-                           << " (rel. " << res / std::max(bnorm, RT(1.e-30))
-                           << ")\n";
+            amrex::Print() << "  pc_jacobi (diag): residual = " << res
+                           << ", " << res / std::max(bnorm, RT(1.e-30))
+                           << " (rel.)\n";
         }
         return;
     }
 
-    // Fill ghost cells before computing initial residual norm
-    for (int n = 0; n < m_num_amr_levels; n++) {
-        const auto& geom = m_ops->GetGeometry(n);
-        for (int dim = 0; dim < 3; dim++) {
-            x_mfarrvec[n][dim]->FillBoundary(geom.periodicity());
-        }
-    }
+    // Copy x into ghost-padded temporaries for stencil access
+    copyToGhostAndFill(x_mfarrvec);
+
     const RT bnorm = a_b.norm2();
     RT res0 = computeResidualNorm(a_x, a_b);
 
     if (m_verbose) {
-        amrex::Print() << "  pc_jacobi: ||b|| = " << bnorm
-                       << ", ncomp = " << (*m_bcoefs)[0][0]->nComp()
-                       << "\n";
-        amrex::Print() << "  pc_jacobi: iter = 0"
-                       << ", ||b-(I+M)x|| = " << res0
-                       << " (rel. " << res0 / std::max(bnorm, RT(1.e-30))
-                       << ")\n";
+        amrex::Print() << "  pc_jacobi: iter = 0, residual = " << res0
+                       << ", " << res0 / std::max(bnorm, RT(1.e-30))
+                       << " (rel.)\n";
     }
 
     // Damped Jacobi iterations for multi-component (off-diagonal) mass matrices.
     for (int iter = 0; iter < m_max_iter; iter++) {
 
-        // Fill ghost cells so neighbor values are available for stencil
-        for (int n = 0; n < m_num_amr_levels; n++) {
-            const auto& geom = m_ops->GetGeometry(n);
-            for (int dim = 0; dim < 3; dim++) {
-                x_mfarrvec[n][dim]->FillBoundary(geom.periodicity());
-            }
-        }
+        // Copy x into ghost-padded temporary and fill boundaries
+        copyToGhostAndFill(x_mfarrvec);
 
         // For each field direction, compute (I+M)*x into work, then update x
         for (int n = 0; n < m_num_amr_levels; n++) {
@@ -364,6 +402,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                 const auto& a_mf = *((*m_bcoefs)[n][dim]);
                 auto& x_mf = *(x_mfarrvec[n][dim]);
                 auto& w_mf = m_work[n][dim];
+                const auto& xg_mf = m_x_ghost[n][dim];
 
                 const int ncomp = a_mf.nComp();
                 if (ncomp <= 1) { continue; }
@@ -379,11 +418,11 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
                 const RT omega = m_omega;
 
-                // Pass 1: compute (I+M)*x into work MultiFab
+                // Pass 1: compute (I+M)*x into work using ghost-padded x
                 for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                     Box bx = mfi.tilebox();
                     auto w_arr = w_mf.array(mfi);
-                    auto x_arr = x_mf.const_array(mfi);
+                    auto xg_arr = xg_mf.const_array(mfi);
                     auto a_arr = a_mf.const_array(mfi);
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
@@ -397,12 +436,12 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                                 for (int c0 = 0; c0 < nc[0]; c0++) {
                                     const int ii = i + c0 - w[0];
                                     mx += a_arr(i,j,k,comp)
-                                        * x_arr(ii,jj,kk);
+                                        * xg_arr(ii,jj,kk);
                                     comp++;
                                 }
                             }
                         }
-                        w_arr(i,j,k) = x_arr(i,j,k) + mx;
+                        w_arr(i,j,k) = xg_arr(i,j,k) + mx;
                     });
                 }
 
@@ -424,12 +463,15 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
             }
         }
 
+        // Copy updated x into ghost-padded temporary for residual norm
+        copyToGhostAndFill(x_mfarrvec);
+
         RT res_norm = computeResidualNorm(a_x, a_b);
         if (m_verbose) {
             amrex::Print() << "  pc_jacobi: iter = " << (iter+1)
-                           << ", ||b-(I+M)x|| = " << res_norm
-                           << " (rel. " << res_norm / std::max(bnorm, RT(1.e-30))
-                           << ")\n";
+                           << ", residual = " << res_norm
+                           << ", " << res_norm / std::max(bnorm, RT(1.e-30))
+                           << " (rel.)\n";
         }
         if (res_norm < m_atol || res_norm < m_rtol * res0) {
             if (m_verbose) {
