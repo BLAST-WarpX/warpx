@@ -146,6 +146,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
+
 }
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
@@ -201,6 +202,12 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     1D: xhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ex
         yhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = 0
+    RCYL: rhat\cdot[\nabla\times\nabla E] = 0
+          that\cdot[\nabla\times\nabla E] = - d/dr[1/r*d/dr(r*Et)]
+          zhat\cdot[\nabla\times\nabla E] = - 1/r*d/dr[r*dEz/dr]
+    RZ: rhat\cdot[\nabla\times\nabla E] = d/dr[dEz/dz] - [d2/dz2]Er
+        that\cdot[\nabla\times\nabla E] = - [d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
+        zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 
     In general, one mask is needed for each derivative in each component of the operator.
     However, for a second order Yee grid where E lives on cell edges, no masks are
@@ -223,6 +230,10 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         the mask for the diagonal term is 1 and the mask for the off-diagonal term is 2.
     */
 
+#if defined(WARPX_DIM_RSPHERE)
+    return; // Can only do Electrostatic limit in 1D spherical geometry
+#endif
+
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const amrex::IntVect ghosts = amrex::IntVect{0};
@@ -234,7 +245,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         const int ncomps_Ex = 2;
         const int ncomps_Ey = 2;
         const int ncomps_Ez = 0;
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER)
         const int ncomps_Ex = 0;
         const int ncomps_Ey = 2;
         const int ncomps_Ez = 2;
@@ -316,16 +327,54 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         val1 = 1.0;
                     }
                 }
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                amrex::Real val0_Et = val0;
+                amrex::Real val1_Et = val1;
+#if defined(WARPX_DIM_RCYLINDER)
+                amrex::Real val0_Ez = val0;
+                amrex::Real val1_Ez = val1;
+#endif
 
-                // Set mask values on the boundary cells (same for Ex and Ey for 1D_Z)
+                // Need to overwrite BC masks for certain BCs in this geometry
+                if (bc_type == FieldBoundaryType::PECInsulator &&
+                   !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
+                    const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
+                                                                   : static_cast<amrex::Real>(domain_hi[bdry_dir]));
+                    const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5);
+                    const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5);
+                    val0_Et = (bdry_side == 0 ? geom_p : geom_m) / (geom_p + geom_m);
+                    val1_Et = 1.0;
+#if defined(WARPX_DIM_RCYLINDER)
+                    val0_Ez = 0.5 * (bdry_side == 0 ? 1.0/geom_p : 1.0/geom_m);
+                    val1_Ez = 1.0;
+#endif
+                }
+                else if (bc_type == FieldBoundaryType::None) { // None is for axis
+                    val0_Et = 0.0;
+                    val1_Et = 0.0;
+#if defined(WARPX_DIM_RCYLINDER)
+                    val0_Ez = 2.0;
+                    val1_Ez = 4.0;
+#endif
+                }
+                val0 = val0_Et;
+                val1 = val1_Et;
+#endif
+
+                // Set mask values on the boundary cells for the relevant field components
 #if defined(WARPX_DIM_1D_Z)
                 amrex::Array4<amrex::Real> const& maskEx_arr = curl2_BC_mask[0]->array(mfi);
+#elif defined(WARPX_DIM_RCYLINDER)
+                amrex::Array4<amrex::Real> const& maskEz_arr = curl2_BC_mask[2]->array(mfi);
 #endif
                 amrex::Array4<amrex::Real> const& maskEy_arr = curl2_BC_mask[1]->array(mfi);
                 amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 #if defined(WARPX_DIM_1D_Z)
                     maskEx_arr(i,j,k,2*bdry_dir  ) = val0;
                     maskEx_arr(i,j,k,2*bdry_dir+1) = val1;
+#elif defined(WARPX_DIM_RCYLINDER)
+                    maskEz_arr(i,j,k,2*bdry_dir  ) = val0_Ez;
+                    maskEz_arr(i,j,k,2*bdry_dir+1) = val1_Ez;
 #endif
                     maskEy_arr(i,j,k,2*bdry_dir  ) = val0;
                     maskEy_arr(i,j,k,2*bdry_dir+1) = val1;
@@ -404,6 +453,27 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                             val2 = 1.0;
                         }
                     }
+
+#if defined(WARPX_DIM_RZ)
+                    // Need to overwrite BC masks for certain BCs in this geometry
+                    if (bdry_dir == 0) {
+                        if (bc_type == FieldBoundaryType::PECInsulator &&
+                           !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
+                            const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
+                                                                           : static_cast<amrex::Real>(domain_hi[bdry_dir]));
+                            const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5);
+                            const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5);
+                            val0 = 0.5 * (bdry_side == 0 ? 1.0/geom_p : 1.0/geom_m);
+                            val1 = 1.0;
+                            val2 = 1.0;
+                        }
+                        else if (bc_type == FieldBoundaryType::None) { // None is for axis
+                            val0 = 2.0;
+                            val1 = 4.0;
+                            val2 = 0.0;
+                        }
+                    }
+#endif
 
                     // Set mask values on the boundary cells
                     const int comp_shift = (tdir1 == bdry_dir) ? 0:3;
