@@ -332,10 +332,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
     BL_PROFILE("MatrixPC::Assemble()");
     using namespace amrex;
 
-#if defined(WARPX_DIM_RSPHERE)
-    return; // Can only do Electrostatic limit in 1D spherical geometry
-#endif
-
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "MatrixPC::Assemble() called on undefined object" );
