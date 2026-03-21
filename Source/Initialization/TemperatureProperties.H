@@ -43,7 +43,7 @@ struct TemperatureProperties
     std::unique_ptr<amrex::Parser> m_ptr_temperature_parser;
 
     /* Standard deviations for temperature vector, if m_type == TempConstantVector */
-    amrex::Real m_ux_std, m_uy_std, m_uz_std;
+    amrex::Real m_ux_std{0.0}, m_uy_std{0.0}, m_uz_std{0.0};
     /* Storage of the parser functions for temperature vector, if m_type == TempParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_std_parser, m_ptr_uy_std_parser, m_ptr_uz_std_parser;
 };

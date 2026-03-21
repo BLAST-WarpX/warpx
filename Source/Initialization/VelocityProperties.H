@@ -50,7 +50,7 @@ struct VelocityProperties
     std::unique_ptr<amrex::Parser> m_ptr_velocity_parser;
 
     /* Mean velocity components for velocity vector, if m_type == VelConstantVector */
-    amrex::Real m_ux_mean, m_uy_mean, m_uz_mean;
+    amrex::Real m_ux_mean{0.0}, m_uy_mean{0.0}, m_uz_mean{0.0};
     /* Storage of the parser functions for velocity vector, if m_type == VelParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_mean_parser, m_ptr_uy_mean_parser, m_ptr_uz_mean_parser;
 };
