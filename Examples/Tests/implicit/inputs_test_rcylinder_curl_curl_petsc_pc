@@ -3,9 +3,9 @@
 #################################
 
 ###   characteristic plasma values
-my_constants.n0 = 1.e23    # plasma density [1/m^3]
+my_constants.n0 = 1.0e23   # plasma density [1/m^3]
 my_constants.R0 = 1.5e-2   # plasma radius [m]
-my_constants.I0 = 200.e3   # pinch current [Amps]
+my_constants.I0 = 2.1e6    # pinch current [Amps]
 
 my_constants.AD = 2.01410  # atomic number deuterium
 my_constants.mD = AD*m_u - m_e   # deuterium mass [kg]
@@ -18,31 +18,34 @@ my_constants.u0 = sqrt(PB0/rho0)    # implosion speed [m/s]
 my_constants.t0 = R0/u0             # implosion time [m/s]
 
 ###   simulation parameters
-my_constants.tsim = 220.e-9       # sim time = 1.35*t0 [s]
+my_constants.tsim = 22.0e-9       # sim time = 1.35*t0 [s]
 my_constants.rise_time = t0/20.0  # current rise time [s]
-my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
+my_constants.dt = 4.0e-4*1.0e-9   # time step [s]
 
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = tsim
-max_step = 200
-amr.n_cell =  224 8
+max_step = 1000
+amr.n_cell =  224
 amr.max_grid_size = 8
+amr.blocking_factor = 8
 amr.max_level = 0
-geometry.dims = 2
-geometry.prob_lo = 0.0 0.0
-geometry.prob_hi = 1.54e-2 0.11e-2
+warpx.numprocs = 2
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.54e-2
 
 #################################
 ####### Boundary condition ######
 #################################
-boundary.field_lo = pmc periodic
-boundary.field_hi = pec_insulator periodic
-boundary.particle_lo = reflecting periodic
-boundary.particle_hi = absorbing periodic
+boundary.field_lo = none
+boundary.field_hi = pec_insulator
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
 
-insulator.area_x_hi(y,z) = (-1.0 <= z and z <= 1.0)
+insulator.area_x_hi(y,z) = 1.0
+insulator.Bz_x_hi(y,z,t) = min(t/rise_time,1)*B0
 insulator.By_x_hi(y,z,t) = min(t/rise_time,1)*B0
 
 #################################
@@ -54,49 +57,45 @@ warpx.limit_verbose_step = false
 warpx.const_dt = dt
 warpx.use_filter = 0
 
-amrex.fpe_trap_invalid = 1
-amrex.fpe_trap_overflow = 1
-amrex.fpe_trap_zero = 1
-
 algo.maxwell_solver = Yee
 algo.evolve_scheme = "theta_implicit_em"
 
 implicit_evolve.theta = 0.5
 
 implicit_evolve.nonlinear_solver = "newton"
-newton.verbose = true
 newton.linear_solver = petsc_ksp
-newton.max_iterations = 100
-newton.relative_tolerance = 1.0e-6
+newton.verbose = true
+newton.max_iterations = 10
+newton.relative_tolerance = 1.0e-8
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
-newton.diagnostic_interval = 10
+newton.diagnostic_interval = 100
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
-gmres.relative_tolerance = 1.0e-3
+gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
-jacobian.pc_type = "pc_petsc"
+jacobian.pc_type = pc_petsc
 pc_petsc.verbose = true
-pc_petsc.type = "lu"
+pc_petsc.type = lu
 
 ###   Diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 200
+diag1.intervals = 1000
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz
+diag1.fields_to_plot = Er Et Ez Br Bt Bz
 
 ###   reduced diagnostics
 warpx.reduced_diags_names = field_energy poynting_flux
 
 field_energy.type = FieldEnergy
-field_energy.intervals = 10
+field_energy.intervals = 100
 field_energy.precision = 18
 field_energy.path = diags/reduced_files/
 
 poynting_flux.type = FieldPoyntingFlux
-poynting_flux.intervals = 10
+poynting_flux.intervals = 100
 poynting_flux.precision = 18
 poynting_flux.path = diags/reduced_files/
