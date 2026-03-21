@@ -86,15 +86,10 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
         utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
         if (u_std_dist_s == "constant") {
 
-            // Query for all three components
-            bool has_ux = utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
-            bool has_uy = utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
-            bool has_uz = utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
-
-            // Ensure all three are specified
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                has_ux && has_uy && has_uz,
-                "Temperature parameters ux_std, uy_std, uz_std must all be specified");
+          // Query for all three components. Defaults are zeros if not provided.
+            utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
+            utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
+            utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
 
             // Threshold in terms of std² (theta)
             constexpr double theta_threshold = 0.01;
