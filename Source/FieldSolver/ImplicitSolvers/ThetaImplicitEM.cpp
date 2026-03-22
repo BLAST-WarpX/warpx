@@ -197,16 +197,16 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         yhat\cdot[\nabla\times\nabla E] = d/dy[dEx/dx + dEz/dz] - [d2/dx2 + d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx + dEy/dy] - [d2/dx2 + d2/dy2]Ez
     2D: xhat\cdot[\nabla\times\nabla E] = d/dx[dEz/dz] - [d2/dz2]Ex
-        yhat\cdot[\nabla\times\nabla E] = - [d2/dx2 + d2/dz2]Ey
+        yhat\cdot[\nabla\times\nabla E] = -[d2/dx2 + d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx] - [d2/dx2]Ez
-    1D: xhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ex
-        yhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ey
+    1D: xhat\cdot[\nabla\times\nabla E] = -[d2/dz2]Ex
+        yhat\cdot[\nabla\times\nabla E] = -[d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = 0
     RCYL: rhat\cdot[\nabla\times\nabla E] = 0
-          that\cdot[\nabla\times\nabla E] = - d/dr[1/r*d/dr(r*Et)]
-          zhat\cdot[\nabla\times\nabla E] = - 1/r*d/dr[r*dEz/dr]
+          that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
+          zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
     RZ: rhat\cdot[\nabla\times\nabla E] = d/dr[dEz/dz] - [d2/dz2]Er
-        that\cdot[\nabla\times\nabla E] = - [d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
+        that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
         zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 
     In general, one mask is needed for each derivative in each component of the operator.

@@ -477,9 +477,13 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                         }
 #elif defined(WARPX_DIM_RCYLINDER)
+                        // dir = 0: rhat\cdot[\nabla\times\nabla E] = 0
+                        // dir = 1: that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
                         if (dir != 0) {
                             const amrex::Real i_real = static_cast<amrex::Real>(i);
                             {
+                                // diagonal component (i) of curl curl operator
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -497,6 +501,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // left component (i-1) of curl curl operator
                                 int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -513,6 +518,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // right component (i+1) of curl curl operator
                                 int cidx_g_rhs = dof_arr(i+1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -530,10 +536,19 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                         }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                        // DIM_XZ:
+                        // dir = 0: xhat\cdot[\nabla\times\nabla E] = d/dx[dEz/dz] - [d2/dz2]Ex
+                        // dir = 1: yhat\cdot[\nabla\times\nabla E] = -[d2/dx2 + d2/dz2]Ey
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx] - [d2/dx2]Ez
+                        // DIM_RZ:
+                        // dir = 0: rhat\cdot[\nabla\times\nabla E] = d/dr[dEz/dz] - [d2/dz2]Er
+                        // dir = 1: that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 #if defined(WARPX_DIM_RZ)
                         const amrex::Real i_real = static_cast<amrex::Real>(i);
 #endif
                         {
+                            // diagonal component (i,j) of second derivative operator
                             int cidx_g_rhs = dof_arr(i,j,k,1);
                             amrex::Real val = 0.0;
                             if (dir == 0) {
@@ -557,6 +572,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         }
                         if ((dir == 0) || (dir == 2)) {
                             {
+                                // left component (i-1,j) or (i,j-1) of second derivative operator
 #if defined(WARPX_DIM_RZ)
                                 const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
 #else
@@ -571,6 +587,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // right component (i+1,j) or (i,j+1) of second derivative operator
 #if defined(WARPX_DIM_RZ)
                                 const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
 #else
@@ -584,9 +601,13 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                                                         nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
-                            // The following four blocks are for
+                            // The following four blocks are for the cross terms of the curl curl operator
+                            // DIM_XZ:
                             // dir = 0: d/dx(dEz/dz) at Ex(i,j) with Ex centered in x and nodal in z
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
+                            // DIM_RZ:
+                            // dir = 0: d/dr(dEz/dz) at Er(i,j) with Er centered in r and nodal in z
+                            // dir = 2: 1/r*d/dr[r*dEr/dz] at Ez(i,j) with Ez centered in z and nodal in r
 #if defined(WARPX_DIM_RZ)
                             const amrex::Real geom_m = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
                             const amrex::Real geom_p = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
