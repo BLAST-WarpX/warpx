@@ -39,9 +39,12 @@ jobs:
 
   strategy:
     matrix:
-      # 1D Cartesian, Cylindrical, Spherical
+      # 1D Cartesian, Spherical
       1d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # 1D Cylindrical
+      rcylinder:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RCYLINDER -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
