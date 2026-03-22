@@ -241,7 +241,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         const int ncomps_Ex = 2;
         const int ncomps_Ey = 2;
         const int ncomps_Ez = 0;
-#elif defined(WARPX_DIM_RCYLINDER)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const int ncomps_Ex = 0;
         const int ncomps_Ey = 2;
         const int ncomps_Ez = 2;
