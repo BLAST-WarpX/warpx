@@ -233,7 +233,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     */
 
 #if defined(WARPX_DIM_RSPHERE)
-    return; // Can only do Electrostatic limit in 1D spherical geometry
+    return; // 1D spherical geometry is electrostatic
 #endif
 
     using ablastr::fields::Direction;
