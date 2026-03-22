@@ -180,7 +180,7 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 
 }
 
-#if defined(WARPX_DIM_RSPHERE)
+#if !defined(WARPX_DIM_RSPHERE)
 const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int field_dir) const
 {
     using ablastr::fields::Direction;
