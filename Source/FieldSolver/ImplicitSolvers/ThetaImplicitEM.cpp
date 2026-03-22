@@ -180,14 +180,12 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
 
 }
 
-#if !defined(WARPX_DIM_RSPHERE)
 const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int field_dir) const
 {
     using ablastr::fields::Direction;
     const amrex::MultiFab* mask = m_WarpX->m_fields.get(FieldType::curl2_BC_mask, Direction{field_dir}, lev);
     return mask;
 }
-#endif
 
 void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 {
@@ -231,10 +229,6 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         In this case, the operator transforms as [1 -2 1] ==> [0 -2 2]. In terms of the masks,
         the mask for the diagonal term is 1 and the mask for the off-diagonal term is 2.
     */
-
-#if defined(WARPX_DIM_RSPHERE)
-    return; // 1D spherical geometry is electrostatic
-#endif
 
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
