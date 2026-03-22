@@ -89,10 +89,12 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
 
+#if defined(WARPX_DIM_RSPHERE)
     /**
      * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
     [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
+#endif
 
     /**
      * \brief Inititialize the BC masks for the curl curl operator
