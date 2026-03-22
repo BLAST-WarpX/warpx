@@ -7,8 +7,8 @@
 # This is a script that analyses simulation results from the following input files:
 # `inputs_test_2d_curl_curl_petsc_pc`,
 # `inputs_test_rcylinder_curl_curl_petsc_pc`, and
-# `inputs_tset_rz_curl_curl_petsc_pc`.
-# These test simulate a time-varing EM wave injected from an insulator boundary
+# `inputs_test_rz_curl_curl_petsc_pc`.
+# These tests simulate a time-varing EM wave injected from an insulator boundary
 # using the theta-implicit solver with PETSc's LU preconditer.
 # Since LU is an exact solver, if the preconditioner matrix is constructed
 # correctly, then here should be 1 Newton and 1 GMRES iteration per time step.
