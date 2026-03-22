@@ -8,7 +8,6 @@ my_constants.R0 = 1.5e-2   # plasma radius [m]
 my_constants.I0 = 2.1e6    # pinch current [Amps]
 
 my_constants.AD = 2.01410  # atomic number deuterium
-my_constants.mD = AD*m_u - m_e   # deuterium mass [kg]
 
 ###   derived characteristic pinch values
 my_constants.B0 = mu0*I0/(2*pi*R0)  # B at r=R0 [Tesla]

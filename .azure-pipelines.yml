@@ -43,7 +43,7 @@ jobs:
       1d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # 1D Cylindrical
-      rcylinder:
+      cylindrical_r:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RCYLINDER -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
