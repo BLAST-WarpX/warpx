@@ -447,8 +447,12 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         int icol = num_nz_ptr[ridx_l];
 
 #if defined(WARPX_DIM_1D_Z)
+                        // dir = 0: xhat\cdot[\nabla\times\nabla E] = -[d2/dx2]Ex
+                        // dir = 1: yhat\cdot[\nabla\times\nabla E] = -[d2/dx2]Ey
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = 0
                         if (dir != 2) {
                             {
+                                // diagonal component (i) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
                                 amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
@@ -458,6 +462,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // left component (i-1) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
@@ -467,6 +472,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // right component (i+1) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i+1,j,k,1);
                                 amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
@@ -483,7 +489,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         if (dir != 0) {
                             const amrex::Real i_real = static_cast<amrex::Real>(i);
                             {
-                                // diagonal component (i) of curl curl operator
+                                // diagonal component (i) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -501,7 +507,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                // left component (i-1) of curl curl operator
+                                // left component (i-1) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -518,7 +524,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                // right component (i+1) of curl curl operator
+                                // right component (i+1) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i+1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
@@ -601,7 +607,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                                                         nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
-                            // The following four blocks are for the cross terms of the curl curl operator
+                            // The following four blocks are for the mixed derivative terms of the curl curl operator
                             // DIM_XZ:
                             // dir = 0: d/dx(dEz/dz) at Ex(i,j) with Ex centered in x and nodal in z
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
@@ -684,9 +690,13 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             }
                         }
 #elif defined(WARPX_DIM_3D)
+                        // xhat\cdot[\nabla\times\nabla E] = d/dx[dEy/dy + dEz/dz] - [d2/dy2 + d2/dz2]Ex
+                        // yhat\cdot[\nabla\times\nabla E] = d/dy[dEx/dx + dEz/dz] - [d2/dx2 + d2/dz2]Ey
+                        // zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx + dEy/dy] - [d2/dx2 + d2/dy2]Ez
                         amrex::IntVect dvec(AMREX_D_DECL(dir,tdir1,tdir2));
                         amrex::IntVect ic(AMREX_D_DECL(i,j,k));
                         {
+                            // diagonal component (i,j,k) of second derivative operator
                             int cidx_g_rhs = dof_arrays[0](ic,1);
                             amrex::Real val = 2.0_rt * alpha * ( dxi[dvec[1]]*dxi[dvec[1]] * BC_mask_Edir_arr(i,j,k,0)
                                                                + dxi[dvec[2]]*dxi[dvec[2]] * BC_mask_Edir_arr(i,j,k,3) );
@@ -696,6 +706,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                                                     nnz_max, icol );
                             if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                         }
+                        // left and right components (i+/-1,j,k), (i,j+/-1,k), or (i,j,k+/-1) of second derivative operator
                         for (int ctr = -1; ctr <= 1; ctr += 2) {
                             for (int tdir = 1; tdir <= 2; tdir++) {
                                 auto iv = ic; iv[dvec[tdir]] += ctr;
@@ -709,6 +720,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                         }
+                        // mixed derivative terms of the curl curl operator
                         for (int ctr_dir = -1; ctr_dir <= 0; ctr_dir++) {
                             for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
                                 for (int tdir = 1; tdir <= 2; tdir++) {
