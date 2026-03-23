@@ -445,6 +445,19 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         if (ridx_l < 0) { return; }
 
                         int icol = num_nz_ptr[ridx_l];
+                        int ridx_g = dof_arr(i,j,k,1);
+
+                        r_indices_g_ptr[ridx_l] = ridx_g;
+
+                        {
+                            int cidx_g_lhs = dof_arr(i,j,k,1);
+                            amrex::Real val = 1.0_rt;
+                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
+                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                    &a_ij_ptr[ridx_l*nnz_max],
+                                                                    nnz_max, icol );
+                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                        }
 
 #if defined(WARPX_DIM_1D_Z)
                         // dir = 0: xhat\cdot[\nabla\times\nabla E] = -[d2/dx2]Ex
