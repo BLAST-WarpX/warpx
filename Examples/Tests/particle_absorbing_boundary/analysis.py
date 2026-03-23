@@ -9,8 +9,8 @@
 #
 # This script analyzes the phase-space plot from the 1D particle absorbing boundary test, ensuring that there are not too many fast-moving particles with negative velocities near the boundary
 
+
 from openpmd_viewer import OpenPMDTimeSeries
-import os
 
 ts = OpenPMDTimeSeries("./diags/reducedfiles/PhaseSpaceElectrons")
 it = ts.iterations
