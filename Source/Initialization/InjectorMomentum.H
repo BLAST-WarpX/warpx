@@ -205,13 +205,13 @@ private:
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
-// drift velocity beta, from the Maxwell-Boltzmann distribution.
-struct InjectorMomentumBoltzmann
+// drift velocity beta, from the Maxwellian (Maxwell–Boltzmann) distribution.
+struct InjectorMomentumMaxwellian
 {
     // Constructor whose inputs are:
     // a reference to the initial temperature container t,
     // a reference to the initial velocity container b
-    InjectorMomentumBoltzmann(GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
+    InjectorMomentumMaxwellian(GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
         : velocity(b), temperature(t)
         {}
 
@@ -227,7 +227,7 @@ struct InjectorMomentumBoltzmann
         const amrex::XDim3 u_std = temperature(x,y,z);
         const amrex::XDim3 u_mean = velocity(x,y,z);
         // Calculate the local temperature and check if it's too
-        // high for Boltzmann or less than zero
+        // high for Maxwellian sampling or less than zero
         // if (u_std < 0._rt) {
         //     amrex::Abort("Negative temperature parameter theta encountered, which is not allowed");
         // }
@@ -438,6 +438,7 @@ struct InjectorMomentumGaussianParser
 // - InjectorMomentumGaussianFlux   : to generate v*gaussian distribution;
 // - InjectorMomentumParser         : to generate momentum from parser;
 // - InjectorMomentumGaussianParser : to generate momentum and thermal spread from parser;
+// - InjectorMomentumMaxwellian      : Maxwellian momentum distribution;
 // The choice is made at runtime, depending in the constructor called.
 // This mimics virtual functions.
 struct InjectorMomentum
@@ -496,9 +497,9 @@ struct InjectorMomentum
           object(t,a_ux_min,a_uy_min,a_uz_min,a_ux_max,a_uy_max,a_uz_max)
     { }
 
-    InjectorMomentum (InjectorMomentumBoltzmann* t,
+    InjectorMomentum (InjectorMomentumMaxwellian* t,
                        GetTemperatureVector const& temperature, GetVelocityVector const& velocity)
-         : type(Type::boltzmann),
+         : type(Type::maxwellian),
            object(t, temperature, velocity)
     { }
 
@@ -521,20 +522,20 @@ struct InjectorMomentum
 
     void clear ();
 
-    [[nodiscard]] bool hasBoltzmannVelocityMeanFromFile () const noexcept;
+    [[nodiscard]] bool hasMaxwellianVelocityMeanFromFile () const noexcept;
 
-    void prepareBoltzmannVelocityMeanFromFile (amrex::BoxArray const& grids,
+    void prepareMaxwellianVelocityMeanFromFile (amrex::BoxArray const& grids,
                                                amrex::DistributionMapping const& dmap,
                                                amrex::IntVect const& ngrow,
                                                std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
-    void prepareBoltzmannVelocityMeanFromFile (int li, InjectorMomentum** inj_mom);
+    void prepareMaxwellianVelocityMeanFromFile (int li, InjectorMomentum** inj_mom);
 
-    void prepareBoltzmannVelocityMeanFromFileMovingWindow (
+    void prepareMaxwellianVelocityMeanFromFileMovingWindow (
         amrex::RealBox const& pbox, int moving_dir, int moving_sign,
         std::function<amrex::Real(amrex::Real)> const& get_zlab);
 
-    [[nodiscard]] bool boltzmannVelocityMeanDistributed () const noexcept;
+    [[nodiscard]] bool maxwellianVelocityMeanDistributed () const noexcept;
 
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).
@@ -566,9 +567,9 @@ struct InjectorMomentum
         {
             return object.uniform.getMomentum(x,y,z,engine);
         }
-        case Type::boltzmann:
+        case Type::maxwellian:
         {
-            return object.boltzmann.getMomentum(x,y,z,engine);
+            return object.maxwellian.getMomentum(x,y,z,engine);
         }
         case Type::juttner:
         {
@@ -615,9 +616,9 @@ struct InjectorMomentum
         {
             return object.uniform.getBulkMomentum(x,y,z);
         }
-        case Type::boltzmann:
+        case Type::maxwellian:
         {
-            return object.boltzmann.getBulkMomentum(x,y,z);
+            return object.maxwellian.getBulkMomentum(x,y,z);
         }
         case Type::juttner:
         {
@@ -635,7 +636,7 @@ struct InjectorMomentum
         }
     }
 
-    enum struct Type { constant, gaussian, gaussianflux, uniform, boltzmann, juttner, parser, gaussianparser };
+    enum struct Type { constant, gaussian, gaussianflux, uniform, maxwellian, juttner, parser, gaussianparser };
     Type type;
 
 private:
@@ -662,9 +663,9 @@ private:
                 amrex::Real a_uz_min, amrex::Real a_ux_max,
                 amrex::Real a_uy_max, amrex::Real a_uz_max) noexcept
             : uniform(a_ux_min,a_uy_min,a_uz_min,a_ux_max,a_uy_max,a_uz_max) {}
-        Object (InjectorMomentumBoltzmann*,
+        Object (InjectorMomentumMaxwellian*,
                 GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
-            : boltzmann(t,b) {}
+            : maxwellian(t,b) {}
         Object (InjectorMomentumJuttner*,
                 GetTemperature const& t, GetVelocity const& b) noexcept
             : juttner(t,b) {}
@@ -686,7 +687,7 @@ private:
         InjectorMomentumGaussian gaussian;
         InjectorMomentumGaussianFlux gaussianflux;
         InjectorMomentumUniform uniform;
-        InjectorMomentumBoltzmann boltzmann;
+        InjectorMomentumMaxwellian maxwellian;
         InjectorMomentumJuttner juttner;
         InjectorMomentumParser parser;
         InjectorMomentumGaussianParser gaussianparser;

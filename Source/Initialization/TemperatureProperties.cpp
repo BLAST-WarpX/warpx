@@ -28,7 +28,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                    mom_dist_s.begin(),
                    ::tolower);
 
-    if (mom_dist_s != "maxwell_boltzmann") {
+    if (mom_dist_s != "maxwellian") {
         // Set defaults
         amrex::Real theta = 0; // quiet GCC warning maybe-uninitialized
         std::string temp_dist_s = "constant";
@@ -53,8 +53,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 " is less than minimum 0.1 allowed for Maxwell-Juttner."
             );
 
-
-            // if (mom_dist_s == "maxwell_boltzmann" && theta > 0.01) {
+            // if (mom_dist_s == "maxwellian" && theta > 0.01) {
             //     ablastr::warn_manager::WMRecordWarning(
             //         "Temperature",
             //         std::string{"Maxwell-Boltzmann distribution has errors greater than 1%"} +
@@ -100,7 +99,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             {
                 ablastr::warn_manager::WMRecordWarning(
                     "Temperature",
-                    "Maxwell-Boltzmann distribution has errors greater than 1% "
+                    "Maxwellian distribution has errors greater than 1% "
                     "for temperature parameter(s) ux_std², uy_std², uz_std² > 0.01. "
                     "Values given: ux_std² = " + std::to_string(m_ux_std*m_ux_std) +
                     ", uy_std² = " + std::to_string(m_uy_std*m_uy_std) +

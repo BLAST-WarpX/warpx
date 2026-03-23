@@ -2177,6 +2177,16 @@ WarpX::BackwardCompatibility ()
         std::vector<amrex::Real> backward_vel;
         std::stringstream ssspecies;
 
+        std::string mom_dist_type;
+        if (pp_species.query("momentum_distribution_type", mom_dist_type)) {
+            if (mom_dist_type == "maxwell_boltzmann" || mom_dist_type == "gaussian_parse_momentum_function") {
+                ablastr::warn_manager::WMRecordWarning("Species",
+                    + speciesiter + ".momentum_distribution_type = " + mom_dist_type + "' is deprecated; "
+                    "use 'maxwellian' instead.",
+                    ablastr::warn_manager::WarnPriority::low);
+            }
+        }
+
         ssspecies << "'" << speciesiter << ".multiple_particles_vel_<x,y,z>'";
         ssspecies << " are not supported anymore. ";
         ssspecies << "Please use the renamed variables ";

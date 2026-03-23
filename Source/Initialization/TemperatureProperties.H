@@ -19,7 +19,7 @@ enum TemperatureInitType {TempConstantValue, TempParserFunction, TempParserFunct
 /**
  * \brief Struct to store temperature properties, for use in momentum initialization.
  *
- * Reads in and stores temperature used to initialize the Maxwell-Boltzmann and Maxwell-Juttner
+ * Reads in and stores temperature used to initialize the Maxwellian and Maxwell-Juttner
  * momentum distributions in InjectorMomentum. The information is read from the parameters of
  * the species being initialized, and will be accessed by GetTemperature.
  */

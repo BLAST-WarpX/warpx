@@ -23,7 +23,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                    mom_dist_s.end(),
                    mom_dist_s.begin(),
                    ::tolower);
-    if (mom_dist_s != "maxwell_boltzmann") {
+    if (mom_dist_s != "maxwellian") {
         // Set defaults
         std::string vel_dist_s = "constant";
         std::string vel_dir_s = "x";

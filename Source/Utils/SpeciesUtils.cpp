@@ -205,13 +205,13 @@ namespace SpeciesUtils {
             // Construct InjectorMomentum with InjectorMomentumUniform.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
-        } else if (mom_dist_s == "maxwell_boltzmann"){
+        } else if (mom_dist_s == "maxwellian"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
             const GetVelocityVector getVelVec(*h_mom_vel);
-            // Construct InjectorMomentum with InjectorMomentumBoltzmann.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumBoltzmann*)nullptr, getTempVec, getVelVec));
+            // Construct InjectorMomentum with InjectorMomentumMaxwellian.
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperature getTemp(*h_mom_temp);
