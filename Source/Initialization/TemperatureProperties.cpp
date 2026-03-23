@@ -90,20 +90,17 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
             utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
 
-            // Threshold in terms of std² (theta)
-            constexpr double theta_threshold = 0.01;
-
-            if ( (m_ux_std*m_ux_std > theta_threshold) ||
-                (m_uy_std*m_uy_std > theta_threshold) ||
-                (m_uz_std*m_uz_std > theta_threshold) )
+            if ( (m_ux_std*m_ux_std > 0.01) ||
+                (m_uy_std*m_uy_std > 0.01) ||
+                (m_uz_std*m_uz_std > 0.01) )
             {
                 ablastr::warn_manager::WMRecordWarning(
                     "Temperature",
                     "Maxwellian distribution has errors greater than 1% "
-                    "for temperature parameter(s) ux_std², uy_std², uz_std² > 0.01. "
-                    "Values given: ux_std² = " + std::to_string(m_ux_std*m_ux_std) +
-                    ", uy_std² = " + std::to_string(m_uy_std*m_uy_std) +
-                    ", uz_std² = " + std::to_string(m_uz_std*m_uz_std)
+                    "for temperature parameter(s) ux_std*ux_std, uy_std*uy_std, uz_std*uz_std > 0.01. "
+                    "Values given: ux_std*ux_std = " + std::to_string(m_ux_std*m_ux_std) +
+                    ", uy_std*uy_std = " + std::to_string(m_uy_std*m_uy_std) +
+                    ", uz_std*uz_std = " + std::to_string(m_uz_std*m_uz_std)
                 );
             }
             m_type = TempConstantVector;
