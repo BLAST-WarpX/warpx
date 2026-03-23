@@ -96,10 +96,6 @@ struct GetVelocityVector
     amrex::Real m_ux_mean{0}, m_uy_mean{0}, m_uz_mean{0};
     /** Velocity parser function, if m_type == VelParserFunctionVector */
     amrex::ParserExecutor<3> m_ux_mean_parser, m_uy_mean_parser, m_uz_mean_parser;
-
-    /** Default constructor */
-    //GetVelocityVector () noexcept = default;
-
     /**
      * \brief Construct the functor with information provided by vel
      *
