@@ -138,10 +138,10 @@ namespace ablastr::fields
         }
 
         // e.g., "x"
-        explicit Direction (char const * c) : dir{Direction{c}} {}
+        Direction (char const * c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
 
         // e.g., 'x'
-        explicit Direction (char const c) : dir{Direction{c}} {}
+        Direction (char const c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
 
         // rule of five: define default constructors and the destructor
         //   because we defined a special one above for char
