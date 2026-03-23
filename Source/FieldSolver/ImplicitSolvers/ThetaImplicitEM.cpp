@@ -297,30 +297,30 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                 if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
 
                 // Set the BC-dependent mask values
-                amrex::Real val0 = 1.0;
-                amrex::Real val1 = 1.0;
+                amrex::Real val0 = 1.0_rt;
+                amrex::Real val1 = 1.0_rt;
                 const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
                 if (bc_type == FieldBoundaryType::PEC){
-                    val0 = 0.0;
-                    val1 = 0.0;
+                    val0 = 0.0_rt;
+                    val1 = 0.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::PMC){
-                    val0 = 1.0;
-                    val1 = 2.0;
+                    val0 = 1.0_rt;
+                    val1 = 2.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
-                    val0 = 0.5;
-                    val1 = 1.0;
+                    val0 = 0.5_rt;
+                    val1 = 1.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::PECInsulator) {
                     const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                     if (voltage_driven) { // Dirichlet boundary for E
-                        val0 = 0.0;
-                        val1 = 0.0;
+                        val0 = 0.0_rt;
+                        val1 = 0.0_rt;
                     }
                     else { // Dirichlet boundary for B
-                        val0 = 0.5;
-                        val1 = 1.0;
+                        val0 = 0.5_rt;
+                        val1 = 1.0_rt;
                     }
                 }
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
@@ -336,21 +336,21 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                    !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                     const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                    : static_cast<amrex::Real>(domain_hi[bdry_dir]));
-                    const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5);
-                    const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5);
+                    const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5_rt);
+                    const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5_rt);
                     val0_Et = (bdry_side == 0 ? geom_p : geom_m) / (geom_p + geom_m);
-                    val1_Et = 1.0;
+                    val1_Et = 1.0_rt;
 #if defined(WARPX_DIM_RCYLINDER)
-                    val0_Ez = 0.5 * (bdry_side == 0 ? 1.0/geom_p : 1.0/geom_m);
-                    val1_Ez = 1.0;
+                    val0_Ez = 0.5_rt * (bdry_side == 0 ? 1.0_rt/geom_p : 1.0_rt/geom_m);
+                    val1_Ez = 1.0_rt;
 #endif
                 }
                 else if (bc_type == FieldBoundaryType::None) { // None is for axis
-                    val0_Et = 0.0;
-                    val1_Et = 0.0;
+                    val0_Et = 0.0_rt;
+                    val1_Et = 0.0_rt;
 #if defined(WARPX_DIM_RCYLINDER)
-                    val0_Ez = 2.0;
-                    val1_Ez = 4.0;
+                    val0_Ez = 2.0_rt;
+                    val1_Ez = 4.0_rt;
 #endif
                 }
                 val0 = val0_Et;
@@ -422,31 +422,31 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
 
                     // Set the BC-dependent mask values
-                    amrex::Real val0 = 1.0;
-                    amrex::Real val1 = 1.0;
-                    amrex::Real val2 = 1.0;
+                    amrex::Real val0 = 1.0_rt;
+                    amrex::Real val1 = 1.0_rt;
+                    amrex::Real val2 = 1.0_rt;
                     const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
                     if (bc_type == FieldBoundaryType::PEC){
-                        val0 = 0.0;
-                        val1 = 0.0;
-                        val2 = 0.0;
+                        val0 = 0.0_rt;
+                        val1 = 0.0_rt;
+                        val2 = 0.0_rt;
                     }
                     if (bc_type == FieldBoundaryType::PMC){
-                        val0 = 1.0;
-                        val1 = 2.0;
-                        val2 = 2.0;
+                        val0 = 1.0_rt;
+                        val1 = 2.0_rt;
+                        val2 = 2.0_rt;
                     }
                     if (bc_type == FieldBoundaryType::PECInsulator) {
                         const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                         if (voltage_driven) { // Dirichlet boundary for E
-                            val0 = 0.0;
-                            val1 = 0.0;
-                            val2 = 0.0;
+                            val0 = 0.0_rt;
+                            val1 = 0.0_rt;
+                            val2 = 0.0_rt;
                         }
                         else { // Dirichlet boundary for B
-                            val0 = 0.5;
-                            val1 = 1.0;
-                            val2 = 1.0;
+                            val0 = 0.5_rt;
+                            val1 = 1.0_rt;
+                            val2 = 1.0_rt;
                         }
                     }
 
@@ -457,22 +457,22 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                            !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                             const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                            : static_cast<amrex::Real>(domain_hi[bdry_dir]));
-                            const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5);
-                            const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5);
-                            val0 = 0.5 * (bdry_side == 0 ? 1.0/geom_p : 1.0/geom_m);
-                            val1 = 1.0;
-                            val2 = 1.0;
+                            const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5_rt);
+                            const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5_rt);
+                            val0 = 0.5_rt * (bdry_side == 0 ? 1.0_rt/geom_p : 1.0_rt/geom_m);
+                            val1 = 1.0_rt;
+                            val2 = 1.0_rt;
                         }
                         else if (bc_type == FieldBoundaryType::None) { // None is for axis
-                            val0 = 2.0;
-                            val1 = 4.0;
-                            val2 = 0.0;
+                            val0 = 2.0_rt;
+                            val1 = 4.0_rt;
+                            val2 = 0.0_rt;
                         }
                     }
 #endif
 
                     // Set mask values on the boundary cells
-                    const int comp_shift = (tdir1 == bdry_dir) ? 0:3;
+                    const int comp_shift = (tdir1 == bdry_dir) ? 0 : 3;
                     amrex::Array4<amrex::Real> const& mask_arr = curl2_BC_mask[field_dir]->array(mfi);
                     amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         mask_arr(i,j,k,comp_shift+0) = val0;
