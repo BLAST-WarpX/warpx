@@ -519,7 +519,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
-                                amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
+                                const amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
