@@ -114,7 +114,7 @@ namespace ablastr::fields
             return std::to_string(dir);
         }
 
-        explicit Direction (std::string const & s) :
+        Direction (std::string const & s) : // NOLINT(google-explicit-constructor)
             dir{-1}
         {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
