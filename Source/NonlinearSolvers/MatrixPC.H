@@ -407,17 +407,17 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 // Set row indices and identity diagonal (unconditional)
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    int ridx_l = dof_arr(i,j,k,0);
+                    const int ridx_l = dof_arr(i,j,k,0);
                     if (ridx_l < 0) { return; }
 
                     int icol = 0;
-                    int ridx_g = dof_arr(i,j,k,1);
+                    const int ridx_g = dof_arr(i,j,k,1);
 
                     r_indices_g_ptr[ridx_l] = ridx_g;
 
                     {
-                        int cidx_g_lhs = dof_arr(i,j,k,1);
-                        amrex::Real val = 1.0;
+                        const int cidx_g_lhs = dof_arr(i,j,k,1);
+                        const amrex::Real val = 1.0;
                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                 &a_ij_ptr[ridx_l*nnz_max],
