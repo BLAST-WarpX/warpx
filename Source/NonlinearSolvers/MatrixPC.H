@@ -457,7 +457,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         const int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
 
-                        const int icol = num_nz_ptr[ridx_l];
+                        int icol = num_nz_ptr[ridx_l];
 
 #if defined(WARPX_DIM_1D_Z)
                         if (dir != 2) {
