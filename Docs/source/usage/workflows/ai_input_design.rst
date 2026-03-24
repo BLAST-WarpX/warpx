@@ -4,11 +4,11 @@ AI (LLM)-Assisted Input File Design
 ===================================
 
 Large Language Models (LLMs) can accelerate the process of creating and modifying WarpX input files and Python (PICMI) scripts.
-By providing an LLM-based coding assistant with WarpX documentation as context, users can describe a simulation setup in natural language and receive a draft input file or Python script, ask for explanations of existing parameters, or request modifications to an existing configuration.
+By providing an LLM-based coding assistant with WarpX documentation as context, users can describe a simulation setup in natural language and receive a draft parameter list file or Python script, ask for explanations of existing parameters, or request modifications to an existing configuration.
 
 This workflow is equally applicable to:
 
-- **WarpX input files** (:ref:`parameter list files <running-cpp-parameters>`)
+- **WarpX parameter list files** (:ref:`parameter list files <running-cpp-parameters>`)
 - **Python/PICMI scripts** (:ref:`Python scripts <usage-picmi>`)
 
 .. note::
@@ -46,7 +46,7 @@ Adding pyAMReX documentation as an additional Context7 source gives the assistan
 
 - **pyAMReX**: `context7.com/amrex-codes/pyamrex <https://context7.com/amrex-codes/pyamrex>`__
 
-For popular coding assistants, see the `Context7 documentation <https://context7.com/docs/resources/all-clients>`__ to configure `WarpX <https://context7.com/blast-warpx/warpx>`.
+To configure Context7 for your coding assistant, see the `Context7 documentation <https://context7.com/docs/resources/all-clients>`__.
 
 .. tip::
 

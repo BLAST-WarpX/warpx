@@ -12,9 +12,9 @@ This guide documents how the WarpX repository is configured for LLM-based coding
    LLMs can hallucinate APIs, miss physics constraints, or produce code that compiles but is incorrect.
    The configurations described below help by providing accurate, up-to-date context, but developer judgment remains essential.
 
-   The WarpX community thus urges you to perform a careful, manual review of all LLM-generated code and documentation before sending a pull-request.
-   This is important, otherwise you risk to waste the valuable time of our most proficient developers that will need to review your bot-generated code.
-   (Be considerate that WarpX developers can prompt an LLM just as efficiently as you can. Your critical thinking skill to make sense of the bot generated code and make it sensible for review and maintainable for the long term is what is needed!)
+   The WarpX community thus urges you to perform a careful, manual review of all LLM-generated code and documentation before asking for a review of your pull-request.
+   This is important, otherwise you risk to waste the valuable time of our most proficient developers that will need to review your LLM-generated code.
+   (Be considerate that WarpX developers can prompt an LLM just as efficiently as you can. Your critical thinking skill to make sense of the LLM-generated code and make it sensible for review and maintainable for the long term is what is needed!)
 
 .. note::
 
@@ -27,10 +27,10 @@ This guide documents how the WarpX repository is configured for LLM-based coding
    Keep instructions concise (e.g., in ``CLAUDE.md``), break complex tasks into focused sessions, and provide targeted context rather than overwhelming the assistant with information.
 
 
-CLAUDE.md / AGENTS.md
+AGENTS.md / CLAUDE.md
 ---------------------
 
-The repository includes a ``CLAUDE.md`` file (with a symbolic link as ``AGENTS.md``) at its root.
+The repository includes an ``AGENTS.md`` file at its root (as well as a ``CLAUDE.md``, which directly points to ``AGENTS.md``.) 
 These files are automatically loaded by LLM coding assistants (Claude Code reads ``CLAUDE.md``; other tools such as OpenAI Codex CLI read ``AGENTS.md``) to provide project-specific instructions.
 
 The file contains in a compressed form for an LLM agent:
@@ -102,7 +102,7 @@ The following documentation is available through Context7:
 - **openPMD-api**: `context7.com/openpmd/openpmd-api <https://context7.com/openpmd/openpmd-api>`__
 - **pybind11**: `context7.com/pybind/pybind11 <https://context7.com/pybind/pybind11>`__
 
-When all five are configured, the assistant can look up AMReX data structures (e.g., ``MultiFab``, ``ParticleContainer``, ``Geometry``), pyAMReX and pybind11 binding patterns, and openPMD I/O APIs directly, which is especially helpful when working on:
+When all five are configured, the assistant can look up AMReX data structures (e.g., ``MultiFab``, ``ParticleContainer``, ``Geometry``), pyAMReX and pybind11 binding patterns, and openPMD I/O APIs directly, which is especially helpful when working, for instance, on:
 
 - Field solver implementations that use AMReX mesh data structures
 - Particle routines built on ``amrex::ParticleContainer``
