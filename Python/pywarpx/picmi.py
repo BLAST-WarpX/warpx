@@ -4331,6 +4331,22 @@ class LabFrameParticleDiagnostic(
     warpx_buffer_size: integer, optional
         Passed to <diagnostic name>.buffer_size
 
+    warpx_random_fraction: float or dict, optional
+        Random fraction of particles to include in the diagnostic. If a float
+        is given the same fraction will be used for all species, if a dictionary
+        is given the keys should be species with the value specifying the random
+        fraction for that species.
+
+    warpx_uniform_stride: integer or dict, optional
+        Stride to down select to the particles to include in the diagnostic.
+        If an integer is given the same stride will be used for all species, if
+        a dictionary is given the keys should be species with the value
+        specifying the stride for that species.
+
+    warpx_plot_filter_function: string, optional
+        Analytic expression to down select the particles in the diagnostic.
+        Filtering is applied in the lab frame after back-transformation.
+
     warpx_verbose: int, optional
         Verbosity level to use for printing diagnostic output information.
     """
@@ -4343,7 +4359,23 @@ class LabFrameParticleDiagnostic(
         self.intervals = kw.pop("warpx_intervals", None)
         self.file_min_digits = kw.pop("warpx_file_min_digits", None)
         self.buffer_size = kw.pop("warpx_buffer_size", None)
+        self.random_fraction = kw.pop("warpx_random_fraction", None)
+        self.uniform_stride = kw.pop("warpx_uniform_stride", None)
+        self.plot_filter_function = kw.pop("warpx_plot_filter_function", None)
         self.verbose = kw.pop("warpx_verbose", None)
+
+        self.user_defined_kw = {}
+        if self.plot_filter_function is not None:
+            # This allows variables to be used in the plot_filter_function, but
+            # in order not to break other codes, the variables must begin with "warpx_"
+            for k in list(kw.keys()):
+                if k.startswith("warpx_") and re.search(
+                    r"\b%s\b" % k, self.plot_filter_function
+                ):
+                    self.user_defined_kw[k] = kw[k]
+                    del kw[k]
+
+        self.mangle_dict = None
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -4451,8 +4483,38 @@ class LabFrameParticleDiagnostic(
         else:
             species_names = [self.species.name]
 
+        # check if random fraction is specified and whether a value is given per species
+        random_fraction = {}
+        random_fraction_default = self.random_fraction
+        if isinstance(self.random_fraction, dict):
+            random_fraction_default = 1.0
+            for key, val in self.random_fraction.items():
+                random_fraction[key.name] = val
+
+        # check if uniform stride is specified and whether a value is given per species
+        uniform_stride = {}
+        uniform_stride_default = self.uniform_stride
+        if isinstance(self.uniform_stride, dict):
+            uniform_stride_default = 1
+            for key, val in self.uniform_stride.items():
+                uniform_stride[key.name] = val
+
+        if self.mangle_dict is None:
+            # Only do this once so that the same variables are used in this distribution
+            # is used multiple times
+            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
         for name in species_names:
-            diag = pywarpx.Bucket.Bucket(self.name + "." + name, variables=variables)
+            diag = pywarpx.Bucket.Bucket(
+                self.name + "." + name,
+                variables=variables,
+                random_fraction=random_fraction.get(name, random_fraction_default),
+                uniform_stride=uniform_stride.get(name, uniform_stride_default),
+            )
+            expression = pywarpx.my_constants.mangle_expression(
+                self.plot_filter_function, self.mangle_dict
+            )
+            diag.__setattr__("plot_filter_function(t,x,y,z,ux,uy,uz)", expression)
             self.diagnostic._species_dict[name] = diag
 
 
