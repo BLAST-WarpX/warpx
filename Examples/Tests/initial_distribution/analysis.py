@@ -15,7 +15,7 @@
 # 6 denotes maxwell-boltzmann distribution w/ constant velocity
 # 7 denotes maxwell-boltzmann distribution w/ spatially-varying velocity
 # 8 denotes uniform distribution
-# 9 denotes gaussian_parser distribution w/ spatially-varying mean and thermal velocity
+# 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
@@ -439,6 +439,6 @@ f9_error = (
     / bin_value_ux.size
 )
 
-print("gaussian_parse_momentum_function velocity difference:", f9_error)
+print("maxwellian parser mean/std velocity difference:", f9_error)
 
 assert f9_error < tolerance
