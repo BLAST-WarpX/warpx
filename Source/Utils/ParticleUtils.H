@@ -197,7 +197,7 @@ namespace ParticleUtils {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 1.0_prt - 2.0_prt * amrex::Random(engine);
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
