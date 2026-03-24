@@ -30,7 +30,7 @@ This guide documents how the WarpX repository is configured for LLM-based coding
 AGENTS.md / CLAUDE.md
 ---------------------
 
-The repository includes an ``AGENTS.md`` file at its root (as well as a ``CLAUDE.md``, which directly points to ``AGENTS.md``.) 
+The repository includes an ``AGENTS.md`` file at its root (as well as a ``CLAUDE.md``, which directly points to ``AGENTS.md``.)
 These files are automatically loaded by LLM coding assistants (Claude Code reads ``CLAUDE.md``; other tools such as OpenAI Codex CLI read ``AGENTS.md``) to provide project-specific instructions.
 
 The file contains in a compressed form for an LLM agent:
