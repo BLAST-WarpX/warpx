@@ -39,14 +39,12 @@ WarpX documentation is available at:
 
     `context7.com/blast-warpx/warpx <https://context7.com/blast-warpx/warpx>`__
 
-Once connected, a coding assistant (Claude Code, Cursor, VS Code Copilot, Windsurf, etc.) can retrieve relevant sections of the WarpX documentation in real time when helping you write or debug input files and PICMI scripts.
-
-When writing Python/PICMI scripts, users will also encounter `pyAMReX <https://pyamrex.readthedocs.io>`__ APIs (e.g., for accessing mesh and particle data, callbacks, or custom field initialization).
-Adding pyAMReX documentation as an additional Context7 source gives the assistant the ability to look up these APIs:
+When writing Python/PICMI scripts, users will also encounter `pyAMReX <https://pyamrex.readthedocs.io>`__ APIs (e.g., for accessing mesh and particle data, callbacks, or custom field initialization):
 
 - **pyAMReX**: `context7.com/amrex-codes/pyamrex <https://context7.com/amrex-codes/pyamrex>`__
 
 To configure Context7 for your coding assistant, see the `Context7 documentation <https://context7.com/docs/resources/all-clients>`__.
+Once connected, a coding assistant (Claude Code, Cursor, VS Code Copilot, Windsurf, etc.) can retrieve relevant sections of all the above projects in real time when helping you write or debug input files and PICMI scripts.
 
 .. tip::
 
@@ -59,7 +57,7 @@ Best Practices
 --------------
 
 When working with LLM coding assistants, keep in mind that *"most best practices are based on one constraint: [the] context window fills up fast, and performance degrades as it fills"* (`Claude Code Best Practices <https://code.claude.com/docs/en/best-practices>`__).
-Starting from examples and iterating incrementally — as described below — helps keep sessions focused and productive.
+Starting from examples and iterating incrementally as described below and making a plan with the LLM assistant helps keep sessions focused and productive.
 
 #. **Start from examples.**
    Run your coding agent inside the WarpX source directory.

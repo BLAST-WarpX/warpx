@@ -24,7 +24,7 @@ This guide documents how the WarpX repository is configured for LLM-based coding
 .. tip::
 
    When working with LLM coding assistants, keep in mind that *"most best practices are based on one constraint: [the] context window fills up fast, and performance degrades as it fills"* (`Claude Code Best Practices <https://code.claude.com/docs/en/best-practices>`__).
-   Keep instructions concise (e.g., in ``CLAUDE.md``), break complex tasks into focused sessions, and provide targeted context rather than overwhelming the assistant with information.
+   Keep instructions concise, use plan modes, break complex tasks into focused sessions, and provide targeted context rather than overwhelming the assistant with information.
 
 
 AGENTS.md / CLAUDE.md
@@ -33,18 +33,7 @@ AGENTS.md / CLAUDE.md
 The repository includes an ``AGENTS.md`` file at its root (as well as a ``CLAUDE.md``, which directly points to ``AGENTS.md``.)
 These files are automatically loaded by LLM coding assistants (Claude Code reads ``CLAUDE.md``; other tools such as OpenAI Codex CLI read ``AGENTS.md``) to provide project-specific instructions.
 
-The file contains in a compressed form for an LLM agent:
-
-- **Project overview**: what WarpX is, its dimensionalities and compute backends.
-- **Development environment**: how to activate the conda build environment.
-- **Build commands**: CMake configure, build, and install commands with all key options (``WarpX_DIMS``, ``WarpX_COMPUTE``, ``WarpX_PYTHON``, etc.).
-- **Testing**: how to list and run CTest tests, add new tests, and handle checksums.
-- **Linting and formatting**: pre-commit setup, clang-format and Ruff configuration.
-- **Code architecture**: source layout, key patterns (``MultiFab``, ``MultiParticleContainer``), and compile-time macros.
-- **C++ style**: indentation, naming conventions, include order.
-- **Backward compatibility**: how to handle renamed or removed input parameters.
-- **Version control**: branch conventions (``development`` as main branch), PR workflow.
-
+The file contains in a compressed form instructions for an LLM agent:
 With this file present, an LLM assistant working inside the WarpX repository will automatically know how to build, test, and style code without being told each time.
 
 To update these instructions, edit ``AGENTS.md``.
@@ -102,7 +91,8 @@ The following documentation is available through Context7:
 - **openPMD-api**: `context7.com/openpmd/openpmd-api <https://context7.com/openpmd/openpmd-api>`__
 - **pybind11**: `context7.com/pybind/pybind11 <https://context7.com/pybind/pybind11>`__
 
-When all five are configured, the assistant can look up AMReX data structures (e.g., ``MultiFab``, ``ParticleContainer``, ``Geometry``), pyAMReX and pybind11 binding patterns, and openPMD I/O APIs directly, which is especially helpful when working, for instance, on:
+When Context7 connected, the assistant can look up any of those when needed:
+AMReX data structures (e.g., ``MultiFab``, ``ParticleContainer``, ``Geometry``), pyAMReX and pybind11 binding patterns, and openPMD I/O APIs directly, which is especially helpful when working, for instance, on:
 
 - Field solver implementations that use AMReX mesh data structures
 - Particle routines built on ``amrex::ParticleContainer``
