@@ -438,12 +438,15 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
 #else
     constexpr int num_required_ppc_each_dim = 3;
 #endif
-    utils::parser::getArrWithParser(pp_species, source_name, "num_particles_per_cell_each_dim", num_particles_per_cell_each_dim,
-                        0, num_required_ppc_each_dim);
+    utils::parser::getArrWithParser(pp_species, source_name, "num_particles_per_cell_each_dim", num_particles_per_cell_each_dim);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<int>(num_particles_per_cell_each_dim.size()) == num_required_ppc_each_dim,
+                                     "num_particles_per_cell_each_dim must have " + std::to_string(num_required_ppc_each_dim) + " elements specified");
+
     // overwrite extra dimensions with 1
-    for (int i=num_required_ppc_each_dim ; i < 3 ; i++) {
+    for (int i = num_required_ppc_each_dim ; i < 3 ; i++) {
         num_particles_per_cell_each_dim.push_back(1);
     }
+
 #if WARPX_DIM_RZ
     if (WarpX::n_rz_azimuthal_modes > 1) {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
