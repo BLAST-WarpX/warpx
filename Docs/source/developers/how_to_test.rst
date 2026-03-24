@@ -195,17 +195,16 @@ Here is the help message of the default regression analysis script, including us
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
 
-How to reset checksums locally
-------------------------------
+How to reset checksums
+----------------------
 
-It is possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
+Your code changes may sometimes change the results that WarpX produces.
+This is automatically detected by the automated tests (run as part of a PR) and by comparing the WarpX results with the reference values stored in the checksum files.
 
-  .. code-block:: bash
-
-       CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
-
-Alternatively, it is also possible to reset multiple checksum files automatically using the output of our Azure pipelines, which can be useful for code changes that result in resetting a large number of checksum files.
-Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ with the ``--pr-number`` option:
+**If** the differences are expected, you can reset the checksum files automatically using the output
+of the tests that were run as part of the PR. To do so, go to the directory
+`Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script
+`update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ with the ``--pr-number`` option:
 
 .. code:: bash
 
