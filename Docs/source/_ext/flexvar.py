@@ -2,7 +2,9 @@ r"""
 flexvar - A Sphinx domain for documenting variables with flexible names.
 
 Supports names containing characters like <, >, /, commas, etc.
-Provides type annotation and default value support, styled like the Python domain.
+Provides type annotation, default value support, units, optional flag, and
+extra inline comments. The output format can be changed by modifying
+the `handle_signature` method in `FlexVarDirective`.
 
 Usage / Examples
 ----------------
