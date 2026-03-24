@@ -386,66 +386,78 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
         for (int dir = 0; dir < 3; dir++) {
 
-            const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
-
             for (amrex::MFIter mfi(*dofs_mfarrvec[lev][dir]); mfi.isValid(); ++mfi) {
 
                 const amrex::Box bx = mfi.tilebox();
                 const amrex::Box full_bx = mfi.fabbox();
 
-                // BC mask values for in-plane components of curl curl E operator for 2D
-                const auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
-
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
 
 #if defined(WARPX_DIM_RCYLINDER)
-                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
+                amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
 #elif defined(WARPX_DIM_RSPHERE)
-                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
+                amrex::ignore_unused(dxi);
                 WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RSPHERE");
 #elif defined(WARPX_DIM_RZ)
-                amrex::ignore_unused(dxi, BC_mask_Edir_arr);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
-#elif defined(WARPX_DIM_XZ)
-                int tdir = -1;
-                if  (dir == 0) { tdir = 2; }
-                else if (dir == 2) { tdir = 0; }
-                else { tdir = 1; }
-                auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
-#elif defined(WARPX_DIM_3D)
-                int tdir1 = (dir + 1) % 3;
-                int tdir2 = (dir + 2) % 3;
-                GpuArray<Array4<const int>, AMREX_SPACEDIM>
-                    const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
-                                                      dofs_mfarrvec[lev][tdir1]->const_array(mfi),
-                                                      dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
-#elif !defined(WARPX_DIM_1D_Z)
                 amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble encountered unknown dimensionality");
+                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
 #endif
 
-                // Add the Maxwell's piece
+                // Set row indices and identity diagonal (unconditional)
+                ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    int ridx_l = dof_arr(i,j,k,0);
+                    if (ridx_l < 0) { return; }
+
+                    int icol = 0;
+                    int ridx_g = dof_arr(i,j,k,1);
+
+                    r_indices_g_ptr[ridx_l] = ridx_g;
+
+                    {
+                        int cidx_g_lhs = dof_arr(i,j,k,1);
+                        amrex::Real val = 1.0;
+                        auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
+                                                                &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                &a_ij_ptr[ridx_l*nnz_max],
+                                                                nnz_max, icol );
+                        if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                    }
+
+                    num_nz_ptr[ridx_l] = icol;
+                });
+
+                // Add the curl-curl stencil entries (only when alpha > 0)
                 if (thetaDt > 0.0) {
+
+                    const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
+                    AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);
+                    const auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
+
+#if defined(WARPX_DIM_XZ)
+                    int tdir = -1;
+                    if  (dir == 0) { tdir = 2; }
+                    else if (dir == 2) { tdir = 0; }
+                    else { tdir = 1; }
+                    auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
+#elif defined(WARPX_DIM_3D)
+                    int tdir1 = (dir + 1) % 3;
+                    int tdir2 = (dir + 2) % 3;
+                    GpuArray<Array4<const int>, AMREX_SPACEDIM>
+                        const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
+                                                          dofs_mfarrvec[lev][tdir1]->const_array(mfi),
+                                                          dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
+#elif !defined(WARPX_DIM_1D_Z)
+                    amrex::ignore_unused(dxi, BC_mask_Edir_arr);
+#endif
+
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
 
-                        int icol = 0;
-                        int ridx_g = dof_arr(i,j,k,1);
-
-                        r_indices_g_ptr[ridx_l] = ridx_g;
-
-                        {
-                            int cidx_g_lhs = dof_arr(i,j,k,1);
-                            amrex::Real val = 1.0;
-                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
-                                                                    &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                    &a_ij_ptr[ridx_l*nnz_max],
-                                                                    nnz_max, icol );
-                            if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
-                        }
+                        int icol = num_nz_ptr[ridx_l];
 
 #if defined(WARPX_DIM_1D_Z)
                         if (dir != 2) {
