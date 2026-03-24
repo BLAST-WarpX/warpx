@@ -406,7 +406,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                     {
                         int cidx_g_lhs = dof_arr(i,j,k,1);
-                        amrex::Real val = 1.0;
+                        amrex::Real val = 1.0_rt;
                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                 &a_ij_ptr[ridx_l*nnz_max],
