@@ -6,6 +6,23 @@ Provides type annotation, default value support, units, optional flag, and
 extra inline comments. The output format can be changed by modifying
 the `handle_signature` method in `FlexVarDirective`.
 
+Directive usage::
+
+    .. fv:var:: <name>
+        :type: <type>
+        :default: <default>
+        :unit: <unit>
+        :optional:
+        :comment: <comment>
+
+        <Description body>
+
+Directive output format::
+
+    <name>: (<type>; in <unit>) optional (default: <default>) <comment>
+
+    <Description body>
+
 Usage / Examples
 ----------------
 
@@ -72,23 +89,6 @@ class FlexVarDirective(ObjectDescription[str]):
     - `unit` and `units` are aliases
     - `comment` and `annotation` are aliases
     - `optional` and `required` are opposite flags
-
-    Usage::
-
-        .. fv:var:: <name>
-            :type: <type>
-            :default: <default>
-            :unit: <unit>
-            :optional:
-            :comment: <comment>
-
-            <Description body>
-
-    Output format::
-
-        <name>: (<type>; in <unit>) optional (default: <default>) <comment>
-
-        <Description body>
     """
 
     option_spec = {
