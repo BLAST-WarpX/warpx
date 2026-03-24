@@ -119,30 +119,6 @@ class FlexVarDirective(ObjectDescription[str]):
     # Signature parsing / rendering
     # ------------------------------------------------------------------
 
-    def _parse_inline_into_node_list(self, text: str) -> list[nodes.Node]:
-        """
-        Parse *text* as RST inline content and return the resulting nodes.
-
-        Do not add directly to signode, as this will render without whitespaces.
-        """
-        parsed_nodes, messages = self.state.inline_text(text, self.lineno)
-        # Report any parse warnings through the normal directive machinery
-        for msg in messages:
-            self.state_machine.reporter.system_message(
-                msg["level"], msg.astext(), source=self.get_source_info()[0]
-            )
-        return parsed_nodes
-
-    def parse_inline(self, text: str) -> nodes.inline:
-        """
-        Parse *text* as RST inline content and return a single inline node.
-
-        This can added directly to signode to keep whitespace.
-        """
-        parsed_node_list = self._parse_inline_into_node_list(text)
-        inline_node = nodes.inline(text, "", *parsed_node_list)
-        return inline_node
-
     def handle_signature(
         self,
         sig: str,
@@ -231,6 +207,30 @@ class FlexVarDirective(ObjectDescription[str]):
             signode += self.parse_inline(anno)
 
         return name
+
+    def parse_inline(self, text: str) -> nodes.inline:
+        """
+        Parse *text* as RST inline content and return a single inline node.
+
+        This can added directly to signode to keep whitespace.
+        """
+        parsed_node_list = self._parse_inline_into_node_list(text)
+        inline_node = nodes.inline(text, "", *parsed_node_list)
+        return inline_node
+
+    def _parse_inline_into_node_list(self, text: str) -> list[nodes.Node]:
+        """
+        Parse *text* as RST inline content and return the resulting nodes.
+
+        Do not add directly to signode, as this will render without whitespaces.
+        """
+        parsed_nodes, messages = self.state.inline_text(text, self.lineno)
+        # Report any parse warnings through the normal directive machinery
+        for msg in messages:
+            self.state_machine.reporter.system_message(
+                msg["level"], msg.astext(), source=self.get_source_info()[0]
+            )
+        return parsed_nodes
 
     # ------------------------------------------------------------------
     # Index + target registration
