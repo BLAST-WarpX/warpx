@@ -1449,7 +1449,7 @@ void doGatherPicnicShapeN (
     amrex::Real const yp_mid = yp_nph;
     amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
     amrex::Real const costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
-    amrex::Real const sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0._rt);
+    amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid: 0._rt);
 #if defined(WARPX_DIM_RZ)
     const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
 #endif
