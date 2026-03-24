@@ -89,6 +89,9 @@ The following documentation is available through Context7:
 - **AMReX**: `context7.com/amrex-codes/amrex <https://context7.com/amrex-codes/amrex>`__
 - **pyAMReX**: `context7.com/amrex-codes/pyamrex <https://context7.com/amrex-codes/pyamrex>`__
 - **openPMD-api**: `context7.com/openpmd/openpmd-api <https://context7.com/openpmd/openpmd-api>`__
+- **openPMD-viewer**: `context7.com/openpmd/openpmd-viewer <https://context7.com/openpmd/openpmd-viewer>`__
+- **PICSAR-QED**: `context7.com/ecp-warpx/picsar <https://context7.com/ecp-warpx/picsar>`__
+- **PICMI**: `context7.com/picmi-standard/picmi <https://context7.com/picmi-standard/picmi>`__
 - **pybind11**: `context7.com/pybind/pybind11 <https://context7.com/pybind/pybind11>`__
 
 When Context7 connected, the assistant can look up any of those when needed:
