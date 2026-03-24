@@ -2180,10 +2180,10 @@ WarpX::BackwardCompatibility ()
         std::string mom_dist_type;
         if (pp_species.query("momentum_distribution_type", mom_dist_type)) {
             if (mom_dist_type == "maxwell_boltzmann" || mom_dist_type == "gaussian_parse_momentum_function") {
-                ablastr::warn_manager::WMRecordWarning("Species",
-                    + speciesiter + ".momentum_distribution_type = " + mom_dist_type + "' is deprecated; "
-                    "use 'maxwellian' instead.",
-                    ablastr::warn_manager::WarnPriority::low);
+                WARPX_ABORT_WITH_MESSAGE (
+                    "The momentum distribution type '" + mom_dist_type + "' is not supported anymore. "
+                    "Please use the 'maxwellian' momentum distribution instead."
+                );
             }
         }
 
