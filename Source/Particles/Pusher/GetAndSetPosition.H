@@ -231,7 +231,8 @@ struct SetParticlePosition
     RType* AMREX_RESTRICT m_phi;
 #endif
 
-    template <typename ptiType> explicit
+    template <typename ptiType>
+    explicit
     SetParticlePosition (const ptiType& a_pti, long a_offset = 0) noexcept
     {
         auto& soa = a_pti.GetStructOfArrays();
