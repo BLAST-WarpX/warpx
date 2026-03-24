@@ -3093,8 +3093,11 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
 * ``<diag_name>.fields_to_plot`` (list of `strings`, optional)
     Fields written to output.
-    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, ``P_<species_name>``, and ``Q_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV.
+    ``P_<species_name>`` is the pressure tensor, output as 6 components (``Pxx``, ``Pxy``, ``Pxz``, ``Pyy``, ``Pyz``, ``Pzz``) in Pa.
+    The trace ``(Pxx + Pyy + Pzz) / 3`` equals ``n * k_B * T`` where ``n`` is the number density and ``T`` is the scalar temperature.
+    ``Q_<species_name>`` is the heat flux vector, output as 3 components (``Qx``, ``Qy``, ``Qz``) in W/m^2.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for ``<diag_name>.diag_type = BackTransformed``, the only scalar field currently supported is ``rho``.

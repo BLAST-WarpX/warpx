@@ -3764,6 +3764,12 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 elif dataname.startswith("T_"):
                     # Adds T_species diagnostic
                     fields_to_plot.add(dataname)
+                elif dataname.startswith("P_"):
+                    # Adds P_species pressure tensor diagnostic (6 components)
+                    fields_to_plot.add(dataname)
+                elif dataname.startswith("Q_"):
+                    # Adds Q_species heat flux diagnostic (3 components)
+                    fields_to_plot.add(dataname)
                 elif any([dataname.startswith(tstr) for tstr in T_fields_list]):
                     fields_to_plot.add(dataname)
                 elif dataname == "dive":
