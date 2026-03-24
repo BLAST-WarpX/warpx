@@ -14,7 +14,6 @@
 # Unrelated to the Langmuir waves, we also test the plotfile particle filter function in this
 # analysis script.
 import os
-import re
 import sys
 
 import matplotlib
@@ -27,6 +26,7 @@ yt.funcs.mylog.setLevel(50)
 
 import numpy as np
 import post_processing_utils
+from analysis_utils import check_charge_conservation
 from scipy.constants import c, e, epsilon_0, m_e
 
 # this will be the name of the plot file
@@ -34,9 +34,6 @@ fn = sys.argv[1]
 
 # test name
 test_name = os.path.split(os.getcwd())[1]
-
-# Parse test name and check if current correction (psatd.current_correction) is applied
-current_correction = True if re.search("current_correction", test_name) else False
 
 # Parameters (these parameters must match the parameters in `inputs.multi.rz.rt`)
 epsilon = 0.01
@@ -144,17 +141,9 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
 
-# Check charge conservation (relative L-infinity norm of error) with current correction
-if current_correction:
-    divE = data[("boxlib", "divE")].to_ndarray()
-    rho = data[("boxlib", "rho")].to_ndarray() / epsilon_0
-    error_rel = np.amax(np.abs(divE - rho)) / max(np.amax(divE), np.amax(rho))
-    tolerance = 1.0e-9
-    print("Check charge conservation:")
-    print("error_rel = {}".format(error_rel))
-    print("tolerance = {}".format(tolerance))
-    assert error_rel < tolerance
-
+# Additional check on charge conservation for certain cases
+# (e.g., Esirkepov or Vay deposition, current correction)
+check_charge_conservation(data)
 
 ## In the final past of the test, we verify that the diagnostic particle filter function works as
 ## expected in RZ geometry. For this, we only use the last simulation timestep.

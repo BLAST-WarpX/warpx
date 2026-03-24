@@ -94,9 +94,6 @@ namespace SpeciesUtils {
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));
-        } else if (rho_prof_s == "predefined") {
-            // Construct InjectorDensity with InjectorDensityPredefined.
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityPredefined*)nullptr,species_name));
         } else if (rho_prof_s == "parse_density_function") {
             std::string str_density_function;
             utils::parser::Store_parserString(pp_species, source_name, "density_function(x,y,z)", str_density_function);
@@ -222,12 +219,6 @@ namespace SpeciesUtils {
             const GetVelocity getVel(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
-        } else if (mom_dist_s == "radial_expansion") {
-            amrex::Real u_over_r = 0._rt;
-            utils::parser::queryWithParser(pp_species, source_name, "u_over_r", u_over_r);
-            // Construct InjectorMomentum with InjectorMomentumRadialExpansion.
-            h_inj_mom.reset(new InjectorMomentum
-                            ((InjectorMomentumRadialExpansion*)nullptr, u_over_r));
         } else if (mom_dist_s == "parse_momentum_function") {
             std::string str_momentum_function_ux;
             std::string str_momentum_function_uy;

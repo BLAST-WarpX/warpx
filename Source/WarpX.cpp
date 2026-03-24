@@ -275,7 +275,7 @@ void WarpX::MakeWarpX ()
 {
     warpx::initialization::check_dims();
 
-    ReadMovingWindowParameters(
+    warpx::initialization::read_moving_window_parameters(
         do_moving_window, start_moving_window_step, end_moving_window_step,
         moving_window_dir, moving_window_v);
 
@@ -1926,14 +1926,6 @@ WarpX::ReadParameters ()
                     "Collisions",
                     "Collisions with split momentum push not implemented with implicit\
                     evolve schemes, ignoring collisions.split_momentum_push.",
-                    ablastr::warn_manager::WarnPriority::low
-                );
-            }
-            if (EB::enabled()) {
-                ablastr::warn_manager::WMRecordWarning(
-                    "Collisions",
-                    "Collisions with split momentum push not implemented with embedded\
-                    boundaries, ignoring collisions.split_momentum_push.",
                     ablastr::warn_manager::WarnPriority::low
                 );
             }
