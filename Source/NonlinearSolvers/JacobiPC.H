@@ -28,24 +28,20 @@
  *  where M is the scaled mass matrix (plasma response dJ/dE).
  *
  *  When the mass matrix is purely diagonal (mass_matrices_pc_width=0),
- *  the solve is exact in one step: x = b / (1 + M_diag).
- *
- *  When the mass matrix has off-diagonal stencil entries, damped Jacobi
- *  iterations are performed. This is effective when the operator is
- *  diagonally dominant, which occurs when there is no implicit EM
- *  component (SemiImplicitEM, StrangImplicitSpectralEM) or when the
- *  EM component is weak.
+ *  the solve is exact in one step: x = b / (1 + M_diag). When the mass
+ *  matrix has off-diagonal stencil entries, damped Jacobi iterations are
+ *  performed.
  *
  *  Adaptive omega (enabled by default): the relaxation parameter omega
  *  starts at 1.0 and is automatically reduced (by a factor of 0.9) when
  *  the Jacobi residual increases, indicating that the current omega is
- *  too aggressive for the spectral properties of the mass matrix. The
+ *  too large for the spectral properties of the mass matrix. The
  *  adapted omega is cached for subsequent Apply() calls. This handles
- *  marginally diagonally dominant or non-symmetric mass matrices that
- *  arise from particle-based deposition. When the user explicitly sets
- *  pc_jacobi.omega, adaptive behavior is disabled by default (can be
- *  re-enabled with pc_jacobi.adaptive_omega = true).
+ *  marginally diagonally dominant or non-symmetric mass matrices. When
+ *  the user explicitly sets pc_jacobi.omega, adaptive behavior is disabled
+ *  (can be re-enabled with pc_jacobi.adaptive_omega = true).
  *
+ *  Matrix Elements Layout:
  *  The mass matrix MultiFab stores stencil coefficients as components.
  *  For a field direction dim, the per-spatial-direction component counts
  *  are given by GetMassMatricesPCnComp(dim, d). The total number of
