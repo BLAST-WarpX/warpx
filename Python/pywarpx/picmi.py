@@ -4500,7 +4500,7 @@ class LabFrameParticleDiagnostic(
                 uniform_stride[key.name] = val
 
         if self.mangle_dict is None:
-            # Only do this once so that the same variables are used in this distribution
+            # Only do this once so that the same variables are used in this diagnostics
             # is used multiple times
             self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
