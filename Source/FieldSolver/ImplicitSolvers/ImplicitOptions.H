@@ -6,7 +6,7 @@
 struct ImplicitOptions
 {
     int max_particle_iterations = 21;
-    amrex::ParticleReal particle_tolerance = static_cast<amrex::ParticleReal>(1.0);
+    amrex::ParticleReal particle_tolerance = static_cast<amrex::ParticleReal>(1.0e-10);
     bool print_unconverged_particle_details = false;
     bool use_mass_matrices_jacobian = false;
     bool use_mass_matrices_pc = false;
