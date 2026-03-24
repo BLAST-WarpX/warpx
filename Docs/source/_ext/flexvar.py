@@ -23,8 +23,8 @@ Directive output format::
 
     <Description body>
 
-Usage / Examples
-----------------
+Examples
+--------
 
 Directive::
 
@@ -39,17 +39,17 @@ Directive::
 
 Role::
 
-    # Cross reference to my/variable<T>
+    # Cross reference link to my/variable<T>:
     See :fv:var:`my/variable<T>` for details.
 
     # With explicit title (whitespace required before the `<`):
     See :fv:var:`My Var <my/variable<T>>` for details.
 
-    # With backslash-escaped angle brackets (same as the option role):
+    # With backslash-escaped angle brackets:
     See :fv:var:`my/variable\<T\>` for details.
 
-    # With inline value (value shown in link text, stripped for lookup):
-    See :fv:var:`my/variable<T> = [1, 1]` for details.
+    # With inline value:
+    For instance, :fv:var:`my/variable<T> = [1, 1]`
 """
 
 from __future__ import annotations
