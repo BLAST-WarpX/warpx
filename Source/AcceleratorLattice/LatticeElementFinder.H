@@ -176,7 +176,7 @@ struct LatticeElementFinderDevice
 
         // This check shouldn't be needed since the particle should always
         // be within the grid, but it is added for safety.
-        if (iz < 0 || m_nz <= iz) { return; }
+        if (iz < 0 || iz >= m_nz) { return; }
 
         constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
         amrex::ParticleReal const gamma = std::sqrt(1._prt + (m_ux[i]*m_ux[i] + m_uy[i]*m_uy[i] + m_uz[i]*m_uz[i])*inv_c2);
