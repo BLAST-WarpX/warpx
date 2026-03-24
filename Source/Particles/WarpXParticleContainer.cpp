@@ -2125,20 +2125,36 @@ WarpXParticleContainer::DepositNGPPressureTensor (amrex::MultiFab* ptensor, cons
 
     // Finalize: divide by cell volume and multiply by mass to get pressure in Pa
     amrex::ParticleReal mass = m_mass;
-    const amrex::Real inv_cell_volume = 1._rt / (AMREX_D_TERM(
-        Geom(lev).CellSize(0),
-        * Geom(lev).CellSize(1),
-        * Geom(lev).CellSize(2)));
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
+#endif
+
         amrex::Array4<amrex::Real> const& pt_array = ptensor->array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                const amrex::Real factor = mass * inv_cell_volume;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
+#else
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                const amrex::Real factor = mass / (dV * volume_factor);
                 for (int comp = 0; comp < 6; ++comp) {
                     pt_array(i,j,k,comp) *= factor;
                 }
@@ -2255,20 +2271,36 @@ WarpXParticleContainer::DepositNGPHeatFlux (amrex::MultiFab* heatflux, const int
 
     // Finalize: divide by cell volume and multiply by mass/2 to get heat flux in W/m^2
     amrex::ParticleReal mass = m_mass;
-    const amrex::Real inv_cell_volume = 1._rt / (AMREX_D_TERM(
-        Geom(lev).CellSize(0),
-        * Geom(lev).CellSize(1),
-        * Geom(lev).CellSize(2)));
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (amrex::MFIter mfi(sum_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const amrex::Box& box = mfi.tilebox();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
+#endif
+
         amrex::Array4<amrex::Real> const& hf_array = heatflux->array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                const amrex::Real factor = mass * inv_cell_volume / 2._rt;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
+#else
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                const amrex::Real factor = mass / (dV * volume_factor) / 2._rt;
                 for (int comp = 0; comp < 3; ++comp) {
                     hf_array(i,j,k,comp) *= factor;
                 }
