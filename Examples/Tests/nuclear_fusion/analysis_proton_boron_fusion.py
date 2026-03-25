@@ -596,7 +596,6 @@ def check_initial_energy1(data, E_com):
             np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=5e-14
         )
 
-
 def check_initial_energy2(data):
     ## In WarpX, the initial momentum of the alphas is computed assuming that the fusion process
     ## takes place in two steps:
