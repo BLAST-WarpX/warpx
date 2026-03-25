@@ -43,9 +43,7 @@ def makeMakefileForClangTidy(argv):
     fout.write("clang-tidy: $$(all_targets)\n")
     fout.write("\t@echo SUCCESS\n\n")
 
-    exe_re = re.compile(
-        r" Executing .*? (-.*{}.*) -c .* -o .* (\S*)".format(args.identifier)
-    )
+    exe_re = re.compile(r" Executing .*? (-.*{}.*) -c(?: \S+)* -o .* (\S*)".format(args.identifier))
 
     count = 0
     for line in fin.readlines():
