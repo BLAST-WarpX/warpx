@@ -488,8 +488,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
         " to read the external openPMD file with species data");
 #endif
     external_file = true;
-    std::string str_injection_file;
-    utils::parser::get(pp_species, source_name, "injection_file", str_injection_file);
+    utils::parser::get(pp_species, source_name, "injection_file", m_injection_file_path);
     // optional parameters
     utils::parser::queryWithParser(pp_species, source_name, "q_tot", q_tot);
     utils::parser::queryWithParser(pp_species, source_name, "z_shift",z_shift);
@@ -499,9 +498,12 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
     const bool mass_is_specified = pp_species.contains("mass");
     const bool species_is_specified = pp_species.contains("species_type");
 
+    // IO rank opens the file to read charge/mass metadata only.
+    // The Series is closed when this block exits — particle data is read
+    // later in AddPlasmaFromFile() where all ranks open the file independently.
     if (amrex::ParallelDescriptor::IOProcessor()) {
         auto series = openPMD::Series(
-            str_injection_file, openPMD::Access::READ_ONLY);
+            m_injection_file_path, openPMD::Access::READ_ONLY);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             series.iterations.size() == 1u,
@@ -562,7 +564,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
                 mass = p_m * mass_unit;
             }
         }
-        m_openpmd_input_series = series;
+        // Series closes here — no handle stored. All ranks reopen in AddPlasmaFromFile().
     } // IOProcessor
 
     // Broadcast charge and mass to non-IO processors if read in from the file
