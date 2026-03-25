@@ -426,7 +426,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
 #if defined(WARPX_DIM_1D_Z)
                 const auto x = 0.0_rt;
                 const auto y = 0.0_rt;
-                const auto z = problo[0] + (i+Real(0.5))*dx[0];
+                const auto z = problo[0] + (i+0.5_rt)*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
                 const auto x = problo[0] + (i+Real(0.5))*dx[0];
                 const auto y = 0.0_rt;

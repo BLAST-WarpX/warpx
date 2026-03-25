@@ -99,7 +99,8 @@ struct GetParticlePosition
      * \param a_pti iterator to the tile containing the macroparticles
      * \param a_offset offset to apply to the particle indices
      */
-    template <typename ptiType> explicit
+    template <typename ptiType>
+    explicit
     GetParticlePosition (const ptiType& a_pti, long a_offset = 0) noexcept
     {
         const auto& soa = a_pti.GetStructOfArrays();
@@ -230,7 +231,8 @@ struct SetParticlePosition
     RType* AMREX_RESTRICT m_phi;
 #endif
 
-    template <typename ptiType> explicit
+    template <typename ptiType>
+    explicit
     SetParticlePosition (const ptiType& a_pti, long a_offset = 0) noexcept
     {
         auto& soa = a_pti.GetStructOfArrays();

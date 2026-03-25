@@ -2160,7 +2160,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
 
                         vzbar_arr(i,j,k) = sumwv/sumw;
                         varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
-                        if (single_pass){
+                        if (single_pass) {
                             varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
                         }
                     }
