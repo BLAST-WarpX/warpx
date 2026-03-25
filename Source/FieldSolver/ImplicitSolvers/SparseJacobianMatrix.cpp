@@ -176,9 +176,6 @@ int SparseJacobianMatrix::Assemble (
         IsDefined(),
         "SparseJacobianMatrix::Assemble() called on undefined object");
 
-    // set the alpha coefficient for the curl-curl op
-    const Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
-
     // Get DOF arrays
     const auto& dofs_mfarrvec = a_dofs->m_array;
     AMREX_ALWAYS_ASSERT(m_ndofs_l == a_dofs->m_nDoFs_l);
@@ -269,6 +266,7 @@ int SparseJacobianMatrix::Assemble (
                 // Add the curl-curl stencil entries (only when alpha > 0)
                 if (a_theta_dt > 0.0) {
 
+                    const Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
                     const MultiFab* BC_mask_Edir = a_bc_masks[lev][dir];
                     AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);
                     const auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
@@ -288,7 +286,7 @@ int SparseJacobianMatrix::Assemble (
                             dofs_mfarrvec[lev][tdir1]->const_array(mfi),
                             dofs_mfarrvec[lev][tdir2]->const_array(mfi)) }};
 #elif !defined(WARPX_DIM_1D_Z)
-                    ignore_unused(dxi, BC_mask_Edir_arr);
+                    ignore_unused(alpha, dxi, BC_mask_Edir_arr);
 #endif
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
