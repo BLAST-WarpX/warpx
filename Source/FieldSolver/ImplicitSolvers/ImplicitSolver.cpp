@@ -1179,6 +1179,7 @@ void ImplicitSolver::AssemblePCMatrix (const WarpXSolverVec& a_U)
 
     // Lazy initialization on first call
     if (!m_sparse_jacobian) {
+        InitializePCMatrixFields();
         m_sparse_jacobian = std::make_unique<SparseJacobianMatrix>();
         m_sparse_jacobian->Define(
             static_cast<int>(a_U.nDOF_local()),

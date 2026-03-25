@@ -319,6 +319,13 @@ protected:
     void SaveE ();
 
     /**
+     * \brief Called once before the first sparse matrix assembly.
+     *        Derived classes override to allocate fields needed by the assembly
+     *        (e.g., curl-curl BC masks). Default is a no-op.
+     */
+    virtual void InitializePCMatrixFields () {}
+
+    /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, const int bdry_side ) const;

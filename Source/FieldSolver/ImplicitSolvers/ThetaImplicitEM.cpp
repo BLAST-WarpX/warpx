@@ -57,9 +57,6 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
 
-    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
-    if (pc_type == PreconditionerType::pc_petsc) { InitializeCurlCurlBCMasks(); }
-
     m_is_defined = true;
 
 }
