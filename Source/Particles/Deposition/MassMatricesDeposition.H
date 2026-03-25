@@ -1737,7 +1737,8 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
-                xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, //NOLINT(readability-suspicious-call-argument)
+                xp_n, yp_n, zp_n,
+                xp_np1, yp_np1, zp_np1,
                 wq_invvol,
                 uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                 gaminv,
@@ -1749,7 +1750,7 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
                 Sxx_arr, Sxy_arr, Sxz_arr,
                 Syx_arr, Syy_arr, Syz_arr,
                 Szx_arr, Szy_arr, Szz_arr,
-                dt, dinv, xyzmin, domain_double, do_cropping, lo );
+                dt, dinv, xyzmin, domain_double, do_cropping, lo ); //NOLINT(readability-suspicious-call-argument)
 
     });
 }
