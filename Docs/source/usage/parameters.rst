@@ -3390,11 +3390,8 @@ Maxwell solver: kinetic-fluid hybrid
 
     **Required Parameters:**
 
-    .. fv:var:: hybrid_pic_model.elec_temp
-        :comment: must be specified when using the hybrid solver.
-
-    .. fv:var:: hybrid_pic_model.n0_ref
-        :comment: should be specified if ``hybrid_pic_model.gamma != 1``.
+    - ``hybrid_pic_model.elec_temp`` must be specified when using the hybrid solver.
+    - ``hybrid_pic_model.n0_ref`` should be specified if ``hybrid_pic_model.gamma != 1``.
 
     **Best Practices**
 
