@@ -105,7 +105,7 @@ void ElasticCollisionPerez (
       for (T_index k = coll_idx; k < max_N; k += min_N)
       {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-          /* In RZ geometry, macroparticles can collide with other macroparticles
+          /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
            * in the same *cylindrical* cell. For this reason, collisions between macroparticles
            * are actually not local in space. In this case, the underlying assumption is that
            * particles within the same cylindrical cell represent a cylindrically-symmetry
