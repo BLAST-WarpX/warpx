@@ -4234,6 +4234,7 @@ BackTransformed Diagnostics
 
 .. fv:var:: <diag_name>.intervals
     :type: `string`
+    :noindex:
 
     Only used when ``<diag_name>.diag_type`` is ``BackTransformed``.
     Using the `Time intervals`_ syntax, this string defines the lab frame times at which data is dumped,
