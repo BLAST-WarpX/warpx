@@ -178,7 +178,7 @@ FlushFormatOpenPMD::WriteToFile (
     m_OpenPMDPlotWriter->WriteOpenPMDParticles(
         particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush);
 
-    if (isBTD  && (bufferID % m_NumAggBTDBufferToFlush == 0) ){
+    if (isBTD  && (bufferID % m_NumAggBTDBufferToFlush == 0) ) {
         m_OpenPMDPlotWriter->FlushBTDToDisk();
     }
 
