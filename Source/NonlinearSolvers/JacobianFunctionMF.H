@@ -9,7 +9,7 @@
 
 #include "LinearFunction.H"
 #include "CurlCurlMLMGPC.H"
-#include "MatrixPC.H"
+#include "ExternLibPC.H"
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
@@ -167,7 +167,7 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
         } else if (m_pc_type == PreconditionerType::pc_jacobi) {
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
         } else {
-            m_preCond = std::make_unique<MatrixPC<T,Ops>>();
+            m_preCond = std::make_unique<ExternLibPC<T,Ops>>();
             m_preCond->setName(amrex::getEnumNameString(m_pc_type));
         }
         m_preCond->Define(a_U, a_ops);
