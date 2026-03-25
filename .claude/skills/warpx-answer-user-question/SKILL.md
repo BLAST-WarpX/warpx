@@ -43,7 +43,6 @@ Search these sources as relevant to the category:
 - `usage/python.rst` — PICMI/Python interface
 - `install/cmake.rst` — build options
 - `dataanalysis/` — output formats, openPMD, post-processing tools
-- `theory/` — numerical methods
 
 **Source code** — key directories:
 - `Source/Laser/`, `Source/Particles/`, `Source/FieldSolver/`, `Source/Diagnostics/`, `Source/BoundaryConditions/`, `Source/Python/`
