@@ -577,7 +577,17 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
                 // Grow the valid box by the ghost width to cover all ghost cells
                 const Box gbx = mfi.growntilebox();
                 const Box vbx = mfi.validbox();
-                auto dof_arr_h = dof_fab.const_array(mfi);
+
+                // Copy fab data to host (needed for GPU builds where
+                // const_array returns a device pointer)
+                const int ncomp = dof_fab.nComp();
+                const Long n_cells = gbx.numPts() * Long(ncomp);
+                Gpu::PinnedVector<int> dof_host_v(n_cells);
+                Gpu::copyAsync(Gpu::deviceToHost,
+                               dof_fab[mfi].dataPtr(), dof_fab[mfi].dataPtr() + n_cells,
+                               dof_host_v.data());
+                Gpu::streamSynchronize();
+                Array4<const int> dof_arr_h(dof_host_v.data(), gbx, ncomp);
 
                 const auto lo = gbx.smallEnd();
                 const auto hi = gbx.bigEnd();
