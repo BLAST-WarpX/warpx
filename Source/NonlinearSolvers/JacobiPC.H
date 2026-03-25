@@ -1,4 +1,4 @@
-/* Copyright 2024 Debojyoti Ghosh
+/* Copyright 2024-2025 Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -11,11 +11,16 @@
 #include "Utils/WarpXConst.H"
 #include "Preconditioner.H"
 
+#include "FieldSolver/ImplicitSolvers/SparseJacobianMatrix.H"
+#include "FieldSolver/ImplicitSolvers/SparseMatrixUtils.H"
+
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Array.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParallelReduce.H>
 #include <AMReX_Reduce.H>
 #include <AMReX_Vector.H>
@@ -24,34 +29,24 @@
 /**
  * \brief Point-Jacobi Preconditioner
  *
- *  Approximately solves (I + M) x = b using damped Jacobi iterations,
- *  where M is the scaled mass matrix (plasma response dJ/dE).
+ *  Approximately solves A x = b via damped Jacobi iterations.
  *
- *  When the mass matrix is purely diagonal (mass_matrices_pc_width=0),
- *  the solve is exact in one step: x = b / (1 + M_diag). When the mass
- *  matrix has off-diagonal stencil entries, damped Jacobi iterations are
- *  performed.
+ *  Two operating modes, selected automatically:
+ *
+ *  1) Stencil path (semi-implicit, GetThetaForPC()==0):
+ *     A = I + M where M is the mass matrix stored as MultiFab stencil
+ *     coefficients. When diagonal-only (mass_matrices_pc_width=0), the
+ *     solve is exact in one step.
+ *
+ *  2) CSR path (theta-implicit, GetThetaForPC()>0):
+ *     A = I + curl(alpha*curl[]) + M assembled as a sparse CSR matrix
+ *     by SparseJacobianMatrix. Operations (matvec, sweep, residual)
+ *     are performed on flat device vectors in local-extended DOF space.
  *
  *  Adaptive omega (enabled by default): the relaxation parameter omega
  *  starts at 1.0 and is automatically reduced (by a factor of 0.9) when
- *  the Jacobi residual increases, indicating that the current omega is
- *  too large for the spectral properties of the mass matrix. The
- *  adapted omega is cached for subsequent Apply() calls. This handles
- *  marginally diagonally dominant or non-symmetric mass matrices. When
- *  the user explicitly sets pc_jacobi.omega, adaptive behavior is disabled
- *  (can be re-enabled with pc_jacobi.adaptive_omega = true).
- *
- *  Matrix Elements Layout:
- *  The mass matrix MultiFab stores stencil coefficients as components.
- *  For a field direction dim, the per-spatial-direction component counts
- *  are given by GetMassMatricesPCnComp(dim, d). The total number of
- *  components is the product over spatial dimensions. The diagonal
- *  component is at index (nComp-1)/2. The stencil offset for component c
- *  is decoded from the component index using the per-direction counts.
- *
- *  Note: WarpXSolverVec MultiFabs have zero ghost cells. This class
- *  allocates its own ghost-padded temporaries (m_x_ghost) for stencil
- *  neighbor access. All FillBoundary calls operate on these temporaries.
+ *  the Jacobi residual increases. When the user explicitly sets
+ *  pc_jacobi.omega, adaptive behavior is disabled.
  */
 
 template <class T, class Ops>
@@ -75,7 +70,8 @@ class JacobiPC : public Preconditioner<T,Ops>
         void Update (const T& a_U) override;
 
         /**
-         * \brief Solve (I + M) x = b via damped Jacobi iteration
+         * \brief Solve A x = b via damped Jacobi iteration.
+         *        Dispatches to stencil or CSR path based on m_use_csr_path.
          */
         void Apply (T&, const T&) override;
 
@@ -84,11 +80,7 @@ class JacobiPC : public Preconditioner<T,Ops>
         [[nodiscard]] inline bool IsDefined () const override { return m_is_defined; }
 
         /**
-         * \brief Compute ||b - (I+M)*x|| for residual monitoring.
-         *        Uses the ghost-padded m_x_ghost (which must already be
-         *        populated and boundary-filled) for stencil neighbor access.
-         *        For diagonal-only mass matrices (ncomp=1), uses the fast
-         *        diagonal formula from x directly.
+         * \brief Compute ||b - A*x|| using the stencil path.
          */
         RT computeResidualNorm (const T& a_x, const T& a_b) const;
 
@@ -110,6 +102,10 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         int m_num_amr_levels = 0;
 
+        /** Whether to use the CSR sparse matrix path (theta-implicit) */
+        bool m_use_csr_path = false;
+
+        // --- Stencil path members ---
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
 
         bool m_has_offdiag = false;
@@ -124,6 +120,11 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         void copyToGhostAndFill (
             const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>& a_x_mfarrvec);
+
+        // --- CSR path members ---
+        amrex::Gpu::DeviceVector<RT> m_x_flat;
+        amrex::Gpu::DeviceVector<RT> m_b_flat;
+        amrex::Gpu::DeviceVector<RT> m_x_ext;
 
     private:
 
@@ -140,6 +141,7 @@ void JacobiPC<T,Ops>::printParameters() const
     Print() << pc_name << " adaptive omega:       " << (m_adaptive_omega?"true":"false") << "\n";
     Print() << pc_name << " absolute tolerance:   " << m_atol << "\n";
     Print() << pc_name << " relative tolerance:   " << m_rtol << "\n";
+    Print() << pc_name << " use CSR path:         " << (m_use_csr_path?"true":"false") << "\n";
 }
 
 template <class T, class Ops>
@@ -284,47 +286,66 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
         IsDefined(),
         "JacobiPC::Update() called on undefined object" );
 
-    if (m_bcoefs != nullptr && !m_work_defined) {
-        auto& u_mfarrvec = a_U.getArrayVec();
-        m_work.resize(m_num_amr_levels);
-        m_x_ghost.resize(m_num_amr_levels);
+    // Determine which path to use based on theta
+    m_use_csr_path = (m_ops->GetThetaForPC() > Real(0.0));
 
-        // Determine max stencil width needed across all dims/levels
-        m_stencil_width = 0;
-        for (int n = 0; n < m_num_amr_levels; n++) {
-            for (int dim = 0; dim < 3; dim++) {
-                if ((*m_bcoefs)[n][dim]->nComp() > 1) {
-                    m_has_offdiag = true;
-                    for (int d = 0; d < AMREX_SPACEDIM; d++) {
-                        int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
-                        int w_d = (nc_d - 1) / 2;
-                        m_stencil_width = std::max(m_stencil_width, w_d);
+    if (m_use_csr_path) {
+        // CSR path: assemble sparse matrix and remap columns
+        m_ops->AssemblePCMatrix(a_U);
+        const auto* sp = m_ops->GetSparseJacobian();
+        if (!sp->IsRemapped()) {
+            // RemapColumns needs to be called through ImplicitSolver
+            // which owns the SparseJacobianMatrix. We call it via
+            // a non-const method on Ops. For now, we cast away const
+            // since RemapColumns is a post-assembly setup step that
+            // logically belongs with Update.
+            auto* sp_nc = const_cast<SparseJacobianMatrix*>(sp);
+            sp_nc->RemapColumns(a_U.getDOFsObject().get());
+        }
+    } else {
+        // Stencil path: set up MultiFab work arrays (once)
+        if (m_bcoefs != nullptr && !m_work_defined) {
+            auto& u_mfarrvec = a_U.getArrayVec();
+            m_work.resize(m_num_amr_levels);
+            m_x_ghost.resize(m_num_amr_levels);
+
+            m_stencil_width = 0;
+            for (int n = 0; n < m_num_amr_levels; n++) {
+                for (int dim = 0; dim < 3; dim++) {
+                    if ((*m_bcoefs)[n][dim]->nComp() > 1) {
+                        m_has_offdiag = true;
+                        for (int d = 0; d < AMREX_SPACEDIM; d++) {
+                            int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
+                            int w_d = (nc_d - 1) / 2;
+                            m_stencil_width = std::max(m_stencil_width, w_d);
+                        }
                     }
                 }
             }
-        }
 
-        const amrex::IntVect nghost(m_stencil_width);
-        for (int n = 0; n < m_num_amr_levels; n++) {
-            for (int dim = 0; dim < 3; dim++) {
-                m_work[n][dim].define(
-                    u_mfarrvec[n][dim]->boxArray(),
-                    u_mfarrvec[n][dim]->DistributionMap(),
-                    1, 0);
-                if (m_has_offdiag) {
-                    m_x_ghost[n][dim].define(
+            const IntVect nghost(m_stencil_width);
+            for (int n = 0; n < m_num_amr_levels; n++) {
+                for (int dim = 0; dim < 3; dim++) {
+                    m_work[n][dim].define(
                         u_mfarrvec[n][dim]->boxArray(),
                         u_mfarrvec[n][dim]->DistributionMap(),
-                        1, nghost);
+                        1, 0);
+                    if (m_has_offdiag) {
+                        m_x_ghost[n][dim].define(
+                            u_mfarrvec[n][dim]->boxArray(),
+                            u_mfarrvec[n][dim]->DistributionMap(),
+                            1, nghost);
+                    }
                 }
             }
+            m_work_defined = true;
         }
-        m_work_defined = true;
     }
 
     if (m_verbose) {
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_jacobi)
-                       << ": theta*dt = " << this->m_dt << "\n";
+                       << ": theta*dt = " << this->m_dt
+                       << ", path = " << (m_use_csr_path ? "CSR" : "stencil") << "\n";
     }
 }
 
@@ -344,61 +365,86 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
         a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "JacobiPC::Apply() - a_b must be Efield_fp type");
 
-    if (m_bcoefs == nullptr) {
+    if (!m_use_csr_path && m_bcoefs == nullptr) {
         a_x.Copy(a_b);
         return;
     }
 
-    auto& b_mfarrvec = a_b.getArrayVec();
-    auto& x_mfarrvec = a_x.getArrayVec();
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        ((b_mfarrvec.size() == m_num_amr_levels) && (x_mfarrvec.size() == m_num_amr_levels)),
-        "Error in JacobiPC::Apply() - mismatch in number of levels." );
-
     const int max_omega_reductions = m_adaptive_omega ? 10 : 0;
     RT omega = m_omega;
 
+    // CSR path: linearize b once (it doesn't change)
+    const SparseJacobianMatrix* sp = nullptr;
+    Vector<Geometry> geom_vec;
+    if (m_use_csr_path) {
+        sp = m_ops->GetSparseJacobian();
+        AMREX_ALWAYS_ASSERT(sp != nullptr && sp->IsRemapped());
+        SparseMatrixUtils::CopyToLocalDOFVector(a_b, m_b_flat);
+        geom_vec.resize(m_num_amr_levels);
+        for (int lev = 0; lev < m_num_amr_levels; lev++) {
+            geom_vec[lev] = m_ops->GetGeometry(lev);
+        }
+    }
+
     for (int adapt = 0; adapt <= max_omega_reductions; adapt++) {
 
-        // Initial guess: x = b / (1 + M_diag)
-        for (int n = 0; n < m_num_amr_levels; n++) {
-            for (int dim = 0; dim < 3; dim++) {
-                const auto& b_mf = *(b_mfarrvec[n][dim]);
-                const auto& a_mf = *((*m_bcoefs)[n][dim]);
-                auto& x_mf = *(x_mfarrvec[n][dim]);
-                const int diag_comp = (a_mf.nComp() - 1) / 2;
+        // === Initial guess ===
+        if (m_use_csr_path) {
+            m_x_flat.resize(sp->nLocalRows());
+            sp->MatInitialGuess(m_x_flat.data(), m_b_flat.data());
+            SparseMatrixUtils::CopyFromLocalDOFVector(a_x, m_x_flat);
+        } else {
+            auto& b_mfarrvec = a_b.getArrayVec();
+            auto& x_mfarrvec = a_x.getArrayVec();
+            for (int n = 0; n < m_num_amr_levels; n++) {
+                for (int dim = 0; dim < 3; dim++) {
+                    const auto& b_mf = *(b_mfarrvec[n][dim]);
+                    const auto& a_mf = *((*m_bcoefs)[n][dim]);
+                    auto& x_mf = *(x_mfarrvec[n][dim]);
+                    const int diag_comp = (a_mf.nComp() - 1) / 2;
 
-                for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    Box bx = mfi.tilebox();
-                    auto x_arr = x_mf.array(mfi);
-                    auto b_arr = b_mf.const_array(mfi);
-                    auto a_arr = a_mf.const_array(mfi);
+                    for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                        Box bx = mfi.tilebox();
+                        auto x_arr = x_mf.array(mfi);
+                        auto b_arr = b_mf.const_array(mfi);
+                        auto a_arr = a_mf.const_array(mfi);
 
-                    ParallelFor(bx,
-                        [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
-                    {
-                        x_arr(i,j,k) = b_arr(i,j,k)
-                            / (RT(1.0) + a_arr(i,j,k,diag_comp));
-                    });
+                        ParallelFor(bx,
+                            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                        {
+                            x_arr(i,j,k) = b_arr(i,j,k)
+                                / (RT(1.0) + a_arr(i,j,k,diag_comp));
+                        });
+                    }
                 }
             }
-        }
 
-        if (!m_has_offdiag) {
-            if (m_verbose) {
-                RT bnorm = a_b.norm2();
-                RT res = computeResidualNorm(a_x, a_b);
-                amrex::Print() << "  pc_jacobi (diag): residual = " << res
-                               << ", " << res / std::max(bnorm, RT(1.e-30))
-                               << " (rel.)\n";
+            if (!m_has_offdiag) {
+                if (m_verbose) {
+                    RT bnorm = a_b.norm2();
+                    RT res = computeResidualNorm(a_x, a_b);
+                    amrex::Print() << "  pc_jacobi (diag): residual = " << res
+                                   << ", " << res / std::max(bnorm, RT(1.e-30))
+                                   << " (rel.)\n";
+                }
+                return;
             }
-            return;
         }
 
-        copyToGhostAndFill(x_mfarrvec);
-
-        const RT bnorm = a_b.norm2();
-        RT res0 = computeResidualNorm(a_x, a_b);
+        // === Compute initial residual ===
+        RT bnorm, res0;
+        if (m_use_csr_path) {
+            bnorm = a_b.norm2();
+            SparseMatrixUtils::BuildExtendedDOFVector(a_x, m_x_ext, *sp, geom_vec, m_num_amr_levels);
+            RT res_sq = sp->MatResidualNorm(m_x_ext.data(), m_b_flat.data());
+            ParallelAllReduce::Sum(res_sq, ParallelContext::CommunicatorSub());
+            res0 = std::sqrt(res_sq);
+        } else {
+            auto& x_mfarrvec = a_x.getArrayVec();
+            copyToGhostAndFill(x_mfarrvec);
+            bnorm = a_b.norm2();
+            res0 = computeResidualNorm(a_x, a_b);
+        }
         RT res_prev = res0;
 
         if (m_verbose) {
@@ -407,84 +453,108 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                            << " (rel.), omega = " << omega << "\n";
         }
 
+        // === Jacobi iteration loop ===
         bool diverged = false;
 
         for (int iter = 0; iter < m_max_iter; iter++) {
 
-            copyToGhostAndFill(x_mfarrvec);
+            // --- One Jacobi sweep ---
+            if (m_use_csr_path) {
+                // Build extended vector (FillBoundary + linearize owned+ghost)
+                SparseMatrixUtils::BuildExtendedDOFVector(a_x, m_x_ext, *sp, geom_vec, m_num_amr_levels);
+                // Sweep: x[i] += omega * (b[i] - (A*x)[i]) / diag[i]
+                sp->MatJacobiSweep(m_x_flat.data(), m_x_ext.data(),
+                                   m_b_flat.data(), omega);
+                // Copy back to MultiFab
+                SparseMatrixUtils::CopyFromLocalDOFVector(a_x, m_x_flat);
+            } else {
+                auto& b_mfarrvec = a_b.getArrayVec();
+                auto& x_mfarrvec = a_x.getArrayVec();
+                copyToGhostAndFill(x_mfarrvec);
 
-            for (int n = 0; n < m_num_amr_levels; n++) {
-                for (int dim = 0; dim < 3; dim++) {
-                    const auto& b_mf = *(b_mfarrvec[n][dim]);
-                    const auto& a_mf = *((*m_bcoefs)[n][dim]);
-                    auto& x_mf = *(x_mfarrvec[n][dim]);
-                    auto& w_mf = m_work[n][dim];
-                    const auto& xg_mf = m_x_ghost[n][dim];
+                for (int n = 0; n < m_num_amr_levels; n++) {
+                    for (int dim = 0; dim < 3; dim++) {
+                        const auto& b_mf = *(b_mfarrvec[n][dim]);
+                        const auto& a_mf = *((*m_bcoefs)[n][dim]);
+                        auto& x_mf = *(x_mfarrvec[n][dim]);
+                        auto& w_mf = m_work[n][dim];
+                        const auto& xg_mf = m_x_ghost[n][dim];
 
-                    const int ncomp = a_mf.nComp();
-                    if (ncomp <= 1) { continue; }
+                        const int ncomp = a_mf.nComp();
+                        if (ncomp <= 1) { continue; }
 
-                    const int diag_comp = (ncomp - 1) / 2;
+                        const int diag_comp = (ncomp - 1) / 2;
 
-                    amrex::GpuArray<int,3> nc = {1, 1, 1};
-                    amrex::GpuArray<int,3> w = {0, 0, 0};
-                    for (int d = 0; d < AMREX_SPACEDIM; d++) {
-                        nc[d] = m_ops->GetMassMatricesPCnComp(dim, d);
-                        w[d] = (nc[d] - 1) / 2;
-                    }
+                        GpuArray<int,3> nc = {1, 1, 1};
+                        GpuArray<int,3> w = {0, 0, 0};
+                        for (int d = 0; d < AMREX_SPACEDIM; d++) {
+                            nc[d] = m_ops->GetMassMatricesPCnComp(dim, d);
+                            w[d] = (nc[d] - 1) / 2;
+                        }
 
-                    const RT om = omega;
+                        const RT om = omega;
 
-                    for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-                    {
-                        Box bx = mfi.tilebox();
-                        auto w_arr = w_mf.array(mfi);
-                        auto xg_arr = xg_mf.const_array(mfi);
-                        auto a_arr = a_mf.const_array(mfi);
-
-                        ParallelFor(bx,
-                            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                        for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
                         {
-                            RT mx = RT(0.0);
-                            int comp = 0;
-                            for (int c2 = 0; c2 < nc[2]; c2++) {
-                                const int kk = k + c2 - w[2];
-                                for (int c1 = 0; c1 < nc[1]; c1++) {
-                                    const int jj = j + c1 - w[1];
-                                    for (int c0 = 0; c0 < nc[0]; c0++) {
-                                        const int ii = i + c0 - w[0];
-                                        mx += a_arr(i,j,k,comp)
-                                            * xg_arr(ii,jj,kk);
-                                        comp++;
+                            Box bx = mfi.tilebox();
+                            auto w_arr = w_mf.array(mfi);
+                            auto xg_arr = xg_mf.const_array(mfi);
+                            auto a_arr = a_mf.const_array(mfi);
+
+                            ParallelFor(bx,
+                                [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                            {
+                                RT mx = RT(0.0);
+                                int comp = 0;
+                                for (int c2 = 0; c2 < nc[2]; c2++) {
+                                    const int kk = k + c2 - w[2];
+                                    for (int c1 = 0; c1 < nc[1]; c1++) {
+                                        const int jj = j + c1 - w[1];
+                                        for (int c0 = 0; c0 < nc[0]; c0++) {
+                                            const int ii = i + c0 - w[0];
+                                            mx += a_arr(i,j,k,comp)
+                                                * xg_arr(ii,jj,kk);
+                                            comp++;
+                                        }
                                     }
                                 }
-                            }
-                            w_arr(i,j,k) = xg_arr(i,j,k) + mx;
-                        });
-                    }
+                                w_arr(i,j,k) = xg_arr(i,j,k) + mx;
+                            });
+                        }
 
-                    for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-                    {
-                        Box bx = mfi.tilebox();
-                        auto x_arr = x_mf.array(mfi);
-                        auto b_arr = b_mf.const_array(mfi);
-                        auto w_arr = w_mf.const_array(mfi);
-                        auto a_arr = a_mf.const_array(mfi);
-
-                        ParallelFor(bx,
-                            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                        for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
                         {
-                            RT r = b_arr(i,j,k) - w_arr(i,j,k);
-                            x_arr(i,j,k) += om * r
-                                / (RT(1.0) + a_arr(i,j,k,diag_comp));
-                        });
+                            Box bx = mfi.tilebox();
+                            auto x_arr = x_mf.array(mfi);
+                            auto b_arr = b_mf.const_array(mfi);
+                            auto w_arr = w_mf.const_array(mfi);
+                            auto a_arr = a_mf.const_array(mfi);
+
+                            ParallelFor(bx,
+                                [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                            {
+                                RT r = b_arr(i,j,k) - w_arr(i,j,k);
+                                x_arr(i,j,k) += om * r
+                                    / (RT(1.0) + a_arr(i,j,k,diag_comp));
+                            });
+                        }
                     }
                 }
             }
 
-            copyToGhostAndFill(x_mfarrvec);
+            // --- Compute residual ---
+            RT res_norm;
+            if (m_use_csr_path) {
+                SparseMatrixUtils::BuildExtendedDOFVector(a_x, m_x_ext, *sp, geom_vec, m_num_amr_levels);
+                RT res_sq = sp->MatResidualNorm(m_x_ext.data(), m_b_flat.data());
+                ParallelAllReduce::Sum(res_sq, ParallelContext::CommunicatorSub());
+                res_norm = std::sqrt(res_sq);
+            } else {
+                auto& x_mfarrvec = a_x.getArrayVec();
+                copyToGhostAndFill(x_mfarrvec);
+                res_norm = computeResidualNorm(a_x, a_b);
+            }
 
-            RT res_norm = computeResidualNorm(a_x, a_b);
             if (m_verbose) {
                 amrex::Print() << "  pc_jacobi: iter = " << (iter+1)
                                << ", residual = " << res_norm
@@ -492,6 +562,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                                << " (rel.)\n";
             }
 
+            // --- Convergence / omega adaptation ---
             if (m_adaptive_omega && res_norm > res_prev) {
                 omega *= RT(0.9);
                 if (m_verbose) {

@@ -153,6 +153,15 @@ public:
                       amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
                       int& a_n, int& a_ncols_max);
 
+    /**
+     * \brief Get a const pointer to the SparseJacobianMatrix (for calling
+     *        MatVecMult, MatJacobiSweep, etc.)
+     */
+    [[nodiscard]] const SparseJacobianMatrix* GetSparseJacobian () const
+    {
+        return m_sparse_jacobian.get();
+    }
+
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
     /**

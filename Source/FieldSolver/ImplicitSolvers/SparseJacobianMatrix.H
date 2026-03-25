@@ -66,11 +66,17 @@ namespace SparseJacobianMatrixUtil
  *  The matrix is stored in a row-major fixed-width format on GPU:
  *  - m_r_indices_g: global row indices (size n_local_rows)
  *  - m_num_nz:      non-zero count per row (size n_local_rows)
- *  - m_c_indices_g: column indices (size n_local_rows * nnz_max)
+ *  - m_c_indices_g: column indices in global DOF space (size n_local_rows * nnz_max)
  *  - m_a_ij:        matrix values  (size n_local_rows * nnz_max)
+ *
+ *  After RemapColumns(), an additional array is available:
+ *  - m_c_indices_ext: column indices in local-extended space (owned + ghost DOFs)
  *
  *  This class is used by ImplicitSolver and accessed by external library
  *  preconditioners (e.g., PETSc) through the ImplicitSolver interface.
+ *  It also provides linear algebra operations (MatVecMult, MatJacobiSweep,
+ *  MatResidualNorm) that operate on flat device arrays in the local-extended
+ *  index space.
  */
 class SparseJacobianMatrix
 {
@@ -133,17 +139,84 @@ public:
                   const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* a_mass_matrices,
                   const amrex::Array<amrex::IntVect,3>& a_mm_ncomp);
 
+    /**
+     * \brief Remap CSR column indices from global DOF to local-extended index space.
+     *
+     * Iterates over the DOF iMultiFab (owned + ghost cells) to build a mapping
+     * from global DOF index to local-extended index. Owned DOFs use their local
+     * index [0, nlocal). Ghost DOFs are assigned indices [nlocal, nlocal+nghost).
+     * Verifies that every column index in the CSR matrix is covered.
+     * Also extracts the diagonal.
+     *
+     * \param[in] a_dofs pointer to the WarpXSolverDOF object
+     */
+    void RemapColumns (const WarpXSolverDOF* a_dofs);
+
+    /**
+     * \brief Sparse matrix-vector product: y = A * x
+     *
+     * \param[out] a_y  result vector (size nLocalRows, device memory)
+     * \param[in]  a_x  input vector in local-extended space (size nExtended, device memory)
+     */
+    void MatVecMult (amrex::Real* a_y, const amrex::Real* a_x) const;
+
+    /**
+     * \brief One damped Jacobi sweep: x[i] += omega * (b[i] - (A*x)[i]) / diag[i]
+     *
+     * \param[in,out] a_x_local  solution vector, local DOFs only (size nLocalRows)
+     * \param[in]     a_x_ext    solution vector, local-extended (size nExtended, for matvec)
+     * \param[in]     a_b        RHS vector (size nLocalRows)
+     * \param[in]     a_omega    damping parameter
+     */
+    void MatJacobiSweep (amrex::Real* a_x_local,
+                         const amrex::Real* a_x_ext,
+                         const amrex::Real* a_b,
+                         amrex::Real a_omega) const;
+
+    /**
+     * \brief Compute the Jacobi residual norm: ||b - A*x||_2
+     *
+     * \param[in] a_x_ext  solution vector in local-extended space (size nExtended)
+     * \param[in] a_b      RHS vector (size nLocalRows)
+     * \return    local contribution to squared residual norm (caller must MPI reduce)
+     */
+    [[nodiscard]] amrex::Real MatResidualNorm (const amrex::Real* a_x_ext,
+                                               const amrex::Real* a_b) const;
+
+    /**
+     * \brief Initial guess: x[i] = b[i] / diag[i]
+     *
+     * \param[out] a_x  solution vector (size nLocalRows)
+     * \param[in]  a_b  RHS vector (size nLocalRows)
+     */
+    void MatInitialGuess (amrex::Real* a_x, const amrex::Real* a_b) const;
+
+    [[nodiscard]] int nLocalRows () const { return m_ndofs_l; }
+    [[nodiscard]] int nExtended () const { return m_ndofs_ext; }
+    [[nodiscard]] int nGhostDOFs () const { return m_ndofs_ext - m_ndofs_l; }
+    [[nodiscard]] int nnzMax () const { return m_pc_mat_nnz; }
+    [[nodiscard]] bool IsRemapped () const { return m_is_remapped; }
+
+    /** Ghost DOF mapping: global DOF indices of ghost cells */
+    [[nodiscard]] const amrex::Gpu::DeviceVector<int>& ghostGlobalDOFs () const
+    { return m_ghost_global_dofs; }
+    /** Ghost DOF mapping: corresponding extended-local indices */
+    [[nodiscard]] const amrex::Gpu::DeviceVector<int>& ghostExtIndices () const
+    { return m_ghost_ext_indices; }
+
 private:
 
     void readParameters ();
 
     bool m_is_defined = false;
+    bool m_is_remapped = false;
     bool m_verbose = true;
     bool m_pc_diag_only = false;
     bool m_include_mass_matrices = false;
 
     int m_ndofs_l = 0;
     int m_ndofs_g = 0;
+    int m_ndofs_ext = 0;
     int m_pc_mat_nnz = 1;
     int m_num_realloc = 0;
 
@@ -151,6 +224,17 @@ private:
     amrex::Gpu::DeviceVector<int> m_num_nz;
     amrex::Gpu::DeviceVector<int> m_c_indices_g;
     amrex::Gpu::DeviceVector<amrex::Real> m_a_ij;
+
+    /** Column indices remapped to local-extended space */
+    amrex::Gpu::DeviceVector<int> m_c_indices_ext;
+    /** Diagonal entries of the matrix (size nLocalRows) */
+    amrex::Gpu::DeviceVector<amrex::Real> m_diagonal;
+
+    /** Ghost cell DOF mapping: parallel arrays storing
+     *  (global_dof, extended_index) for each ghost DOF.
+     *  Used by BuildExtendedDOFVector to fill ghost entries. */
+    amrex::Gpu::DeviceVector<int> m_ghost_global_dofs;
+    amrex::Gpu::DeviceVector<int> m_ghost_ext_indices;
 };
 
 #endif
