@@ -12,7 +12,7 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Random.H>
-
+#include <iostream>
 
 /** Prepare information for and call UpdateMomentumPerezElastic().
  *
@@ -91,7 +91,7 @@ void ElasticCollisionPerez (
     // set max cross section based on mfp = atomic spacing
     const T_PR sigma_max = T_PR(1.0) / (maxn * rmin);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     T_PR * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
     T_PR * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
@@ -105,7 +105,7 @@ void ElasticCollisionPerez (
       // stride (smaller set size) until we do all collisions (larger set size)
       for (T_index k = coll_idx; k < max_N; k += min_N)
       {
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
           /* In RZ geometry, macroparticles can collide with other macroparticles
            * in the same *cylindrical* cell. For this reason, collisions between macroparticles
            * are actually not local in space. In this case, the underlying assumption is that
@@ -138,7 +138,7 @@ void ElasticCollisionPerez (
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
               n12, sigma_max, L, bmax, dt, engine );
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
           T_PR const u1xbuf_new = u1x[I1[i1]];
           u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
           u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
