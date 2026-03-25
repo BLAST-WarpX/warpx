@@ -13,6 +13,7 @@
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_MFIter.H>
+#include <AMReX_MultiFab.H>
 
 using namespace amrex;
 
@@ -48,11 +49,33 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
 
     for (int lev = 0; lev < a_num_levels; lev++) {
         for (int dir = 0; dir < 3; dir++) {
-            // FillBoundary to populate ghost cells with neighboring rank data
-            data_mfarrvec[lev][dir]->FillBoundary(a_geom[lev].periodicity());
 
             const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
-            const auto& data_fab = *(data_mfarrvec[lev][dir]);
+            const auto& data_src = *(data_mfarrvec[lev][dir]);
+
+            // The DOF iMultiFab has ghost cells (matching the E field),
+            // but the data MultiFab may have fewer or zero ghost cells
+            // (e.g., GMRES workspace vectors). We need the data at ghost
+            // cell locations to fill the extended vector. If the data
+            // MultiFab has fewer ghost cells than the DOF iMultiFab,
+            // create a temporary with matching ghost width and FillBoundary.
+            const IntVect dof_ng = dof_fab.nGrowVect();
+            const IntVect data_ng = data_src.nGrowVect();
+            const bool need_tmp = (data_ng != dof_ng);
+
+            MultiFab data_tmp;
+            if (need_tmp) {
+                data_tmp.define(data_src.boxArray(),
+                                data_src.DistributionMap(),
+                                data_src.nComp(), dof_ng);
+                data_tmp.setVal(Real(0.0));
+                MultiFab::Copy(data_tmp, data_src, 0, 0,
+                               data_src.nComp(), IntVect::TheZeroVector());
+                data_tmp.FillBoundary(a_geom[lev].periodicity());
+            } else {
+                data_mfarrvec[lev][dir]->FillBoundary(a_geom[lev].periodicity());
+            }
+            const auto& data_fab = need_tmp ? data_tmp : data_src;
 
             for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
                 const Box gbx = mfi.growntilebox();
