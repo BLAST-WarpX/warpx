@@ -74,13 +74,12 @@ If not, identify the 1-3 most important missing pieces. Common things to ask for
 - Direct: give the answer first, then the explanation
 - Concrete: include corrected input file snippets or code examples inline
 - Honest about limitations: if a feature doesn't exist, say so clearly
-- Close with "Let us know if you have any further questions"
 
 **Structure by situation:**
 
-**Answerable question:** (1) Direct answer upfront, (2) explanation if needed, (3) corrected snippet or example, (4) link to relevant docs page on `warpx.readthedocs.io` or example file in repo, (5) gotcha warning if applicable (see below), (6) invite follow-up.
+**Answerable question:** (1) Direct answer upfront, (2) explanation if needed, (3) corrected snippet or example, (4) link to relevant docs page on `warpx.readthedocs.io` or example file in repo
 
-**Bug report:** (1) Confirm the bug with explanation, (2) workaround if one exists, (3) state if a fix PR will be opened (only if true), (4) ask user to verify once merged.
+**Bug report:** (1) Confirm the bug with explanation, (2) workaround if one exists, (3) state if a fix PR is already open, (4) ask user to verify once merged.
 
 **Missing info:** (1) Explain what's needed and why, (2) provide partial answer if possible.
 
@@ -98,8 +97,8 @@ If not, identify the 1-3 most important missing pieces. Common things to ask for
 
 ## Step 6 — Present the draft
 
-Show the draft to the user and ask:
+Show the draft and ask:
 
 > Does this response look good? Would you like me to adjust anything before you post it?
 
-Only post the reply to GitHub if the user explicitly asks. Always show the draft first.
+Only post the reply to GitHub if asked explicitly. Always show the draft first.
