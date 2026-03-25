@@ -573,7 +573,6 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
     for (int lev = 0; lev < num_amr_levels; lev++) {
         for (int dir = 0; dir < 3; dir++) {
             const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
-            const int ncomp = dof_fab.nComp();
             for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
                 const Box gbx = mfi.growntilebox();
                 const Box vbx = mfi.validbox();
@@ -631,30 +630,6 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
 
     m_ndofs_ext = next_ghost_idx;
 
-    // Diagnostic: verify the map contains all owned DOFs [0, m_ndofs_l).
-    // For 1 rank: global == local, so map must have all DOFs.
-    {
-        int n_owned_in_map = 0;
-        int n_owned_missing = 0;
-        for (int d = 0; d < m_ndofs_l; d++) {
-            if (global_to_ext.find(d) != global_to_ext.end()) {
-                n_owned_in_map++;
-            } else {
-                if (n_owned_missing < 5) {
-                    Print() << "RemapColumns DIAG: owned global DOF " << d
-                            << " NOT in global_to_ext map!\n";
-                }
-                n_owned_missing++;
-            }
-        }
-        Print() << "RemapColumns DIAG: map size=" << global_to_ext.size()
-                << ", ndofs_l=" << m_ndofs_l
-                << ", ndofs_g=" << m_ndofs_g
-                << ", ndofs_ext=" << m_ndofs_ext
-                << ", owned_in_map=" << n_owned_in_map
-                << ", owned_missing=" << n_owned_missing << "\n";
-    }
-
     // Step 2: Remap CSR column indices from global to local-extended.
     // Copy global columns to host, remap, copy back to device.
     const auto n_entries = static_cast<int>(m_c_indices_g.size());
@@ -670,82 +645,19 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
     Gpu::PinnedVector<int> c_ext_h(n_entries, -1);
     const int nnz_max = m_pc_mat_nnz;
 
-    // Also copy row indices to host for diagnostics
-    Gpu::PinnedVector<int> r_indices_diag(m_ndofs_l);
-    Gpu::copyAsync(Gpu::deviceToHost, m_r_indices_g.begin(), m_r_indices_g.end(),
-                   r_indices_diag.begin());
-    Gpu::streamSynchronize();
-
-    int n_missing = 0;
     for (int row = 0; row < m_ndofs_l; row++) {
         for (int col = 0; col < num_nz_h[row]; col++) {
             const int idx = row * nnz_max + col;
             const int gcol = c_global_h[idx];
             if (gcol < 0) { continue; }
             auto it = global_to_ext.find(gcol);
-            if (it == global_to_ext.end()) {
-                if (n_missing < 10) {
-                    Print() << "RemapColumns: MISSING col DOF " << gcol
-                            << " (valid range [0," << m_ndofs_g << "))"
-                            << " in row " << row
-                            << " (row_g=" << r_indices_diag[row]
-                            << ", nnz=" << num_nz_h[row]
-                            << ", col_pos=" << col
-                            << ", nnz_max=" << nnz_max << ")\n";
-                    // Search all DOF fabs to see if the DOF exists anywhere
-                    // (uses GPU kernel + copy to correctly read device data)
-                    for (int d = 0; d < 3; d++) {
-                        const auto& df = *(dofs_mfarrvec[0][d]);
-                        for (MFIter mfi2(df); mfi2.isValid(); ++mfi2) {
-                            const Box gb2 = mfi2.growntilebox();
-                            const Box vb2 = mfi2.validbox();
-                            const auto np2 = static_cast<int>(gb2.numPts());
-                            Gpu::DeviceVector<int> gd2(np2);
-                            auto* gd2_ptr = gd2.data();
-                            auto da2 = df.const_array(mfi2);
-                            const auto lo2 = lbound(gb2);
-                            const auto len2 = length(gb2);
-                            ParallelFor(np2, [=] AMREX_GPU_DEVICE (int flat)
-                            {
-                                int kk = flat / (len2.x * len2.y);
-                                int jj = (flat - kk*len2.x*len2.y) / len2.x;
-                                int ii = flat - kk*len2.x*len2.y - jj*len2.x;
-                                gd2_ptr[flat] = da2(ii+lo2.x, jj+lo2.y, kk+lo2.z, 1);
-                            });
-                            Gpu::streamSynchronize();
-                            Gpu::PinnedVector<int> gd2_h(np2);
-                            Gpu::copyAsync(Gpu::deviceToHost, gd2.begin(), gd2.end(),
-                                           gd2_h.begin());
-                            Gpu::streamSynchronize();
-                            for (int flat = 0; flat < np2; flat++) {
-                                if (gd2_h[flat] == gcol) {
-                                    int kk = flat / (len2.x * len2.y);
-                                    int jj = (flat - kk*len2.x*len2.y) / len2.x;
-                                    int ii = flat - kk*len2.x*len2.y - jj*len2.x;
-                                    ii += lo2.x; jj += lo2.y; kk += lo2.z;
-                                    bool owned = vb2.contains(
-                                        IntVect(AMREX_D_DECL(ii,jj,kk)));
-                                    Print() << "  Found DOF " << gcol
-                                            << " in dir=" << d
-                                            << " fab=" << mfi2.index()
-                                            << " at (" << ii << "," << jj << "," << kk << ")"
-                                            << (owned ? " OWNED" : " GHOST")
-                                            << " gbx=" << gb2 << "\n";
-                                }
-                            }
-                        }
-                    }
-                }
-                n_missing++;
-            } else {
-                c_ext_h[idx] = it->second;
-            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                it != global_to_ext.end(),
+                "SparseJacobianMatrix::RemapColumns(): column global DOF "
+                + std::to_string(gcol) + " not found in owned or ghost cells");
+            c_ext_h[idx] = it->second;
         }
     }
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        n_missing == 0,
-        "SparseJacobianMatrix::RemapColumns(): " + std::to_string(n_missing)
-        + " column DOFs not found in owned or ghost cells");
 
     m_c_indices_ext.resize(n_entries);
     Gpu::copyAsync(Gpu::hostToDevice, c_ext_h.begin(), c_ext_h.end(),
