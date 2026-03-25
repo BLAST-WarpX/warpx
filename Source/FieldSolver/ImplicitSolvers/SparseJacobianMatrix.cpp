@@ -84,14 +84,23 @@ void SparseJacobianMatrix::Update (
 
     m_include_mass_matrices = (a_mass_matrices != nullptr);
 
+    const amrex::Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
+    if (m_verbose) {
+        amrex::Print() << "Updating sparse_jacobian_matrix: theta*dt = " << a_theta_dt
+                        << ", alpha = " << alpha << "\n";
+    }
+
     while (true) {
 
         auto nnz_diff = Assemble(a_dofs, a_geom, a_theta_dt,
                                  a_bc_masks, a_mass_matrices, a_mm_ncomp);
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
         if (nnz_diff > 0) {
-            m_pc_mat_nnz += nnz_diff;
             m_num_realloc++;
+            amrex::Print() << "sparse_jacobian_matrix: reallocating CSR arrays"
+                           << " (nnz_max " << m_pc_mat_nnz
+                           << " -> " << m_pc_mat_nnz + nnz_diff << ")\n";
+            m_pc_mat_nnz += nnz_diff;
         } else {
             break;
         }
@@ -169,12 +178,6 @@ int SparseJacobianMatrix::Assemble (
 
     // set the alpha coefficient for the curl-curl op
     const Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
-    if (m_verbose) {
-        Print() << "Updating sparse_jacobian_matrix"
-                << ": theta*dt = " << a_theta_dt << ", "
-                << " coefficients: "
-                << "alpha = " << alpha << "\n";
-    }
 
     // Get DOF arrays
     const auto& dofs_mfarrvec = a_dofs->m_array;
