@@ -1059,7 +1059,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument) 
+                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
