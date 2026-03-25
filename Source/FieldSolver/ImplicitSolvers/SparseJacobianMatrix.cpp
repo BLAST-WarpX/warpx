@@ -573,44 +573,56 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
     for (int lev = 0; lev < num_amr_levels; lev++) {
         for (int dir = 0; dir < 3; dir++) {
             const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
+            const int ncomp = dof_fab.nComp();
             for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
-                // Grow the valid box by the ghost width to cover all ghost cells
                 const Box gbx = mfi.growntilebox();
                 const Box vbx = mfi.validbox();
 
-                // Copy fab data to host (needed for GPU builds where
-                // const_array returns a device pointer)
-                const Box fab_box = dof_fab[mfi].box();
-                AMREX_ALWAYS_ASSERT(gbx == fab_box);
-                const int ncomp = dof_fab.nComp();
-                const Long n_cells = gbx.numPts() * Long(ncomp);
-                Gpu::PinnedVector<int> dof_host_v(n_cells);
-                Gpu::copyAsync(Gpu::deviceToHost,
-                               dof_fab[mfi].dataPtr(), dof_fab[mfi].dataPtr() + n_cells,
-                               dof_host_v.data());
+                // Use a GPU kernel to read DOF data via const_array() — the
+                // same access path used by Assemble — then copy to host.
+                // Direct dataPtr() device-to-host copies returned stale data
+                // on some GPU platforms.
+                const auto npts = static_cast<int>(gbx.numPts());
+                Gpu::DeviceVector<int> ldof_d(npts), gdof_d(npts);
+                auto* ldof_ptr = ldof_d.data();
+                auto* gdof_ptr = gdof_d.data();
+                auto dof_arr = dof_fab.const_array(mfi);
+                const auto gbx_lo = lbound(gbx);
+                const auto gbx_len = length(gbx);
+                ParallelFor(npts, [=] AMREX_GPU_DEVICE (int idx)
+                {
+                    int k = idx / (gbx_len.x * gbx_len.y);
+                    int j = (idx - k * gbx_len.x * gbx_len.y) / gbx_len.x;
+                    int i = idx - k * gbx_len.x * gbx_len.y - j * gbx_len.x;
+                    i += gbx_lo.x; j += gbx_lo.y; k += gbx_lo.z;
+                    ldof_ptr[idx] = dof_arr(i, j, k, 0);
+                    gdof_ptr[idx] = dof_arr(i, j, k, 1);
+                });
                 Gpu::streamSynchronize();
-                Array4<const int> dof_arr_h(dof_host_v.data(), gbx, ncomp);
 
-                const auto lo = gbx.smallEnd();
-                const auto hi = gbx.bigEnd();
-                for (int k = lo[2]; k <= hi[2]; ++k) {
-                    for (int j = lo[1]; j <= hi[1]; ++j) {
-                        for (int i = lo[0]; i <= hi[0]; ++i) {
-                            const int gdof = dof_arr_h(i, j, k, 1); // global DOF
-                            if (gdof < 0) { continue; }
-                            if (global_to_ext.find(gdof) != global_to_ext.end()) {
-                                continue; // already mapped
-                            }
-                            if (vbx.contains(IntVect(AMREX_D_DECL(i, j, k)))) {
-                                // Owned cell: use local DOF index
-                                const int ldof = dof_arr_h(i, j, k, 0);
-                                global_to_ext[gdof] = ldof;
-                            } else {
-                                // Ghost cell: assign next extended index
-                                global_to_ext[gdof] = next_ghost_idx;
-                                next_ghost_idx++;
-                            }
-                        }
+                Gpu::PinnedVector<int> ldof_h(npts), gdof_h(npts);
+                Gpu::copyAsync(Gpu::deviceToHost, ldof_d.begin(), ldof_d.end(),
+                               ldof_h.begin());
+                Gpu::copyAsync(Gpu::deviceToHost, gdof_d.begin(), gdof_d.end(),
+                               gdof_h.begin());
+                Gpu::streamSynchronize();
+
+                for (int idx = 0; idx < npts; ++idx) {
+                    const int gdof = gdof_h[idx];
+                    if (gdof < 0) { continue; }
+                    if (global_to_ext.find(gdof) != global_to_ext.end()) {
+                        continue;
+                    }
+                    // Recover (i,j,k) from flat index for the owned-cell check
+                    int k = idx / (gbx_len.x * gbx_len.y);
+                    int j = (idx - k * gbx_len.x * gbx_len.y) / gbx_len.x;
+                    int i = idx - k * gbx_len.x * gbx_len.y - j * gbx_len.x;
+                    i += gbx_lo.x; j += gbx_lo.y; k += gbx_lo.z;
+                    if (vbx.contains(IntVect(AMREX_D_DECL(i, j, k)))) {
+                        global_to_ext[gdof] = ldof_h[idx];
+                    } else {
+                        global_to_ext[gdof] = next_ghost_idx;
+                        next_ghost_idx++;
                     }
                 }
             }
@@ -681,36 +693,44 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
                             << ", col_pos=" << col
                             << ", nnz_max=" << nnz_max << ")\n";
                     // Search all DOF fabs to see if the DOF exists anywhere
+                    // (uses GPU kernel + copy to correctly read device data)
                     for (int d = 0; d < 3; d++) {
                         const auto& df = *(dofs_mfarrvec[0][d]);
                         for (MFIter mfi2(df); mfi2.isValid(); ++mfi2) {
                             const Box gb2 = mfi2.growntilebox();
                             const Box vb2 = mfi2.validbox();
-                            const int nc2 = df.nComp();
-                            const Long nc2_cells = gb2.numPts() * Long(nc2);
-                            Gpu::PinnedVector<int> dv2(nc2_cells);
-                            Gpu::copyAsync(Gpu::deviceToHost,
-                                           df[mfi2].dataPtr(),
-                                           df[mfi2].dataPtr() + nc2_cells,
-                                           dv2.data());
+                            const auto np2 = static_cast<int>(gb2.numPts());
+                            Gpu::DeviceVector<int> gd2(np2);
+                            auto* gd2_ptr = gd2.data();
+                            auto da2 = df.const_array(mfi2);
+                            const auto lo2 = lbound(gb2);
+                            const auto len2 = length(gb2);
+                            ParallelFor(np2, [=] AMREX_GPU_DEVICE (int flat)
+                            {
+                                int kk = flat / (len2.x * len2.y);
+                                int jj = (flat - kk*len2.x*len2.y) / len2.x;
+                                int ii = flat - kk*len2.x*len2.y - jj*len2.x;
+                                gd2_ptr[flat] = da2(ii+lo2.x, jj+lo2.y, kk+lo2.z, 1);
+                            });
                             Gpu::streamSynchronize();
-                            Array4<const int> da2(dv2.data(), gb2, nc2);
-                            const auto lo2 = gb2.smallEnd();
-                            const auto hi2 = gb2.bigEnd();
-                            for (int kk = lo2[2]; kk <= hi2[2]; ++kk) {
-                                for (int jj = lo2[1]; jj <= hi2[1]; ++jj) {
-                                    for (int ii = lo2[0]; ii <= hi2[0]; ++ii) {
-                                        if (da2(ii,jj,kk,1) == gcol) {
-                                            bool owned = vb2.contains(
-                                                IntVect(AMREX_D_DECL(ii,jj,kk)));
-                                            Print() << "  Found DOF " << gcol
-                                                    << " in dir=" << d
-                                                    << " fab=" << mfi2.index()
-                                                    << " at (" << ii << "," << jj << "," << kk << ")"
-                                                    << (owned ? " OWNED" : " GHOST")
-                                                    << " gbx=" << gb2 << "\n";
-                                        }
-                                    }
+                            Gpu::PinnedVector<int> gd2_h(np2);
+                            Gpu::copyAsync(Gpu::deviceToHost, gd2.begin(), gd2.end(),
+                                           gd2_h.begin());
+                            Gpu::streamSynchronize();
+                            for (int flat = 0; flat < np2; flat++) {
+                                if (gd2_h[flat] == gcol) {
+                                    int kk = flat / (len2.x * len2.y);
+                                    int jj = (flat - kk*len2.x*len2.y) / len2.x;
+                                    int ii = flat - kk*len2.x*len2.y - jj*len2.x;
+                                    ii += lo2.x; jj += lo2.y; kk += lo2.z;
+                                    bool owned = vb2.contains(
+                                        IntVect(AMREX_D_DECL(ii,jj,kk)));
+                                    Print() << "  Found DOF " << gcol
+                                            << " in dir=" << d
+                                            << " fab=" << mfi2.index()
+                                            << " at (" << ii << "," << jj << "," << kk << ")"
+                                            << (owned ? " OWNED" : " GHOST")
+                                            << " gbx=" << gb2 << "\n";
                                 }
                             }
                         }
