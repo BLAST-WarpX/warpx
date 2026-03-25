@@ -1056,18 +1056,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(max_crossings);
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
-
-                    const auto& xp_old = xp_n;
-                    const auto& yp_old = yp_n;
-                    const auto& zp_old = zp_n;
-                    const auto& xp_new = xp_np1;
-                    const auto& yp_new = yp_np1;
-                    const auto& zp_new = zp_np1;
-
                     if constexpr (depos_order_control == order_one) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true>(
-                                                              xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
@@ -1081,7 +1073,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_two) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true>(
-                                                              xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
@@ -1095,7 +1087,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_three) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true>(
-                                                              xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
@@ -1109,7 +1101,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     } else if constexpr (depos_order_control == order_four) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true>(
-                                                              xp_old, yp_old, zp_old, xp_new, yp_new, zp_new,
+                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
@@ -1123,13 +1115,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     }
 
                 } else {
-
-                    const auto& xp_old = xp_n;
-                    const auto& yp_old = yp_n;
-                    const auto& zp_old = zp_n;
-                    const auto& xp_new = xp_np1;
-                    const auto& yp_new = yp_np1;
-                    const auto& zp_new = zp_np1;
 
                     const amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
