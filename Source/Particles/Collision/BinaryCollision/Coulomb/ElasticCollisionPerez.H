@@ -12,7 +12,6 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Random.H>
-#include <iostream>
 
 /** Prepare information for and call UpdateMomentumPerezElastic().
  *
