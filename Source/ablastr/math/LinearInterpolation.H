@@ -19,7 +19,7 @@ namespace ablastr::math
      * (x0, f0) and (x1, f1)
      */
     template<typename TCoord, typename TVal>
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     constexpr auto linear_interp(
         TCoord x0, TCoord x1,
         TVal f0, TVal f1,
@@ -52,7 +52,7 @@ namespace ablastr::math
      * (x1, y0, z0, f100), (x1, y0, z1, f101), (x1, y1, z0, f110), (x1, y1, z1, f111)
      */
     template<typename TCoord, typename TVal>
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     constexpr auto trilinear_interp(
         TCoord x0, TCoord x1, TCoord y0, TCoord y1, TCoord z0, TCoord z1,
         TVal f000, TVal f001, TVal f010, TVal f011, TVal f100, TVal f101, TVal f110, TVal f111,

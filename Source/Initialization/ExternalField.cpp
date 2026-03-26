@@ -549,6 +549,9 @@ ExternalFieldView ExternalFieldReader::getView (int li) const
 
 ExternalFieldView ExternalFieldReader::getView () const
 {
+    if (m_distributed && !m_moving_window && m_mf.local_size() > 0) {
+        return make_view(m_mf.atLocalIdx(0));
+    }
     return make_view(m_fab);
 }
 
