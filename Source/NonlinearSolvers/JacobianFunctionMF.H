@@ -130,6 +130,10 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     inline
     PreconditionerType pcType () const override { return m_pc_type; }
 
+    /** \brief Return the Ops pointer. */
+    inline
+    Ops* getOps () const { return m_ops; }
+
     private:
 
     bool m_is_defined = false;

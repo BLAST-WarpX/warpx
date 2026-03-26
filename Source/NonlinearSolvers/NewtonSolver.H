@@ -10,6 +10,7 @@
 #include "LinearSolverLibrary.H"
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
+#include "JacobiSolver_Wrapper.H"
 #include "Preconditioner.H"
 #include "Utils/TextMsg.H"
 
@@ -228,6 +229,8 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 #else
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): must compile with PETSc to use petsc_ksp (AMREX_USE_PETSC must be defined)");
 #endif
+    } else if (m_linear_solver_type == LinearSolverType::weighted_jacobi) {
+        m_linear_solver = std::make_unique<JacobiSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
     } else {
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
     }

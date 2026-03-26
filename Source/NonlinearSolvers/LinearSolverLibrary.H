@@ -10,7 +10,7 @@
   * \brief struct to select the linear solver for implicit schemes
   */
 AMREX_ENUM (LinearSolverType,
-    amrex_gmres, petsc_ksp
+    amrex_gmres, petsc_ksp, weighted_jacobi
 );
 
 #endif
