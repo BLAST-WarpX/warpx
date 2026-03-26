@@ -450,8 +450,18 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
             }, true);
             particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
         } else {
-            tmp.copyParticles(*pinned_pc, true);
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
+            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
+            using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
+            tmp.copyParticles(*pinned_pc,
+                              [random_filter,uniform_filter,parser_filter,geometry_filter]
+                              AMREX_GPU_HOST_DEVICE
+                              (const SrcData& src, int ip, const amrex::RandomEngine& engine)
+            {
+                const SuperParticleType& p = src.getSuperParticle(ip);
+                return random_filter(p, engine) * uniform_filter(p, engine)
+                    * parser_filter(p, engine) * geometry_filter(p, engine);
+            }, true);
+            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
         }
 
         // real_names contains a list of all particle attributes.
