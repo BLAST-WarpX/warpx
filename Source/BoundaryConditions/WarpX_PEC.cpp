@@ -393,7 +393,7 @@ namespace
             // Update the cell if the mirror guard cell exists
             if (fabbox.contains(ijk_mirror)) {
                 // Note that this includes the cells on the boundary
-                auto rscale = 1._rt; // NOLINT(misc-const-correctness)
+                amrex::Real rscale = 1._rt; // NOLINT(misc-const-correctness)
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                 const amrex::Real rvalid = ijk_vec[idim] + rshift;
