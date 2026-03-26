@@ -1344,19 +1344,22 @@ Particle initialization
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
-    * ``maxwellian``: Maxwellian momentum distribution where the mean (bulk drift) and the standard deviation (thermal spread) of each normalized-momentum component
-        are required and can be specified as constants, or functions of position.
-        Each component is sampled independently from a Gaussian distribution in the drift frame.
-        It requires the following arguments:
-    * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
-        * If ``constant``, set any of:
-        * ``<species_name>.ux_mean``: mean :math:`u_{x}`
-        * ``<species_name>.uy_mean``: mean :math:`u_{y}`
-        * ``<species_name>.uz_mean``: mean :math:`u_{z}`
-        * If ``parser``, the following are required:
-        * ``<species_name>.ux_mean_function(x,y,z)``: mean :math:`u_{x}`
-        * ``<species_name>.uy_mean_function(x,y,z)``: mean :math:`u_{y}`
-        * ``<species_name>.uz_mean_function(x,y,z)``: mean :math:`u_{z}`
+    * ``maxwellian``: Maxwellian momentum distribution where, in the drift frame, each of the three normalized-momentum components is sampled independently from a Gaussian distribution.
+      The mean and standard deviation of each component (bulk drift and thermal spread) are set using the **Maxwellian** parameter groups below:
+
+      * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
+        * If ``constant``, set any of ``<species_name>.ux_mean``, ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``). The magnitude :math:`|u_\mathrm{mean}|` must be strictly less than 1.
+        This is the bulk drift in the drift frame.
+        * If ``parser``, the following are required: ``<species_name>.ux_mean_function(x,y,z)``, ``<species_name>.uy_mean_function(x,y,z)``, ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, the spatial bulk drift is read from openPMD file (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          Required: ``<species_name>.read_ux_mean_from_path``, ``<species_name>.read_uy_mean_from_path``, ``<species_name>.read_uz_mean_from_path`` (each an openPMD file path).
+          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to load openPMD data in parallel, in the same way density is loaded from a file via ``read_density_distributed``.
+
+      * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
+        * If ``constant``, set any of ``<species_name>.ux_std``, ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`) optional (default ``0``).
+        These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift frame, i.e. the thermal spread per axis.
+        If any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` exceeds ``0.01``, ignored relativistic corrections can exceed about 1% and WarpX may record a warning.
+        * If ``parser``, the following are required: ``<species_name>.ux_std_function(x,y,z)``, ``<species_name>.uy_std_function(x,y,z)``, ``<species_name>.uz_std_function(x,y,z)``.
 
     * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
         * If ``constant``, set any of:

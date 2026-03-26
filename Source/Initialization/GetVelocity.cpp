@@ -8,6 +8,8 @@
 
 #include "GetVelocity.H"
 
+#include <cmath>
+
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 namespace
 {
@@ -162,4 +164,50 @@ bool GetVelocityVector::distributed () const noexcept
 #else
     return false;
 #endif
+}
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+AMREX_GPU_HOST_DEVICE
+amrex::XDim3
+GetVelocityVector::meanFromFileAt (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
+{
+#if (AMREX_SPACEDIM == 1)
+    amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_RZ)
+    amrex::RealVect const pos{std::sqrt(x * x + y * y), z};
+#elif defined(WARPX_DIM_XZ)
+    amrex::RealVect const pos{x, z};
+#else
+    amrex::RealVect const pos{x, y, z};
+#endif
+    return amrex::XDim3{m_ux_mean_view(pos), m_uy_mean_view(pos), m_uz_mean_view(pos)};
+}
+#endif
+
+AMREX_GPU_HOST_DEVICE
+amrex::XDim3
+GetVelocityVector::operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
+{
+    switch (m_type)
+    {
+    case (VelConstantVector):
+    {
+        return amrex::XDim3{m_ux_mean, m_uy_mean, m_uz_mean};
+    }
+    case (VelParserFunctionVector):
+    {
+        return amrex::XDim3{m_ux_mean_parser(x, y, z), m_uy_mean_parser(x, y, z), m_uz_mean_parser(x, y, z)};
+    }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    case (VelFromFileVector):
+    {
+        return meanFromFileAt(x, y, z);
+    }
+#endif
+    default:
+    {
+        amrex::Abort("Get initial velocity (vector): unknown type");
+        return amrex::XDim3{0.0, 0.0, 0.0};
+    }
+    }
 }
