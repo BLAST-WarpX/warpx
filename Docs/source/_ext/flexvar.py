@@ -69,6 +69,7 @@ from typing import Any, Iterator, List, TypedDict, cast
 from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx import addnodes
+from sphinx.addnodes import desc_signature
 from sphinx.application import Sphinx
 from sphinx.directives import ObjectDescription
 from sphinx.domains import Domain, ObjType
@@ -166,11 +167,7 @@ class FlexVarDirective(ObjectDescription[str]):
     # Signature parsing / rendering
     # ------------------------------------------------------------------
 
-    def handle_signature(
-        self,
-        sig: str,
-        signode: addnodes.desc_signature,
-    ) -> str:
+    def handle_signature(self, sig: str, signode: desc_signature) -> str:
         """
         Build the rendered signature node and return the canonical name.
 
@@ -293,7 +290,7 @@ class FlexVarDirective(ObjectDescription[str]):
     # ------------------------------------------------------------------
 
     def add_target_and_index(
-        self, name: str, sig: str, signode: addnodes.desc_signature
+        self, name: str, sig: str, signode: desc_signature
     ) -> None:
         node_id = make_id(self.env, self.state.document, "", name)
         signode["ids"].append(node_id)
@@ -318,11 +315,11 @@ class FlexVarOptionHelper:
         self,
         options: dict[str, Any],
         name: str,
-        signode: addnodes.desc_signature,
+        signode: desc_signature,
     ):
         self.options: dict[str, Any] = options
         self.name: str = name
-        self.signode: addnodes.desc_signature = signode
+        self.signode: desc_signature = signode
 
     def get_and_check_aliases(self, *keys: str, default=None) -> Any:
         if len(keys) > 1:
