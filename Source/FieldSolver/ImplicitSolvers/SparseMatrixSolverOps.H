@@ -38,6 +38,7 @@ public:
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
+    [[nodiscard]] RT EstimateOmega () const override;
     [[nodiscard]] bool HasOffDiag () const override { return true; }
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
@@ -131,6 +132,13 @@ auto SparseMatrixSolverOps<T,Ops>::ResidualNorm (const T& a_x, const T& a_b) -> 
     RT res_sq = sp->MatResidualNorm(m_x_ext.data(), m_b_flat.data());
     ParallelAllReduce::Sum(res_sq, ParallelContext::CommunicatorSub());
     return std::sqrt(res_sq);
+}
+
+template <class T, class Ops>
+auto SparseMatrixSolverOps<T,Ops>::EstimateOmega () const -> RT
+{
+    const auto* sp = m_ops->GetSparseJacobian();
+    return static_cast<RT>(sp->EstimateOmega());
 }
 
 #endif

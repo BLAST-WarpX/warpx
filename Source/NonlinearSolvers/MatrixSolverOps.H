@@ -39,6 +39,10 @@ public:
     /** ||b - A*x||_2 (MPI-reduced) */
     [[nodiscard]] virtual RT ResidualNorm (const T& a_x, const T& a_b) = 0;
 
+    /** Gershgorin-based estimate: omega = 2 / (2 + max_i r_i) where
+     *  r_i = sum_{j!=i} |A_ij| / |A_ii| is the off-diagonal row ratio. */
+    [[nodiscard]] virtual RT EstimateOmega () const = 0;
+
     /** False when A is diagonal (initial guess is exact) */
     [[nodiscard]] virtual bool HasOffDiag () const = 0;
 

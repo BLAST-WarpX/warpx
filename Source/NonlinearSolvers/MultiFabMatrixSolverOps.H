@@ -37,6 +37,7 @@ public:
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
+    [[nodiscard]] RT EstimateOmega () const override;
     [[nodiscard]] bool HasOffDiag () const override { return m_has_offdiag; }
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
@@ -236,6 +237,54 @@ auto MultiFabMatrixSolverOps<T,Ops>::ResidualNorm (const T& a_x, const T& a_b) -
         copyToGhostAndFill(x_mfarrvec);
     }
     return computeResidualNormInternal(a_x, a_b);
+}
+
+template <class T, class Ops>
+auto MultiFabMatrixSolverOps<T,Ops>::EstimateOmega () const -> RT
+{
+    using namespace amrex;
+
+    if (!m_is_defined || !m_has_offdiag) { return RT(1.0); }
+
+    // Gershgorin: for A = I + M, r_i = sum_{comp != diag} |M(i,comp)| / (1 + M(i,diag))
+    RT max_r = RT(0.0);
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        for (int dim = 0; dim < 3; dim++) {
+            const auto& a_mf = *((*m_bcoefs)[n][dim]);
+            const int ncomp = a_mf.nComp();
+            if (ncomp <= 1) { continue; }
+            const int diag_comp = (ncomp - 1) / 2;
+
+            ReduceOps<ReduceOpMax> reduce_op;
+            ReduceData<RT> reduce_data(reduce_op);
+            using ReduceTuple = typename decltype(reduce_data)::Type;
+
+            for (MFIter mfi(a_mf); mfi.isValid(); ++mfi) {
+                Box bx = mfi.validbox();
+                auto a_arr = a_mf.const_array(mfi);
+                const int nc = ncomp;
+                const int dc = diag_comp;
+
+                reduce_op.eval(bx, reduce_data,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+                    {
+                        RT offdiag_sum = RT(0.0);
+                        for (int c = 0; c < nc; c++) {
+                            if (c != dc) {
+                                offdiag_sum += amrex::Math::abs(a_arr(i,j,k,c));
+                            }
+                        }
+                        RT diag = RT(1.0) + a_arr(i,j,k,dc);
+                        return {offdiag_sum / amrex::Math::abs(diag)};
+                    });
+            }
+            RT dim_max_r = amrex::get<0>(reduce_data.value(reduce_op));
+            max_r = std::max(max_r, dim_max_r);
+        }
+    }
+    ParallelAllReduce::Max(max_r, ParallelContext::CommunicatorSub());
+
+    return RT(2.0) / (RT(2.0) + max_r);
 }
 
 template <class T, class Ops>

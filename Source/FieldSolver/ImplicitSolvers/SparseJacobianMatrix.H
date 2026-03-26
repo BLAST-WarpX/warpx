@@ -188,6 +188,10 @@ public:
      */
     void MatInitialGuess (amrex::Real* a_x, const amrex::Real* a_b) const;
 
+    /** Gershgorin estimate: omega = 2 / (2 + max_i r_i),
+     *  r_i = (row_sum_i - |diag_i|) / |diag_i|. MPI-reduced. */
+    [[nodiscard]] amrex::Real EstimateOmega () const;
+
     [[nodiscard]] int nLocalRows () const { return m_ndofs_l; }
     [[nodiscard]] int nExtended () const { return m_ndofs_ext; }
     [[nodiscard]] int nGhostDOFs () const { return m_ndofs_ext - m_ndofs_l; }

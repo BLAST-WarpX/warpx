@@ -846,3 +846,40 @@ void SparseJacobianMatrix::MatInitialGuess (amrex::Real* a_x,
     });
     Gpu::streamSynchronize();
 }
+
+amrex::Real SparseJacobianMatrix::EstimateOmega () const
+{
+    BL_PROFILE("SparseJacobianMatrix::EstimateOmega()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const int nnz = m_pc_mat_nnz;
+    const auto* aij_ptr = m_a_ij.data();
+    const auto* diag_ptr = m_diagonal.data();
+    const auto* num_nz_ptr = m_num_nz.data();
+
+    // Gershgorin: r_i = (sum_j |A_ij| - |A_ii|) / |A_ii|
+    ReduceOps<ReduceOpMax> reduce_op;
+    ReduceData<Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    reduce_op.eval(nrows, reduce_data,
+        [=] AMREX_GPU_DEVICE (int row) -> ReduceTuple
+        {
+            Real row_sum = Real(0.0);
+            const int ncols = num_nz_ptr[row];
+            for (int col = 0; col < ncols; col++) {
+                row_sum += amrex::Math::abs(aij_ptr[row * nnz + col]);
+            }
+            Real abs_diag = amrex::Math::abs(diag_ptr[row]);
+            Real r = (row_sum - abs_diag) / abs_diag;
+            return {r};
+        });
+
+    Real max_r = amrex::get<0>(reduce_data.value(reduce_op));
+    ParallelAllReduce::Max(max_r, ParallelContext::CommunicatorSub());
+
+    return Real(2.0) / (Real(2.0) + max_r);
+}

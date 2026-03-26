@@ -175,11 +175,16 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
 
     m_matrix_ops->Update(a_U);
 
+    if (m_adaptive_omega) {
+        m_omega = m_matrix_ops->EstimateOmega();
+    }
+
     if (m_verbose) {
         bool use_csr = (m_ops->GetThetaForPC() > Real(0.0));
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_jacobi)
                        << ": theta*dt = " << this->m_dt
-                       << ", path = " << (use_csr ? "CSR" : "stencil") << "\n";
+                       << ", path = " << (use_csr ? "CSR" : "stencil")
+                       << ", omega = " << m_omega << "\n";
     }
 }
 
