@@ -194,7 +194,6 @@ AMREX_ENUM(
     ScatteringAngle,
     Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
     Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
-    Anisotropic, /**< Scattering angle follows a specific distribution, i.e., products are scattered anisotropically in the center of mass frame */
     Default = Isotropic  /**< Isotropic */
 );
 
