@@ -5,7 +5,7 @@ Cylindrical and Spherical Geometries
 
 .. _fig_cyl_and_sph_coords:
 
-.. figure:: Cyl_and_Sph_Coords.png
+.. figure:: Cyl_and_Sph_Coords.svg
    :alt: Figure not found
 
    Cylindrical (left) and spherical (right) coordinate systems. The azimuthal angle :math:`\theta` is the same in both systems and ranges from :math:`0` to :math:`2\pi`. The elevation angle :math:`\phi` in the spherical system ranges from :math:`-\pi/2` to :math:`\pi/2`.
