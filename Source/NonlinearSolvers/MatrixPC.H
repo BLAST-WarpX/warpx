@@ -561,7 +561,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         {
                             // diagonal component (i,j) of second derivative operator
                             int cidx_g_rhs = dof_arr(i,j,k,1);
-                            amrex::Real val = 0.0;
+                            amrex::Real val = 0.0_rt;
                             if (dir == 0) {
                                 val = 2.0_rt * alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 2) {
