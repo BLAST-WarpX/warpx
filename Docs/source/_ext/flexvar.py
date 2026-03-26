@@ -6,7 +6,10 @@ Provides type annotation, default value support, units, optional flag, and
 extra inline comments. The output format can be changed by modifying
 the `handle_signature` method in `FlexVarDirective`.
 
-Directive usage::
+Usage
+-----
+
+[Directive](https://docutils.sourceforge.io/docs/ref/rst/directives.html)::
 
     .. fv:var:: <name>
         :type: <type>
@@ -17,11 +20,17 @@ Directive usage::
 
         <Description body>
 
-Directive output format::
+    Rendered format:
 
     <name>: (<type>; in <unit>) optional (default: <default>) <comment>
 
-    <Description body>
+        <Description body>
+
+[Cross reference role](https://www.sphinx-doc.org/en/master/usage/referencing.html)::
+
+    :fv:var:`name`
+    :fv:var:`Title <name>`
+    :fv:var:`name = value`
 
 Examples
 --------
@@ -37,7 +46,7 @@ Directive::
 
         Description of the variable.
 
-Role::
+Cross reference role::
 
     # Cross reference link to my/variable<T>:
     See :fv:var:`my/variable<T>` for details.
@@ -50,24 +59,6 @@ Role::
 
     # With inline value:
     For instance, :fv:var:`my/variable<T> = [1, 1]`
-
-More info
----------
-
-Roles:
-[docutils](https://docutils.sourceforge.io/docs/ref/rst/roles.html),
-[docutils](https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#interpreted-text),
-[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/roles.html)
-[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#roles),
-
-Sphinx cross reference roles:
-[sphinx](https://www.sphinx-doc.org/en/master/usage/referencing.html)
-
-Directives:
-[docutils](https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives),
-[docutils](https://docutils.sourceforge.io/docs/ref/rst/directives.html)
-[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html)
-[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#rst-directives),
 """
 
 from __future__ import annotations
