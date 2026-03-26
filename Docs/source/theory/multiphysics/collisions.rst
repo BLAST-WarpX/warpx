@@ -55,7 +55,7 @@ Once a particle is selected for a specific collision process, that process deter
 .. _multiphysics-collisions-pulseddecay:
 
 Pulsed Decay
----------------------------------------
+------------
 
 This collision module can be used to have a parent species decay into two product
 species with a user-defined decay rate. Mathematically, it solves the following
