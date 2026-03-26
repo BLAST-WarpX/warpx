@@ -11,6 +11,7 @@
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -106,7 +107,7 @@ namespace {
             ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
             E_fusion,
-            /*isotropic_scattering=*/true,
+            /*scattering_angle=*/ScatteringAngle::Isotropic,
             engine);
 
         // Compute momentum of beryllium in lab frame

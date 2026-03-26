@@ -10,6 +10,7 @@
 
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -77,7 +78,7 @@ namespace {
             ux1_out, uy1_out, uz1_out, m1_out,
             ux2_out, uy2_out, uz2_out, m2_out,
             E_fusion,
-            /*isotropic_scattering=*/true,
+            /*scattering_angle=*/ScatteringAngle::Isotropic,
             engine);
 
         // Fill momentum of product species (note that we actually
