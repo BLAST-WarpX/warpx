@@ -1,6 +1,7 @@
 #include "ImplicitSolver.H"
 #include "SparseJacobianMatrix.H"
 #include "Fields.H"
+#include "NonlinearSolvers/LinearSolverLibrary.H"
 #include "WarpX.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -540,10 +541,18 @@ void ImplicitSolver::InitializeMassMatrices ()
     // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
     // dJz = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
 
-    // check that PC is being used by nonlinear solver
+    // Check that PC mass matrices are needed (by PC or by linear solver with use_pcmat)
     if (m_use_mass_matrices_pc) {
         const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
-        if (pc_type == PreconditionerType::none) {
+        bool linsol_use_pcmat = false;
+        {
+            LinearSolverType linsol_type = LinearSolverType::amrex_gmres;
+            const ParmParse pp_newton("newton");
+            pp_newton.query("linear_solver", linsol_type);
+            const ParmParse pp_l(getEnumNameString(linsol_type));
+            pp_l.query("use_pcmat", linsol_use_pcmat);
+        }
+        if (pc_type == PreconditionerType::none && !linsol_use_pcmat) {
             m_use_mass_matrices_pc = false;
         }
         if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {

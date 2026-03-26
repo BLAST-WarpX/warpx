@@ -94,6 +94,10 @@ public:
         amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+        if (m_linear_solver_type == LinearSolverType::weighted_jacobi ||
+            m_linear_solver_type == LinearSolverType::chebyshev) {
+            amrex::Print() << "Linear solver (" << linsol_name << ") use_pcmat:           " << (m_use_pcmat?"true":"false") << "\n";
+        }
         amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
 
         m_linear_function->printParams();
@@ -171,6 +175,8 @@ private:
      */
     PreconditionerType m_pc_type = PreconditionerType::none;
 
+    bool m_use_pcmat = false;
+
     mutable amrex::Real m_cur_time, m_dt;
 
     /**
@@ -233,14 +239,14 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 #endif
     } else if (m_linear_solver_type == LinearSolverType::weighted_jacobi) {
         m_linear_solver = std::make_unique<JacobiSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
-        if (m_pc_type != PreconditionerType::none) {
+        if (!m_use_pcmat && m_pc_type != PreconditionerType::none) {
             ablastr::warn_manager::WMRecordWarning("NewtonSolver",
                 "weighted_jacobi linear solver does not use an external preconditioner;"
                 " ignoring jacobian.pc_type = " + amrex::getEnumNameString(m_pc_type));
         }
     } else if (m_linear_solver_type == LinearSolverType::chebyshev) {
         m_linear_solver = std::make_unique<ChebyshevSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
-        if (m_pc_type != PreconditionerType::none) {
+        if (!m_use_pcmat && m_pc_type != PreconditionerType::none) {
             ablastr::warn_manager::WMRecordWarning("NewtonSolver",
                 "chebyshev linear solver does not use an external preconditioner;"
                 " ignoring jacobian.pc_type = " + amrex::getEnumNameString(m_pc_type));
@@ -306,10 +312,13 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
 
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
     pp_l.query("verbose_int",         m_linsol_verbose_int);
-    pp_l.query("restart_length",      m_linsol_restart_length);
     pp_l.query("absolute_tolerance",  m_linsol_atol);
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
+    if (m_linear_solver_type == LinearSolverType::amrex_gmres ||
+        m_linear_solver_type == LinearSolverType::petsc_ksp) {
+        pp_l.query("restart_length",  m_linsol_restart_length);
+    }
 
     /* backward compatibility */
     const amrex::ParmParse pp_gmres("gmres");
@@ -318,6 +327,11 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_gmres.query("absolute_tolerance",  m_linsol_atol);
     pp_gmres.query("relative_tolerance",  m_linsol_rtol);
     pp_gmres.query("max_iterations",      m_linsol_maxits);
+
+    if (m_linear_solver_type == LinearSolverType::weighted_jacobi ||
+        m_linear_solver_type == LinearSolverType::chebyshev) {
+        pp_l.query("use_pcmat", m_use_pcmat);
+    }
 
     const amrex::ParmParse pp_jac("jacobian");
     pp_jac.query("pc_type", m_pc_type);
@@ -401,6 +415,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         m_linear_function->setBaseSolution(a_U);
         m_linear_function->setBaseRHS(m_R);
         m_linear_function->updatePreCondMat(a_U);
+        m_linear_solver->update(a_U);
 
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();

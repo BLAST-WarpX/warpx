@@ -72,8 +72,7 @@ public:
 
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
-    /** Set the scaling factor (c^2 * mu0 * theta * dt) for mass matrix diagonal. */
-    void SetPCFactor (RT a_pc_factor) { m_pc_factor = a_pc_factor; }
+    void SetPCFactor (RT a_pc_factor) override { m_pc_factor = a_pc_factor; }
 
 private:
 

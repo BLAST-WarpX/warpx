@@ -52,6 +52,9 @@ public:
         amrex::Abort("MatrixSolverOps::Matvec() not implemented");
     }
 
+    /** Set scaling for mass matrix diagonal (MFMatrixSolverOps only). */
+    virtual void SetPCFactor ([[maybe_unused]] RT) {}
+
     /** False when A is diagonal (initial guess is exact) */
     [[nodiscard]] virtual bool HasOffDiag () const = 0;
 

@@ -10,18 +10,20 @@
 #include "LinearSolver.H"
 #include "WeightedJacobiImpl.H"
 #include "FieldSolver/ImplicitSolvers/MFMatrixSolverOps.H"
+#include "FieldSolver/ImplicitSolvers/MultiFabMatrixSolverOps.H"
+#include "FieldSolver/ImplicitSolvers/SparseMatrixSolverOps.H"
+
+#include <AMReX_ParmParse.H>
 
 #include <memory>
+#include <type_traits>
 
 /**
  * \brief LinearSolver wrapper for weighted Jacobi.
  *
- *  Wraps WeightedJacobiImpl<Vec> and MFMatrixSolverOps<Vec> into
- *  the LinearSolver interface.
- *
- *  The matrix-vector product J*v is provided by JacobianFunctionMF::apply().
- *  The diagonal of the Jacobian comes from the mass matrices (the EM
- *  curl-curl term has no diagonal component): diag(J) = I + M_diag.
+ *  When use_pcmat=false (default), the matrix-vector product is provided
+ *  by JacobianFunctionMF::apply(). When use_pcmat=true, the assembled
+ *  PC matrix (stencil or CSR) is used instead.
  */
 template <typename Vec, typename LinOp>
 class JacobiSolver : public LinearSolver<Vec, LinOp>
@@ -41,38 +43,52 @@ public:
     void define (LinOp& a_linop) override
     {
         m_linop = &a_linop;
-
-        // Create a matvec callable that wraps LinOp::apply()
-        auto matvec = [linop = m_linop](Vec& y, const Vec& x) {
-            linop->apply(y, x);
-        };
-
-        // Get diagonal blocks of original (Jacobian) mass matrices
         auto* ops = m_linop->getOps();
-        auto* bcoefs = ops->GetMassMatricesJacDiag();
-        int n_levels = ops->numAMRLevels();
 
-        m_mf_ops = std::make_unique<MFMatrixSolverOps<Vec>>();
-        m_mf_ops->Define(std::move(matvec), bcoefs, n_levels);
+        const amrex::ParmParse pp("weighted_jacobi");
+        pp.query("use_pcmat", m_use_pcmat);
 
-        m_solver.Define(m_mf_ops.get(), "weighted_jacobi");
+        if (m_use_pcmat) {
+            // Stencil/CSR ops (same dispatch as JacobiPC)
+            using OpsType = std::remove_pointer_t<decltype(ops)>;
+            if (ops->GetThetaForPC() > amrex::Real(0.0)) {
+                auto sp_ops = std::make_unique<SparseMatrixSolverOps<Vec, OpsType>>();
+                sp_ops->Define(ops);
+                m_matrix_ops = std::move(sp_ops);
+            } else {
+                auto mf_ops = std::make_unique<MultiFabMatrixSolverOps<Vec, OpsType>>();
+                mf_ops->Define(ops);
+                m_matrix_ops = std::move(mf_ops);
+            }
+        } else {
+            // Matrix-free ops wrapping JacobianFunctionMF::apply()
+            auto matvec = [linop = m_linop](Vec& y, const Vec& x) {
+                linop->apply(y, x);
+            };
+            auto* bcoefs = ops->GetMassMatricesJacDiag();
+            int n_levels = ops->numAMRLevels();
+            auto mf_ops = std::make_unique<MFMatrixSolverOps<Vec>>();
+            mf_ops->Define(std::move(matvec), bcoefs, n_levels);
+            m_matrix_ops = std::move(mf_ops);
+        }
+
+        m_solver.Define(m_matrix_ops.get(), "weighted_jacobi");
+    }
+
+    void update (const Vec& a_U) override
+    {
+        if (!m_use_pcmat) {
+            m_matrix_ops->SetPCFactor(
+                static_cast<RT>(m_linop->getOps()->GetMassMatrixDiagScale()));
+        }
+        m_solver.Update(a_U);
     }
 
     void solve (Vec& a_sol, Vec const& a_rhs,
                 RT a_tol_rel, RT a_tol_abs, int a_its=-1) override
     {
-        // Update scaling factor for mass matrix diagonal
-        m_mf_ops->SetPCFactor(
-            static_cast<RT>(m_linop->getOps()->GetMassMatrixDiagScale()));
-
-        // Update on every solve (allocates work vectors on first call,
-        // no-op thereafter for MFMatrixSolverOps)
-        m_solver.Update(a_rhs);
-
-        // Override tolerances from Newton
         m_solver.setTolerances(a_tol_rel, a_tol_abs);
         if (a_its > 0) { m_solver.setMaxIters(a_its); }
-
         m_solver.Solve(a_sol, a_rhs);
     }
 
@@ -101,10 +117,13 @@ public:
         return m_solver.getResidualNorm();
     }
 
+    [[nodiscard]] bool usePCMat () const { return m_use_pcmat; }
+
 private:
 
     LinOp* m_linop = nullptr;
-    std::unique_ptr<MFMatrixSolverOps<Vec>> m_mf_ops;
+    bool m_use_pcmat = false;
+    std::unique_ptr<MatrixSolverOps<Vec>> m_matrix_ops;
     WeightedJacobiImpl<Vec> m_solver;
 };
 

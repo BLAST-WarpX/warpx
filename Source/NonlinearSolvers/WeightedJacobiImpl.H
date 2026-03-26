@@ -109,7 +109,10 @@ void WeightedJacobiImpl<T>::Define (MatrixSolverOps<T>* a_ops,
     m_name = a_pp_prefix;
 
     const amrex::ParmParse pp(a_pp_prefix);
-    pp.query("verbose", m_verbose);
+    int verbose_int = 0;
+    if (pp.query("verbose_int", verbose_int)) {
+        m_verbose = (verbose_int > 0);
+    }
     pp.query("max_iter", m_max_iter);
     if (pp.query("omega", m_omega)) {
         m_adaptive_omega = false;
