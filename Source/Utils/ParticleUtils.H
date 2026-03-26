@@ -181,28 +181,27 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate random unit vector in 3 dimensions
-     * https://mathworld.wolfram.com/SpherePointPicking.html
+     * \brief Generate a random unit vector with isotropic distribution,
+     * following the method described in equations (27)-(31) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
-     * @param[out] x x-component of resulting random vector
-     * @param[out] y y-component of resulting random vector
-     * @param[out] z z-component of resulting random vector
+     * @param[out] x x-component of the random unit vector
+     * @param[out] y y-component of the random unit vector
+     * @param[out] z z-component of the random unit vector
      * @param[in] engine the random-engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
                            amrex::ParticleReal& z, amrex::RandomEngine const& engine )
     {
-        using std::sqrt;
-        using std::cos;
-        using std::sin;
         using namespace amrex::literals;
 
-        auto const theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-        z = 2.0_prt * amrex::Random(engine) - 1.0_prt;
-        auto const xy = sqrt(1_prt - z*z);
-        x = xy * cos(theta);
-        y = xy * sin(theta);
+        auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
+        x = sin_theta * std::cos(phi);
+        y = sin_theta * std::sin(phi);
+        z = cos_theta;
     }
 
 
