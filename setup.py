@@ -326,7 +326,7 @@ setup(
     cmdclass=cmdclass,
     # scripts=['warpx_1d', 'warpx_2d', 'warpx_rz', 'warpx_3d'],
     zip_safe=False,
-    python_requires=">=3.8",  # left for CI, truly ">=3.9"
+    python_requires=">=3.8",  # left for CI, truly ">=3.11"
     # tests_require=['pytest'],
     install_requires=install_requires,
     # see: src/bindings/python/cli
@@ -355,11 +355,10 @@ setup(
         "Topic :: Scientific/Engineering :: Physics",
         "Programming Language :: C++",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         (
             "License :: OSI Approved :: BSD License"
         ),  # TODO: use real SPDX: BSD-3-Clause-LBNL
