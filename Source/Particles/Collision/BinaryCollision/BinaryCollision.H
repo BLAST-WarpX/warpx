@@ -318,13 +318,15 @@ public:
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
         // dV is level-specific: cell volume at this refinement level (smaller on fine levels).
         amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
+#if defined(WARPX_DIM_RZ)
         auto const lo = lbound(cbx);
         auto const hi = ubound(cbx);
         int const nz = hi.y - lo.y + 1;
 #endif
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(cbx, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
         auto const dr = geom_lev.CellSize(0);
 #endif
 
@@ -333,18 +335,18 @@ public:
             // Return the radial factor for the volume element, dV
             int const ri = (i_cell - i_cell%nz)/nz;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RCYLINDER)
             int const ri = i_cell;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RSPHERE)
             // This needs double checking
             int const ri = i_cell;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr*rr;
 #else
             // No factor is needed for Cartesian
