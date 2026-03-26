@@ -19,11 +19,11 @@
 /**
  * \brief Matrix-free MatrixSolverOps using an external matvec callable.
  *
- *  The diagonal of the Jacobian is diag(J) = I + M_diag where M_diag is
- *  the diagonal component of the mass matrix stencil coefficients. The EM
- *  curl-curl term has no diagonal component (it couples only off-diagonal
- *  staggered grid cells), so the diagonal comes entirely from the identity
- *  and the mass matrix.
+ *  The diagonal of the Jacobian is diag(J) = I + scale * M_diag where
+ *  M_diag is the diagonal component of the mass matrix stencil coefficients
+ *  and scale = c^2 * mu0 * theta * dt. The EM curl-curl term has no
+ *  diagonal component (it couples only off-diagonal staggered grid cells),
+ *  so the diagonal comes entirely from the identity and the mass matrix.
  *
  *  The matrix-vector product (J*v) is provided as a std::function callable,
  *  typically bound to JacobianFunctionMF::apply().
@@ -71,6 +71,9 @@ public:
 
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
+    /** Set the scaling factor (c^2 * mu0 * theta * dt) for mass matrix diagonal. */
+    void SetPCFactor (RT a_pc_factor) { m_pc_factor = a_pc_factor; }
+
 private:
 
     bool m_is_defined = false;
@@ -79,6 +82,7 @@ private:
     MatvecFn m_matvec;
     const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
     int m_num_amr_levels = 0;
+    RT m_pc_factor = RT(1.0);  /**< c^2 * mu0 * theta * dt scaling for diagonal */
 
     T m_Jx;  /**< workspace for matvec result */
 };
@@ -121,6 +125,7 @@ void MFMatrixSolverOps<T>::InitialGuess (T& a_x, const T& a_b)
 
     auto& b_mfarrvec = a_b.getArrayVec();
     auto& x_mfarrvec = a_x.getArrayVec();
+    const RT pc_factor = m_pc_factor;
 
     for (int n = 0; n < m_num_amr_levels; n++) {
         for (int dim = 0; dim < 3; dim++) {
@@ -139,7 +144,7 @@ void MFMatrixSolverOps<T>::InitialGuess (T& a_x, const T& a_b)
                     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
                 {
                     x_arr(i,j,k) = b_arr(i,j,k)
-                        / (RT(1.0) + a_arr(i,j,k,diag_comp));
+                        / (RT(1.0) + pc_factor * a_arr(i,j,k,diag_comp));
                 });
             }
         }
@@ -159,6 +164,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
     auto& jx_mfarrvec = m_Jx.getArrayVec();
 
     const RT om = a_omega;
+    const RT pc_factor = m_pc_factor;
 
     for (int n = 0; n < m_num_amr_levels; n++) {
         for (int dim = 0; dim < 3; dim++) {
@@ -182,7 +188,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
                     {
                         RT r = b_arr(i,j,k) - jx_arr(i,j,k);
                         x_arr(i,j,k) += om * r
-                            / (RT(1.0) + a_arr(i,j,k,diag_comp));
+                            / (RT(1.0) + pc_factor * a_arr(i,j,k,diag_comp));
                     });
                 }
             } else {

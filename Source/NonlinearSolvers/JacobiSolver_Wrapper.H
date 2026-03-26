@@ -47,9 +47,9 @@ public:
             linop->apply(y, x);
         };
 
-        // Get mass matrix data from the Ops (ImplicitSolver)
+        // Get diagonal blocks of original (Jacobian) mass matrices
         auto* ops = m_linop->getOps();
-        auto* bcoefs = ops->GetMassMatricesCoeff();
+        auto* bcoefs = ops->GetMassMatricesJacDiag();
         int n_levels = ops->numAMRLevels();
 
         m_mf_ops = std::make_unique<MFMatrixSolverOps<Vec>>();
@@ -61,6 +61,10 @@ public:
     void solve (Vec& a_sol, Vec const& a_rhs,
                 RT a_tol_rel, RT a_tol_abs, int a_its=-1) override
     {
+        // Update scaling factor for mass matrix diagonal
+        m_mf_ops->SetPCFactor(
+            static_cast<RT>(m_linop->getOps()->GetMassMatrixDiagScale()));
+
         // Update on every solve (allocates work vectors on first call,
         // no-op thereafter for MFMatrixSolverOps)
         m_solver.Update(a_rhs);

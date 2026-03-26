@@ -9,6 +9,7 @@
 
 #include "ImplicitSolver_fwd.H"
 
+#include "Utils/WarpXConst.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 #include "FieldSolver/ImplicitSolvers/SparseJacobianMatrix.H"
 
@@ -105,11 +106,26 @@ public:
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
 
     /**
-     * \brief Return pointer to MultiFab array for mass matrix
+     * \brief Return pointer to MultiFab array for PC mass matrices
      */
     [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
         if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
+    }
+
+    /**
+     * \brief Return pointer to diagonal blocks (XX, YY, ZZ) of the original mass matrices
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesJacDiag() const {
+        if (m_use_mass_matrices_jacobian) { return &m_mm_diag_mfarrvec; }
+        else { return nullptr; }
+    }
+
+    /**
+     * \brief Return the scaling factor c^2 * mu0 * theta * dt for the mass matrix diagonal
+     */
+    [[nodiscard]] amrex::Real GetMassMatrixDiagScale () const {
+        return PhysConst::c * PhysConst::c * PhysConst::mu0 * m_theta * m_dt;
     }
 
     /**
@@ -273,6 +289,11 @@ protected:
      * \brief Array of multifab pointers to mass matrix preconditioner
      */
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
+
+    /**
+     * \brief Array of multifab pointers to diagonal blocks (XX, YY, ZZ) of original mass matrices
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mm_diag_mfarrvec;
 
     /**
      * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)

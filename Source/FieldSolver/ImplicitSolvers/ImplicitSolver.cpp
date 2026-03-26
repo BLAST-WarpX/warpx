@@ -754,6 +754,17 @@ void ImplicitSolver::InitializeMassMatrices ()
         }
     }
 
+    // Set pointers to diagonal blocks (XX, YY, ZZ) of original mass matrices
+    if (m_use_mass_matrices_jacobian) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            m_mm_diag_mfarrvec.push_back({
+                m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+                m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+                m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)
+            });
+        }
+    }
+
 }
 
 void ImplicitSolver::PreLinearSolve ()
