@@ -38,6 +38,8 @@ from pybtex.style.formatting.unsrt import Style as UnsrtStyle
 module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
 sys.path.insert(0, checksum_path)
+
+# Modify sys.path to use custom extension in _ext
 _ext_path = os.path.join(module_path, "_ext")
 sys.path.insert(0, _ext_path)
 
