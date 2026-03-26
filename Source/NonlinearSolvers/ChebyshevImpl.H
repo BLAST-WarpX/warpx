@@ -160,13 +160,13 @@ void ChebyshevImpl<T>::EstimateLargestEigenvalue (const T& a_ref)
     // Power method: repeatedly compute v = D^{-1} A v, normalize
     // Uses m_w1, m_w2 as work vectors
 
-    // Initialize v = uniform vector (use m_w1)
+    // Initialize v for power iteration (use m_w1)
     m_w1.Copy(a_ref);
     RT vnorm = m_w1.norm2();
     if (vnorm < RT(1.0e-30)) {
-        m_lambda_max = RT(2.0);
-        m_eigenvalues_estimated = true;
-        return;
+        // a_ref is zero (e.g. initial E=0); seed with ones instead
+        m_w1.setVal(RT(1.0));
+        vnorm = m_w1.norm2();
     }
     m_w1.scale(RT(1.0) / vnorm);
 
