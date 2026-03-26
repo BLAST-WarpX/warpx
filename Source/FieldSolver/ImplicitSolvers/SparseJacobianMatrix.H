@@ -128,9 +128,6 @@ public:
     /**
      * \brief Core assembly routine. Returns 0 on success, positive int
      *        (actual_nnz - nnz_max) if storage is insufficient.
-     *
-     * Public because CUDA requires public access for functions containing
-     * extended __device__ lambdas (used with amrex::ParallelFor).
      */
     int Assemble (const WarpXSolverDOF* a_dofs,
                   const amrex::Vector<amrex::Geometry>& a_geom,

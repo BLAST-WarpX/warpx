@@ -19,12 +19,7 @@
 #include <AMReX_Vector.H>
 
 /**
- * \brief CSR sparse matrix operations for Jacobi iteration.
- *
- *  Used when A = I + curl(alpha*curl[]) + M (theta-implicit path, theta > 0).
- *  The matrix is assembled by SparseJacobianMatrix and stored in CSR format.
- *  Operations linearize the WarpXSolverVec to/from flat device vectors
- *  using SparseMatrixUtils, then delegate to SparseJacobianMatrix kernels.
+ * \brief CSR sparse matrix ops for A = I + curl(alpha*curl[]) + M (theta-implicit).
  */
 template <class T, class Ops>
 class SparseMatrixSolverOps : public MatrixSolverOps<T>
@@ -36,23 +31,21 @@ public:
     SparseMatrixSolverOps () = default;
     ~SparseMatrixSolverOps () override = default;
 
+    /** \brief Set the Ops pointer and cache geometry. */
     void Define (Ops* a_ops);
 
     void Update (const T& a_U) override;
-
     void InitialGuess (T& a_x, const T& a_b) override;
-
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
-
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
-
     [[nodiscard]] bool HasOffDiag () const override { return true; }
-
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
 private:
 
+    /** \brief Copy b into flat device vector m_b_flat. */
     void linearizeRHS (const T& a_b);
+    /** \brief FillBoundary + linearize owned+ghost into m_x_ext. */
     void buildExtended (const T& a_x);
 
     bool m_is_defined = false;

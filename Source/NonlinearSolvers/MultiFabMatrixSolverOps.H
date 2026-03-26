@@ -18,11 +18,7 @@
 #include <AMReX_Vector.H>
 
 /**
- * \brief MultiFab stencil-based matrix operations for Jacobi iteration.
- *
- *  Used when A = I + M (semi-implicit path, theta == 0).
- *  The mass matrix M is stored as MultiFab stencil coefficients.
- *  When diagonal-only (nComp==1), the solve is exact in one step.
+ * \brief Stencil-based matrix ops for A = I + M (semi-implicit, theta == 0).
  */
 template <class T, class Ops>
 class MultiFabMatrixSolverOps : public MatrixSolverOps<T>
@@ -34,26 +30,24 @@ public:
     MultiFabMatrixSolverOps () = default;
     ~MultiFabMatrixSolverOps () override = default;
 
+    /** \brief Set the Ops pointer and read mass matrix coefficients. */
     void Define (Ops* a_ops);
 
     void Update (const T& a_U) override;
-
     void InitialGuess (T& a_x, const T& a_b) override;
-
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
-
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
-
     [[nodiscard]] bool HasOffDiag () const override { return m_has_offdiag; }
-
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
+
+    /** \brief Compute ||b - A*x||_2 on owned cells (MPI-reduced). */
+    RT computeResidualNormInternal (const T& a_x, const T& a_b) const;
 
 private:
 
+    /** \brief Copy x to ghost-padded MultiFab and call FillBoundary. */
     void copyToGhostAndFill (
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>& a_x_mfarrvec);
-
-    RT computeResidualNormInternal (const T& a_x, const T& a_b) const;
 
     bool m_is_defined = false;
 
@@ -77,8 +71,6 @@ void MultiFabMatrixSolverOps<T,Ops>::Define (Ops* a_ops)
     m_ops = a_ops;
     m_num_amr_levels = m_ops->numAMRLevels();
     m_bcoefs = m_ops->GetMassMatricesCoeff();
-    // When m_bcoefs is null (no mass matrices), A = I and x = b is exact.
-    // Report as "not defined" so the caller can handle the identity case.
     m_is_defined = (m_bcoefs != nullptr);
 }
 
