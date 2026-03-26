@@ -420,7 +420,7 @@ class FlexVarDomain(Domain):
     }
 
     initial_data: dict[str, dict[str, ObjectEntry]] = {
-        "vars": {},  # name -> {"docname": str, "node_id": str, "type": str, "default": str}
+        "vars": {},
     }
 
     @property
