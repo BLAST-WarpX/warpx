@@ -6,7 +6,8 @@ WarpX is a massively parallel electromagnetic Particle-In-Cell (PIC) code built 
 
 ## Development Environment
 
-If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX:
+If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
+The `conda` command may be called `conda`, `mamba`, or `micromamba` depending on the system (check aliases and available binaries):
 ```bash
 conda activate warpx-cpu-mpich-dev
 ```
