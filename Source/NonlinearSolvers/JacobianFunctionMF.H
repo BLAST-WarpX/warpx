@@ -8,9 +8,7 @@
 #define JacobianFunctionMF_H_
 
 #include "LinearFunction.H"
-#include "CurlCurlMLMGPC.H"
-#include "ExternLibPC.H"
-#include "JacobiPC.H"
+#include "PreconditionerLibrary.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
 #include <string>

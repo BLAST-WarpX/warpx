@@ -1,4 +1,4 @@
-/* Copyright 2025 Debojyoti Ghosh
+/* Copyright 2025-2026 Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *

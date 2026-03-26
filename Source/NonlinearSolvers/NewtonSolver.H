@@ -10,7 +10,6 @@
 #include "LinearSolverLibrary.H"
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
-#include "JacobiSolver_Wrapper.H"
 #include "Preconditioner.H"
 #include "Utils/TextMsg.H"
 

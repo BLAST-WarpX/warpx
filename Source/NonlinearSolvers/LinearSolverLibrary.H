@@ -2,6 +2,7 @@
 #define LINEAR_SOLVER_LIBRARY_H_
 
 #include "AMReXGMRES_Wrapper.H"  // IWYU pragma: export
+#include "JacobiSolver_Wrapper.H"  // IWYU pragma: export
 #include "PETScKSP_Wrapper.H"  // IWYU pragma: export
 
 #include <AMReX_Enum.H>
