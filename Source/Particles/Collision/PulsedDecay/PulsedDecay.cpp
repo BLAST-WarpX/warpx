@@ -23,6 +23,7 @@
 #include <AMReX_Vector.H>
 #include <AMReX_ParticleTile.H>
 
+#include <cmath>
 #include <string>
 
 PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContainer const * mypc)
