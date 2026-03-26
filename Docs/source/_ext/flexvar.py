@@ -143,6 +143,12 @@ class FlexVarDirective(ObjectDescription[str]):
         ]
         self.make_unit_alias_dict(unit_alias_lists)
 
+        # type_alias_lists: list[list[str]] = [
+        #     ["bool", "boolean"],
+        #     ["int", "integer"],
+        #     ["string", "str"],
+        # ]
+
     def make_unit_alias_dict(self, unit_alias_lists: list[list[str]]):
         """
         Construct unit alias dict, e.g., "seconds" -> "s".
