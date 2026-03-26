@@ -50,6 +50,24 @@ Role::
 
     # With inline value:
     For instance, :fv:var:`my/variable<T> = [1, 1]`
+
+More info
+---------
+
+Roles:
+[docutils](https://docutils.sourceforge.io/docs/ref/rst/roles.html),
+[docutils](https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#interpreted-text),
+[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/roles.html)
+[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#roles),
+
+Sphinx cross reference roles:
+[sphinx](https://www.sphinx-doc.org/en/master/usage/referencing.html)
+
+Directives:
+[docutils](https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives),
+[docutils](https://docutils.sourceforge.io/docs/ref/rst/directives.html)
+[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html)
+[sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#rst-directives),
 """
 
 from __future__ import annotations
