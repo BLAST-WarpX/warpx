@@ -544,13 +544,18 @@ void ImplicitSolver::InitializeMassMatrices ()
     // Check that PC mass matrices are needed (by PC or by linear solver with use_pcmat)
     if (m_use_mass_matrices_pc) {
         const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
-        bool linsol_use_pcmat = false;
+        bool linsol_use_pcmat = true;
         {
             LinearSolverType linsol_type = LinearSolverType::amrex_gmres;
             const ParmParse pp_newton("newton");
             pp_newton.query("linear_solver", linsol_type);
-            const ParmParse pp_l(getEnumNameString(linsol_type));
-            pp_l.query("use_pcmat", linsol_use_pcmat);
+            if (linsol_type == LinearSolverType::weighted_jacobi ||
+                linsol_type == LinearSolverType::chebyshev) {
+                const ParmParse pp_l(getEnumNameString(linsol_type));
+                pp_l.query("use_pcmat", linsol_use_pcmat);
+            } else {
+                linsol_use_pcmat = false;
+            }
         }
         if (pc_type == PreconditionerType::none && !linsol_use_pcmat) {
             m_use_mass_matrices_pc = false;
