@@ -1,6 +1,7 @@
 #ifndef PRECONDITIONER_LIBRARY_H_
 #define PRECONDITIONER_LIBRARY_H_
 
+#include "ChebyshevPC.H"  // IWYU pragma: export
 #include "CurlCurlMLMGPC.H"  // IWYU pragma: export
 #include "ExternLibPC.H"  // IWYU pragma: export
 #include "JacobiPC.H"  // IWYU pragma: export

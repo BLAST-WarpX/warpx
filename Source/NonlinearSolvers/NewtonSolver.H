@@ -87,7 +87,8 @@ public:
         auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
         amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
-        if (m_linear_solver_type != LinearSolverType::weighted_jacobi) {
+        if (m_linear_solver_type != LinearSolverType::weighted_jacobi &&
+            m_linear_solver_type != LinearSolverType::chebyshev) {
             amrex::Print() << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
         }
         amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
@@ -235,6 +236,13 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
         if (m_pc_type != PreconditionerType::none) {
             ablastr::warn_manager::WMRecordWarning("NewtonSolver",
                 "weighted_jacobi linear solver does not use an external preconditioner;"
+                " ignoring jacobian.pc_type = " + amrex::getEnumNameString(m_pc_type));
+        }
+    } else if (m_linear_solver_type == LinearSolverType::chebyshev) {
+        m_linear_solver = std::make_unique<ChebyshevSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
+        if (m_pc_type != PreconditionerType::none) {
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver",
+                "chebyshev linear solver does not use an external preconditioner;"
                 " ignoring jacobian.pc_type = " + amrex::getEnumNameString(m_pc_type));
         }
     } else {

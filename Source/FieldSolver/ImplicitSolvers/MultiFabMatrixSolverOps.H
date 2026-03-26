@@ -37,6 +37,7 @@ public:
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
+    void Matvec (T& a_y, const T& a_x) override;
     [[nodiscard]] RT EstimateOmega () const override;
     [[nodiscard]] bool HasOffDiag () const override { return m_has_offdiag; }
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
@@ -144,6 +145,79 @@ void MultiFabMatrixSolverOps<T,Ops>::InitialGuess (T& a_x, const T& a_b)
                 {
                     x_arr(i,j,k) = b_arr(i,j,k)
                         / (RT(1.0) + a_arr(i,j,k,diag_comp));
+                });
+            }
+        }
+    }
+}
+
+template <class T, class Ops>
+void MultiFabMatrixSolverOps<T,Ops>::Matvec (T& a_y, const T& a_x)
+{
+    using namespace amrex;
+
+    auto& x_mfarrvec = a_x.getArrayVec();
+    auto& y_mfarrvec = a_y.getArrayVec();
+    copyToGhostAndFill(x_mfarrvec);
+
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        for (int dim = 0; dim < 3; dim++) {
+            const auto& a_mf = *((*m_bcoefs)[n][dim]);
+            auto& y_mf = *(y_mfarrvec[n][dim]);
+            const auto& xg_mf = m_x_ghost[n][dim];
+
+            const int ncomp = a_mf.nComp();
+            if (ncomp <= 1) {
+                // Diagonal only: y = (1 + a) * x
+                auto& x_mf = *(x_mfarrvec[n][dim]);
+                for (MFIter mfi(y_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+                {
+                    Box bx = mfi.tilebox();
+                    auto y_arr = y_mf.array(mfi);
+                    auto x_arr = x_mf.const_array(mfi);
+                    auto a_arr = a_mf.const_array(mfi);
+                    ParallelFor(bx,
+                        [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                    {
+                        y_arr(i,j,k) = x_arr(i,j,k)
+                            * (RT(1.0) + a_arr(i,j,k,0));
+                    });
+                }
+                continue;
+            }
+
+            GpuArray<int,3> nc = {1, 1, 1};
+            GpuArray<int,3> w = {0, 0, 0};
+            for (int d = 0; d < AMREX_SPACEDIM; d++) {
+                nc[d] = m_ops->GetMassMatricesPCnComp(dim, d);
+                w[d] = (nc[d] - 1) / 2;
+            }
+
+            for (MFIter mfi(y_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                Box bx = mfi.tilebox();
+                auto y_arr = y_mf.array(mfi);
+                auto xg_arr = xg_mf.const_array(mfi);
+                auto a_arr = a_mf.const_array(mfi);
+
+                ParallelFor(bx,
+                    [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                {
+                    RT mx = RT(0.0);
+                    int comp = 0;
+                    for (int c2 = 0; c2 < nc[2]; c2++) {
+                        const int kk = k + c2 - w[2];
+                        for (int c1 = 0; c1 < nc[1]; c1++) {
+                            const int jj = j + c1 - w[1];
+                            for (int c0 = 0; c0 < nc[0]; c0++) {
+                                const int ii = i + c0 - w[0];
+                                mx += a_arr(i,j,k,comp)
+                                    * xg_arr(ii,jj,kk);
+                                comp++;
+                            }
+                        }
+                    }
+                    y_arr(i,j,k) = xg_arr(i,j,k) + mx;
                 });
             }
         }

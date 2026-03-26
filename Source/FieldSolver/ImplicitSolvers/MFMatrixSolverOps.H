@@ -62,6 +62,7 @@ public:
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
+    void Matvec (T& a_y, const T& a_x) override;
 
     /** No spectral information available from matrix-free product. */
     [[nodiscard]] RT EstimateOmega () const override { return RT(1.0); }
@@ -220,6 +221,12 @@ auto MFMatrixSolverOps<T>::ResidualNorm (const T& a_x, const T& a_b) -> RT
     m_Jx.scale(RT(-1.0));           // m_Jx = -J*x
     m_Jx.increment(a_b, RT(1.0));   // m_Jx = b - J*x
     return m_Jx.norm2();
+}
+
+template <class T>
+void MFMatrixSolverOps<T>::Matvec (T& a_y, const T& a_x)
+{
+    m_matvec(a_y, a_x);
 }
 
 #endif
