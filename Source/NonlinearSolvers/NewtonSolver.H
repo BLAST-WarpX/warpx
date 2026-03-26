@@ -87,7 +87,9 @@ public:
         auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
         amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
+        if (m_linear_solver_type != LinearSolverType::weighted_jacobi) {
+            amrex::Print() << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
+        }
         amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
         amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
@@ -230,6 +232,11 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 #endif
     } else if (m_linear_solver_type == LinearSolverType::weighted_jacobi) {
         m_linear_solver = std::make_unique<JacobiSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
+        if (m_pc_type != PreconditionerType::none) {
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver",
+                "weighted_jacobi linear solver does not use an external preconditioner;"
+                " ignoring jacobian.pc_type = " + amrex::getEnumNameString(m_pc_type));
+        }
     } else {
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
     }
