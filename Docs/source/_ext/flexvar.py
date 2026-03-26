@@ -277,7 +277,7 @@ class FlexVarDirective(ObjectDescription[str]):
         result = result.replace(".", " ")
         # Use preferred alias for physical units
         for unit_alias, preferred_unit_name in self.unit_alias_dict.items():
-            unit_re = re.compile(rf"\b{unit_alias}\b", re.IGNORECASE)
+            unit_re = re.compile(rf"\b{re.escape(unit_alias)}\b", re.IGNORECASE)
             result = re.sub(unit_re, preferred_unit_name, result)
 
         return result
