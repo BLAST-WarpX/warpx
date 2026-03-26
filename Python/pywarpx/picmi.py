@@ -621,19 +621,55 @@ class DensityDistributionBase(object):
         if hasattr(self, "momentum_spread_expressions") and np.any(
             np.not_equal(self.momentum_spread_expressions, None)
         ):
-            species.momentum_distribution_type = "gaussian_parse_momentum_function"
-            self.setup_parse_momentum_functions(
-                species,
-                source_name,
-                self.momentum_expressions,
-                "_m",
-                self.directed_velocity,
+            species.add_new_group_attr(
+                source_name, "momentum_distribution_type", "maxwellian"
             )
-            self.setup_parse_momentum_functions(
+            if hasattr(self, "momentum_expressions") and np.any(
+                np.not_equal(self.momentum_expressions, None)
+            ):
+                species.add_new_group_attr(
+                    source_name,
+                    "maxwellian_u_mean_distribution_type",
+                    "parser",
+                )
+                self.setup_maxwellian_parser_functions(
+                    species,
+                    source_name,
+                    self.momentum_expressions,
+                    "mean",
+                    self.directed_velocity,
+                )
+            else:
+                species.add_new_group_attr(
+                    source_name,
+                    "maxwellian_u_mean_distribution_type",
+                    "constant",
+                )
+                species.add_new_group_attr(
+                    source_name,
+                    "ux_mean",
+                    self.directed_velocity[0] / constants.c,
+                )
+                species.add_new_group_attr(
+                    source_name,
+                    "uy_mean",
+                    self.directed_velocity[1] / constants.c,
+                )
+                species.add_new_group_attr(
+                    source_name,
+                    "uz_mean",
+                    self.directed_velocity[2] / constants.c,
+                )
+            species.add_new_group_attr(
+                source_name,
+                "maxwellian_u_std_distribution_type",
+                "parser",
+            )
+            self.setup_maxwellian_parser_functions(
                 species,
                 source_name,
                 self.momentum_spread_expressions,
-                "_th",
+                "std",
                 [0.0, 0.0, 0.0],
             )
         elif hasattr(self, "momentum_expressions") and np.any(
@@ -703,6 +739,33 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name,
                 f"momentum_function_u{sdir}{suffix}(x,y,z)",
+                f"({expression})/{constants.c}",
+            )
+
+    def setup_maxwellian_parser_functions(
+        self, species, source_name, expressions, role, defaults
+    ):
+        """Set ``ux_mean_function(x,y,z)`` or ``ux_std_function(x,y,z)`` inputs
+        for ``momentum_distribution_type`` = ``maxwellian`` (see
+        ``VelocityProperties`` / ``TemperatureProperties``).
+        """
+        if role == "mean":
+            infix = "mean"
+        elif role == "std":
+            infix = "std"
+        else:
+            raise ValueError("role must be 'mean' or 'std'")
+
+        for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
+            if expressions[idir] is not None:
+                expression = pywarpx.my_constants.mangle_expression(
+                    expressions[idir], self.mangle_dict
+                )
+            else:
+                expression = f"{defaults[idir]}"
+            species.add_new_group_attr(
+                source_name,
+                f"u{sdir}_{infix}_function(x,y,z)",
                 f"({expression})/{constants.c}",
             )
 
