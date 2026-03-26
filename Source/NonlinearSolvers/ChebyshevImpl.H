@@ -117,6 +117,7 @@ void ChebyshevImpl<T>::Define (MatrixSolverOps<T>* a_ops,
     m_name = a_pp_prefix;
 
     const amrex::ParmParse pp(a_pp_prefix);
+    pp.query("verbose", m_verbose);
     int verbose_int = 0;
     if (pp.query("verbose_int", verbose_int)) {
         m_verbose = (verbose_int > 0);
