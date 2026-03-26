@@ -43,7 +43,7 @@ namespace {
      * @param[out] u2z_out normalized momentum of the second product macroparticles along z (in m.s^-1)
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
-     * @param[in] scattering_angle strategy to determine the scattering angle in the center-of-mass frame.
+     * @param[in] scattering_angle the scattering angle distribution to use
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE

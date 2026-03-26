@@ -167,6 +167,7 @@ public:
         const int t_num_product_species = m_num_product_species;
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
+        const ScatteringAngle t_scattering_angle = m_scattering_angle;
 
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -204,7 +205,8 @@ public:
                                                            p_num_products_device[0];
                     ProtonBoronFusionInitializeMomentum(soa_1, soa_2, soa_products_data[0],
                                                         p_pair_indices_1[i], p_pair_indices_2[i],
-                                                        product_start_index, m1, m2, engine);
+                                                        product_start_index, m1, m2,
+                                                        t_scattering_angle, engine);
                 }
                 else if (BinaryCollisionUtils::is_two_product_fusion_type(t_collision_type))
                 {
@@ -216,7 +218,8 @@ public:
                         p_pair_indices_1[i], p_pair_indices_2[i],
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
-                        m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy, engine);
+                        m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy,
+                        t_scattering_angle, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
                     LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
@@ -260,6 +263,7 @@ private:
     amrex::Gpu::DeviceVector<int> m_num_products_device;
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
+    ScatteringAngle m_scattering_angle{ScatteringAngle::Default};
 };
 
 

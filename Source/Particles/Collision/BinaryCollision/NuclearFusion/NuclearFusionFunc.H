@@ -16,7 +16,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_DenseBins.H>
@@ -62,7 +61,6 @@ public:
         m_probability_threshold{amrex::ParticleReal{0.02}}, // default fusion probability threshold
         m_probability_target_value{amrex::ParticleReal{0.002}}, // default fusion probability target_value
         m_fusion_type{BinaryCollisionUtils::get_nuclear_fusion_type(collision_name, mypc)},
-        m_scattering_angle{ScatteringAngle::Default},
         m_isSameSpecies{isSameSpecies}
     {
 
@@ -78,13 +76,11 @@ public:
         utils::parser::queryWithParser(
             pp_collision_name, "probability_target_value",
             m_probability_target_value);
-        pp_collision_name.query_enum_sloppy("scattering_angle", m_scattering_angle, "-_");
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
         m_exe.m_fusion_type = m_fusion_type;
-        m_exe.m_scattering_angle = m_scattering_angle;
         m_exe.m_isSameSpecies = m_isSameSpecies;
     }
 
@@ -242,7 +238,6 @@ public:
         amrex::ParticleReal m_probability_threshold;
         amrex::ParticleReal m_probability_target_value;
         NuclearFusionType m_fusion_type;
-        ScatteringAngle m_scattering_angle;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
@@ -266,7 +261,6 @@ private:
     amrex::ParticleReal m_probability_threshold;
     amrex::ParticleReal m_probability_target_value;
     NuclearFusionType m_fusion_type;
-    ScatteringAngle m_scattering_angle;
     bool m_isSameSpecies;
 
     Executor m_exe;
