@@ -442,8 +442,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                     else { tdir = 1; }
                     auto dof_tdir_arr = dofs_mfarrvec[lev][tdir]->const_array(mfi);
 #elif defined(WARPX_DIM_3D)
-                    int tdir1 = (dir + 1) % 3;
-                    int tdir2 = (dir + 2) % 3;
+                    const int tdir1 = (dir + 1) % 3;
+                    const int tdir2 = (dir + 2) % 3;
                     GpuArray<Array4<const int>, AMREX_SPACEDIM>
                         const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
                                                           dofs_mfarrvec[lev][tdir1]->const_array(mfi),
