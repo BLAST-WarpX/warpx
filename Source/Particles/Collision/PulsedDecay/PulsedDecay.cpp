@@ -16,6 +16,8 @@
 #include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
+
+#include <AMReX_Math.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
