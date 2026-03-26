@@ -115,6 +115,38 @@ class FlexVarDirective(ObjectDescription[str]):
     # Use emphasis for type and default value
     use_emphasis = False
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Equivalent names for physical units.
+        # Aliases will be mapped to the first name of each list, e.g.,
+        # ["m", "meter", "meters"] implies "meter" -> "m" and "meters" -> "m"
+        unit_alias_lists: list[list[str]] = [
+            ["m", "meter", "meters"],
+            ["s", "second", "seconds"],
+            ["kg", "kilogram", "kilograms"],
+            ["V", "volt", "volts"],
+            ["eV", "electronvolt", "electronvolts", "electron volt", "electron volts"],
+            ["T", "Telsa", "Telsas"],
+            ["A", "amp", "amps"],
+            ["C", "Coulomb", "Coulombs"],
+            ["dimensionless", "unitless", "none"],
+        ]
+        self.make_unit_alias_dict(unit_alias_lists)
+
+    def make_unit_alias_dict(self, unit_alias_lists: list[list[str]]):
+        """
+        Construct unit alias dict, e.g., "seconds" -> "s".
+
+        Map aliases to first name of each list in `unit_alias_lists`, e.g.,
+        ["m", "meter", "meters"] implies "meter" -> "m" and "meters" -> "m".
+        """
+        self.unit_alias_dict: dict[str, str] = {}
+        for unit_alias_list in unit_alias_lists:
+            for unit_alias in unit_alias_list[1:]:
+                # Map aliases to the first name
+                self.unit_alias_dict[unit_alias] = unit_alias_list[0]
+
     # ------------------------------------------------------------------
     # Signature parsing / rendering
     # ------------------------------------------------------------------
@@ -155,6 +187,10 @@ class FlexVarDirective(ObjectDescription[str]):
         l_optional: bool = "optional" in self.options
         l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
+
+        # Process unit string:
+        if unit:
+            unit = self.process_unit_string(unit)
 
         # Format: (`<type>`; in <unit>)
         if type_ or unit:
@@ -221,6 +257,21 @@ class FlexVarDirective(ObjectDescription[str]):
             )
         inline_node = nodes.inline(text, "", *parsed_nodes)
         return inline_node
+
+    def process_unit_string(self, unit_str: str) -> str:
+        result: str = unit_str
+        # x / y -> x/y
+        result = "/".join([u.strip() for u in result.split("/")])
+        # x**n -> x^n
+        result = result.replace("**", "^")
+        # x.y -> x y
+        result = result.replace(".", " ")
+        # Use preferred alias for physical units
+        for unit_alias, preferred_unit_name in self.unit_alias_dict.items():
+            unit_re = re.compile(rf"\b{unit_alias}\b", re.IGNORECASE)
+            result = re.sub(unit_re, preferred_unit_name, result)
+
+        return result
 
     # ------------------------------------------------------------------
     # Index + target registration
