@@ -307,14 +307,14 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
 
         /* loop from 1 to nx - 2 inclusive */
         for (int ix = 1; ix + 1 < nx; ix++) {
-            const amrex::Real m = 1.00_rt / (2.0_rt - -1.0_rt * cmod(ix - 1,0,0));
+            const amrex::Real m = 1.0_rt / (2.0_rt - -1.0_rt * cmod(ix - 1,0,0));
             cmod(ix,0,0) = -1.0_rt * m;
             u(ix,0,0) = (0.0f  - -1.0_rt * u(ix - 1,0,0)) * m;
             x(ix,0,0) = (x(ix,0,0) - -1.0_rt * x(ix - 1,0,0)) * m;
         }
 
         /* handle nx - 1 */
-        const amrex::Real m = 1.00_rt / (2.0_rt - alpha * beta / gamma - -1.0_rt * cmod(nx - 2,0,0));
+        const amrex::Real m = 1.0_rt / (2.0_rt - alpha * beta / gamma - -1.0_rt * cmod(nx - 2,0,0));
         u(nx - 1,0,0) = (alpha    - -1.0_rt * u(nx - 2,0,0)) * m;
         x(nx - 1,0,0) = (x(nx - 1,0,0) - -1.0_rt * x(nx - 2,0,0)) * m;
 
@@ -324,7 +324,7 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
             x(ix,0,0) -= cmod(ix,0,0) * x(ix + 1,0,0);
         }
 
-        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.00_rt + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
+        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.0_rt + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
 
         /* loop from 0 to nx - 1 inclusive */
         for (int ix = 0; ix < nx; ix++) {
