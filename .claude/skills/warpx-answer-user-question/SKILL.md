@@ -1,6 +1,7 @@
 ---
 name: warpx-answer-user-question
 description: Draft a response to a WarpX user question (from a GitHub issue, discussion, or email).
+disable-model-invocation: true
 ---
 
 # Answer WarpX User Question
@@ -9,7 +10,7 @@ Draft a helpful, accurate response to a WarpX user question, in the style of an 
 
 ## Step 1 — Gather the question
 
-If a GitHub issue or discussion URL was provided, fetch it with `gh`. If a plain-text question was pasted, use it directly.
+If a plain-text question was pasted, use it directly. If a GitHub issue or discussion URL was provided, fetch it with `gh` and read the **full thread** (all comments and replies), not just the opening post — the answer or key context is often in subsequent comments.
 
 Identify:
 - **What the user is trying to do** (their end goal, not just their literal question)
@@ -66,13 +67,28 @@ If not, identify the 1-3 most important missing pieces. Common things to ask for
 - WarpX version, platform, CMake configuration (for build issues)
 - Minimal reproducible script (for Python/PICMI issues)
 
-## Step 5 — Draft the response
+If information is missing, proceed directly to Step 6 and draft a "Missing info" reply — do not attempt the Step 5 escalation check, since you cannot yet assess the complexity of the issue.
+
+## Step 5 — Decide whether to draft a response or escalate
+
+Before drafting, check whether the question is within the agent's ability to answer reliably.
+**Stop and report to the skill invoker (the WarpX developer running this skill) instead of drafting a GitHub reply** if the issue falls into either of these categories:
+
+- **Non-trivial bug**: all the information needed to reproduce the issue is present (input file, error message, reproducing script, platform details), but determining the root cause requires running the code, inspecting runtime state, or deeper investigation of WarpX internals that cannot be done through static analysis alone.
+- **Complicated physics or numerics question**: the question requires domain expertise to answer correctly (e.g., interpreting anomalous simulation results, choosing numerical parameters for an unconventional setup, evaluating algorithm trade-offs) and cannot be answered with confidence from documentation, past issues, and source code alone.
+
+In these cases, report to the skill invoker:
+
+> This issue appears to require deeper investigation (or domain expertise) that goes beyond what I can reliably provide. I recommend that a WarpX developer look into this directly.
+
+Then briefly summarize what is known, what makes the question hard, and what a developer would need to look at.
+
+## Step 6 — Draft the response
 
 **Tone** — match the style of experienced WarpX developers:
-- Warm and welcoming: open with "Hi @username," or "Thanks for your question!"
-- Patient and non-condescending
+- Warm, welcoming
 - Direct: give the answer first, then the explanation
-- Concrete: include corrected input file snippets or code examples inline
+- Concrete: include corrected input file snippets or links to the documentation and/or online examples
 - Honest about limitations: if a feature doesn't exist, say so clearly
 
 **Structure by situation:**
@@ -85,17 +101,7 @@ If not, identify the 1-3 most important missing pieces. Common things to ask for
 
 **Feature not available:** (1) Confirm clearly, (2) explain workarounds (Python callbacks, post-processing, etc.), (3) link to tracking issue/PR if one exists, (4) invite contribution.
 
-**Common gotchas to check proactively:**
-- Wrong sign on `q_tot` for electrons (must be negative; positive silently causes `BeamRelevant` to output zeros)
-- CFL too low for EM laser simulations (should be ~0.999, not 0.9)
-- Missing `<diag_name>.intervals` on reduced diagnostics (nothing is written)
-- HDF5 I/O slow on HPC filesystems — recommend ADIOS2 BP (`openpmd_backend = bp`)
-- `get_particle_uz()` returns a list of per-box arrays in Python, not a flat array
-- PICMI `focal_position` (absolute position) vs native `profile_focal_distance` (distance from antenna) — different sign conventions
-- `do_continuous_injection` is for moving-window plasma injection only, not for fixed-domain plasma sources
-- `particle_fields` parser expressions cannot cross-reference other computed moments
-
-## Step 6 — Present the draft
+## Step 7 — Present the draft
 
 Show the draft and ask:
 

@@ -46,10 +46,31 @@ Skills
 WarpX defines reusable *skills* in the ``.claude/skills/`` directory.
 Skills are scripted workflows that an LLM assistant can execute on demand, automating multi-step tasks that follow a fixed procedure.
 
+All WarpX skills use the prefix ``warpx-`` for easy discovery (start typing ``/warpx`` to see them).
+
 Currently available skills:
 
-``/new-paper-highlight``
-^^^^^^^^^^^^^^^^^^^^^^^^
+``/warpx-answer-user-question``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Drafts a response to a WarpX user question from a GitHub issue, discussion, or email.
+
+Usage (in Claude Code):
+
+.. code-block:: text
+
+   /warpx-answer-user-question https://github.com/BLAST-WarpX/warpx/discussions/1234
+
+The skill will:
+
+#. Fetch the question from the provided URL (or use a pasted question directly).
+#. Categorize the question (installation, input parameters, diagnostics, physics, etc.).
+#. Search the WarpX source code, documentation, and past issues for relevant information.
+#. Draft a response in the style of an experienced WarpX developer.
+#. Present the draft for review before posting.
+
+``/warpx-new-paper-highlight``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Adds a new paper to the WarpX science highlights documentation (``Docs/source/highlights.rst``).
 
@@ -57,7 +78,7 @@ Usage (in Claude Code):
 
 .. code-block:: text
 
-   /new-paper-highlight https://doi.org/10.1103/PhysRevLett.133.045002
+   /warpx-new-paper-highlight https://doi.org/10.1103/PhysRevLett.133.045002
 
 The skill will:
 
