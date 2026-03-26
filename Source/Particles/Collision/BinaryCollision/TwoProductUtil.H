@@ -139,7 +139,7 @@ namespace {
         else if (scattering_angle == ScatteringAngle::Forward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
-            if (vc_sq > std::numeric_limits<amrex::ParticleReal>::min())
+            if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
             {
                 // Convert momentum of first incident particle to lab frame, using equation (2)
                 // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
