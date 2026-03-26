@@ -7,7 +7,7 @@
 #ifndef MULTIFAB_MATRIX_SOLVER_OPS_H_
 #define MULTIFAB_MATRIX_SOLVER_OPS_H_
 
-#include "MatrixSolverOps.H"
+#include "NonlinearSolvers/MatrixSolverOps.H"
 
 #include <AMReX.H>
 #include <AMReX_Array.H>

@@ -12,7 +12,7 @@
 #include "Preconditioner.H"
 
 #include "MatrixSolverOps.H"
-#include "MultiFabMatrixSolverOps.H"
+#include "FieldSolver/ImplicitSolvers/MultiFabMatrixSolverOps.H"
 #include "FieldSolver/ImplicitSolvers/SparseMatrixSolverOps.H"
 
 #include <AMReX.H>
