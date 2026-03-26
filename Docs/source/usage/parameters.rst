@@ -1728,6 +1728,14 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, the spatial bulk drift is read from openPMD file
+          (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          The following are required: ``<species_name>.read_ux_mean_from_path``,
+          ``<species_name>.read_uy_mean_from_path``,
+          ``<species_name>.read_uz_mean_from_path`` (each an openPMD file path).
+          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to
+          load openPMD data in parallel, in the same way density is loaded from a file via
+          ``read_density_distributed``.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1744,6 +1752,14 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
+        * If ``read_from_file``, the spatial bulk drift is read from openPMD file
+          (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          The following are required: ``<species_name>.read_ux_std_from_path``,
+          ``<species_name>.read_uy_std_from_path``,
+          ``<species_name>.read_uz_std_from_path`` (each an openPMD file path).
+          Optional: ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) to
+          load openPMD data in parallel, in the same way density is loaded from a file via
+          ``read_density_distributed``.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
