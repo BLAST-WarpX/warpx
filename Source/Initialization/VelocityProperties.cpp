@@ -85,19 +85,16 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                        ::tolower);
         if (u_mean_dist_s == "constant") {
 
-            // Query for all three components. Defaults are zeros if not provided.
             utils::parser::queryWithParser(pp, source_name, "ux_mean", m_ux_mean);
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
 
-            // Compute |u| = sqrt(ux^2 + uy^2 + uz^2)
-            double velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
+            amrex::Real velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
                                                   m_uy_mean*m_uy_mean +
                                                   m_uz_mean*m_uz_mean);
-            // Assert |u_mean| < 1
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 velocity_magnitude < 1.0,
-                "Magnitude of velocity |u_mean| = " + std::to_string(velocity_magnitude) +
+                "Magnitude of mean velocity abs(u_mean) = " + std::to_string(velocity_magnitude) +
                 " is greater than or equal to 1"
             );
 

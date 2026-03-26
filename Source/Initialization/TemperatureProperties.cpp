@@ -53,14 +53,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 " is less than minimum 0.1 allowed for Maxwell-Juttner."
             );
 
-            // if (mom_dist_s == "maxwellian" && theta > 0.01) {
-            //     ablastr::warn_manager::WMRecordWarning(
-            //         "Temperature",
-            //         std::string{"Maxwell-Boltzmann distribution has errors greater than 1%"} +
-            //         std::string{" for temperature parameter theta > 0.01. (theta = "} +
-            //         std::to_string(theta) + " given)");
-            // }
-
             m_type = TempConstantValue;
             m_temperature = theta;
         }
@@ -94,13 +86,16 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 (m_uy_std*m_uy_std > 0.01) ||
                 (m_uz_std*m_uz_std > 0.01) )
             {
+                amrex::Real ux_var = m_ux_std * m_ux_std;
+                amrex::Real uy_var = m_uy_std * m_uy_std;
+                amrex::Real uz_var = m_uz_std * m_uz_std;
+
                 ablastr::warn_manager::WMRecordWarning(
                     "Temperature",
-                    "Maxwellian distribution has errors greater than 1% "
-                    "for temperature parameter(s) ux_std*ux_std, uy_std*uy_std, uz_std*uz_std > 0.01. "
-                    "Values given: ux_std*ux_std = " + std::to_string(m_ux_std*m_ux_std) +
-                    ", uy_std*uy_std = " + std::to_string(m_uy_std*m_uy_std) +
-                    ", uz_std*uz_std = " + std::to_string(m_uz_std*m_uz_std)
+                    "Maxwellian distribution has temperature variance(s) exceeding 0.01: "
+                    "ux_std*ux_std = " + std::to_string(ux_var) +
+                    ", uy_std*uy_std = " + std::to_string(uy_var) +
+                    ", uz_std*uz_std = " + std::to_string(uz_var)
                 );
             }
             m_type = TempConstantVector;
