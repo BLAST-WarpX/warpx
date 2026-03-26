@@ -7,6 +7,10 @@ This section describes the list of parameters that can be set in the WarpX input
 
 Examples of inputs files can be found in the :ref:`Examples <usage-examples>` section.
 
+.. tip::
+
+   If you enjoy AI/LLM/agentic workflows, see our :ref:`AI (LLM)-Assisted Input File Design <ai_input_design>` section, too.
+
 .. note::
 
    WarpX's input parameters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
