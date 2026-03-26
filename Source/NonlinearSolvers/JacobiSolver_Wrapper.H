@@ -122,7 +122,7 @@ public:
 private:
 
     LinOp* m_linop = nullptr;
-    bool m_use_pcmat = false;
+    bool m_use_pcmat = true;
     std::unique_ptr<MatrixSolverOps<Vec>> m_matrix_ops;
     WeightedJacobiImpl<Vec> m_solver;
 };

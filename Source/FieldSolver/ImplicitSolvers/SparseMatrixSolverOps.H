@@ -113,9 +113,7 @@ void SparseMatrixSolverOps<T,Ops>::InitialGuess (T& a_x, const T& a_b)
 template <class T, class Ops>
 void SparseMatrixSolverOps<T,Ops>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
 {
-    using namespace amrex;
-    amrex::ignore_unused(a_b);
-
+    linearizeRHS(a_b);
     const auto* sp = m_ops->GetSparseJacobian();
     buildExtended(a_x);
     sp->MatJacobiSweep(m_x_flat.data(), m_x_ext.data(),
@@ -126,13 +124,11 @@ void SparseMatrixSolverOps<T,Ops>::JacobiSweep (T& a_x, const T& a_b, RT a_omega
 template <class T, class Ops>
 auto SparseMatrixSolverOps<T,Ops>::ResidualNorm (const T& a_x, const T& a_b) -> RT
 {
-    using namespace amrex;
-    amrex::ignore_unused(a_b);
-
+    linearizeRHS(a_b);
     const auto* sp = m_ops->GetSparseJacobian();
     buildExtended(a_x);
     RT res_sq = sp->MatResidualNorm(m_x_ext.data(), m_b_flat.data());
-    ParallelAllReduce::Sum(res_sq, ParallelContext::CommunicatorSub());
+    amrex::ParallelAllReduce::Sum(res_sq, amrex::ParallelContext::CommunicatorSub());
     return std::sqrt(res_sq);
 }
 

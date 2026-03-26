@@ -175,7 +175,7 @@ private:
      */
     PreconditionerType m_pc_type = PreconditionerType::none;
 
-    bool m_use_pcmat = false;
+    bool m_use_pcmat = true;
 
     mutable amrex::Real m_cur_time, m_dt;
 
