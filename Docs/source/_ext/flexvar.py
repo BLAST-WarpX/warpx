@@ -64,7 +64,7 @@ Cross reference role::
 from __future__ import annotations
 
 import re
-from typing import Any, Iterator, TypedDict, cast
+from typing import Any, Iterator, NamedTuple, cast
 
 from docutils import nodes
 from docutils.parsers.rst import directives
@@ -82,9 +82,10 @@ from sphinx.util.nodes import make_id, make_refnode
 logger = logging.getLogger(__name__)
 
 
-class ObjectEntry(TypedDict):
+class ObjectEntry(NamedTuple):
     docname: str
     node_id: str
+    vardesc: VarDesc
 
 
 class VarDesc:
@@ -102,7 +103,7 @@ class VarDesc:
     #     return self.display_name
 
 
-class FlexVarDirective(ObjectDescription[str]):
+class FlexVarDirective(ObjectDescription[VarDesc]):
     """
     Description of a variable.
 
@@ -183,13 +184,15 @@ class FlexVarDirective(ObjectDescription[str]):
     # Signature parsing / rendering
     # ------------------------------------------------------------------
 
-    def handle_signature(self, sig: str, signode: desc_signature) -> str:
+    def handle_signature(self, sig: str, signode: desc_signature) -> VarDesc:
         """
         Build the rendered signature node and return the canonical name.
 
         ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
-        name = sig.strip()
+        result = VarDesc(sig)
+
+        name = result.display_name
 
         signode["fullname"] = name
         signode["ids"] = []  # filled in add_target_and_index
@@ -271,7 +274,7 @@ class FlexVarDirective(ObjectDescription[str]):
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(anno)
 
-        return name
+        return result
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
@@ -306,8 +309,9 @@ class FlexVarDirective(ObjectDescription[str]):
     # ------------------------------------------------------------------
 
     def add_target_and_index(
-        self, name: str, sig: str, signode: desc_signature
+        self, name_cls: VarDesc, sig: str, signode: desc_signature
     ) -> None:
+        name: str = name_cls.display_name
         node_id = make_id(self.env, self.state.document, "", name)
         signode["ids"].append(node_id)
         self.state.document.note_explicit_target(signode)
@@ -315,6 +319,7 @@ class FlexVarDirective(ObjectDescription[str]):
         domain = cast(FlexVarDomain, self.env.get_domain(FlexVarDomain.name))
         domain.note_var(
             name=name,
+            vardesc=name_cls,
             docname=self.env.docname,
             node_id=node_id,
             location=signode,
@@ -449,6 +454,7 @@ class FlexVarDomain(Domain):
     def note_var(
         self,
         name: str,
+        vardesc: VarDesc,
         docname: str,
         node_id: str,
         location: Any = None,
@@ -459,24 +465,25 @@ class FlexVarDomain(Domain):
                 "duplicate object description of %s, "
                 "other instance in %s, use :noindex: for one of them",
                 name,
-                other["docname"],
+                other.docname,
                 location=location,
             )
 
-        self.vars[name] = {
-            "docname": docname,
-            "node_id": node_id,
-        }
+        self.vars[name] = ObjectEntry(
+            docname=docname,
+            node_id=node_id,
+            vardesc=vardesc,
+        )
 
     def clear_doc(self, docname: str) -> None:
-        to_remove = [k for k, v in self.vars.items() if v["docname"] == docname]
+        to_remove = [k for k, v in self.vars.items() if v.docname == docname]
         for k in to_remove:
             del self.vars[k]
 
     def merge_domaindata(self, docnames: list[str], otherdata: dict[str, dict]) -> None:
         for name, info in otherdata.get("vars", {}).items():
             info = cast(ObjectEntry, info)
-            if info["docname"] in docnames:
+            if info.docname in docnames:
                 self.vars[name] = info
 
     def resolve_xref(
@@ -493,22 +500,22 @@ class FlexVarDomain(Domain):
         if info is None:
             return None
         return make_refnode(
-            builder,
-            fromdocname,
-            info["docname"],
-            info["node_id"],
-            contnode,
-            target,
+            builder=builder,
+            fromdocname=fromdocname,
+            todocname=info.docname,
+            targetid=info.node_id,
+            child=contnode,
+            title=target,
         )
 
     def get_objects(self) -> Iterator[tuple[str, str, str, str, str, int]]:
         for name, info in self.vars.items():
             yield (
                 name,  # name
-                name,  # dispname
+                info.vardesc.display_name,  # dispname
                 "var",  # type
-                info["docname"],  # docname
-                info["node_id"],  # anchor
+                info.docname,  # docname
+                info.node_id,  # anchor
                 1,  # priority
             )
 
