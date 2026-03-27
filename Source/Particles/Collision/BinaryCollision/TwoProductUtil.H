@@ -130,7 +130,9 @@ namespace {
         const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
 
         // Compute momentum of first product in the center of mass frame
-        amrex::ParticleReal px_star_out, py_star_out, pz_star_out;
+        amrex::ParticleReal px_star_out = 0.0_prt;
+        amrex::ParticleReal py_star_out = 0.0_prt;
+        amrex::ParticleReal pz_star_out = 0.0_prt;
         if (scattering_angle == ScatteringAngle::Isotropic) {
             // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
             ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
