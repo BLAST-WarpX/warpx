@@ -151,15 +151,30 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
             // Parallel loop over particles in the tile.
             amrex::ParallelForRNG(np, [=] AMREX_GPU_DEVICE (long ip, amrex::RandomEngine const& engine) noexcept {
                 amrex::ParticleReal x, y, z;
+                amrex::ParticleReal norm_pos = 0.0_prt;
+
                 getPosition(ip, x, y, z);
+#if defined(WARPX_DIM_1D_Z)
+                norm_pos = z;  // only one possibility
+#elif defined(WARPX_DIM_XZ)
+                norm_pos = dir ? z : x;  // if dir = 1, z; if dir = 0, x
+#elif defined(WARPX_DIM_3D)
+                if (dir == 0) {
+                    norm_pos = x;
+                } else if (dir == 1) {
+                    norm_pos = y;
+                } else if (dir == 2) {
+                    norm_pos = z;
+                }
+#endif  // other geometries have already been ruled out.
 
                 amrex::Real prob; // stopping probability
-                if (z < loend) {
+                if (norm_pos < loend) {
                   prob = 0._rt;
-                } else if (z > hiend - dx[dir]) {
+                } else if (norm_pos > hiend - dx[dir]) {
                   prob = 1._rt;
                 } else {
-                  prob = 1.0 - std::pow((hiend - dx[dir] - z) /
+                  prob = 1.0 - std::pow((hiend - dx[dir] - norm_pos) /
                                         (hiend - dx[dir] - loend),
                                         0.25_rt);
                 }

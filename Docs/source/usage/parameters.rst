@@ -814,9 +814,9 @@ method used is similar to that of `Miller et al. (Phys. Plasmas 28, 112702 (2021
 
 The user specifies a region in which particles will be thermalized, a normal direction, a temperature, and a
 momentum threshold. Inside the thermalizing region, the probability that a particle will be affected increases
-from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta in the normal direction thermalized
-using the temperature paramters ``theta`` if their momenta are over the threshold. The parameters affecting this region
-are as follows:
+from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta thermalized
+using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold.
+The parameters affecting this region are as follows:
 
 * ``particle_thermalizer.normal`` (`string`)
     The normal direction describing the thermalizer region. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive). Along with the ``start`` and ``stop`` parameters below, this specifies the region in space where particles will be thermalized.
@@ -835,14 +835,14 @@ are as follows:
     This parameter is required if the thermalizer is enabled.
 
 * ``particle_thermalizer.momentum_threshold`` (`float`)
-    Momentum threshold used by the thermalizer. Particles for which the magnitude of their normalized momenta, i.e. :math:`\gamma |\beta|`) is less than this threshold will not be affected.
+    Momentum threshold used by the thermalizer. In each direction, if a particle's normalized momentum component (e.g. :math:`\gamma \beta_x`) is above this threshold, that component will be thermalized.
     This parameter is required if the thermalizer is enabled.
 
 * ``particle_thermalizer.theta`` (`float`)
     Dimensionless temperature parameter (k*T/m/c^2) used to sample the thermalized particle velocities.
-    This parameter is required if the thermalizer is enabled. The normalized momentum of the selected
-    particles in the ``particle_thermalizer.normal`` direction will be drawn from a Gaussian distribution
-    with mean 0.0 and variance ``theta``.
+    This parameter is required if the thermalizer is enabled. For the selected particles, if the
+    normalized momentum in any direction exceeds the threshold, the particle's momentum in that direction will be set
+    to a value drawn from a Gaussian distribution with mean 0.0 and variance ``theta``.
 
 Example::
 
@@ -851,7 +851,7 @@ Example::
     particle_thermalizer.end = 1.0e-6
     particle_thermalizer.momentum_threshold = 0.5
     particle_thermalizer.theta = 0.1
-    partcle_thermalizer.species = electrons hydrogen
+    particle_thermalizer.species = electrons hydrogen
 
 .. _running-cpp-parameters-parallelization:
 
