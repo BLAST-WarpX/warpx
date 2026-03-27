@@ -99,9 +99,6 @@ class VarDesc:
         self.name_list: list[str] = name_list
         self.sig: str = sig
 
-    # def __str__(self):
-    #     return self.display_name
-
 
 class FlexVarDirective(ObjectDescription[VarDesc]):
     """
@@ -320,7 +317,6 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         domain.note_var(
             name=name,
             vardesc=name_cls,
-            docname=self.env.docname,
             node_id=node_id,
             location=signode,
         )
@@ -455,7 +451,6 @@ class FlexVarDomain(Domain):
         self,
         name: str,
         vardesc: VarDesc,
-        docname: str,
         node_id: str,
         location: Any = None,
     ) -> None:
@@ -470,7 +465,7 @@ class FlexVarDomain(Domain):
             )
 
         self.vars[name] = ObjectEntry(
-            docname=docname,
+            docname=self.env.docname,
             node_id=node_id,
             vardesc=vardesc,
         )
