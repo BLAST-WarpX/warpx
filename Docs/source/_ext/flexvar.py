@@ -314,7 +314,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         self.state.document.note_explicit_target(signode)
 
         domain = cast(FlexVarDomain, self.env.get_domain(FlexVarDomain.name))
-        domain.note_var(
+        domain.note_object(
             name=name,
             vardesc=name_cls,
             node_id=node_id,
@@ -447,7 +447,7 @@ class FlexVarDomain(Domain):
     def vars(self) -> dict[str, ObjectEntry]:
         return self.data.setdefault("vars", {})
 
-    def note_var(
+    def note_object(
         self,
         name: str,
         vardesc: VarDesc,
