@@ -3549,7 +3549,7 @@ Grid types (collocated, staggered, hybrid)
         The default behavior should not normally be changed.
         At present, this parameter is intended mainly for testing and development purposes.
 
-.. fv:var:: warpx.field_centering_nox/noy/noz
+.. fv:var:: warpx.field_centering_no<x,y,z>
     :type: `integer`
     :optional:
 
