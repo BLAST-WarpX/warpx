@@ -87,6 +87,21 @@ class ObjectEntry(TypedDict):
     node_id: str
 
 
+class VarDesc:
+    def __init__(self, sig: str):
+        name_list: list[str] = sig.strip().split(" ")
+        disp_name: str = name_list[0]
+        if len(name_list) > 1:
+            disp_name += ", ".join(name_list[1:-1]) + " & " + name_list[-1]
+
+        self.display_name: str = disp_name
+        self.name_list: list[str] = name_list
+        self.sig: str = sig
+
+    # def __str__(self):
+    #     return self.display_name
+
+
 class FlexVarDirective(ObjectDescription[str]):
     """
     Description of a variable.
