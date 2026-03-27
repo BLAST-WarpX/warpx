@@ -13,8 +13,16 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
+#include <limits>
+
 /* Type of temperature initialization. Used by TemperatureProperties and GetTemperature. */
-enum TemperatureInitType {TempConstantValue, TempParserFunction, TempParserFunctionVector, TempConstantVector};
+enum TemperatureInitType {
+    TempConstantValue,
+    TempParserFunction,
+    TempParserFunctionVector,
+    TempConstantVector,
+    TempParserScalarTeV
+};
 
 /**
  * \brief Struct to store temperature properties, for use in momentum initialization.
@@ -34,6 +42,12 @@ struct TemperatureProperties
      */
     TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name);
 
+    /**
+     * \brief Same as above, but species_mass [kg] is required for maxwellian ``T_eV`` spread.
+     */
+    TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                           amrex::Real species_mass);
+
     /* Type of temperature initialization */
     TemperatureInitType m_type;
 
@@ -46,6 +60,10 @@ struct TemperatureProperties
     amrex::Real m_ux_std{0.0}, m_uy_std{0.0}, m_uz_std{0.0};
     /* Storage of the parser functions for temperature vector, if m_type == TempParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_std_parser, m_ptr_uy_std_parser, m_ptr_uz_std_parser;
+
+    /* Species mass [kg] required for maxwellian ``T_eV`` spread  */
+    amrex::Real m_species_mass{std::numeric_limits<amrex::Real>::quiet_NaN()};
+    std::unique_ptr<amrex::Parser> m_ptr_T_eV_parser;
 };
 
 #endif //WARPX_TEMPERATURE_PROPERTIES_H_

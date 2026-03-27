@@ -1308,6 +1308,16 @@ Particle initialization
         * ``<species_name>.ux_std_function(x,y,z)``: standard deviation of :math:`u_{x}`
         * ``<species_name>.uy_std_function(x,y,z)``: standard deviation of :math:`u_{y}`
         * ``<species_name>.uz_std_function(x,y,z)``: standard deviation of :math:`u_{z}`
+    * ``<species_name>.maxwellian_T_eV_distribution_type`` (`string`) is an alternative to ``maxwellian_u_std_distribution_type`` (mutually exclusive).
+        This sets isotropic thermal spread from a temperature in electron-volts, using species mass from the input:
+
+        .. math:: u_\mathrm{std} = \sqrt{\frac{T_\mathrm{eV}\, q_e}{m\, c^2}}
+
+        The same :math:`u_\mathrm{std}` is used for all three thermal momentum spread components.
+
+        * If ``constant``, set ``<species_name>.T_eV``.
+        * If ``parser``, set ``<species_name>.maxwellian_T_eV(x,y,z)``.
+
         Particles may be relativistic in the lab frame, but the sampling model treats them as non-relativistic in the drift frame. For a relativistic thermal spread in the drift frame, use ``maxwell_juttner`` instead.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
@@ -1340,13 +1350,13 @@ Particle initialization
       which gives the distribution of each component of the momentum as a function of space.
 
 * ``<species_name>.theta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the spread is set using ``maxwellian_u_std_*`` parameters above).
+    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` or ``maxwellian_T_eV_distribution_type*`` above).
     See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than zero are not allowed.
     * If ``constant``, use a constant temperature, given by the required float parameter ``<species_name>.theta``.
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.theta_function(x,y,z)``.
 
 * ``<species_name>.beta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the drift is set using ``maxwellian_u_mean_*`` parameters above).
+    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters above).
     See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
     * If ``constant``, use a constant speed, given by the required float parameter ``<species_name>.beta``.
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.beta_function(x,y,z)``.

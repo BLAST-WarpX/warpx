@@ -9,16 +9,56 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
-/*
- * Construct TemperatureProperties based on the passed parameters.
- * If temperature is a constant, store value. If a parser, make and
- * store the parser function
- */
-TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name) {
-    // Set defaults
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <sstream>
+
+namespace
+{
+    bool specified (const amrex::ParmParse& pp, const std::string& group, const char* name)
+    {
+        if (pp.contains(name)) {
+            return true;
+        }
+        if (!group.empty()) {
+            return pp.contains((group + '.' + name).c_str());
+        }
+        return false;
+    }
+
+    bool any_u_std_specified (const amrex::ParmParse& pp, const std::string& group)
+    {
+        static const char* keys[] = {
+            "maxwellian_u_std_distribution_type",
+            "ux_std", "uy_std", "uz_std",
+            "ux_std_function(x,y,z)",
+            "uy_std_function(x,y,z)",
+            "uz_std_function(x,y,z)"
+        };
+        for (const char* k : keys) {
+            if (specified(pp, group, k)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name)
+    : TemperatureProperties(pp, source_name, std::numeric_limits<amrex::Real>::quiet_NaN())
+{
+}
+
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                             amrex::Real species_mass)
+{
+    m_species_mass = species_mass;
+
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
@@ -33,7 +73,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 utils::parser::queryWithParser(pp, source_name, "theta", theta),
                 "Temperature parameter theta not specified");
 
-            // Do validation on theta value
+            // Do validation on theta value.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(theta >= 0,
                 "Temperature parameter theta = " + std::to_string(theta) +
                 " is less than zero, which is not allowed");
@@ -58,60 +98,109 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_type = TempParserFunction;
         }
         else {
-            std::stringstream stringstream;
-            std::string string;
-            stringstream << "Temperature distribution type '" << temp_dist_s << "' not recognized.";
-            string = stringstream.str();
-            WARPX_ABORT_WITH_MESSAGE(string);
+            std::stringstream ss;
+            ss << "Temperature distribution type '" << temp_dist_s << "' not recognized.";
+            WARPX_ABORT_WITH_MESSAGE(ss.str());
         }
     }
     else {
-        std::string u_std_dist_s = "constant";
-        utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
-        if (u_std_dist_s == "constant") {
-            utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
-            utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
-            utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
+        std::string tev_dist_s;
+        const bool has_temperature_in_ev = utils::parser::query(pp, source_name,
+            "maxwellian_T_eV_distribution_type", tev_dist_s);
 
-            amrex::Real ux_var = m_ux_std * m_ux_std;
-            amrex::Real uy_var = m_uy_std * m_uy_std;
-            amrex::Real uz_var = m_uz_std * m_uz_std;
-            if ( (ux_var > 0.01) ||
-                 (uy_var > 0.01) ||
-                 (uz_var > 0.01) )
-            {
-                ablastr::warn_manager::WMRecordWarning(
-                    "Temperature",
-                    "Maxwellian distribution has component-wise temperature variances exceeding 0.01: "
-                    "ux_std*ux_std = " + std::to_string(ux_var) +
-                    ", uy_std*uy_std = " + std::to_string(uy_var) +
-                    ", uz_std*uz_std = " + std::to_string(uz_var)
-                );
+        if (!has_temperature_in_ev) {
+            if (specified(pp, source_name, "T_eV") ||
+                specified(pp, source_name, "maxwellian_T_eV(x,y,z)")) {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Set maxwellian_T_eV_distribution_type (constant or parser) when using T_eV "
+                    "or maxwellian_T_eV(x,y,z).");
             }
-            m_type = TempConstantVector;
-        } else if (u_std_dist_s == "parser") {
-            std::string str_ux_std_function, str_uy_std_function, str_uz_std_function;
-            utils::parser::Store_parserString(pp, source_name, "ux_std_function(x,y,z)", str_ux_std_function);
-            utils::parser::Store_parserString(pp, source_name, "uy_std_function(x,y,z)", str_uy_std_function);
-            utils::parser::Store_parserString(pp, source_name, "uz_std_function(x,y,z)", str_uz_std_function);
-            m_ptr_ux_std_parser =
-                std::make_unique<amrex::Parser>(
-                    utils::parser::makeParser(str_ux_std_function,{"x","y","z"}));
-            m_ptr_uy_std_parser =
-                std::make_unique<amrex::Parser>(
-                    utils::parser::makeParser(str_uy_std_function,{"x","y","z"}));
-            m_ptr_uz_std_parser =
-                std::make_unique<amrex::Parser>(
-                    utils::parser::makeParser(str_uz_std_function,{"x","y","z"}));
-            m_type = TempParserFunctionVector;
 
+            std::string u_std_dist_s = "constant";
+            utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
+
+            if (u_std_dist_s == "constant") {
+                utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
+                utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
+                utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
+
+                const amrex::Real vx = m_ux_std * m_ux_std;
+                const amrex::Real vy = m_uy_std * m_uy_std;
+                const amrex::Real vz = m_uz_std * m_uz_std;
+                if (vx > 0.01 || vy > 0.01 || vz > 0.01) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "Temperature",
+                        "Maxwellian distribution has component-wise temperature variances exceeding 0.01: "
+                        "ux_std*ux_std = " + std::to_string(vx) +
+                        ", uy_std*uy_std = " + std::to_string(vy) +
+                        ", uz_std*uz_std = " + std::to_string(vz)
+                    );
+                }
+                m_type = TempConstantVector;
+            }
+            else if (u_std_dist_s == "parser") {
+                std::string sx, sy, sz;
+                utils::parser::Store_parserString(pp, source_name, "ux_std_function(x,y,z)", sx);
+                utils::parser::Store_parserString(pp, source_name, "uy_std_function(x,y,z)", sy);
+                utils::parser::Store_parserString(pp, source_name, "uz_std_function(x,y,z)", sz);
+                m_ptr_ux_std_parser =
+                    std::make_unique<amrex::Parser>(utils::parser::makeParser(sx, {"x", "y", "z"}));
+                m_ptr_uy_std_parser =
+                    std::make_unique<amrex::Parser>(utils::parser::makeParser(sy, {"x", "y", "z"}));
+                m_ptr_uz_std_parser =
+                    std::make_unique<amrex::Parser>(utils::parser::makeParser(sz, {"x", "y", "z"}));
+                m_type = TempParserFunctionVector;
+            }
+            else {
+                std::stringstream ss;
+                ss << "Maxwellian velocity standard deviation distribution type '" << u_std_dist_s
+                   << "' not recognized.";
+                WARPX_ABORT_WITH_MESSAGE(ss.str());
+            }
         }
         else {
-            std::stringstream stringstream;
-            std::string string;
-            stringstream << "Maxwellian velocity standard deviation distribution type '" << u_std_dist_s << "' not recognized.";
-            string = stringstream.str();
-            WARPX_ABORT_WITH_MESSAGE(string);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !any_u_std_specified(pp, source_name),
+                "maxwellian_T_eV_distribution_type is mutually exclusive with maxwellian_u_std_* "
+                "and ux_std / uy_std / uz_std / ux_std_function(x,y,z) / ...");
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species_mass > 0.0 && !std::isnan(species_mass),
+                "Valid species mass is required to convert T_eV to u_std for maxwellian momentum.");
+
+            if (tev_dist_s == "constant") {
+                amrex::Real T_eV = 0.0;
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    utils::parser::queryWithParser(pp, source_name, "T_eV", T_eV),
+                    "T_eV must be set when maxwellian_T_eV_distribution_type = constant.");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(T_eV >= 0.0,
+                    "T_eV must be non-negative.");
+                const amrex::Real u_std = std::sqrt(T_eV * PhysConst::q_e /
+                    (species_mass * PhysConst::c * PhysConst::c));
+                m_ux_std = u_std;
+                m_uy_std = u_std;
+                m_uz_std = u_std;
+                if (u_std * u_std > 0.01) {
+                    ablastr::warn_manager::WMRecordWarning(
+                        "Temperature",
+                        "Maxwellian u_std*u_std > 0.01 from T_eV — ignored relativistic corrections can exceed ~1%."
+                    );
+                }
+                m_type = TempConstantVector;
+            }
+            else if (tev_dist_s == "parser") {
+                std::string str_tev;
+                utils::parser::Store_parserString(pp, source_name, "maxwellian_T_eV(x,y,z)", str_tev);
+                m_ptr_T_eV_parser =
+                    std::make_unique<amrex::Parser>(
+                        utils::parser::makeParser(str_tev, {"x", "y", "z"}));
+                m_type = TempParserScalarTeV;
+            }
+            else {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "maxwellian_T_eV_distribution_type '" + tev_dist_s + "' not recognized. "
+                    "Use constant or parser.");
+            }
         }
     }
 }
