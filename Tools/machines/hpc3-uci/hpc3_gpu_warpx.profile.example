@@ -33,7 +33,8 @@ export PATH=${HOME}/sw/hpc3/gpu/adios2-2.10.2/bin:${PATH}
 #module load ccache  # missing
 
 # optional: for Python bindings
-module load python/3.10.2
+# Any supported Python >=3.11 module should work
+module load python/3.14.3
 
 if [ -d "${HOME}/sw/hpc3/gpu/venvs/warpx-gpu" ]
 then
