@@ -171,6 +171,11 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         Map aliases to first name of each list in `unit_alias_lists`, e.g.,
         ["m", "meter", "meters"] implies "meter" -> "m" and "meters" -> "m".
         """
+        # self.unit_alias_dict: dict[str, str]  = {
+        #     unit_alias: unit_alias_list[0]
+        #     for unit_alias_list in unit_alias_lists
+        #     for unit_alias in unit_alias_list[1:]
+        # }
         self.unit_alias_dict: dict[str, str] = {}
         for unit_alias_list in unit_alias_lists:
             for unit_alias in unit_alias_list[1:]:
@@ -410,6 +415,7 @@ class FlexVarXRefRole(XRefRole):
             m = self._value_re.match(target)
             if m:
                 target = m.group(1).strip()
+        # return XRefRole.process_link(self, env, refnode, has_explicit_title, title, target)
         return XRefRole.process_link(
             self,
             env=env,
@@ -493,26 +499,26 @@ class FlexVarDomain(Domain):
         node: addnodes.pending_xref,
         contnode: nodes.Element,
     ) -> nodes.Element | None:
-        info: ObjectEntry | None = self.vars.get(target)
-        if info is None:
+        obj: ObjectEntry | None = self.vars.get(target)
+        if obj is None:
             return None
         return make_refnode(
             builder=builder,
             fromdocname=fromdocname,
-            todocname=info.docname,
-            targetid=info.node_id,
+            todocname=obj.docname,
+            targetid=obj.node_id,
             child=contnode,
             title=target,
         )
 
     def get_objects(self) -> Iterator[tuple[str, str, str, str, str, int]]:
-        for name, info in self.vars.items():
+        for name, obj in self.vars.items():
             yield (
                 name,  # name
-                info.var_desc.display_name,  # dispname
+                obj.var_desc.display_name,  # dispname
                 "var",  # type
-                info.docname,  # docname
-                info.node_id,  # anchor
+                obj.docname,  # docname
+                obj.node_id,  # anchor
                 1,  # priority
             )
 
