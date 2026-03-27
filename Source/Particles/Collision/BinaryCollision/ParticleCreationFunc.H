@@ -62,7 +62,8 @@ public:
      * at the first reactant position, second at the second). For all other binary processes
      * (Linear Breit-Wheeler, fusion, etc.), one product is created at the position of each
      * parent particle that collided (e.g. 2 photons and 2 electrons for Breit-Wheeler), allowing
-     * for exact charge conservation.
+     * for exact charge conservation. For example, in the nuclear reaction "proton + boron -> 3 alpha",
+     * we create 6 new alpha particles, 3 at the position of the proton and 3 at the position of the boron.
      * This function also sets the initial weight of the produced particles and subtracts it from
      * the parent particles. If the weight of a parent particle becomes 0, then that particle is
      * deleted.
@@ -120,15 +121,20 @@ public:
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
         const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
-        // Linear Compton: one macroparticle per product species (first at first reactant
-        // position, second at second). All other binary processes: create one product at
-        // the position of each source particle (factor 2) for charge conservation.
-        const int products_per_reaction_factor =
-            (m_num_product_species == 1 || m_collision_type != CollisionType::LinearCompton) ? 2 : 1;
+        // How many particles of each product species are created.
+        // Linear Compton: one macroparticle per product species
+        // (one product photon at reactant photon position, same for electron)
+        // All other binary processes: create one product particle at
+        // the position of each reacting particles (factor 2).
+        // E.g., if a binary collision produces one electron, we create two electrons,
+        // one at the position of each particle that collided.
+        // This allows for exact charge conservation.
+        const int products_per_reactant_factor =
+            (m_collision_type == CollisionType::LinearCompton) ? 1 : 2;
         amrex::Vector<int> num_added_vec(m_num_product_species);
         for (int i = 0; i < m_num_product_species; i++)
         {
-            const index_type num_added = total * m_num_products_host[i] * products_per_reaction_factor;
+            const index_type num_added = total * m_num_products_host[i] * products_per_reactant_factor;
             num_added_vec[i] = static_cast<int>(num_added);
             tile_products[i]->resize(products_np[i] + num_added);
         }
@@ -184,13 +190,13 @@ public:
                             // first at first reactant position, second at second.
                             const auto product_index = products_np_data[j] +
                                 (p_offsets[i]*p_num_products_device[j] + k);
-                            if (j == 0)
+                            if (j == 0) // first product: photon
                             {
                                 copy_species1[j](soa_products_data[j], soa_1,
                                     static_cast<int>(p_pair_indices_1[i]),
                                     static_cast<int>(product_index), engine);
                             }
-                            else
+                            else if (j == 1) // second product: electron
                             {
                                 copy_species2[j](soa_products_data[j], soa_2,
                                     static_cast<int>(p_pair_indices_2[i]),
