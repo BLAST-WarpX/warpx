@@ -523,8 +523,16 @@ class FlexVarDomain(Domain):
             )
 
 
+class WarpXDomain(FlexVarDomain):
+    label = "WarpX"
+
+    object_types = {
+        "var": ObjType("parameter", "var"),
+    }
+
+
 def setup(app: Sphinx) -> dict:
-    app.add_domain(FlexVarDomain)
+    app.add_domain(WarpXDomain)
     return {
         "version": "0.1.0",
         "parallel_read_safe": True,
