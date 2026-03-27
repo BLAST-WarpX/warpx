@@ -97,9 +97,7 @@ private:
     MatrixSolverOps<T>* m_matrix_ops = nullptr;
 };
 
-// ============================================================================
-//  Implementation
-// ============================================================================
+// Implementation
 
 template <class T>
 void WeightedJacobiImpl<T>::Define (MatrixSolverOps<T>* a_ops,
@@ -167,7 +165,7 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
 
     for (int adapt = 0; adapt <= max_omega_reductions; adapt++) {
 
-        // === Initial guess: x = D^{-1} b ===
+        // Initial guess: x = D^{-1} b
         m_matrix_ops->InitialGuess(a_x, a_b);
 
         if (!m_matrix_ops->HasOffDiag()) {
@@ -181,7 +179,7 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
             return;
         }
 
-        // === Compute initial residual ===
+        // Compute initial residual
         RT bnorm = a_b.norm2();
         RT res0 = m_matrix_ops->ResidualNorm(a_x, a_b);
         RT res_prev = res0;
@@ -192,7 +190,7 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
                     << " (rel.), omega = " << omega << "\n";
         }
 
-        // === Jacobi iteration loop ===
+        // Jacobi iteration loop
         bool diverged = false;
 
         for (int iter = 0; iter < m_max_iter; iter++) {

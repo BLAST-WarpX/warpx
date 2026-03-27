@@ -105,9 +105,7 @@ private:
     MatrixSolverOps<T>* m_ops = nullptr;
 };
 
-// ============================================================================
-//  Implementation
-// ============================================================================
+// Implementation
 
 template <class T>
 void ChebyshevImpl<T>::Define (MatrixSolverOps<T>* a_ops,
@@ -224,7 +222,7 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
         return;
     }
 
-    // === Initial guess: x = D^{-1} b ===
+    // Initial guess: x = D^{-1} b
     m_ops->InitialGuess(a_x, a_b);
 
     if (!m_ops->HasOffDiag()) {
@@ -259,7 +257,7 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
 
     RT omega = RT(1);
 
-    // === Chebyshev iteration loop ===
+    // Chebyshev iteration loop
     for (int k = 0; k < m_max_iter; k++) {
 
         // r = b - A*x (stored in m_w1)

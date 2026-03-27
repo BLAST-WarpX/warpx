@@ -15,13 +15,11 @@
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
 
-using namespace amrex;
-
 void SparseMatrixUtils::BuildExtendedDOFVector (
     const WarpXSolverVec& a_V,
-    Gpu::DeviceVector<Real>& a_ext,
+    amrex::Gpu::DeviceVector<amrex::Real>& a_ext,
     const SparseJacobianMatrix& a_sp,
-    const Vector<Geometry>& a_geom,
+    const amrex::Vector<amrex::Geometry>& a_geom,
     const int a_num_levels)
 {
     BL_PROFILE("SparseMatrixUtils::BuildExtendedDOFVector()");
@@ -34,8 +32,11 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
     const int ndofs_l = a_sp.nLocalRows();
     a_ext.resize(ndofs_ext);
     auto* ext_ptr = a_ext.data();
-    ParallelFor(ndofs_ext, [=] AMREX_GPU_DEVICE (int i) { ext_ptr[i] = Real(0.0); });
-    Gpu::streamSynchronize();
+    amrex::ParallelFor(ndofs_ext,
+        [=] AMREX_GPU_DEVICE (int i) {
+            ext_ptr[i] = amrex::Real(0.0);
+        });
+    amrex::Gpu::streamSynchronize();
 
     const auto* dofs = a_V.getDOFsObject().get();
     const auto& dofs_mfarrvec = dofs->m_array;
@@ -53,56 +54,55 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
             const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
             const auto& data_src = *(data_mfarrvec[lev][dir]);
 
-            // The DOF iMultiFab has ghost cells (matching the E field),
-            // but the data MultiFab may have fewer or zero ghost cells
-            // (e.g., GMRES workspace vectors). We need the data at ghost
-            // cell locations to fill the extended vector. If the data
-            // MultiFab has fewer ghost cells than the DOF iMultiFab,
-            // create a temporary with matching ghost width and FillBoundary.
-            const IntVect dof_ng = dof_fab.nGrowVect();
-            const IntVect data_ng = data_src.nGrowVect();
+            const amrex::IntVect dof_ng = dof_fab.nGrowVect();
+            const amrex::IntVect data_ng = data_src.nGrowVect();
             const bool need_tmp = (data_ng != dof_ng);
 
-            MultiFab data_tmp;
+            amrex::MultiFab data_tmp;
             if (need_tmp) {
                 data_tmp.define(data_src.boxArray(),
                                 data_src.DistributionMap(),
                                 data_src.nComp(), dof_ng);
-                data_tmp.setVal(Real(0.0));
-                MultiFab::Copy(data_tmp, data_src, 0, 0,
-                               data_src.nComp(), IntVect::TheZeroVector());
-                data_tmp.FillBoundary(a_geom[lev].periodicity());
+                data_tmp.setVal(amrex::Real(0.0));
+                amrex::MultiFab::Copy(data_tmp, data_src, 0, 0,
+                    data_src.nComp(),
+                    amrex::IntVect::TheZeroVector());
+                data_tmp.FillBoundary(
+                    a_geom[lev].periodicity());
             } else {
-                data_mfarrvec[lev][dir]->FillBoundary(a_geom[lev].periodicity());
+                data_mfarrvec[lev][dir]->FillBoundary(
+                    a_geom[lev].periodicity());
             }
-            const auto& data_fab = need_tmp ? data_tmp : data_src;
+            const auto& data_fab =
+                need_tmp ? data_tmp : data_src;
 
-            for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
-                const Box gbx = mfi.growntilebox();
-                const Box vbx = mfi.validbox();
+            for (amrex::MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
+                const amrex::Box gbx = mfi.growntilebox();
+                const amrex::Box vbx = mfi.validbox();
                 auto dof_arr = dof_fab.const_array(mfi);
                 auto data_arr = data_fab.const_array(mfi);
                 const int nl = ndofs_l;
                 const int ng = nghost;
 
-                // Iterate over the full grown box (owned + ghost cells).
-                // For owned cells: use local DOF index (comp 0) as ext index.
-                // For ghost cells: look up the global DOF in the ghost mapping.
-                ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                amrex::ParallelFor(gbx,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    if (vbx.contains(IntVect(AMREX_D_DECL(i, j, k)))) {
-                        // Owned cell
+                    const amrex::IntVect iv(
+                        AMREX_D_DECL(i, j, k));
+                    if (vbx.contains(iv)) {
                         const int ldof = dof_arr(i, j, k, 0);
                         if (ldof >= 0 && ldof < nl) {
                             ext_ptr[ldof] = data_arr(i, j, k);
                         }
                     } else if (ng > 0) {
-                        // Ghost cell: find global DOF in ghost mapping
                         const int gdof = dof_arr(i, j, k, 1);
                         if (gdof < 0) { return; }
                         for (int g = 0; g < ng; g++) {
                             if (ghost_gdofs_ptr[g] == gdof) {
-                                ext_ptr[ghost_ext_ptr[g]] = data_arr(i, j, k);
+                                const int eidx =
+                                    ghost_ext_ptr[g];
+                                ext_ptr[eidx] =
+                                    data_arr(i, j, k);
                                 break;
                             }
                         }
@@ -111,12 +111,12 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
             }
         }
     }
-    Gpu::streamSynchronize();
+    amrex::Gpu::streamSynchronize();
 }
 
 void SparseMatrixUtils::CopyToLocalDOFVector (
     const WarpXSolverVec& a_V,
-    Gpu::DeviceVector<Real>& a_local)
+    amrex::Gpu::DeviceVector<amrex::Real>& a_local)
 {
     const int ndofs_l = static_cast<int>(a_V.nDOF_local());
     a_local.resize(ndofs_l);
@@ -125,7 +125,7 @@ void SparseMatrixUtils::CopyToLocalDOFVector (
 
 void SparseMatrixUtils::CopyFromLocalDOFVector (
     WarpXSolverVec& a_V,
-    const Gpu::DeviceVector<Real>& a_local)
+    const amrex::Gpu::DeviceVector<amrex::Real>& a_local)
 {
     a_V.copyFrom(a_local.data());
 }

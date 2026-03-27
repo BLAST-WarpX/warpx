@@ -350,8 +350,12 @@ int SparseJacobianMatrix::Assemble (
                         }
                         if ((dir == 0) || (dir == 2)) {
                             {
-                                int cidx_g_rhs = (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
-                                Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
+                                int cidx_g_rhs = (dir == 0)
+                                    ? dof_arr(i,j-1,k,1)
+                                    : dof_arr(i-1,j,k,1);
+                                const int di = dir==0 ? 1 : 0;
+                                Real val = -alpha * dxi[di] * dxi[di]
+                                    * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -360,8 +364,12 @@ int SparseJacobianMatrix::Assemble (
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                int cidx_g_rhs = (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
-                                Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
+                                int cidx_g_rhs = (dir == 0)
+                                    ? dof_arr(i,j+1,k,1)
+                                    : dof_arr(i+1,j,k,1);
+                                const int di = dir==0 ? 1 : 0;
+                                Real val = -alpha * dxi[di] * dxi[di]
+                                    * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -373,7 +381,9 @@ int SparseJacobianMatrix::Assemble (
                             // dir = 0: d/dx(dEz/dz) at Ex(i,j) with Ex centered in x and nodal in z
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
                             {
-                                int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
+                                int cidx_g_rhs = (dir == 0)
+                                    ? dof_tdir_arr(i,j-1,k,1)
+                                    : dof_tdir_arr(i-1,j,k,1);
                                 Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
@@ -393,7 +403,9 @@ int SparseJacobianMatrix::Assemble (
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
+                                int cidx_g_rhs = (dir == 0)
+                                    ? dof_tdir_arr(i+1,j-1,k,1)
+                                    : dof_tdir_arr(i-1,j+1,k,1);
                                 Real val = -alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
@@ -403,7 +415,9 @@ int SparseJacobianMatrix::Assemble (
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
+                                int cidx_g_rhs = (dir == 0)
+                                    ? dof_tdir_arr(i+1,j,k,1)
+                                    : dof_tdir_arr(i,j+1,k,1);
                                 Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
@@ -415,8 +429,12 @@ int SparseJacobianMatrix::Assemble (
                         } else if (dir==1) {
                             for (int jdir = 0; jdir <= 2; jdir+=2) {
                                 {
-                                    int cidx_g_rhs = (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
-                                    Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
+                                    int cidx_g_rhs = (jdir == 0)
+                                        ? dof_arr(i-1,j,k,1)
+                                        : dof_arr(i,j-1,k,1);
+                                    const int di = jdir==0 ? 0 : 1;
+                                    Real val = -alpha * dxi[di] * dxi[di]
+                                        * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                         cidx_g_rhs, val,
                                         &c_indices_g_ptr[ridx_l*nnz_max],
@@ -425,8 +443,12 @@ int SparseJacobianMatrix::Assemble (
                                     if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                                 }
                                 {
-                                    int cidx_g_rhs = (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
-                                    Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
+                                    int cidx_g_rhs = (jdir == 0)
+                                        ? dof_arr(i+1,j,k,1)
+                                        : dof_arr(i,j+1,k,1);
+                                    const int di = jdir==0 ? 0 : 1;
+                                    Real val = -alpha * dxi[di] * dxi[di]
+                                        * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                         cidx_g_rhs, val,
                                         &c_indices_g_ptr[ridx_l*nnz_max],
@@ -441,8 +463,11 @@ int SparseJacobianMatrix::Assemble (
                         IntVect ic(AMREX_D_DECL(i,j,k));
                         {
                             int cidx_g_rhs = dof_arrays[0](ic,1);
-                            Real val = 2.0_rt * alpha * ( dxi[dvec[1]]*dxi[dvec[1]] * BC_mask_Edir_arr(i,j,k,0)
-                                                        + dxi[dvec[2]]*dxi[dvec[2]] * BC_mask_Edir_arr(i,j,k,3) );
+                            Real val = 2.0_rt * alpha
+                                * (dxi[dvec[1]]*dxi[dvec[1]]
+                                    * BC_mask_Edir_arr(i,j,k,0)
+                                 + dxi[dvec[2]]*dxi[dvec[2]]
+                                    * BC_mask_Edir_arr(i,j,k,3));
                             auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                 cidx_g_rhs, val,
                                 &c_indices_g_ptr[ridx_l*nnz_max],
@@ -455,7 +480,9 @@ int SparseJacobianMatrix::Assemble (
                                 auto iv = ic; iv[dvec[tdir]] += ctr;
                                 int cidx_g_rhs = dof_arrays[0](iv,1);
                                 const int comp_shift = (dvec[tdir] == tdir1) ? 0 : 3;
-                                Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+1);
+                                Real val = -alpha
+                                    * dxi[dvec[tdir]]*dxi[dvec[tdir]]
+                                    * BC_mask_Edir_arr(i,j,k,comp_shift+1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -467,11 +494,16 @@ int SparseJacobianMatrix::Assemble (
                         for (int ctr_dir = -1; ctr_dir <= 0; ctr_dir++) {
                             for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
                                 for (int tdir = 1; tdir <= 2; tdir++) {
-                                    auto iv = ic; iv[dvec[0]] += (ctr_dir+1); iv[dvec[tdir]] += ctr_tdir;
-                                    auto sign = std::copysign(1,ctr_dir) * std::copysign(1,ctr_tdir);
+                                    auto iv = ic;
+                                    iv[dvec[0]] += (ctr_dir+1);
+                                    iv[dvec[tdir]] += ctr_tdir;
+                                    auto sign = std::copysign(1,ctr_dir)
+                                        * std::copysign(1,ctr_tdir);
                                     int cidx_g_rhs = dof_arrays[tdir](iv,1);
                                     const int comp_shift = (dvec[tdir] == tdir1) ? 0 : 3;
-                                    Real val = Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+2);
+                                    Real val = Real(sign) * alpha
+                                        * dxi[dvec[0]]*dxi[dvec[tdir]]
+                                        * BC_mask_Edir_arr(i,j,k,comp_shift+2);
                                     auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                         cidx_g_rhs, val,
                                         &c_indices_g_ptr[ridx_l*nnz_max],

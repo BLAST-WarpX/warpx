@@ -87,9 +87,7 @@ private:
     T m_Jx;  /**< workspace for matvec result */
 };
 
-// ============================================================================
-//  Implementation
-// ============================================================================
+// Implementation
 
 template <class T>
 void MFMatrixSolverOps<T>::Define (
