@@ -317,7 +317,7 @@ public:
                     -reaction_energy*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    /*scattering_angle=*/ScatteringAngle::Forward,
+                    ScatteringAngle::Forward,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the incident particle, in the center-of-mass frame
                     engine);
