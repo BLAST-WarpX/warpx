@@ -469,6 +469,9 @@ class FlexVarDomain(Domain):
             var_desc=var_desc,
         )
 
+        for alt_name in var_desc.name_list:
+            self.vars[alt_name] = self.vars[name]
+
     def clear_doc(self, docname: str) -> None:
         to_remove = [k for k, v in self.vars.items() if v.docname == docname]
         for k in to_remove:
