@@ -85,7 +85,7 @@ logger = logging.getLogger(__name__)
 class ObjectEntry(NamedTuple):
     docname: str
     node_id: str
-    vardesc: VarDesc
+    var_desc: VarDesc
 
 
 class VarDesc:
@@ -306,17 +306,16 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
     # ------------------------------------------------------------------
 
     def add_target_and_index(
-        self, name_cls: VarDesc, sig: str, signode: desc_signature
+        self, var_desc: VarDesc, sig: str, signode: desc_signature
     ) -> None:
-        name: str = name_cls.display_name
+        name: str = var_desc.display_name
         node_id = make_id(self.env, self.state.document, "", name)
         signode["ids"].append(node_id)
         self.state.document.note_explicit_target(signode)
 
         domain = cast(FlexVarDomain, self.env.get_domain(FlexVarDomain.name))
         domain.note_object(
-            name=name,
-            vardesc=name_cls,
+            var_desc=var_desc,
             node_id=node_id,
             location=signode,
         )
@@ -449,11 +448,11 @@ class FlexVarDomain(Domain):
 
     def note_object(
         self,
-        name: str,
-        vardesc: VarDesc,
+        var_desc: VarDesc,
         node_id: str,
         location: Any = None,
     ) -> None:
+        name = var_desc.display_name
         if name in self.vars:
             other = self.vars[name]
             logger.warning(
@@ -467,7 +466,7 @@ class FlexVarDomain(Domain):
         self.vars[name] = ObjectEntry(
             docname=self.env.docname,
             node_id=node_id,
-            vardesc=vardesc,
+            var_desc=var_desc,
         )
 
     def clear_doc(self, docname: str) -> None:
@@ -507,7 +506,7 @@ class FlexVarDomain(Domain):
         for name, info in self.vars.items():
             yield (
                 name,  # name
-                info.vardesc.display_name,  # dispname
+                info.var_desc.display_name,  # dispname
                 "var",  # type
                 info.docname,  # docname
                 info.node_id,  # anchor
