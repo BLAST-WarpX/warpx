@@ -42,12 +42,9 @@ jobs:
       # 1D Cartesian
       cartesian_1d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=1 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
-      # 1D Cylindrical
-      cylindrical_r:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RCYLINDER -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
-      # 1D Spherical
-      spherical_r:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RSPHERE -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+      # 1D Cylindrical and 1D Spherical
+      cylindrical_and_spherical_1d:
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS='RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
