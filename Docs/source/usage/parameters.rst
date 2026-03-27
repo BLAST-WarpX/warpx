@@ -3441,7 +3441,7 @@ Maxwell solver: kinetic-fluid hybrid
 
     If ``algo.maxwell_solver`` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
-.. fv:var:: hybrid_pic_model.J[x/y/z]_external_grid_function(x, y, z, t)
+.. fv:var:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: `float` or `str`
     :default: ``0``
     :optional:
