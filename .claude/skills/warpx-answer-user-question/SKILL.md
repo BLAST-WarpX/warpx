@@ -47,7 +47,7 @@ Search these sources as relevant to the category:
 
 **Source code** — key directories:
 - `Source/Laser/`, `Source/Particles/`, `Source/FieldSolver/`, `Source/Diagnostics/`, `Source/BoundaryConditions/`, `Source/Python/`
-- For parameter reading: search for `pp.query`/`pp.get` with the parameter name
+- For parameter reading: search for `query`/`queryWithParser`/`add`/`addarr`/`queryAdd` with the parameter name
 - For reduced diagnostics: `Source/Diagnostics/ReducedDiags/`
 
 **Examples** (`Examples/Tests/`, `Examples/Physics_applications/`):
@@ -55,7 +55,7 @@ Search these sources as relevant to the category:
 
 **Past GitHub issues and discussions**:
 - Search issues and discussions for similar questions and their resolutions
-- For feature availability: also search open issues/PRs for planned work
+- For feature availability: also search open issues/PRs for planned features and fixes
 
 ## Step 4 — Assess whether more information is needed
 

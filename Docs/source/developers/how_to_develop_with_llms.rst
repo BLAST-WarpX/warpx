@@ -51,7 +51,7 @@ All WarpX skills use the prefix ``warpx-`` for easy discovery (start typing ``/w
 Currently available skills:
 
 ``/warpx-answer-user-question``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Drafts a response to a WarpX user question from a GitHub issue, discussion, or email.
 
@@ -70,7 +70,7 @@ The skill will:
 #. Present the draft for review before posting.
 
 ``/warpx-new-paper-highlight``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Adds a new paper to the WarpX science highlights documentation (``Docs/source/highlights.rst``).
 
