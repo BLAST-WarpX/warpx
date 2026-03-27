@@ -490,7 +490,7 @@ class FlexVarDomain(Domain):
         node: addnodes.pending_xref,
         contnode: nodes.Element,
     ) -> nodes.Element | None:
-        info = self.vars.get(target)
+        info: ObjectEntry | None = self.vars.get(target)
         if info is None:
             return None
         return make_refnode(
