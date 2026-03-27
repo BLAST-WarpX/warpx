@@ -86,7 +86,7 @@ implicit_evolve.use_mass_matrices_jacobian = true
 implicit_evolve.skip_particle_picard_init = true
 implicit_evolve.use_mass_matrices_pc = true
 jacobian.pc_type = "pc_petsc"
-pc_petsc.verbose = true
+precon_mat.verbose = true
 pc_petsc.type = "lu"
 
 particles.max_grid_crossings = 2

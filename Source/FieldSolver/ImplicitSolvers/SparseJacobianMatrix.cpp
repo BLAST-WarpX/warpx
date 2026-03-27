@@ -28,19 +28,32 @@
 
 void SparseJacobianMatrix::readParameters ()
 {
-    const amrex::ParmParse pp("sparse_jacobian_matrix");
+    const amrex::ParmParse pp("precon_mat");
     pp.query("verbose", m_verbose);
     pp.query("pc_diagonal_only", m_pc_diag_only);
+
+    // Backward compatibility: pc_petsc.verbose and pc_petsc.pc_diagonal_only
+    // were read by the old MatrixPC class (renamed to ExternLibPC).
+    const amrex::ParmParse pp_old("pc_petsc");
+    bool backward_bool;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_old.query("verbose", backward_bool),
+        "pc_petsc.verbose is no longer supported. "
+        "Use precon_mat.verbose instead.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_old.query("pc_diagonal_only", backward_bool),
+        "pc_petsc.pc_diagonal_only is no longer supported. "
+        "Use precon_mat.pc_diagonal_only instead.");
 }
 
 void SparseJacobianMatrix::printParameters () const
 {
     using namespace amrex;
-    Print() << "sparse_jacobian_matrix verbose:              "
+    Print() << "precon_mat verbose:              "
             << (m_verbose ? "true" : "false") << "\n";
-    Print() << "sparse_jacobian_matrix pc_diagonal_only:     "
+    Print() << "precon_mat pc_diagonal_only:     "
             << (m_pc_diag_only ? "true" : "false") << "\n";
-    Print() << "sparse_jacobian_matrix include_mass_matrices: "
+    Print() << "precon_mat include_mass_matrices: "
             << (m_include_mass_matrices ? "true" : "false") << "\n";
 }
 
@@ -86,7 +99,7 @@ void SparseJacobianMatrix::Update (
 
     const amrex::Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
     if (m_verbose) {
-        amrex::Print() << "Updating sparse_jacobian_matrix: theta*dt = " << a_theta_dt
+        amrex::Print() << "Updating precon_mat: theta*dt = " << a_theta_dt
                         << ", alpha = " << alpha << "\n";
     }
 
@@ -97,7 +110,7 @@ void SparseJacobianMatrix::Update (
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
         if (nnz_diff > 0) {
             m_num_realloc++;
-            amrex::Print() << "sparse_jacobian_matrix: reallocating CSR arrays"
+            amrex::Print() << "precon_mat: reallocating CSR arrays"
                            << " (nnz_max " << m_pc_mat_nnz
                            << " -> " << m_pc_mat_nnz + nnz_diff << ")\n";
             m_pc_mat_nnz += nnz_diff;
