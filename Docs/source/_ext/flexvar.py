@@ -64,13 +64,14 @@ Cross reference role::
 from __future__ import annotations
 
 import re
-from typing import Any, Iterator, List, TypedDict, cast
+from typing import Any, Iterator, TypedDict, cast
 
 from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx import addnodes
 from sphinx.addnodes import desc_signature
 from sphinx.application import Sphinx
+from sphinx.builders import Builder
 from sphinx.directives import ObjectDescription
 from sphinx.domains import Domain, ObjType
 from sphinx.environment import BuildEnvironment
@@ -457,7 +458,7 @@ class FlexVarDomain(Domain):
         for k in to_remove:
             del self.vars[k]
 
-    def merge_domaindata(self, docnames: List[str], otherdata: dict[str, dict]) -> None:
+    def merge_domaindata(self, docnames: list[str], otherdata: dict[str, dict]) -> None:
         for name, info in otherdata.get("vars", {}).items():
             info = cast(ObjectEntry, info)
             if info["docname"] in docnames:
@@ -467,7 +468,7 @@ class FlexVarDomain(Domain):
         self,
         env: BuildEnvironment,
         fromdocname: str,
-        builder: Any,
+        builder: Builder,
         typ: str,
         target: str,
         node: addnodes.pending_xref,
