@@ -3490,28 +3490,28 @@ Maxwell solver: kinetic-fluid hybrid
 
     If ``hybrid_pic_model.add_external_fields`` is set to ``true``, this adds a list of names for external time varying vector potentials to be added to hybrid solver.
 
-.. fv:var:: external_vector_potential.<field name>.read_from_file
+.. fv:var:: external_vector_potential.<field_name>.read_from_file
     :type: `bool`
     :default: ``false``
     :optional:
 
     If ``hybrid_pic_model.add_external_fields`` is set to ``true``, this flag determines whether to load an external field or use an implicit function to evaluate the time varying field.
 
-.. fv:var:: external_vector_potential.<field name>.path
+.. fv:var:: external_vector_potential.<field_name>.path
     :type: `str`
     :default: ``""``
     :optional:
 
-    If ``external_vector_potential.<field name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
+    If ``external_vector_potential.<field_name>.read_from_file`` is set to ``true``, sets the path to an OpenPMD file that can be loaded externally in :math:`weber/m`.
 
-.. fv:var:: external_vector_potential.<field name>.A[x,y,z]_external_grid_function(x,y,z)
+.. fv:var:: external_vector_potential.<field_name>.A[x,y,z]_external_grid_function(x,y,z)
     :type: `str`
     :default: ``"0"``
     :optional:
 
-    If ``external_vector_potential.<field name>.read_from_file`` is set to ``false``, Sets the external vector potential to be populated by an implicit function (on the grid) in :math:`weber/m`.
+    If ``external_vector_potential.<field_name>.read_from_file`` is set to ``false``, Sets the external vector potential to be populated by an implicit function (on the grid) in :math:`weber/m`.
 
-.. fv:var:: external_vector_potential.<field name>.A_time_external_grid_function(t)
+.. fv:var:: external_vector_potential.<field_name>.A_time_external_grid_function(t)
     :type: `str`
     :default: ``"1"``
     :optional:
