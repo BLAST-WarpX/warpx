@@ -205,7 +205,7 @@ private:
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
-// drift velocity beta, from the Maxwellian (Maxwell–Boltzmann) distribution.
+// drift velocity u_mean, from the Maxwellian distribution.
 struct InjectorMomentumMaxwellian
 {
     // Constructor whose inputs are:
@@ -214,8 +214,6 @@ struct InjectorMomentumMaxwellian
     InjectorMomentumMaxwellian(GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
         : velocity(b), temperature(t)
         {}
-
-
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -226,16 +224,17 @@ struct InjectorMomentumMaxwellian
         using namespace amrex::literals;
         const amrex::XDim3 u_std = temperature(x,y,z);
         const amrex::XDim3 u_mean = velocity(x,y,z);
-        // Calculate the local temperature and check if it's too
-        // high for Maxwellian sampling or less than zero
-        // if (u_std < 0._rt) {
-        //     amrex::Abort("Negative temperature parameter theta encountered, which is not allowed");
-        // }
-        // Calculate local velocity and abort if |beta|>=1
-        // amrex::Real const beta = velocity(x,y,z);
-        // if (beta <= -1._rt || beta >= 1._rt) {
-        //     amrex::Abort("beta = v/c magnitude greater than or equal to 1");
-        // }
+
+        // Calculate local velocity and abort if |u_mean|>=1
+        amrex::Real const u_mean_mag = std::sqrt(
+            u_mean.x*u_mean.x +
+            u_mean.y*u_mean.y +
+            u_mean.z*u_mean.z
+        );
+        if (u_mean_mag >= 1._rt) {
+            amrex::Abort("Magnitude of mean normalized momentum |u_mean| >= 1.");
+        }
+
         amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
         amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
         amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
@@ -396,7 +395,7 @@ struct InjectorMomentumParser
 // - InjectorMomentumGaussian       : to generate gaussian distribution;
 // - InjectorMomentumGaussianFlux   : to generate v*gaussian distribution;
 // - InjectorMomentumParser         : to generate momentum from parser;
-// - InjectorMomentumMaxwellian      : Maxwellian momentum distribution;
+// - InjectorMomentumMaxwellian     : to generate Maxwellian distribution;
 // The choice is made at runtime, depending in the constructor called.
 // This mimics virtual functions.
 struct InjectorMomentum
@@ -466,21 +465,6 @@ struct InjectorMomentum
     ~InjectorMomentum() = default;
 
     void clear ();
-
-    [[nodiscard]] bool hasMaxwellianVelocityMeanFromFile () const noexcept;
-
-    void prepareMaxwellianVelocityMeanFromFile (amrex::BoxArray const& grids,
-                                               amrex::DistributionMapping const& dmap,
-                                               amrex::IntVect const& ngrow,
-                                               std::function<amrex::Real(amrex::Real)> const& get_zlab);
-
-    void prepareMaxwellianVelocityMeanFromFile (int li, InjectorMomentum** inj_mom);
-
-    void prepareMaxwellianVelocityMeanFromFileMovingWindow (
-        amrex::RealBox const& pbox, int moving_dir, int moving_sign,
-        std::function<amrex::Real(amrex::Real)> const& get_zlab);
-
-    [[nodiscard]] bool maxwellianVelocityMeanDistributed () const noexcept;
 
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).

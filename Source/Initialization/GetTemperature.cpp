@@ -7,9 +7,8 @@
  */
 
 #include "GetTemperature.H"
-// Constructors are implemented inline in the header to avoid
-// out-of-line signature mismatches across compile units.
-// Inline constructor implementations to ensure signature matches declaration
+
+// Constructor for single-component (scalar) temperature
 GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
 {
@@ -21,6 +20,7 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     }
 }
 
+// Constructor for three-component (vector) temperature
 GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
 {

@@ -63,7 +63,7 @@ struct GetTemperature
             }
             default:
             {
-                amrex::Abort("Get initial temperature (scalar): unknown type");
+                amrex::Abort("Get initial temperature: unknown type");
                 return 0.0;
             }
         }
@@ -110,7 +110,7 @@ struct GetTemperatureVector
             }
             default:
             {
-                amrex::Abort("Get initial temperature (vector): unknown type");
+                amrex::Abort("Get initial temperature: unknown type");
                 return amrex::XDim3{0.0, 0.0, 0.0};
             }
         }

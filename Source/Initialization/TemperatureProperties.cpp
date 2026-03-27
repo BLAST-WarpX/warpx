@@ -12,8 +12,6 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
-#include <algorithm>
-
 /*
  * Construct TemperatureProperties based on the passed parameters.
  * If temperature is a constant, store value. If a parser, make and
@@ -23,10 +21,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
     // Set defaults
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
-    std::transform(mom_dist_s.begin(),
-                   mom_dist_s.end(),
-                   mom_dist_s.begin(),
-                   ::tolower);
 
     if (mom_dist_s != "maxwellian") {
         // Set defaults
@@ -40,7 +34,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 "Temperature parameter theta not specified");
 
             // Do validation on theta value
-
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(theta >= 0,
                 "Temperature parameter theta = " + std::to_string(theta) +
                 " is less than zero, which is not allowed");
@@ -76,23 +69,20 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
         std::string u_std_dist_s = "constant";
         utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
         if (u_std_dist_s == "constant") {
-
-          // Query for all three components. Defaults are zeros if not provided.
             utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
             utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
             utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
 
-            if ( (m_ux_std*m_ux_std > 0.01) ||
-                (m_uy_std*m_uy_std > 0.01) ||
-                (m_uz_std*m_uz_std > 0.01) )
+            amrex::Real ux_var = m_ux_std * m_ux_std;
+            amrex::Real uy_var = m_uy_std * m_uy_std;
+            amrex::Real uz_var = m_uz_std * m_uz_std;
+            if ( (ux_var > 0.01) ||
+                 (uy_var > 0.01) ||
+                 (uz_var > 0.01) )
             {
-                amrex::Real ux_var = m_ux_std * m_ux_std;
-                amrex::Real uy_var = m_uy_std * m_uy_std;
-                amrex::Real uz_var = m_uz_std * m_uz_std;
-
                 ablastr::warn_manager::WMRecordWarning(
                     "Temperature",
-                    "Maxwellian distribution has temperature variance(s) exceeding 0.01: "
+                    "Maxwellian distribution has component-wise temperature variances exceeding 0.01: "
                     "ux_std*ux_std = " + std::to_string(ux_var) +
                     ", uy_std*uy_std = " + std::to_string(uy_var) +
                     ", uz_std*uz_std = " + std::to_string(uz_var)

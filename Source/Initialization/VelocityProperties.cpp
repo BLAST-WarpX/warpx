@@ -11,7 +11,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
-#include <algorithm>
 #include <cmath>
 
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
@@ -19,10 +18,6 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
-    std::transform(mom_dist_s.begin(),
-                   mom_dist_s.end(),
-                   mom_dist_s.begin(),
-                   ::tolower);
     if (mom_dist_s != "maxwellian") {
         // Set defaults
         std::string vel_dist_s = "constant";
@@ -79,12 +74,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
     } else {
         std::string u_mean_dist_s = "constant";
         utils::parser::query(pp, source_name, "maxwellian_u_mean_distribution_type", u_mean_dist_s);
-        std::transform(u_mean_dist_s.begin(),
-                       u_mean_dist_s.end(),
-                       u_mean_dist_s.begin(),
-                       ::tolower);
         if (u_mean_dist_s == "constant") {
-
             utils::parser::queryWithParser(pp, source_name, "ux_mean", m_ux_mean);
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
@@ -97,7 +87,6 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                 "Magnitude of mean velocity abs(u_mean) = " + std::to_string(velocity_magnitude) +
                 " is greater than or equal to 1"
             );
-
             m_type = VelConstantVector;
         } else if (u_mean_dist_s == "parser") {
             std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
@@ -114,7 +103,6 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                 std::make_unique<amrex::Parser>(
                     utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
             m_type = VelParserFunctionVector;
-
         }
         else {
             std::stringstream stringstream;

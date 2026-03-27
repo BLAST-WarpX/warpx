@@ -1283,25 +1283,39 @@ Particle initialization
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
-    * ``maxwellian``: Maxwellian momentum distribution where, in the drift frame, each of the three normalized-momentum components is sampled independently from a Gaussian distribution.
-      The mean and standard deviation of each component (bulk drift and thermal spread) are set using the **Maxwellian** parameter groups below:
-      * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
-        * If ``constant``, set any of ``<species_name>.ux_mean``, ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``). The magnitude :math:`|u_\mathrm{mean}|` must be strictly less than 1.
-        This is the bulk drift in the drift frame.
-        * If ``parser``, the following are required: ``<species_name>.ux_mean_function(x,y,z)``, ``<species_name>.uy_mean_function(x,y,z)``, ``<species_name>.uz_mean_function(x,y,z)``.
-      * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
-        * If ``constant``, set any of ``<species_name>.ux_std``, ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`) optional (default ``0``).
-        These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift frame, i.e. the thermal spread per axis.
-        If any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` exceeds ``0.01``, ignored relativistic corrections can exceed about 1% and WarpX may record a warning.
-        * If ``parser``, the following are required: ``<species_name>.ux_std_function(x,y,z)``, ``<species_name>.uy_std_function(x,y,z)``, ``<species_name>.uz_std_function(x,y,z)``.
+    * ``maxwellian``: Maxwellian momentum distribution where the mean (bulk drift) and the standard deviation (thermal spread) of each normalized-momentum component
+        are required and can be specified as constants, or functions of position.
+        Each component is sampled independently from a Gaussian distribution in the drift frame.
+        It requires the following arguments:
+    * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
+        * If ``constant``, set any of:
+        * ``<species_name>.ux_mean``: mean :math:`u_{x}`
+        * ``<species_name>.uy_mean``: mean :math:`u_{y}`
+        * ``<species_name>.uz_mean``: mean :math:`u_{z}`
+        * If ``parser``, the following are required:
+        * ``<species_name>.ux_mean_function(x,y,z)``: mean :math:`u_{x}`
+        * ``<species_name>.uy_mean_function(x,y,z)``: mean :math:`u_{y}`
+        * ``<species_name>.uz_mean_function(x,y,z)``: mean :math:`u_{z}`
 
-      Particles may be relativistic in the lab frame, but the sampling model treats them as non-relativistic in the drift frame. For a relativistic thermal spread in the drift frame, use ``maxwell_juttner`` instead.
+    * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
+        * If ``constant``, set any of:
+        * ``<species_name>.ux_std``: standard deviation of :math:`u_{x}`
+        * ``<species_name>.uy_std``: standard deviation of :math:`u_{y}`
+        * ``<species_name>.uz_std``: standard deviation of :math:`u_{z}`
+        These correspond to the thermal spread per axis in the drift frame.
+        Here, we assume that any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` does not exceed ``0.01``, ensuring relativistic corrections remain small (``<1%``).
+        * If ``parser``, the following are required:
+        * ``<species_name>.ux_std_function(x,y,z)``: standard deviation of :math:`u_{x}`
+        * ``<species_name>.uy_std_function(x,y,z)``: standard deviation of :math:`u_{y}`
+        * ``<species_name>.uz_std_function(x,y,z)``: standard deviation of :math:`u_{z}`
+        Particles may be relativistic in the lab frame, but the sampling model treats them as non-relativistic in the drift frame. For a relativistic thermal spread in the drift frame, use ``maxwell_juttner`` instead.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
       :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
       Theta is specified by a combination of ``<species_name>.theta_distribution_type``, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
       The Sobol method used to generate the distribution will not terminate for :math:`\theta \lesssim 0.1`, and the code will abort if it encounters a temperature below that threshold.
-      The Maxwellian (``maxwellian``) distribution is recommended for temperatures in the range :math:`0.01 < \theta < 0.1`.
+      The Maxwellian (``maxwellian``) distribution is recommended when the component-wise temperature parameters (i.e., :math:\theta_x = u_{x,\mathrm{std}}^2,
+      :math:\theta_y = u_{y,\mathrm{std}}^2, :math:\theta_z = u_{z,\mathrm{std}}^2) satisfy :math:0.01 < \theta_i < 0.1.
       Errors due to relativistic effects can be expected to approximately between 1% and 10%.
       The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
       The speed is specified by the parameters ``<species_name>.beta_distribution_type``, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
@@ -1326,19 +1340,15 @@ Particle initialization
       which gives the distribution of each component of the momentum as a function of space.
 
 * ``<species_name>.theta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner``.
-    It is **not** used for ``maxwellian`` (Maxwellian widths are set with ``maxwellian_u_std_*`` above). See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than zero are not allowed.
-
+    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the spread is set using ``maxwellian_u_std_*`` parameters above).
+    See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than zero are not allowed.
     * If ``constant``, use a constant temperature, given by the required float parameter ``<species_name>.theta``.
-
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.theta_function(x,y,z)``.
 
 * ``<species_name>.beta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner``.
-    It is **not** used for ``maxwellian`` (Maxwellian drift is set with ``maxwellian_u_mean_*`` above). See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
-
+    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the drift is set using ``maxwellian_u_mean_*`` parameters above).
+    See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
     * If ``constant``, use a constant speed, given by the required float parameter ``<species_name>.beta``.
-
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.beta_function(x,y,z)``.
 
 * ``<species_name>.zinject_plane`` (`float`)
