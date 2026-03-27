@@ -88,16 +88,9 @@ class ObjectEntry(NamedTuple):
     var_desc: VarDesc
 
 
-class VarDesc:
-    def __init__(self, sig: str):
-        name_list: list[str] = sig.strip().split(" ")
-        disp_name: str = name_list[0]
-        if len(name_list) > 1:
-            disp_name += ", ".join(name_list[1:-1]) + " & " + name_list[-1]
-
-        self.display_name: str = disp_name
-        self.name_list: list[str] = name_list
-        self.sig: str = sig
+class VarDesc(NamedTuple):
+    display_name: str
+    name_list: list[str]
 
 
 class FlexVarDirective(ObjectDescription[VarDesc]):
@@ -192,9 +185,14 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
 
         ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
-        result = VarDesc(sig)
+        name_list: list[str] = sig.strip().split(" ")
+        disp_name: str = name_list[0]
+        if len(name_list) > 1:
+            disp_name += ", ".join(name_list[1:-1]) + " & " + name_list[-1]
 
-        name = result.display_name
+        var_desc = VarDesc(disp_name, name_list)
+
+        name = var_desc.display_name
 
         signode["fullname"] = name
         signode["ids"] = []  # filled in add_target_and_index
@@ -223,7 +221,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
 
         # Process unit string:
         if unit:
-            unit = self.process_unit_string(unit)
+            unit = self._process_unit_string(unit)
 
         # Format: (`<type>`; in <unit>)
         if type_ or unit:
@@ -276,7 +274,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(anno)
 
-        return result
+        return var_desc
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
@@ -291,7 +289,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         inline_node = nodes.inline(text, "", *parsed_nodes)
         return inline_node
 
-    def process_unit_string(self, unit_str: str) -> str:
+    def _process_unit_string(self, unit_str: str) -> str:
         result: str = unit_str
         # x / y -> x/y
         result = "/".join([u.strip() for u in result.split("/")])
