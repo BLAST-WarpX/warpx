@@ -635,6 +635,7 @@ Setting up the field mesh
     The default is ``1``, which corresponds to a perfectly axisymmetric simulation.
 
 .. fv:var:: geometry.prob_lo/hi
+    :link_aliases: geometry.prob_lo geometry.prob_hi
     :type: `2 floats in 2D`, `3 floats in 3D`
     :unit: meters
 
@@ -673,6 +674,7 @@ Setting up the field mesh
     The timestep at which the moving window ends.
 
 .. fv:var:: warpx.fine_tag_lo/hi
+    :link_aliases: warpx.fine_tag_lo warpx.fine_tag_hi
     :type: `2 floats in 2D`, `3 floats in 3D`
     :unit: meters
     :optional:
@@ -751,6 +753,7 @@ Domain Boundary Conditions
 --------------------------
 
 .. fv:var:: boundary.field_lo/hi
+    :link_aliases: boundary.field_lo boundary.field_hi
     :type: `2 strings` for 2D, `3 strings` for 3D
     :default: `pml`
 
@@ -810,6 +813,7 @@ Domain Boundary Conditions
     * ``open``: For the electrostatic Poisson solver based on a Integrated Green Function method.
 
 .. fv:var:: boundary.potential_lo/hi_x/y/z
+    :link_aliases: boundary.potential_lo_x/y/z boundary.potential_hi_x/y/z
     :default: `0`
 
     Gives the value of the electric potential, in Volts, at the boundaries, for ``pec`` boundaries. With electrostatic solvers
@@ -819,6 +823,7 @@ Domain Boundary Conditions
     electric field produced by the boundaries.
 
 .. fv:var:: boundary.particle_lo/hi
+    :link_aliases: boundary.particle_lo boundary.particle_hi
     :type: `2 strings` for 2D, `3 strings` for 3D
     :default: `absorbing`
 
@@ -1244,6 +1249,7 @@ Particle initialization
     ``mass`` must be strictly positive. For massless species, use ``<species_name>.species_type``. The only allowed massless species type is ``photon``.
 
 .. fv:var:: <species_name>.xmin,ymin,zmin,xmax,ymax,zmax
+    :link_aliases: <species_name>.xmin,ymin,zmin <species_name>.xmax,ymax,zmax
     :type: `float`
     :default: unlimited
     :optional:
@@ -1776,6 +1782,7 @@ Particle initialization
         :math:`v/c` is the particle velocity normalized by the speed of light.
 
 .. fv:var:: <species_name>.save_particles_at_xlo/ylo/zlo/xhi/yhi/zhi/eb
+    :link_aliases: <species_name>.save_particles_at_xlo/ylo/zlo <species_name>.save_particles_at_xhi/yhi/zhi <species_name>.save_particles_at_eb
     :type: `0` or `1`
     :default: `0`
     :optional:
@@ -2369,6 +2376,7 @@ are applied to the grid directly. In particular, these fields can be seen in the
     should contain both B and E external fields data.
 
 .. fv:var:: warpx.E/B_external_grid
+    :link_aliases: warpx.E_external_grid warpx.B_external_grid
     :type: list of `3 floats`
 
     required when ``warpx.E_ext_grid_init_style="constant"``
@@ -2395,6 +2403,7 @@ The external fields defined with input parameters that start with ``warpx.B_ext_
 are applied to the particles directly, at each timestep. As a results, these fields **cannot** be seen in the diagnostics that output the fields on the grid.
 
 .. fv:var:: particles.E/B_ext_particle_init_style
+    :link_aliases: particles.E_ext_particle_init_style particles.B_ext_particle_init_style
     :type: string
     :default: "none"
     :optional:
@@ -2532,6 +2541,7 @@ The external fields defined with input parameters that start with ``warpx.B_ext_
 are applied to the fluids directly, at each timestep. As a results, these fields **cannot** be seen in the diagnostics that output the fields on the grid.
 
 .. fv:var:: <fluid_species_name>.E/B_ext_init_style
+    :link_aliases: <fluid_species_name>.E_ext_init_style <fluid_species_name>.B_ext_init_style
     :type: string
     :default: "none"
     :optional:
@@ -3185,6 +3195,7 @@ Maxwell solver: PSATD method
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. fv:var:: psatd.nox/noy/noz
+    :link_aliases: psatd.nox psatd.noy psatd.noz
     :type: `integer`
     :default: `16` for all
     :optional:
@@ -3193,6 +3204,7 @@ Maxwell solver: PSATD method
     If ``psatd.periodic_single_box_fft`` is used, these can be set to ``inf`` for infinite-order PSATD.
 
 .. fv:var:: psatd.nx/ny/nz_guard
+    :link_aliases: psatd.nx_guard psatd.ny_guard psatd.nz_guard
     :type: `integer`
     :optional:
 
@@ -3367,6 +3379,7 @@ Maxwell solver: macroscopic media
     Comparing the two methods, Lax-Wendroff is more prone to developing oscillations and requires a smaller timestep for stability. On the other hand, Backward Euler is more robust but it is first-order accurate in time compared to the second-order Lax-Wendroff method.
 
 .. fv:var:: macroscopic.sigma/epsilon/mu_function(x,y,z)
+    :link_aliases: macroscopic.sigma_function(x,y,z) macroscopic.epsilon_function(x,y,z) macroscopic.mu_function(x,y,z)
     :type: `string`
 
     To initialize spatially varying conductivity, permittivity, and permeability, respectively,
@@ -3375,6 +3388,7 @@ Maxwell solver: macroscopic media
     if ``algo.em_solver_medium=macroscopic``.
 
 .. fv:var:: macroscopic.sigma/epsilon/mu
+    :link_aliases: macroscopic.sigma macroscopic.epsilon macroscopic.mu
     :type: `double`
 
     To initialize a constant conductivity, permittivity, and permeability of the
@@ -3550,6 +3564,7 @@ Grid types (collocated, staggered, hybrid)
         At present, this parameter is intended mainly for testing and development purposes.
 
 .. fv:var:: warpx.field_centering_no<x,y,z>
+    :link_aliases: warpx.field_centering_nox warpx.field_centering_noy warpx.field_centering_noz
     :type: `integer`
     :optional:
 
@@ -3558,6 +3573,7 @@ Grid types (collocated, staggered, hybrid)
     Default: ``warpx.field_centering_no<x,y,z> = 2`` with staggered grids, ``warpx.field_centering_no<x,y,z> = 8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
 
 .. fv:var:: warpx.current_centering_nox/noy/noz
+    :link_aliases: warpx.current_centering_nox warpx.current_centering_noy warpx.current_centering_noz
     :type: `integer`
     :optional:
 
@@ -4145,6 +4161,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     ``-DWarpX_MPI_THREAD_MULTIPLE=ON``.
 
 .. fv:var:: warpx.field/particle_io_nfiles
+    :link_aliases: warpx.field_io_nfiles warpx.particle_io_nfiles
     :type: `int`
     :default: `1024`
     :optional:
@@ -5158,6 +5175,7 @@ Schwinger process
     (e.g. the beam waist for a focused laser beam).
 
 .. fv:var:: qed_schwinger.xmin,ymin,zmin,xmax,ymax,zmax
+    :link_aliases: qed_schwinger.xmin,ymin,zmin qed_schwinger.xmax,ymax,zmax
     :type: `float`
     :default: unlimited
     :optional:
