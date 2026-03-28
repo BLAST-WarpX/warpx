@@ -622,14 +622,14 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                             // DIM_RZ:
                             // dir = 0: d/dr(dEz/dz) at Er(i,j) with Er centered in r and nodal in z
                             // dir = 2: 1/r*d/dr[r*dEr/dz] at Ez(i,j) with Ez centered in z and nodal in r
-#if defined(WARPX_DIM_RZ)
-                            const amrex::Real geom_m = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
-                            const amrex::Real geom_p = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
-#else
-                            const amrex::Real geom_m = 1.0_rt;
-                            const amrex::Real geom_p = 1.0_rt;
-#endif
                             if (!blank_Efield[tdir]) {
+#if defined(WARPX_DIM_RZ)
+                                const amrex::Real geom_m = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
+                                const amrex::Real geom_p = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
+#else
+                                const amrex::Real geom_m = 1.0_rt;
+                                const amrex::Real geom_p = 1.0_rt;
+#endif
                                 {
                                 int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
                                 amrex::Real val = geom_m * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
