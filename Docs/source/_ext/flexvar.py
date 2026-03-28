@@ -109,6 +109,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
     """
 
     option_spec = {
+        "link_aliases": directives.unchanged,
         "type": directives.unchanged,
         # `default` and `value` are aliases
         "default": directives.unchanged,
@@ -185,43 +186,34 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
 
         ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
-        name_list: list[str] = sig.strip().split(" ")
-        disp_name: str = name_list[0]
-        if len(name_list) > 1:
-            disp_name += ", ".join(name_list[1:-1]) + " & " + name_list[-1]
-
-        var_desc = VarDesc(disp_name, name_list)
-
-        name = var_desc.display_name
-
-        signode["fullname"] = name
-        signode["ids"] = []  # filled in add_target_and_index
-
-        # The variable name itself
-        signode += addnodes.desc_name(
-            name,
-            "",
-            self.parse_inline(name),
-        )
-
+        # Parse self.options
         helper = FlexVarOptionHelper(
             options=self.options,
-            name=name,
+            sig=sig,
             signode=signode,
         )
-
+        link_aliases: str | None = helper.get_and_check_aliases("link_aliases")
         type_: str | None = helper.get_and_check_aliases("type")
         value: str | None = helper.get_and_check_aliases("default", "value")
         unit: str | None = helper.get_and_check_aliases("unit", "units")
         anno: str | None = helper.get_and_check_aliases("annotation", "comment")
-
         l_optional: bool = "optional" in self.options
         l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
 
+        # Make alias list and canonical name
+        alias_list: list[str] = link_aliases.split() if link_aliases else []
+        name = sig.strip()
+
+        signode["fullname"] = name
+        signode["ids"] = []  # filled in add_target_and_index
+
         # Process unit string:
         if unit:
             unit = self._process_unit_string(unit)
+
+        # Format: <name>
+        signode += addnodes.desc_name(name, "", self.parse_inline(name))
 
         # Format: (`<type>`; in <unit>)
         if type_ or unit:
@@ -274,7 +266,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(anno)
 
-        return var_desc
+        return VarDesc(name, alias_list)
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
@@ -333,11 +325,11 @@ class FlexVarOptionHelper:
     def __init__(
         self,
         options: dict[str, Any],
-        name: str,
+        sig: str,
         signode: desc_signature,
     ):
         self.options: dict[str, Any] = options
-        self.name: str = name
+        self.sig: str = sig
         self.signode: desc_signature = signode
 
     def get_and_check_aliases(self, *keys: str, default=None) -> Any:
@@ -353,7 +345,7 @@ class FlexVarOptionHelper:
         if sum(blist) > 1:
             logger.warning(
                 "Conflicting options for %s: specify only one of :%s",
-                self.name,
+                self.sig.strip(),
                 keys,
                 location=self.signode,
             )
