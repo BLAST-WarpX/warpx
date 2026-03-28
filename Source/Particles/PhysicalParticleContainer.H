@@ -480,6 +480,9 @@ protected:
     // Continuously inject a flux of particles from a defined surface
     void ContinuousFluxInjection (amrex::Real t, amrex::Real dt) override;
 
+    // Time dependent injection of bulk particles
+    void TimeDependentInjection (amrex::Real cur_time) override;
+
     //This function return true if the PhysicalParticleContainer contains electrons
     //or positrons, false otherwise
 

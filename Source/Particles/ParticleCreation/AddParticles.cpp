@@ -290,6 +290,22 @@ PhysicalParticleContainer::ContinuousFluxInjection (amrex::Real t, amrex::Real d
         }
     }
 }
+
+/* \brief Time dependent injection of bulk particles
+ *
+ * \param[in] cur_tine Current time
+ */
+void
+PhysicalParticleContainer::TimeDependentInjection (amrex::Real cur_time)
+{
+    const int lev=0;
+    for (auto const& plasma_injector : plasma_injectors) {
+        if (plasma_injector->doTimeDependentInjection(cur_time)){
+            AddPlasma(*plasma_injector, lev);
+        }
+    }
+}
+
 void PhysicalParticleContainer::MapParticletoBoostedFrame (
     amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::ParticleReal& z,
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz, amrex::Real t_lab) const
@@ -757,7 +773,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         initial_injection = false;
     }
 
-    const int num_ppc = plasma_injector.num_particles_per_cell;
+    const amrex::Real num_ppc_real = plasma_injector.num_particles_per_cell_real;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real rmax = std::min(plasma_injector.xmax, part_realbox.hi(0));
     const amrex::Real rmin = std::max(plasma_injector.xmin, part_realbox.lo(0));
@@ -855,14 +871,17 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                           overlap_realbox.lo(2))};
 
         // count the number of particles that each cell in overlap_box could add
+        amrex::Gpu::DeviceVector<amrex::Real> counts_real(overlap_box.numPts(), 0);
         amrex::Gpu::DeviceVector<amrex::Long> counts(overlap_box.numPts(), 0);
         amrex::Gpu::DeviceVector<amrex::Long> offset(overlap_box.numPts());
+        auto *pcounts_real = counts_real.data();
         auto *pcounts = counts.data();
         amrex::Box fine_overlap_box; // default Box is NOT ok().
         if (refine_injection) {
             fine_overlap_box = overlap_box & amrex::shift(fine_injection_box, -shifted);
         }
-        amrex::ParallelFor(overlap_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        amrex::ParallelForRNG(overlap_box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
             const amrex::IntVect iv(AMREX_D_DECL(i, j, k));
             auto lo = getCellCoords(overlap_corner, dx, {0._rt, 0._rt, 0._rt}, iv);
@@ -876,7 +895,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 auto index = overlap_box.index(iv);
                 const amrex::Long r = (fine_overlap_box.ok() && fine_overlap_box.contains(iv))?
                     (AMREX_D_TERM(rrfac[0],*rrfac[1],*rrfac[2])) : (1);
-                pcounts[index] = num_ppc*r;
                 // update pcount by checking if cell-corners or cell-center
                 // has non-zero density
                 const auto xlim = amrex::GpuArray<Real, 3>{lo.x,(lo.x+hi.x)/2._rt,hi.x};
@@ -895,7 +913,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     }
                     return 0;
                 };
-                pcounts[index] = checker() ? num_ppc*r : 0;
+                pcounts_real[index] = checker() ? num_ppc_real*r : 0;
+                pcounts[index] = static_cast<int>(pcounts_real[index] + amrex::Random(engine));
             }
             amrex::ignore_unused(j,k);
         });
@@ -975,7 +994,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             if (rz_random_theta) { theta_offset = amrex::Random(engine) * 2._rt * MathConst::pi; }
 #endif
 
-            const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts[index]);
+            const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts_real[index]);
             for (int i_part = 0; i_part < pcounts[index]; ++i_part)
             {
                 long ip = poffset[index] + i_part;

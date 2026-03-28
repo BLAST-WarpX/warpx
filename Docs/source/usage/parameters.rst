@@ -1168,9 +1168,14 @@ Particle initialization
     Currently implemented on CPU only.
 
 * ``<species_name>.do_continuous_injection`` (`0` or `1`)
-    Whether to inject particles during the simulation, and not only at
-    initialization. This can be required with a moving window and/or when
-    running in a boosted frame.
+    With a moving window and/or boosted frame, this specifies whether particles
+    are added to fill the new space the simulation frame moves into, as long as that
+    space is with the bounds ``<species_name>.zmin`` and ``<species_name>.zmax``.
+
+* ``<species_name>.time_dependence(t)`` (`string`) optional (default `0`)
+    Allows continuous injection over time in the defined region.
+    The expression specified will be evaluated each time step, and when true,
+    particles will be loaded.
 
 * ``<species_name>.initialize_self_fields`` (`0` or `1`)
     Whether to calculate the space-charge fields associated with this species

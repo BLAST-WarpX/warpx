@@ -71,9 +71,9 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real compute_scale_fac_volume (const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
-                                      const amrex::Long pcount) {
+                                      const amrex::Real pcount_real) {
     using namespace amrex::literals;
-    return (pcount != 0) ? AMREX_D_TERM(dx[0],*dx[1],*dx[2])/pcount : 0.0_rt;
+    return (pcount_real != 0.0_rt) ? AMREX_D_TERM(dx[0],*dx[1],*dx[2])/pcount_real : 0.0_rt;
 }
 
 /*
