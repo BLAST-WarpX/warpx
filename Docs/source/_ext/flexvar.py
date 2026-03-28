@@ -22,7 +22,7 @@ Usage
 
     Rendered format:
 
-    <name>: (<type>; in <unit>) optional (default: <default>) <comment>
+    <name> (<type>; in <unit>) optional (default: <default>) <comment>
 
         <Description body>
 
@@ -182,9 +182,9 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
 
     def handle_signature(self, sig: str, signode: desc_signature) -> VarDesc:
         """
-        Build the rendered signature node and return the canonical name.
+        Build the rendered signature node and return a description object.
 
-        ``<name>: (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
+        ``<name> (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
         """
         # Parse self.options
         helper = FlexVarOptionHelper(
