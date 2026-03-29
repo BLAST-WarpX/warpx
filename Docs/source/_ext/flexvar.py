@@ -190,9 +190,9 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         )
         link_aliases: str | None = helper.get_and_check_aliases("link_aliases")
         type_: str | None = helper.get_and_check_aliases("type")
-        value: str | None = helper.get_and_check_aliases("default", "value")
+        default: str | None = helper.get_and_check_aliases("default", "value")
         unit: str | None = helper.get_and_check_aliases("unit", "units")
-        anno: str | None = helper.get_and_check_aliases("annotation", "comment")
+        comment: str | None = helper.get_and_check_aliases("annotation", "comment")
         l_optional: bool = "optional" in self.options
         l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
@@ -247,23 +247,23 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             pass
 
         # Format: (default: `<default>`)
-        if value:
+        if default:
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
             signode += nodes.Text("default")
             signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
-            value_node = self.parse_inline(value)
+            value_node = self.parse_inline(default)
             if self.use_emphasis:
-                signode += nodes.emphasis(value, "", value_node)
+                signode += nodes.emphasis(default, "", value_node)
             else:
                 signode += value_node
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: <comment>
-        if anno:
+        if comment:
             signode += addnodes.desc_sig_space()
-            signode += self.parse_inline(anno)
+            signode += self.parse_inline(comment)
 
         return VarDesc(name, alias_list)
 
