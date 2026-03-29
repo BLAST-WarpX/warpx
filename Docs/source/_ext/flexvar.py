@@ -538,15 +538,14 @@ class FlexVarDomain(Domain):
           ``-1``
             Object should not show up in search at all.
         """
-        for name, obj in self.vars.items():
-            yield (
-                name,  # name
-                obj.var_desc.display_name,  # dispname
-                "var",  # type
-                obj.docname,  # docname
-                obj.node_id,  # anchor
-                1,  # priority
-            )
+        for obj_key, obj in self.vars.items():
+            name: str = obj_key
+            dispname: str = obj.var_desc.display_name
+            type_: str = "var"
+            docname: str = obj.docname
+            anchor: str = obj.node_id
+            priority: int = 0
+            yield (name, dispname, type_, docname, anchor, priority)
 
 
 class WarpXDomain(FlexVarDomain):
