@@ -103,6 +103,7 @@ unit_equiv_name_dict: dict[str, list[str]] = {
     "dimensionless": ["unitless", "none"],
 }
 
+
 def replace_equiv_names(txt: str, equiv_dict: dict[str, list[str]]) -> str:
     """Replace equivalent names in ``txt``, e.g., "seconds" -> "s".
 
