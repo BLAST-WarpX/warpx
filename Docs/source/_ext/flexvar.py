@@ -22,7 +22,7 @@ Usage
 
     Rendered format:
 
-    <name> (<type>; in <unit>) optional (default: <default>) <comment>
+    <name> (<type>; [<unit>]; optional, default: <default>) <comment>
 
         <Description body>
 
@@ -180,7 +180,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         """
         Build the rendered signature node and return a description object.
 
-        ``<name> (<type>; in <unit>) [optional|required] (default: <default>) <comment>``
+        ``<name> (<type>; [<unit>]; optional, default: <default>) <comment>``
         """
         # Parse self.options
         helper = FlexVarOptionHelper(
@@ -214,43 +214,41 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         # Format: <name>
         signode += addnodes.desc_name(name, "", self.parse_inline(name))
 
-        # Format: (`<type>`; in <unit>)
-        if type_ or unit:
-            # signode += addnodes.desc_sig_punctuation("", ":")
+        # Format: (<type>; [<unit>]; optional, default: <default>)
+        if type_ or unit or l_optional or l_required or default:
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
+        # Format: <type>;
         if type_:
             type_node = self.parse_inline(type_)
             if self.use_emphasis:
                 signode += nodes.emphasis(type_, "", type_node)
             else:
                 signode += type_node
-        if type_ and unit:
+        if type_ and (unit or l_optional or l_required or default):
             signode += addnodes.desc_sig_punctuation("", ";")
             signode += addnodes.desc_sig_space()
+        # Format: [<unit>];
         if unit:
-            if unit.lower() not in ["dimensionless", "unitless"]:
-                signode += nodes.Text("in")
-                signode += addnodes.desc_sig_space()
+            signode += addnodes.desc_sig_punctuation("", "[")
             signode += self.parse_inline(unit)
-        if type_ or unit:
-            signode += addnodes.desc_sig_punctuation("", ")")
-
+            signode += addnodes.desc_sig_punctuation("", "]")
+        if unit and (l_optional or l_required or default):
+            signode += addnodes.desc_sig_punctuation("", ";")
+            signode += addnodes.desc_sig_space()
         # Format: optional, required, or possibly neither
         if l_optional:
-            signode += addnodes.desc_sig_space()
             signode += nodes.Text("optional")
         elif l_required:
-            signode += addnodes.desc_sig_space()
             signode += nodes.Text("required")
         else:
             # Do nothing if neither flag is specified
             pass
-
-        # Format: (default: `<default>`)
-        if default:
+        if (l_optional or l_required) and default:
+            signode += addnodes.desc_sig_punctuation("", ",")
             signode += addnodes.desc_sig_space()
-            signode += addnodes.desc_sig_punctuation("", "(")
+        # default: <default>
+        if default:
             signode += nodes.Text("default")
             signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
@@ -259,6 +257,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
                 signode += nodes.emphasis(default, "", value_node)
             else:
                 signode += value_node
+        if type_ or unit or l_optional or l_required or default:
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: <comment>
