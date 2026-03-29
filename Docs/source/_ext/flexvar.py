@@ -502,6 +502,39 @@ class FlexVarDomain(Domain):
         )
 
     def get_objects(self) -> Iterator[tuple[str, str, str, str, str, int]]:
+        """Return an iterable of "object descriptions".
+
+        Object descriptions are tuples with six items (from Domain.get_objects
+        docstring):
+
+        ``name``
+          Fully qualified name.
+
+        ``dispname``
+          Name to display when searching/linking.
+
+        ``type``
+          Object type, a key in ``self.object_types``.
+
+        ``docname``
+          The document where it is to be found.
+
+        ``anchor``
+          The anchor name for the object.
+
+        ``priority``
+          How "important" the object is (determines placement in search
+          results). One of:
+
+          ``1``
+            Default priority (placed before full-text matches).
+          ``0``
+            Object is important (placed before default-priority objects).
+          ``2``
+            Object is unimportant (placed after full-text matches).
+          ``-1``
+            Object should not show up in search at all.
+        """
         for name, obj in self.vars.items():
             yield (
                 name,  # name
