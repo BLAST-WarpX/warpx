@@ -81,6 +81,40 @@ from sphinx.util.nodes import make_id, make_refnode
 
 logger = logging.getLogger(__name__)
 
+type_equiv_name_dict: dict[str, list[str]] = {
+    "bool": ["boolean", "logical"],
+    "int": ["integer"],
+    "string": ["str"],
+}
+
+unit_equiv_name_dict: dict[str, list[str]] = {
+    "m": ["meter", "meters"],
+    "s": ["second", "seconds"],
+    "kg": ["kilogram", "kilograms"],
+    "V": ["volt", "volts"],
+    "eV": ["electronvolt", "electronvolts", "electron volt", "electron volts"],
+    "T": ["Telsa", "Telsas"],
+    "A": ["amp", "amps"],
+    "C": ["Coulomb", "Coulombs"],
+    "dimensionless": ["unitless", "none"],
+}
+
+def replace_equiv_names(txt: str, equiv_dict: dict[str, list[str]]) -> str:
+    """Replace equivalent names in ``txt``, e.g., "seconds" -> "s".
+
+    Each key, value in ``equiv_dict`` is a preferred name and equivalent name
+    list, respectively. Replace each equivalent name to the preferred name,
+    e.g., "m": ["meter", "meters"] implies "meter" -> "m" and "meters" -> "m".
+    """
+    preferred_name: str
+    other_name_list: list[str]
+    for preferred_name, other_name_list in equiv_dict.items():
+        for other_name in other_name_list:
+            # Only replace whole word matches. \b = word break.
+            sub_re = re.compile(rf"\b{other_name}\b", re.IGNORECASE)
+            txt = sub_re.sub(preferred_name, txt)
+    return txt
+
 
 class ObjectEntry(NamedTuple):
     docname: str
@@ -133,49 +167,6 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
     # Use emphasis for type and default value
     use_emphasis = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # Equivalent names for physical units.
-        # Aliases will be mapped to the first name of each list, e.g.,
-        # ["m", "meter", "meters"] implies "meter" -> "m" and "meters" -> "m"
-        unit_alias_lists: list[list[str]] = [
-            ["m", "meter", "meters"],
-            ["s", "second", "seconds"],
-            ["kg", "kilogram", "kilograms"],
-            ["V", "volt", "volts"],
-            ["eV", "electronvolt", "electronvolts", "electron volt", "electron volts"],
-            ["T", "Telsa", "Telsas"],
-            ["A", "amp", "amps"],
-            ["C", "Coulomb", "Coulombs"],
-            ["dimensionless", "unitless", "none"],
-        ]
-        self.make_unit_alias_dict(unit_alias_lists)
-
-        # type_alias_lists: list[list[str]] = [
-        #     ["bool", "boolean"],
-        #     ["int", "integer"],
-        #     ["string", "str"],
-        # ]
-
-    def make_unit_alias_dict(self, unit_alias_lists: list[list[str]]):
-        """
-        Construct unit alias dict, e.g., "seconds" -> "s".
-
-        Map aliases to first name of each list in `unit_alias_lists`, e.g.,
-        ["m", "meter", "meters"] implies "meter" -> "m" and "meters" -> "m".
-        """
-        # self.unit_alias_dict: dict[str, str]  = {
-        #     unit_alias: unit_alias_list[0]
-        #     for unit_alias_list in unit_alias_lists
-        #     for unit_alias in unit_alias_list[1:]
-        # }
-        self.unit_alias_dict: dict[str, str] = {}
-        for unit_alias_list in unit_alias_lists:
-            for unit_alias in unit_alias_list[1:]:
-                # Map aliases to the first name
-                self.unit_alias_dict[unit_alias] = unit_alias_list[0]
-
     # ------------------------------------------------------------------
     # Signature parsing / rendering
     # ------------------------------------------------------------------
@@ -208,7 +199,9 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         signode["fullname"] = name
         signode["ids"] = []  # filled in add_target_and_index
 
-        # Process unit string:
+        # Process strings:
+        if type_:
+            type_ = self._process_type_string(type_)
         if unit:
             unit = self._process_unit_string(unit)
 
@@ -284,20 +277,21 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         inline_node = nodes.inline(text, "", *parsed_nodes)
         return inline_node
 
-    def _process_unit_string(self, unit_str: str) -> str:
-        result: str = unit_str
-        # x / y -> x/y
-        result = "/".join([u.strip() for u in result.split("/")])
-        # x**n -> x^n
-        result = result.replace("**", "^")
-        # x.y -> x y
-        result = result.replace(".", " ")
-        # Use preferred alias for physical units
-        for unit_alias, preferred_unit_name in self.unit_alias_dict.items():
-            unit_re = re.compile(rf"\b{re.escape(unit_alias)}\b", re.IGNORECASE)
-            result = re.sub(unit_re, preferred_unit_name, result)
+    def _process_type_string(self, type_str: str) -> str:
+        # Replace equivalent names for types, e.g., "integer" -> "int"
+        type_str = replace_equiv_names(type_str, type_equiv_name_dict)
+        return type_str
 
-        return result
+    def _process_unit_string(self, unit_str: str) -> str:
+        # x / y -> x/y
+        unit_str = "/".join([u.strip() for u in unit_str.split("/")])
+        # x**n -> x^n
+        unit_str = unit_str.replace("**", "^")
+        # x.y -> x y
+        unit_str = unit_str.replace(".", " ")
+        # Replace equivalent names for physical units, e.g., "meter" -> "m"
+        unit_str = replace_equiv_names(unit_str, unit_equiv_name_dict)
+        return unit_str
 
     # ------------------------------------------------------------------
     # Index + target registration
