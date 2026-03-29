@@ -196,9 +196,10 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
 
-        # Make alias list and canonical name
+        # Make canonical name and alternative name list
+        name: str = re.sub(r"\s+", "", sig)
+
         alias_list: list[str] = link_aliases.split() if link_aliases else []
-        name = sig.strip()
 
         signode["fullname"] = name
         signode["ids"] = []  # filled in add_target_and_index
