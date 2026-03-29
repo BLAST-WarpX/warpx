@@ -38,6 +38,7 @@ Examples
 Directive::
 
     .. fv:var:: my/variable<T>
+        :link_aliases: my<T> variable<T>
         :type: real array
         :default: [0.0, 0.0]
         :unit: seconds
@@ -50,6 +51,9 @@ Cross reference role::
 
     # Cross reference link to my/variable<T>:
     See :fv:var:`my/variable<T>` for details.
+
+    # Alternative names also work as links:
+    See :fv:var:`my<T>` or :fv:var:`variable<T>` for details.
 
     # With explicit title (whitespace required before the `<`):
     See :fv:var:`My Var <my/variable<T>>` for details.
