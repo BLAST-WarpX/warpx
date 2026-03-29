@@ -265,9 +265,6 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(anno)
 
-        # if link_aliases:
-        #     print(f"\nhandle_signature:\n  sig = {sig}\n  link_aliases={link_aliases}\n  name_list={alias_list}\n")
-
         return VarDesc(name, alias_list)
 
     def parse_inline(self, text: str) -> nodes.inline:
