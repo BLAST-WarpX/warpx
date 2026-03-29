@@ -438,12 +438,12 @@ class FlexVarDomain(Domain):
     }
 
     initial_data: dict[str, dict[str, ObjectEntry]] = {
-        "vars": {},
+        "objects": {},
     }
 
     @property
-    def vars(self) -> dict[str, ObjectEntry]:
-        return self.data.setdefault("vars", {})
+    def objects(self) -> dict[str, ObjectEntry]:
+        return self.data.setdefault("objects", {})
 
     def note_object(
         self,
@@ -452,8 +452,8 @@ class FlexVarDomain(Domain):
         location: Any = None,
     ) -> None:
         name = var_desc.display_name
-        if name in self.vars:
-            other = self.vars[name]
+        if name in self.objects:
+            other = self.objects[name]
             logger.warning(
                 "duplicate object description of %s, "
                 "other instance in %s, use :noindex: for one of them",
@@ -462,25 +462,25 @@ class FlexVarDomain(Domain):
                 location=location,
             )
 
-        self.vars[name] = ObjectEntry(
+        self.objects[name] = ObjectEntry(
             docname=self.env.docname,
             node_id=node_id,
             var_desc=var_desc,
         )
 
         for alt_name in var_desc.name_list:
-            self.vars[alt_name] = self.vars[name]
+            self.objects[alt_name] = self.objects[name]
 
     def clear_doc(self, docname: str) -> None:
-        to_remove = [k for k, v in self.vars.items() if v.docname == docname]
+        to_remove = [k for k, v in self.objects.items() if v.docname == docname]
         for k in to_remove:
-            del self.vars[k]
+            del self.objects[k]
 
     def merge_domaindata(self, docnames: list[str], otherdata: dict[str, dict]) -> None:
-        for name, info in otherdata.get("vars", {}).items():
+        for name, info in otherdata.get("objects", {}).items():
             info = cast(ObjectEntry, info)
             if info.docname in docnames:
-                self.vars[name] = info
+                self.objects[name] = info
 
     def resolve_xref(
         self,
@@ -492,7 +492,7 @@ class FlexVarDomain(Domain):
         node: addnodes.pending_xref,
         contnode: nodes.Element,
     ) -> nodes.Element | None:
-        obj: ObjectEntry | None = self.vars.get(target)
+        obj: ObjectEntry | None = self.objects.get(target)
         if obj is None:
             return None
         return make_refnode(
@@ -538,7 +538,7 @@ class FlexVarDomain(Domain):
           ``-1``
             Object should not show up in search at all.
         """
-        for obj_key, obj in self.vars.items():
+        for obj_key, obj in self.objects.items():
             name: str = obj_key
             dispname: str = obj.var_desc.display_name
             type_: str = "var"
