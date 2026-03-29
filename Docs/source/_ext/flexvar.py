@@ -362,7 +362,7 @@ class FlexVarXRefRole(XRefRole):
         :fv:var:`Title <name>`
         :fv:var:`name = value`
 
-    Customisations over the base ``XRefRole``:
+    Customizations over the base ``XRefRole``:
 
     **Generic-style names**
         Variable names may contain ``<`` and ``>``
