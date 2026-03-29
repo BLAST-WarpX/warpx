@@ -219,20 +219,21 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             # signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
-            if type_:
-                type_node = self.parse_inline(type_)
-                if self.use_emphasis:
-                    signode += nodes.emphasis(type_, "", type_node)
-                else:
-                    signode += type_node
-            if type_ and unit:
-                signode += addnodes.desc_sig_punctuation("", ";")
+        if type_:
+            type_node = self.parse_inline(type_)
+            if self.use_emphasis:
+                signode += nodes.emphasis(type_, "", type_node)
+            else:
+                signode += type_node
+        if type_ and unit:
+            signode += addnodes.desc_sig_punctuation("", ";")
+            signode += addnodes.desc_sig_space()
+        if unit:
+            if unit.lower() not in ["dimensionless", "unitless"]:
+                signode += nodes.Text("in")
                 signode += addnodes.desc_sig_space()
-            if unit:
-                if unit.lower() not in ["dimensionless", "unitless"]:
-                    signode += nodes.Text("in")
-                    signode += addnodes.desc_sig_space()
-                signode += self.parse_inline(unit)
+            signode += self.parse_inline(unit)
+        if type_ or unit:
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: optional, required, or possibly neither
