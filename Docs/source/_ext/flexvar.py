@@ -406,14 +406,8 @@ class FlexVarXRefRole(XRefRole):
             m = self._value_re.match(target)
             if m:
                 target = m.group(1).strip()
-        # return XRefRole.process_link(self, env, refnode, has_explicit_title, title, target)
         return XRefRole.process_link(
-            self,
-            env=env,
-            refnode=refnode,
-            has_explicit_title=has_explicit_title,
-            title=title,
-            target=target,
+            self, env, refnode, has_explicit_title, title, target
         )
 
 
