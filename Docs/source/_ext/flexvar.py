@@ -252,11 +252,11 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             signode += nodes.Text("default")
             signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
-            value_node = self.parse_inline(default)
+            default_node = self.parse_inline(default)
             if self.use_emphasis:
-                signode += nodes.emphasis(default, "", value_node)
+                signode += nodes.emphasis(default, "", default_node)
             else:
-                signode += value_node
+                signode += default_node
         if type_ or unit or l_optional or l_required or default:
             signode += addnodes.desc_sig_punctuation("", ")")
 
