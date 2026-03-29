@@ -286,14 +286,14 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         return type_str
 
     def _process_unit_string(self, unit_str: str) -> str:
-        # x / y -> x/y
-        unit_str = "/".join([u.strip() for u in unit_str.split("/")])
-        # x**n -> x^n
-        unit_str = unit_str.replace("**", "^")
-        # x.y -> x y
-        unit_str = unit_str.replace(".", " ")
         # Replace equivalent names for physical units, e.g., "meter" -> "m"
         unit_str = replace_equiv_names(unit_str, unit_equiv_name_dict)
+        # (x / y or x per y) -> x/y
+        unit_str = re.sub(r"\b(\s*/\s*|\s+per\s+)\b", "/", unit_str)
+        # x**n -> x^n
+        unit_str = unit_str.replace("**", "^")
+        # (x.y or x y) -> x*y
+        unit_str = re.sub(r"\b\s*(\.|\s+)\s*\b", "*", unit_str)
         return unit_str
 
     # ------------------------------------------------------------------
