@@ -21,6 +21,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
+#include "WarpX.H"
 
 #include <AMReX_Config.H>
 #include <AMReX_INT.H>
@@ -166,8 +167,8 @@ guardCellManager::Init (
                     dt_J = dt;
                 }
             }
-            ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
-            ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
+            ng_alloc_Rho[i] += static_cast<int>(std::ceil(WarpX::c_light * dt_Rho / dx[i]));
+            ng_alloc_J[i]   += static_cast<int>(std::ceil(WarpX::c_light * dt_J / dx[i]));
         }
     } else if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
                evolve_scheme == EvolveScheme::SemiImplicitEM ||

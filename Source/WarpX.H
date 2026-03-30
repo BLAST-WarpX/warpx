@@ -310,6 +310,12 @@ public:
     //! If true, the initial conditions from random number generators are serialized (useful for reproducible testing with OpenMP)
     static bool serialize_initial_conditions;
 
+    //! Effective speed of light for the EM solver (reduced speed of light model)
+    //! Set via warpx.c_light_factor (default 1.0, meaning no reduction)
+    static amrex::Real c_light;
+    //! Square of the effective speed of light
+    static amrex::Real c_light_sq;
+
     //! Lorentz factor of the boosted frame in which a boosted-frame simulation is run
     static amrex::Real gamma_boost;
     //! Beta value corresponding to the Lorentz factor of the boosted frame of the simulation

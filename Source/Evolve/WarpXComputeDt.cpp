@@ -66,31 +66,36 @@ WarpX::ComputeDt ()
         if (m_max_dt.has_value()) {
             deltat = m_max_dt.value();
         } else {
-            deltat = cfl * minDim(dx) / PhysConst::c;
+            deltat = cfl * minDim(dx) / WarpX::c_light;
         }
     } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
         // Computation of dt for spectral algorithm
         // (determined by the minimum cell size in all directions)
-        deltat = cfl * minDim(dx) / PhysConst::c;
+        deltat = cfl * minDim(dx) / WarpX::c_light;
     } else {
         // Computation of dt for FDTD algorithm
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // - In RZ geometry
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
-            deltat = cfl * CylindricalYeeAlgorithm::ComputeMaxDt(dx,  n_rz_azimuthal_modes);
+            deltat = cfl * CylindricalYeeAlgorithm::ComputeMaxDt(dx,  n_rz_azimuthal_modes)
+                   * (PhysConst::c / WarpX::c_light);
 #elif defined(WARPX_DIM_RSPHERE)
         // - In RZ geometry
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
-            deltat = cfl * SphericalYeeAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * SphericalYeeAlgorithm::ComputeMaxDt(dx)
+                   * (PhysConst::c / WarpX::c_light);
 #else
         // - In Cartesian geometry
         if (grid_type == GridType::Collocated) {
-            deltat = cfl * CartesianNodalAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianNodalAlgorithm::ComputeMaxDt(dx)
+                   * (PhysConst::c / WarpX::c_light);
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
                     || electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-            deltat = cfl * CartesianYeeAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianYeeAlgorithm::ComputeMaxDt(dx)
+                   * (PhysConst::c / WarpX::c_light);
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
-            deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx)
+                   * (PhysConst::c / WarpX::c_light);
 #endif
         } else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");
