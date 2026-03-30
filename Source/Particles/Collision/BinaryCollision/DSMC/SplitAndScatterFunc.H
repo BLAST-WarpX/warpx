@@ -45,13 +45,21 @@ public:
     SplitAndScatterFunc (const std::string& collision_name, MultiParticleContainer const * mypc);
 
     /**
-     * \brief Function that performs the particle scattering and injection due
-     * to binary collisions.
+     * \brief Function that performs binary collision between two macroparticles
+     *  (referred to as "reactant species" in the code below)
      *
-     * Product species are arranged in slots 0 through m_num_product_species-1.
-     * Slots 0 and 1 always correspond to the first and second reactant species, respectively. For reaction
-     * events that produce new species (ionization, charge exchange, two-product
-     * reaction), slots 2 and 3 hold the true output species.
+     * During a collision, new macroparticles can be created in different species,
+     * which are arranged in slots 0 through m_num_product_species-1.
+     *
+     * Slots 0 and 1 always correspond to the first and second reactant species, respectively.
+     * This is because, physically, some of the reacting particles can still be present after the collision
+     * (e.g., if the collision is elastic scattering), but with modified properties (e.g., modified momentum).
+     * In the code, this is handled by creating *new* macroparticles in the reactant species, whose weight
+     * is subtracted from the reacting macroparticles.
+     * (This approach is used because the two reactant macroparticles may have different weights.)
+     *
+     * For collisions that, physically, produce new particles (e.g., ionization, charge exchange, two-product
+     * reaction), slots 2 and 3 hold the true product species.
      *
      * @param[in]     n_total_pairs         total number of particle pairs across all cells.
      * @param[in,out] ptile0                particle tile for the first reactant species (slot 0);

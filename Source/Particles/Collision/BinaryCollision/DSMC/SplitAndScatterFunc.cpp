@@ -35,8 +35,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             // For ionization:
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "ionization") != scattering_processes.end()) {
                 m_num_product_species = 4;
-                m_num_products_host.push_back(1); // slot 0: first reactant (incident/non-target) species; 1 particle per ionization event
-                m_num_products_host.push_back(0); // slot 1: other reactant (target) species; consumed by reaction, no new reaction-product particles
+                m_num_products_host.push_back(1); // slot 0: first reactant (incident/non-target) species; 1 scattered particle per ionization event
+                m_num_products_host.push_back(0); // slot 1: other reactant (target) species; consumed by reaction, no new reaction-produced particle
                 m_num_products_host.push_back(1); // slot 2: first true product species (e.g. ejected electron)
                 m_num_products_host.push_back(1); // slot 3: second true product species (e.g. resulting ion)
 
@@ -48,8 +48,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end() ||
                 std::find(scattering_processes.begin(), scattering_processes.end(), "two_product_reaction") != scattering_processes.end()) {
                 m_num_product_species = 4;
-                m_num_products_host.push_back(0); // slot 0: first reactant species; consumed by reaction, no new reaction-product particles
-                m_num_products_host.push_back(0); // slot 1: other reactant species; consumed by reaction, no new reaction-product particles
+                m_num_products_host.push_back(0); // slot 0: first reactant species; consumed by reaction, no new reaction-produced particles
+                m_num_products_host.push_back(0); // slot 1: other reactant species; consumed by reaction, no new reaction-produced particles
                 m_num_products_host.push_back(1); // slot 2: first true product species
                 m_num_products_host.push_back(1); // slot 3: second true product species
 
@@ -59,8 +59,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
         } else {
             m_num_product_species = 2;
-            m_num_products_host.push_back(0); // slot 0: first reactant species; no reaction-product particles (only weight-split copies)
-            m_num_products_host.push_back(0); // slot 1: other reactant species; no reaction-product particles (only weight-split copies)
+            m_num_products_host.push_back(0);
+            m_num_products_host.push_back(0);
         }
     }
     else
