@@ -743,18 +743,18 @@ void ImplicitSolver::InitializeMassMatrices ()
             int ncomp_tot_pc_xx = 1;
             int ncomp_tot_pc_yy = 1;
             int ncomp_tot_pc_zz = 1;
-            if (m_use_mass_matrices_jacobian) { // Additional MM components in PC not setup yet
-                                                // for when MM is only used for the PC
-                const int ncomp_dir_pc = 1 + 2*m_mass_matrices_pc_width;
-                for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-                    m_ncomp_pc_xx[dir] = std::min(m_ncomp_xx[dir],ncomp_dir_pc);
-                    m_ncomp_pc_yy[dir] = std::min(m_ncomp_yy[dir],ncomp_dir_pc);
-                    m_ncomp_pc_zz[dir] = std::min(m_ncomp_zz[dir],ncomp_dir_pc);
-                    ncomp_tot_pc_xx *= m_ncomp_pc_xx[dir];
-                    ncomp_tot_pc_yy *= m_ncomp_pc_yy[dir];
-                    ncomp_tot_pc_zz *= m_ncomp_pc_zz[dir];
-                }
+
+            // Additional MM components in PC not setup yet for when MM is only used for the PC
+            const int ncomp_dir_pc = (m_use_mass_matrices_jacobian ? 1 + 2*m_mass_matrices_pc_width : 1);
+            for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
+                m_ncomp_pc_xx[dir] = std::min(m_ncomp_xx[dir],ncomp_dir_pc);
+                m_ncomp_pc_yy[dir] = std::min(m_ncomp_yy[dir],ncomp_dir_pc);
+                m_ncomp_pc_zz[dir] = std::min(m_ncomp_zz[dir],ncomp_dir_pc);
+                ncomp_tot_pc_xx *= m_ncomp_pc_xx[dir];
+                ncomp_tot_pc_yy *= m_ncomp_pc_yy[dir];
+                ncomp_tot_pc_zz *= m_ncomp_pc_zz[dir];
             }
+
             m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{0}, lev, ba_Jx, dm, ncomp_tot_pc_xx, ngJ, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{1}, lev, ba_Jy, dm, ncomp_tot_pc_yy, ngJ, 0.0_rt);
             m_WarpX->m_fields.alloc_init(FieldType::MassMatrices_PC, Direction{2}, lev, ba_Jz, dm, ncomp_tot_pc_zz, ngJ, 0.0_rt);
