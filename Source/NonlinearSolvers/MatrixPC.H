@@ -556,7 +556,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         // dir = 1: that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
                         // dir = 2: zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 #if defined(WARPX_DIM_RZ)
-                        const amrex::Real i_real = static_cast<amrex::Real>(i);
+                        const auto i_real = static_cast<amrex::Real>(i);
 #endif
                         {
                             // diagonal component (i,j) of second derivative operator
