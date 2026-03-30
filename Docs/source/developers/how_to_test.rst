@@ -199,10 +199,10 @@ How to reset checksums
 ----------------------
 
 Your code changes may sometimes change the results that WarpX produces.
-This is automatically detected by the automated tests (run as part of a PR) and by comparing the WarpX results with the reference values stored in the checksum files.
+This is automatically detected by the automated tests (which run every time a commit is pushed to the head branch of an open PR) through comparison of the WarpX results with the reference values stored in the checksum files.
 
 **If** the differences are expected, you can reset the checksum files automatically using the output
-of the tests that were run as part of the PR. To do so, go to the directory
+of the automated tests. To do so, go to the directory
 `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script
 `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ with the ``--pr-number`` option:
 
@@ -219,6 +219,7 @@ Alternatively, it is also possible to reset a checksum file locally by running t
 
      CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
 
+Note that it is possible that the checksum values generated locally on your computer architecture may differ from the ones generated remotely by the autometed tests on the architecture provided by the CI runners.
 .. _developers-testing-naming:
 
 Naming conventions for automated tests
