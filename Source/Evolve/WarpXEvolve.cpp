@@ -23,6 +23,7 @@
 #       include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #   endif
 #endif
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
