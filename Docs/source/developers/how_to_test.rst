@@ -213,6 +213,12 @@ of the tests that were run as part of the PR. To do so, go to the directory
 This requires the `GitHub CLI <https://cli.github.com/>`__ (``gh``) to be installed and authenticated.
 The script will automatically find the failing Azure Pipelines jobs for the pull request, download their logs, and update all checksum benchmark files that did not pass the checksum analysis.
 
+Alternatively, it is also possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
+
+  .. code-block:: bash
+
+     CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
+
 .. _developers-testing-naming:
 
 Naming conventions for automated tests
