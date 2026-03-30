@@ -492,7 +492,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         // dir = 1: that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
                         // dir = 2: zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
                         if (dir != 0) {
-                            const amrex::Real i_real = static_cast<amrex::Real>(i);
+                            const auto i_real = static_cast<amrex::Real>(i);
                             {
                                 // diagonal component (i) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
