@@ -393,17 +393,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
 
-#if defined(WARPX_DIM_RCYLINDER)
-                amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RCYLINDER");
-#elif defined(WARPX_DIM_RSPHERE)
-                amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RSPHERE");
-#elif defined(WARPX_DIM_RZ)
-                amrex::ignore_unused(dxi);
-                WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Assemble() not yet implemented for WARPX_DIM_RZ");
-#endif
-
                 // Set row indices and identity diagonal (unconditional)
                 ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
@@ -417,7 +406,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
 
                     {
                         const int cidx_g_lhs = dof_arr(i,j,k,1);
-                        const amrex::Real val = 1.0;
+                        const amrex::Real val = 1.0_rt;
                         auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                 &a_ij_ptr[ridx_l*nnz_max],
@@ -431,11 +420,16 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 // Add the curl-curl stencil entries (only when alpha > 0)
                 if (thetaDt > 0.0) {
 
+#if defined(WARPX_DIM_RSPHERE)
+                    // 1D spherical geometry is electrostatic
+                    amrex::ignore_unused(dxi);
+#else
                     const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
                     AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);
                     const auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
+#endif
 
-#if defined(WARPX_DIM_XZ)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     int tdir = -1;
                     if  (dir == 0) { tdir = 2; }
                     else if (dir == 2) { tdir = 0; }
@@ -448,8 +442,6 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         const dof_arrays {{ AMREX_D_DECL( dofs_mfarrvec[lev][dir]->const_array(mfi),
                                                           dofs_mfarrvec[lev][tdir1]->const_array(mfi),
                                                           dofs_mfarrvec[lev][tdir2]->const_array(mfi) ) }};
-#elif !defined(WARPX_DIM_1D_Z)
-                    amrex::ignore_unused(dxi, BC_mask_Edir_arr);
 #endif
 
                     ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -460,19 +452,59 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         int icol = num_nz_ptr[ridx_l]; //NOLINT (misc-const-correctness)
 
 #if defined(WARPX_DIM_1D_Z)
+                        // dir = 0: xhat\cdot[\nabla\times\nabla E] = -[d2/dx2]Ex
+                        // dir = 1: yhat\cdot[\nabla\times\nabla E] = -[d2/dx2]Ey
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = 0
                         if (dir != 2) {
                             {
+                                // diagonal component (i) of 2nd derivative operator
                                 const int cidx_g_rhs = dof_arr(i,j,k,1);
                                 const amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
-                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // left component (i-1) of 2nd derivative operator
                                 const int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 const amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
+                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
+                                if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                            }
+                            {
+                                // right component (i+1) of 2nd derivative operator
+                                const int cidx_g_rhs = dof_arr(i+1,j,k,1);
+                                const amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
+                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
+                                if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                            }
+                        }
+#elif defined(WARPX_DIM_RCYLINDER)
+                        // dir = 0: rhat\cdot[\nabla\times\nabla E] = 0
+                        // dir = 1: that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
+                        if (dir != 0) {
+                            const amrex::Real i_real = static_cast<amrex::Real>(i);
+                            {
+                                // diagonal component (i) of 2nd derivative operator
+                                int cidx_g_rhs = dof_arr(i,j,k,1);
+                                amrex::Real geom_factor = 1.0_rt;
+                                if (dir == 1) {
+                                    // r_{i} / r_{i-1/2} + r_{i} / r_{i+1/2}
+                                    geom_factor = i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt);
+                                }
+                                else if (dir == 2) {
+                                    geom_factor = 2.0_rt; // (r_{i+1/2} + r_{i-1/2}) / r_{i}
+                                }
+                                amrex::Real val = geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -480,8 +512,33 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                const int cidx_g_rhs = dof_arr(i+1,j,k,1);
-                                const amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
+                                // left component (i-1) of 2nd derivative operator
+                                int cidx_g_rhs = dof_arr(i-1,j,k,1);
+                                amrex::Real geom_factor = 1.0_rt;
+                                if (dir == 1) {
+                                    geom_factor = (i_real - 1.0_rt) / (i_real - 0.5_rt); // r_{i-1} / r_{i-1/2}
+                                }
+                                else if (dir == 2 && i != 0) {
+                                    geom_factor = 1.0_rt - 0.5_rt / i_real; // r_{i-1/2} / r_{i}
+                                }
+                                amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
+                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
+                                if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
+                            }
+                            {
+                                // right component (i+1) of 2nd derivative operator
+                                int cidx_g_rhs = dof_arr(i+1,j,k,1);
+                                amrex::Real geom_factor = 1.0_rt;
+                                if (dir == 1) {
+                                    geom_factor = (i_real + 1.0_rt) / (i_real + 0.5_rt); // r_{i+1} / r_{i+1/2}
+                                }
+                                else if (dir == 2 && i != 0) {
+                                    geom_factor = 1.0_rt + 0.5_rt / i_real; // r_{i+1/2} / r_{i}
+                                }
+                                amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
@@ -489,17 +546,34 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                         }
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                        // DIM_XZ:
+                        // dir = 0: xhat\cdot[\nabla\times\nabla E] = d/dx[dEz/dz] - [d2/dz2]Ex
+                        // dir = 1: yhat\cdot[\nabla\times\nabla E] = -[d2/dx2 + d2/dz2]Ey
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx] - [d2/dx2]Ez
+                        // DIM_RZ:
+                        // dir = 0: rhat\cdot[\nabla\times\nabla E] = d/dr[dEz/dz] - [d2/dz2]Er
+                        // dir = 1: that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
+                        // dir = 2: zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
+#if defined(WARPX_DIM_RZ)
+                        const amrex::Real i_real = static_cast<amrex::Real>(i);
+#endif
                         {
+                            // diagonal component (i,j) of second derivative operator
                             const int cidx_g_rhs = dof_arr(i,j,k,1);
-                            amrex::Real val = 0.0;
+                            amrex::Real val = 0.0_rt;
                             if (dir == 0) {
-                                val += 2.0_rt*alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,0);
+                                val = 2.0_rt * alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 2) {
-                                val += 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
+                                val = 2.0_rt * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 1) {
-                                val += 2.0_rt*alpha * ( dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0)
-                                                      + dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,2) );
+#if defined(WARPX_DIM_RZ)
+                                const amrex::Real geom_factor = i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt);
+#else
+                                const amrex::Real geom_factor = 2.0_rt;
+#endif
+                                val = geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0)
+                                    +      2.0_rt * alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                             }
                             auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -509,88 +583,125 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                         }
                         if ((dir == 0) || (dir == 2)) {
                             {
+                                // left component (i-1,j) or (i,j-1) of second derivative operator
+#if defined(WARPX_DIM_RZ)
+                                const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
+#else
+                                const amrex::Real geom_factor = 1.0_rt;
+#endif
                                 const int cidx_g_rhs = (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
-                                const amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
+                                const amrex::Real val = -geom_factor * alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
+                                // right component (i+1,j) or (i,j+1) of second derivative operator
+#if defined(WARPX_DIM_RZ)
+                                const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
+#else
+                                const amrex::Real geom_factor = 1.0_rt;
+#endif
                                 const int cidx_g_rhs = (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
-                                const amrex::Real val = -alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
+                                const amrex::Real val = -geom_factor * alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
-                            // The following four blocks are for
+                            // The following four blocks are for the mixed derivative terms of the curl curl operator
+                            // DIM_XZ:
                             // dir = 0: d/dx(dEz/dz) at Ex(i,j) with Ex centered in x and nodal in z
                             // dir = 2: d/dz(dEx/dx) at Ez(i,j) with Ez centered in z and nodal in x
+                            // DIM_RZ:
+                            // dir = 0: d/dr(dEz/dz) at Er(i,j) with Er centered in r and nodal in z
+                            // dir = 2: 1/r*d/dr[r*dEr/dz] at Ez(i,j) with Ez centered in z and nodal in r
+#if defined(WARPX_DIM_RZ)
+                            const amrex::Real geom_m = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
+                            const amrex::Real geom_p = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
+#else
+                            const amrex::Real geom_m = 1.0_rt;
+                            const amrex::Real geom_p = 1.0_rt;
+#endif
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
-                                const amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
+                                const amrex::Real val = geom_m * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
                                 const int cidx_g_rhs = dof_tdir_arr(i,j,k,1);
-                                const amrex::Real val = -alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
+                                const amrex::Real val = -geom_p * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
-                                const amrex::Real val = -alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
+                                const amrex::Real val = -geom_m * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
-                                const amrex::Real val = alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
+                                const amrex::Real val = geom_p * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                                 const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                              &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                              &a_ij_ptr[ridx_l*nnz_max],
-                                                                              nnz_max, icol );
+                                                                        &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                        &a_ij_ptr[ridx_l*nnz_max],
+                                                                        nnz_max, icol );
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                         } else if (dir==1) {
                             for (int jdir = 0; jdir <= 2; jdir+=2) {
                                 {
+#if defined(WARPX_DIM_RZ)
+                                    const amrex::Real geom_factor = (jdir == 0 ? (i_real - 1.0_rt) / (i_real - 0.5_rt) : 1.0_rt);
+#else
+                                    const amrex::Real geom_factor = 1.0_rt;
+#endif
                                     const int cidx_g_rhs = (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
-                                    const amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
+                                    const amrex::Real val = -geom_factor * alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                                  &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                                  &a_ij_ptr[ridx_l*nnz_max],
-                                                                                  nnz_max, icol );
+                                                                            &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                            &a_ij_ptr[ridx_l*nnz_max],
+                                                                            nnz_max, icol );
                                     if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                                 }
                                 {
+#if defined(WARPX_DIM_RZ)
+                                    const amrex::Real geom_factor = (jdir == 0 ? (i_real + 1.0_rt) / (i_real + 0.5_rt) : 1.0_rt);
+#else
+                                    const amrex::Real geom_factor = 1.0_rt;
+#endif
                                     const int cidx_g_rhs = (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
-                                    const amrex::Real val = -alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
+                                    const amrex::Real val = -geom_factor * alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
                                     const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
-                                                                                  &c_indices_g_ptr[ridx_l*nnz_max],
-                                                                                  &a_ij_ptr[ridx_l*nnz_max],
-                                                                                  nnz_max, icol );
+                                                                            &c_indices_g_ptr[ridx_l*nnz_max],
+                                                                            &a_ij_ptr[ridx_l*nnz_max],
+                                                                            nnz_max, icol );
                                     if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                                 }
                             }
                         }
 #elif defined(WARPX_DIM_3D)
+                        // xhat\cdot[\nabla\times\nabla E] = d/dx[dEy/dy + dEz/dz] - [d2/dy2 + d2/dz2]Ex
+                        // yhat\cdot[\nabla\times\nabla E] = d/dy[dEx/dx + dEz/dz] - [d2/dx2 + d2/dz2]Ey
+                        // zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx + dEy/dy] - [d2/dx2 + d2/dy2]Ez
                         amrex::IntVect dvec(AMREX_D_DECL(dir,tdir1,tdir2));
                         const amrex::IntVect ic(AMREX_D_DECL(i,j,k));
                         {
+                            // diagonal component (i,j,k) of second derivative operator
                             const int cidx_g_rhs = dof_arrays[0](ic,1);
                             const amrex::Real val = 2.0_rt * alpha * ( dxi[dvec[1]]*dxi[dvec[1]] * BC_mask_Edir_arr(i,j,k,0)
                                                                + dxi[dvec[2]]*dxi[dvec[2]] * BC_mask_Edir_arr(i,j,k,3) );
@@ -600,6 +711,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                                                     nnz_max, icol );
                             if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                         }
+                        // left and right components (i+/-1,j,k), (i,j+/-1,k), or (i,j,k+/-1) of second derivative operator
                         for (int ctr = -1; ctr <= 1; ctr += 2) {
                             for (int tdir = 1; tdir <= 2; tdir++) {
                                 auto iv = ic; iv[dvec[tdir]] += ctr;
@@ -613,6 +725,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                         }
+                        // mixed derivative terms of the curl curl operator
                         for (int ctr_dir = -1; ctr_dir <= 0; ctr_dir++) {
                             for (int ctr_tdir = -1; ctr_tdir <= 0; ctr_tdir++) {
                                 for (int tdir = 1; tdir <= 2; tdir++) {
