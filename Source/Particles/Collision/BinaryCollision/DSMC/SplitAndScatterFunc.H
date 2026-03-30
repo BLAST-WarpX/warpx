@@ -45,7 +45,7 @@ public:
     SplitAndScatterFunc (const std::string& collision_name, MultiParticleContainer const * mypc);
 
     /**
-     * \brief Function that performs binary collision between two macroparticles
+     * \brief Function that performs binary collision between macroparticle pairs
      *  (referred to as "reactant species" in the code below)
      *
      * During a collision, new macroparticles can be created in different species,
@@ -55,13 +55,14 @@ public:
      * This is because, physically, some of the reacting particles can still be present after the collision
      * (e.g., if the collision is elastic scattering), but with modified properties (e.g., modified momentum).
      * In the code, this is handled by creating *new* macroparticles in the reactant species, whose weight
-     * is subtracted from the reacting macroparticles.
-     * (This approach is used because the two reactant macroparticles may have different weights.)
+     * is subtracted from the reacting macroparticles. (This approach is used in order to handle the fact
+     * that the two reactant macroparticles may have different weights.)
      *
      * For collisions that, physically, produce new particles (e.g., ionization, charge exchange, two-product
      * reaction), slots 2 and 3 hold the true product species.
      *
-     * @param[in]     n_total_pairs         total number of particle pairs across all cells.
+     * @param[in]     n_total_pairs         total number of colliding particle pairs
+     *                                      (across all cells) handled by this kernel.
      * @param[in,out] ptile0                particle tile for the first reactant species (slot 0);
      *                                      weights may be reduced by the collision.
      * @param[in,out] ptile1                particle tile for the other reactant species (slot 1);
@@ -76,20 +77,18 @@ public:
      * @param[in]     m1                    rest mass of the other reactant species (slot 1).
      * @param[in]     mask                  per-pair collision type: 0 = no collision,
      *                                      otherwise cast of ScatteringProcessType to int.
-     * @param[in,out] products_np           on input: current particle count of each product
-     *                                      tile; updated to the pre-addition count so that
-     *                                      newly added particles can be correctly addressed
-     *                                      even when the same container appears in multiple
-     *                                      slots (e.g. e- + H -> 2 e- + H+).
+     * @param[in,out] products_np           macroparticle count of each product tile; updated in this
+     *                                      kernel to reflect the number of new macroparticles added in each species.
      * @param[in]     copy_species0         array of SmartCopy functors (size m_num_product_species);
      *                                      copy_species0[k] copies a particle FROM the first
      *                                      reactant species (slot 0) INTO product slot k.
-     * @param[in]     copy_species1         same as copy_species0 but copies FROM the other
-     *                                      reactant species (slot 1).
+     * @param[in]     copy_species1         array of SmartCopy functors (size m_num_product_species);
+     *                                      copy_species1[k] copies a particle FROM the other
+     *                                      reactant species (slot 1) INTO product slot k.
      * @param[in]     p_pair_indices_0      per-pair index of the first reactant species (slot 0) particle.
      * @param[in]     p_pair_indices_1      per-pair index of the other reactant species (slot 1) particle.
      * @param[in]     p_pair_reaction_weight per-pair weight assigned to newly created product
-     *                                      particles; also the amount subtracted from the
+     *                                      macroparticles; also the amount subtracted from the
      *                                      colliding macroparticle weights.
      * \return num_added                    number of particles added to each product slot.
      */
@@ -115,24 +114,24 @@ public:
         // Product species slot layout (m_num_product_species slots total):
         //   Slot 0: copy of the first reactant species, i.e. the species from ptile0 (always present)
         //   Slot 1: copy of the other reactant species, i.e. the species from ptile1 (always present)
-        //   Slot 2: first true output species   (only when m_num_product_species == 4)
-        //   Slot 3: second true output species  (only when m_num_product_species == 4)
+        //   Slot 2: first true product species
+        //   Slot 3: second true product species
         //
-        // For non-reaction events (elastic, back, forward scattering), only slots 0 and 1
-        // receive new particles: one weight-split copy per reactant per colliding pair.
+        // For non-product producing collisions (elastic, back, forward scattering), only slots 0
+        // and 1 receive new macroparticles: one weight-split copy per reactant per colliding pair.
         // These are counted by `no_product_total` and NOT reflected in `m_num_products_host`.
         //
-        // For reaction events (ionization, two-product reaction, charge exchange), slots 2
-        // and 3 receive one new particle per event. For ionization, slot 0 also receives one
-        // particle (the surviving incident species copy). These counts are stored in
+        // For product-producing collisions (ionization, two-product reaction, charge exchange),
+        // slots 2 and 3 receive one new particle per event. For ionization, slot 0 also receives one
+        // particle (the surviving reactant species copy). These counts are stored in
         // `m_num_products_host[i]` and multiplied by `with_product_total` to get the totals.
 
-        // Return a vector of zeros, indicating that for all the "product" species
-        // there were no new particles added.
+        // If there are no colliding pairs, skip the rest of this kernel and return a vector of
+        // zeros, indicating that for all the "product" species, there were no new macroparticles added.
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
-        // The following is used to calculate the appropriate offsets for processes
-        // that do not produce macroparticles in new species (i.e., not ionization, not two-product reaction).
+        // The following is used to calculate the appropriate offsets for
+        // non-product producing collisions (i.e., not ionization, not two-product reaction).
         // Note that a standard cummulative sum is not appropriate since the
         // mask is also used to specify the type of collision and can therefore
         // have values >1
@@ -151,7 +150,7 @@ public:
         amrex::Vector<int> num_added_vec(m_num_product_species, 0);
         for (int i = 0; i < 2; i++)
         {
-            // Record the number of non-reaction events that lead to new particles
+            // Record the number of non-product producing collisions that lead to new particles
             // for the first and second reactant species (slots 0 and 1). Only 1
             // weight-split particle is created per reactant per event.
             num_added_vec[i] = static_cast<int>(no_product_total);
@@ -373,13 +372,13 @@ public:
                     // We also convert from eV to Joules
                     false,
                     // no angular scattering: the products' momenta have the same direction
-                    // as that of the incident particle, in the center-of-mass frame
+                    // as that of the reactant particle, in the center-of-mass frame
                     engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_total + with_product_offsets_data[i];
-                // Make a copy of the particle from the first reactant species (incident species, slot 0)
+                // Make a copy of the particle from the first reactant species (slot 0)
                 copy_species0[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_0[i]),
                                static_cast<int>(slot0_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
