@@ -404,6 +404,21 @@ PhysicalParticleContainer::BackwardCompatibility ()
         WARPX_ABORT_WITH_MESSAGE("<species>.plot_species is not supported anymore. "
                      "Please use the new syntax for diagnostics, see documentation.");
     }
+
+    std::string backward_profile_type;
+    if (pp_species_name.query("profile", backward_profile_type) && backward_profile_type == "predefined"){
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.profile = predefined is no longer supported. "
+            "Please use <species>.profile = parse_density_function instead.");
+    }
+
+    std::string backward_mom_dist;
+    if (pp_species_name.query("momentum_distribution_type", backward_mom_dist) &&
+        backward_mom_dist == "radial_expansion") {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.momentum_distribution_type = radial_expansion is not supported anymore. "
+            "Please use momentum_distribution_type = parse_momentum_function instead.");
+    }
 }
 
 void PhysicalParticleContainer::InitData ()
@@ -468,8 +483,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     bool const deposit_charge = (
         has_rho &&
         !skip_deposition &&
+        !do_not_deposit
+    );
+    bool const deposit_current = (
+        !skip_deposition &&
         !do_not_deposit &&
-        (position_push_type == PositionPushType::Full)
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only)
     );
     bool const split_particles = (
         do_splitting &&
@@ -671,7 +690,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 ABLASTR_PROFILE_VAR_STOP(blp_fg);
 
                 // Current Deposition
-                if (!skip_deposition && !(implicit_options && implicit_options->evolve_suborbit_particles_only))
+                if (deposit_current)
                 {
                     // Deposit at t_{n+1/2} with explicit push
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);

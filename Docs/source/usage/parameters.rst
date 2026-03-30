@@ -7,6 +7,10 @@ This section describes the list of parameters that can be set in the WarpX input
 
 Examples of inputs files can be found in the :ref:`Examples <usage-examples>` section.
 
+.. tip::
+
+   If you enjoy AI/LLM/agentic workflows, see our :ref:`AI (LLM)-Assisted Input File Design <ai_input_design>` section, too.
+
 .. note::
 
    WarpX's input parameters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
@@ -1203,10 +1207,6 @@ Particle initialization
       and ``<species_name>.xmax`` (and same in all directions). This requires additional
       parameter ``<species_name>.density``. i.e., the plasma density in :math:`m^{-3}`.
 
-    * ``predefined``: Predefined density profile.
-      This requires additional parameters ``<species_name>.predefined_profile_name`` and ``<species_name>.predefined_profile_params``.
-      Currently, only a parabolic channel density profile is implemented.
-
     * ``parse_density_function``: the density is given by a function in the input file.
       It requires additional argument ``<species_name>.density_function(x,y,z)``, which is a
       mathematical expression for the density of the species, e.g.
@@ -1332,9 +1332,6 @@ Particle initialization
       to the Maxwell Boltzmann setting, which initializes non-relativistic plasma in their relativistic
       drifting frame.
 
-    * ``radial_expansion``: momentum depends on the radial coordinate linearly. This
-      can be controlled with additional parameter ``u_over_r`` which is the slope (``0.`` by default).
-
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
@@ -1385,38 +1382,6 @@ Particle initialization
     * ``vzbar`` or ``true``: the species' average longitudinal velocity :math:`\overline{v_z}`
 
     * ``v``: each particle's velocity :math:`{\bf v}`, including transverse components
-
-* ``species_name.predefined_profile_name`` (`string`)
-    Only read if ``<species_name>.profile`` is ``predefined``.
-
-    * If ``parabolic_channel``, the plasma profile is a parabolic profile with
-      cosine-like ramps at the beginning and the end of the profile.
-      The density is given by
-
-      .. math::
-
-          n = n_0 n(x,y) n(z-z_0)
-
-      with
-
-      .. math::
-
-          n(x,y) = 1 + 4\frac{x^2+y^2}{k_p^2 R_c^4}
-
-      where :math:`k_p` is the plasma wavenumber associated with density :math:`n_0`.
-      Here, with :math:`z_0` as the start of the plasma, :math:`n(z-z_0)` is a cosine-like up-ramp from :math:`0` to :math:`L_{ramp,up}`,
-      constant to :math:`1` from :math:`L_{ramp,up}` to :math:`L_{ramp,up} + L_{plateau}`
-      and a cosine-like down-ramp from :math:`L_{ramp,up} + L_{plateau}` to
-      :math:`L_{ramp,up} + L_{plateau}+L_{ramp,down}`. All parameters are given
-      in ``predefined_profile_params``.
-
-* ``<species_name>.predefined_profile_params`` (list of `float`)
-    Parameters for the predefined profiles.
-
-    * If ``species_name.predefined_profile_name`` is ``parabolic_channel``,
-      ``predefined_profile_params`` contains a space-separated list of the
-      following parameters, in this order: :math:`z_0` :math:`L_{ramp,up}` :math:`L_{plateau}`
-      :math:`L_{ramp,down}` :math:`R_c` :math:`n_0`
 
 * ``<species_name>.do_backward_propagation`` (`bool`)
     Inject a backward-propagating beam to reduce the effect of charge-separation

@@ -21,6 +21,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
 #include "Initialization/ExternalField_fwd.H"
 #include "Particles/ParticleBoundaryBuffer_fwd.H"
@@ -40,7 +41,6 @@
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
@@ -1039,7 +1039,12 @@ private:
         int a_step
     );
 
-    void OneStep_nosub (amrex::Real cur_time);
+    void OneStep_nosub (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_sub1 (amrex::Real cur_time);
 
     /**

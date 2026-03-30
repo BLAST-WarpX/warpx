@@ -6,7 +6,8 @@ WarpX is a massively parallel electromagnetic Particle-In-Cell (PIC) code built 
 
 ## Development Environment
 
-If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX:
+If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
+The `conda` command may be called `conda`, `mamba`, or `micromamba` depending on the system (check aliases and available binaries):
 ```bash
 conda activate warpx-cpu-mpich-dev
 ```
@@ -14,9 +15,11 @@ If this environment does not yet exist, create it as described in `Docs/source/i
 
 ## Build Commands
 
+The cmake build directory is always inside the repository root (or worktree root). Never look for or create a build directory outside of the current working directory.
+
 ```bash
 # Configure (common development build with Python bindings)
-cmake -S . -B build -DWarpX_DIMS=3 -DWarpX_PYTHON=ON
+cmake --fresh -S . -B build -DWarpX_DIMS=3 -DWarpX_PYTHON=ON
 
 # Build
 cmake --build build -j 8
@@ -124,9 +127,12 @@ Commits should limit any formatting changes of unchanged code.
 
 In `.cpp` files: (1) corresponding header, (2) WarpX headers, (3) WarpX forward declarations, (4) AMReX headers, (5) AMReX forward declarations, (6) third-party headers, (7) standard library. Each group alphabetically sorted with blank lines between groups.
 
+## Backward Compatibility
+
+When a change removes or renames a user-facing input parameter, add a guard to the relevant `BackwardCompatibility()` method — e.g., in `Source/WarpX.cpp` or `Source/Particles/PhysicalParticleContainer.cpp`.
+
 ## Version Control
 
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
 - Pull requests with features and bug fixes need to add a test for coverage.
-- Pull requests require a clear, helpful, concise pull request description and must pass all existing and new tests.
