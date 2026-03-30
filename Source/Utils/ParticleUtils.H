@@ -181,28 +181,27 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate random unit vector in 3 dimensions
-     * https://mathworld.wolfram.com/SpherePointPicking.html
+     * \brief Generate a random unit vector with isotropic distribution,
+     * following the method described in equations (27)-(31) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
-     * @param[out] x x-component of resulting random vector
-     * @param[out] y y-component of resulting random vector
-     * @param[out] z z-component of resulting random vector
+     * @param[out] x x-component of the random unit vector
+     * @param[out] y y-component of the random unit vector
+     * @param[out] z z-component of the random unit vector
      * @param[in] engine the random-engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
                            amrex::ParticleReal& z, amrex::RandomEngine const& engine )
     {
-        using std::sqrt;
-        using std::cos;
-        using std::sin;
         using namespace amrex::literals;
 
-        auto const theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-        z = 2.0_prt * amrex::Random(engine) - 1.0_prt;
-        auto const xy = sqrt(1_prt - z*z);
-        x = xy * cos(theta);
-        y = xy * sin(theta);
+        auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
+        x = sin_theta * std::cos(phi);
+        y = sin_theta * std::sin(phi);
+        z = cos_theta;
     }
 
 
@@ -309,6 +308,60 @@ namespace ParticleUtils {
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);
         }
+    }
+
+    /* \brief Check if the particle position is out of bounds at a boundary
+     *        where orbit cropping is being performed.
+     * \param[in] xp, yp, zp      The particle position
+     * \param[in] dinv            3D cell size inverse
+     * \param[in] xyzmin          Physical lower bounds of domain
+     * \param[in] domain_double   The domain boundary indicies cast to double values
+     * \param[in] do_cropping     Whether to crop particle orbits at domain boundaries
+     * return whether position is out of bounds
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool is_out_of_bounds ([[maybe_unused]] double xp,
+                           [[maybe_unused]] double yp,
+                           [[maybe_unused]] double zp,
+                           const amrex::XDim3 & dinv,
+                           const amrex::XDim3 & xyzmin,
+                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping)
+    {
+
+        // Store logical particle position (in grid units) in temporary array
+        amrex::GpuArray<double,AMREX_SPACEDIM> xp_grid;
+#if defined(WARPX_DIM_3D)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (yp - xyzmin.y)*dinv.y;
+        xp_grid[2] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_XZ)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_1D_Z)
+        xp_grid[0] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#if defined(WARPX_DIM_RZ)
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#endif
+
+        // Check if particle's position is out of bounds
+        for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
+            if (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) {
+                return true;
+            }
+            else if (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1]) {
+                return true;
+            }
+        }
+        return false;
+
     }
 
     /* \brief Add or subtract a small percent of energy from a

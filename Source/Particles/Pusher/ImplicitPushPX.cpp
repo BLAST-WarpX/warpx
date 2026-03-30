@@ -61,6 +61,7 @@ namespace {
         int const & ip,
         amrex::Real const & dt,
         SetParticlePosition<PIdx> const &  setPosition,
+        bool const this_suborbit_out_of_bounds,
         amrex::ParticleReal & xp,
         amrex::ParticleReal & yp,
         amrex::ParticleReal & zp,
@@ -150,6 +151,10 @@ namespace {
         zp = zp_n + dzp;
         setPosition(ip, xp, yp, zp);
 
+        // Propogate ballistically if the suborbit starts out of bounds, avoiding
+        // field gather and the possiblity that the particle orbit re-enters the domain.
+        if (this_suborbit_out_of_bounds) { return true; }
+
         bool convergence = false;
         for (int iter=0; iter < max_iterations; iter++) {
 
@@ -187,7 +192,7 @@ namespace {
                                           ion_lev ? ion_lev[ip] : 1,
                                           mass, q, pusher_algo, do_crr,
                                           t_chi_max,
-                                          dt);
+                                          dt, MomentumPushType::Full);
             } else {
                 if constexpr (qed_control == has_qed) {
                     doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
@@ -195,7 +200,7 @@ namespace {
                                               ion_lev ? ion_lev[ip] : 1,
                                               mass, q, pusher_algo, do_crr,
                                               t_chi_max,
-                                              dt);
+                                              dt, MomentumPushType::Full);
                 }
             }
 #else
@@ -203,7 +208,7 @@ namespace {
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt);
+                                      dt, MomentumPushType::Full);
 #endif
 
 #ifdef WARPX_QED
@@ -602,7 +607,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         amrex::ParticleReal Bzp = 0.0_prt;
         amrex::ParticleReal step_norm = 1._prt;
 
-        bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition,
+        bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt, setPosition, false,
                              xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
                              step_norm, particle_tolerance, max_iterations,
                              Ex_external_particle, Ey_external_particle, Ez_external_particle,
@@ -808,7 +813,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::IndexType const by_type = byfab->box().ixType();
     amrex::IndexType const bz_type = bzfab->box().ixType();
 
-    const bool deposit_mass_matrices = implicit_options->deposit_mass_matrices;
+    const bool use_mass_matrices_pc = implicit_options->use_mass_matrices_pc;
+    const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
+    const bool deposit_mass_matrices = use_mass_matrices_pc && !linear_stage_of_jfnk;
     amrex::MultiFab *Sxx, *Sxy, *Sxz, *Syx, *Syy, *Syz, *Szx, *Szy, *Szz;
     if (deposit_mass_matrices) {
         // Mass matrices deposit for suborbit particles is only for the preconditioner,
@@ -902,7 +909,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     // The number of suborbits are not permitted to change during the linear stage of jfnk.
     // A buffer is given to the max_iterations to decrease the chance of non-convergence.
-    const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
     const int iter_buffer = linear_stage_of_jfnk ? 10 : 0;
     const int max_iterations = implicit_options->max_particle_iterations + iter_buffer;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
@@ -975,6 +981,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::ParticleReal yp = yp_n;
         amrex::ParticleReal zp = zp_n;
 
+        ux[ip] = uxp_n;
+        uy[ip] = uyp_n;
+        uz[ip] = uzp_n;
+
         // For nonlinear stage, we first loop over all suborbits doing the push only to
         // check for non-convergence. If a suborbit does not convegence, then the number
         // of suborbits is increased and the loop starts over. This proceeds until all
@@ -986,6 +996,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             amrex::Real const dt_suborbit = dt/nsuborbits[ip];
 
+            // Check if initial suborbit position is past an absorbing boundary.
+            bool this_suborbit_out_of_bounds = ParticleUtils::is_out_of_bounds(xp_n, yp_n, zp_n,
+                                                                               dinv, xyzmin,
+                                                                               domain_double, do_cropping);
+
             amrex::ParticleReal Bxp = 0.0_prt;
             amrex::ParticleReal Byp = 0.0_prt;
             amrex::ParticleReal Bzp = 0.0_prt;
@@ -993,6 +1008,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
             // Try advancing the particle one suborbit step
             bool convergence = PushXPSingleStep<exteb_control, qed_control>(ip, dt_suborbit, setPosition,
+                                 this_suborbit_out_of_bounds,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
                                  step_norm, particle_tolerance, max_iterations,
                                  Ex_external_particle, Ey_external_particle, Ez_external_particle,
@@ -1010,7 +1026,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             // Don't change number of suborbits during linear stage of jfnk
             if (linear_stage_of_jfnk) { convergence = true; }
 
-            if (doing_deposition) {
+            if (doing_deposition && !this_suborbit_out_of_bounds) {
 
                 const amrex::ParticleReal xp_np1 = 2.0_prt*xp - xp_n;
                 const amrex::ParticleReal yp_np1 = 2.0_prt*yp - yp_n;
@@ -1039,7 +1055,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
-                        doVillasenorJandSigmaDepositionKernel<1,false>(
+                        doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1052,7 +1068,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_two) {
-                        doVillasenorJandSigmaDepositionKernel<2,false>(
+                        doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1065,7 +1081,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_three) {
-                        doVillasenorJandSigmaDepositionKernel<3,false>(
+                        doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1078,7 +1094,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_four) {
-                        doVillasenorJandSigmaDepositionKernel<4,false>(
+                        doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,

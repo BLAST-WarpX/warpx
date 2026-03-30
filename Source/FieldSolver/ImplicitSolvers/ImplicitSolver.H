@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "ImplicitSolver_fwd.H"
+
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
@@ -85,6 +87,11 @@ public:
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
 
+    /**
+     * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
+     */
+    void PreLinearSolve ();
+
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
     [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
@@ -101,12 +108,38 @@ public:
         else { return nullptr; }
     }
 
+    /**
+     * \brief Return reference to the multifabs for curl curl mask
+     */
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int dir) const
+    {
+        amrex::ignore_unused(lev,dir);
+        return nullptr;
+    }
+
+    /**
+     * \brief Return the space_dir number of components for the mass matrices used in
+     *        the preconditioner for field direction field_dir
+     */
+    int GetMassMatricesPCnComp (const int field_dir, const int space_dir) const
+    {
+        if      (field_dir == 0) { return m_ncomp_pc_xx[space_dir]; }
+        else if (field_dir == 1) { return m_ncomp_pc_yy[space_dir]; }
+        else if (field_dir == 2) { return m_ncomp_pc_zz[space_dir]; }
+        else { return -1; }
+    }
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
+
+    /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
 
 protected:
 
@@ -183,6 +216,11 @@ protected:
     bool m_use_mass_matrices_pc = false;
 
     /**
+     * \brief Width for mass matrices in the preconditioner
+     */
+    int m_mass_matrices_pc_width = -1;
+
+    /**
      * \brief Direction-dependent component number of mass matrices elements
      */
     amrex::IntVect m_ncomp_xx = amrex::IntVect{0};
@@ -194,6 +232,14 @@ protected:
     amrex::IntVect m_ncomp_zx = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zy = amrex::IntVect{0};
     amrex::IntVect m_ncomp_zz = amrex::IntVect{0};
+
+    /**
+     * \brief Direction-dependent component number of mass matrices elements
+     *        used for the preconditioner
+     */
+    amrex::IntVect m_ncomp_pc_xx = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_yy = amrex::IntVect{0};
+    amrex::IntVect m_ncomp_pc_zz = amrex::IntVect{0};
 
     /**
      * \brief Array of multifab pointers to mass matrix preconditioner
@@ -242,7 +288,7 @@ protected:
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
-    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& ) const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, const int bdry_side ) const;
 
 };
 

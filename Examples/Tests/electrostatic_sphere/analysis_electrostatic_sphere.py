@@ -48,14 +48,22 @@ else:
 ndims = np.count_nonzero(ds.domain_dimensions > 1)
 
 if ndims == 2:
-    xmin, zmin = [float(x) for x in ds.parameters.get("geometry.prob_lo").split()]
-    xmax, zmax = [float(x) for x in ds.parameters.get("geometry.prob_hi").split()]
+    xmin, zmin = [
+        float(x) for x in ds.parameters.get("geometry.prob_lo").split("#")[0].split()
+    ]
+    xmax, zmax = [
+        float(x) for x in ds.parameters.get("geometry.prob_hi").split("#")[0].split()
+    ]
     nx, nz = [int(n) for n in ds.parameters["amr.n_cell"].split()]
     ymin, ymax = xmin, xmax
     ny = nx
 else:
-    xmin, ymin, zmin = [float(x) for x in ds.parameters.get("geometry.prob_lo").split()]
-    xmax, ymax, zmax = [float(x) for x in ds.parameters.get("geometry.prob_hi").split()]
+    xmin, ymin, zmin = [
+        float(x) for x in ds.parameters.get("geometry.prob_lo").split("#")[0].split()
+    ]
+    xmax, ymax, zmax = [
+        float(x) for x in ds.parameters.get("geometry.prob_hi").split("#")[0].split()
+    ]
     nx, ny, nz = [int(n) for n in ds.parameters["amr.n_cell"].split()]
 
 dx = (xmax - xmin) / nx

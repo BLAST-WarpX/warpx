@@ -205,8 +205,8 @@ public:
                 auto& uy2 = soa_products_data[1].m_rdata[PIdx::uy][product2_index];
                 auto& uz2 = soa_products_data[1].m_rdata[PIdx::uz][product2_index];
 
-#if (defined WARPX_DIM_RZ)
-                /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
                 * in the same *cylindrical* cell. For this reason, collisions between macroparticles
                 * are actually not local in space. In this case, the underlying assumption is that
                 * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -272,7 +272,7 @@ public:
                 uy2 += uCOM_y;
                 uz2 += uCOM_z;
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 /* Undo the earlier velocity rotation. */
                 amrex::ParticleReal const ux1buf_new = ux1;
                 ux1 = ux1buf_new*std::cos(-theta) - uy1*std::sin(-theta);
@@ -359,8 +359,8 @@ public:
                 auto& uy_p2 = soa_products_data[3].m_rdata[PIdx::uy][product2_index];
                 auto& uz_p2 = soa_products_data[3].m_rdata[PIdx::uz][product2_index];
 
-#if (defined WARPX_DIM_RZ)
-                /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
                 * in the same *cylindrical* cell. For this reason, collisions between macroparticles
                 * are actually not local in space. In this case, the underlying assumption is that
                 * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -440,7 +440,7 @@ public:
                 uy_p2 += uCOM_y;
                 uz_p2 += uCOM_z;
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 /* Undo the earlier velocity rotation. */
                 amrex::ParticleReal const ux1buf_new = ux1;
                 ux1 = ux1buf_new*std::cos(-theta) - uy1*std::sin(-theta);
@@ -455,19 +455,7 @@ public:
             const int start_index = int(products_np[i]);
             const int stop_index  = int(products_np[i] + num_added_vec[i]);
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
-                                       0, 0,
-                                       pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
-                                       pc_products[i]->getUserRealAttribParser(),
-                                       pc_products[i]->getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the SmartCopy functors
-                                       pc_products[i]->get_breit_wheeler_engine_ptr(),
-                                       pc_products[i]->get_quantum_sync_engine_ptr(),
-#endif
-                                       pc_products[i]->getIonizationInitialLevel(),
-                                       start_index, stop_index);
+                                                 *pc_products[i], start_index, stop_index);
         }
 
         amrex::Gpu::synchronize();

@@ -12,11 +12,11 @@
 void init_WarpXParIter (py::module& m)
 {
     py::class_<
-        WarpXParIter, amrex::ParIterSoA<PIdx::nattribs, 0>
+        WarpXParIter, amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>
     >(m, "WarpXParIter")
-        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0>::ContainerType&, int>(),
+        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>::ContainerType&, int>(),
             py::arg("particle_container"), py::arg("level"))
-        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0>::ContainerType&, int, amrex::MFItInfo&>(),
+        .def(py::init<amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>::ContainerType&, int, amrex::MFItInfo&>(),
             py::arg("particle_container"), py::arg("level"),
             py::arg("info"))
     ;
@@ -26,7 +26,7 @@ void init_WarpXParticleContainer (py::module& m)
 {
     py::class_<
         WarpXParticleContainer,
-        amrex::ParticleContainerPureSoA<PIdx::nattribs, 0>
+        amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>
     > wpc (m, "WarpXParticleContainer");
     wpc
         .def("add_n_particles",
@@ -128,6 +128,13 @@ void init_WarpXParticleContainer (py::module& m)
                 return pc.GetChargeDensity(lev, local);
             },
             py::arg("lev"), py::arg("local")
+        )
+        .def("get_number_density",
+            [](WarpXParticleContainer& pc, int lev)
+            {
+                return pc.GetNumberDensity(lev);
+            },
+            py::arg("lev")
         )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },

@@ -1,13 +1,13 @@
 {
-    "version_warpx": "25.12",
-    "version_amrex": "25.12",
-    "version_pyamrex": "25.12",
+    "version_warpx": "26.03",
+    "version_amrex": "26.03",
+    "version_pyamrex": "26.03",
     "version_picsar": "25.06",
-    "version_pybind11": "v3.0.1",
+    "version_pybind11": "v3.0.2",
     "version_picmi": "0.34.0",
-    "commit_amrex": "fb1812114873931880cf2ee2d9cf14996a105f7f",
-    "commit_pyamrex": "0bbec88879e89d2b5c20e26c5df0330890c1e6d3",
+    "commit_amrex": "f30ca3d33848b8723100a0e701e9fdf059037c27",
+    "commit_pyamrex": "7c95f9531bd07cd754ddc1c9a194fba400959a43",
     "commit_picsar": "25.06",
-    "commit_pybind11": "v3.0.1",
-    "commit_picmi": "e79dc49c58ad65b5e207ed40e4e6edc4b1482241"
+    "commit_pybind11": "v3.0.2",
+    "commit_picmi": "2e923fbc6619626f63c4a018467d69c8c4df53dd"
 }

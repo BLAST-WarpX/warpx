@@ -24,6 +24,7 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Filter/BilinearFilter.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
@@ -34,12 +35,12 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -785,7 +786,7 @@ WarpX::PrintMainPICparameters ()
 void
 WarpX::InitData ()
 {
-    WARPX_PROFILE("WarpX::InitData()");
+    ABLASTR_PROFILE("WarpX::InitData()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -877,14 +878,27 @@ WarpX::InitData ()
 
     if (restart_chkfile.empty())
     {
-        // Loop through species and calculate their space-charge field
-        bool const reset_fields = false; // Do not erase previous user-specified values on the grid
         ExecutePythonCallback("beforeInitEsolve");
-        ComputeSpaceChargeField(reset_fields);
-        ExecutePythonCallback("afterInitEsolve");
-        if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
-            ComputeMagnetostaticField();
+        // Loop through species and calculate their space-charge field
+        // Field solve step for electrostatic solvers, or when
+        // any species has initialize_self_fields = true, or when boundary potential is specified
+        bool has_initialize_self_fields = false;
+        for (auto const& species : *mypc) {
+            has_initialize_self_fields |= species->initialize_self_fields;
         }
+        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
+             has_initialize_self_fields ||
+             has_boundary_potential)
+            && WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
+        {
+            bool const reset_fields = false; // Do not erase previous user-specified values on the grid
+            ComputeSpaceChargeField(reset_fields);
+            if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
+                ComputeMagnetostaticField();
+            }
+        }
+        ExecutePythonCallback("afterInitEsolve");
         // Add external fields to the fine patch fields. This makes it so that the
         // net fields are the sum of the field solutions and any external fields.
         for (int lev = 0; lev <= max_level; ++lev) {
@@ -1599,12 +1613,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
                 // Mark on which grid points B should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
             }
 
         }

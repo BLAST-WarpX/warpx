@@ -21,6 +21,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
 #include "Initialization/ExternalField_fwd.H"
 #include "Particles/ParticleBoundaryBuffer_fwd.H"
@@ -40,7 +41,6 @@
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
@@ -122,6 +122,9 @@ public:
         return field_boundary_hi;
     }
 
+    [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
+                                               const int  bdry_side ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -146,6 +149,7 @@ public:
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
                                const ablastr::fields::MultiLevelVectorField& Field_n,
                                amrex::Real theta );
+    void DepositMassMatrices ();
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -795,6 +799,8 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    amrex::Real magnetostatic_solver_required_precision = amrex::Real(1.e-11);
+    amrex::Real magnetostatic_solver_absolute_tolerance = amrex::Real(0.0);
     int magnetostatic_solver_max_iters = 200;
     int magnetostatic_solver_verbosity = 2;
     void ComputeMagnetostaticField ();
@@ -1033,7 +1039,12 @@ private:
         int a_step
     );
 
-    void OneStep_nosub (amrex::Real cur_time);
+    void OneStep_nosub (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_sub1 (amrex::Real cur_time);
 
     /**
@@ -1594,7 +1605,7 @@ private:
      *        or before both the position and momentum push. The default value
      *        is set in WarpX::ReadParameters().
      */
-    bool m_collisions_split_position_push;
+    bool m_collisions_split_momentum_push;
 };
 
 #endif

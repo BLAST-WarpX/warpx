@@ -408,6 +408,7 @@ computePhi (
         mlmg.setPostSmooth(num_sweeps);
         mlmg.setFinalSmooth(4*num_sweeps); // amrex default is 8. Thus the 4*.
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
+        mlmg.setNoGpuSync(true);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {

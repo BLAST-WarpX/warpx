@@ -13,7 +13,6 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 
-#include "WarpX.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 
@@ -53,7 +52,7 @@ using SoaData_type = typename WarpXParticleContainer::ParticleTileType::Particle
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
-    WARPX_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
+    ABLASTR_PROFILE("collision::binarycollision::virtualphotons::GenerateVirtualPhotons()");
 
     // Loop through the species
     for (int i_s = 0; i_s < mypc->nSpecies(); ++i_s) {
@@ -70,13 +69,13 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
 
         // Minimum allowed energy of the virtual photons
-        amrex::Real vphoton_min_energy;
+        amrex::Real vphoton_min_energy = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_min_energy", vphoton_min_energy);
 
         // Sampling factor (a.k.a. multiplier):
         // the number of virtual photons generated is multiplied by this factor,
         // the weight of each virtual photon is divided by this factor
-        amrex::Real sampling_factor;
+        amrex::Real sampling_factor = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
