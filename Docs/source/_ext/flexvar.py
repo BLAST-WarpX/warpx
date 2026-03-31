@@ -444,6 +444,17 @@ class FlexVarDomain(Domain):
         location: Any = None,
     ) -> None:
         name = var_desc.display_name
+        obj = ObjectEntry(
+            docname=self.env.docname,
+            node_id=node_id,
+            var_desc=var_desc,
+        )
+        self.add_object(name, obj, location)
+
+        for alt_name in var_desc.name_list:
+            self.add_object(alt_name, obj, location)
+
+    def add_object(self, name: str, obj: ObjectEntry, location: Any) -> None:
         if name in self.objects:
             other = self.objects[name]
             logger.warning(
@@ -453,15 +464,7 @@ class FlexVarDomain(Domain):
                 other.docname,
                 location=location,
             )
-
-        self.objects[name] = ObjectEntry(
-            docname=self.env.docname,
-            node_id=node_id,
-            var_desc=var_desc,
-        )
-
-        for alt_name in var_desc.name_list:
-            self.objects[alt_name] = self.objects[name]
+        self.objects[name] = obj
 
     def clear_doc(self, docname: str) -> None:
         to_remove = [k for k, v in self.objects.items() if v.docname == docname]
