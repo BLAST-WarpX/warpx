@@ -100,6 +100,7 @@ unit_equiv_name_dict: dict[str, list[str]] = {
     "T": ["Telsa", "Telsas"],
     "A": ["amp", "amps"],
     "C": ["Coulomb", "Coulombs"],
+    "speed of light fraction": ["units of the speed of light"],
     "dimensionless": ["unitless", "none"],
 }
 
