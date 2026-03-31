@@ -705,9 +705,13 @@ FlushFormatPlotfile::WriteAllRawFields(
             }
             if (warpx.m_fields.has(FieldType::rho_fp, lev) && warpx.m_fields.has(FieldType::rho_cp, lev))
             {
-                // Use the component 1 of `rho_cp`, i.e. rho_new for time synchronization
+                // Use the last component of rho_cp (rho_new) for time synchronization.
+                // When rho has old and new components (nComp >= 2*ncomps), component ncomps
+                // is rho_new; otherwise fall back to component 0.
+                const int rho_cp_ncomp = warpx.m_fields.get(FieldType::rho_cp, lev)->nComp();
+                const int rho_icomp = (rho_cp_ncomp >= 2 * WarpX::ncomps) ? WarpX::ncomps : 0;
                 WriteCoarseScalar("rho", warpx.m_fields.get(FieldType::rho_cp, lev), warpx.m_fields.get(FieldType::rho_fp, lev),
-                    dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, 1);
+                    dm, raw_pltname, default_level_prefix, lev, plot_raw_fields_guards, rho_icomp);
             }
         }
     }
