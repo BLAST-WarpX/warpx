@@ -139,10 +139,6 @@ void DifferentialLuminosity::ComputeDiags (int step)
 
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
-    const Real dt = warpx.getdt(0);
-    // get cell volume
-    Geometry const & geom = warpx.Geom(0);
-    const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
 
     // declare local variables
     auto const num_bins = m_bin_num;
@@ -165,13 +161,18 @@ void DifferentialLuminosity::ComputeDiags (int step)
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev < nlevs; ++lev) {
+        // get cell volume and timestep at current level
+        Geometry const & geom = warpx.Geom(lev);
+        const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+        const Real dt = warpx.getdt(lev);
+
         for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
-            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_1 );
-            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_2 );
+            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( geom, mfi, ptile_1 );
+            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( geom, mfi, ptile_2 );
 
             // Species 1
             const auto soa_1 = ptile_1.getParticleTileData();

@@ -813,7 +813,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::IndexType const by_type = byfab->box().ixType();
     amrex::IndexType const bz_type = bzfab->box().ixType();
 
-    const bool deposit_mass_matrices = implicit_options->deposit_mass_matrices;
+    const bool use_mass_matrices_pc = implicit_options->use_mass_matrices_pc;
+    const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
+    const bool deposit_mass_matrices = use_mass_matrices_pc && !linear_stage_of_jfnk;
     amrex::MultiFab *Sxx, *Sxy, *Sxz, *Syx, *Syy, *Syz, *Szx, *Szy, *Szz;
     if (deposit_mass_matrices) {
         // Mass matrices deposit for suborbit particles is only for the preconditioner,
@@ -907,7 +909,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     // The number of suborbits are not permitted to change during the linear stage of jfnk.
     // A buffer is given to the max_iterations to decrease the chance of non-convergence.
-    const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
     const int iter_buffer = linear_stage_of_jfnk ? 10 : 0;
     const int max_iterations = implicit_options->max_particle_iterations + iter_buffer;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
@@ -1054,7 +1055,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
                     amrex::ignore_unused(pSbuf);
                     if constexpr (depos_order_control == order_one) {
-                        doVillasenorJandSigmaDepositionKernel<1,false>(
+                        doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1067,7 +1068,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_two) {
-                        doVillasenorJandSigmaDepositionKernel<2,false>(
+                        doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1080,7 +1081,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_three) {
-                        doVillasenorJandSigmaDepositionKernel<3,false>(
+                        doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
@@ -1093,7 +1094,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
                                                               dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_four) {
-                        doVillasenorJandSigmaDepositionKernel<4,false>(
+                        doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
                                                               wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
                                                               fpxx, fpxy, fpxz,
