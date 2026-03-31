@@ -423,7 +423,7 @@ class ParmParseDomain(Domain):
     label = "ParmParse"
 
     object_types = {
-        "param": ObjType("parameter", label),
+        "param": ObjType("parameter", "param"),
     }
 
     directives = {
