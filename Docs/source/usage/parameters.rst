@@ -166,6 +166,18 @@ Overall simulation parameters
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
 
+* ``warpx.c_light_factor`` (`float`) optional (default ``1.0``)
+    Factor by which the speed of light is reduced in the EM solver (reduced speed of light model).
+    Setting this to a value ``N > 1`` replaces the physical speed of light ``c`` with an effective value ``c_eff = c / N`` in Maxwell's equations and in the CFL time step calculation.
+    This relaxes the CFL condition, allowing a larger time step ``dt`` for explicit EM simulations of high-density plasmas where the plasma frequency is much smaller than the light frequency (e.g., Z-pinch, dense fusion targets).
+    The default value of ``1.0`` disables the model (physical speed of light is used).
+    Must be ``>= 1.0``.
+
+    .. warning::
+        The reduced speed of light approximation is only valid when the plasma frequency
+        and particle velocities are much smaller than ``c_eff``. Use with care and
+        verify that results are physically consistent.
+
 * ``warpx.gamma_boost`` (`float`)
     The Lorentz factor of the boosted frame in which the simulation is run. (The corresponding Lorentz transformation is assumed to be along ``warpx.boost_direction``.)
     For more practical guidance on setting up boosted-frame simulations, refer to the :ref:`FAQ: What do I need to know about using the boosted frame? <faq_boosted_frame>`.
