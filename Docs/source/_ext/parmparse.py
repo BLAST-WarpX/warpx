@@ -1,17 +1,16 @@
-r"""
-flexvar - A Sphinx domain for documenting variables with flexible names.
+r"""parmparse - A Sphinx domain for documenting ParamParse parameters.
 
 Supports names containing characters like <, >, /, commas, etc.
 Provides type annotation, default value support, units, optional flag, and
 extra inline comments. The output format can be changed by modifying
-the `handle_signature` method in `FlexVarDirective`.
+the `handle_signature` method in `ParmParseDirective`.
 
 Usage
 -----
 
 [Directive](https://docutils.sourceforge.io/docs/ref/rst/directives.html)::
 
-    .. fv:var:: <name>
+    .. pp:param:: <name>
         :type: <type>
         :default: <default>
         :unit: <unit>
@@ -28,41 +27,41 @@ Usage
 
 [Cross reference role](https://www.sphinx-doc.org/en/master/usage/referencing.html)::
 
-    :fv:var:`name`
-    :fv:var:`Title <name>`
-    :fv:var:`name = value`
+    :pp:param:`name`
+    :pp:param:`Title <name>`
+    :pp:param:`name = value`
 
 Examples
 --------
 
 Directive::
 
-    .. fv:var:: my/variable<T>
-        :link_aliases: my<T> variable<T>
+    .. pp:param:: my/parameter<T>
+        :link_aliases: my<T> parameter<T>
         :type: real array
         :default: [0.0, 0.0]
         :unit: seconds
         :optional:
-        :comment: Inline comments on this variable.
+        :comment: Inline comments on this parameter.
 
-        Description of the variable.
+        Description of the parameter.
 
 Cross reference role::
 
-    # Cross reference link to my/variable<T>:
-    See :fv:var:`my/variable<T>` for details.
+    # Cross reference link to my/parameter<T>:
+    See :pp:param:`my/parameter<T>` for details.
 
     # Alternative names also work as links:
-    See :fv:var:`my<T>` or :fv:var:`variable<T>` for details.
+    See :pp:param:`my<T>` or :pp:param:`parameter<T>` for details.
 
     # With explicit title (whitespace required before the `<`):
-    See :fv:var:`My Var <my/variable<T>>` for details.
+    See :pp:param:`My param <my/parameter<T>>` for details.
 
     # With backslash-escaped angle brackets:
-    See :fv:var:`my/variable\<T\>` for details.
+    See :pp:param:`my/parameter\<T\>` for details.
 
     # With inline value:
-    For instance, :fv:var:`my/variable<T> = [1, 1]`
+    For instance, :pp:param:`my/parameter<T> = [1, 1]`
 """
 
 from __future__ import annotations
@@ -133,11 +132,11 @@ class DirDesc(NamedTuple):
     link_aliases: list[str]
 
 
-class FlexVarDirective(ObjectDescription[DirDesc]):
+class ParmParseDirective(ObjectDescription[DirDesc]):
     """
-    Description of a variable.
+    Description of a parameter.
 
-    Supports variable names containing characters like <, >, /, commas, etc.
+    Supports parameter names containing characters like <, >, /, commas, etc.
     See `handle_signature` for formatting details.
 
     Specify at most one of the following:
@@ -184,7 +183,7 @@ class FlexVarDirective(ObjectDescription[DirDesc]):
         ``<name> (<type>; [<unit>]; optional, default: <default>) <comment>``
         """
         # Parse self.options
-        helper = FlexVarOptionHelper(
+        helper = ParmParseOptionHelper(
             options=self.options,
             sig=sig,
             signode=signode,
@@ -309,7 +308,7 @@ class FlexVarDirective(ObjectDescription[DirDesc]):
         signode["ids"].append(node_id)
         self.state.document.note_explicit_target(signode)
 
-        domain = cast(FlexVarDomain, self.env.get_domain(FlexVarDomain.name))
+        domain = cast(ParmParseDomain, self.env.get_domain(ParmParseDomain.name))
         domain.note_object(
             desc=desc,
             node_id=node_id,
@@ -318,11 +317,11 @@ class FlexVarDirective(ObjectDescription[DirDesc]):
 
         if "noindex" not in self.options:
             self.indexnode["entries"].append(
-                ("single", name + " (variable)", node_id, "", None)
+                ("single", name + " (parameter)", node_id, "", None)
             )
 
 
-class FlexVarOptionHelper:
+class ParmParseOptionHelper:
     def __init__(
         self,
         options: dict[str, Any],
@@ -352,20 +351,20 @@ class FlexVarOptionHelper:
             )
 
 
-class FlexVarXRefRole(XRefRole):
+class ParmParseXRefRole(XRefRole):
     r"""
-    Cross-referencing role for flexible name variables.
+    Cross-referencing role for flexible name parameters.
 
     Usage::
 
-        :fv:var:`name`
-        :fv:var:`Title <name>`
-        :fv:var:`name = value`
+        :pp:param:`name`
+        :pp:param:`Title <name>`
+        :pp:param:`name = value`
 
     Customizations over the base ``XRefRole``:
 
     **Generic-style names**
-        Variable names may contain ``<`` and ``>``
+        parameter names may contain ``<`` and ``>``
         (e.g. ``filter<T>``).  We require whitespace before the ``<`` that
         separates an explicit title from its target, so bare names like
         ``filter<T>`` are never mis-split.  This is done by overriding
@@ -375,11 +374,11 @@ class FlexVarXRefRole(XRefRole):
         A cross-reference may include a value
         expression after `` = ``. For example::
 
-            :fv:var:`timeout = 30`
+            :pp:param:`timeout = 30`
 
         will display as ``timeout = 30``. The value expression after
         is kept in the displayed title but stripped from the lookup target so
-        that it still resolves to the ``.. fv:var:: timeout`` entry.
+        that it still resolves to the ``.. pp:param:: timeout`` entry.
         Backslash-escape support (``\<``, ``\>``) comes for free from the
         base class.
     """
@@ -389,7 +388,7 @@ class FlexVarXRefRole(XRefRole):
     # \x00 means the "<" was backslash-escaped. Preserve that lookbehind.
     explicit_title_re = re.compile(r"^(.+?)\s+(?<!\x00)<(.*?)>$", re.DOTALL)
 
-    # Matches an inline value expression: "varname = value" or "varname[=value]"
+    # Matches an inline value expression: "param_name = value" or "param_name[=value]"
     # The name portion (before = or [=) is captured as group 1.
     _value_re = re.compile(r"^(.+?)(?:\s*=\s*.*|\[=.*\])$", re.DOTALL)
 
@@ -407,30 +406,30 @@ class FlexVarXRefRole(XRefRole):
             if m:
                 target = m.group(1).strip()
 
-        refnode["refdomain"] = FlexVarDomain.name
-        refnode["reftype"] = "var"
+        refnode["refdomain"] = ParmParseDomain.name
+        refnode["reftype"] = "param"
 
         return XRefRole.process_link(
             self, env, refnode, has_explicit_title, title, target
         )
 
 
-class FlexVarDomain(Domain):
-    """FlexVar domain."""
+class ParmParseDomain(Domain):
+    """ParmParse domain."""
 
-    name = "fv"
-    label = "FlexVar"
+    name = "pp"
+    label = "ParmParse"
 
     object_types = {
-        "var": ObjType("variable", "var"),
+        "param": ObjType("parameter", label),
     }
 
     directives = {
-        "var": FlexVarDirective,
+        "param": ParmParseDirective,
     }
 
     roles = {
-        "var": FlexVarXRefRole(),
+        "param": ParmParseXRefRole(),
     }
 
     initial_data: dict[str, dict[str, ObjectEntry]] = {
@@ -498,9 +497,9 @@ class FlexVarDomain(Domain):
             return None
 
         # Set classes for valid cross reference to object
-        domain_name = FlexVarDomain.name
+        domain_name = type(self).name
 
-        contnode["classes"] = ["xref", domain_name, f"{domain_name}-var"]
+        contnode["classes"] = ["xref", domain_name, f"{domain_name}-param"]
 
         return make_refnode(
             builder=builder,
@@ -548,26 +547,22 @@ class FlexVarDomain(Domain):
         for obj_key, obj in self.objects.items():
             name: str = obj_key
             dispname: str = obj_key
-            type_: str = "var"
+            type_: str = "param"
             docname: str = obj.docname
             anchor: str = obj.node_id
             priority: int = 0
             yield (name, dispname, type_, docname, anchor, priority)
 
 
-class WarpXDomain(FlexVarDomain):
+class WarpXDomain(ParmParseDomain):
     label = "WarpX"
-
-    object_types = {
-        "var": ObjType("parameter", "var"),
-    }
 
 
 def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
     # Add default-role defintion at beginning of each document.
-    # This makes `XYZ` equivalent to :fv:var:`XYZ`.
+    # This makes `XYZ` equivalent to :pp:param:`XYZ`.
     for i in range(len(source)):
-        new_doc_txt = ".. default-role:: fv:var\n"
+        new_doc_txt = ".. default-role:: pp:param\n"
         new_doc_txt += "\n"
         new_doc_txt += source[i]
         source[i] = new_doc_txt
@@ -575,7 +570,7 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
     # Replace double backticks with single backticks.
     #
     # This makes ``...`` effectively the same as the default role `...`.
-    # This, along with setting the default role to :fv:var:, avoids having to
+    # This, along with setting the default role to :pp:param:, avoids having to
     # find and edit every instance of a parameter currently enclosed in double
     # backticks in the documentation files. This is also makes things more
     # convenient and consistent for future contributors to the docs.

@@ -75,7 +75,7 @@ extensions = [
     "breathe",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
-    "flexvar",
+    "parmparse",
 ]
 
 # Google Analytics
