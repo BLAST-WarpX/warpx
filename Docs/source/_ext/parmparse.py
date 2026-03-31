@@ -291,8 +291,12 @@ class ParmParseDirective(ObjectDescription[ObjDesc]):
         unit_str = replace_equiv_names(unit_str, unit_equiv_name_dict)
         # (x / y or x per y) -> x/y
         unit_str = re.sub(r"\b(\s*/\s*|\s+per\s+)\b", "/", unit_str)
-        # x**n -> x^n
-        unit_str = unit_str.replace("**", "^")
+        # x**n or x^n -> x\ :sup:`n`
+        superscript_pattern = re.compile(r"\b(?:\*\*|\^)(\w+)\b")
+        def superscript_repl(m: re.Match):
+            # Tip from https://docutils.sourceforge.io/docs/ref/rst/roles.html#subscript
+            return r"\ :sup:`" + m.group(1) + r"`"
+        unit_str = superscript_pattern.sub(superscript_repl, unit_str)
         # x.y -> x y
         unit_str = re.sub(r"\b\.\b", " ", unit_str)
         return unit_str
@@ -587,7 +591,7 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
 
     def _repl(m: re.Match[str]):
         # Replace r"``XYZ``" with r"\ `XYZ`"
-        return rf"\ `{m.group(1)}`"
+        return r"\ `" + m.group(1) + r"`"
 
     for i in range(len(source)):
         source[i] = literal_re.sub(_repl, source[i])
