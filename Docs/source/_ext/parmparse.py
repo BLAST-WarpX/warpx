@@ -555,8 +555,8 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
     # backticks in the documentation files. This is also makes things more
     # convenient and consistent for future contributors to the docs.
     #
-    # This is implemented by replacing the pattern ``XYZ`` with `XYZ\ `.
-    # The whitespace escape in `XYZ\ ` is a hack to preserve the same string
+    # This is implemented by replacing the pattern "``XYZ``" with "\ `XYZ`".
+    # The backslash-escaped whitespace is a hack to preserve the same string
     # length as ``XYZ`` while rendering the same as `XYZ`. The purpose is to
     # avoid breaking the RST tables, which are sensitive to whitespace
     # alignment. For example:
@@ -572,19 +572,22 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
     #
     # After:
     # =============  ==================================
-    # `q_e\ `        Elementary charge (C)
-    # `m_e\ `        Electron mass (kg)
-    # `m_p\ `        Proton mass (kg)
-    # `m_u\ `        Unified atomic mass unit (kg)
+    # \ `q_e`        Elementary charge (C)
+    # \ `m_e`        Electron mass (kg)
+    # \ `m_p`        Proton mass (kg)
+    # \ `m_u`        Unified atomic mass unit (kg)
     # ...
     # =============  ==================================
+    #
+    # Backslash-escaped whitespace characters are removed from the document:
+    # https://docutils.sourceforge.io/0.4/docs/ref/rst/restructuredtext.html#escaping-mechanism
 
     # Pattern for ``XYZ``
     literal_re = re.compile(r"``([^`]+)``", re.DOTALL)
 
     def _repl(m: re.Match[str]):
-        # Replace ``XYZ`` with `XYZ\ `
-        return rf"`{m.group(1)}\ `"
+        # Replace r"``XYZ``" with r"\ `XYZ`"
+        return rf"\ `{m.group(1)}`"
 
     for i in range(len(source)):
         source[i] = literal_re.sub(_repl, source[i])
