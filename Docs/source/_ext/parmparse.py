@@ -67,7 +67,7 @@ Cross reference role::
 from __future__ import annotations
 
 import re
-from typing import Any, Iterator, NamedTuple, cast
+from typing import Any, Iterator, Literal, NamedTuple, cast
 
 from docutils import nodes
 from docutils.parsers.rst import directives
@@ -389,7 +389,8 @@ class ParmParseXRefRole(XRefRole):
     # \x00 means the "<" was backslash-escaped. Preserve that lookbehind.
     explicit_title_re = re.compile(r"^(.+?)\s+(?<!\x00)<(.*?)>$", re.DOTALL)
 
-    # Matches an inline value expression: "param_name = value" or "param_name[=value]"
+    # Matches an inline value expression.
+    # Examples: "param_name = value", "param_name[=value]", etc.
     # The name portion (before = or [=) is captured as group 1.
     _value_re = re.compile(r"^(.+?)(?:\s*=\s*.*|\[=.*\])$", re.DOTALL)
 
@@ -512,46 +513,24 @@ class ParmParseDomain(Domain):
         )
 
     def get_objects(self) -> Iterator[tuple[str, str, str, str, str, int]]:
-        """Return an iterable of "object descriptions".
-
-        Object descriptions are tuples with six items (from Domain.get_objects
-        docstring):
-
-        ``name``
-          Fully qualified name.
-
-        ``dispname``
-          Name to display when searching/linking.
-
-        ``type``
-          Object type, a key in ``self.object_types``.
-
-        ``docname``
-          The document where it is to be found.
-
-        ``anchor``
-          The anchor name for the object.
-
-        ``priority``
-          How "important" the object is (determines placement in search
-          results). One of:
-
-          ``1``
-            Default priority (placed before full-text matches).
-          ``0``
-            Object is important (placed before default-priority objects).
-          ``2``
-            Object is unimportant (placed after full-text matches).
-          ``-1``
-            Object should not show up in search at all.
-        """
         for obj_key, obj in self.objects.items():
+            # name: Fully qualified name.
             name: str = obj_key
+            # dispname: Name to display when searching/linking.
             dispname: str = obj_key
+            # type_: Object type, a key in ``self.object_types``.
             type_: str = "param"
+            # docname: The document where it is to be found.
             docname: str = obj.docname
+            # anchor: The anchor name for the object.
             anchor: str = obj.node_id
-            priority: int = 0
+            # priority: How "important" the object is.
+            #   Determines placement in search results. One of:
+            #   1: Default priority (placed before full-text matches).
+            #   0: Object is important (placed before default-priority objects).
+            #   2: Object is unimportant (placed after full-text matches).
+            #  -1: Object should not show up in search at all.
+            priority: Literal[-1,0,1,2] = 0
             yield (name, dispname, type_, docname, anchor, priority)
 
 
