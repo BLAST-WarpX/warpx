@@ -31,6 +31,7 @@ namespace
         return false;
     }
 
+    /** True if any u_std / parser spread keys are set (T_eV path excludes these). */
     bool any_u_std_specified (const amrex::ParmParse& pp, const std::string& group)
     {
         static const char* keys[] = {
@@ -54,6 +55,8 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
 {
 }
 
+/** Read ``momentum_distribution_type``: ``maxwell_juttner`` uses ``theta``, ``maxwellian`` uses ``u_std``
+ *  or ``maxwellian_T_eV_*`` (constant ``T_eV`` needs ``species_mass`` [kg]). */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                                              amrex::Real species_mass)
 {
@@ -104,6 +107,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
         }
     }
     else {
+        // ``maxwellian`` distribution uses ``u_std_*`` or ``T_eV_*`` (exclusive)
         std::string tev_dist_s;
         const bool has_temperature_in_ev = utils::parser::query(pp, source_name,
             "maxwellian_T_eV_distribution_type", tev_dist_s);
