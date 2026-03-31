@@ -293,9 +293,11 @@ class ParmParseDirective(ObjectDescription[ObjDesc]):
         unit_str = re.sub(r"\b(\s*/\s*|\s+per\s+)\b", "/", unit_str)
         # x**n or x^n -> x\ :sup:`n`
         superscript_pattern = re.compile(r"\b(?:\*\*|\^)(\w+)\b")
+
         def superscript_repl(m: re.Match):
             # Tip from https://docutils.sourceforge.io/docs/ref/rst/roles.html#subscript
             return r"\ :sup:`" + m.group(1) + r"`"
+
         unit_str = superscript_pattern.sub(superscript_repl, unit_str)
         # x.y -> x y
         unit_str = re.sub(r"\b\.\b", " ", unit_str)
