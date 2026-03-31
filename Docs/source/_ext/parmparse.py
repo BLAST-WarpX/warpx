@@ -530,7 +530,7 @@ class ParmParseDomain(Domain):
             #   0: Object is important (placed before default-priority objects).
             #   2: Object is unimportant (placed after full-text matches).
             #  -1: Object should not show up in search at all.
-            priority: Literal[-1,0,1,2] = 0
+            priority: Literal[-1, 0, 1, 2] = 0
             yield (name, dispname, type_, docname, anchor, priority)
 
 
