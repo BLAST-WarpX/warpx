@@ -125,15 +125,15 @@ def replace_equiv_names(txt: str, equiv_dict: dict[str, list[str]]) -> str:
 class ObjectEntry(NamedTuple):
     docname: str
     node_id: str
-    var_desc: VarDesc
+    desc: DirDesc
 
 
-class VarDesc(NamedTuple):
-    display_name: str
-    name_list: list[str]
+class DirDesc(NamedTuple):
+    directive_target_name: str
+    link_aliases: list[str]
 
 
-class FlexVarDirective(ObjectDescription[VarDesc]):
+class FlexVarDirective(ObjectDescription[DirDesc]):
     """
     Description of a variable.
 
@@ -177,7 +177,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
     # Signature parsing / rendering
     # ------------------------------------------------------------------
 
-    def handle_signature(self, sig: str, signode: desc_signature) -> VarDesc:
+    def handle_signature(self, sig: str, signode: desc_signature) -> DirDesc:
         """
         Build the rendered signature node and return a description object.
 
@@ -266,7 +266,7 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
             signode += addnodes.desc_sig_space()
             signode += self.parse_inline(comment)
 
-        return VarDesc(name, alias_list)
+        return DirDesc(name, alias_list)
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
@@ -302,16 +302,16 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
     # ------------------------------------------------------------------
 
     def add_target_and_index(
-        self, var_desc: VarDesc, sig: str, signode: desc_signature
+        self, desc: DirDesc, sig: str, signode: desc_signature
     ) -> None:
-        name: str = var_desc.display_name
+        name: str = desc.directive_target_name
         node_id = make_id(self.env, self.state.document, "", name)
         signode["ids"].append(node_id)
         self.state.document.note_explicit_target(signode)
 
         domain = cast(FlexVarDomain, self.env.get_domain(FlexVarDomain.name))
         domain.note_object(
-            var_desc=var_desc,
+            desc=desc,
             node_id=node_id,
             location=signode,
         )
@@ -439,19 +439,19 @@ class FlexVarDomain(Domain):
 
     def note_object(
         self,
-        var_desc: VarDesc,
+        desc: DirDesc,
         node_id: str,
         location: Any = None,
     ) -> None:
-        name = var_desc.display_name
+        name = desc.directive_target_name
         obj = ObjectEntry(
             docname=self.env.docname,
             node_id=node_id,
-            var_desc=var_desc,
+            desc=desc,
         )
         self.add_object(name, obj, location)
 
-        for alt_name in var_desc.name_list:
+        for alt_name in desc.link_aliases:
             self.add_object(alt_name, obj, location)
 
     def add_object(self, name: str, obj: ObjectEntry, location: Any) -> None:
