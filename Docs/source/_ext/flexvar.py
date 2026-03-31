@@ -406,6 +406,10 @@ class FlexVarXRefRole(XRefRole):
             m = self._value_re.match(target)
             if m:
                 target = m.group(1).strip()
+
+        refnode["refdomain"] = FlexVarDomain.name
+        refnode["reftype"] = "var"
+
         return XRefRole.process_link(
             self, env, refnode, has_explicit_title, title, target
         )
@@ -489,7 +493,19 @@ class FlexVarDomain(Domain):
     ) -> nodes.Element | None:
         obj: ObjectEntry | None = self.objects.get(target)
         if obj is None:
+            # Revert contnode to plain literal
+            contnode["classes"] = []
             return None
+
+        # Set classes for valid cross reference to object
+        domain_name = FlexVarDomain.name
+
+        contnode["classes"] = [
+          "xref",
+          domain_name,
+          f"{domain_name}-var"
+        ]
+
         return make_refnode(
             builder=builder,
             fromdocname=fromdocname,
