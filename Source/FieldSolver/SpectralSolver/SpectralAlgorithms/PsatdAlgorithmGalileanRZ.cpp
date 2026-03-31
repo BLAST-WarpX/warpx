@@ -8,9 +8,9 @@
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <cmath>
 
 using namespace amrex::literals;
@@ -290,7 +290,7 @@ void
 PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
 {
     // Profiling
-    WARPX_PROFILE( "PsatdAlgorithmGalileanRZ::CurrentCorrection" );
+    ABLASTR_PROFILE( "PsatdAlgorithmGalileanRZ::CurrentCorrection" );
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 

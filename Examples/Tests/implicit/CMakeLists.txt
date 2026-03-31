@@ -43,6 +43,26 @@ if(AMReX_PETSC)
     )
 
     add_warpx_test(
+        test_rcylinder_curl_curl_petsc_pc  # name
+        RCYLINDER  # dims
+        2  # nprocs
+        inputs_test_rcylinder_curl_curl_petsc_pc  # inputs
+        "analysis_petsc_matrix.py diags/diag1001000"  # analysis
+        "analysis_default_regression.py --path diags/diag1001000"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_rz_curl_curl_petsc_pc  # name
+        RZ  # dims
+        2  # nprocs
+        inputs_test_rz_curl_curl_petsc_pc  # inputs
+        "analysis_petsc_matrix.py diags/diag1000200"  # analysis
+        "analysis_default_regression.py --path diags/diag1000200"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
         test_2d_theta_implicit_planar_pinch  # name
         2  # dims
         2  # nprocs
