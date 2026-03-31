@@ -116,7 +116,6 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
         const auto& problo = geom.ProbLoArray();
         int dir = static_cast<int>(m_normal);
 
-        thermalizer_region.setLo(dir, m_start);
         thermalizer_region.setHi(dir, m_end);
         for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti) {
             const long np = pti.numParticles();
