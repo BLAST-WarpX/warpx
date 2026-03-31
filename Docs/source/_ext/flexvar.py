@@ -531,7 +531,7 @@ class FlexVarDomain(Domain):
         """
         for obj_key, obj in self.objects.items():
             name: str = obj_key
-            dispname: str = obj.var_desc.display_name
+            dispname: str = obj_key
             type_: str = "var"
             docname: str = obj.docname
             anchor: str = obj.node_id
