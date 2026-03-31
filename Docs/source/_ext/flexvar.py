@@ -500,11 +500,7 @@ class FlexVarDomain(Domain):
         # Set classes for valid cross reference to object
         domain_name = FlexVarDomain.name
 
-        contnode["classes"] = [
-          "xref",
-          domain_name,
-          f"{domain_name}-var"
-        ]
+        contnode["classes"] = ["xref", domain_name, f"{domain_name}-var"]
 
         return make_refnode(
             builder=builder,
@@ -617,6 +613,7 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
 
     for i in range(len(source)):
         source[i] = literal_re.sub(_repl, source[i])
+
 
 def setup(app: Sphinx) -> dict:
     app.add_domain(WarpXDomain)
