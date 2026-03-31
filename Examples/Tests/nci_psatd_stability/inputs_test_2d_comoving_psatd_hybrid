@@ -59,9 +59,25 @@ electrons.xmin = -45.e-6
 electrons.xmax =  45.e-6
 electrons.zmin = 0.
 electrons.zmax = 15000.e-6
-electrons.profile = "predefined"
-electrons.predefined_profile_name = "parabolic_channel"
-electrons.predefined_profile_params = 0. 0.5e-3 14.e-3 0.5e-3 30.e-6 1.e24
+# Parabolic plasma channel profile: n0*(1 + 4*(x^2+y^2)/(kp^2*rc^4)) * n_long(z)
+# with kp = q_e/clight * sqrt(n0/(m_e*epsilon0))
+# and n_long(z) a cosine up-ramp, constant plateau, cosine down-ramp
+my_constants.z_start   = 0.
+my_constants.ramp_up   = 0.5e-3
+my_constants.plateau   = 14.e-3
+my_constants.ramp_down = 0.5e-3
+my_constants.rc        = 30.e-6
+my_constants.n0        = 1.e24
+my_constants.kp        = q_e/clight*sqrt(n0/(m_e*epsilon0))
+
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
+    "*if(z<z_start, 0," \
+    "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
+    "   if(z<z_start+ramp_up+plateau, 1," \
+    "   if(z<z_start+ramp_up+plateau+ramp_down, 0.5*(1+cos(pi*(z-z_start-ramp_up-plateau)/ramp_down))," \
+    "   0))))"
 electrons.do_continuous_injection = 1
 
 ions.charge = q_e
@@ -73,9 +89,14 @@ ions.xmin = -45.e-6
 ions.xmax =  45.e-6
 ions.zmin = 0.
 ions.zmax = 15000.e-6
-ions.profile = "predefined"
-ions.predefined_profile_name = "parabolic_channel"
-ions.predefined_profile_params = 0. 0.5e-3 14.e-3 0.5e-3 30.e-6 1.e24
+ions.profile = parse_density_function
+ions.density_function(x,y,z) = \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
+    "*if(z<z_start, 0," \
+    "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
+    "   if(z<z_start+ramp_up+plateau, 1," \
+    "   if(z<z_start+ramp_up+plateau+ramp_down, 0.5*(1+cos(pi*(z-z_start-ramp_up-plateau)/ramp_down))," \
+    "   0))))"
 ions.do_continuous_injection = 1
 
 beam.charge = -q_e

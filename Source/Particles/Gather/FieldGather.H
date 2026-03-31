@@ -1141,7 +1141,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             for (int k=dkl_B; k<=depos_order+1-dku_B; k++) {
                 sdzk += (sz_B_old[k] - sz_B_new[k]);
                 auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_E_new-1+k)*sdzkov*sdzij;
+                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdzkov*sdzij;
             }
         }
     }
