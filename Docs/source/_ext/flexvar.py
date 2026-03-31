@@ -292,8 +292,8 @@ class FlexVarDirective(ObjectDescription[VarDesc]):
         unit_str = re.sub(r"\b(\s*/\s*|\s+per\s+)\b", "/", unit_str)
         # x**n -> x^n
         unit_str = unit_str.replace("**", "^")
-        # (x.y or x y) -> x*y
-        unit_str = re.sub(r"\b\s*(\.|\s+)\s*\b", "*", unit_str)
+        # x.y -> x y
+        unit_str = re.sub(r"\b\.\b", " ", unit_str)
         return unit_str
 
     # ------------------------------------------------------------------
