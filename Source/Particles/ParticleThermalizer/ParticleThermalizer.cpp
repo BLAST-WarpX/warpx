@@ -116,7 +116,6 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
         const auto& problo = geom.ProbLoArray();
         int dir = static_cast<int>(m_normal);
 
-        amrex::RealBox thermalizer_region = geom.ProbDomain();
         thermalizer_region.setLo(dir, m_start);
         thermalizer_region.setHi(dir, m_end);
         for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti) {
