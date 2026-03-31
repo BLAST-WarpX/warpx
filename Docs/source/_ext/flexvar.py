@@ -567,8 +567,60 @@ class WarpXDomain(FlexVarDomain):
     }
 
 
+def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
+    # Add default-role defintion at beginning of each document.
+    # This makes `XYZ` equivalent to :fv:var:`XYZ`.
+    for i in range(len(source)):
+        new_doc_txt = ".. default-role:: fv:var\n"
+        new_doc_txt += "\n"
+        new_doc_txt += source[i]
+        source[i] = new_doc_txt
+
+    # Replace double backticks with single backticks.
+    #
+    # This makes ``...`` effectively the same as the default role `...`.
+    # This, along with setting the default role to :fv:var:, avoids having to
+    # find and edit every instance of a parameter currently enclosed in double
+    # backticks in the documentation files. This is also makes things more
+    # convenient and consistent for future contributors to the docs.
+    #
+    # This is implemented by replacing the pattern ``XYZ`` with `\ XYZ`.
+    # The whitespace escape in `\ XYZ` is a hack to preserve the same string
+    # length as ``XYZ`` while rendering the same as `XYZ`. The purpose is to
+    # avoid breaking the RST tables, which are sensitive to whitespace
+    # alignment. For example:
+    #
+    # Before:
+    # =============  ==================================
+    # ``q_e``        Elementary charge (C)
+    # ``m_e``        Electron mass (kg)
+    # ``m_p``        Proton mass (kg)
+    # ``m_u``        Unified atomic mass unit (kg)
+    # ...
+    # =============  ==================================
+    #
+    # After:
+    # =============  ==================================
+    # `\ q_e`        Elementary charge (C)
+    # `\ m_e`        Electron mass (kg)
+    # `\ m_p`        Proton mass (kg)
+    # `\ m_u`        Unified atomic mass unit (kg)
+    # ...
+    # =============  ==================================
+
+    # Pattern for ``XYZ``
+    literal_re = re.compile(r"``([^`]+)``", re.DOTALL)
+
+    def _repl(m: re.Match[str]):
+        # Replace ``XYZ`` with `\ XYZ`
+        return rf"`\ {m.group(1)}`"
+
+    for i in range(len(source)):
+        source[i] = literal_re.sub(_repl, source[i])
+
 def setup(app: Sphinx) -> dict:
     app.add_domain(WarpXDomain)
+    app.connect("source-read", warpx_source_read)
     return {
         "version": "0.1.0",
         "parallel_read_safe": True,
