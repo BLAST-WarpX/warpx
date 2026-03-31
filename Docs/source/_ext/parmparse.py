@@ -124,15 +124,15 @@ def replace_equiv_names(txt: str, equiv_dict: dict[str, list[str]]) -> str:
 class ObjectEntry(NamedTuple):
     docname: str
     node_id: str
-    desc: DirDesc
+    desc: ObjDesc
 
 
-class DirDesc(NamedTuple):
+class ObjDesc(NamedTuple):
     directive_target_name: str
     link_aliases: list[str]
 
 
-class ParmParseDirective(ObjectDescription[DirDesc]):
+class ParmParseDirective(ObjectDescription[ObjDesc]):
     """
     Description of a parameter.
 
@@ -176,7 +176,7 @@ class ParmParseDirective(ObjectDescription[DirDesc]):
     # Signature parsing / rendering
     # ------------------------------------------------------------------
 
-    def handle_signature(self, sig: str, signode: desc_signature) -> DirDesc:
+    def handle_signature(self, sig: str, signode: desc_signature) -> ObjDesc:
         """
         Build the rendered signature node and return a description object.
 
@@ -188,52 +188,53 @@ class ParmParseDirective(ObjectDescription[DirDesc]):
             sig=sig,
             signode=signode,
         )
-        link_aliases: str | None = helper.get_and_check_aliases("link_aliases")
-        type_: str | None = helper.get_and_check_aliases("type")
-        default: str | None = helper.get_and_check_aliases("default", "value")
-        unit: str | None = helper.get_and_check_aliases("unit", "units")
-        comment: str | None = helper.get_and_check_aliases("annotation", "comment")
+        aliases_str: str | None = helper.get_option("link_aliases")
+        type_str: str | None = helper.get_option("type")
+        default_str: str | None = helper.get_option("default", "value")
+        unit_str: str | None = helper.get_option("unit", "units")
+        comment_str: str | None = helper.get_option("annotation", "comment")
         l_optional: bool = "optional" in self.options
         l_required: bool = "required" in self.options
         helper.check_conflicting_options("optional", "required")
 
-        # Make canonical name and alternative name list
+        # Make canonical name
         name: str = re.sub(r"\s+", "", sig)
 
-        alias_list: list[str] = link_aliases.split() if link_aliases else []
+        # Make alternative name list
+        alias_list: list[str] = aliases_str.split() if aliases_str else []
 
         signode["fullname"] = name
         signode["ids"] = []  # filled in add_target_and_index
 
         # Process strings:
-        if type_:
-            type_ = self._process_type_string(type_)
-        if unit:
-            unit = self._process_unit_string(unit)
+        if type_str:
+            type_str = self._process_type_string(type_str)
+        if unit_str:
+            unit_str = self._process_unit_string(unit_str)
 
         # Format: <name>
         signode += addnodes.desc_name(name, "", self.parse_inline(name))
 
         # Format: (<type>; [<unit>]; optional, default: <default>)
-        if type_ or unit or l_optional or l_required or default:
+        if type_str or unit_str or l_optional or l_required or default_str:
             signode += addnodes.desc_sig_space()
             signode += addnodes.desc_sig_punctuation("", "(")
         # Format: <type>;
-        if type_:
-            type_node = self.parse_inline(type_)
+        if type_str:
+            type_node = self.parse_inline(type_str)
             if self.use_emphasis:
-                signode += nodes.emphasis(type_, "", type_node)
+                signode += nodes.emphasis(type_str, "", type_node)
             else:
                 signode += type_node
-        if type_ and (unit or l_optional or l_required or default):
+        if type_str and (unit_str or l_optional or l_required or default_str):
             signode += addnodes.desc_sig_punctuation("", ";")
             signode += addnodes.desc_sig_space()
         # Format: [<unit>];
-        if unit:
+        if unit_str:
             signode += addnodes.desc_sig_punctuation("", "[")
-            signode += self.parse_inline(unit)
+            signode += self.parse_inline(unit_str)
             signode += addnodes.desc_sig_punctuation("", "]")
-        if unit and (l_optional or l_required or default):
+        if unit_str and (l_optional or l_required or default_str):
             signode += addnodes.desc_sig_punctuation("", ";")
             signode += addnodes.desc_sig_space()
         # Format: optional, required, or possibly neither
@@ -244,28 +245,28 @@ class ParmParseDirective(ObjectDescription[DirDesc]):
         else:
             # Do nothing if neither flag is specified
             pass
-        if (l_optional or l_required) and default:
+        if (l_optional or l_required) and default_str:
             signode += addnodes.desc_sig_punctuation("", ",")
             signode += addnodes.desc_sig_space()
         # default: <default>
-        if default:
+        if default_str:
             signode += nodes.Text("default")
             signode += addnodes.desc_sig_punctuation("", ":")
             signode += addnodes.desc_sig_space()
-            default_node = self.parse_inline(default)
+            default_node = self.parse_inline(default_str)
             if self.use_emphasis:
-                signode += nodes.emphasis(default, "", default_node)
+                signode += nodes.emphasis(default_str, "", default_node)
             else:
                 signode += default_node
-        if type_ or unit or l_optional or l_required or default:
+        if type_str or unit_str or l_optional or l_required or default_str:
             signode += addnodes.desc_sig_punctuation("", ")")
 
         # Format: <comment>
-        if comment:
+        if comment_str:
             signode += addnodes.desc_sig_space()
-            signode += self.parse_inline(comment)
+            signode += self.parse_inline(comment_str)
 
-        return DirDesc(name, alias_list)
+        return ObjDesc(name, alias_list)
 
     def parse_inline(self, text: str) -> nodes.inline:
         """
@@ -301,7 +302,7 @@ class ParmParseDirective(ObjectDescription[DirDesc]):
     # ------------------------------------------------------------------
 
     def add_target_and_index(
-        self, desc: DirDesc, sig: str, signode: desc_signature
+        self, desc: ObjDesc, sig: str, signode: desc_signature
     ) -> None:
         name: str = desc.directive_target_name
         node_id = make_id(self.env, self.state.document, "", name)
@@ -332,7 +333,7 @@ class ParmParseOptionHelper:
         self.sig: str = sig
         self.signode: desc_signature = signode
 
-    def get_and_check_aliases(self, *keys: str, default=None) -> Any:
+    def get_option(self, *keys: str, default=None) -> Any:
         if len(keys) > 1:
             self.check_conflicting_options(*keys)
         for key in keys:
@@ -442,7 +443,7 @@ class ParmParseDomain(Domain):
 
     def note_object(
         self,
-        desc: DirDesc,
+        desc: ObjDesc,
         node_id: str,
         location: Any = None,
     ) -> None:
