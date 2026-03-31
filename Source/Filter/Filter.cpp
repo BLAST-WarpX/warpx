@@ -38,7 +38,9 @@ void
 Filter::ApplyStencil (MultiFab& dstmf, const MultiFab& srcmf, const int lev, int scomp, int dcomp, int ncomp)
 {
     ABLASTR_PROFILE("Filter::ApplyStencil(MultiFab)");
-    ncomp = std::min(ncomp, srcmf.nComp());
+    ncomp = std::min(ncomp, srcmf.nComp() - scomp);
+    ncomp = std::min(ncomp, dstmf.nComp() - dcomp);
+    if (ncomp <= 0) { return; }
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -79,7 +81,9 @@ Filter::ApplyStencil (FArrayBox& dstfab, const FArrayBox& srcfab,
                       const Box& tbx, int scomp, int dcomp, int ncomp)
 {
     ABLASTR_PROFILE("Filter::ApplyStencil(FArrayBox)");
-    ncomp = std::min(ncomp, srcfab.nComp());
+    ncomp = std::min(ncomp, srcfab.nComp() - scomp);
+    ncomp = std::min(ncomp, dstfab.nComp() - dcomp);
+    if (ncomp <= 0) { return; }
     const auto& src = srcfab.array();
     const auto& dst = dstfab.array();
 
@@ -198,7 +202,9 @@ void
 Filter::ApplyStencil (amrex::MultiFab& dstmf, const amrex::MultiFab& srcmf, const int lev, int scomp, int dcomp, int ncomp)
 {
     ABLASTR_PROFILE("Filter::ApplyStencil(MultiFab)");
-    ncomp = std::min(ncomp, srcmf.nComp());
+    ncomp = std::min(ncomp, srcmf.nComp() - scomp);
+    ncomp = std::min(ncomp, dstmf.nComp() - dcomp);
+    if (ncomp <= 0) { return; }
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -252,7 +258,9 @@ Filter::ApplyStencil (amrex::FArrayBox& dstfab, const amrex::FArrayBox& srcfab,
                       const amrex::Box& tbx, int scomp, int dcomp, int ncomp)
 {
     ABLASTR_PROFILE("Filter::ApplyStencil(FArrayBox)");
-    ncomp = std::min(ncomp, srcfab.nComp());
+    ncomp = std::min(ncomp, srcfab.nComp() - scomp);
+    ncomp = std::min(ncomp, dstfab.nComp() - dcomp);
+    if (ncomp <= 0) { return; }
     FArrayBox tmpfab;
     const Box& gbx = amrex::grow(tbx,stencil_length_each_dir-1);
     // tmpfab has enough ghost cells for the stencil
