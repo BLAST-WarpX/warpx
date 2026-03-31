@@ -1124,12 +1124,16 @@ WarpX::FillBoundaryAux (int lev, IntVect ng)
     ablastr::fields::MultiLevelVectorField Bfield_aux = m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level);
 
     const amrex::Periodicity& period = Geom(lev).periodicity();
-    ablastr::utils::communication::FillBoundary(*Efield_aux[lev][0], ng, WarpX::do_single_precision_comms, period);
-    ablastr::utils::communication::FillBoundary(*Efield_aux[lev][1], ng, WarpX::do_single_precision_comms, period);
-    ablastr::utils::communication::FillBoundary(*Efield_aux[lev][2], ng, WarpX::do_single_precision_comms, period);
-    ablastr::utils::communication::FillBoundary(*Bfield_aux[lev][0], ng, WarpX::do_single_precision_comms, period);
-    ablastr::utils::communication::FillBoundary(*Bfield_aux[lev][1], ng, WarpX::do_single_precision_comms, period);
-    ablastr::utils::communication::FillBoundary(*Bfield_aux[lev][2], ng, WarpX::do_single_precision_comms, period);
+    for (int i = 0; i < 3; ++i)
+    {
+        const amrex::IntVect nghost = (m_safe_guard_cells) ? Efield_aux[lev][i]->nGrowVect() : ng;
+        ablastr::utils::communication::FillBoundary(*Efield_aux[lev][i], nghost, WarpX::do_single_precision_comms, period);
+    }
+    for (int i = 0; i < 3; ++i)
+    {
+        const amrex::IntVect nghost = (m_safe_guard_cells) ? Bfield_aux[lev][i]->nGrowVect() : ng;
+        ablastr::utils::communication::FillBoundary(*Bfield_aux[lev][i], nghost, WarpX::do_single_precision_comms, period);
+    }
 }
 
 void
