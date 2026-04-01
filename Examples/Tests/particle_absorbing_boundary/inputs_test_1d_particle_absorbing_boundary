@@ -6,19 +6,30 @@
 max_step = 8000
 #stop_time = 5.0e-12            # [s]
 
+# small 1D case for CI, switch to run full 2d case similar to Miller et. al. 2021
 amr.n_cell = 5120
+#amr.n_cell = 128 8192
 
 # simulation box, no MR
 amr.max_level = 0
+
+# switch for 2D case
 geometry.dims = 1
 geometry.prob_lo = -150e-6
 geometry.prob_hi =  50.e-6
+#geometry.dims = 2
+#geometry.prob_lo = -1.6e-6 -774.156e-6
+#geometry.prob_hi =  1.6e-6 150.e-6
 
-# Boundary conditions
+# Boundary conditions (switch for 2D case)
 boundary.field_lo = absorbing_silver_mueller
 boundary.field_hi = absorbing_silver_mueller
 boundary.particle_lo = absorbing
 boundary.particle_hi = absorbing
+#boundary.field_lo = periodic pml
+#boundary.field_hi = periodic pml
+#boundary.particle_lo = periodic absorbing
+#boundary.particle_hi = periodic absorbing
 
 # Order of particle shape factors
 algo.particle_shape = 3
@@ -30,6 +41,9 @@ warpx.use_filter = 1          # bilinear current/charge filter
 # Grid size parameters (tune for performance on your machine)
 amr.blocking_factor = 128
 amr.max_grid_size = 1024
+# 2D case:
+#amr.max_grid_size_x = 128
+#amr.max_grid_size_y = 2048  # this is confusingly named and means z in 2D
 
 #################################
 # Target Profile
@@ -47,6 +61,8 @@ particles.species_names = electrons hydrogen
 hydrogen.species_type = hydrogen
 hydrogen.injection_style = NUniformPerCell
 hydrogen.num_particles_per_cell_each_dim = 8
+# 2d case:
+#hydrogen.num_particles_per_cell_each_dim = 4 4
 hydrogen.momentum_distribution_type = at_rest
 hydrogen.zmin = zmin
 hydrogen.profile = parse_density_function
@@ -54,6 +70,8 @@ hydrogen.profile = parse_density_function
 electrons.species_type = electron
 electrons.injection_style = NUniformPerCell
 electrons.num_particles_per_cell_each_dim = 64
+# 2D case:
+#electrons.num_particles_per_cell_each_dim = 8 8
 electrons.momentum_distribution_type = "maxwell_boltzmann"
 electrons.theta = 0.0002  # corresponds to 0.1 keV temperature
 electrons.zmin = zmin
@@ -70,6 +88,12 @@ particle_thermalizer.start = 40e-6
 particle_thermalizer.end = 50e-6
 particle_thermalizer.momentum_threshold = 0.1
 particle_thermalizer.theta = 0.02
+# 2D case:
+#particle_thermalizer.normal = "z"
+#particle_thermalizer.start = 145e-6
+#particle_thermalizer.end = 150e-6
+#particle_thermalizer.momentum_threshold = 1.0
+#particle_thermalizer.theta = 1.0
 particle_thermalizer.species = electrons
 
 # definitions used by laser profile
@@ -83,6 +107,8 @@ my_constants.t_ramp1 = 2.87e-12
 #
 lasers.names        = laser1
 laser1.position     = 0. 0. -149.e-6    # point the laser plane (antenna)
+# 2D case:
+#laser1.position     = 0. 0. -773.156e-6 # point the laser plane (antenna)
 laser1.direction    = 0. 0. 1.          # the plane's (antenna's) normal direction
 laser1.polarization = 1. 0. 0.          # the main polarization vector
 laser1.e_max        = Emax              # maximum amplitude of the laser field [V/m]
