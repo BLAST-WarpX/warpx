@@ -509,7 +509,6 @@ WarpX::OneStep_nosub (
     // Deposit current j^{n+1/2}
     // Deposit charge density rho^{n}
 
-    ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
 
     // with collisions placed in the middle of the momentum push
@@ -712,6 +711,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
+
+    ExecutePythonCallback("particlescraper");
 
     // Non-Maxwell solver: particles can move by an arbitrary number of cells
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
