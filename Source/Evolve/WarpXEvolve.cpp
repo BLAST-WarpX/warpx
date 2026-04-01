@@ -724,7 +724,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // Electromagnetic solver: due to CFL condition, particles can
         // only move by one or two cells per time step
         // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
-        if (max_level == 0) {
+        if (finest_level == 0) {
             int num_redistribute_ghost = num_moved;
             if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
                 // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
