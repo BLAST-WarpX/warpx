@@ -9,20 +9,6 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
-#elif defined(WARPX_DIM_RSPHERE)
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
-#endif
-#include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXConst.H"
-
-#include <ablastr/warn_manager/WarnManager.H>
-
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -74,59 +60,8 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     if (pc_type == PreconditionerType::pc_petsc) { InitializeCurlCurlBCMasks(); }
 
-    // The Jacobi preconditioner acts only on the mass matrix (plasma response)
-    // component of the implicit operator. For theta-implicit, the implicit term
-    // also includes the EM (curl-curl) component. If the EM CFL number is >= 1,
-    // the EM component dominates and the Jacobi PC will not be effective.
-    if (pc_type == PreconditionerType::pc_jacobi) {
-        CheckEMCFLForJacobiPC();
-    }
-
     m_is_defined = true;
 
-}
-
-void ThetaImplicitEM::CheckEMCFLForJacobiPC () const
-{
-    // Compute the CFL-stable max dt for the EM solver using the same
-    // logic as WarpX::ComputeDt()
-    const amrex::Vector<amrex::Real> dt_vec = m_WarpX->getdt();
-    if (dt_vec.empty()) { return; }
-
-    const amrex::Real a_dt = dt_vec[0];
-    const amrex::Real* dx = m_WarpX->Geom(0).CellSize();
-    amrex::Real dt_CFL_max = 0.0;
-
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
-        dt_CFL_max = std::min({AMREX_D_DECL(dx[0], dx[1], dx[2])}) / PhysConst::c;
-    } else {
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        dt_CFL_max = CylindricalYeeAlgorithm::ComputeMaxDt(dx, WarpX::n_rz_azimuthal_modes);
-#elif defined(WARPX_DIM_RSPHERE)
-        dt_CFL_max = SphericalYeeAlgorithm::ComputeMaxDt(dx);
-#else
-        if (WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
-            dt_CFL_max = CartesianNodalAlgorithm::ComputeMaxDt(dx);
-        } else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
-                   || WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-            dt_CFL_max = CartesianYeeAlgorithm::ComputeMaxDt(dx);
-        } else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
-            dt_CFL_max = CartesianCKCAlgorithm::ComputeMaxDt(dx);
-        } else {
-            dt_CFL_max = std::min({AMREX_D_DECL(dx[0], dx[1], dx[2])}) / PhysConst::c;
-        }
-#endif
-    }
-
-    if (a_dt >= dt_CFL_max) {
-        const std::string warnMsg =
-            "Jacobi PC does not precondition the EM (curl-curl) term. "
-            "EM CFL = " + std::to_string(a_dt / dt_CFL_max) + " >= 1 "
-            "(dt = " + std::to_string(a_dt) + ", dt_CFL = " + std::to_string(dt_CFL_max) + "). "
-            "This may cause poor solver convergence.";
-        ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM", warnMsg,
-            ablastr::warn_manager::WarnPriority::high);
-    }
 }
 
 void ThetaImplicitEM::PrintParameters () const

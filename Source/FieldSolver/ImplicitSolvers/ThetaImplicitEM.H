@@ -102,16 +102,6 @@ public:
 private:
 
     /**
-     * \brief Check that the EM CFL number is < 1 when using the Jacobi
-     * preconditioner. The Jacobi PC only preconditions the mass matrix
-     * (plasma response) part of the implicit operator. For theta-implicit,
-     * the implicit operator also includes the EM (curl-curl) term. If
-     * dt > dt_CFL, the EM component dominates and the Jacobi PC will
-     * not be effective, leading to poor solver convergence.
-     */
-    void CheckEMCFLForJacobiPC () const;
-
-    /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the
      * electric field E. The main logic for determining which variables should be
      * WarpXSolverVec type is that it must have the same size and have the same
