@@ -24,15 +24,15 @@ data, info = ts.get_field(field="data", iteration=8000, plot=False)
 # We check the total weight of particles in the region of phase space with z
 # between 0 and 50 microns and uz between -5 and -1.
 input_dict = parse_input_file("./warpx_used_inputs")
-nz   = int(input_dict["PhaseSpaceElectrons.bin_number_abs"][0])
+nz = int(input_dict["PhaseSpaceElectrons.bin_number_abs"][0])
 zmin = float(input_dict["PhaseSpaceElectrons.bin_min_abs"][0])
 zmax = float(input_dict["PhaseSpaceElectrons.bin_max_abs"][0])
-nuz  = int(input_dict["PhaseSpaceElectrons.bin_number_ord"][0])
+nuz = int(input_dict["PhaseSpaceElectrons.bin_number_ord"][0])
 uzmin = float(input_dict["PhaseSpaceElectrons.bin_min_ord"][0])
 uzmax = float(input_dict["PhaseSpaceElectrons.bin_max_ord"][0])
 
 reg_lo_z = 0.0
-reg_hi_z = 50.e-6
+reg_hi_z = 50.0e-6
 reg_lo_uz = -5
 reg_hi_uz = -1
 
