@@ -9,26 +9,30 @@
 #
 # This script analyzes the phase-space plot from the 1D particle absorbing boundary test, ensuring that there are not too many fast-moving particles with negative velocities near the boundary
 
+import sys
+
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
+
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import parse_input_file
 
 ts = OpenPMDTimeSeries("./diags/reducedfiles/PhaseSpaceElectrons")
 it = ts.iterations
 data, info = ts.get_field(field="data", iteration=8000, plot=False)
 
 # We check the total weight of particles in the region of phase space with z
-# between 0 and 50 microns and uz between -5 and -1. If you change the bounds
-# or number of points in the PhaseSpaceElectrons diagnostic in the inputs file,
-# you need to update the calculations below.
-nz = 1000
-zmin = -100
-zmax = 50
-nuz = 1000
-uzmin = -20
-uzmax = 40
+# between 0 and 50 microns and uz between -5 and -1.
+input_dict = parse_input_file("./warpx_used_inputs")
+nz   = int(input_dict["PhaseSpaceElectrons.bin_number_abs"][0])
+zmin = float(input_dict["PhaseSpaceElectrons.bin_min_abs"][0])
+zmax = float(input_dict["PhaseSpaceElectrons.bin_max_abs"][0])
+nuz  = int(input_dict["PhaseSpaceElectrons.bin_number_ord"][0])
+uzmin = float(input_dict["PhaseSpaceElectrons.bin_min_ord"][0])
+uzmax = float(input_dict["PhaseSpaceElectrons.bin_max_ord"][0])
 
-reg_lo_z = 0
-reg_hi_z = 50
+reg_lo_z = 0.0
+reg_hi_z = 50.e-6
 reg_lo_uz = -5
 reg_hi_uz = -1
 
