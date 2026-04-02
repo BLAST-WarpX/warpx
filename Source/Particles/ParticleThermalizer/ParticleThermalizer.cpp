@@ -97,7 +97,7 @@ void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
   if (m_species_names.empty()) {
     // No species filter: apply to all species.
     for (auto &pc_uptr : mpc) {
-      if (!pc_uptr) { continue };
+      if (!pc_uptr) { continue; }
       applyThermalizer(*pc_uptr);
     }
   } else {
