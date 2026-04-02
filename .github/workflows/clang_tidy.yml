@@ -47,7 +47,7 @@ jobs:
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=300M
-        export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
+        export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy:${{ github.workspace }}/.github/workflows/clang_tidy.yml:${{ github.workspace }}/.github/workflows/source/makeMakefileForClangTidy.py:${{ github.workspace }}/.github/workflows/dependencies/clang.sh
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
         export CXX=$(which clang++-17)
