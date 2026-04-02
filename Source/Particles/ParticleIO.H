@@ -104,7 +104,7 @@ storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
  * \param save_Bz Whether the Ex field is saved
  */
 void
-storeFieldOnParticles (PinnedMemoryParticleContainer& tmp, bool is_full_diagnostic,
+storeFieldOnParticles (WarpXParticleContainer::Base& tmp, bool is_full_diagnostic,
                        bool save_Ex, bool save_Ey, bool save_Ez,
                        bool save_Bx, bool save_By, bool save_Bz);
 

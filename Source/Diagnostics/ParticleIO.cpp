@@ -305,11 +305,11 @@ storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
 }
 
 void
-storeFieldOnParticles ( PinnedMemoryParticleContainer& tmp, bool is_full_diagnostic,
+storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnostic,
                         bool save_Ex, bool save_Ey, bool save_Ez,
                         bool save_Bx, bool save_By, bool save_Bz) {
 
-    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
     using ablastr::fields::Direction;
 
     // When this is not a full diagnostic, the particles are not written at the same physical time (i.e. PIC iteration)
