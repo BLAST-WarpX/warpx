@@ -567,15 +567,12 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
             amrex::ParticleReal Bxp = 0.0;
             amrex::ParticleReal Byp = 0.0;
             amrex::ParticleReal Bzp = 0.0;
-            const int depos_order_perp = 1;
-            const int depos_order_para = 1;
-            const int n_rz_azimuthal_modes = 0;
-            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+            doDirectGatherVectorField</*depos_order_perp=*/depos_order,/*depos_order_para=*/depos_order>(
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+                                    dinv, xyzmin, lo, /*n_rz_azimuthal_modes=*/0 );
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
@@ -1695,13 +1692,12 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal Bzp = 0.0;
             const int depos_order_perp = 1;
             const int depos_order_para = 1;
-            const int n_rz_azimuthal_modes = 0;
             doDirectGatherVectorField<depos_order_perp,depos_order_para>(
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+                                    dinv, xyzmin, lo, /*n_rz_azimuthal_modes=*/0 );
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
