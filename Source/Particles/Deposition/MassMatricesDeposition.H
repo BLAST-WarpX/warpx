@@ -139,7 +139,8 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  * \tparam deposit_J               Whether to deposit the current density
  * \param xp, yp, zp               The particle positions.
- * \param wqx,wqy,wqz              The particle velocity multiplied by the charge / volume
+ * \param wq_invvol                Particle charge / volume
+ * \param vx,vy,vz                 The particle velocities.
  * \param fpxx,fpxy,fpxz           Mass matrix kernels for Jx
  * \param fpyx,fpyy,fpyz           Mass matrix kernels for Jy
  * \param fpzx,fpzy,fpzz           Mass matrix kernels for Jz
