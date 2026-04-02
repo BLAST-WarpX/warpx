@@ -64,7 +64,12 @@ void doDirectGatherVectorField (
 
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    const double rp = std::sqrt(xp*xp + yp*yp);
+    const double xp_np1 = 2.0*xp - xp_n;
+    const double yp_np1 = 2.0*yp - yp_n;
+    const double rp_n   = std::sqrt(xp_n*xp_n     + yp_n*yp_n);
+    const double rp_np1 = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1);
+    const double rp = ( direct_algo ? std::sqrt(xp*xp + yp*yp) :
+                                      0.5*(rp_n + rp_np1) );
     const double x_bar = (rp - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
     const double rp = std::sqrt(xp*xp + yp*yp + zp*zp);
