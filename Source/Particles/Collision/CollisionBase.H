@@ -31,7 +31,7 @@ public:
 
     virtual ~CollisionBase() = default;
 
-    void BackwardCompatibility () const;
+    void BackwardCompatibility ();
 
     [[nodiscard]] int get_ndt() const { return m_ndt; }
 
