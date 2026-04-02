@@ -27,25 +27,25 @@ ParticleThermalizer::ParticleThermalizer()
   const amrex::ParmParse pp("particle_thermalizer");
 
   // Read normal as a string (x, y, or z)
-  m_normal_str = "";
-  const bool thermalizer_present = pp.query("normal", m_normal_str);
+  std::string normal_str = "";
+  const bool thermalizer_present = pp.query("normal", normal_str);
   if (!thermalizer_present) {
     // If no normal is specified, the thermalizer is not defined
     return;
   }
 
   // normalize to lowercase
-  std::transform(m_normal_str.begin(), m_normal_str.end(), m_normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
+  std::transform(normal_str.begin(), normal_str.end(), normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
 #if defined(WARPX_DIM_1D_Z)
-  if (m_normal_str == "z") {
+  if (normal_str == "z") {
     m_normal = 0;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'z' in 1D simulations");
   }
 #elif defined(WARPX_DIM_XZ)
-  if (m_normal_str == "x") {
+  if (normal_str == "x") {
     m_normal = 0;
-  } else if (m_normal_str == "z") {
+  } else if (normal_str == "z") {
     m_normal = 1;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'x' or 'z' in 2D simulations");
@@ -57,11 +57,11 @@ ParticleThermalizer::ParticleThermalizer()
 #elif defined(WARPX_DIM_RSPHERE)
   amrex::Abort("particle_thermalizer: thermalizer not supported in RSPHERE geometry");
 #elif defined(WARPX_DIM_3D)
-  if (m_normal_str == "x") {
+  if (normal_str == "x") {
     m_normal = 0;
-  } else if (m_normal_str == "y") {
+  } else if (normal_str == "y") {
     m_normal = 1;
-  } else if (m_normal_str == "z") {
+  } else if (normal_str == "z") {
     m_normal = 2;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'x', 'y', or 'z'");
