@@ -21,9 +21,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
@@ -242,34 +242,32 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
         constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-        amrex::Real position_dt = dt;
-        if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
-            position_dt *= 0.5_rt;
-        }
-        amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(i, xp, yp, zp);
-            if (zp <= z_plane_lev) {
-                xp = x_save[i];
-                yp = y_save[i];
-                zp = z_save[i];
-                if (rigid == RigidAdvanceMode::vzbar) {
-                    zp += position_dt * vz_ave_boosted;
-                } else {
-                    const amrex::ParticleReal gi =
-                        1._prt /
-                        std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
-                                            uz[i] * uz[i]) *
-                                               inv_c2);
-                    zp += position_dt * uz[i] * gi;
-                    if (rigid == RigidAdvanceMode::v) {
-                        xp += position_dt * ux[i] * gi;
-                        yp += position_dt * uy[i] * gi;
+        if (position_push_type == PositionPushType::Full) {
+            amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
+                amrex::ParticleReal xp, yp, zp;
+                GetPosition(i, xp, yp, zp);
+                if (zp <= z_plane_lev) {
+                    xp = x_save[i];
+                    yp = y_save[i];
+                    zp = z_save[i];
+                    if (rigid == RigidAdvanceMode::vzbar) {
+                        zp += dt * vz_ave_boosted;
+                    } else {
+                        const amrex::ParticleReal gi =
+                            1._prt /
+                            std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
+                                                uz[i] * uz[i]) *
+                                                inv_c2);
+                        zp += dt * uz[i] * gi;
+                        if (rigid == RigidAdvanceMode::v) {
+                            xp += dt * ux[i] * gi;
+                            yp += dt * uy[i] * gi;
+                        }
                     }
+                    SetPosition(i, xp, yp, zp);
                 }
-                SetPosition(i, xp, yp, zp);
-            }
-        });
+            });
+        }
     }
 }
 
@@ -314,9 +312,10 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
 void
 RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                       MomentumPushType momentum_push_type)
 {
-    WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
+    ABLASTR_PROFILE("RigidInjectedParticleContainer::PushP");
 
     if (do_not_push) { return; }
 
@@ -440,15 +439,15 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 if (do_crr) {
                     UpdateMomentumBorisWithRadiationReaction(uxpp[ip], uypp[ip], uzpp[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, mass, dt);
+                                                             Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     UpdateMomentumBoris( uxpp[ip], uypp[ip], uzpp[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, mass, dt);
+                                         Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     UpdateMomentumVay( uxpp[ip], uypp[ip], uzpp[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, mass, dt);
+                                       Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( uxpp[ip], uypp[ip], uzpp[ip],
                                                Exp, Eyp, Ezp, Bxp,
