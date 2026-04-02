@@ -2779,7 +2779,15 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(self, name, species, CoulombLog=None, ndt_supercycle=None, ndt_subcycle=None, **kw):
+    def __init__(
+        self,
+        name,
+        species,
+        CoulombLog=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
         self.name = name
         self.species = species
         self.CoulombLog = CoulombLog
@@ -2926,8 +2934,14 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
     """
 
     def __init__(
-        self, name, species, scattering_processes, product_species=None,
-        ndt_supercycle=None, ndt_subcycle=None, **kw
+        self,
+        name,
+        species,
+        scattering_processes,
+        product_species=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
     ):
         self.name = name
         self.species = species
