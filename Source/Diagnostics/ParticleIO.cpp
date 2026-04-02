@@ -250,10 +250,10 @@ MultiParticleContainer::WriteHeader (std::ostream& os) const
 }
 
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic ) {
 
-    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame) ||

@@ -9,6 +9,10 @@ This documents on how to use WarpX as a Python script (e.g., ``python3 PICMI_scr
 WarpX uses the `PICMI standard <https://github.com/picmi-standard/picmi>`__ for its Python input files.
 Complete example input files can be found in :ref:`the examples section <usage-examples>`.
 
+.. tip::
+
+   If you enjoy AI/LLM/agentic workflows, see our :ref:`AI (LLM)-Assisted Input File Design <ai_input_design>` section, too.
+
 In the input file, instances of classes are created defining the various aspects of the simulation.
 A variable of type :py:class:`pywarpx.picmi.Simulation` is the central object to which all other options are passed, defining the simulation time, field solver, registered species, etc.
 
@@ -34,7 +38,7 @@ Simulation and Grid Setup
 -------------------------
 
 .. autoclass:: pywarpx.picmi.Simulation
-    :members: step, add_species, add_laser, add_applied_field, write_input_file
+    :members: step, add_species, add_laser, add_applied_field, add_interaction, add_diagnostic, write_input_file
 
 .. autoclass:: pywarpx.picmi.Cartesian3DGrid
 

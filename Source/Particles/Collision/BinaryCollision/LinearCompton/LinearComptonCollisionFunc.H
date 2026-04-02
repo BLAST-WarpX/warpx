@@ -114,8 +114,8 @@ public:
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
          * @param[in] soa_1,soa_2 contain the struct of array data of the two species
-         * @param[in] dt is the time step length between two collision calls.
-         * @param[in] dV is the volume of the corresponding cell.
+         * @param[in] dt time between collision calls (level-independent; collisions run once per coarse step).
+         * @param[in] dV volume of the cell at the current refinement level (level-specific).
          * @param[in] coll_idx is the collision number of the cell
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
          * @param[out] p_mask is a mask that will be set to true if a collision occurs for a given
@@ -173,7 +173,7 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
             amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
@@ -190,8 +190,8 @@ public:
                     p_mask[pair_index] = false;
                 }
                 else {
-#if (defined WARPX_DIM_RZ)
-                    /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
                      * in the same *cylindrical* cell. For this reason, collisions between macroparticles
                      * are actually not local in space. In this case, the underlying assumption is that
                      * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -213,7 +213,7 @@ public:
                         m_probability_threshold,
                         m_probability_target_value,
                         engine);
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
                     u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
                     u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);

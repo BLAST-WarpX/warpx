@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "ImplicitSolver_fwd.H"
+
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
@@ -85,6 +87,11 @@ public:
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
 
+    /**
+     * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
+     */
+    void PreLinearSolve ();
+
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
     [[nodiscard]] const amrex::Geometry& GetGeometry (int) const;
@@ -128,6 +135,11 @@ public:
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
+
+    /**
+     * \brief Finish filling the mass matrices after deposit
+     */
+    void FinishMassMatrices ();
 
 protected:
 
@@ -262,11 +274,6 @@ protected:
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
     void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
-
-    /**
-     * \brief Finish filling the mass matrices after deposit
-     */
-    void FinishMassMatrices ();
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
