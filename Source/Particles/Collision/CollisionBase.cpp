@@ -22,10 +22,10 @@ CollisionBase::CollisionBase (const std::string& collision_name)
 
     // time step control: ndt_supercycle or ndt_subcycle (mutually exclusive)
     int ndt_supercycle = 0;
-    int ndt_subcycle   = 0;
+    int ndt_subcycle = 0;
     const bool has_supercycle = utils::parser::queryWithParser(
         pp_collision_name, "ndt_supercycle", ndt_supercycle);
-    const bool has_subcycle   = utils::parser::queryWithParser(
+    const bool has_subcycle = utils::parser::queryWithParser(
         pp_collision_name, "ndt_subcycle", ndt_subcycle);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -39,7 +39,7 @@ CollisionBase::CollisionBase (const std::string& collision_name)
             ndt_subcycle >= 1,
             "<collision_name>.ndt_subcycle must be >= 1."
         );
-        m_ndt                     = ndt_subcycle;
+        m_ndt = ndt_subcycle;
         m_collision_stepping_mode = CollisionSteppingMode::Subcycle;
     } else {
         if (has_supercycle) {

@@ -126,8 +126,8 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
     }
 
     for (auto& collision : allcollisions) {
-        const int ndt                       = collision->get_ndt();
-        const auto collision_stepping_mode  = collision->get_collision_stepping_mode();
+        const int ndt = collision->get_ndt();
+        const auto collision_stepping_mode = collision->get_collision_stepping_mode();
 
         if (collision_stepping_mode == CollisionSteppingMode::Subcycle) {
             // Subcycle: run ndt times per PIC step, each with dt_collision = dt / ndt
