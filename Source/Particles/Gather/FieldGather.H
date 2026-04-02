@@ -22,6 +22,9 @@
  * \tparam depos_order_perp       Particle shape order in parallel direction
  * \tparam depos_order_para       Particle shape order in perpendicular direction
  *
+ * \param direct_algo             True if called from direct deposition. False otherwise
+ * \param xp_n,yp_n,zp_n          Particle position coordinates at start of step
+ * \param xp_n,yp_n,zp_n          Particle position coordinates at start of step
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle
  * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
@@ -34,6 +37,10 @@
 template <int depos_order_perp, int depos_order_para>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doDirectGatherVectorField (
+                     [[maybe_unused]] const bool direct_algo,
+                     [[maybe_unused]] const amrex::ParticleReal xp_n,
+                     [[maybe_unused]] const amrex::ParticleReal yp_n,
+                     [[maybe_unused]] const amrex::ParticleReal zp_n,
                      [[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      [[maybe_unused]] const amrex::ParticleReal zp,
@@ -2089,7 +2096,9 @@ void doGatherPicnicShapeN (
     // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
-    doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+    const bool direct_algo = true;
+    doDirectGatherVectorField<depos_order_perp,depos_order_para>( direct_algo,
+                                    xp_n, yp_n, zp_n,
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,

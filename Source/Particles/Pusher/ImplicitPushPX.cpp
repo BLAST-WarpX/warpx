@@ -1044,7 +1044,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ParticleReal fpxx, fpxy, fpxz;
                     amrex::ParticleReal fpyx, fpyy, fpyz;
                     amrex::ParticleReal fpzx, fpzy, fpzz;
-                    setMassMatricesKernels(q, mass, dt_suborbit, rhop,
+                    const bool direct_algo = false;
+                    setMassMatricesKernels(q, mass, dt_suborbit, rhop, direct_algo,
+                                           xp_n, yp_n, zp_n,
+                                           xp_np1, yp_np1, zp_np1,
                                            ux[ip], uy[ip], uz[ip],
                                            Bxp, Byp, Bzp,
                                            fpxx, fpxy, fpxz,
