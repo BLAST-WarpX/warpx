@@ -96,7 +96,7 @@ unit_equiv_name_dict: dict[str, list[str]] = {
     "kg": ["kilogram", "kilograms"],
     "V": ["volt", "volts"],
     "eV": ["electronvolt", "electronvolts", "electron volt", "electron volts"],
-    "T": ["Telsa", "Telsas"],
+    "T": ["Tesla", "Teslas"],
     "A": ["amp", "amps"],
     "C": ["Coulomb", "Coulombs"],
     "speed of light fraction": ["units of the speed of light"],
