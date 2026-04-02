@@ -64,6 +64,5 @@ CollisionBase::BackwardCompatibility ()
         !pp_collision_name.query("ndt", backward_int),
         "<collision_name>.ndt is no longer a valid option. "
         "Please use <collision_name>.ndt_supercycle (run collision every N PIC steps) "
-        "or <collision_name>.ndt_subcycle (run collision N times per PIC step) instead."
     );
 }
