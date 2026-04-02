@@ -84,7 +84,7 @@ namespace {
         using namespace amrex::literals;
 
         constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-        constexpr amrex::ParticleReal inv_c2 = 1._prt / PhysConst::c2;
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         // Extract the momenta of the incident particles
         amrex::ParticleReal const photon_ux = soa1_in.m_rdata[PIdx::ux][idx1_in];

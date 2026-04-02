@@ -83,7 +83,7 @@ amrex::ParticleReal GetImplicitGammaInverse (const amrex::ParticleReal uxp_n,
 {
     using namespace amrex::literals;
 
-    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/PhysConst::c2;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph - uxp_n;
     const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph - uyp_n;

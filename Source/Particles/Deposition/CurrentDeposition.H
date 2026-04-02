@@ -321,7 +321,7 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    constexpr amrex::Real inv_c2 = 1.0_rt/PhysConst::c2;
+    constexpr amrex::Real inv_c2 = PhysConst::inv_c2;
 
     amrex::Array4<amrex::Real> const& jx_arr = jx_fab.array();
     amrex::Array4<amrex::Real> const& jy_arr = jy_fab.array();
@@ -708,7 +708,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                              (1.0_rt/dt)*dinv.x*dinv.z,
                                              (1.0_rt/dt)*dinv.x*dinv.y};
 
-    Real constexpr inv_c2 = 1.0_rt / PhysConst::c2;
+    Real constexpr inv_c2 = PhysConst::inv_c2;
 
 #if (AMREX_SPACEDIM > 1)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
@@ -2219,7 +2219,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/PhysConst::c2;
+            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
             const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                                + uyp[ip]*uyp[ip]*inv_c2
                                                                + uzp[ip]*uzp[ip]*inv_c2);

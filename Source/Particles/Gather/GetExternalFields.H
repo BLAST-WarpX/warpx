@@ -84,7 +84,7 @@ struct GetExternalEBField
         amrex::ParticleReal By = 0._prt;
         amrex::ParticleReal Bz = 0._prt;
 
-        constexpr amrex::ParticleReal inv_c2 = 1._prt/PhysConst::c2;
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         if (m_Etype == ExternalFieldInitType::Parser)
         {

@@ -61,7 +61,7 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
 {
     using namespace amrex::literals;
 
-    constexpr amrex::ParticleReal inv_c2 = 1._prt/PhysConst::c2;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     // Convert B on particle to normalized cyclotron units with dt/2.0
     const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);

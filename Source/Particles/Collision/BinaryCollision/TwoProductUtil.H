@@ -73,8 +73,8 @@ namespace {
         using namespace amrex::literals;
         using namespace amrex::Math;
 
-        constexpr amrex::ParticleReal c2 = PhysConst::c2;
-        constexpr amrex::ParticleReal inv_c2 = 1._prt / c2;
+        constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
+        constexpr auto inv_c2 = inv_c2_v<amrex::ParticleReal>;
         // Rest energy of incident particles
         const amrex::ParticleReal E_rest_in = (m1_in + m2_in)*c2;
         // Rest energy of products

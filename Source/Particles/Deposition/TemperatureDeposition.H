@@ -462,7 +462,7 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     );
 #endif
 
-    const amrex::Real inv_c2 = 1.0_rt/PhysConst::c2;
+    const amrex::Real inv_c2 = PhysConst::inv_c2;
 
     const amrex::Array4<int> & nx_arr = nx_iab.array();
     const amrex::Array4<int> & ny_arr = ny_iab.array();

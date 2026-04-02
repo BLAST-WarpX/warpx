@@ -2247,7 +2247,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
     amrex::Long np_total = 0;
 
-    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/PhysConst::c2;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const int nLevels = finestLevel();
 
@@ -2327,7 +2327,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
 amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
-    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/PhysConst::c2;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 

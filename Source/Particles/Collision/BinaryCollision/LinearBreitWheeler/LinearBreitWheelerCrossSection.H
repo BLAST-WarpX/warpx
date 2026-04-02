@@ -30,7 +30,7 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
 {
     using namespace amrex::literals;
 
-    constexpr amrex::ParticleReal c2 = PhysConst::c2;
+    constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
     constexpr amrex::ParticleReal me = PhysConst::m_e;
 
     if (E_star < me*c2) {return 0._prt;}

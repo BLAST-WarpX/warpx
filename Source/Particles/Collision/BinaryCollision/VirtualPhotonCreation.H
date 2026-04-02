@@ -79,7 +79,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
-        amrex::Real constexpr inv_c2 = 1._rt / PhysConst::c2;
+        amrex::Real constexpr inv_c2 = PhysConst::inv_c2;
         amrex::Real const mass = primary.getMass();
 
         int const nlevs = std::max(0, primary.finestLevel()+1);

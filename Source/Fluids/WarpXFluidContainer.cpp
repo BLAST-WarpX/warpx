@@ -1443,7 +1443,7 @@ void WarpXFluidContainer::DepositCurrent(
     amrex::MultiFab tmp_jy_fluid(fields.get(name_mf_N, lev)->boxArray(), fields.get(name_mf_N, lev)->DistributionMap(), 1, 0);
     amrex::MultiFab tmp_jz_fluid(fields.get(name_mf_N, lev)->boxArray(), fields.get(name_mf_N, lev)->DistributionMap(), 1, 0);
 
-    const amrex::Real inv_c2 = 1.0_prt / PhysConst::c2;
+    const amrex::Real inv_c2 = PhysConst::inv_c2;
     const amrex::Real q = getCharge();
 
     // Prepare interpolation of current components to cell center

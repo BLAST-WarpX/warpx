@@ -60,8 +60,8 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
                                        const amrex::RandomEngine& engine)
 {
     using namespace amrex::literals;
-    constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-    constexpr amrex::ParticleReal inv_c2 = inv_c * inv_c;
+    constexpr auto inv_c = PhysConst::inv_c_v<amrex::ParticleReal>;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const amrex::ParticleReal w_min = amrex::min(w1, w2);
     const amrex::ParticleReal w_max = amrex::max(w1, w2);

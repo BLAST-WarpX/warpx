@@ -95,7 +95,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    const amrex::Real inv_c2 = 1.0_rt/PhysConst::c2;
+    const amrex::Real inv_c2 = PhysConst::inv_c2;
 
     // --- Get particle quantities
     const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2

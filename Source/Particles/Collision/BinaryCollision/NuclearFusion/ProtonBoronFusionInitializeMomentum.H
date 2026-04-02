@@ -89,7 +89,7 @@ namespace {
         // mass of the Be8 excited state (3.03 MeV above ground state)
         constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt);
         constexpr double mBe_sq = m_beryllium*m_beryllium;
-        constexpr amrex::ParticleReal c2 = PhysConst::c2;
+        constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
 
         // Compute the resulting momenta of the alpha and beryllium particles
         // produced in the fusion reaction
