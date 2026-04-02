@@ -214,7 +214,7 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
     const amrex::Real costheta = (rpxymid > 0._rt ? xp/rpxymid : 1._rt);
     const amrex::Real sintheta = (rpxymid > 0._rt ? yp/rpxymid : 0._rt);
     const amrex::Real cosphi = (rpmid > 0._rt ? rpxymid/rpmid : 1._rt);
-    const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
+    const amrex::Real sinphi = (rpmid > 0._rt ? zp/rpmid : 0._rt);
     // convert from Cartesian to spherical
     const amrex::Real wqx = wq_invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
     const amrex::Real wqy = wq_invvol*(-vx*sintheta + vy*costheta);
