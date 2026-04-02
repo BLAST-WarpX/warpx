@@ -710,12 +710,13 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
     mypc->ApplyBoundaryConditions();
+    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
     // Non-Maxwell solver: particles can move by an arbitrary number of cells
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
     {
-        mypc->Redistribute();
+        mypc->Redistribute(false);
     }
     else
     {
@@ -731,14 +732,12 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
                 // Standard algorithm ; particles can move by up to the max number
                 num_redistribute_ghost += particle_max_grid_crossings;
             }
-            mypc->RedistributeLocal(num_redistribute_ghost);
+            mypc->RedistributeLocal(num_redistribute_ghost, false);
         }
         else {
-            mypc->Redistribute();
+            mypc->Redistribute(false);
         }
     }
-
-    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {

@@ -243,13 +243,13 @@ public:
         bool sort_particles_for_deposition,
         const amrex::IntVect& sort_idx_type);
 
-    void Redistribute ();
+    void Redistribute (bool remove_negative = true);
 
     void defineAllParticleTiles ();
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int num_ghost);
+    void RedistributeLocal (int num_ghost, bool remove_negative = true);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */
