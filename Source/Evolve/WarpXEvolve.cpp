@@ -709,11 +709,6 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 {
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
-    mypc->ApplyBoundaryConditions();
-    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
-
-    ExecutePythonCallback("particlescraper");
-
     // Non-Maxwell solver: particles can move by an arbitrary number of cells
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
@@ -741,14 +736,21 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         }
     }
 
+    mypc->ApplyBoundaryConditions();
+    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
+
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {
         using warpx::fields::FieldType;
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
-        mypc->deleteInvalidParticles();
     }
+
+    ExecutePythonCallback("particlescraper");
+
+    // Remove particles that have been flagged to be scraped
+    mypc->deleteInvalidParticles();
 
     if (sort_intervals.contains(step+1)) {
         if (verbose && !m_limit_verbose_step) {
