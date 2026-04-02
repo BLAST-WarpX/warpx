@@ -272,6 +272,11 @@ WarpX::Evolve (int numsteps)
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
+        // Apply particle thermalizer (no-op until implemented)
+        if (m_particle_thermalizer.defined()) {
+            m_particle_thermalizer.applyThermalizer(*mypc);
+        }
+
         if (m_implicit_solver) {
             ExecutePythonCallback("beforecollisions");
             mypc->doCollisions(step, cur_time, dt[0]);
