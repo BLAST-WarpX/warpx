@@ -24,7 +24,6 @@
  *
  * \param direct_algo             True if called from direct deposition. False otherwise
  * \param xp_n,yp_n,zp_n          Particle position coordinates at start of step
- * \param xp_n,yp_n,zp_n          Particle position coordinates at start of step
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle
  * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
