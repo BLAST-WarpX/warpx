@@ -2768,15 +2768,23 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         Value of the Coulomb log to use in the collision cross section.
         If not supplied, it is calculated from the local conditions.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(self, name, species, CoulombLog=None, ndt=None, **kw):
+    def __init__(self, name, species, CoulombLog=None, ndt_supercycle=None, ndt_subcycle=None, **kw):
         self.name = name
         self.species = species
         self.CoulombLog = CoulombLog
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
 
         self.handle_init(kw)
 
@@ -2785,7 +2793,8 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.type = "pairwisecoulomb"
         collision.species = [species.name for species in self.species]
         collision.CoulombLog = self.CoulombLog
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
 
 class MCCCollisions(picmistandard.base._ClassWithInit):
@@ -2819,8 +2828,15 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         The maximum background density. When the background_density is an expression, this must also
         be specified.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
@@ -2832,7 +2848,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         scattering_processes,
         background_mass=None,
         max_background_density=None,
-        ndt=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
         **kw,
     ):
         self.name = name
@@ -2842,7 +2859,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.background_mass = background_mass
         self.scattering_processes = scattering_processes
         self.max_background_density = max_background_density
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
 
         self.handle_init(kw)
 
@@ -2864,7 +2882,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
             collision.background_temperature = self.background_temperature
         collision.background_mass = self.background_mass
         collision.max_background_density = self.max_background_density
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -2895,18 +2914,27 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         The species produced by collision processes (currently both
         ionization and charge-exchange require defining the product species).
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
-        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+        self, name, species, scattering_processes, product_species=None,
+        ndt_supercycle=None, ndt_subcycle=None, **kw
     ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
         self.product_species = product_species
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
 
         self.handle_init(kw)
 
@@ -2918,7 +2946,8 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
             collision.product_species = [
                 species.name for species in self.product_species
             ]
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
