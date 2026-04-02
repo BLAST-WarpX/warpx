@@ -4,6 +4,7 @@
 add_subdirectory(beam_beam_collision)
 add_subdirectory(capacitive_discharge)
 add_subdirectory(free_electron_laser)
+add_subdirectory(ion_beam_extraction)
 add_subdirectory(laser_acceleration)
 add_subdirectory(laser_ion)
 add_subdirectory(pierce_diode)

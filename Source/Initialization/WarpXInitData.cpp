@@ -24,6 +24,7 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Filter/BilinearFilter.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
@@ -34,12 +35,12 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -785,7 +786,7 @@ WarpX::PrintMainPICparameters ()
 void
 WarpX::InitData ()
 {
-    WARPX_PROFILE("WarpX::InitData()");
+    ABLASTR_PROFILE("WarpX::InitData()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -1612,12 +1613,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
                 // Mark on which grid points B should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
             }
 
         }
