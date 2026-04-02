@@ -35,7 +35,7 @@
  * \param direct_algo     true if using direct deposition. False otherwise.
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
- * \param upx,upx,upz     Proper velocity of particle (time-centered)
+ * \param upx,upy,upz     Proper velocity of particle (time-centered)
  * \param Bpx,Bpy,Bpz     Magnetic field vector components on particle
  * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
  * \param fpyx,fpyy,fpyz  Mass matrices kernels corresponding to dJy
