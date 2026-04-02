@@ -1706,7 +1706,7 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, 
             // If Stt is node centered, Stt[0] is located on the boundary.
             // If Stt is cell centered, Stt[0] is at 1/2 dr.
             if (rmin == 0._rt && 1-ishift_t <= i && i <= ngS[0]-ishift_t) {
-                Stt_arr(i,j,0,icomp) += Stt_arr(-ishift_t-i,j,0,0);
+                Stt_arr(i,j,0,icomp) += Stt_arr(-ishift_t-i,j,0,icomp);
             }
 
             // Apply the inverse volume scaling
