@@ -41,16 +41,12 @@ CollisionBase::CollisionBase (const std::string& collision_name)
         );
         m_ndt = ndt_subcycle;
         m_collision_stepping_mode = CollisionSteppingMode::Subcycle;
-    } else {
-        if (has_supercycle) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                ndt_supercycle >= 1,
-                "<collision_name>.ndt_supercycle must be >= 1."
-            );
-            m_ndt = ndt_supercycle;
-        } else {
-            m_ndt = 1;
-        }
+    } else if (has_supercycle) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            ndt_supercycle >= 1,
+            "<collision_name>.ndt_supercycle must be >= 1."
+        );
+        m_ndt = ndt_supercycle;
         m_collision_stepping_mode = CollisionSteppingMode::Supercycle;
     }
 }
