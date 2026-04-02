@@ -55,7 +55,7 @@
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
  *
  *  x, y, z  : position components
- *  ux uy uz : normalized momentum components
+ *  ux uy uz : momentum components, stored as proper velocity, i.e. gamma*v
  *  w        : weight
  *  theta    : azimuthal angle
  *  phi      : polar angle, relative to the x-y plane
@@ -237,6 +237,16 @@ public:
                          MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
+    /**
+     * \brief virtual function to deposit mass matrices for charged particles
+     */
+    virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                                      int lev,
+                                      amrex::Real dt)
+    {
+        amrex::ignore_unused(fields,lev,dt);
+    }
+
     virtual void PostRestart () = 0;
 
     virtual void AllocData ();
@@ -378,33 +388,29 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
-    virtual
-    void DepositCurrentAndMassMatrices ( WarpXParIter& pti,
-                                   const RealVector& wp,
-                                   const RealVector& uxp,
-                                   const RealVector& uyp,
-                                   const RealVector& uzp,
-                                         amrex::MultiFab* jx,
-                                         amrex::MultiFab* jy,
-                                         amrex::MultiFab* jz,
-                                         amrex::MultiFab* Sxx,
-                                         amrex::MultiFab* Sxy,
-                                         amrex::MultiFab* Sxz,
-                                         amrex::MultiFab* Syx,
-                                         amrex::MultiFab* Syy,
-                                         amrex::MultiFab* Syz,
-                                         amrex::MultiFab* Szx,
-                                         amrex::MultiFab* Szy,
-                                         amrex::MultiFab* Szz,
-                                   const amrex::FArrayBox* bxfab,
-                                   const amrex::FArrayBox* byfab,
-                                   const amrex::FArrayBox* bzfab,
-                                         long offset,
-                                         long np_to_deposit,
-                                         int thread_num,
-                                         int lev,
-                                         int depos_lev,
-                                         amrex::Real dt );
+    void DepositMassMatrices (WarpXParIter& pti,
+                        const RealVector& wp,
+                        const RealVector& uxp,
+                        const RealVector& uyp,
+                        const RealVector& uzp,
+                              amrex::MultiFab* Sxx,
+                              amrex::MultiFab* Sxy,
+                              amrex::MultiFab* Sxz,
+                              amrex::MultiFab* Syx,
+                              amrex::MultiFab* Syy,
+                              amrex::MultiFab* Syz,
+                              amrex::MultiFab* Szx,
+                              amrex::MultiFab* Szy,
+                              amrex::MultiFab* Szz,
+                        const amrex::FArrayBox* bxfab,
+                        const amrex::FArrayBox* byfab,
+                        const amrex::FArrayBox* bzfab,
+                              long offset,
+                              long np_to_deposit,
+                              int thread_num,
+                              int lev,
+                              int depos_lev,
+                              amrex::Real dt);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and

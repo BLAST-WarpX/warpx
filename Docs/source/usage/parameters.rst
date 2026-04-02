@@ -7,6 +7,10 @@ This section describes the list of parameters that can be set in the WarpX input
 
 Examples of inputs files can be found in the :ref:`Examples <usage-examples>` section.
 
+.. tip::
+
+   If you enjoy AI/LLM/agentic workflows, see our :ref:`AI (LLM)-Assisted Input File Design <ai_input_design>` section, too.
+
 .. note::
 
    WarpX's input parameters are read via AMReX's `ParmParse <https://amrex-codes.github.io/amrex/docs_html/Basics.html#parmparse>`__.
@@ -792,6 +796,63 @@ additionally define the electric potential at the embedded boundary with an anal
     inside the embedded boundary. For this reason, it is important to define
     this function in such a way that it is constant inside the embedded boundary.
 
+.. _param-particle-thermalizer:
+
+Particle thermalizer
+--------------------
+
+In simulations of the interaction between a laser and an over-dense plasma, it is not always
+practical to model the entire target. In this case, the region containing the plasma may
+extend all the way the domain boundary, using either an absorbing or a thermal boundary
+condition for the particles. With either choice, the resulting electric field build-up at
+the boundary can lead to a non-physical return current of hot electrons that can have an
+effect on the plasma instabilities and laser-plasma interaction under study.
+
+To mitigate, WarpX implements a particle thermalizing region that reduces the flux of particles
+leaving the simulation domain that leads to the non-physical build-up of electric fields at the boundary. The
+method used is similar to that of `Miller et al. (Phys. Plasmas 28, 112702 (2021)) <https://doi.org/10.1063/5.0065232>`__.
+
+The user specifies a region in which particles will be thermalized, a normal direction, a temperature, and a
+momentum threshold. Inside the thermalizing region, the probability that a particle will be affected increases
+from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta thermalized
+using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold.
+The parameters affecting this region are as follows:
+
+* ``particle_thermalizer.normal`` (`string`)
+    The normal direction describing the thermalizer region. Allowed values are ``x``, ``y``, or ``z`` (case-insensitive). Along with the ``start`` and ``stop`` parameters below, this specifies the region in space where particles will be thermalized.
+    This parameter is optional. If not specified, the thermalizer will not be applied.
+
+* ``particle_thermalizer.species`` (`list of strings`, optional)
+    Names of the species to which the thermalizer is applied. If not specified, the thermalizer
+    is applied to all species.
+
+* ``particle_thermalizer.start`` (`float`)
+    Starting coordinate (in SI units) of the thermalization region along the specified normal direction.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.end`` (`float`)
+    Ending coordinate (in SI units) of the thermalization region along the specified normal direction.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.momentum_threshold`` (`float`)
+    Momentum threshold used by the thermalizer. In each direction, if a particle's normalized momentum component (e.g. :math:`\gamma \beta_x`) is above this threshold, that component will be thermalized.
+    This parameter is required if the thermalizer is enabled.
+
+* ``particle_thermalizer.theta`` (`float`)
+    Dimensionless temperature parameter (k*T/m/c^2) used to sample the thermalized particle velocities.
+    This parameter is required if the thermalizer is enabled. For the selected particles, if the
+    normalized momentum in any direction exceeds the threshold, the particle's momentum in that direction will be set
+    to a value drawn from a Gaussian distribution with mean 0.0 and variance ``theta``.
+
+Example::
+
+    particle_thermalizer.normal = z
+    particle_thermalizer.start = 0.0
+    particle_thermalizer.end = 1.0e-6
+    particle_thermalizer.momentum_threshold = 0.5
+    particle_thermalizer.theta = 0.1
+    particle_thermalizer.species = electrons hydrogen
+
 .. _running-cpp-parameters-parallelization:
 
 Distribution across MPI ranks and parallelization
@@ -1203,10 +1264,6 @@ Particle initialization
       and ``<species_name>.xmax`` (and same in all directions). This requires additional
       parameter ``<species_name>.density``. i.e., the plasma density in :math:`m^{-3}`.
 
-    * ``predefined``: Predefined density profile.
-      This requires additional parameters ``<species_name>.predefined_profile_name`` and ``<species_name>.predefined_profile_params``.
-      Currently, only a parabolic channel density profile is implemented.
-
     * ``parse_density_function``: the density is given by a function in the input file.
       It requires additional argument ``<species_name>.density_function(x,y,z)``, which is a
       mathematical expression for the density of the species, e.g.
@@ -1332,9 +1389,6 @@ Particle initialization
       to the Maxwell Boltzmann setting, which initializes non-relativistic plasma in their relativistic
       drifting frame.
 
-    * ``radial_expansion``: momentum depends on the radial coordinate linearly. This
-      can be controlled with additional parameter ``u_over_r`` which is the slope (``0.`` by default).
-
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
@@ -1385,38 +1439,6 @@ Particle initialization
     * ``vzbar`` or ``true``: the species' average longitudinal velocity :math:`\overline{v_z}`
 
     * ``v``: each particle's velocity :math:`{\bf v}`, including transverse components
-
-* ``species_name.predefined_profile_name`` (`string`)
-    Only read if ``<species_name>.profile`` is ``predefined``.
-
-    * If ``parabolic_channel``, the plasma profile is a parabolic profile with
-      cosine-like ramps at the beginning and the end of the profile.
-      The density is given by
-
-      .. math::
-
-          n = n_0 n(x,y) n(z-z_0)
-
-      with
-
-      .. math::
-
-          n(x,y) = 1 + 4\frac{x^2+y^2}{k_p^2 R_c^4}
-
-      where :math:`k_p` is the plasma wavenumber associated with density :math:`n_0`.
-      Here, with :math:`z_0` as the start of the plasma, :math:`n(z-z_0)` is a cosine-like up-ramp from :math:`0` to :math:`L_{ramp,up}`,
-      constant to :math:`1` from :math:`L_{ramp,up}` to :math:`L_{ramp,up} + L_{plateau}`
-      and a cosine-like down-ramp from :math:`L_{ramp,up} + L_{plateau}` to
-      :math:`L_{ramp,up} + L_{plateau}+L_{ramp,down}`. All parameters are given
-      in ``predefined_profile_params``.
-
-* ``<species_name>.predefined_profile_params`` (list of `float`)
-    Parameters for the predefined profiles.
-
-    * If ``species_name.predefined_profile_name`` is ``parabolic_channel``,
-      ``predefined_profile_params`` contains a space-separated list of the
-      following parameters, in this order: :math:`z_0` :math:`L_{ramp,up}` :math:`L_{plateau}`
-      :math:`L_{ramp,down}` :math:`R_c` :math:`n_0`
 
 * ``<species_name>.do_backward_propagation`` (`bool`)
     Inject a backward-propagating beam to reduce the effect of charge-separation
