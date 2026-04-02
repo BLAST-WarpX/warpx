@@ -50,7 +50,7 @@ namespace {
      * @param[in] m1_out mass of first product species
      * @param[in] m2_out mass of second product species
      * @param[in] E_fusion energy released in the fusion reaction
-     * @param[in] scattering_angle the scattering angle distribution to use
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -62,7 +62,7 @@ namespace {
                             const amrex::ParticleReal& m1_in, const amrex::ParticleReal& m2_in,
                             const amrex::ParticleReal& m1_out, const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_fusion,
-                            ScatteringAngle const scattering_angle,
+                            ScatteringAngleModel const scattering_angle_model,
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;
@@ -80,7 +80,7 @@ namespace {
             ux1_out, uy1_out, uz1_out, m1_out,
             ux2_out, uy2_out, uz2_out, m2_out,
             E_fusion,
-            scattering_angle,
+            scattering_angle_model,
             engine);
 
         // Fill momentum of product species (note that we actually

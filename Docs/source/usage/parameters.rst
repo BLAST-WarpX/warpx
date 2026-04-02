@@ -2260,7 +2260,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     ``probability_threshold``, WarpX reduces the event multiplier for
     that collisions such that the probability approches ``probability_target_value``.
 
-* ``<collision_name>.scattering_angle`` (`string`, optional, default: ``isotropic``)
+* ``<collision_name>.scattering_angle_model`` (`string`, optional, default: ``isotropic``)
     Only for ``nuclearfusion``. The scattering angle for the products of the fusion reaction.
     The possible values are ``isotropic`` and ``forward``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.

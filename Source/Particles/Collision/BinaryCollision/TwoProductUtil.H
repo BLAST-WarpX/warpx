@@ -43,7 +43,7 @@ namespace {
      * @param[out] u2z_out normalized momentum of the second product macroparticles along z (in m.s^-1)
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
-     * @param[in] scattering_angle the scattering angle distribution to use
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -65,7 +65,7 @@ namespace {
                             amrex::ParticleReal& u2z_out,
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
-                            ScatteringAngle scattering_angle,
+                            ScatteringAngleModel scattering_angle_model,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -133,12 +133,12 @@ namespace {
         amrex::ParticleReal px_star_out = 0.0_prt;
         amrex::ParticleReal py_star_out = 0.0_prt;
         amrex::ParticleReal pz_star_out = 0.0_prt;
-        if (scattering_angle == ScatteringAngle::Isotropic) {
+        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
             // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
             ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
                                              engine);
         }
-        else if (scattering_angle == ScatteringAngle::Forward) {
+        else if (scattering_angle_model == ScatteringAngleModel::Forward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
