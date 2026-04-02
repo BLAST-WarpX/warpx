@@ -24,8 +24,8 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 yt.funcs.mylog.setLevel(50)
 
 import numpy as np
-from openpmd_viewer import OpenPMDTimeSeries
 from analysis_utils import check_charge_conservation
+from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, e, epsilon_0, m_e
 
 # test name
