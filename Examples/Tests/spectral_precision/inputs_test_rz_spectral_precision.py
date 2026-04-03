@@ -20,29 +20,41 @@ parser = argparse.ArgumentParser(
     "Initializes a purely axial Bz mode and evolves with PSATD. "
     "Grid size and decomposition can be adjusted for multi-rank runs. "
     "Domain decomposition is along z only (r is not split). "
-    "Requires pywarpx (with WarpX_FFT=ON) to be installed.")
-parser.add_argument("--nr", type=int, default=32,
-                    help="Radial cells (default: 32). "
-                    "Must exceed the PSATD guard cell count (default nox=16).")
-parser.add_argument("--nz", type=int, default=64,
-                    help="Axial cells (default: 64). "
-                    "Must exceed the PSATD guard cell count (default nox=16). "
-                    "Increase for more ranks, e.g. --nz 128 for 4 boxes.")
-parser.add_argument("--max_grid_size", type=int, default=None,
-                    help="Maximum box size for domain decomposition (default: nz, "
-                    "i.e. single box). Set smaller than nz to create multiple "
-                    "boxes, e.g. --nz 128 --max_grid_size 32 gives 4 boxes.")
+    "Requires pywarpx (with WarpX_FFT=ON) to be installed."
+)
+parser.add_argument(
+    "--nr",
+    type=int,
+    default=32,
+    help="Radial cells (default: 32). "
+    "Must exceed the PSATD guard cell count (default nox=16).",
+)
+parser.add_argument(
+    "--nz",
+    type=int,
+    default=64,
+    help="Axial cells (default: 64). "
+    "Must exceed the PSATD guard cell count (default nox=16). "
+    "Increase for more ranks, e.g. --nz 128 for 4 boxes.",
+)
+parser.add_argument(
+    "--max_grid_size",
+    type=int,
+    default=None,
+    help="Maximum box size for domain decomposition (default: nz, "
+    "i.e. single box). Set smaller than nz to create multiple "
+    "boxes, e.g. --nz 128 --max_grid_size 32 gives 4 boxes.",
+)
 args, _ = parser.parse_known_args()
 
-import numpy as np
 from pywarpx import picmi
 
 constants = picmi.constants
 
-B0 = 1.0e-3       # T — magnetic field amplitude
+B0 = 1.0e-3  # T — magnetic field amplitude
 c = constants.c
-Lr = 1.0e-6        # radial extent
-Lz = 1.0e-6        # axial extent
+Lr = 1.0e-6  # radial extent
+Lz = 1.0e-6  # axial extent
 nr = args.nr
 nz = args.nz
 dr = Lr / nr

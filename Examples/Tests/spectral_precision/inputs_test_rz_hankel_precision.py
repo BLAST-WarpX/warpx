@@ -31,7 +31,7 @@ c = constants.c
 Lr = 1.0e-6
 Lz = 1.0e-6
 nr = 64
-nz = 32             # must exceed guard cell count (default nox=16)
+nz = 32  # must exceed guard cell count (default nox=16)
 dr = Lr / nr
 dz = Lz / nz
 dt = 0.3 * min(dr, dz) / c

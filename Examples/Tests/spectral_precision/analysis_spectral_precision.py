@@ -22,7 +22,6 @@ Usage:
 import argparse
 
 import numpy as np
-
 import yt
 
 yt.funcs.mylog.setLevel(50)
@@ -47,7 +46,7 @@ def analyze_cartesian(ds_init, ds_final, ndim):
     """
     t_init = float(ds_init.current_time)
     t_final = float(ds_final.current_time)
-    dt = (t_final - t_init)
+    dt = t_final - t_init
 
     data_final = ds_final.covering_grid(
         level=0, left_edge=ds_final.domain_left_edge, dims=ds_final.domain_dimensions
@@ -75,7 +74,13 @@ def analyze_cartesian(ds_init, ds_final, ndim):
 
         # Phase rotation for total time dt
         C = np.cos(omega * dt)
-        S = np.where(omega > 0, np.divide(np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)), dt)
+        S = np.where(
+            omega > 0,
+            np.divide(
+                np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)
+            ),
+            dt,
+        )
 
         # PSATD update: +z traveling wave has (Ey, Bx)
         # In 1D (z-only): (ik x B)_y = -ikz * Bx (for k = kz z-hat)
@@ -131,7 +136,13 @@ def analyze_cartesian(ds_init, ds_final, ndim):
         omega = c_light * knorm
 
         C = np.cos(omega * dt)
-        S = np.where(omega > 0, np.divide(np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)), dt)
+        S = np.where(
+            omega > 0,
+            np.divide(
+                np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)
+            ),
+            dt,
+        )
 
         # 2D XZ: k = kx x-hat + kz z-hat, E = Ey y-hat, B = Bz z-hat
         # (ik x B)_y = (ik x Bz z-hat)_y = i*(kx x-hat + kz z-hat) x Bz z-hat)_y
@@ -180,7 +191,13 @@ def analyze_cartesian(ds_init, ds_final, ndim):
         omega = c_light * knorm
 
         C = np.cos(omega * dt)
-        S = np.where(omega > 0, np.divide(np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)), dt)
+        S = np.where(
+            omega > 0,
+            np.divide(
+                np.sin(omega * dt), omega, where=omega > 0, out=np.full_like(omega, dt)
+            ),
+            dt,
+        )
 
         # 3D: k = (kx,ky,kz), E = Ey y-hat, B = Bx x-hat
         # (ik x B)_y = (ik x Bx x-hat)_y = i*(ky*(y x x) + kz*(z x x))_y
@@ -248,7 +265,6 @@ def analyze_rz(ds_init, ds_final):
     # Check 3: Bz z-profile at middle r should still be sinusoidal
     # Take the middle r-row
     nr = Bz_final.shape[0]
-    nz = Bz_final.shape[1]
     Bz_mid = Bz_final[nr // 2, :]
     # FFT and check dominant mode is still k=1
     Bz_hat = np.abs(np.fft.rfft(Bz_mid))
@@ -261,7 +277,7 @@ def analyze_rz(ds_init, ds_final):
     err = 0.0
     if amp_ratio > 1.01:
         err = max(err, amp_ratio - 1.0)
-        print(f"  WARNING: Bz amplitude grew by {(amp_ratio-1)*100:.1f}%")
+        print(f"  WARNING: Bz amplitude grew by {(amp_ratio - 1) * 100:.1f}%")
     if dominant_mode != 1:
         err = max(err, 1.0)
         print(f"  WARNING: dominant mode shifted to k={dominant_mode}")
@@ -283,7 +299,6 @@ def analyze_rz_hankel(ds_init, ds_final):
     """
     t_init = float(ds_init.current_time)
     t_final = float(ds_final.current_time)
-    dt = t_final - t_init
 
     data_init = ds_init.covering_grid(
         level=0, left_edge=ds_init.domain_left_edge, dims=ds_init.domain_dimensions

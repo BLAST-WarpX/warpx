@@ -16,15 +16,24 @@ parser = argparse.ArgumentParser(
     description="3D PSATD vacuum eigenmode precision test. "
     "Initializes a single Fourier eigenmode and evolves with PSATD. "
     "Grid size and decomposition can be adjusted for multi-rank runs. "
-    "Requires pywarpx (with WarpX_FFT=ON) to be installed.")
-parser.add_argument("--ncells", type=int, default=32,
-                    help="Grid cells per dimension (default: 32). "
-                    "Must exceed the PSATD guard cell count (default nox=16). "
-                    "Increase for more ranks, e.g. --ncells 64 for 8 boxes.")
-parser.add_argument("--max_grid_size", type=int, default=None,
-                    help="Maximum box size for domain decomposition (default: ncells, "
-                    "i.e. single box). Set smaller than ncells to create multiple "
-                    "boxes, e.g. --ncells 64 --max_grid_size 32 gives 8 boxes.")
+    "Requires pywarpx (with WarpX_FFT=ON) to be installed."
+)
+parser.add_argument(
+    "--ncells",
+    type=int,
+    default=32,
+    help="Grid cells per dimension (default: 32). "
+    "Must exceed the PSATD guard cell count (default nox=16). "
+    "Increase for more ranks, e.g. --ncells 64 for 8 boxes.",
+)
+parser.add_argument(
+    "--max_grid_size",
+    type=int,
+    default=None,
+    help="Maximum box size for domain decomposition (default: ncells, "
+    "i.e. single box). Set smaller than ncells to create multiple "
+    "boxes, e.g. --ncells 64 --max_grid_size 32 gives 8 boxes.",
+)
 args, _ = parser.parse_known_args()
 
 from pywarpx import picmi
@@ -70,7 +79,7 @@ field_init = picmi.AnalyticInitialField(
     Ex_expression="0",
     Ey_expression=f"{E0} * sin(2 * 3.141592653589793 * z / {L})",
     Ez_expression="0",
-    Bx_expression=f"{E0/c} * sin(2 * 3.141592653589793 * z / {L})",
+    Bx_expression=f"{E0 / c} * sin(2 * 3.141592653589793 * z / {L})",
     By_expression="0",
     Bz_expression="0",
 )
