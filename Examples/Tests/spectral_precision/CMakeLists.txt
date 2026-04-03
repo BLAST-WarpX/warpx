@@ -41,7 +41,7 @@ endif()
 
 # --- Tier 2: PICMI PSATD vacuum eigenmode tests ---
 # Single-box variants (nprocs=1): global FFT
-# Multi-box variants (nprocs=2): local FFTs with guard cell exchange
+# Multi-box variants (nprocs=4): local FFTs with guard cell exchange
 
 if(WarpX_PYTHON)
     # 2D single-box
@@ -57,12 +57,12 @@ if(WarpX_PYTHON)
         )
     endif()
 
-    # 2D multi-box (2 ranks, domain decomposed)
+    # 2D multi-box (4 ranks, domain decomposed)
     if(2 IN_LIST WarpX_DIMS)
         add_warpx_test(
             test_2d_spectral_precision_multi  # name
             2    # dims
-            2    # nprocs
+            4    # nprocs
             "inputs_test_2d_spectral_precision.py --ncells 64 --max_grid_size 32"  # inputs
             "analysis_spectral_precision.py --dim 2 --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
@@ -83,9 +83,10 @@ if(WarpX_PYTHON)
         )
     endif()
 
-    # 3D multi-box skipped: default nox=16 requires >16 valid cells per box,
-    # incompatible with 32^3 grid split across 2 ranks.  Multi-box decomposition
-    # is validated by 2D and RZ variants.
+    # 3D multi-box skipped in CI: default nox=16 requires >16 valid cells per
+    # box, incompatible with 32^3 grid split across 2 ranks.  Multi-box
+    # decomposition is validated by 2D and RZ variants.  For manual runs with
+    # more ranks, use e.g.: --ncells 64 --max_grid_size 32  (gives 8 boxes).
 
     # RZ z-mode precision (single-box)
     if(RZ IN_LIST WarpX_DIMS)
@@ -100,13 +101,13 @@ if(WarpX_PYTHON)
         )
     endif()
 
-    # RZ multi-box (2 ranks)
+    # RZ multi-box (4 ranks)
     if(RZ IN_LIST WarpX_DIMS)
         add_warpx_test(
             test_rz_spectral_precision_multi  # name
             RZ   # dims
-            2    # nprocs
-            "inputs_test_rz_spectral_precision.py --max_grid_size 32"  # inputs
+            4    # nprocs
+            "inputs_test_rz_spectral_precision.py --nz 128 --max_grid_size 32"  # inputs
             "analysis_spectral_precision.py --dim rz --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
