@@ -8,6 +8,7 @@
  */
 
 #include "VelocityCoincidenceThinning.H"
+#include "WarpX.H"
 
 
 VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& species_name)
@@ -93,6 +94,12 @@ void VelocityCoincidenceThinning::operator() (
     const auto n_cells = static_cast<int>(bins.numBins());
     auto *const indices = bins.permutationPtr();
     auto *const cell_offsets = bins.offsetsPtr();
+
+    const auto dxi = geom_lev.InvCellSizeArray();
+    const auto dx = geom_lev.CellSizeArray();
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(pti.tilebox(), lev, 0._rt);
+
+    const int depos_order = WarpX::nox;
 
     const auto min_ppc = m_min_ppc;
     const auto cluster_weight = m_cluster_weight;
@@ -195,6 +202,9 @@ void VelocityCoincidenceThinning::operator() (
 #endif
 #if defined(WARPX_ZINDEX)
             amrex::ParticleReal cluster_z = 0._prt;
+#if !defined(WARPX_DIM_1D_Z)
+            amrex::ParticleReal cluster_xz = 0._prt;
+#endif
 #endif
             amrex::ParticleReal cluster_ux = 0._prt, cluster_uy = 0._prt, cluster_uz = 0._prt;
 
@@ -213,6 +223,9 @@ void VelocityCoincidenceThinning::operator() (
 #endif
 #if defined(WARPX_ZINDEX)
                 cluster_z += w[part_idx]*z[part_idx];
+#if !defined(WARPX_DIM_1D_Z)
+                cluster_xz += w[part_idx]*x[part_idx]*z[part_idx];
+#endif
 #endif
                 cluster_ux += w[part_idx]*ux[part_idx];
                 cluster_uy += w[part_idx]*uy[part_idx];
@@ -241,6 +254,9 @@ void VelocityCoincidenceThinning::operator() (
 #endif
 #if defined(WARPX_ZINDEX)
                         cluster_z /= total_weight;
+#if !defined(WARPX_DIM_1D_Z)
+                        cluster_xz /= total_weight;
+#endif
 #endif
                         cluster_ux /= total_weight;
                         cluster_uy /= total_weight;
@@ -288,8 +304,51 @@ void VelocityCoincidenceThinning::operator() (
                         // the bin's aggregate values
                         const auto part_idx2 = indices[sorted_indices_data[i - 1]];
 
+#if defined(WARPX_ZINDEX)
+#if !defined(WARPX_DIM_1D_Z)
+                        amrex::ParticleReal deltax = 0._prt;
+                        amrex::ParticleReal deltaz = 0._prt;
+                        if (depos_order == 1) {
+                            // The particles to be merge may have correlation between x and z.
+                            // This cannot be accounted for by two particles at the same location.
+                            // A small plus/minus offset to the particles can provide that correlation.
+                            // The correlation_error is the difference of the x-z correlation of the particles
+                            // to be merged, and the x-z correlation or the new particles.
+                            // The offset is calculated to force the error to zero, and set so that the
+                            // x and z offsets are the same.
+                            const amrex::ParticleReal correlation_error = cluster_xz - cluster_x*cluster_z;
+                            deltax = std::sqrt(std::abs(correlation_error));
+                            deltaz = std::copysign(deltax, correlation_error);
+
+                            // Ensure that the offset does not shift the particle outside of the grid cell
+                            int ixcell = static_cast<int>((cluster_x - xyzmin.x)*dxi[0]);
+                            int izcell = static_cast<int>((cluster_z - xyzmin.z)*dxi[WARPX_ZINDEX]);
+                            const amrex::ParticleReal xgbar = (cluster_x - xyzmin.x)*dxi[0] - ixcell;
+                            const amrex::ParticleReal zgbar = (cluster_z - xyzmin.z)*dxi[WARPX_ZINDEX] - izcell;
+                            const amrex::ParticleReal deltax_max = std::min(xgbar, 1._prt - xgbar);
+                            const amrex::ParticleReal deltaz_max = std::min(zgbar, 1._prt - zgbar);
+
+                            // If one of the shifts are too large, adjust it down to the maximum allowed value
+                            // (updating the other offset as needed)
+                            if (deltax > deltax_max) {
+                                deltax = deltax_max;
+                                deltaz = deltax > 0._prt ? correlation_error/deltax : 0._prt;
+                            }
+                            if (deltaz > deltaz_max) {
+                                deltaz = deltaz_max;
+                                deltax = deltaz > 0._prt ? correlation_error/deltaz : 0._prt;
+                            }
+                            if (deltax > deltax_max || deltaz > deltaz_max) {
+                                // A viable solution was not found, so reject this merge
+                                continue;
+                            }
+                        }
+#endif
+#endif
+
                         w[part_idx] = total_weight / 2._prt;
                         w[part_idx2] = total_weight / 2._prt;
+
 #if !defined(WARPX_DIM_1D_Z)
                         x[part_idx] = cluster_x;
                         x[part_idx2] = cluster_x;
@@ -301,6 +360,15 @@ void VelocityCoincidenceThinning::operator() (
 #if defined(WARPX_ZINDEX)
                         z[part_idx] = cluster_z;
                         z[part_idx2] = cluster_z;
+#endif
+
+#if defined(WARPX_ZINDEX)
+#if !defined(WARPX_DIM_1D_Z)
+                        x[part_idx] += deltax;
+                        x[part_idx2] -= deltax;
+                        z[part_idx] += deltaz;
+                        z[part_idx2] -= deltaz;
+#endif
 #endif
 
                         ux[part_idx] = ux_new;
@@ -328,6 +396,9 @@ void VelocityCoincidenceThinning::operator() (
 #endif
 #if defined(WARPX_ZINDEX)
                     cluster_z = 0_prt;
+#if !defined(WARPX_DIM_1D_Z)
+                    cluster_xz = 0._prt;
+#endif
 #endif
                     cluster_ux = 0_prt;
                     cluster_uy = 0_prt;
