@@ -125,5 +125,4 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
         p_mask[pair_index] = false;
     }
 }
-
 #endif // SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_

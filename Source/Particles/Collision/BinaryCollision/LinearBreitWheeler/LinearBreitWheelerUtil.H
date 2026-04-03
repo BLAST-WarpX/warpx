@@ -24,8 +24,10 @@ namespace {
      * \brief Given the momenta of two colliding macrophotons in a two-photon collision,
      * this function computes the momenta of the two product macroparticles (electron and positron).
      *
-     * This is done by using the conservation of energy and momentum,
-     * and by assuming isotropic emission of the products in the center-of-momentum frame
+     * This is done by using the conservation of energy and momentum.
+     * The polar angle of the products in the center-of-momentum frame is sampled
+     * from the Breit-Wheeler differential cross section dσ/d(cosθ) using
+     * Newton-Raphson inversion of the CDF. The azimuthal angle is uniform in [0, 2π).
      *
      * @param[in] u1x_in normalized momentum of the first colliding macrophoton along x (in m.s^-1)
      * @param[in] u1y_in normalized momentum of the first colliding macrophoton along y (in m.s^-1)
@@ -89,71 +91,42 @@ namespace {
         const amrex::ParticleReal E_ratio = std::sqrt(E_star_sq)/(2._prt*me*c_sq);
         const amrex::ParticleReal p_star_sq = me*me*c_sq * ( pow2(2._prt*E_ratio) - 1._prt );
 
-        // Compute momentum of first product in the center of mass frame, assuming isotropic
-        // distribution
+        // Compute momentum of first product in the center of mass frame.
+        // The polar angle is sampled from the BW differential cross section
+        // via Newton-Raphson inversion of the CDF.
         amrex::ParticleReal px_star, py_star, pz_star;
-        //ParticleUtils::RandomizeVelocity(px_star, py_star, pz_star, std::sqrt(p_star_sq),
-        //                                 engine);
 
-        amrex::ParticleReal phi = 2._prt*MathConst::pi*amrex::Random(engine);
-        amrex::ParticleReal s = 2._prt * p1_in * p2_in * (1._prt - cos_ang) / (4._prt * me*me * c_sq) ;
+        // s = (E_CM / (2*me*c^2))^2 = (E_star / (me*c^2))^2
+        const amrex::ParticleReal s = pow2(2._prt * E_ratio);
+        const amrex::ParticleReal beta = std::sqrt(1._prt - 1._prt / s);
+        const amrex::ParticleReal u = amrex::Random(engine);
+        // initial guess is the isotropic guess
+        amrex::ParticleReal costh = 2._prt * u - 1._prt;
+        amrex::ParticleReal I1 = LBWIntegralOfDifferentialCrossSection(beta, 1._prt);
 
-        // beta of leptons in CM frame
-        amrex::ParticleReal beta = std::sqrt(1._prt - 1._prt / s);
-        amrex::ParticleReal const u = amrex::Random(engine);
-        amrex::ParticleReal costh = 2._prt*u - 1._prt; // initial guess
-        amrex::ParticleReal rel_err = 1._prt;
-
-        int iter = 0;
-        while ( rel_err > 1e-12_prt && iter < 20){
-
-            amrex::ParticleReal G = 0.5_prt + 0.5_prt * LBWIntegralOfDifferentialCrossSection(beta, costh) / LBWIntegralOfDifferentialCrossSection(beta, 1._prt) - u;
-            amrex::ParticleReal G_prime = LBWDifferentialCrossSection(beta, costh);
+        // Inverse transform sampling: draw u ~ Uniform[0,1] and solve CDF(x) = u
+        // for x = cos(theta). Let I(x) = indefinite integral of dsigma/dx.
+        // Since dsigma/dx is even, I(x) is odd so I(-1) = -I(1).
+        // CDF(x) = (I(x) - I(-1)) / (I(1) - I(-1)) = 0.5 + 0.5*I(x)/I(1) = u
+        // Define G(x) = 0.5 + 0.5*I(x)/I(1) - u = 0
+        // Solve for x by Newton-Raphson: x_{n+1} = x_n - G / G'
+        // where G'(x) = 0.5*(dsigma/dx)/I(1)
+        for (int iter = 0; iter < 20; ++iter)
+        {
+            amrex::ParticleReal I = LBWIntegralOfDifferentialCrossSection(beta, costh);
+            amrex::ParticleReal G = 0.5_prt + 0.5_prt * (I / I1) - u;
+            amrex::ParticleReal G_prime = LBWDifferentialCrossSection(beta, costh) / (2._prt * I1);
             amrex::ParticleReal delta = G / G_prime;
-            rel_err = amrex::Math::abs(delta) / amrex::Math::abs(costh);
             costh -= delta;
-            iter++;
+            costh = amrex::max(-1._prt, amrex::min(1._prt, costh));
+            if (amrex::Math::abs(delta) < 1e-12_prt) { break; }
         }
+        const amrex::ParticleReal sinth = std::sqrt(1._prt - costh * costh);
 
+        // Sample azimuthal angle uniformly in [0, 2pi)
+        const amrex::ParticleReal phi = 2._prt * MathConst::pi * amrex::Random(engine);
 
-
-
-
-
-
-/*if (beta < 1e-8_prt) {
-    // Isotropic near threshold
-    costh = 2._prt*u - 1._prt;
-} else {
-
-    amrex::ParticleReal A = (beta4 - 1._prt) / (1._prt - beta2);
-    amrex::ParticleReal B = (1._prt - beta4) / (beta2 * (1._prt - beta2));
-    amrex::ParticleReal F1 = A + B * 0.5_prt * std::log((1._prt + beta) / (1._prt - beta));
-    amrex::ParticleReal target = 2._prt * u * F1 - F1;
-
-
-    for(int i = 0; i < 6; i++) {
-        amrex::ParticleReal cos2 = costh*costh;
-        amrex::ParticleReal num = 1._prt - beta4 * (1._prt - cos2)*(1._prt - cos2);
-        amrex::ParticleReal den = (1._prt - beta2 * cos2);
-        amrex::ParticleReal pdf = num / (den*den);
-
-        amrex::ParticleReal arg1 = amrex::max(1._prt + beta*costh, 1e-15_prt);
-        amrex::ParticleReal arg2 = amrex::max(1._prt - beta*costh, 1e-15_prt);
-        amrex::ParticleReal Fc  = A * costh + B * 0.5_prt * std::log(arg1 / arg2);
-
-        amrex::ParticleReal delta = (Fc - target) / pdf;
-        costh -= delta;
-
-        if (costh > 1._prt) costh = 1._prt;
-        if (costh < -1._prt) costh = -1._prt;
-        if (amrex::Math::abs(delta) < 1e-14_prt) break; // convergence check
-    }
-}*/
-
-        amrex::ParticleReal sinth = std::sqrt(1._prt - costh*costh);
-
-        // product in CM frame
+        // Momentum of the each of the two products in CM frame
         px_star = std::sqrt(p_star_sq) * sinth * std::cos(phi);
         py_star = std::sqrt(p_star_sq) * sinth * std::sin(phi);
         pz_star = std::sqrt(p_star_sq) * costh;
@@ -201,5 +174,4 @@ namespace {
         u2z_out = p2z_out/me;
     }
 }
-
 #endif // LINEAR_BREIT_WHEELER_UTIL_H
