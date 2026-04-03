@@ -589,14 +589,14 @@ def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
     # https://docutils.sourceforge.io/0.4/docs/ref/rst/restructuredtext.html#escaping-mechanism
 
     # Pattern for ``XYZ``
-    literal_re = re.compile(r"``([^`]+)``", re.DOTALL)
+    literal_pattern = re.compile(r"``(?=\S)([^`]+)(?<=\S)``", re.DOTALL)
 
-    def _repl(m: re.Match[str]):
+    def literal_repl(m: re.Match[str]):
         # Replace r"``XYZ``" with r"\ `XYZ`"
         return r"\ `" + m.group(1) + r"`"
 
     for i in range(len(source)):
-        source[i] = literal_re.sub(_repl, source[i])
+        source[i] = literal_pattern.sub(literal_repl, source[i])
 
 
 def setup(app: Sphinx) -> dict:
