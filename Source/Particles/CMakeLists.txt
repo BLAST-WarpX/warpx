@@ -11,6 +11,7 @@ foreach(D IN LISTS WarpX_DIMS)
         LaserParticleContainer.cpp
         ParticleBoundaryBuffer.cpp
         SpeciesPhysicalProperties.cpp
+        ExternalParticleFields.cpp
     )
 endforeach()
 
@@ -20,6 +21,7 @@ add_subdirectory(Deposition)
 add_subdirectory(ElementaryProcess)
 add_subdirectory(Gather)
 add_subdirectory(ParticleCreation)
-#add_subdirectory(Pusher)
+add_subdirectory(ParticleThermalizer)
+add_subdirectory(Pusher)
 add_subdirectory(Resampling)
 add_subdirectory(Sorting)

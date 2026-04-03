@@ -24,7 +24,7 @@ Under `Tools/Linter <https://github.com/BLAST-WarpX/warpx/blob/development/Tools
    .. literalinclude:: ../../../Tools/Linter/runClangTidy.sh
       :language: bash
 
-It is a prerequisite that WarpX is compiled following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+It is a prerequisite that WarpX is compiled following the instructions that you find in our :ref:`Users <install-methods-cmake>` or :ref:`Developers <install-build-cmake>` sections.
 
 The script generates a wrapper to ensure that clang-tidy is only applied to WarpX source files and compiles WarpX in 1D, 2D, 3D, and RZ geometry, using such wrapper.
 
@@ -36,7 +36,7 @@ Few optional environment variables can be set to tune the behavior of the script
 
 * ``CLANG``, ``CLANGXX``, and ``CLANGTIDY``: set the version of the compiler and the linter.
 
-For continuous integration we currently use clang version 15.0.0 and it is recommended to use this version locally as well.
+For continuous integration we currently use clang version 17.0.6 and it is recommended to use this version locally as well.
 A newer version may find issues not currently covered by CI tests (checks are opt-in), while older versions may not find all the issues.
 
 Here's an example of how to run the script after setting the appropriate environment variables:
@@ -44,8 +44,8 @@ Here's an example of how to run the script after setting the appropriate environ
 .. code-block:: bash
 
    export WARPX_TOOLS_LINTER_PARALLEL=12
-   export CLANG=clang-15
-   export CLANGXX=clang++-15
-   export CLANGTIDY=clang-tidy-15
+   export CLANG=clang-17
+   export CLANGXX=clang++-17
+   export CLANGTIDY=clang-tidy-17
 
    ./Tools/Linter/runClangTidy.sh

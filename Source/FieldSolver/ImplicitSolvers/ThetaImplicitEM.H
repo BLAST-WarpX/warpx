@@ -84,6 +84,21 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
+
+    /**
+     * \brief Return reference to the multifabs for curl curl mask in virtual dirs
+     */
+    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
+
+    /**
+     * \brief Inititialize the BC masks for the curl curl operator
+     */
+    void InitializeCurlCurlBCMasks ();
+
 private:
 
     /**

@@ -13,7 +13,6 @@
 
 #include <AMReX_Random.H>
 
-
 /** Prepare information for and call UpdateMomentumPerezElastic().
  *
  * @tparam T_index type of index arguments
@@ -74,8 +73,8 @@ void ElasticCollisionPerez (
     T_PR lmdD = T_PR(-1.0);
     if ( L <= T_PR(0.0) ) {
         if (global_lamdb <= T_PR(0.0)) {
-            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::ep0) +
-                                        n2*q2*q2/(T2*PhysConst::ep0) );
+            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::epsilon_0) +
+                                        n2*q2*q2/(T2*PhysConst::epsilon_0) );
         } else {
             lmdD = global_lamdb;
         }
@@ -91,7 +90,7 @@ void ElasticCollisionPerez (
     // set max cross section based on mfp = atomic spacing
     const T_PR sigma_max = T_PR(1.0) / (maxn * rmin);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     T_PR * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
     T_PR * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
@@ -105,8 +104,8 @@ void ElasticCollisionPerez (
       // stride (smaller set size) until we do all collisions (larger set size)
       for (T_index k = coll_idx; k < max_N; k += min_N)
       {
-#if (defined WARPX_DIM_RZ)
-          /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+          /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
            * in the same *cylindrical* cell. For this reason, collisions between macroparticles
            * are actually not local in space. In this case, the underlying assumption is that
            * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -138,7 +137,7 @@ void ElasticCollisionPerez (
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
               n12, sigma_max, L, bmax, dt, engine );
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
           T_PR const u1xbuf_new = u1x[I1[i1]];
           u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
           u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);

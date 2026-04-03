@@ -83,6 +83,7 @@ public:
          * @param[in,out] soa_1,soa_2 contain the struct of array data of the two species.
          * @param[in] n1,n2 are local densities.
          * @param[in] T1,T2 are local temperatures.
+         * @param[in] global_lamdb global Debye length.
          * @param[in] q1,q2 are charges.
          * @param[in] m1,m2 are masses.
          * @param[in] dt is the time step length between two collision calls.
@@ -107,6 +108,7 @@ public:
             index_type const /*cell_start_pair*/, index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             using namespace amrex::literals;
@@ -121,6 +123,7 @@ public:
         amrex::ParticleReal m_CoulombLog;
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies;
     };
 

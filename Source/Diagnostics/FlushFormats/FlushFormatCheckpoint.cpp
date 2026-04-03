@@ -9,10 +9,10 @@
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParticleIO.H>
@@ -57,7 +57,7 @@ FlushFormatCheckpoint::WriteToFile (
     using ablastr::fields::Direction;
     using WARPX_UNITY_ID::default_level_prefix;
 
-    WARPX_PROFILE("FlushFormatCheckpoint::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatCheckpoint::WriteToFile()");
 
     auto & warpx = WarpX::GetInstance();
 
@@ -235,10 +235,12 @@ FlushFormatCheckpoint::CheckpointParticles (
         // and the int comps
         int_names.resize(pc->NumIntComps());
         write_int_comps.resize(pc->NumIntComps());
+        //   note: inames and h_redistribute_int_comp are not the same size
         auto inames = pc->GetIntSoANames();
+        std::size_t const i0_redist = pc->h_redistribute_int_comp.size() - inames.size();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
-            write_int_comps[index] = pc->h_redistribute_int_comp[index];
+            write_int_comps[index] = pc->h_redistribute_int_comp[i0_redist + index];
         }
 
         pc->Checkpoint(dir, part_diag.getSpeciesName(),

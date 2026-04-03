@@ -1,10 +1,10 @@
 #include "FlushFormatOpenPMD.H"
 
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Diagnostics/OpenPMDHelpFunction.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -64,6 +64,8 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
             ablastr::warn_manager::WMRecordWarning("Diagnostics", warnMsg);
             encoding = openPMD::IterationEncoding::groupBased;
         }
+
+        pp_diag_name.query("buffer_flush_limit_btd", m_NumAggBTDBufferToFlush);
     }
 
     //
@@ -136,7 +138,7 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Geometry& full_BTD_snapshot,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         if (!isBTD)
@@ -175,6 +177,9 @@ FlushFormatOpenPMD::WriteToFile (
     // particles: all (reside only on locally finest level)
     m_OpenPMDPlotWriter->WriteOpenPMDParticles(
         particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush);
+
+    if (isBTD  && (bufferID % m_NumAggBTDBufferToFlush == 0) )
+        m_OpenPMDPlotWriter->FlushBTDToDisk();
 
     // signal that no further updates will be written to this iteration
     m_OpenPMDPlotWriter->CloseStep(isBTD, isLastBTDFlush);

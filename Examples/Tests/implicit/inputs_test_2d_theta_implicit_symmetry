@@ -1,0 +1,120 @@
+#################################
+########## CONSTANTS ############
+#################################
+
+my_constants.ne0 = 4.e26     # m^-3
+my_constants.Ti = 2000.      # eV
+my_constants.Te = 2000.      # eV
+my_constants.A = 12.
+my_constants.Z = 6
+my_constants.mi = A*m_u - Z*m_e
+my_constants.qi = Z*q_e
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 400
+amr.n_cell =  16 16
+amr.max_grid_size = 128
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = 0.e-6   0.e-6    # physical domain
+geometry.prob_hi = 2.5e-7  2.5e-7
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = pmc pmc
+boundary.field_hi = pmc pmc
+boundary.particle_lo = reflecting reflecting
+boundary.particle_hi = reflecting reflecting
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.abort_on_warning_threshold = high
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.cfl = 0.98
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 0
+
+algo.maxwell_solver = Yee
+algo.evolve_scheme = "theta_implicit_em"
+
+implicit_evolve.theta = 0.5
+implicit_evolve.max_particle_iterations = 21
+implicit_evolve.particle_tolerance = 1.0e-12
+
+implicit_evolve.nonlinear_solver = "newton"
+newton.verbose = true
+newton.max_iterations = 20
+newton.relative_tolerance = 1.0e-12
+newton.absolute_tolerance = 0.0
+newton.require_convergence = false
+newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
+
+gmres.verbose_int = 2
+gmres.max_iterations = 1000
+gmres.relative_tolerance = 1.0e-8
+gmres.absolute_tolerance = 0.0
+
+implicit_evolve.use_mass_matrices_pc = true
+jacobian.pc_type = "pc_curl_curl_mlmg"
+pc_curl_curl_mlmg.verbose = true
+pc_curl_curl_mlmg.max_iter = 1
+pc_curl_curl_mlmg.relative_tolerance = 0.0
+
+algo.particle_pusher = "boris"
+
+algo.particle_shape = 2
+algo.current_deposition = "villasenor"
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons C
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 8 8
+electrons.profile = constant
+electrons.density = ne0  # number per m^3
+electrons.momentum_distribution_type = "gaussian"
+electrons.ux_th = sqrt(Te*q_e/m_e)/clight
+electrons.uy_th = sqrt(Te*q_e/m_e)/clight
+electrons.uz_th = sqrt(Te*q_e/m_e)/clight
+
+C.charge = qi
+C.mass = mi
+C.injection_style = "NUniformPerCell"
+C.num_particles_per_cell_each_dim = 8 8
+C.profile = constant
+C.density = ne0/Z  # number per m^3
+C.momentum_distribution_type = "gaussian"
+C.ux_th = sqrt(Ti*q_e/mi)/clight
+C.uy_th = sqrt(Ti*q_e/mi)/clight
+C.uz_th = sqrt(Ti*q_e/mi)/clight
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 200
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
+diag1.particle_fields_to_plot = num
+diag1.particle_fields.num.do_average = 0
+diag1.particle_fields.num(x,y,z,ux,uy,uz) = "1."
+diag1.electrons.variables = x z w ux uy uz
+diag1.C.variables = x z w ux uy uz
+
+warpx.reduced_diags_names = particle_energy field_energy
+reduced_diags.intervals = 1
+
+particle_energy.type = ParticleEnergy
+particle_energy.path = diags/reduced_files/
+particle_energy.precision = 18
+
+field_energy.type = FieldEnergy
+field_energy.path = diags/reduced_files/
+field_energy.precision = 18

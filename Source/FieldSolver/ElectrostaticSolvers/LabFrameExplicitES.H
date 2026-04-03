@@ -32,6 +32,11 @@ public:
         const ablastr::fields::MultiLevelScalarField& phi
     );
 
+    void computePhiTriDiagonal_periodic (
+        const ablastr::fields::MultiLevelScalarField& rho,
+        const ablastr::fields::MultiLevelScalarField& phi
+    );
+
 };
 
 #endif  // WARPX_LABFRAMEEXPLICITES_H_

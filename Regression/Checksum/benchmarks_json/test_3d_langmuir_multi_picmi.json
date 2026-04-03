@@ -4,10 +4,10 @@
     "jx": 3.29425033675221e+18
   },
   "electrons": {
-    "particle_momentum_x": 1.5270147028488757e-17,
-    "particle_position_x": 10.35104554122117,
-    "particle_position_y": 10.485759999999997,
-    "particle_position_z": 10.48576,
+    "particle_momentum_x": 1.7409643319280496e-17,
+    "particle_position_x": 10.351045541221172,
+    "particle_position_y": 10.48576,
+    "particle_position_z": 10.485760000000003,
     "particle_weight": 320000000000.00006
   }
 }

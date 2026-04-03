@@ -16,13 +16,19 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, picmi
+from pywarpx import callbacks, libwarpx, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+
+
+def get_xp():
+    xp, _ = load_cupy()
+    return xp
 
 
 class ForceFreeSheetReconnection(object):
@@ -55,7 +61,7 @@ class ForceFreeSheetReconnection(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 6e-3  # normalized resistivity
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 40
 
     def __init__(self, test, verbose):
         self.test = test
@@ -257,11 +263,16 @@ class ForceFreeSheetReconnection(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.total_steps,
-                data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez"],
+                data_list=["B", "E", "phi"],
                 # warpx_format='openpmd',
                 # warpx_openpmd_backend='h5',
             )
             simulation.add_diagnostic(field_diag)
+
+            # set the solver convergence criteria low since phi is only
+            # calculated for diagnostic output testing
+            simulation.self_fields_required_precision = 1e-3
+            simulation.self_fields_verbosity = 1
 
         # reduced diagnostics for reconnection rate calculation
         # create a 2 l_i box around the X-point on which to measure
@@ -301,12 +312,19 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = fields.RhoFPWrapper(include_ghosts=False)[:, :]
-        Jiy = fields.JyFPWrapper(include_ghosts=False)[...] / self.J0
-        Jy = fields.JyFPPlasmaWrapper(include_ghosts=False)[...] / self.J0
-        Bx = fields.BxFPWrapper(include_ghosts=False)[...] / self.B0
-        By = fields.ByFPWrapper(include_ghosts=False)[...] / self.B0
-        Bz = fields.BzFPWrapper(include_ghosts=False)[...] / self.B0
+        get_xp()
+
+        rho = simulation.fields.get("rho_fp", level=0)[...] / self.J0
+
+        Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
+        Jy = (
+            simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
+            / self.J0
+        )
+
+        Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
+        By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
+        Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

@@ -72,6 +72,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
 //   *
 //   * \param[out] Jfield  vector of total current MultiFabs at a given level
 //   * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
+//   * \param[in] eb_update_E specifies where the plasma current should be calculated.
+//   * \param[in] lev refinement level
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>
@@ -84,11 +86,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -275,11 +272,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -376,11 +368,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -861,8 +848,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                             btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
                         }
 
-                        auto nabla2Jtheta = T_Algo::Dr_rDr_over_r(Jtheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
-                            + T_Algo::Dzz(Jtheta, coefs_z, n_coefs_z, i, j, 0, 0) - Jtheta(i, j, 0)/(r*r);
+                        // Special handling of the hyper-resistivity term on axis to avoid division by zero
+                        // and ensure that Etheta remains 0 on axis for m=0 mode
+                        auto nabla2Jtheta = 0.0_rt;
+                        if (r > 0.0_rt) {
+                            nabla2Jtheta = T_Algo::Dr_rDr_over_r(Jtheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                                + T_Algo::Dzz(Jtheta, coefs_z, n_coefs_z, i, j, 0, 0) - Jtheta(i, j, 0)/(r*r);
+                        }
 
                         Etheta(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jtheta;
                     }
@@ -930,6 +922,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
                         if (r > 0.5_rt*dr) {
                             nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                        } else {
+                            // Special handling of the hyper-resistivity term on axis to avoid division by zero
+                            // and ensure that Jz remains well-behaved on axis for m=0 mode
+                            // This works since there is a symmetry condition on axis that cancels the geometric 1/r term
+                            nabla2Jz += T_Algo::Drr(Jz, coefs_r, n_coefs_r, i, j, 0, 0);
                         }
 
                         Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;

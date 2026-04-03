@@ -8,8 +8,6 @@
  */
 #include "LaserParticleContainer.H"
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "Laser/LaserProfiles.H"
 #include "Particles/LaserParticleContainer.H"
@@ -19,9 +17,9 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -86,7 +84,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
       m_laser_name{name}
 {
     charge = 1.0;
-    mass = std::numeric_limits<Real>::max();
+    m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
 
@@ -251,14 +249,14 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
             (m_nvec[0]-windir[0])*(m_nvec[0]-windir[0]) +
             (m_nvec[1]-windir[1])*(m_nvec[1]-windir[1]) +
             (m_nvec[2]-windir[2])*(m_nvec[2]-windir[2]) < 1.e-12,
-            "do_continous_injection for laser particle only works" +
+            "do_continous_injection for laser particle only works"
             " if moving window direction and laser propagation direction are the same");
         if ( WarpX::gamma_boost>1 ){
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (WarpX::boost_direction[0]-0)*(WarpX::boost_direction[0]-0) +
                 (WarpX::boost_direction[1]-0)*(WarpX::boost_direction[1]-0) +
                 (WarpX::boost_direction[2]-1)*(WarpX::boost_direction[2]-1) < 1.e-12,
-                "do_continous_injection for laser particle only works if " +
+                "do_continous_injection for laser particle only works if "
                 "warpx.boost_direction = z. TODO: all directions.");
         }
     }
@@ -562,16 +560,20 @@ void
 LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                 int lev,
                                 const std::string& current_fp_string,
-                                Real t, Real dt, DtType /*a_dt_type*/, bool skip_deposition,
-                                bool /*deposit_mass_matrices*/, PushType push_type)
+                                Real t, Real dt, SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
+                                PositionPushType /*position_push_type*/,
+                                MomentumPushType /*momentum_push_type*/,
+                                ImplicitOptions const * implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("LaserParticleContainer::Evolve()");
-    WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
+    ABLASTR_PROFILE("LaserParticleContainer::Evolve()");
+    ABLASTR_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
+
+    const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
     Real t_lab = t;
     if (WarpX::gamma_boost > 1) {
@@ -644,7 +646,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             //
             // Particle Push
             //
-            WARPX_PROFILE_VAR_START(blp_pp);
+            ABLASTR_PROFILE_VAR_START(blp_pp);
             // Find the coordinates of the particles in the emission plane
             calculate_laser_plane_coordinates(pti, static_cast<int>(np),
                                               plane_Xp.dataPtr(),
@@ -660,7 +662,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             update_laser_particle(pti, static_cast<int>(np), uxp.dataPtr(), uyp.dataPtr(),
                                   uzp.dataPtr(), wp.dataPtr(),
                                   amplitude_E.dataPtr(), dt, push_type );
-            WARPX_PROFILE_VAR_STOP(blp_pp);
+            ABLASTR_PROFILE_VAR_STOP(blp_pp);
 
             // Current Deposition
             using ablastr::fields::Direction;
@@ -769,7 +771,7 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
     // `eps` of the speed of light, at the peak of the laser field.
     constexpr Real eps = 0.05_rt;
     m_mobility = eps/m_e_max;
-    m_weight = PhysConst::ep0 / m_mobility;
+    m_weight = PhysConst::epsilon_0 / m_mobility;
     // Multiply by particle spacing
     m_weight *= AMREX_D_TERM(1._rt, * Sx, * Sy);
     // When running in the boosted-frame, the input parameters (and in particular
@@ -781,7 +783,8 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
 void
 LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
-                               const MultiFab&, const MultiFab&, const MultiFab&)
+                               const MultiFab&, const MultiFab&, const MultiFab&,
+                               MomentumPushType /*momentum_push_type*/)
 {
     // I don't think we need to do anything.
 }

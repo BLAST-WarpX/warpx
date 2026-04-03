@@ -9,8 +9,6 @@
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Parallelization/GuardCellManager.H"
@@ -21,8 +19,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -76,7 +74,7 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
         amrex::MultiFab::Copy(*Bfp[1], *a_Bn[lev][1], 0, 0, ncomps, a_Bn[lev][1]->nGrowVect());
         amrex::MultiFab::Copy(*Bfp[2], *a_Bn[lev][2], 0, 0, ncomps, a_Bn[lev][2]->nGrowVect());
     }
-    EvolveB(a_thetadt, DtType::Full, start_time);
+    EvolveB(a_thetadt, SubcyclingHalf::None, start_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -87,7 +85,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
     using warpx::fields::FieldType;
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
-    ApplyBfieldBoundary(0, PatchType::fine, DtType::Full, a_time);
+    ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -169,6 +167,9 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
                 amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
+                // Check if nsuborbits is present, and if so it is set to 1
+                int *nsuborbits = (pc->HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+
                 const long np = pti.numParticles();
 
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
@@ -189,6 +190,10 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                     ux_n[ip] = ux[ip];
                     uy_n[ip] = uy[ip];
                     uz_n[ip] = uz[ip];
+
+                    if (nsuborbits) {
+                        nsuborbits[ip] = 1;
+                    }
 
                 });
 
@@ -329,6 +334,22 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
+WarpX::DepositMassMatrices ( )
+{
+    ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        mypc->DepositMassMatrices(
+            m_fields,
+            lev,
+            dt[lev]
+        );
+    }
+
+}
+
+void
 WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
@@ -340,7 +361,7 @@ WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 void
 WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
-    WARPX_PROFILE("WarpX::ImplicitComputeRHSE()");
+    ABLASTR_PROFILE("WarpX::ImplicitComputeRHSE()");
     ImplicitComputeRHSE(lev, PatchType::fine, a_dt, a_Erhs_vec);
     if (lev > 0)
     {

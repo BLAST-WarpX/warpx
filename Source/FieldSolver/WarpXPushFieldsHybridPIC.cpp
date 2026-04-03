@@ -7,17 +7,16 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Evolve/WarpXDtType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 
@@ -28,7 +27,7 @@ void WarpX::HybridPICEvolveFields ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::HybridPICEvolveFields()");
+    ABLASTR_PROFILE("WarpX::HybridPICEvolveFields()");
 
     // The below deposition is hard coded for a single level simulation
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -99,15 +98,16 @@ void WarpX::HybridPICEvolveFields ()
     // Push the B field from t=n to t=n+1/2 using the current and density
     // at t=n, while updating the E field along with B using the electron
     // momentum equation
-    for (int sub_step = 0; sub_step < sub_steps; sub_step++)
+    const int sub_steps_per_half = sub_steps / 2;
+    for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
     {
         m_hybrid_pic_model->BfieldEvolveRK(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
             m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
-            0.5_rt/sub_steps*dt[0],
-            DtType::FirstHalf, guard_cells.ng_FieldSolver,
+            dt[0]/sub_steps,
+            SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -132,7 +132,7 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
-    for (int sub_step = 0; sub_step < sub_steps; sub_step++)
+    for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
     {
         m_hybrid_pic_model->BfieldEvolveRK(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
@@ -140,8 +140,8 @@ void WarpX::HybridPICEvolveFields ()
             m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
             rho_fp_temp,
             m_eb_update_E,
-            0.5_rt/sub_steps*dt[0],
-            DtType::SecondHalf, guard_cells.ng_FieldSolver,
+            dt[0]/sub_steps,
+            SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
     }
@@ -302,13 +302,21 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {
             // Get the external fields
+            // Currently t_new is what t_old will be when entering the solver since
+            // after initialization the t_old is set to t_new, then t_new is incremented by dt
             m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
-                gett_old(0),
+                gett_new(0),
                 0.5_rt*dt[0]);
 
             // If using split fields, add the external field at t=0
             for (int lev = 0; lev <= finest_level; ++lev) {
                 for (int idim = 0; idim < 3; ++idim) {
+                    // Check to make sure field only contains numeric values
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev)->is_finite(),
+                        "Non-finite value detected in external B-field at t=0."
+                    );
+
                     MultiFab::Add(
                         *m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
                         *m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
@@ -340,7 +348,7 @@ void WarpX::HybridPICInitializeRhoJandB ()
 
 void
 WarpX::CalculateExternalCurlA() {
-    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
+    ABLASTR_PROFILE("WarpX::CalculateExternalCurlA()");
 
     auto & warpx = WarpX::GetInstance();
 

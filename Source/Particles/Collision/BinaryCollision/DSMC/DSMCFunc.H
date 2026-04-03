@@ -22,8 +22,8 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_DenseBins.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Random.H>
@@ -59,8 +59,8 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     DSMCFunc ( const std::string& collision_name,
-               MultiParticleContainer const * mypc,
-               bool isSameSpecies );
+               [[maybe_unused]] MultiParticleContainer const * mypc,
+               const bool isSameSpecies );
 
     struct Executor {
         /**
@@ -105,6 +105,7 @@ public:
             index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
+            amrex::ParticleReal* /*p_product_data*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -131,7 +132,7 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
             amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
@@ -148,8 +149,8 @@ public:
                     p_mask[pair_index] = false;
                 } else {
 
-#if (defined WARPX_DIM_RZ)
-                    /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
                     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
                     * are actually not local in space. In this case, the underlying assumption is that
                     * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -176,7 +177,7 @@ public:
                         p_pair_reaction_weight, multiplier_ratio,
                         m_process_count, m_scattering_processes_data, engine);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     /* Undo the earlier velocity rotation. */
                     amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
                     u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
@@ -203,6 +204,7 @@ public:
         int m_process_count;
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
+        bool m_need_product_data = false;
         bool m_isSameSpecies = false;
         ScatteringProcess::Executor* m_scattering_processes_data;
     };

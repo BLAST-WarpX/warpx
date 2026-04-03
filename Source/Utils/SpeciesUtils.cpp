@@ -79,7 +79,8 @@ namespace SpeciesUtils {
     // InjectorPosition[Constant or Predefined or etc.].getDensity.
     void parseDensity (std::string const& species_name, std::string const& source_name,
         std::unique_ptr<InjectorDensity,InjectorDensityDeleter>& h_inj_rho,
-        std::unique_ptr<amrex::Parser>& density_parser)
+        std::unique_ptr<amrex::Parser>& density_parser,
+        amrex::Geometry const& geom)
     {
         const amrex::ParmParse pp_species(species_name);
 
@@ -93,9 +94,6 @@ namespace SpeciesUtils {
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));
-        } else if (rho_prof_s == "predefined") {
-            // Construct InjectorDensity with InjectorDensityPredefined.
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityPredefined*)nullptr,species_name));
         } else if (rho_prof_s == "parse_density_function") {
             std::string str_density_function;
             utils::parser::Store_parserString(pp_species, source_name, "density_function(x,y,z)", str_density_function);
@@ -104,6 +102,12 @@ namespace SpeciesUtils {
                 utils::parser::makeParser(str_density_function,{"x","y","z"}));
             h_inj_rho.reset(new InjectorDensity((InjectorDensityParser*)nullptr,
                 density_parser->compile<3>()));
+        } else if (rho_prof_s == "read_from_file") {
+            std::string density_file;
+            bool distributed = true;
+            utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
+            pp_species.query("read_density_distributed", distributed);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
@@ -215,12 +219,6 @@ namespace SpeciesUtils {
             const GetVelocity getVel(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
-        } else if (mom_dist_s == "radial_expansion") {
-            amrex::Real u_over_r = 0._rt;
-            utils::parser::queryWithParser(pp_species, source_name, "u_over_r", u_over_r);
-            // Construct InjectorMomentum with InjectorMomentumRadialExpansion.
-            h_inj_mom.reset(new InjectorMomentum
-                            ((InjectorMomentumRadialExpansion*)nullptr, u_over_r));
         } else if (mom_dist_s == "parse_momentum_function") {
             std::string str_momentum_function_ux;
             std::string str_momentum_function_uy;

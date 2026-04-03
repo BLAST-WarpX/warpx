@@ -12,8 +12,8 @@
 #include "PoissonBoundaryHandler.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array.H>
 
 
@@ -60,7 +60,7 @@ public:
      * dimension according to the desired values from the simulation input file,
      * boundary.potential_lo and boundary.potential_hi.
      * \param[inout] phi The electrostatic potential
-     * \param[in] idim The dimension for which the Dirichlet boundary condition is set
+     * \param[in] t current time
      */
     void setPhiBC (
         ablastr::fields::MultiLevelScalarField const& phi,

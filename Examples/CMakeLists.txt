@@ -42,7 +42,6 @@ function(add_warpx_test
 )
     # cannot run MPI tests w/o MPI build
     if(nprocs GREATER_EQUAL 2 AND NOT WarpX_MPI)
-        message(WARNING "${name}: cannot run MPI tests without MPI build")
         return()
     endif()
 
@@ -191,10 +190,14 @@ function(add_warpx_test
     # run all tests with 1 OpenMP thread by default
     set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
-    if(python OR WIN32)
-        set(THIS_Python_SCRIPT_EXE ${Python_EXECUTABLE})
-    else()
-        set(THIS_Python_SCRIPT_EXE "")
+    # Always use Python_EXECUTABLE for analysis/checksum scripts to ensure conda Python is used
+    if(python OR analysis OR checksum)
+        # Try to find Python if not already set
+        # This is more robust in virtual envs (conda, venv) than
+        # relying only on /usr/bin/env python3
+        if(NOT Python_EXECUTABLE)
+            find_package(Python COMPONENTS Interpreter REQUIRED)
+        endif()
     endif()
 
     # test analysis
@@ -204,7 +207,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.analysis
             COMMAND
-                ${THIS_Python_SCRIPT_EXE}
+                ${Python_EXECUTABLE}
                 ${ANALYSIS_FILE}
                 ${ANALYSIS_ARGS}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}
@@ -227,7 +230,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.checksum
             COMMAND
-                ${THIS_Python_SCRIPT_EXE}
+                ${Python_EXECUTABLE}
                 ${CHECKSUM_FILE}
                 ${CHECKSUM_ARGS}
             WORKING_DIRECTORY ${THIS_WORKING_DIR}

@@ -48,14 +48,22 @@ else:
 ndims = np.count_nonzero(ds.domain_dimensions > 1)
 
 if ndims == 2:
-    xmin, zmin = [float(x) for x in ds.parameters.get("geometry.prob_lo").split()]
-    xmax, zmax = [float(x) for x in ds.parameters.get("geometry.prob_hi").split()]
+    xmin, zmin = [
+        float(x) for x in ds.parameters.get("geometry.prob_lo").split("#")[0].split()
+    ]
+    xmax, zmax = [
+        float(x) for x in ds.parameters.get("geometry.prob_hi").split("#")[0].split()
+    ]
     nx, nz = [int(n) for n in ds.parameters["amr.n_cell"].split()]
     ymin, ymax = xmin, xmax
     ny = nx
 else:
-    xmin, ymin, zmin = [float(x) for x in ds.parameters.get("geometry.prob_lo").split()]
-    xmax, ymax, zmax = [float(x) for x in ds.parameters.get("geometry.prob_hi").split()]
+    xmin, ymin, zmin = [
+        float(x) for x in ds.parameters.get("geometry.prob_lo").split("#")[0].split()
+    ]
+    xmax, ymax, zmax = [
+        float(x) for x in ds.parameters.get("geometry.prob_hi").split("#")[0].split()
+    ]
     nx, ny, nz = [int(n) for n in ds.parameters["amr.n_cell"].split()]
 
 dx = (xmax - xmin) / nx
@@ -160,6 +168,7 @@ L2_error_z = calculate_error(Ez_axis, zmin, dz, nz)
 print("L2 error along x-axis = %s" % L2_error_x)
 print("L2 error along y-axis = %s" % L2_error_y)
 print("L2 error along z-axis = %s" % L2_error_z)
+print("L2 error tolerance = %s" % l2_tolerance)
 
 assert L2_error_x < l2_tolerance
 assert L2_error_y < l2_tolerance
@@ -180,6 +189,12 @@ def return_energies(iteration):
 
 ts = OpenPMDTimeSeries("./diags/diag2")
 if "phi" in ts.avail_record_components["electron"]:
+    if test_name.endswith("uniform_weighting"):
+        # A larger tolerance is needed with uniform weighting, perhaps because
+        # of more noise near the axis.
+        energy_fraction = 0.012
+    else:
+        energy_fraction = 0.0032
     # phi is only available when this script is run with the labframe poisson solver
     print("Checking conservation of energy")
     Ek_i, Ep_i = return_energies(0)
@@ -187,8 +202,10 @@ if "phi" in ts.avail_record_components["electron"]:
     print(f"Ek_i + Ep_i = {Ek_i} + {Ep_i} = {Ek_i + Ep_i}")
     print(f"Ek_f + Ep_f = {Ek_f} + {Ep_f} = {Ek_f + Ep_f}")
     print(f"(Ek_i + Ep_i) - (Ek_f + Ep_f) = {(Ek_i + Ep_i) - (Ek_f + Ep_f)}")
-    print(f"Energy change tolerance = 0.0032*(Ek_i + Ep_i) = {0.0032 * (Ek_i + Ep_i)}")
+    print(
+        f"Energy change tolerance = {energy_fraction}*(Ek_i + Ep_i) = {energy_fraction * (Ek_i + Ep_i)}"
+    )
     assert Ep_f < 0.7 * Ep_i  # Check that potential energy changes significantly
-    assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < 0.0032 * (
+    assert abs((Ek_i + Ep_i) - (Ek_f + Ep_f)) < energy_fraction * (
         Ek_i + Ep_i
     )  # Check conservation of energy

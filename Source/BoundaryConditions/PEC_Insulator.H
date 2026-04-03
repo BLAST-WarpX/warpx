@@ -69,6 +69,44 @@ public:
                                      amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
                                      int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
                                      amrex::Real time);
+    /**
+     * \brief Zeros the parallel fields on the boundary
+     *        When the E field is being set, the field is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the field is zeroed only in the conductor.
+     *
+     * \param[in,out] field
+     * \param[in]     field_boundary_lo   lower field boundary conditions
+     * \param[in]     field_boundary_hi   upper field boundary conditions
+     * \param[in]     ng_fieldgather      number of guard cells used by field gather
+     * \param[in]     geom                geometry object of level "lev"
+     * \param[in]     lev                 level of the Multifab
+     * \param[in]     patch_type          coarse or fine
+     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     */
+    void ZeroParallelFieldInConductor (std::array<amrex::MultiFab*, 3> field,
+                                       amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+                                       amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+                                       amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
+                                       int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios);
+
+    /**
+     * \brief Zeros the scalar on the boundary
+     *        When the E field is being set, the scalar is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the scalar is zeroed only in the conductor.
+     *
+     * \param[in,out] scalar
+     * \param[in]     field_boundary_lo   lower field boundary conditions
+     * \param[in]     field_boundary_hi   upper field boundary conditions
+     * \param[in]     geom                geometry object of level "lev"
+     * \param[in]     lev                 level of the Multifab
+     * \param[in]     patch_type          coarse or fine
+     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     */
+    void ZeroParallelScalarInConductor (amrex::MultiFab* scalar,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+                                        amrex::Geometry const & geom, int lev, PatchType patch_type,
+                                        amrex::Vector<amrex::IntVect> const & ref_ratios);
 
     /**
      * \brief The work routine applying the boundary condition
@@ -82,102 +120,139 @@ public:
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
      * \param[in]     time                current time of the simulation
-     * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or
-     *                                    split pml field
-     * \param[in]     E_like whether the field is E like or B like
-     * \param[in]     set_F_x_lo whether the tangential field at the boundary was specified
-     * \param[in]     set_F_x_hi whether the tangential field at the boundary was specified
-     * \param[in]     a_Fy_x_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_x_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fy_x_hi the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_x_hi the parser for the tangential field at the boundary
-     * \param[in]     set_F_y_lo whether the tangential field at the boundary was specified
-     * \param[in]     set_F_y_hi whether the tangential field at the boundary was specified
-     * \param[in]     a_Fx_y_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_y_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fx_y_hi the parser for the tangential field at the boundary
-     * \param[in]     a_Fz_y_hi the parser for the tangential field at the boundary
-     * \param[in]     set_F_z_lo whether the tangential field at the boundary was specified
-     * \param[in]     set_F_z_hi whether the tangential field at the boundary was specified
-     * \param[in]     a_Fx_z_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fy_z_lo the parser for the tangential field at the boundary
-     * \param[in]     a_Fx_z_hi the parser for the tangential field at the boundary
-     * \param[in]     a_Fy_z_hi the parser for the tangential field at the boundary
+     * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
+     * \param[in]     E_like              whether the field is E like or B like
+     * \param[in]     only_zero_parallel_field only zero the parallel field on the boundary
+     * \param[in]     set_Fx_lo           the flags for the x-field at the lower boundaries
+     * \param[in]     set_Fy_lo           the flags for the y-field at the lower boundaries
+     * \param[in]     set_Fz_lo           the flags for the z-field at the lower boundaries
+     * \param[in]     set_Fx_hi           the flags for the x-field at the upper boundaries
+     * \param[in]     set_Fy_hi           the flags for the y-field at the upper boundaries
+     * \param[in]     set_Fz_hi           the flags for the z-field at the upper boundaries
+     * \param[in]     Fx_parsers_lo       the parsers for the x-field at the lower boundaries
+     * \param[in]     Fy_parsers_lo       the parsers for the y-field at the lower boundaries
+     * \param[in]     Fz_parsers_lo       the parsers for the z-field at the lower boundaries
+     * \param[in]     Fx_parsers_hi       the parsers for the x-field at the upper boundaries
+     * \param[in]     Fy_parsers_hi       the parsers for the y-field at the upper boundaries
+     * \param[in]     Fz_parsers_hi       the parsers for the z-field at the upper boundaries
      */
     void
     ApplyPEC_InsulatortoField (std::array<amrex::MultiFab*, 3> field,
                                amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
                                amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
-                               amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
-                               int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
+                               amrex::IntVect const & ng_fieldgather,
+                               amrex::Geometry const & geom,
+                               int lev,
+                               PatchType patch_type,
+                               amrex::Vector<amrex::IntVect> const & ref_ratios,
                                amrex::Real time,
                                bool split_pml_field,
-                               bool E_like
-#ifndef WARPX_DIM_1D_Z
-                               , bool set_F_x_lo, bool set_F_x_hi,
-                               std::unique_ptr<amrex::Parser> const & a_Fy_x_lo, std::unique_ptr<amrex::Parser> const & a_Fz_x_lo,
-                               std::unique_ptr<amrex::Parser> const & a_Fy_x_hi, std::unique_ptr<amrex::Parser> const & a_Fz_x_hi
-#endif
-#if defined(WARPX_DIM_3D)
-                               , bool set_F_y_lo, bool set_F_y_hi,
-                               std::unique_ptr<amrex::Parser> const & a_Fx_y_lo, std::unique_ptr<amrex::Parser> const & a_Fz_y_lo,
-                               std::unique_ptr<amrex::Parser> const & a_Fx_y_hi, std::unique_ptr<amrex::Parser> const & a_Fz_y_hi
-#endif
-#if defined(WARPX_ZINDEX)
-                               , bool set_F_z_lo, bool set_F_z_hi,
-                               std::unique_ptr<amrex::Parser> const & a_Fx_z_lo, std::unique_ptr<amrex::Parser> const & a_Fy_z_lo,
-                               std::unique_ptr<amrex::Parser> const & a_Fx_z_hi, std::unique_ptr<amrex::Parser> const & a_Fy_z_hi
-#endif
-                               );
+                               bool E_like,
+                               bool only_zero_parallel_field,
+                               amrex::Vector<int> const & set_Fx_lo,
+                               amrex::Vector<int> const & set_Fy_lo,
+                               amrex::Vector<int> const & set_Fz_lo,
+                               amrex::Vector<int> const & set_Fx_hi,
+                               amrex::Vector<int> const & set_Fy_hi,
+                               amrex::Vector<int> const & set_Fz_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_lo,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fx_parsers_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fy_parsers_hi,
+                               amrex::Vector<amrex::ParserExecutor<3>> const & Fz_parsers_hi);
+
+    /* \brief Returns whether any E field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \return whether the E field is set on the boundary
+     */
+    int IsESet(int idim, int iside) const { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
+
+    /* \brief Returns whether any B field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \return whether the B field is set on the boundary
+     */
+    int IsBSet(int idim, int iside) const { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
+
+    /* \brief Returns whether the E field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \param[in] ifield which field to check, 0, 1, or 2
+     * \return whether the E field is set on the boundary
+     */
+    int IsESet(int idim, int iside, int ifield) const;
+
+    /* \brief Returns whether the B field is set on a boundary
+     * \param[in] idim dimension to check
+     * \param[in] iside side to check, 0 is lower, 1 is upper
+     * \param[in] ifield which field to check, 0, 1, or 2
+     * \return whether the B field is set on the boundary
+     */
+    int IsBSet(int idim, int iside, int ifield) const;
 
 private:
 
-    /* \brief Reads in the parsers for the tangential fields, returning whether
-     *        the input parameter was specified.
-     * \param[in]  pp_insulator ParmParse instance
-     * \param[out] parser the parser generated from the input
-     * \param[in]  input_name the name of the input parameter
-     * \param[in]  coord1 the first coordinate in the plane
-     * \param[in]  coord2 the second coordinate in the plane
-     */
-    bool ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                    std::unique_ptr<amrex::Parser> & parser,
-                                    std::string const & input_name,
-                                    std::string const & coord1,
-                                    std::string const & coord2);
 
-    std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
-    std::vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;
+    // Parsers specifying the region of each boundary that is insulator
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_hi;
 
-#ifndef WARPX_DIM_1D_Z
-    bool m_set_B_x_lo = false, m_set_B_x_hi = false;
-    std::unique_ptr<amrex::Parser> m_By_x_lo, m_Bz_x_lo;
-    std::unique_ptr<amrex::Parser> m_By_x_hi, m_Bz_x_hi;
-#endif
-#if defined(WARPX_DIM_3D)
-    bool m_set_B_y_lo = false, m_set_B_y_hi = false;
-    std::unique_ptr<amrex::Parser> m_Bx_y_lo, m_Bz_y_lo;
-    std::unique_ptr<amrex::Parser> m_Bx_y_hi, m_Bz_y_hi;
-#endif
-    bool m_set_B_z_lo = false, m_set_B_z_hi = false;
-    std::unique_ptr<amrex::Parser> m_Bx_z_lo, m_By_z_lo;
-    std::unique_ptr<amrex::Parser> m_Bx_z_hi, m_By_z_hi;
+    amrex::Vector<amrex::ParserExecutor<2>> m_area_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<2>> m_area_parsers_hi;
 
+    // Flags whether any B fields are specified on each boundary
+    amrex::Vector<int> m_set_B_lo = {0, 0, 0};
+    amrex::Vector<int> m_set_B_hi = {0, 0, 0};
 
-#ifndef WARPX_DIM_1D_Z
-    bool m_set_E_x_lo = false, m_set_E_x_hi = false;
-    std::unique_ptr<amrex::Parser> m_Ey_x_lo, m_Ez_x_lo;
-    std::unique_ptr<amrex::Parser> m_Ey_x_hi, m_Ez_x_hi;
-#endif
-#if defined(WARPX_DIM_3D)
-    bool m_set_E_y_lo = false, m_set_E_y_hi = false;
-    std::unique_ptr<amrex::Parser> m_Ex_y_lo, m_Ez_y_lo;
-    std::unique_ptr<amrex::Parser> m_Ex_y_hi, m_Ez_y_hi;
-#endif
-    bool m_set_E_z_lo = false, m_set_E_z_hi = false;
-    std::unique_ptr<amrex::Parser> m_Ex_z_lo, m_Ey_z_lo;
-    std::unique_ptr<amrex::Parser> m_Ex_z_hi, m_Ey_z_hi;
+    // Parsers for the two B fields tangential to each boundary
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B1_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_B2_hi;
 
+    // Flags whether any E fields are specified on each boundary
+    amrex::Vector<int> m_set_E_lo = {0, 0, 0};
+    amrex::Vector<int> m_set_E_hi = {0, 0, 0};
+
+    // Parsers for the two B fields tangential to each boundary
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_lo;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E1_hi;
+    amrex::Vector<std::unique_ptr<amrex::Parser>> m_parsers_E2_hi;
+
+    // For each B field, the flags specifying whether it is set on each boundary
+    amrex::Vector<int> m_set_Bx_lo;
+    amrex::Vector<int> m_set_By_lo;
+    amrex::Vector<int> m_set_Bz_lo;
+    amrex::Vector<int> m_set_Bx_hi;
+    amrex::Vector<int> m_set_By_hi;
+    amrex::Vector<int> m_set_Bz_hi;
+
+    // For each B field, the parsers for the field value on each boundary
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bx_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_By_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bz_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bx_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_By_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Bz_parsers_hi;
+
+    // For each E field, the flags specifying whether it is set on each boundary
+    amrex::Vector<int> m_set_Ex_lo;
+    amrex::Vector<int> m_set_Ey_lo;
+    amrex::Vector<int> m_set_Ez_lo;
+    amrex::Vector<int> m_set_Ex_hi;
+    amrex::Vector<int> m_set_Ey_hi;
+    amrex::Vector<int> m_set_Ez_hi;
+
+    // For each E field, the parsers for the field value on each boundary
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ex_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ey_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ez_parsers_lo;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ex_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ey_parsers_hi;
+    amrex::Vector<amrex::ParserExecutor<3>> m_Ez_parsers_hi;
 
 };
 #endif // PEC_INSULATOR_H_

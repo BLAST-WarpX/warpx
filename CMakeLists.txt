@@ -73,9 +73,12 @@ option(WarpX_APP           "Build the WarpX executable application"     ON)
 option(WarpX_ASCENT        "Ascent in situ diagnostics"                 OFF)
 option(WarpX_CATALYST      "Catalyst in situ diagnostics"               OFF)
 option(WarpX_EB            "Embedded boundary support"                  ON)
+option(WarpX_PETSC         "PETSc linear/nonlinear solvers via AMReX"   OFF)
 option(WarpX_LIB           "Build WarpX as a library"                   OFF)
 option(WarpX_MPI           "Multi-node support (message-passing)"       ON)
+option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
 option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
+option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
 option(WarpX_FFT           "FFT-based solvers"                          OFF)
 option(WarpX_PYTHON        "Python bindings"                            OFF)
 option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
@@ -197,6 +200,11 @@ option(ABLASTR_POSITION_INDEPENDENT_CODE
        "Build ABLASTR with position independent code" ON)
 mark_as_advanced(ABLASTR_POSITION_INDEPENDENT_CODE)
 
+option(ABLASTR_FASTMATH "Enable fast-math optimizations" ${WarpX_FASTMATH})
+if(WarpX_FASTMATH)
+    set(ABLASTR_FASTMATH ON CACHE STRING "Enable fast-math optimizations" FORCE)
+endif()
+
 option(ABLASTR_FFT "compile AnyFFT wrappers" ${WarpX_FFT})
 if(WarpX_FFT)
     set(ABLASTR_FFT ON CACHE STRING "FFT-based solvers" FORCE)
@@ -209,6 +217,17 @@ include(CTest)
 
 # Dependencies ################################################################
 #
+
+# Old GCCs: std::filesystem as a separate library
+try_compile(CXX_HAS_STD_FS "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+)
+try_compile(CXX_HAS_STD_FS_WITH_LINK "${WarpX_BINARY_DIR}/temp"
+    "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    LINK_LIBRARIES stdc++fs
+)
 
 # AMReX
 #   builds AMReX from source (default) or finds an existing install
@@ -275,6 +294,21 @@ foreach(D IN LISTS WarpX_DIMS)
     list(APPEND _ALL_TARGETS ablastr_${SD})
     add_library(WarpX::ablastr_${SD} ALIAS ablastr_${SD})
 
+    # Fast-Math
+    if(ABLASTR_FASTMATH)
+        target_link_libraries(ablastr_${SD} PUBLIC AMReX::Flags_FASTMATH)
+    endif()
+
+    # GCC < 9 need to manually link std::filesystem
+    if(NOT CXX_HAS_STD_FS)
+        if(CXX_HAS_STD_FS_WITH_LINK)
+            target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
+        else()
+            message(FATAL_ERROR "Your compiler does not support C++17 "
+                    "<filesystem> Please use a newer C++ compiler.")
+        endif()
+    endif()
+
     # link into a library (default: static)
     if(WarpX_LIB)
         add_library(lib_${SD})
@@ -297,6 +331,11 @@ foreach(D IN LISTS WarpX_DIMS)
                 # Number must be more than the number of .cpp files in WarpX
                 UNITY_BUILD_BATCH_SIZE 10000
             )
+        endif()
+
+        # Fast-Math
+        if(WarpX_FASTMATH)
+            target_link_libraries(lib_${SD} PUBLIC AMReX::Flags_FASTMATH)
         endif()
     endif()
 
@@ -487,6 +526,10 @@ foreach(D IN LISTS WarpX_DIMS)
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::amrex_${D}d)
     endif()
 
+    if(ABLASTR_FASTMATH)
+        target_link_libraries(ablastr_${SD} PUBLIC AMReX::Flags_FASTMATH)
+    endif()
+
     if(ABLASTR_FFT)
         target_link_libraries(ablastr_${SD} PUBLIC WarpX::thirdparty::FFT)
         if(D STREQUAL "RZ")
@@ -508,7 +551,7 @@ foreach(D IN LISTS WarpX_DIMS)
                 warpx_enable_IPO(pyWarpX_${SD})
             else()
                 # conditionally defined target in pybind11
-                # https://github.com/pybind/pybind11/blob/v2.13.0/tools/pybind11Common.cmake#L407-L413
+                # https://github.com/pybind/pybind11/blob/v3.0.0/tools/pybind11Common.cmake#L420-L426
                 target_link_libraries(pyWarpX_${SD} PRIVATE pybind11::lto)
             endif()
         endif()
@@ -542,7 +585,13 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        if(WarpX_SIMD)
+            # vir::cvt
+            # https://github.com/mattkretz/vir-simd/issues/45
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
+        else()
+            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
+        endif()
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF
@@ -622,11 +671,6 @@ foreach(D IN LISTS WarpX_DIMS)
         target_compile_definitions(pyWarpX_${SD} PRIVATE ABLASTR_IS_DLL_BUILDING)
     endif()
 endforeach()
-
-
-# Warnings ####################################################################
-#
-set_cxx_warnings()
 
 
 # Generate Configuration and .pc Files ########################################
@@ -807,6 +851,13 @@ if(BUILD_TESTING)
         add_subdirectory(Examples)
     endif()
 endif()
+
+
+# Warnings ####################################################################
+#
+foreach(warpx_tgt IN LISTS _ALL_TARGETS)
+    warpx_set_compile_warnings(${warpx_tgt})
+endforeach()
 
 
 # Status Summary for Build Options ############################################

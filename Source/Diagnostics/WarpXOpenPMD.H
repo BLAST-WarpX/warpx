@@ -40,8 +40,8 @@
 class WarpXParticleCounter
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
   WarpXParticleCounter (ParticleContainer* pc);
   [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
@@ -76,8 +76,8 @@ private:
 class WarpXOpenPMDPlot
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
   /** Initialize openPMD I/O routines
    *
@@ -152,6 +152,21 @@ public:
   /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
+  /** Ensure BTD buffers are written to disk
+   *
+   * This function can be called to intermediately ensure ADIOS buffered "steps"
+   * are written to disk, and the valid metadata if checkpointing is required.
+   *
+   * This is needed to read partial data while a simulation is running or
+   * to support restarting (the BTD diagnostics) in WarpX, so it
+   * can continue to append to a partially written labframe station
+   * after restart.
+   *
+   * The frequency is controlled by
+   * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5).
+   * It can be adjusted in the input file: diag_name.buffer_flush_limit_btd
+   */
+  void FlushBTDToDisk ();
 private:
   void Init (openPMD::Access access, bool isBTD);
 
@@ -181,14 +196,18 @@ private:
    * @param[in] isBTD if the current diagnostic is BTD
    *
    * if isBTD=false, apply the default flush behaviour
-   * if isBTD=true,  advice to use ADIOS Put() instead of PDW for better performance.
+   *                 in ADIOS, the action will be PerformDataWrite
+   * if isBTD=true,  in ADIOS, the action will be PerformPut
+   *                 because no action is taken for the span tasks.
+   *                 This way we can aggregate buffers before
+   *                 calling FlushBTDToDisk() to write out.
    *
    * iteration.seriesFlush() is used instead of series.flush()
    *  because the latter flushes only if data is dirty
    *  this causes trouble when the underlying writing function is collective (like PDW)
    *
    */
-  void flushCurrent (bool isBTD) const;
+  void seriesFlush (bool isBTD) const;
 
   /** This function does initial setup for the fields when interation is newly created
    *  @param[in] meshes   The meshes in a series
@@ -306,7 +325,6 @@ private:
    * @param[in] int_comp_names The int attribute names, from WarpX
    * @param[in] charge         Charge of the particles (note: fix for ions)
    * @param[in] mass           Mass of the particles
-   * @param[inout] ParticleFlushOffset previously flushed number of particles in BTD
    * @param[in] isBTD is this a backtransformed diagnostics (BTD) write?
    * @param[in] isLastBTDFlush is this the last time we will flush this BTD station?
    */
