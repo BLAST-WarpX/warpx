@@ -1,0 +1,125 @@
+# 2D charge exchange collision test (DSMC), with electrostatic solver.
+# Electrons (neutralizing background) + He+ ions + He neutrals.
+# He+ and He undergo DSMC charge exchange using the He resonant cross-section.
+# The electrostatic solver is active; total energy (field + particle) conservation
+# is verified using analysis_test_2d_collisions_split_momentum_push.py.
+
+# algo
+algo.field_gathering = energy-conserving
+algo.particle_shape = 2
+
+# amr
+amr.max_level = 0
+amr.n_cell = 16 16
+
+# boundary
+boundary.field_hi = periodic periodic
+boundary.field_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+
+# collisions
+collisions.collision_names = cx_col
+cx_col.type = dsmc
+cx_col.scattering_processes = charge_exchange
+cx_col.species = Heplus He
+cx_col.product_species = He Heplus
+cx_col.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/He/charge_exchange.dat
+
+# diagnostics
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = openpmd
+diag1.intervals = 2000
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
+diag1.write_species = 1
+diag1.species = electrons Heplus He
+diag1.electrons.variables = w x z ux uy uz
+diag1.Heplus.variables = w x z ux uy uz
+diag1.He.variables = w x z ux uy uz
+
+# electrons (neutralizing background for He+)
+electrons.charge = -q_e
+electrons.density = n0
+electrons.injection_style = "NUniformPerCell"
+electrons.mass = m_e
+electrons.momentum_distribution_type = gaussian
+electrons.num_particles_per_cell_each_dim = 8 8
+electrons.profile = constant
+electrons.species_type = electron
+electrons.ux_th = sqrt(Te*q_e/m_e)/clight
+electrons.uy_th = sqrt(Te*q_e/m_e)/clight
+electrons.uz_th = sqrt(Te*q_e/m_e)/clight
+electrons.xmax = 10*de0
+electrons.xmin = 0
+electrons.zmax = 10*de0
+electrons.zmin = 0
+
+# Heplus (He+ ions undergoing charge exchange)
+Heplus.charge = q_e
+Heplus.density = n0
+Heplus.injection_style = "NUniformPerCell"
+Heplus.mass = m_He
+Heplus.momentum_distribution_type = gaussian
+Heplus.num_particles_per_cell_each_dim = 8 8
+Heplus.profile = constant
+Heplus.ux_th = sqrt(Ti*q_e/m_He)/clight
+Heplus.uy_th = sqrt(Ti*q_e/m_He)/clight
+Heplus.uz_th = sqrt(Ti*q_e/m_He)/clight
+Heplus.xmax = 10*de0
+Heplus.xmin = 0
+Heplus.zmax = 10*de0
+Heplus.zmin = 0
+
+# He (neutral He atoms undergoing charge exchange)
+He.charge = 0
+He.density = n0
+He.injection_style = "NUniformPerCell"
+He.mass = m_He
+He.momentum_distribution_type = gaussian
+He.num_particles_per_cell_each_dim = 8 8
+He.profile = constant
+He.ux_th = sqrt(Ti*q_e/m_He)/clight
+He.uy_th = sqrt(Ti*q_e/m_He)/clight
+He.uz_th = sqrt(Ti*q_e/m_He)/clight
+He.xmax = 10*de0
+He.xmin = 0
+He.zmax = 10*de0
+He.zmin = 0
+
+# reduced diagnostics
+field_energy.intervals = 1
+field_energy.type = FieldEnergy
+particle_energy.intervals = 1
+particle_energy.type = ParticleEnergy
+
+# geometry
+geometry.dims = 2
+geometry.prob_hi = 10*de0 10*de0
+geometry.prob_lo = 0. 0.
+
+# interpolation
+interpolation.galerkin_scheme = 1
+
+# max_step
+max_step = 2000
+
+# my_constants
+my_constants.m_He = 4*m_p           # He mass, kg
+my_constants.n0 = 1e30              # number density, m^-3
+my_constants.Te = 100.              # electron temperature, eV
+my_constants.Ti = 100.              # He ion/neutral temperature, eV
+my_constants.wpe = q_e*sqrt(n0/(m_e*epsilon0))   # electron plasma frequency, rad/s
+my_constants.de0 = clight/wpe       # electron skin depth, m
+my_constants.dt = 0.1/wpe           # time step (electron timescale), s
+
+# particles
+particles.species_names = electrons Heplus He
+
+# warpx
+warpx.const_dt = dt
+warpx.do_electrostatic = labframe
+warpx.reduced_diags_names = field_energy particle_energy
+warpx.serialize_initial_conditions = 1
+warpx.use_filter = 0
+warpx.verbose = 1
