@@ -139,6 +139,7 @@ field_on_particle_diag = picmi.ParticleDiagnostic(
     name="openpmd",
     period=40,
     data_list=["x", "y", "z", "Ex", "Ey", "Ez"],
+    warpx_format="openpmd",
 )
 sim.add_diagnostic(particle_diag1_electrons)
 sim.add_diagnostic(particle_diag1_positrons)
