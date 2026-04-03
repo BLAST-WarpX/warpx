@@ -2794,6 +2794,12 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
 
+        if 'ndt' in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
+
         self.handle_init(kw)
 
     def collision_initialize_inputs(self):
@@ -2869,6 +2875,12 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.max_background_density = max_background_density
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+
+        if 'ndt' in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2949,6 +2961,12 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         self.product_species = product_species
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+
+        if 'ndt' in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
