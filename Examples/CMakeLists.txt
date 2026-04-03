@@ -1,6 +1,7 @@
 # Configuration ###############################################################
 #
 if(WarpX_MPI)
+    set(MPIEXEC_SUPPORTS_HOST OFF)
     # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
     if("$ENV{USER}" STREQUAL "root")
         # calling even --help as root will abort and warn on stderr
@@ -13,10 +14,20 @@ if(WarpX_MPI)
             set(MPI_ALLOW_ROOT --allow-run-as-root)
         endif()
         if(${MPIEXEC_HELP_TEXT} MATCHES "^.*--host.*$")
-            # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
-            # "There are not enough slots available in the system to satisfy the 2 slots
-            # that were requested by the application"
-            set(MPI_HOST_NUMPROC --host localhost:${nprocs})
+            set(MPIEXEC_SUPPORTS_HOST ON)
+        endif()
+    else()
+        # non-root: --help is safe to call; capture both stdout and stderr since
+        # MPI implementations vary in which stream they use for help text
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} --help
+            OUTPUT_VARIABLE MPIEXEC_HELP_TEXT
+            ERROR_VARIABLE MPIEXEC_HELP_TEXT_STDERR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        string(APPEND MPIEXEC_HELP_TEXT "${MPIEXEC_HELP_TEXT_STDERR}")
+        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*--host.*$")
+            set(MPIEXEC_SUPPORTS_HOST ON)
         endif()
     endif()
 endif()
@@ -112,6 +123,15 @@ function(add_warpx_test
     # cannot run executable tests w/o WarpX executable application
     if(NOT python AND NOT WarpX_APP)
         return()
+    endif()
+
+    # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
+    # "There are not enough slots available in the system to satisfy the 2 slots
+    # that were requested by the application"
+    if(MPIEXEC_SUPPORTS_HOST)
+        set(MPI_HOST_NUMPROC --host localhost:${nprocs})
+    else()
+        set(MPI_HOST_NUMPROC "")
     endif()
 
     # set MPI executable
