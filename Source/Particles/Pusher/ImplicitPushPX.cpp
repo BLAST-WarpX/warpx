@@ -729,9 +729,10 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // If no particles, do not do anything
     if (num_unconverged_particles == 0) { return; }
 
-    // Suborbits use the Villasenor deposition only.
-    // Because deposition kernels are templated, and have 4 different orders,
-    // this fused kernel is too large when all deposition types are included.
+    // Fused deposition kernels become too large when all orders/types are included.
+    // Suborbit uses Villasenor current deposition only. For energy conservation,
+    // the push must use the matching gather, so we override depos_type here to
+    // Villasenor (instead of the runtime-selected type).
     const auto depos_type = CurrentDepositionAlgo::Villasenor;
 
     // Get cell size on gather_lev
