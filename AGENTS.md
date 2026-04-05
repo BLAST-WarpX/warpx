@@ -75,6 +75,10 @@ Use `add_warpx_test()` in the test directory's `CMakeLists.txt`. Generate checks
 Tests must be quick to run on a 2 core CI CPU runner (ideally <30sec) and be written in a CPU/GPU portable way.
 Tests have analysis functions to validate their outputs are as expected.
 
+## Auto-Generated Files
+
+Never modify `.pyi` stub files. They are auto-generated on the `development` branch after a PR is merged.
+
 ## Linting and Formatting
 
 Pre-commit hooks handle formatting:
