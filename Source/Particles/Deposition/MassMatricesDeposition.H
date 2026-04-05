@@ -560,6 +560,10 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
     amrex::ParallelFor(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
+
+            // Skip particles with zero weight.
+            if (wp[ip] == 0.) { return; }
+
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
