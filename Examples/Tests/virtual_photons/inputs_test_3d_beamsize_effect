@@ -60,7 +60,6 @@ algo.particle_pusher = vay
 ########### PARTICLES ###########
 #################################
 particles.species_names = beam1 virtual_photons1 beam2 virtual_photons2
-particles.photon_species = virtual_photons1 virtual_photons2
 
 beam1.species_type = electron
 beam1.injection_style = gaussian_beam
