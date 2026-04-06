@@ -61,8 +61,7 @@ namespace {
     {
         using namespace amrex::literals;
 
-        constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
+        constexpr amrex::ParticleReal c_sq = PhysConst::c2;
         constexpr amrex::ParticleReal me = PhysConst::m_e;
         auto constexpr pow2 = [](double const x) { return x*x; };
 
@@ -126,35 +125,86 @@ namespace {
         // Sample azimuthal angle uniformly in [0, 2pi)
         const amrex::ParticleReal phi = 2._prt * MathConst::pi * amrex::Random(engine);
 
-        // Momentum of the each of the two products in CM frame
-        px_star = std::sqrt(p_star_sq) * sinth * std::cos(phi);
-        py_star = std::sqrt(p_star_sq) * sinth * std::sin(phi);
-        pz_star = std::sqrt(p_star_sq) * costh;
+        // Compute velocity of the center of momentum frame:
+        // v_CM = (p1 + p2) / (|p1| + |p2|) * c
+        const amrex::ParticleReal vcx = (p1x_in+p2x_in) * PhysConst::c / (p1_in + p2_in);
+        const amrex::ParticleReal vcy = (p1y_in+p2y_in) * PhysConst::c / (p1_in + p2_in);
+        const amrex::ParticleReal vcz = (p1z_in+p2z_in) * PhysConst::c / (p1_in + p2_in);
+        const amrex::ParticleReal vc_sq = vcx*vcx + vcy*vcy + vcz*vcz;
 
-        // Next step is to convert momenta to lab frame
-        amrex::ParticleReal p1x_out, p1y_out, p1z_out;
-        // Preliminary calculation: compute velocity of the center of momentum frame:
-        // v = (p1 + p2) / | p1 + p2 | * c
-        const amrex::ParticleReal vcx    = (p1x_in+p2x_in) * PhysConst::c / (p1_in + p2_in);
-        const amrex::ParticleReal vcy    = (p1y_in+p2y_in) * PhysConst::c / (p1_in + p2_in);
-        const amrex::ParticleReal vcz    = (p1z_in+p2z_in) * PhysConst::c / (p1_in + p2_in);
-        const amrex::ParticleReal vc_sq  = vcx*vcx + vcy*vcy + vcz*vcz;
-
-        // Convert momentum of first product to lab frame, using equation (13) of F. Perez et al.,
-        // Phys.Plasmas.19.083104 (2012) (which is a regular Lorentz transformation)
-        if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
+        // Collision axis = n = direction of photon 1 in the CM frame.
+        // Momentum of the first photon in the CM frame:
+        // p1_CM = p1_lab + v_CM * [(gc−1)/v^2 * (v_CM \dot p1) − gc*|p1|/c]
+        // n = p1_CM / |p1_CM|
+        // When v_CM ~ 0, photon 1's direction is unchanged.
+        // Otherwise, Lorentz-boost photon 1 to the CM frame.
+        amrex::ParticleReal nx = p1x_in;
+        amrex::ParticleReal ny = p1y_in;
+        amrex::ParticleReal nz = p1z_in;
+        amrex::ParticleReal gc = 1._prt;
+        if (vc_sq > std::numeric_limits<amrex::ParticleReal>::min())
         {
-            const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
+            // Lorentz factor of the CM frame boost
+            gc = 1._prt / std::sqrt(1._prt - vc_sq * PhysConst::inv_c2);
+            const amrex::ParticleReal vc_dot_p1 = vcx*p1x_in + vcy*p1y_in + vcz*p1z_in;
+            const amrex::ParticleReal bfact = (gc - 1._prt) / vc_sq * vc_dot_p1 - gc * p1_in / PhysConst::c;
+            nx += vcx * bfact;
+            ny += vcy * bfact;
+            nz += vcz * bfact;
+        }
+        const amrex::ParticleReal n_mag = std::sqrt(nx*nx + ny*ny + nz*nz);
+        nx /= n_mag;
+        ny /= n_mag;
+        nz /= n_mag;
+        // Build orthonormal basis (e1, e2, n) with n along collision axis
+        // if n is near z: n \times (0,0,1) = (ny, -nx, 0)
+        // otherwise: n \times (1,0,0) = (0, nz, -ny)
+        amrex::ParticleReal e1x, e1y, e1z;
+        if (amrex::Math::abs(nz) < 0.9_prt)
+        {
+            e1x =  ny;
+            e1y = -nx;
+            e1z =  0._prt;
+        }
+        else
+        {
+            e1x = 0._prt;
+            e1y = nz;
+            e1z = -ny;
+        }
+        const amrex::ParticleReal e1_mag = std::sqrt(e1x*e1x + e1y*e1y + e1z*e1z);
+        e1x /= e1_mag;
+        e1y /= e1_mag;
+        e1z /= e1_mag;
+        const amrex::ParticleReal e2x = ny*e1z - nz*e1y;
+        const amrex::ParticleReal e2y = nz*e1x - nx*e1z;
+        const amrex::ParticleReal e2z = nx*e1y - ny*e1x;
+
+        // Momentum of the first product in the CM frame, with the BW
+        // polar angle measured from the collision axis
+        const amrex::ParticleReal p_star_perp1 = std::sqrt(p_star_sq) * sinth * std::cos(phi);
+        const amrex::ParticleReal p_star_perp2 = std::sqrt(p_star_sq) * sinth * std::sin(phi);
+        const amrex::ParticleReal p_star_par  = std::sqrt(p_star_sq) * costh;
+        px_star = p_star_perp1*e1x + p_star_perp2*e2x + p_star_par*nx;
+        py_star = p_star_perp1*e1y + p_star_perp2*e2y + p_star_par*ny;
+        pz_star = p_star_perp1*e1z + p_star_perp2*e2z + p_star_par*nz;
+
+        amrex::ParticleReal p1x_out, p1y_out, p1z_out;
+        if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
+        {   // Convert momentum of first product to lab frame, using equation (13) of F. Perez et al.,
+            // Phys.Plasmas.19.083104 (2012) (which is a regular Lorentz transformation)
+            // p1_lab = p1_CM - v_CM * [(gc−1)/v^2 * (v_CM \dot p1) − gc*|p1|/c]
+            // Lorentz factor of the product (electron/positron) in the CM frame
             const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_sq / (me*me*c_sq));
-            const amrex::ParticleReal vcDps = vcx*px_star + vcy*py_star + vcz*pz_star;
+            const amrex::ParticleReal vc_dot_ps = vcx*px_star + vcy*py_star + vcz*pz_star;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
-            const amrex::ParticleReal factor = factor0*vcDps + me*g_star*gc;
+            const amrex::ParticleReal factor = factor0*vc_dot_ps + me*g_star*gc;
             p1x_out = px_star + vcx * factor;
             p1y_out = py_star + vcy * factor;
             p1z_out = pz_star + vcz * factor;
         }
-        else // If center of mass velocity is zero, we are already in the lab frame
-        {
+        else
+        {   // If center of mass velocity is zero, we are already in the lab frame
             p1x_out = px_star;
             p1y_out = py_star;
             p1z_out = pz_star;

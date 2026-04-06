@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 
-# This test checks the angular distribution of electron-positron pairs
-# produced by linear Breit-Wheeler pair production (gamma gamma -> e+ e-).
-#
-# Two monoenergetic photon populations counter-propagate head-on along the
-# x-axis with normalized momentum ux = +/-2.8 (in units of m_e*c).
-# Since the total momentum is zero, the center-of-momentum (CM) frame
-# coincides with the lab frame.
-#
-# The test verifies:
-#   1. Energy and momentum conservation (via reduced diagnostics).
-#   2. Correct lepton Lorentz factor (kinematics: gamma_lepton = u_photon).
-#   3. The angular distribution of the produced pairs matches the
-#      Breit-Wheeler differential cross section:
-#        dsigma/d(cos theta) ~ f(beta, cos theta) with
-#        f(beta, x) = [1 + 2*beta^2 - 2*beta^4
-#                       - 2*beta^2*(1 - beta^2)*x^2
-#                       - beta^4*x^4] / (1 - beta^2*x^2)^2
-#      where beta = sqrt(1 - 1/s) is the lepton velocity in the CM frame,
-#      s = u_photon^2, and x = cos theta.
+"""
+This test checks the angular distribution of electron-positron pairs
+produced by linear Breit-Wheeler pair production (gamma gamma -> e+ e-).
+
+Two monoenergetic photon populations counter-propagate head-on along the
+x-axis with normalized momentum ux = +/-2.8 (in units of m_e*c).
+Since the total momentum is zero, the center-of-momentum (CM) frame
+coincides with the lab frame.
+
+The test verifies:
+  1. Energy and momentum conservation (via reduced diagnostics).
+  2. Correct lepton Lorentz factor (kinematics: gamma_lepton = u_photon).
+  3. The angular distribution of the produced pairs matches the
+     Breit-Wheeler differential cross section in the CM frame:
+        dsigma/dx ~ [1 + 2*beta^2 - 2*beta^4
+                       - 2*beta^2*(1 - beta^2)*x^2
+                       - beta^4*x^4] / (1 - beta^2*x^2)^2
+        where
+        - x = cos(theta), theta the polar angle of the outgoing leptons
+        - beta = sqrt(1 - 1/s) is the lepton velocity in the CM frame
+        - s = (photon_energy/(m_e*c^2)) ^2
+"""
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
@@ -28,21 +31,13 @@ do_plot = True
 
 
 def lbw_diff_xsec(beta, cos_theta):
-    """BW differential cross section dsigma/d(cos theta)."""
+    """BW differential cross section dsigma/d(cos(theta))."""
     b2 = beta**2
     b4 = b2**2
     x2 = cos_theta**2
     num = 1.0 + 2.0 * b2 - 2.0 * b4 - 2.0 * b2 * (1.0 - b2) * x2 - b4 * x2**2
     den = (1.0 - b2 * x2) ** 2
     return num / den
-
-
-def lbw_pdf(beta, cos_theta):
-    """Normalized PDF for cos theta in BW pair production."""
-    x = np.linspace(-1, 1, 10001)
-    f = lbw_diff_xsec(beta, x)
-    norm = np.trapezoid(f, x)
-    return lbw_diff_xsec(beta, cos_theta) / norm
 
 
 def check_energy_conservation():
@@ -78,48 +73,60 @@ def check_momentum_conservation():
 
 def check_angular_distribution():
     """Check angular distribution of produced pairs against BW theory."""
-    u_photon = 2.8
+    ux_photon = 2.8  # = photon_energy/(m_e*c^2)
 
     # For head-on collision of equal-energy photons:
-    # s = u_photon^2 and beta = sqrt(1 - 1/s)
-    s = u_photon**2
+    # s = ux_photon^2 and beta = sqrt(1 - 1/s)
+    s = ux_photon**2
     beta = np.sqrt(1.0 - 1.0 / s)
-    gamma_expected = u_photon
+    gamma_expected = ux_photon
 
     ts = OpenPMDTimeSeries("diags/diag1/")
     it = ts.iterations[-1]
 
-    px_e, py_e, pz_e, w_e = ts.get_particle(
+    ux_e, uy_e, uz_e, w_e = ts.get_particle(
         ["ux", "uy", "uz", "w"], species="electron", iteration=it
     )
 
     # ux/uy/uz are normalized momenta (gamma*beta) for electrons
-    p_mag = np.sqrt(px_e**2 + py_e**2 + pz_e**2)
-    gamma = np.sqrt(1.0 + p_mag**2)
+    u_mag = np.sqrt(ux_e**2 + uy_e**2 + uz_e**2)
+    gamma = np.sqrt(1.0 + u_mag**2)
     assert np.all(np.isclose(gamma, gamma_expected, rtol=1e-5)), (
         f"Expected gamma={gamma_expected}, "
         f"got min={gamma.min():.6f}, max={gamma.max():.6f}"
     )
 
-    # cos(theta*) in the CM frame (= lab frame for this setup).
-    # The code assigns the BW polar angle to the z-axis.
-    cos_theta = pz_e / p_mag
+    # cos(theta) in the CM frame (= lab frame for this setup).
+    # The BW polar angle is measured from the collision axis, which is
+    # the direction of photon 1 (along +x in this test).
+    cos_theta = ux_e / u_mag
 
-    # Binned histogram of cos(theta*), weighted by particle weight
+    # Binned histogram of cos(theta), weighted by particle weight
     n_bins = 20
     bins = np.linspace(-1, 1, n_bins + 1)
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
+    bin_width = bins[1] - bins[0]
     hist, _ = np.histogram(cos_theta, bins=bins, weights=w_e)
 
-    # Normalize to a probability density
-    bin_width = bins[1] - bins[0]
-    hist_norm = hist / (hist.sum() * bin_width)
+    # Expected bin counts from the unnormalized differential cross section.
+    # The total weight fixes the absolute scale; the shape comes from theory.
+    theory_shape = lbw_diff_xsec(beta, bin_centers)
+    x_fine = np.linspace(-1, 1, 10001)
+    integral_f = np.trapezoid(lbw_diff_xsec(beta, x_fine), x_fine)
 
-    # Theoretical PDF
-    theory_pdf = lbw_pdf(beta, bin_centers)
+    # Verify analytical vs numerical integral of f.
+    # Analytical: integral of f from -1 to 1 = [(3-b^4)*ln((1+b)/(1-b)) + 2b(b^2-2)] / b
+    term1 = (3.0 - beta**4) * np.log((1.0 + beta) / (1.0 - beta))
+    term2 = 2.0 * beta * (beta**2 - 2.0)
+    integral_f_analytical = (term1 + term2) / beta
+    assert np.isclose(integral_f, integral_f_analytical, rtol=1e-6), (
+        f"Numerical integral {integral_f:.8f} != analytical {integral_f_analytical:.8f}"
+    )
 
-    # Compare simulation with theory
-    rel_err = np.abs(hist_norm - theory_pdf) / theory_pdf
+    expected_counts = hist.sum() * bin_width * theory_shape / integral_f
+
+    # Compare simulation with theory (unnormalized)
+    rel_err = np.abs(hist - expected_counts) / expected_counts
     max_rel_err = np.max(rel_err)
     print(f"Max relative error in angular distribution: {max_rel_err:.4f}")
     assert np.all(rel_err < 0.15), (
@@ -130,17 +137,17 @@ def check_angular_distribution():
         import matplotlib.pyplot as plt
 
         cos_fine = np.linspace(-1, 1, 500)
-        theory_fine = lbw_pdf(beta, cos_fine)
+        theory_fine = (
+            hist.sum() * bin_width * lbw_diff_xsec(beta, cos_fine) / integral_f
+        )
 
         fig, ax = plt.subplots()
-        ax.bar(
-            bin_centers, hist_norm, width=bin_width * 0.9, alpha=0.6, label="Simulation"
-        )
+        ax.bar(bin_centers, hist, width=bin_width * 0.9, alpha=0.6, label="Simulation")
         ax.plot(cos_fine, theory_fine, "r-", lw=2, label="BW theory")
         ax.set_xlabel(r"$\cos\theta^*$")
-        ax.set_ylabel("Probability density")
+        ax.set_ylabel("Weighted pair count")
         ax.set_title(
-            rf"BW angular distribution ($u_\gamma = {u_photon}$, "
+            rf"BW angular distribution ($u_\gamma = {ux_photon}$, "
             rf"$\beta = {beta:.3f}$)"
         )
         ax.legend()
