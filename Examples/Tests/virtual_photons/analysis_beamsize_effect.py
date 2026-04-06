@@ -14,7 +14,6 @@
 # the virtual photon coordinates are left as they are.
 
 import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
