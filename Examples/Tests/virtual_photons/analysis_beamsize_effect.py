@@ -14,14 +14,18 @@
 # the virtual photon coordinates are left as they are.
 
 import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, eV, m_e
 
 m_e_ev = m_e * c**2 / eV
+
+
 def rho_x(x):
     return hbar * c / (m_e_ev * x)
+
 
 sigma_x = 1  # [m]
 sigma_y = 1  # [m]
