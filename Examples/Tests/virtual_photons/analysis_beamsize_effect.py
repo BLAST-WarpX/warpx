@@ -26,7 +26,6 @@ m_e_ev = m_e * c**2 / eV
 def rho_x(x):
     return hbar * c / (m_e_ev * x)
 
-
 sigma_x = 1  # [m]
 sigma_y = 1  # [m]
 GeV = 1e9 * eV
