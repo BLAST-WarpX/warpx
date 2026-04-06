@@ -21,8 +21,6 @@ from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, eV, m_e
 
 m_e_ev = m_e * c**2 / eV
-
-
 def rho_x(x):
     return hbar * c / (m_e_ev * x)
 
