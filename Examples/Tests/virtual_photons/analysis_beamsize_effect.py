@@ -42,10 +42,6 @@ x_vphot_pos, y_vphot_pos, z_vphot_pos, uz_vphot_pos, w_vphot_pos = series.get_pa
     ["x", "y", "z", "uz", "w"], species="virtual_photons2", iteration=1
 )
 
-# convert to [Eb]
-e_vphot_ele = uz_vphot_ele * c / energy
-e_vphot_pos = -uz_vphot_pos * c / energy
-
 x_ele, y_ele, z_ele, uz_ele, w_ele = series.get_particle(
     ["x", "y", "z", "uz", "w"], species="beam1", iteration=1
 )
