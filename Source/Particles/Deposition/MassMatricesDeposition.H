@@ -500,6 +500,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  * \tparam deposit_J               Whether to deposit J
  * \param GetPosition              A functor for returning the particle position.
+ * \param nsuborbits               Pointer to the number of suborbits for this particle.
  * \param wp                       Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n        Pointer to arrays of particle momentum at time n.
  * \param uxp_nph,uyp_nph,uzp_nph  Pointer to arrays of particle momentum at time n+1/2.
@@ -519,6 +520,7 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
  */
 template <int depos_order, bool full_mass_matrices>
 void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
+                              [[maybe_unused]] const int* nsuborbits,
                               const amrex::ParticleReal* wp,
                               const amrex::ParticleReal* uxp_n,
                               const amrex::ParticleReal* uyp_n,
@@ -561,8 +563,8 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
 
-            // Skip particles with zero weight.
-            if (wp[ip] == 0.) { return; }
+            // Skip mass matrix deposition for particles with suborbits.
+            if (nsuborbits && nsuborbits[ip] > 1) { return; }
 
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
@@ -1683,9 +1685,6 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }
-
-            // Skip particles with zero weight.
-            if (wp[ip] == 0.) { return; }
 
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
