@@ -95,10 +95,13 @@ void VelocityCoincidenceThinning::operator() (
     auto *const indices = bins.permutationPtr();
     auto *const cell_offsets = bins.offsetsPtr();
 
+#if defined(WARPX_ZINDEX)
+#if !defined(WARPX_DIM_1D_Z)
     const auto dxi = geom_lev.InvCellSizeArray();
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(pti.tilebox(), lev, 0._rt);
-
     const int depos_order = WarpX::nox;
+#endif
+#endif
 
     const auto min_ppc = m_min_ppc;
     const auto cluster_weight = m_cluster_weight;
