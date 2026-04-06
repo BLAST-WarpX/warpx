@@ -69,7 +69,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
 #if defined (WARPX_DIM_3D)
-        bool do_beam_size_effect = primary.has_bhabha_beam_size_effect();
+        bool do_beam_size_effect = primary.has_virtual_photons_beam_size_effect();
 #endif
         // Minimum allowed energy of the virtual photons
         amrex::Real vphoton_min_energy;
@@ -246,7 +246,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         // Beam size effect: displace the virtual photon position according to the virtuality
                         if (do_beam_size_effect){
                             // Find distance at which the photon should be displaced (radius)
-                            // Refer to [ADD REFERENCE]
+                            // Refer to doi.org/10.1103/PhysRevAccelBeams.27.091001
                             // radius = hbar * c / [ e * sqrt( Q2*(1-y) ) ]
                             // where Q2 is the virtuality, y the fractional energy
                             // log(Q2) is uniformly distributed between Q2_min and Q2_max
@@ -254,8 +254,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                             // which implies that Q2 can be sampled as
                             // Q2 = Q2_min * (Q2_max / Q2_min)^(rnd)
                             // where rnd is a random number uniformly distributed between 0 and 1
-                            const amrex::ParticleReal compton_wavelength = PhysConst::hbar / (PhysConst::m_e * PhysConst::c);
-                            amrex::ParticleReal radius = compton_wavelength * std::pow(frac_energy,  amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
+                            amrex::ParticleReal radius = PhysConst::reduced_compton_wavelength * std::pow(frac_energy,  -amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
 
                             amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
                             amrex::ParticleReal cos_theta = std::cos(theta);

@@ -277,7 +277,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         pp_species_name.query("qed_virtual_photon_species_name", m_qed_virtual_photon_species_name);
     }
 
-    pp_species_name.query("do_bhabha_beam_size_effect", m_do_bhabha_beam_size_effect);
+    pp_species_name.query("qed_virtual_photons_do_beam_size_effect", m_qed_virtual_photons_do_beam_size_effect);
 
 #endif
 
@@ -1705,9 +1705,9 @@ bool PhysicalParticleContainer::has_virtual_photons () const
     return m_do_qed_virtual_photons;
 }
 
-bool PhysicalParticleContainer::has_bhabha_beam_size_effect () const
+bool PhysicalParticleContainer::has_virtual_photons_beam_size_effect () const
 {
-    return m_do_bhabha_beam_size_effect;
+    return m_qed_virtual_photons_do_beam_size_effect;
 }
 
 int PhysicalParticleContainer::getVirtualPhotonSpeciesIndex() const{

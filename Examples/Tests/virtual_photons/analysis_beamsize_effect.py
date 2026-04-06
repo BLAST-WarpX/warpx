@@ -14,18 +14,14 @@
 # the virtual photon coordinates are left as they are.
 
 import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c, eV, m_e
 
 m_e_ev = m_e * c**2 / eV
-
-
 def rho_x(x):
     return hbar * c / (m_e_ev * x)
-
 
 sigma_x = 1  # [m]
 sigma_y = 1  # [m]
@@ -45,10 +41,6 @@ x_vphot_ele, y_vphot_ele, z_vphot_ele, uz_vphot_ele, w_vphot_ele = series.get_pa
 x_vphot_pos, y_vphot_pos, z_vphot_pos, uz_vphot_pos, w_vphot_pos = series.get_particle(
     ["x", "y", "z", "uz", "w"], species="virtual_photons2", iteration=1
 )
-
-# convert to [Eb]
-e_vphot_ele = uz_vphot_ele * c / energy
-e_vphot_pos = -uz_vphot_pos * c / energy
 
 x_ele, y_ele, z_ele, uz_ele, w_ele = series.get_particle(
     ["x", "y", "z", "uz", "w"], species="beam1", iteration=1
@@ -101,3 +93,5 @@ plt.legend()
 assert np.all(rr < rho_max)
 assert np.all(x_vphot_ele == x_ele)
 assert np.all(y_vphot_ele == y_ele)
+assert ~np.all(x_vphot_pos == x_pos)
+assert ~np.all(y_vphot_pos == y_pos)

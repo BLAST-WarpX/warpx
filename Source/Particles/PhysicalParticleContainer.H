@@ -400,7 +400,11 @@ public:
      */
     bool has_virtual_photons () const override;
 
-    bool has_bhabha_beam_size_effect () const override;
+    /**
+    * Tells if beam size effect is enabled for
+    * the virtual photons
+    */
+    bool has_virtual_photons_beam_size_effect () const override;
 
     /**
      * Gets the index of the PhysicalParticleContainer
@@ -505,8 +509,8 @@ protected:
     // A flag to enable virtual photons
     bool m_do_qed_virtual_photons = false;
 
-    // A flag to enable beam size effect ala xsuite/guineapig in radiative bhabha
-    bool m_do_bhabha_beam_size_effect = false;
+    // A flag to enable beam size effect ala xsuite/guineapig in radiative bhabha and pairs
+    bool m_qed_virtual_photons_do_beam_size_effect = false;
 
 #endif
     /* Vector of user-defined integer attributes for species, species_name */

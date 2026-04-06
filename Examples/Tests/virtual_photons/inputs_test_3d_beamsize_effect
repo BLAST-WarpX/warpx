@@ -7,7 +7,7 @@ my_constants.GeV   = q_e*1.e9
 # BEAMS
 my_constants.beam_energy = 182.5*GeV
 my_constants.beam_gamma  = beam_energy/mc2
-my_constants.beam_npart  = 155000000000 # [e]
+my_constants.beam_npart  = 1.55e11 # [e]
 my_constants.nmacropart  = 1
 my_constants.beam_charge = q_e * beam_npart
 my_constants.sigmax      = 1 # [m]
@@ -60,7 +60,6 @@ algo.particle_pusher = vay
 ########### PARTICLES ###########
 #################################
 particles.species_names = beam1 virtual_photons1 beam2 virtual_photons2
-particles.photon_species = virtual_photons1 virtual_photons2
 
 beam1.species_type = electron
 beam1.injection_style = gaussian_beam
@@ -81,7 +80,7 @@ beam1.ux_th = 0.0
 beam1.uy_th = 0.0
 beam1.uz_th = 0.0
 beam1.do_qed_virtual_photons = 1
-beam1.do_bhabha_beam_size_effect = 0
+beam1.qed_virtual_photons_do_beam_size_effect = 0
 beam1.qed_virtual_photon_species_name = virtual_photons1
 beam1.do_not_deposit = 1
 beam1.do_not_push = 1
@@ -105,7 +104,7 @@ beam2.ux_th = 0.0
 beam2.uy_th = 0.0
 beam2.uz_th = 0.0
 beam2.do_qed_virtual_photons = 1
-beam2.do_bhabha_beam_size_effect = 1
+beam2.qed_virtual_photons_do_beam_size_effect = 1
 beam2.qed_virtual_photon_species_name = virtual_photons2
 beam2.do_not_deposit = 1
 beam2.do_not_push = 1
