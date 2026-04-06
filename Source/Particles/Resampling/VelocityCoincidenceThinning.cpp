@@ -96,7 +96,6 @@ void VelocityCoincidenceThinning::operator() (
     auto *const cell_offsets = bins.offsetsPtr();
 
     const auto dxi = geom_lev.InvCellSizeArray();
-    const auto dx = geom_lev.CellSizeArray();
     const amrex::XDim3 xyzmin = WarpX::LowerCorner(pti.tilebox(), lev, 0._rt);
 
     const int depos_order = WarpX::nox;
