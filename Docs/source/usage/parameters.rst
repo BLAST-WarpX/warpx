@@ -2268,8 +2268,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
-* ``<collision_name>.ndt`` (`int`) optional
-    Execute collision every # time steps. The default value is 1.
+* ``<collision_name>.ndt_supercycle`` (`int`) optional
+    Execute collision once every ``ndt_supercycle`` PIC time steps.
+    The effective collision time step is ``dt_collision = ndt_supercycle * dt_PIC``.
+    Must be >= 1. Mutually exclusive with ``ndt_subcycle``. Default is 1.
+
+* ``<collision_name>.ndt_subcycle`` (`int`) optional
+    Execute collision ``ndt_subcycle`` times per PIC time step.
+    The effective collision time step is ``dt_collision = dt_PIC / ndt_subcycle``.
+    Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
+    Useful when a large PIC time step is desired but collisions require finer time resolution.
 
 * ``<collision_name>.CoulombLog`` (`float`) optional
     Only for ``pairwisecoulomb``. A provided fixed Coulomb logarithm of the
