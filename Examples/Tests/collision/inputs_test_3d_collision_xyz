@@ -68,9 +68,9 @@ collision3.species = ion ion
 collision1.CoulombLog = 15.9
 collision2.CoulombLog = 15.9
 collision3.CoulombLog = 15.9
-collision1.ndt = 10
-collision2.ndt = 10
-collision3.ndt = 10
+collision1.ndt_supercycle = 10
+collision2.ndt_supercycle = 10
+collision3.ndt_supercycle = 10
 
 # Diagnostics
 diagnostics.diags_names = diag1 diag_parser_filter diag_uniform_filter diag_random_filter
