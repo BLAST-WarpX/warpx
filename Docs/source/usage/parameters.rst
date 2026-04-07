@@ -1617,6 +1617,12 @@ Particle initialization
     This QED feature is separated from the strong-field QED modules (quantum synchrotron and non-linear Breit-Wheeler).
     It requires WarpX to be compiled with ``WarpX_QED=ON`` (CMake) or ``QED=TRUE`` (GNU Make).
 
+* ``<species>.qed_virtual_photons_do_beam_size_effect`` (`boolean`) optional (default `false`)
+    Applies the beam size effect on the virtual photons.
+    This effect reduces the radiative Bhabha scattering cross section by approximately half, by smearing the impact parameter of the virtual photons on a disc around the equivalent primary. This accounts for the finite transverse size of the colliding bunches. Otherwise all virtual photons are assumed at the same impact parameter. The (transverse) virtual photon coordinates will be randomized around the coordinate of the corresponding primary and distributed on a disc perpendicular to the primary's propagation direction. The radius of the disc is :math:`\rho=\frac{\hbar}{\sqrt{Q^2(1-x)}}`, where :math:`Q` is the photon virtuality and :math:`x` is the fractional photon energy.
+    See :cite:t:`param-Kicsiny2024` for more details.
+
+
 .. _running-cpp-parameters-fluids:
 
 Cold Relativistic Fluid initialization
