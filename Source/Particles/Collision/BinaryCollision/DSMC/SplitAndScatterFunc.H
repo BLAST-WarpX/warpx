@@ -15,6 +15,7 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 /**
  * \brief This class defines an operator to create product particles from DSMC
@@ -370,7 +371,7 @@ public:
                     -reaction_energy*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    false,
+                    ScatteringAngleModel::Forward,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the reactant particle, in the center-of-mass frame
                     engine);
