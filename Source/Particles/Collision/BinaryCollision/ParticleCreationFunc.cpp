@@ -52,6 +52,12 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
         WARPX_ABORT_WITH_MESSAGE("Unknown collision type in ParticleCreationFunc");
     }
 
+    if (m_collision_type == CollisionType::ProtonBoronToAlphasFusion
+        || BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
+    {
+        pp_collision_name.query_enum_sloppy("scattering_angle_model", m_scattering_angle_model, "-_");
+    }
+
 #ifdef AMREX_USE_GPU
      m_num_products_device.resize(m_num_product_species);
      amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_num_products_host.begin(),
