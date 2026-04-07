@@ -39,7 +39,7 @@ function(find_pyamrex)
     if(WarpX_pyamrex_internal OR WarpX_pyamrex_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-        # safe compile time
+        # save compile time
         set(pyAMReX_CODES "WarpX" CACHE INTERNAL "Fine-tune the pre-compiled particle containers for downstream codes")
 
         # skip pyAMReX's own tests (e.g., pytest.AMReX) in the WarpX superbuild
