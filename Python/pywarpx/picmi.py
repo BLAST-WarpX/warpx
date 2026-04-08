@@ -4483,16 +4483,12 @@ class LabFrameParticleDiagnostic(
         else:
             species_names = [self.species.name]
 
-        rf = (
-            {k.name: v for k, v in self.random_fraction.items()}
-            if isinstance(self.random_fraction, dict)
-            else self.random_fraction
-        )
-        us = (
-            {k.name: v for k, v in self.uniform_stride.items()}
-            if isinstance(self.uniform_stride, dict)
-            else self.uniform_stride
-        )
+        def _resolve(attr, name):
+            if isinstance(attr, dict):
+                return next(
+                    (v for k, v in attr.items() if getattr(k, "name", k) == name), None
+                )
+            return attr
 
         if self.mangle_dict is None:
             # Only do this once so that the same variables are used in this diagnostics
@@ -4503,8 +4499,8 @@ class LabFrameParticleDiagnostic(
             diag = pywarpx.Bucket.Bucket(
                 self.name + "." + name,
                 variables=variables,
-                random_fraction=rf.get(name, None) if isinstance(rf, dict) else rf,
-                uniform_stride=us.get(name, None) if isinstance(us, dict) else us,
+                random_fraction=_resolve(self.random_fraction, name),
+                uniform_stride=_resolve(self.uniform_stride, name),
             )
             expression = pywarpx.my_constants.mangle_expression(
                 self.plot_filter_function, self.mangle_dict
