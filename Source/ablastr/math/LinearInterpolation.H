@@ -34,7 +34,7 @@ namespace ablastr::math
      * (x0, y0, f00), (x0, y1, f01), (x1, y0, f10), (x1, y1, f11).
      */
     template<typename TCoord, typename TVal>
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     constexpr auto bilinear_interp(
         TCoord x0, TCoord x1, TCoord y0, TCoord y1,
         TVal f00, TVal f01, TVal f10, TVal f11,
