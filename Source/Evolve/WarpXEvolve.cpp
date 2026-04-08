@@ -751,7 +751,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
-        mypc->deleteInvalidParticles();
+        if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
+            // If particles are simply absorbed, no need for a full Redistribute.
+            // Instead: simply delete the absorbed particles
+            mypc->deleteInvalidParticles();
+        } else {
+            // For other particle boundary conditions (e.g. reflecting),
+            // particles can move to a different sub-domain, so we need a full Redistribute
+            mypc->Redistribute();
+        }
     }
 
     if (sort_intervals.contains(step+1)) {

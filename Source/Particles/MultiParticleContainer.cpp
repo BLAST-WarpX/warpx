@@ -1147,8 +1147,20 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
-    for (auto& pc : allcontainers) {
-        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+    if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting) {
+        auto& warpx = WarpX::GetInstance();
+        for (auto& pc : allcontainers) {
+            amrex::ParticleReal const mass = pc->getMass();
+            for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
+                amrex::Real const dt_lev = warpx.getdt(lev);
+                scrapeParticlesAtEB(*pc, distance_to_eb, lev,
+                    ParticleBoundaryProcess::Reflect{dt_lev, mass});
+            }
+        }
+    } else {
+        for (auto& pc : allcontainers) {
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        }
     }
 }
 

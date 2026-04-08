@@ -10,7 +10,6 @@
 #include "EmbeddedBoundary/DistanceToEB.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 
-
 #include <ablastr/particles/NodalFieldGather.H>
 
 #include <AMReX.H>
@@ -55,13 +54,18 @@
  *        The form of the callable should model:
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
- *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *        void operator() (PData& ptd, int i,
+ *                         amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+ *                         const amrex::RealVect& normal, amrex::Real phi_value,
+ *                         amrex::Array4<const amrex::Real> const& phi,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
- *        engine is for random number generation, if needed.
+ *        xp/yp/zp the Cartesian particle position, normal the boundary normal vector,
+ *        phi_value the signed distance at the particle position, phi the signed distance
+ *        array, plo/dxi the geometry data, and engine for random number generation.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
 void
@@ -98,13 +102,18 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *        The form of the callable should model:
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
- *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *        void operator() (PData& ptd, int i,
+ *                         amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+ *                         const amrex::RealVect& normal, amrex::Real phi_value,
+ *                         amrex::Array4<const amrex::Real> const& phi,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
- *        engine is for random number generation, if needed.
+ *        xp/yp/zp the Cartesian particle position, normal the boundary normal vector,
+ *        phi_value the signed distance at the particle position, phi the signed distance
+ *        array, plo/dxi the geometry data, and engine for random number generation.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
 void
@@ -143,13 +152,18 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *        The form of the callable should model:
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
- *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *        void operator() (PData& ptd, int i,
+ *                         amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+ *                         const amrex::RealVect& normal, amrex::Real phi_value,
+ *                         amrex::Array4<const amrex::Real> const& phi,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
- *        engine is for random number generation, if needed.
+ *        xp/yp/zp the Cartesian particle position, normal the boundary normal vector,
+ *        phi_value the signed distance at the particle position, phi the signed distance
+ *        array, plo/dxi the geometry data, and engine for random number generation.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
 void
@@ -195,21 +209,7 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
                         xp, yp, zp, plo, dxi, ic, jc, kc, Wc);
                     amrex::RealVect normal = DistanceToEB::interp_normal(i, j, k, W, ic, jc, kc, Wc, phi, dxi);
                     DistanceToEB::normalize(normal);
-                    amrex::RealVect pos;
-#if (defined WARPX_DIM_3D)
-                    pos[0] = xp;
-                    pos[1] = yp;
-                    pos[2] = zp;
-#elif (defined WARPX_DIM_XZ)
-                    pos[0] = xp;
-                    pos[1] = zp;
-#elif (defined WARPX_DIM_RZ)
-                    pos[0] = std::sqrt(xp*xp + yp*yp);
-                    pos[1] = zp;
-#elif (defined WARPX_DIM_1D_Z)
-                    pos[0] = zp;
-#endif
-                    f(ptd, ip, pos, normal, engine);
+                    f(ptd, ip, xp, yp, zp, normal, phi_value, phi, plo, dxi, engine);
 
                 }
             });
