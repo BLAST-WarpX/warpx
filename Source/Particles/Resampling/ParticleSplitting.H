@@ -49,10 +49,15 @@ public:
         int lev, WarpXParticleContainer* pc) const final;
 
 private:
-    int m_min_ppc = 1;
+    /** skip cells with fewer than this number of macroparticles to obtain a sufficiently accurate average weight */
+    int m_min_ppc = 10;
+    /** split macroparticles with w > m_split_weight_koef * (cell mean weight) */
+    amrex::Real m_split_weight_koef = 4.0;
+    /** if m_skip_split_if_ppc_above > 0, do not split in cells with more than this many macroparticles */
+    int m_skip_split_if_ppc_above = 0;
     bool m_resampling_random_splitting_angle = true;
     amrex::ParticleReal m_splitting_angle = 0.0_rt;
     std::string m_splitting_type = "position_axes_aligned_split";
-    int m_splitting_type_id = 1; // 0: unchanged positions splitting type; 1: axes-aligned positions, 2: velocity-aligned positions
+    int m_splitting_type_id = 1; // 0: unchanged positions splitting type; 1: axes-aligned positions (default), 2: velocity-aligned positions
 };
 #endif // WARPX_PARTICLE_SPLITTING_H_
