@@ -784,10 +784,10 @@ MultiParticleContainer::SortParticlesByBin (
 }
 
 void
-MultiParticleContainer::Redistribute (const bool remove_negative)
+MultiParticleContainer::Redistribute ()
 {
     for (auto& pc : allcontainers) {
-        pc->Redistribute(0, -1, 0, 0, remove_negative);
+        pc->Redistribute();
     }
 }
 
@@ -808,10 +808,10 @@ MultiParticleContainer::deleteInvalidParticles ()
 }
 
 void
-MultiParticleContainer::RedistributeLocal (const int num_ghost, const bool remove_negative)
+MultiParticleContainer::RedistributeLocal (const int num_ghost)
 {
     for (auto& pc : allcontainers) {
-        pc->Redistribute(0, 0, 0, num_ghost, remove_negative);
+        pc->Redistribute(0, 0, 0, num_ghost);
     }
 }
 

@@ -709,6 +709,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 {
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
+    ExecutePythonCallback("particlescraper");
+
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
@@ -716,7 +718,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
         electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
     {
-        mypc->Redistribute(false);
+        mypc->Redistribute();
     }
     else
     {
@@ -732,10 +734,10 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
                 // Standard algorithm ; particles can move by up to the max number
                 num_redistribute_ghost += particle_max_grid_crossings;
             }
-            mypc->RedistributeLocal(num_redistribute_ghost, false);
+            mypc->RedistributeLocal(num_redistribute_ghost);
         }
         else {
-            mypc->Redistribute(false);
+            mypc->Redistribute();
         }
     }
 
@@ -745,12 +747,9 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+        // Remove particles that have been flagged to be scraped
+        mypc->deleteInvalidParticles();
     }
-
-    ExecutePythonCallback("particlescraper");
-
-    // Remove particles that have been flagged to be scraped
-    mypc->deleteInvalidParticles();
 
     if (sort_intervals.contains(step+1)) {
         if (verbose && !m_limit_verbose_step) {
