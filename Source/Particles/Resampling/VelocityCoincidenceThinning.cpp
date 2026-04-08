@@ -311,16 +311,21 @@ void VelocityCoincidenceThinning::operator() (
                         amrex::ParticleReal deltax = 0._prt;
                         amrex::ParticleReal deltaz = 0._prt;
                         if (depos_order == 1) {
-                            // The particles to be merge may have correlation between x and z.
+                            // Ensure conservation of charge when shape == 1 and 2D.
+                            // In 1D, putting the two particles at the average position ensures
+                            // charge conservation. (Two particles are needed to conserve energy and momentum.)
+                            // However, in 2D, the particles to be merged may have correlation between x and z,
+                            // defined as Cxz = ave(x*z) - ave(x)*ave(z) not equal to zero.
                             // This cannot be accounted for by two particles at the same location.
                             // A small plus/minus offset to the particles can provide that correlation.
-                            // The correlation_error is the difference of the x-z correlation of the particles
-                            // to be merged, and the x-z correlation or the new particles.
-                            // The offset is calculated to force the error to zero, and set so that the
-                            // x and z offsets are the same.
-                            const amrex::ParticleReal correlation_error = cluster_xz - cluster_x*cluster_z;
-                            deltax = std::sqrt(std::abs(correlation_error));
-                            deltaz = std::copysign(deltax, correlation_error);
+                            // Using the expression for the deposition in the far upper corner, the relation
+                            // between the x and z offsets can be found based on the correlation,
+                            // deltaz = Cxz/deltax.
+                            // The x and z offset magnitudes can be made equal, deltax = deltaz = sqrt(Cxz),
+                            // though note that Cxz can be negative with the sign given to deltaz.
+                            const amrex::ParticleReal correlation = cluster_xz - cluster_x*cluster_z;
+                            deltax = std::sqrt(std::abs(correlation));
+                            deltaz = std::copysign(deltax, correlation);
 
                             // Ensure that the offset does not shift the particle outside of the grid cell
                             int ixcell = static_cast<int>((cluster_x - xyzmin.x)*dxi[0]);
@@ -334,11 +339,11 @@ void VelocityCoincidenceThinning::operator() (
                             // (updating the other offset as needed)
                             if (deltax > deltax_max) {
                                 deltax = deltax_max;
-                                deltaz = deltax > 0._prt ? correlation_error/deltax : 0._prt;
+                                deltaz = deltax > 0._prt ? correlation/deltax : 0._prt;
                             }
                             if (deltaz > deltaz_max) {
                                 deltaz = deltaz_max;
-                                deltax = deltaz > 0._prt ? correlation_error/deltaz : 0._prt;
+                                deltax = deltaz > 0._prt ? correlation/deltaz : 0._prt;
                             }
                             if (deltax > deltax_max || deltaz > deltaz_max) {
                                 // A viable solution was not found, so reject this merge
