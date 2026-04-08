@@ -141,7 +141,8 @@ public:
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] > 0) &
                         (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) &
+                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -166,7 +167,8 @@ public:
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
-                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION)) |
+                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -235,7 +237,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
+            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
@@ -335,7 +337,8 @@ public:
             }
 
             // Next perform all product-producing collisions
-            else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
+            else if ((mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION)) ||
+                     (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 // create a copy of the first product species at the location of the first reactant species
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
@@ -352,6 +355,16 @@ public:
                                 static_cast<int>(slot3_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
+
+                // For charge exchange, swap positions: each product appears at the position
+                // of the *other* reactant, reflecting the physical transfer of charge across space.
+                // Position components occupy indices 0 through PIdx::w-1 in m_rdata.
+                if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
+                    for (int idim = 0; idim < PIdx::w; ++idim) {
+                        soa_products_data[2].m_rdata[idim][slot2_idx] = soa_1.m_rdata[idim][src1_idx];
+                        soa_products_data[3].m_rdata[idim][slot3_idx] = soa_0.m_rdata[idim][src0_idx];
+                    }
+                }
 
                 // Update the momenta of the products
                 TwoProductComputeProductMomenta(
