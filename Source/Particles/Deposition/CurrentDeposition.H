@@ -81,11 +81,13 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
     const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
     const amrex::Real wqx = wq*invvol*(+vx*costheta + vy*sintheta);
+#if !defined(WARPX_EM_TEY)
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+#endif
     const amrex::Real wqz = wq*invvol*vz;
-    #if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
     const Complex xy0 = Complex{costheta, sintheta};
-    #endif
+#endif
 #elif defined(WARPX_DIM_RSPHERE)
     // Convert to cylindrical at the mid point
     const amrex::Real xpmid = xp + relative_time*vx;
@@ -1175,7 +1177,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
-#if !defined(WARPX_DIM_3D) && !(defined(WARPX_EM_TEY) && AMREX_SPACEDIM==2)
+#if !defined(WARPX_DIM_3D) && !(defined(WARPX_EM_TEY) && defined(WARPX_DIM_XZ))
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
                                                                        uxp_nph[ip], uyp_nph[ip], uzp_nph[ip]);
@@ -1265,7 +1267,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
 #endif
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) && !defined(WARPX_EM_TEY)
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ) && !defined(WARPX_EM_TEY)
             amrex::Real const vy = uyp_nph[ip]*gaminv;
