@@ -1885,7 +1885,9 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal Bzp = 0.0;
             const int depos_order_perp = 1;
             const int depos_order_para = 1;
-            doDirectGatherVectorField<depos_order_perp,depos_order_para>(direct_algo,
+            const bool direct_algo = true;
+            doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+                                    direct_algo,
                                     xp_n, yp_n, zp_n,
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
