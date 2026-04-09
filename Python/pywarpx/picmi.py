@@ -1807,6 +1807,9 @@ class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
         particle_tolerance=None,
         particle_suborbits=None,
         use_mass_matrices_jacobian=None,
+        use_mass_matrices_pc=None,
+        jacobian_pc_type=None,
+        mass_matrices_pc_width=None,
     ):
         self.verbose = verbose
         self.absolute_tolerance = absolute_tolerance
@@ -1818,7 +1821,9 @@ class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
         self.particle_tolerance = particle_tolerance
         self.particle_suborbits = particle_suborbits
         self.use_mass_matrices_jacobian = use_mass_matrices_jacobian
-
+        self.use_mass_matrices_pc = use_mass_matrices_pc
+        self.jacobian_pc_type = jacobian_pc_type
+        self.mass_matrices_pc_width = mass_matrices_pc_width
     def nonlinear_solver_initialize_inputs(self):
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
         implicit_evolve.nonlinear_solver = "newton"
@@ -1826,6 +1831,23 @@ class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
         implicit_evolve.particle_tolerance = self.particle_tolerance
         implicit_evolve.particle_suborbits = self.particle_suborbits
         implicit_evolve.use_mass_matrices_jacobian = self.use_mass_matrices_jacobian
+        implicit_evolve.use_mass_matrices_pc = self.use_mass_matrices_pc
+        implicit_evolve.mass_matrices_pc_width = self.mass_matrices_pc_width
+
+        if self.jacobian_pc_type is not None:
+            jacobian = pywarpx.warpx.get_bucket("jacobian")
+            if isinstance(self.jacobian_pc_type, str):
+                # Native WarpX preconditioner: pc_curl_curl_mlmg, pc_jacobi, none
+                jacobian.pc_type = self.jacobian_pc_type
+            elif isinstance(self.jacobian_pc_type, PETScPCPreconditioner):
+                # PETSc-owned sparse preconditioner
+                jacobian.pc_type = "pc_petsc"
+                self.jacobian_pc_type.preconditioner_initialize_inputs()
+            else:
+                raise ValueError(
+                    "jacobian_pc_type must be a string or a PETScPCPreconditioner instance, "
+                    f"got {type(self.jacobian_pc_type)}"
+                )
 
         newton = pywarpx.warpx.get_bucket("newton")
         newton.verbose = self.verbose
@@ -1874,6 +1896,8 @@ class GMRESLinearSolver(picmistandard.base._ClassWithInit):
         self.max_iterations = max_iterations
 
     def linear_solver_initialize_inputs(self):
+        newton = pywarpx.warpx.get_bucket("newton")
+        newton.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
