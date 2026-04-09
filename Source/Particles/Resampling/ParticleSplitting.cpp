@@ -293,7 +293,6 @@ void ParticleSplitting::operator() (
                     // split particle in 4 particles: split in the x–z plane with a rotation by splitting_angle around the z-axis.
                         const int idx = child_base + k;
                         const int sign_offset = (k % 2 == 0) ? -1 : 1;
-                        amrex::Print() << "splitting in action " << "\n";
                         if (k < 2) {
                             // split 2 of 4 particles
                             x[idx] = xp + std::cos(splitting_angle) * sign_offset * offset_x;
