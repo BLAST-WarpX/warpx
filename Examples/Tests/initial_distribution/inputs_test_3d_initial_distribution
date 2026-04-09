@@ -112,9 +112,9 @@ velocity_constant.ux_std = 3.1622776601683795e-05
 velocity_constant.uy_std = 3.1622776601683795e-05
 velocity_constant.uz_std = 3.1622776601683795e-05
 velocity_constant.maxwellian_u_mean_distribution_type = "constant"
-velocity_constant.read_ux_mean_from_path =0.0
-velocity_constant.read_uy_mean_from_path =-0.20412414523193154
-velocity_constant.read_uz_mean_from_path =0.0
+velocity_constant.ux_mean = 0.0
+velocity_constant.uy_mean = -0.20412414523193154
+velocity_constant.uz_mean = 0.0
 
 velocity_parser.charge                     = -q_e
 velocity_parser.mass                       = m_e
@@ -182,12 +182,12 @@ gaussian_parser.uz_std_function(x,y,z) = "0.22*z"
 ########## DIAGNOSTIC ###########
 #################################
 # 1 for gaussian
-# 2 for maxwell-boltzmann with constant temperature
+# 2 for maxwellian with constant temperature
 # 3 for maxwell-juttner with constant temperature
 # 4 for beam
 # 5 for maxwell-juttner with parser function temperature
-# 6 for maxwell-boltzmann with constant velocity
-# 7 for maxwell-boltzmann with parser velocity
+# 6 for maxwellian with constant velocity
+# 7 for maxwellian with parser velocity
 # 8 for cuboid in momentum space
 warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z
 
