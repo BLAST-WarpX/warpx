@@ -21,6 +21,9 @@ endforeach()
 
 if(_FFT_SD AND TARGET ablastr_${_FFT_SD})
     add_executable(fft_roundtrip fft_roundtrip.cpp)
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        set_source_files_properties(fft_roundtrip.cpp PROPERTIES LANGUAGE CUDA)
+    endif()
     target_link_libraries(fft_roundtrip PRIVATE ablastr_${_FFT_SD})
     target_include_directories(fft_roundtrip PRIVATE ${WarpX_SOURCE_DIR}/Source)
 
@@ -114,9 +117,42 @@ if(WarpX_PYTHON)
         )
     endif()
 
-    # RZ Hankel eigenfunction precision — disabled: parser-based B init in RZ
-    # only supports Bz(z), not Bz(r).  LoadInitialFieldFromPython requires CuPy
-    # for GPU field access, which is not available for SYCL/Intel GPUs.
-    # The RZ z-mode test already exercises the Hankel transform pipeline and
-    # validates BLAS++/LAPACK++ ILP64 linkage.
+    # RZ Hankel eigenmode precision (single-box and multi-box).
+    # Initializes the full TE eigenmode (Bz + Br satisfying div B = 0) via
+    # a Python callback (scipy j0/j1) at Yee cell centres, bypassing the
+    # AMReX parser.  The analysis compares against the analytical
+    # standing-wave solution in physical space.
+    # Tolerance: 1e-6 on CPU (~2e-7 observed, limited by DHT amplification
+    # of per-step roundtrip noise); 1e-5 on GPU.
+    if(WarpX_COMPUTE STREQUAL "NOACC" OR WarpX_COMPUTE STREQUAL "OMP")
+        set(_eigenmode_tol "1e-6")
+    else()
+        set(_eigenmode_tol "1e-5")
+    endif()
+
+    if(RZ IN_LIST WarpX_DIMS)
+        add_warpx_test(
+            test_rz_psatd_eigenmode  # name
+            RZ   # dims
+            1    # nprocs
+            inputs_test_rz_psatd_eigenmode.py  # inputs
+            "analysis_spectral_precision.py --dim rz_eigenmode --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040 --tolerance ${_eigenmode_tol}"  # analysis
+            OFF  # checksum
+            OFF  # dependency
+        )
+    endif()
+
+    # RZ Hankel eigenmode precision (multi-box, 4 ranks)
+    # Same as single-box but exercises inter-box guard cell exchange.
+    if(RZ IN_LIST WarpX_DIMS)
+        add_warpx_test(
+            test_rz_psatd_eigenmode_multi  # name
+            RZ   # dims
+            4    # nprocs
+            "inputs_test_rz_psatd_eigenmode.py --nz 128 --max_grid_size 32"  # inputs
+            "analysis_spectral_precision.py --dim rz_eigenmode --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040 --tolerance ${_eigenmode_tol}"  # analysis
+            OFF  # checksum
+            OFF  # dependency
+        )
+    endif()
 endif()

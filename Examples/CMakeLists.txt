@@ -1,15 +1,35 @@
 # Configuration ###############################################################
 #
 if(WarpX_MPI)
-    # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
-    if("$ENV{USER}" STREQUAL "root")
-        # calling even --help as root will abort and warn on stderr
+    # Detect Open MPI so we can apply its workarounds below.
+    # Result is cached so configure_mpiexec() can reuse it.
+    if(NOT DEFINED _WarpX_MPI_IS_OPENMPI)
         execute_process(
             COMMAND ${MPIEXEC_EXECUTABLE} --help
-            ERROR_VARIABLE MPIEXEC_HELP_TEXT
+            OUTPUT_VARIABLE _mpiexec_help
+            ERROR_VARIABLE  _mpiexec_help
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*allow-run-as-root.*$")
+        if(_mpiexec_help MATCHES "Open MPI|OpenRTE|open-mpi")
+            set(_WarpX_MPI_IS_OPENMPI ON  CACHE INTERNAL "MPI is Open MPI")
+        else()
+            set(_WarpX_MPI_IS_OPENMPI OFF CACHE INTERNAL "MPI is Open MPI")
+        endif()
+    endif()
+
+    # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
+    if("$ENV{USER}" STREQUAL "root" AND _WarpX_MPI_IS_OPENMPI)
+        # _mpiexec_help may already be set from the detection above;
+        # if not (cached reconfigure), re-probe.
+        if(NOT DEFINED _mpiexec_help)
+            execute_process(
+                COMMAND ${MPIEXEC_EXECUTABLE} --help
+                OUTPUT_VARIABLE _mpiexec_help
+                ERROR_VARIABLE  _mpiexec_help
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+        endif()
+        if(_mpiexec_help MATCHES "allow-run-as-root")
             set(MPI_ALLOW_ROOT --allow-run-as-root)
         endif()
     endif()
@@ -108,10 +128,14 @@ function(add_warpx_test
         return()
     endif()
 
-    # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
-    # "There are not enough slots available in the system to satisfy the 2 slots
-    # that were requested by the application"
-    set(MPI_HOST_NUMPROC --host localhost:${nprocs})
+    # Open MPI slot oversubscription fix (see configure_mpiexec).
+    # Only set --host for Open MPI; other launchers (Cray PALS, srun)
+    # do not understand this flag.
+    if(_WarpX_MPI_IS_OPENMPI)
+        set(MPI_HOST_NUMPROC --host localhost:${nprocs})
+    else()
+        set(MPI_HOST_NUMPROC)
+    endif()
 
     # set MPI executable
     set(THIS_MPI_TEST_EXE

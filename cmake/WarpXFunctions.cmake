@@ -363,19 +363,24 @@ endfunction()
 # -DMPIEXEC_EXECUTABLE=$(which jsrun) to run ctest.
 #
 function(configure_mpiexec num_ranks)
-    # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
-    if("$ENV{USER}" STREQUAL "root")
-        # calling even --help as root will abort and warn on stderr
-        execute_process(COMMAND ${MPIEXEC_EXECUTABLE} --help
-            ERROR_VARIABLE MPIEXEC_HELP_TEXT
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-            if(${MPIEXEC_HELP_TEXT} MATCHES "^.*allow-run-as-root.*$")
-                set(MPI_ALLOW_ROOT --allow-run-as-root)
-            endif()
+    # Open MPI detection and root guard are handled at the top of
+    # Examples/CMakeLists.txt; the result is in _WarpX_MPI_IS_OPENMPI.
+
+    # Open MPI slot oversubscription fix for CI environments (Azure):
+    # "There are not enough slots available in the system to satisfy the N
+    # slots that were requested by the application."
+    # The --host flag is Open MPI specific and breaks other launchers
+    # (e.g. Cray PALS mpiexec interprets it as an RPC endpoint).
+    if(_WarpX_MPI_IS_OPENMPI)
+        set(MPI_HOST_NUMPROC --host localhost:${num_ranks})
+    else()
+        set(MPI_HOST_NUMPROC)
     endif()
+
     set(MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
         ${MPI_ALLOW_ROOT}
+        ${MPI_HOST_NUMPROC}
         ${MPIEXEC_NUMPROC_FLAG} ${num_ranks}
         PARENT_SCOPE
     )
