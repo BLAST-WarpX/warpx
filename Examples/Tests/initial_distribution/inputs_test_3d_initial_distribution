@@ -112,9 +112,9 @@ velocity_constant.ux_std = 3.1622776601683795e-05
 velocity_constant.uy_std = 3.1622776601683795e-05
 velocity_constant.uz_std = 3.1622776601683795e-05
 velocity_constant.maxwellian_u_mean_distribution_type = "constant"
-velocity_constant.read_ux_mean_from_path =0.0
-velocity_constant.read_uy_mean_from_path =-0.20412414523193154
-velocity_constant.read_uz_mean_from_path =0.0
+velocity_constant.ux_mean = 0.0
+velocity_constant.uy_mean = -0.20412414523193154
+velocity_constant.uz_mean = 0.0
 
 velocity_parser.charge                     = -q_e
 velocity_parser.mass                       = m_e
