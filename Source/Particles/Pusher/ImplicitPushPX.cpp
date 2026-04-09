@@ -729,13 +729,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // If no particles, do not do anything
     if (num_unconverged_particles == 0) { return; }
 
-    const auto depos_type = WarpX::current_deposition_algo;
-
-    if (depos_type != CurrentDepositionAlgo::Villasenor ) {
-        ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
-            "When particle suborbits are used during the implicit particle push, only Villasenor "
-            "current deposition is supported.");
-    }
+    // Fused deposition kernels become too large when all orders/types are included.
+    // Suborbit uses Villasenor current deposition only. For energy conservation,
+    // the push must use the matching gather, so we override depos_type here to
+    // Villasenor (instead of the runtime-selected type).
+    const auto depos_type = CurrentDepositionAlgo::Villasenor;
 
     // Get cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
