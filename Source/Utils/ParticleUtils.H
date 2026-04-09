@@ -39,6 +39,22 @@ namespace ParticleUtils {
                              WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
+     * \brief Find the particles and count the particles that are in each cell. More specifically
+     * this function returns an amrex::DenseBins object containing an offset array and a permutation
+     * array which can be used to loop over all the cells in a tile and apply an algorithm to
+     * particles of a given species present in each cell.
+     * Note that this does *not* rearrange particle arrays.
+     *
+     * @param[in] geom_lev the geometry of the current refinement level.
+     * @param[in] cbx the box
+     * @param[in] ptile the particle tile.
+     */
+    amrex::DenseBins<ParticleTileDataType>
+    findParticlesInEachCell (amrex::Geometry const& geom_lev,
+                             amrex::Box const & cbx,
+                             WarpXParticleContainer::ParticleTileType & ptile);
+
+    /**
      * \brief Return (relativistic) collision energy assuming the target (with
      * mass M) is stationary and the projectile is approaching with the
      * the given speed and mass m. Note the use of `double` since this
