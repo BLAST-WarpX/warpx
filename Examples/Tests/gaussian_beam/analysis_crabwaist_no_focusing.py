@@ -468,7 +468,7 @@ assert np.allclose(
     uz_pos_cw_1_init / gamma, uz_pos_cw_0_init / gamma, rtol=1e-14, atol=1e-14
 )
 
-# cw was applied on these
+# check the variables that are actually modified by crab waist
 assert np.allclose(ux_ele_cw_1_init, ux_ele_cw_0_init, rtol=1e-6, atol=1e-12)
 assert np.allclose(ux_pos_cw_1_init, ux_pos_cw_0_init, rtol=1e-6, atol=1e-12)
 
