@@ -49,6 +49,8 @@ print(sigma_x, sigma_y, sigma_z, sigma_px, sigma_py, sigma_pz)
 
 crabwaist_strength = 0.4  # cw strength [1]
 
+do_plots = False
+
 ###################
 # load warpx data #
 ###################
@@ -173,143 +175,145 @@ assert np.all(z_pos_cw_0 == z_pos_cw_1)
 # R: clockwise rotation by phi half crossing angle in xz plane
 # CW: crabwaist operation
 
-# sim 1
-fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-
-ax[0].plot(
-    x_ele_cw_0[x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_0[x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[0].plot(
-    x_ele_cw_0[~x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_0[~x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[0].plot(
-    x_pos_cw_0[x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_0[x_pos_pos_idx] / sigma_px,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[0].plot(
-    x_pos_cw_0[~x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_0[~x_pos_pos_idx] / sigma_px,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_ele_cw_0[x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_0[x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[1].plot(
-    y_ele_cw_0[~x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_0[~x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_pos_cw_0[x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_0[x_pos_pos_idx] / sigma_py,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[1].plot(
-    y_pos_cw_0[~x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_0[~x_pos_pos_idx] / sigma_py,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[0].set_xlabel(r"x [$\sigma_x$]")
-ax[1].set_xlabel(r"y [$\sigma_y$]")
-ax[0].set_ylabel(r"px [$\sigma_{px}$]")
-ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-
-ax[0].legend()
-ax[1].legend()
-
-fig.suptitle(r"CW off ($CWRx$)")
-
-# sim 2
-fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-
-ax[0].plot(
-    x_ele_cw_1[x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_1[x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[0].plot(
-    x_ele_cw_1[~x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_1[~x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[0].plot(
-    x_pos_cw_1[x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_1[x_pos_pos_idx] / sigma_px,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[0].plot(
-    x_pos_cw_1[~x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_1[~x_pos_pos_idx] / sigma_px,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_ele_cw_1[x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_1[x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[1].plot(
-    y_ele_cw_1[~x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_1[~x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_pos_cw_1[x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_1[x_pos_pos_idx] / sigma_py,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[1].plot(
-    y_pos_cw_1[~x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_1[~x_pos_pos_idx] / sigma_py,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[0].set_xlabel(r"x [$\sigma_x$]")
-ax[1].set_xlabel(r"y [$\sigma_y$]")
-ax[0].set_ylabel(r"px [$\sigma_{px}$]")
-ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-
-ax[0].legend()
-ax[1].legend()
-
-fig.suptitle(r"CW on ($Rx$)")
+if do_plots:
+    
+    # sim 1
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3))
+    
+    ax[0].plot(
+        x_ele_cw_0[x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_0[x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_ele_cw_0[~x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_0[~x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[0].plot(
+        x_pos_cw_0[x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_0[x_pos_pos_idx] / sigma_px,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_pos_cw_0[~x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_0[~x_pos_pos_idx] / sigma_px,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_ele_cw_0[x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_0[x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_ele_cw_0[~x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_0[~x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_pos_cw_0[x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_0[x_pos_pos_idx] / sigma_py,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_pos_cw_0[~x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_0[~x_pos_pos_idx] / sigma_py,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[0].set_xlabel(r"x [$\sigma_x$]")
+    ax[1].set_xlabel(r"y [$\sigma_y$]")
+    ax[0].set_ylabel(r"px [$\sigma_{px}$]")
+    ax[1].set_ylabel(r"py [$\sigma_{py}$]")
+    
+    ax[0].legend()
+    ax[1].legend()
+    
+    fig.suptitle(r"CW off ($CWRx$)")
+    
+    # sim 2
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3))
+    
+    ax[0].plot(
+        x_ele_cw_1[x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_1[x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_ele_cw_1[~x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_1[~x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[0].plot(
+        x_pos_cw_1[x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_1[x_pos_pos_idx] / sigma_px,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_pos_cw_1[~x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_1[~x_pos_pos_idx] / sigma_px,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_ele_cw_1[x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_1[x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_ele_cw_1[~x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_1[~x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_pos_cw_1[x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_1[x_pos_pos_idx] / sigma_py,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_pos_cw_1[~x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_1[~x_pos_pos_idx] / sigma_py,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[0].set_xlabel(r"x [$\sigma_x$]")
+    ax[1].set_xlabel(r"y [$\sigma_y$]")
+    ax[0].set_ylabel(r"px [$\sigma_{px}$]")
+    ax[1].set_ylabel(r"py [$\sigma_{py}$]")
+    
+    ax[0].legend()
+    ax[1].legend()
+    
+    fig.suptitle(r"CW on ($Rx$)")
 
 
 def rot(x, z, phi):
@@ -378,74 +382,76 @@ y_pos_cw_1_init = y_pos_cw_1 + acw_pos * x_pos_cw_1_init * uy_pos_cw_1_init
 # plot phase space #
 ####################
 
-# sim 2 backtransformed
-fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-
-ax[0].plot(
-    x_ele_cw_1_init[x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_1_init[x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[0].plot(
-    x_ele_cw_1_init[~x_ele_pos_idx] / sigma_x,
-    ux_ele_cw_1_init[~x_ele_pos_idx] / sigma_px,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[0].plot(
-    x_pos_cw_1_init[x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_1_init[x_pos_pos_idx] / sigma_px,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[0].plot(
-    x_pos_cw_1_init[~x_pos_pos_idx] / sigma_x,
-    ux_pos_cw_1_init[~x_pos_pos_idx] / sigma_px,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_ele_cw_1_init[x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_1_init[x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkred",
-    label=r"e- ($Rx>0$)",
-)
-ax[1].plot(
-    y_ele_cw_1_init[~x_ele_pos_idx] / sigma_y,
-    uy_ele_cw_1_init[~x_ele_pos_idx] / sigma_py,
-    "o",
-    c="darkblue",
-    label=r"e- ($Rx<0$)",
-)
-
-ax[1].plot(
-    y_pos_cw_1_init[x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_1_init[x_pos_pos_idx] / sigma_py,
-    "rx",
-    label=r"e+ ($Rx>0$)",
-)
-ax[1].plot(
-    y_pos_cw_1_init[~x_pos_pos_idx] / sigma_y,
-    uy_pos_cw_1_init[~x_pos_pos_idx] / sigma_py,
-    "bx",
-    label=r"e+ ($Rx<0$)",
-)
-
-ax[0].set_xlabel(r"x [$\sigma_x$]")
-ax[1].set_xlabel(r"y [$\sigma_y$]")
-ax[0].set_ylabel(r"px [$\sigma_{px}$]")
-ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-
-ax[0].legend()
-ax[1].legend()
-
-fig.suptitle(r"CW on backtransformed ($CW^{-1}R^{-1}x$)")
+if do_plots:
+    
+    # sim 2 backtransformed
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3))
+    
+    ax[0].plot(
+        x_ele_cw_1_init[x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_1_init[x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_ele_cw_1_init[~x_ele_pos_idx] / sigma_x,
+        ux_ele_cw_1_init[~x_ele_pos_idx] / sigma_px,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[0].plot(
+        x_pos_cw_1_init[x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_1_init[x_pos_pos_idx] / sigma_px,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[0].plot(
+        x_pos_cw_1_init[~x_pos_pos_idx] / sigma_x,
+        ux_pos_cw_1_init[~x_pos_pos_idx] / sigma_px,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_ele_cw_1_init[x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_1_init[x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkred",
+        label=r"e- ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_ele_cw_1_init[~x_ele_pos_idx] / sigma_y,
+        uy_ele_cw_1_init[~x_ele_pos_idx] / sigma_py,
+        "o",
+        c="darkblue",
+        label=r"e- ($Rx<0$)",
+    )
+    
+    ax[1].plot(
+        y_pos_cw_1_init[x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_1_init[x_pos_pos_idx] / sigma_py,
+        "rx",
+        label=r"e+ ($Rx>0$)",
+    )
+    ax[1].plot(
+        y_pos_cw_1_init[~x_pos_pos_idx] / sigma_y,
+        uy_pos_cw_1_init[~x_pos_pos_idx] / sigma_py,
+        "bx",
+        label=r"e+ ($Rx<0$)",
+    )
+    
+    ax[0].set_xlabel(r"x [$\sigma_x$]")
+    ax[1].set_xlabel(r"y [$\sigma_y$]")
+    ax[0].set_ylabel(r"px [$\sigma_{px}$]")
+    ax[1].set_ylabel(r"py [$\sigma_{py}$]")
+    
+    ax[0].legend()
+    ax[1].legend()
+    
+    fig.suptitle(r"CW on backtransformed ($CW^{-1}R^{-1}x$)")
 
 #########
 # tests #
