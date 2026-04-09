@@ -27,6 +27,7 @@
 #include "Particles/ParticleBoundaryBuffer_fwd.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer_fwd.H"
+#include "Particles/ParticleThermalizer/ParticleThermalizer.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "Fluids/WarpXFluidContainer_fwd.H"
 
@@ -1168,6 +1169,9 @@ private:
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
+
+    // Particle thermalizer configuration (constructed from inputs)
+    ParticleThermalizer m_particle_thermalizer;
 
     //! Order of finite centering of currents (from nodal grid to staggered grid), along x
     int m_current_centering_nox  = 2;

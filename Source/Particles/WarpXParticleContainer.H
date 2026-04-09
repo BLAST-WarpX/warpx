@@ -55,7 +55,7 @@
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
  *
  *  x, y, z  : position components
- *  ux uy uz : normalized momentum components
+ *  ux uy uz : momentum components, stored as proper velocity, i.e. gamma*v
  *  w        : weight
  *  theta    : azimuthal angle
  *  phi      : polar angle, relative to the x-y plane
@@ -543,6 +543,7 @@ public:
     virtual bool has_quantum_sync() const {return false;}
     virtual bool has_breit_wheeler() const {return false;}
     virtual bool has_virtual_photons() const {return false;}
+    virtual bool has_virtual_photons_beam_size_effect() const {return false;}
     virtual int getVirtualPhotonSpeciesIndex() const { return -1; }
     int DoQED() const { return has_quantum_sync() || has_breit_wheeler(); }
 #else
