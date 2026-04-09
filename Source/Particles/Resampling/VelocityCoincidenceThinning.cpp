@@ -288,25 +288,29 @@ void VelocityCoincidenceThinning::operator() (
                     ux[part_idx], uy[part_idx], uz[part_idx], mass
                 );
 
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 if (depos_order == 2) {
                     // These use compute_shape_factor for convenience, but it slightly wasteful
                     // since the shape factor wx[1] is not used here.
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    amrex::ParticleReal ss[3];
+                    double ss[3];
                     double const wx = (x[part_idx] - xyzmin.x)*dxi[0];
                     compute_shape_factor(ss, wx);
                     for (int iw = 0 ; iw < 3 ; iw++) {
                         cluster_wx[iw] += ss[iw]*w[part_idx];
                     }
+                }
 #elif defined(WARPX_DIM_1D_Z)
-                    amrex::ParticleReal ss[3];
+                if (depos_order == 2) {
+                    // These use compute_shape_factor for convenience, but it slightly wasteful
+                    // since the shape factor wx[1] is not used here.
+                    double ss[3];
                     double const wz = (z[part_idx] - xyzmin.z)*dxi[WARPX_ZINDEX];
                     compute_shape_factor(ss, wz);
                     for (int iw = 0 ; iw < 3 ; iw++) {
                         cluster_wz[iw] += ss[iw]*w[part_idx];
                     }
-#endif
                 }
+#endif
 
                 // check if this is the last particle in the current momentum bin,
                 // or if the next particle would push the current cluster weight
