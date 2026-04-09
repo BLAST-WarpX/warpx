@@ -451,7 +451,7 @@ fig.suptitle(r"CW on backtransformed ($CW^{-1}R^{-1}x$)")
 # tests #
 #########
 
-# these are trivial
+# sanity check: these variables should not change upon crab waist
 assert np.all(x_ele_cw_1_init == x_ele_cw_0_init)
 assert np.all(x_pos_cw_1_init == x_pos_cw_0_init)
 
