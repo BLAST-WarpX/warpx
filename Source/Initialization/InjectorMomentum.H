@@ -283,7 +283,7 @@ struct InjectorMomentumJuttner
         // Check if temperature is too low to do sampling method. Abort for now,
         // in future should implement an alternate method e.g. inverse transform
         if (theta < 0.1_rt) {
-            amrex::Abort("Temeprature parameter theta is less than minimum 0.1 allowed for Maxwell-Juttner");
+            amrex::Abort("Temperature parameter theta is less than minimum 0.1 allowed for Maxwell-Juttner");
         }
         // Calculate local velocity and abort if |beta|>=1
         amrex::Real const beta = velocity(x,y,z);
