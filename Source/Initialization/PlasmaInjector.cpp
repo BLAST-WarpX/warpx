@@ -267,8 +267,7 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rotation_angle!=0,
                 "Error: Invalid value for rotation_angle. It must not be 0!");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE((rotation_axis[0]==0 && rotation_axis[1]==1 && rotation_axis[2]==0),
-                "Error: Invalid value for rotation_axis. It must be [0,1,0]!");
-            ablastr::warn_manager::WMRecordWarning("Species", "Currently crab waist is supported in y dimension only.\n");
+                "Error: Invalid value for rotation_axis. It must be [0,1,0]! Currently crab waist is supported in y dimension only.");
             utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (crabwaist_strength>=0 && crabwaist_strength<=1),
                 "Error: Invalid value for crabwaist_strength. It must be between [0,1]!");
