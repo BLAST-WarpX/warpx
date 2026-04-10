@@ -1029,7 +1029,7 @@ Particle initialization
 
           y_{CW} &= y + \alpha x p_y.
 
-    It is applied on the coordinates in the lab frame before the rotation. Currently supports vertical crab waist only. See (:cite:t:`param-Zobov2010`) for more details.
+    It is applied on the :math:`y` and :math:`p_x` coordinates in the lab frame before the rotation. Currently supports vertical crab waist only. Rotation angle must be larger than 0 as this operation only makes sense with a nonzero crossing angle. See (:cite:t:`param-Zobov2010`) for more details.
 
       * ``<species_name>.crabwaist_strength`` (`double`, optional) is the strength of the crab waist transformation. :math:`k\in [0, 1]`. A value of 0 is equivalent to no crab waist. A value of 1 is equivalent to the full crab sextupole strength. Optimal value is typically in between.
 
