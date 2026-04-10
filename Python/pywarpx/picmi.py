@@ -336,6 +336,7 @@ class Species(picmistandard.PICMI_Species):
 
         self.species = pywarpx.Bucket.Bucket(
             self.name,
+            species_type=self.species_type,
             mass=self.mass,
             charge=self.charge,
             injection_style=None,
@@ -371,8 +372,6 @@ class Species(picmistandard.PICMI_Species):
             resampling_algorithm_delta_u=self.resampling_algorithm_delta_u,
             do_temperature_deposition=self.do_temperature_deposition,
         )
-
-        self.species.species_type = self.species_type
 
         # add reflection models
         self.species.add_new_attr("reflection_model_xlo(E)", self.reflection_model_xlo)
