@@ -635,7 +635,7 @@ WarpX::OneStep_nosub (
         // E and B are up-to-date in the domain, but all guard cells are
         // outdated.
         if (m_safe_guard_cells) {
-            FillBoundaryB(guard_cells.ng_alloc_EB);
+            FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
         }
     } // !PSATD
 
