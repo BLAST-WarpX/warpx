@@ -2090,14 +2090,14 @@ void doGatherPicnicShapeN (
     // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
-    const bool direct_algo = true;
-    doDirectGatherVectorField<depos_order_perp,depos_order_para>( direct_algo,
+    const bool direct_algo = false;
+    doDirectGatherVectorField<depos_order_perp,depos_order_para>(direct_algo,
                                     xp_n, yp_n, zp_n,
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
 
 }
 
