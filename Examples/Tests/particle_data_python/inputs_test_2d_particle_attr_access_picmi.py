@@ -175,6 +175,20 @@ for pti in electrons.iterator(level=0):
     vals = pti["newPid"]
     assert np.allclose(vals, 5)
 
+#####################################
+# check that current deposition works
+#####################################
+
+electrons.deposit_current(
+    "current_fp", 0, sim.extension.warpx.getdt(0), -0.5 * sim.extension.warpx.getdt(0)
+)
+assert np.isclose(
+    np.max(np.abs(sim.fields.get("current_fp", "x", 0)[...])), 6.889716673402935e-09
+)
+assert np.isclose(
+    np.max(np.abs(sim.fields.get("current_fp", "z", 0)[...])), 4.888491863315444e-09
+)
+
 ##########################
 # take the final sim step
 ##########################
