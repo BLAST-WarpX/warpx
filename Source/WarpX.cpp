@@ -702,6 +702,21 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "c_light_factor", c_light_factor);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(c_light_factor >= 1.0,
                 "warpx.c_light_factor must be >= 1.0");
+            if (c_light_factor > 1.0) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    evolve_scheme == EvolveScheme::Explicit,
+                    "warpx.c_light_factor > 1 (reduced speed of light) is only supported "
+                    "with the explicit FDTD solver (algo.evolve_scheme = explicit). "
+                    "Implicit and spectral-implicit schemes do not require RSL and are not supported.");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD,
+                    "warpx.c_light_factor > 1 (reduced speed of light) is not supported "
+                    "with the PSATD spectral solver. Use an explicit FDTD solver (Yee or CKC).");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC,
+                    "warpx.c_light_factor > 1 (reduced speed of light) is not supported "
+                    "with the HybridPIC solver.");
+            }
             c_light = PhysConst::c / c_light_factor;
             c_light_sq = c_light * c_light;
             if (c_light_factor > 1.0) {
