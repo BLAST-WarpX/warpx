@@ -114,14 +114,94 @@ sim = picmi.Simulation(
 # reported by mesh("r") / mesh("z"), bypassing the AMReX parser.
 # Bz and Br are both set to satisfy div B = 0 at t=0:
 #   (1/r) d(r*Br)/dr + dBz/dz = 0  =>  Br = -(kz/kr)*J1(kr*r)*cos(kz*z)*B0
+def _fill_mfab_from_numpy(mfab, values_2d):
+    """Fill a 2-D RZ MultiFab from a numpy array using the MFIter API.
+
+    Works on both CPU and GPU (including SYCL builds without cupy):
+    on GPU a pinned-arena copy of the full MultiFab is used as an
+    intermediary: numpy data is written there (host memory), then
+    htod_memcpy transfers everything to the device in one call.
+
+    Parameters
+    ----------
+    mfab : amrex MultiFab (2-D, single component, F-order [r, z])
+        Target field MultiFab.
+    values_2d : np.ndarray, shape (nr, nz)
+        Global data array in Fortran (r-major) order.  Indexed as
+        values_2d[ir, iz] where ir/iz run over the valid-cell range.
+    """
+    import inspect
+
+    amr = inspect.getmodule(mfab)
+    have_gpu = amr.Config.have_gpu
+
+    min_box = mfab.box_array().minimal_box()
+    r0 = min_box.small_end[0]
+    z0 = min_box.small_end[1]
+
+    if have_gpu:
+        # Allocate a pinned (host-accessible) MultiFab with the same
+        # BoxArray/DistributionMapping as the target, fill it on the CPU,
+        # then copy host→device in one htod_memcpy call.
+        mf_type = type(mfab)
+        mf_pin = mf_type(
+            mfab.box_array(),
+            mfab.dm(),
+            mfab.n_comp,
+            mfab.n_grow_vect,
+            amr.MFInfo().set_arena(amr.The_Pinned_Arena()),
+            mfab.factory,
+        )
+        ngrow_r = mfab.n_grow_vect[0]
+        ngrow_z = mfab.n_grow_vect[1]
+        for mfi in mf_pin:
+            # tilebox() covers valid cells only (no ghost cells).
+            box = mfi.tilebox()
+            r_lo, r_hi = box.small_end[0], box.big_end[0]
+            z_lo, z_hi = box.small_end[1], box.big_end[1]
+            local_patch = values_2d[
+                r_lo - r0 : r_hi - r0 + 1,
+                z_lo - z0 : z_hi - z0 + 1,
+            ]
+            # to_numpy(copy=False) on Pinned arena is safe (host memory).
+            # Array4.to_numpy(order="F") shape includes all dimensions:
+            # (nr_with_ghost, nz_with_ghost, [1,] ncomp).
+            # Use squeeze() on trailing size-1 axes, then fill valid cells.
+            pin_arr = mf_pin.array(mfi).to_numpy(copy=False, order="F")
+            nr_valid = r_hi - r_lo + 1
+            nz_valid = z_hi - z_lo + 1
+            pin_2d = pin_arr[ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...]
+            pin_2d.squeeze()[:] = local_patch
+        amr.htod_memcpy(mfab, mf_pin)
+    else:
+        # CPU build: write directly into each FAB via numpy view.
+        ngrow_r = mfab.n_grow_vect[0]
+        ngrow_z = mfab.n_grow_vect[1]
+        for mfi in mfab:
+            box = mfi.tilebox()
+            r_lo, r_hi = box.small_end[0], box.big_end[0]
+            z_lo, z_hi = box.small_end[1], box.big_end[1]
+            local_patch = values_2d[
+                r_lo - r0 : r_hi - r0 + 1,
+                z_lo - z0 : z_hi - z0 + 1,
+            ]
+            arr_np = mfab.array(mfi).to_numpy(copy=False, order="F")
+            nr_valid = r_hi - r_lo + 1
+            nz_valid = z_hi - z_lo + 1
+            arr_2d = arr_np[ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...]
+            arr_2d.squeeze()[:] = local_patch
+
+
 def load_exact_fields():
     Bz_ext = sim.fields.get("Bfield_fp_external", dir="z", level=0)
     RM, ZM = np.meshgrid(Bz_ext.mesh("r"), Bz_ext.mesh("z"), indexing="ij")
-    Bz_ext[:, :] = B0 * scipy_j0(kr * RM) * np.sin(kz * ZM)
+    Bz_vals = B0 * scipy_j0(kr * RM) * np.sin(kz * ZM)
+    _fill_mfab_from_numpy(Bz_ext, Bz_vals)
 
     Br_ext = sim.fields.get("Bfield_fp_external", dir="r", level=0)
     RM_r, ZM_r = np.meshgrid(Br_ext.mesh("r"), Br_ext.mesh("z"), indexing="ij")
-    Br_ext[:, :] = -B0 * (kz / kr) * scipy_j1(kr * RM_r) * np.cos(kz * ZM_r)
+    Br_vals = -B0 * (kz / kr) * scipy_j1(kr * RM_r) * np.cos(kz * ZM_r)
+    _fill_mfab_from_numpy(Br_ext, Br_vals)
 
 
 field_init = picmi.LoadInitialFieldFromPython(

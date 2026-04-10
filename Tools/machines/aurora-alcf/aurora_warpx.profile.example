@@ -10,14 +10,11 @@ module load boost
 
 # optional: for openPMD and PSATD+RZ support
 module load hdf5/1.14.5
-export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2025.05.28:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2025.05.28:$CMAKE_PREFIX_PATH
 
-export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
-
-# necessary for Python and AI/ML on Aurora:
-module load frameworks
+export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/blaspp-2025.05.28/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/${USER}/sw/aurora/gpu/lapackpp-2025.05.28/lib64:$LD_LIBRARY_PATH
 
 if [ -d "/home/${USER}/sw/aurora/gpu/venvs/warpx-aurora" ]
 then

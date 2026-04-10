@@ -225,6 +225,7 @@ jobs:
 
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_DIMS="RZ;3"          \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_QED_TABLE_GEN=ON
@@ -237,3 +238,10 @@ jobs:
       run: |
         export OMP_NUM_THREADS=1
         mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py
+
+    - name: spectral precision tests
+      run: |
+        python3 -m pip install --upgrade scipy
+        export OMP_NUM_THREADS=1
+        ctest --test-dir build/Examples/Tests/spectral_precision \
+          --output-on-failure -j 2
