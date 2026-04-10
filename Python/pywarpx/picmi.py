@@ -197,34 +197,23 @@ class Species(picmistandard.PICMI_Species):
     """
 
     def init(self, kw):
-        if self.particle_type == "electron":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "positron":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "proton":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_p"
-        elif self.particle_type == "anti-proton":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_p"
+        self.species_type = None
+        if self.particle_type in [
+            "unspecified",
+            "electron",
+            "positron",
+            "muon",
+            "antimuon",
+            "photon",
+            "neutron",
+            "proton",
+            "antiproton",
+            "alpha",
+        ]:
+            self.species_type = self.particle_type
         else:
             if self.charge is None and self.charge_state is not None:
-                if self.charge_state == +1.0:
-                    self.charge = "q_e"
-                elif self.charge_state == -1.0:
-                    self.charge = "-q_e"
-                else:
-                    self.charge = self.charge_state * constants.q_e
+                self.charge = f"{self.charge_state}*q_e"
             if self.particle_type is not None:
                 # Match a string of the format '#nXx', with the '#n' optional isotope number.
                 m = re.match(r"(?P<iso>#[\d+])*(?P<sym>[A-Za-z]+)", self.particle_type)
@@ -382,6 +371,8 @@ class Species(picmistandard.PICMI_Species):
             resampling_algorithm_delta_u=self.resampling_algorithm_delta_u,
             do_temperature_deposition=self.do_temperature_deposition,
         )
+
+        self.species.species_type = self.species_type
 
         # add reflection models
         self.species.add_new_attr("reflection_model_xlo(E)", self.reflection_model_xlo)
