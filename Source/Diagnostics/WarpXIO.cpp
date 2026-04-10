@@ -25,9 +25,9 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/text/StreamUtils.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
@@ -97,7 +97,7 @@ WarpX::InitFromCheckpoint ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::InitFromCheckpoint()");
+    ABLASTR_PROFILE("WarpX::InitFromCheckpoint()");
 
     amrex::Print()<< Utils::TextMsg::Info(
         "restart from checkpoint " + restart_chkfile);

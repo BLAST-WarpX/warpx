@@ -11,6 +11,7 @@
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -54,6 +55,7 @@ namespace {
      * @param[in] idx_alpha_start index of first produced alpha macroparticle
      * @param[in] m1 mass of first colliding species
      * @param[in] m2 mass of second colliding species
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -63,6 +65,7 @@ namespace {
                             const index_type& idx_1, const index_type& idx_2,
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
+                            ScatteringAngleModel const scattering_angle_model,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
@@ -85,9 +88,10 @@ namespace {
         // which can cause compilation to fail or generate a warning, so we're explicitly setting
         // them as double. Note that nuclear fusion module does not currently work with single
         // precision anyways.
-        constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt;
-        // mass of the Be8 excited state (3.03 MeV above ground state)
-        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt);
+        // Alpha (He4) mass: subtract 2 electron masses to get nuclear mass
+        constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt - 2.0_prt * PhysConst::m_e;
+        // mass of the Be8 excited state (3.03 MeV above ground state): subtract 4 electron masses to get nuclear mass
+        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt) - 4.0_prt * PhysConst::m_e;
         constexpr double mBe_sq = m_beryllium*m_beryllium;
         constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
 
@@ -105,7 +109,7 @@ namespace {
             ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
             E_fusion,
-            /*isotropic_scattering=*/true,
+            scattering_angle_model,
             engine);
 
         // Compute momentum of beryllium in lab frame

@@ -22,7 +22,7 @@ collisions.collision_names = collision1 collision2 collision3
 diagnostics.diags_names = diag1
 diag1.diag_type = Full
 diag1.format = openpmd
-diag1.intervals = 1000
+diag1.intervals = 2000
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
 diag1.write_species = 1
 diag1.species = electrons protons
@@ -89,7 +89,6 @@ protons.zmin = 0
 
 # warpx
 warpx.const_dt = dt
-warpx.do_electrostatic = labframe
 warpx.reduced_diags_names = field_energy particle_energy
 warpx.serialize_initial_conditions = 1
 warpx.use_filter = 0

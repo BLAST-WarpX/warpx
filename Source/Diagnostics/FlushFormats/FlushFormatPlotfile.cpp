@@ -6,14 +6,14 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleIO.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_Box.H>
@@ -79,7 +79,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Geometry& /*full_BTD_snapshot*/,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
@@ -359,25 +359,31 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 {
     for (const auto& part_diag : particle_diags) {
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
-        PinnedMemoryParticleContainer* pinned_pc = part_diag.getPinnedParticleContainer();
+        WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
-            pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-            pc->make_alike<amrex::PinnedArenaAllocator>();
+            pinned_pc->make_alike<>() :
+            pc->make_alike<>();
+        tmp.SetArena(amrex::The_Pinned_Arena());
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
         Vector<int> int_flags;
         Vector<int> real_flags;
 
+        // This gets the names correct relative to what WarpX uses, but note that AMReX ignores
+        // these names and always writes the particles out with "x" as the first coordinate,
+        // "y" as the second, and "z" as the third independent of what geometry is being used.
+        // All that matters here is getting the correct number of positions.
 #if !defined (WARPX_DIM_1D_Z)
         real_names.push_back("position_x");
 #endif
-#if defined (WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined (WARPX_DIM_3D)
         real_names.push_back("position_y");
 #endif
-#if !defined(WARPX_DIM_RZ)
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         real_names.push_back("position_z");
 #endif
+
         real_names.push_back("weight");
         real_names.push_back("momentum_x");
         real_names.push_back("momentum_y");
@@ -444,8 +450,18 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
             }, true);
             particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
         } else {
-            tmp.copyParticles(*pinned_pc, true);
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
+            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
+            using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
+            tmp.copyParticles(*pinned_pc,
+                              [random_filter,uniform_filter,parser_filter,geometry_filter]
+                              AMREX_GPU_HOST_DEVICE
+                              (const SrcData& src, int ip, const amrex::RandomEngine& engine)
+            {
+                const SuperParticleType& p = src.getSuperParticle(ip);
+                return random_filter(p, engine) * uniform_filter(p, engine)
+                    * parser_filter(p, engine) * geometry_filter(p, engine);
+            }, true);
+            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
         }
 
         // real_names contains a list of all particle attributes.
