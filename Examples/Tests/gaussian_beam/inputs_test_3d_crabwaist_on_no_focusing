@@ -1,120 +1,12 @@
-#################################
-########## MY CONSTANTS #########
-#################################
-my_constants.mc2   = m_e*clight*clight
-my_constants.GeV   = q_e*1.e9
-
-# BEAMS
-my_constants.beam_energy = 182.5*GeV # [J]
-my_constants.beam_gamma  = beam_energy/mc2
-my_constants.beam_npart  = 155000000000 # [e]
-my_constants.nmacropart  = 1e6 # [1]
-my_constants.beam_charge = q_e * beam_npart # [C]
-my_constants.emit_x = 1e-6
-my_constants.emit_y = 1e-6
-my_constants.emit_z = 0
-my_constants.sigma_x     = 1e-5 # [m]
-my_constants.sigma_y     = 1e-5 # [m]
-my_constants.sigma_z     = 1e-4 # [m]
-my_constants.sigma_px    = emit_x / sigma_x # [1]
-my_constants.sigma_py    = emit_y / sigma_y # [1]
-my_constants.sigma_pz    = emit_z / sigma_z # [1]
-my_constants.rotation_angle = 1e-3 # [rad]
-
-# full box
-my_constants.Lx = 512*sigma_x
-my_constants.Ly = 512*sigma_y
-my_constants.Lz = 512*sigma_z
-my_constants.nx = 32
-my_constants.ny = 32
-my_constants.nz = 3
-
-# TIME
-my_constants.T = 0.5*Lz/clight
-my_constants.dt = T / nz
-
-#################################
-####### GENERAL PARAMETERS ######
-#################################
-max_step = 0
-amr.n_cell = nx ny nz
-amr.max_level = 0
-geometry.dims = 3
-geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
-geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
-warpx.numprocs = 1 1 1
-warpx.random_seed = 42 # use same random seed for comparison
-
-#################################
-######## BOUNDARY CONDITION #####
-#################################
-boundary.particle_lo = Absorbing Absorbing Absorbing
-boundary.particle_hi = Absorbing Absorbing Absorbing
-
-#################################
-############ NUMERICS ###########
-#################################
-algo.maxwell_solver = none
-warpx.const_dt = dt
-algo.particle_shape = 3
-algo.particle_pusher = vay
+FILE=inputs_test_3d_crabwaist_off_no_focusing
 
 #################################
 ########### PARTICLES ###########
 #################################
-particles.species_names = beam1 beam2
 
-beam1.species_type = electron
-beam1.injection_style = gaussian_beam
-beam1.momentum_distribution_type = gaussian
-beam1.x_rms = sigma_x
-beam1.y_rms = sigma_y
-beam1.z_rms = sigma_z
-beam1.ux_th = sigma_px
-beam1.uy_th = sigma_py
-beam1.uz_th = sigma_pz
-beam1.x_m = 0
-beam1.y_m = 0
-beam1.z_m = 0
-beam1.uy_m = 0
-beam1.ux_m = 0
-beam1.uz_m = beam_gamma # mean delta
-beam1.npart = nmacropart
-beam1.q_tot = -beam_charge
-beam1.z_cut = 4
-beam1.do_not_deposit = 1
-beam1.do_not_push = 1
-beam1.do_gaussian_beam_rotation = 1
-beam1.do_gaussian_beam_rotation_momenta = 1
-beam1.gaussian_beam_rotation_angle = rotation_angle
-beam1.gaussian_beam_rotation_axis = 0 1 0
 beam1.do_gaussian_beam_crabwaist = 1
 beam1.crabwaist_strength = 0.4
 
-beam2.species_type = positron
-beam2.injection_style = gaussian_beam
-beam2.momentum_distribution_type = gaussian
-beam2.x_rms = sigma_x
-beam2.y_rms = sigma_y
-beam2.z_rms = sigma_z
-beam2.ux_th = sigma_px
-beam2.uy_th = sigma_py
-beam2.uz_th = sigma_pz
-beam2.x_m = 0
-beam2.y_m = 0
-beam2.z_m = 0
-beam2.uy_m = 0
-beam2.ux_m = 0
-beam2.uz_m = -beam_gamma # mean delta, - sign indicates movement in negative dir
-beam2.npart = nmacropart
-beam2.q_tot = beam_charge
-beam2.z_cut = 4
-beam2.do_not_deposit = 1
-beam2.do_not_push = 1
-beam2.do_gaussian_beam_rotation = 1
-beam2.do_gaussian_beam_rotation_momenta = 1
-beam2.gaussian_beam_rotation_angle = -rotation_angle
-beam2.gaussian_beam_rotation_axis = 0 1 0
 beam2.do_gaussian_beam_crabwaist = 1
 beam2.crabwaist_strength = 0.4
 
