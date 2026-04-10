@@ -406,7 +406,7 @@ void VelocityCoincidenceThinning::operator() (
                             auto shape2_positions = [=] AMREX_GPU_DEVICE(int idir, amrex::Real gmin,
                                                                          amrex::ParticleReal cluster_avg,
                                                                          amrex::ParticleReal const * cluster_w,
-                                                                         bool & do_merge,
+                                                                         bool & a_do_merge,
                                                                          amrex::ParticleReal & pos1,
                                                                          amrex::ParticleReal & pos2) noexcept {
                                 const amrex::ParticleReal W0 = cluster_w[0];
@@ -429,9 +429,9 @@ void VelocityCoincidenceThinning::operator() (
                                 const amrex::ParticleReal xupper = (ig % 2 == 0 ? 0.5_prt : 0._prt);
 
                                 // Only do the merge if the new particles are within the half-grid cell
-                                do_merge = (pos1 < xupper && pos2 > xlower);
+                                a_do_merge = (pos1 < xupper && pos2 > xlower);
 
-                                if (do_merge) {
+                                if (a_do_merge) {
                                     // Convert the position in the helf-cell to the physical location
                                     const int i_sub = static_cast<int>((cluster_avg - gmin)*dxi[idir] + 0.5_prt);
                                     pos1 = gmin + (i_sub + pos1)*dx[idir];
