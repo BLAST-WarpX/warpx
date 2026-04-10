@@ -88,7 +88,7 @@ beam1.do_gaussian_beam_rotation = 1
 beam1.do_gaussian_beam_rotation_momenta = 1
 beam1.gaussian_beam_rotation_angle = rotation_angle
 beam1.gaussian_beam_rotation_axis = 0 1 0
-beam1.do_crabwaist = 1
+beam1.do_gaussian_beam_crabwaist = 1
 beam1.crabwaist_strength = 0.4
 
 beam2.species_type = positron
@@ -115,7 +115,7 @@ beam2.do_gaussian_beam_rotation = 1
 beam2.do_gaussian_beam_rotation_momenta = 1
 beam2.gaussian_beam_rotation_angle = -rotation_angle
 beam2.gaussian_beam_rotation_axis = 0 1 0
-beam2.do_crabwaist = 1
+beam2.do_gaussian_beam_crabwaist = 1
 beam2.crabwaist_strength = 0.4
 
 #################################
