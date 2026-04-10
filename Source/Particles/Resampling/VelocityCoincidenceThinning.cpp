@@ -541,10 +541,12 @@ void VelocityCoincidenceThinning::operator() (
 #endif
 #if defined(WARPX_ZINDEX)
                     cluster_z = 0_prt;
-#if !defined(WARPX_DIM_1D_Z)
+#endif
+
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     cluster_xz = 0._prt;
 #endif
-#endif
+
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     for (int iw=0 ; iw < 3 ; iw++) {
                         cluster_wx[iw] = 0._prt;
