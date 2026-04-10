@@ -9,15 +9,3 @@ beam1.crabwaist_strength = 0.4
 
 beam2.do_gaussian_beam_crabwaist = 1
 beam2.crabwaist_strength = 0.4
-
-#################################
-######### DIAGNOSTICS ###########
-#################################
-
-diagnostics.diags_names = diag_on
-
-diag_on.intervals = -1
-diag_on.diag_type = Full
-diag_on.write_species = 1
-diag_on.species = beam1 beam2
-diag_on.format = openpmd

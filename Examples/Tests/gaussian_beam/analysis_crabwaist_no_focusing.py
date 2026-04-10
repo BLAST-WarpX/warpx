@@ -60,7 +60,7 @@ do_plots = False
 
 # sim 1: init a gaussian bunch and rotate by phi
 series = OpenPMDTimeSeries(
-    os.path.join("../test_3d_crabwaist_off_no_focusing", "diags", "diag_off")
+    os.path.join("../test_3d_crabwaist_off_no_focusing", "diags", "diag")
 )
 (
     ux_ele_cw_0,
@@ -87,7 +87,7 @@ series = OpenPMDTimeSeries(
 
 # sim 2: init gaussian bunch, apply cw, rotate by phi
 series = OpenPMDTimeSeries(
-    os.path.join("../test_3d_crabwaist_on_no_focusing", "diags", "diag_on")
+    os.path.join("../test_3d_crabwaist_on_no_focusing", "diags", "diag")
 )
 (
     ux_ele_cw_1,
@@ -176,10 +176,9 @@ assert np.all(z_pos_cw_0 == z_pos_cw_1)
 # CW: crabwaist operation
 
 if do_plots:
-    
     # sim 1
     fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-    
+
     ax[0].plot(
         x_ele_cw_0[x_ele_pos_idx] / sigma_x,
         ux_ele_cw_0[x_ele_pos_idx] / sigma_px,
@@ -194,7 +193,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[0].plot(
         x_pos_cw_0[x_pos_pos_idx] / sigma_x,
         ux_pos_cw_0[x_pos_pos_idx] / sigma_px,
@@ -207,7 +206,7 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_ele_cw_0[x_ele_pos_idx] / sigma_y,
         uy_ele_cw_0[x_ele_pos_idx] / sigma_py,
@@ -222,7 +221,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_pos_cw_0[x_pos_pos_idx] / sigma_y,
         uy_pos_cw_0[x_pos_pos_idx] / sigma_py,
@@ -235,20 +234,20 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[0].set_xlabel(r"x [$\sigma_x$]")
     ax[1].set_xlabel(r"y [$\sigma_y$]")
     ax[0].set_ylabel(r"px [$\sigma_{px}$]")
     ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-    
+
     ax[0].legend()
     ax[1].legend()
-    
+
     fig.suptitle(r"CW off ($CWRx$)")
-    
+
     # sim 2
     fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-    
+
     ax[0].plot(
         x_ele_cw_1[x_ele_pos_idx] / sigma_x,
         ux_ele_cw_1[x_ele_pos_idx] / sigma_px,
@@ -263,7 +262,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[0].plot(
         x_pos_cw_1[x_pos_pos_idx] / sigma_x,
         ux_pos_cw_1[x_pos_pos_idx] / sigma_px,
@@ -276,7 +275,7 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_ele_cw_1[x_ele_pos_idx] / sigma_y,
         uy_ele_cw_1[x_ele_pos_idx] / sigma_py,
@@ -291,7 +290,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_pos_cw_1[x_pos_pos_idx] / sigma_y,
         uy_pos_cw_1[x_pos_pos_idx] / sigma_py,
@@ -304,15 +303,15 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[0].set_xlabel(r"x [$\sigma_x$]")
     ax[1].set_xlabel(r"y [$\sigma_y$]")
     ax[0].set_ylabel(r"px [$\sigma_{px}$]")
     ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-    
+
     ax[0].legend()
     ax[1].legend()
-    
+
     fig.suptitle(r"CW on ($Rx$)")
 
 
@@ -383,10 +382,9 @@ y_pos_cw_1_init = y_pos_cw_1 + acw_pos * x_pos_cw_1_init * uy_pos_cw_1_init
 ####################
 
 if do_plots:
-    
     # sim 2 backtransformed
     fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-    
+
     ax[0].plot(
         x_ele_cw_1_init[x_ele_pos_idx] / sigma_x,
         ux_ele_cw_1_init[x_ele_pos_idx] / sigma_px,
@@ -401,7 +399,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[0].plot(
         x_pos_cw_1_init[x_pos_pos_idx] / sigma_x,
         ux_pos_cw_1_init[x_pos_pos_idx] / sigma_px,
@@ -414,7 +412,7 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_ele_cw_1_init[x_ele_pos_idx] / sigma_y,
         uy_ele_cw_1_init[x_ele_pos_idx] / sigma_py,
@@ -429,7 +427,7 @@ if do_plots:
         c="darkblue",
         label=r"e- ($Rx<0$)",
     )
-    
+
     ax[1].plot(
         y_pos_cw_1_init[x_pos_pos_idx] / sigma_y,
         uy_pos_cw_1_init[x_pos_pos_idx] / sigma_py,
@@ -442,15 +440,15 @@ if do_plots:
         "bx",
         label=r"e+ ($Rx<0$)",
     )
-    
+
     ax[0].set_xlabel(r"x [$\sigma_x$]")
     ax[1].set_xlabel(r"y [$\sigma_y$]")
     ax[0].set_ylabel(r"px [$\sigma_{px}$]")
     ax[1].set_ylabel(r"py [$\sigma_{py}$]")
-    
+
     ax[0].legend()
     ax[1].legend()
-    
+
     fig.suptitle(r"CW on backtransformed ($CW^{-1}R^{-1}x$)")
 
 #########

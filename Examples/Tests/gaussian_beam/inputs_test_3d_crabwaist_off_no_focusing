@@ -120,10 +120,10 @@ beam2.do_gaussian_beam_crabwaist = 0
 ######### DIAGNOSTICS ###########
 #################################
 
-diagnostics.diags_names = diag_off
+diagnostics.diags_names = diag
 
-diag_off.intervals = -1
-diag_off.diag_type = Full
-diag_off.write_species = 1
-diag_off.species = beam1 beam2
-diag_off.format = openpmd
+diag.intervals = -1
+diag.diag_type = Full
+diag.write_species = 1
+diag.species = beam1 beam2
+diag.format = openpmd
