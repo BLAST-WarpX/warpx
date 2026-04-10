@@ -281,7 +281,7 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
     amrex::ParallelFor(
         np_to_push, [=] AMREX_GPU_DEVICE (long ip)
@@ -330,7 +330,7 @@ PhysicalParticleContainer::SetupSuborbitParticles (WarpXParIter & pti,
     auto& attribs = pti.GetAttribs();
     amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
     auto num_previous = unconverged_indices.size();
     unconverged_indices.resize(num_previous + num_unconverged_particles);
@@ -535,7 +535,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr() + offset;
     }
 #endif
 
@@ -554,7 +554,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset: nullptr);
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
