@@ -479,17 +479,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         # --- Only PseudoRandomLayout is supported
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
-        # --- Calculate the total charge. Note that charge might be a string instead of a number.
-        charge = species.charge
-        if charge == "q_e" or charge == "+q_e":
-            charge = constants.q_e
-        elif charge == "-q_e":
-            charge = -constants.q_e
-        species.add_new_group_attr(
-            source_name, "q_tot", self.n_physical_particles * charge
-        )
+        # --- Total number of real particles
+        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "q_tot", density_scale)
+            species.add_new_group_attr(source_name, "npart_real", density_scale)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
