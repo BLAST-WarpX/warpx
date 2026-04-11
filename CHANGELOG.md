@@ -31,4 +31,3 @@ conductors (coils, transmission lines) driven by an external circuit.
 - `Source/WarpX.cpp` — Input parsing for all `warpx.current_injection.*` keys.
 - `Source/Evolve/WarpXEvolve.cpp` — `InjectPrescribedCurrent` call each step, before the macroscopic E-solve.
 - `Docs/source/usage/parameters.rst` — New section *Maxwell solver: prescribed current injection*.
-

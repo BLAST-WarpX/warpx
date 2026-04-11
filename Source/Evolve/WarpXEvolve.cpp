@@ -1558,4 +1558,3 @@ WarpX::InjectPrescribedCurrent (amrex::Real t)
         }
     }
 }
-
