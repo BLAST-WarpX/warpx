@@ -2714,6 +2714,56 @@ Maxwell solver: macroscopic media
     computational medium, respectively. The default values are the corresponding values
     in vacuum.
 
+.. _running-cpp-parameters-prescribed-current:
+
+Maxwell solver: prescribed current injection
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Prescribed current injection allows a user-defined, time-varying current waveform to be
+imposed on one or more rectangular faces of the simulation domain.  This is typically used
+to drive a macroscopic conductor (e.g. a coil or transmission line) from an external circuit.
+It requires ``algo.em_solver_medium = macroscopic``.
+
+The waveform is read from a plain-text two-column file (time [s], current [A]).
+At each time step the injected current density :math:`J = I(t) / A` is deposited uniformly
+over the specified face area.
+
+* ``warpx.current_injection`` (`bool`, optional, default: ``0``)
+    Enable prescribed current injection.  Must be ``1`` to activate all parameters below.
+
+* ``warpx.current_injection.file`` (`string`)
+    Path to a plain-text waveform file with two columns: ``t [s]`` and ``I [A]``.
+    Linear interpolation is used between tabulated time points.
+
+* ``warpx.current_injection.n_pairs`` (`integer`, optional, default: ``1``)
+    Number of drive/return face pairs.  At least one pair must be defined.
+
+For each pair index ``N`` (starting from 0), the following parameters define the **drive face**
+(required) and the optional **return face**:
+
+* ``warpx.current_injection.pair_N.drive.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`)
+    Bounding box of the drive injection face in physical coordinates [m].
+    The box must be thin in the current direction (one cell wide is typical).
+
+* ``warpx.current_injection.pair_N.drive.A`` (`float`)
+    Cross-sectional area of the drive face [m²] used to convert total current :math:`I(t)`
+    to current density :math:`J = I(t)/A`.
+
+* ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``)
+    Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
+
+* ``warpx.current_injection.pair_N.return.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`, optional)
+    Bounding box of the return face.  If ``return.xlo`` is absent the return face is disabled.
+    **For coil simulations where the conductor body is present in the domain via**
+    ``macroscopic.sigma_function``, **omit the return face**; the macroscopic solver carries
+    the return current automatically.
+
+* ``warpx.current_injection.pair_N.return.A`` (`float`, optional)
+    Cross-sectional area of the return face [m²].  Required when a return face is specified.
+
+* ``warpx.current_injection.pair_N.return.dir`` (`integer`, optional)
+    Current direction for the return face.  Defaults to ``drive.dir``.
+
 .. _running-cpp-parameters-hybrid-model:
 
 Maxwell solver: kinetic-fluid hybrid
