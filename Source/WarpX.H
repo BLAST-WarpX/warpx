@@ -310,6 +310,12 @@ public:
     //! If true, the initial conditions from random number generators are serialized (useful for reproducible testing with OpenMP)
     static bool serialize_initial_conditions;
 
+    //! Effective speed of light for the EM solver (reduced speed of light model)
+    //! Set via warpx.c_light_factor (default 1.0, meaning no reduction)
+    static amrex::Real c_light;
+    //! Square of the effective speed of light
+    static amrex::Real c_light_sq;
+
     //! Lorentz factor of the boosted frame in which a boosted-frame simulation is run
     static amrex::Real gamma_boost;
     //! Beta value corresponding to the Lorentz factor of the boosted frame of the simulation
@@ -649,6 +655,14 @@ public:
     void UpdateAuxilaryData ();
     void UpdateAuxilaryDataStagToNodal ();
     void UpdateAuxilaryDataSameType ();
+
+    /**
+     * \brief Linearly interpolate I(t) from the loaded waveform table and add
+     *        the resulting current density to current_fp at the drive window.
+     *        Must be public so NVCC can compile the enclosed __device__ lambda.
+     * @param[in] t  current simulation time [s]
+     */
+    void InjectPrescribedCurrent (amrex::Real t);
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -1287,6 +1301,62 @@ private:
 
     // Macroscopic properties
     std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
+
+    // -----------------------------------------------------------------------
+    // Prescribed current injection (file-driven open-loop current source)
+    //
+    // Reads a two-column ASCII file  t[s]  I[A]  (generated externally, e.g.
+    // by generate_waveform.py) and injects the linearly-interpolated I(t)
+    // as a current density into a specified spatial window every timestep.
+    // This keeps WarpX circuit-model-agnostic: any waveform source (RLC,
+    // Marx, SPICE export, experiment) produces the same format file.
+    //
+    // Injection is organized as drive / return *pairs*.  Each pair has:
+    //   drive face  (required) — injects  J = +I(t) / A  at the gap
+    //   return face (optional) — injects  J = -I(t) / A  at a second gap
+    //
+    // For coil simulations where the copper conductor is inside the domain
+    // (modelled via macroscopic.sigma_function), the return face is NEVER
+    // needed: the macroscopic Maxwell solver drives the return current
+    // through the copper body automatically.  Drive-only is the correct
+    // and standard mode for all such cases, regardless of where the gap is.
+    //
+    // The return face is only relevant for vacuum-line geometries where there
+    // is no conducting path between the two ends of the current loop inside
+    // the simulation domain (e.g. a TEM stripline with the conductors outside
+    // the domain boundary).
+    // -----------------------------------------------------------------------
+
+    /** One face of a drive/return pair: bounding box, face area, and J-component. */
+    struct CIFace {
+        amrex::Real xlo{0}, xhi{0};
+        amrex::Real ylo{0}, yhi{0};
+        amrex::Real zlo{0}, zhi{0};
+        amrex::Real A{1};   //!< Face area perpendicular to dir [m^2]
+        int dir{0};         //!< Current direction: 0=Jx, 1=Jy, 2=Jz
+    };
+
+    /** One drive / return pair.
+     *  Input keys:
+     *    warpx.current_injection.pair_N.drive.{xlo,xhi,ylo,yhi,zlo,zhi,A,dir}
+     *    warpx.current_injection.pair_N.return.{xlo,xhi,ylo,yhi,zlo,zhi,A[,dir]}  (optional)
+     *  The return.* block is only needed when there is no conducting body in
+     *  the domain to carry the return current naturally.  For coils with an
+     *  on-grid conductor (macroscopic sigma) omit the return.* keys entirely.
+     *  return.dir is optional and defaults to drive.dir.
+     */
+    struct CIPair {
+        CIFace drive;               //!< Drive face; injects J = +I(t) / drive.A
+        CIFace ret;                 //!< Return face; injects J = -I(t) / ret.A  (rarely used)
+        bool has_return{false};     //!< true only when an explicit return gap is configured
+    };
+
+    /** Enable prescribed current injection.  Set via warpx.current_injection = 1. */
+    bool m_current_injection = false;
+    std::string m_ci_file;                        //!< Path to waveform file (t[s] I[A])
+    std::vector<amrex::Real> m_ci_time;           //!< Loaded time points [s]
+    std::vector<amrex::Real> m_ci_current;        //!< Loaded current points [A]
+    std::vector<CIPair>      m_ci_pairs;          //!< All drive/return pairs
 
     // Electrostatic solver
     std::unique_ptr<ElectrostaticSolver> m_electrostatic_solver;

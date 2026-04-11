@@ -48,6 +48,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXUtil.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
@@ -93,6 +94,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 #include <limits>
 #include <optional>
 #include <random>
@@ -113,6 +116,9 @@ bool WarpX::fft_do_time_averaging = false;
 
 amrex::IntVect WarpX::m_fill_guards_fields  = amrex::IntVect(0);
 amrex::IntVect WarpX::m_fill_guards_current = amrex::IntVect(0);
+
+Real WarpX::c_light = PhysConst::c;
+Real WarpX::c_light_sq = PhysConst::c * PhysConst::c;
 
 Real WarpX::gamma_boost = 1._rt;
 Real WarpX::beta_boost = 0._rt;
@@ -437,7 +443,137 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // Set default values for particle and cell weights for costs update;
+    // --- Prescribed current injection (file-driven) -------------------------
+    {
+        ParmParse pp_warpx("warpx");
+        pp_warpx.query("current_injection", m_current_injection);
+        if (m_current_injection) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_em_solver_medium == MediumForEM::Macroscopic,
+                "warpx.current_injection requires algo.em_solver_medium = macroscopic");
+            // Path to the two-column waveform file: t[s]  I[A]
+            pp_warpx.get("current_injection.file", m_ci_file);
+            std::ifstream wf_stream(m_ci_file);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                wf_stream.is_open(),
+                "warpx.current_injection.file: cannot open '" + m_ci_file + "'");
+            std::string line;
+            while (std::getline(wf_stream, line)) {
+                // Skip blank lines and comment lines beginning with '#'
+                const auto first = line.find_first_not_of(" \t\r\n");
+                if (first == std::string::npos || line[first] == '#') { continue; }
+                std::istringstream iss(line);
+                amrex::Real t_val, I_val;
+                if (iss >> t_val >> I_val) {
+                    m_ci_time.push_back(t_val);
+                    m_ci_current.push_back(I_val);
+                }
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_ci_time.size() >= 2,
+                "warpx.current_injection.file must contain at least 2 data rows");
+
+            // Read injection pairs.
+            // Each pair has a required drive face and an optional return face.
+            // Format (n pairs, zero-indexed):
+            //   warpx.current_injection.n_pairs = N
+            //   warpx.current_injection.pair_0.drive.xlo = ...
+            //   warpx.current_injection.pair_0.drive.xhi = ...
+            //   warpx.current_injection.pair_0.drive.ylo = ...
+            //   warpx.current_injection.pair_0.drive.yhi = ...
+            //   warpx.current_injection.pair_0.drive.zlo = ...
+            //   warpx.current_injection.pair_0.drive.zhi = ...
+            //   warpx.current_injection.pair_0.drive.A   = ...  (face area [m^2])
+            //   warpx.current_injection.pair_0.drive.dir = 0    (0=Jx,1=Jy,2=Jz)
+            //   # return face: omit for all coil sims with on-grid copper conductor.
+            //   # Only specify a return block when the full loop has NO conducting
+            //   # body inside the domain (e.g. vacuum TEM line with external plates).
+            //   warpx.current_injection.pair_0.return.xlo = ...
+            //   warpx.current_injection.pair_0.return.xhi = ...
+            //   warpx.current_injection.pair_0.return.ylo = ...
+            //   warpx.current_injection.pair_0.return.yhi = ...
+            //   warpx.current_injection.pair_0.return.zlo = ...
+            //   warpx.current_injection.pair_0.return.zhi = ...
+            //   warpx.current_injection.pair_0.return.A   = ...
+            //   warpx.current_injection.pair_0.return.dir = 0   # optional, defaults to drive.dir
+            //   (repeat for pair_1, pair_2, ...)
+            int n_pairs = 0;
+            pp_warpx.query("current_injection.n_pairs", n_pairs);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                n_pairs >= 1,
+                "warpx.current_injection.n_pairs must be >= 1");
+            m_ci_pairs.resize(n_pairs);
+            for (int p = 0; p < n_pairs; ++p) {
+                const std::string base = "current_injection.pair_" + std::to_string(p);
+                const std::string dp   = base + ".drive.";
+                const std::string rp   = base + ".return.";
+                auto& pair = m_ci_pairs[p];
+
+                // Drive face (required).
+                utils::parser::queryWithParser(pp_warpx, (dp+"xlo").c_str(), pair.drive.xlo);
+                utils::parser::queryWithParser(pp_warpx, (dp+"xhi").c_str(), pair.drive.xhi);
+                utils::parser::queryWithParser(pp_warpx, (dp+"ylo").c_str(), pair.drive.ylo);
+                utils::parser::queryWithParser(pp_warpx, (dp+"yhi").c_str(), pair.drive.yhi);
+                utils::parser::queryWithParser(pp_warpx, (dp+"zlo").c_str(), pair.drive.zlo);
+                utils::parser::queryWithParser(pp_warpx, (dp+"zhi").c_str(), pair.drive.zhi);
+                utils::parser::queryWithParser(pp_warpx, (dp+"A"  ).c_str(), pair.drive.A);
+                pp_warpx.query((dp+"dir").c_str(), pair.drive.dir);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    pair.drive.dir >= 0 && pair.drive.dir <= 2,
+                    "current_injection pair_" + std::to_string(p) + ".drive.dir must be 0, 1, or 2");
+
+                // Return face: absent in all standard coil runs (copper conductor
+                // in domain carries the return current automatically via macroscopic
+                // sigma).  Only present when the loop has no on-grid conductor.
+                // Detect by probing return.xlo; if present read the full return face.
+                // return.dir is optional and defaults to drive.dir.
+                pair.ret.dir = pair.drive.dir;
+                pair.has_return = (utils::parser::queryWithParser(pp_warpx,
+                    (rp+"xlo").c_str(), pair.ret.xlo) > 0);
+                if (pair.has_return) {
+                    utils::parser::queryWithParser(pp_warpx, (rp+"xhi").c_str(), pair.ret.xhi);
+                    utils::parser::queryWithParser(pp_warpx, (rp+"ylo").c_str(), pair.ret.ylo);
+                    utils::parser::queryWithParser(pp_warpx, (rp+"yhi").c_str(), pair.ret.yhi);
+                    utils::parser::queryWithParser(pp_warpx, (rp+"zlo").c_str(), pair.ret.zlo);
+                    utils::parser::queryWithParser(pp_warpx, (rp+"zhi").c_str(), pair.ret.zhi);
+                    utils::parser::queryWithParser(pp_warpx, (rp+"A"  ).c_str(), pair.ret.A);
+                    pp_warpx.query((rp+"dir").c_str(), pair.ret.dir);  // optional override
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        pair.ret.dir >= 0 && pair.ret.dir <= 2,
+                        "current_injection pair_" + std::to_string(p) + ".return.dir must be 0, 1, or 2");
+                }
+
+                amrex::Print()
+                    << "[CurrentInjection] pair " << p
+                    << "  drive: dir=" << pair.drive.dir
+                    << "  A=" << pair.drive.A << " m^2"
+                    << "  box=[" << pair.drive.xlo << "," << pair.drive.xhi << "]"
+                    << "x[" << pair.drive.ylo << "," << pair.drive.yhi << "]"
+                    << "x[" << pair.drive.zlo << "," << pair.drive.zhi << "]";
+                if (pair.has_return) {
+                    amrex::Print()
+                        << "  return: dir=" << pair.ret.dir
+                        << "  A=" << pair.ret.A << " m^2"
+                        << "  box=[" << pair.ret.xlo << "," << pair.ret.xhi << "]"
+                        << "x[" << pair.ret.ylo << "," << pair.ret.yhi << "]"
+                        << "x[" << pair.ret.zlo << "," << pair.ret.zhi << "]";
+                } else {
+                    amrex::Print() << "  (drive-only, no return face)";
+                }
+                amrex::Print() << "\n";
+            }
+            amrex::Print()
+                << "[CurrentInjection] loaded " << m_ci_time.size() << " points from '"
+                << m_ci_file << "'\n"
+                << "[CurrentInjection] t_range=[" << m_ci_time.front()
+                << ", " << m_ci_time.back() << "] s"
+                << "  I_range=[" << *std::min_element(m_ci_current.begin(), m_ci_current.end())
+                << ", " << *std::max_element(m_ci_current.begin(), m_ci_current.end()) << "] A\n";
+        }
+    }
+    // ------------------------------------------------------------------------
+
+
     // Default values listed here for the case AMREX_USE_GPU are determined
     // from single-GPU tests on Summit.
     if (costs_heuristic_cells_wt<=0. && costs_heuristic_particles_wt<=0.
@@ -692,6 +828,22 @@ WarpX::ReadParameters ()
                                          "Subcycling method 1 only works for 2 levels.");
 
         ReadBoostedFrameParameters(gamma_boost, beta_boost, boost_direction);
+
+        // Reduced speed of light model
+        {
+            amrex::Real c_light_factor = 1.0;
+            utils::parser::queryWithParser(pp_warpx, "c_light_factor", c_light_factor);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(c_light_factor >= 1.0,
+                "warpx.c_light_factor must be >= 1.0");
+            c_light = PhysConst::c / c_light_factor;
+            c_light_sq = c_light * c_light;
+            if (c_light_factor > 1.0) {
+                amrex::Print() << "\n*** Reduced speed of light model enabled ***\n"
+                               << "    c_light_factor = " << c_light_factor << "\n"
+                               << "    c_eff = " << c_light << " m/s"
+                               << " (physical c = " << PhysConst::c << " m/s)\n\n";
+            }
+        }
 
         // queryWithParser returns 1 if argument zmax_plasma_to_compute_max_step is
         // specified by the user, 0 otherwise.

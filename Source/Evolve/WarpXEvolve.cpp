@@ -609,6 +609,10 @@ WarpX::OneStep_nosub (
             // vacuum medium
             EvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
+            // Inject prescribed current into current_fp before the E-solve
+            if (m_current_injection) {
+                InjectPrescribedCurrent(a_cur_time);
+            }
             // macroscopic medium
             MacroscopicEvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else {
@@ -1485,3 +1489,73 @@ WarpX::HandleSignals()
         ExecutePythonCallback("oncheckpointsignal");
     }
 }
+
+void
+WarpX::InjectPrescribedCurrent (amrex::Real t)
+{
+    using namespace amrex;
+    using warpx::fields::FieldType;
+
+    // Linear interpolation into the waveform table loaded from file.
+    // Returns immediately if t is outside the table's time range (I = 0).
+    const auto& t_pts = m_ci_time;
+    const auto& I_pts = m_ci_current;
+
+    if (t <= t_pts.front() || t >= t_pts.back()) { return; }
+
+    // Binary search for the interval [t0, t1] that brackets t.
+    const auto it  = std::lower_bound(t_pts.begin(), t_pts.end(), t);
+    const std::size_t idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
+    const Real t0 = t_pts[idx - 1],  t1 = t_pts[idx];
+    const Real I0 = I_pts[idx - 1],  I1 = I_pts[idx];
+    const Real I_t = I0 + (I1 - I0) * (t - t0) / (t1 - t0);
+
+    if (I_t == 0._rt) { return; }   // nothing to inject this step
+
+    // Inject current density for each drive/return pair.
+    //   Drive face:  J = +I(t) / pair.drive.A
+    //   Return face: J = -I(t) / pair.ret.A  (only when pair.has_return)
+    using ablastr::fields::Direction;
+    const auto& geom0  = Geom(0);
+    const auto prob_lo = geom0.ProbLoArray();
+    const auto dx      = geom0.CellSizeArray();
+
+    // Host-side helper: inject J_inj into all cells inside a CIFace bounding box.
+    auto inject_face = [&](const CIFace& face, Real J_inj) {
+        auto* J_mf = m_fields.get(FieldType::current_fp,
+                                   Direction{face.dir}, 0);
+        const Real xlo = face.xlo, xhi = face.xhi;
+        const Real ylo = face.ylo, yhi = face.yhi;
+        const Real zlo = face.zlo, zhi = face.zhi;
+        const amrex::IntVect iv = J_mf->ixType().toIntVect();
+        const int iv0 = iv[0], iv1 = iv[1], iv2 = iv[2];
+
+        for (amrex::MFIter mfi(*J_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            const amrex::Box& tbx = mfi.tilebox(iv);
+            amrex::Array4<amrex::Real> const& J_arr = J_mf->array(mfi);
+
+            amrex::ParallelFor(tbx,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    const Real fac_x = (1 - iv0) * dx[0] * 0.5_rt;
+                    const Real fac_y = (1 - iv1) * dx[1] * 0.5_rt;
+                    const Real fac_z = (1 - iv2) * dx[2] * 0.5_rt;
+                    const Real x = i * dx[0] + prob_lo[0] + fac_x;
+                    const Real y = j * dx[1] + prob_lo[1] + fac_y;
+                    const Real z = k * dx[2] + prob_lo[2] + fac_z;
+
+                    if (x >= xlo && x < xhi && y >= ylo && y < yhi && z >= zlo && z < zhi) {
+                        J_arr(i,j,k) += J_inj;
+                    }
+                });
+        }
+    };
+
+    for (const auto& pair : m_ci_pairs) {
+        inject_face(pair.drive, +I_t / pair.drive.A);
+        if (pair.has_return) {
+            inject_face(pair.ret, -I_t / pair.ret.A);
+        }
+    }
+}
+
