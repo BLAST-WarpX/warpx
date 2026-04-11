@@ -3018,7 +3018,7 @@ class BremsstrahlungCollisions(picmistandard.base._ClassWithInit):
     koT1_cut: float
         Minimum energy of the photons created.
         This is relative to the electron energy, defaulting to 1.e-4.
-        
+
     create_photons: bool
         Whether photons particles are created during the collisions.
         Defaults to True.
