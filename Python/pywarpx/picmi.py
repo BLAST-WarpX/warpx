@@ -2989,6 +2989,89 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 collision.add_new_attr(process + "_" + key, val)
 
 
+class BremsstrahlungCollisions(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle setup of binary Bremsstrahlung collisions in WarpX. If
+    collision initialization is added to picmistandard this can be changed to
+    inherit that functionality.
+
+    Parameters
+    ----------
+    name: string
+        Name of instance (used in the inputs file)
+
+    species: list of species instances
+        The species involved in the collision. Must be of length 2.
+        The electron species must be given first, followed by the target species.
+
+    product_species: string
+        The species produced, must by photons
+
+    Z: integer
+        The number of electrons on the target
+
+    multiplier: float
+        Multiplier for the collision probability.
+        Any resulting photons will have the electron weight divided the multiplier.
+        The default is 1. This must be greater than or equal to 1.
+
+    koT1_cut: float
+        Minimum energy of the photons created.
+        This is relative to the electron energy, defaulting to 1.e-4.
+        
+    create_photons: bool
+        Whether photons particles are created during the collisions.
+        Defaults to True.
+
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
+    """
+
+    def __init__(
+        self,
+        name,
+        species,
+        product_species,
+        Z,
+        multiplier=None,
+        koT1_cut=None,
+        create_photons=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
+        self.name = name
+        self.species = species
+        self.product_species = product_species
+        self.Z = Z
+        self.multiplier = multiplier
+        self.koT1_cut = koT1_cut
+        self.create_photons = create_photons
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "bremsstrahlung"
+        collision.species = [species.name for species in self.species]
+        collision.product_species = [self.product_species.name]
+        collision.Z = self.Z
+        collision.multiplier = self.multiplier
+        collision.koT1_cut = self.koT1_cut
+        collision.create_photons = self.create_photons
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
+
+
 class EmbeddedBoundary(picmistandard.base._ClassWithInit):
     """
     Custom class to handle set up of embedded boundaries specific to WarpX.
@@ -3194,6 +3277,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         (fields and currents are interpolated back and forth between a staggered grid
         and a collocated grid, must be used with momentum-conserving field gathering algorithm).
 
+    warpx_grid: grid instance
+        When the solver is not specified, this provides a way to specify the grid
+
     warpx_do_current_centering: bool, optional
         If true, the current is deposited on a nodal grid and then centered
         to a staggered grid (Yee grid), using finite-order interpolation.
@@ -3369,6 +3455,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.particle_pusher_algo = kw.pop("warpx_particle_pusher_algo", None)
         self.use_filter = kw.pop("warpx_use_filter", None)
         self.grid_type = kw.pop("warpx_grid_type", None)
+        self.grid = kw.pop("warpx_grid", None)
         self.do_current_centering = kw.pop("warpx_do_current_centering", None)
         self.field_centering_order = kw.pop("warpx_field_centering_order", None)
         self.current_centering_order = kw.pop("warpx_current_centering_order", None)
@@ -3545,7 +3632,11 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.self_fields_max_iters = self.self_fields_max_iters
         pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
 
-        self.solver.solver_initialize_inputs()
+        if self.solver is not None:
+            self.solver.solver_initialize_inputs()
+        else:
+            pywarpx.algo.maxwell_solver = "none"
+            self.grid.grid_initialize_inputs()
 
         # Initialize warpx.field_centering_no<x,y,z> and warpx.current_centering_no<x,y,z>
         # if set by the user in the input (need to access grid info from solver attribute)
