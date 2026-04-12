@@ -1496,31 +1496,16 @@ WarpX::InjectPrescribedCurrent (amrex::Real t)
     using namespace amrex;
     using warpx::fields::FieldType;
 
-    // Linear interpolation into the waveform table loaded from file.
-    // Returns immediately if t is outside the table's time range (I = 0).
-    const auto& t_pts = m_ci_time;
-    const auto& I_pts = m_ci_current;
-
-    if (t <= t_pts.front() || t >= t_pts.back()) { return; }
-
-    // Binary search for the interval [t0, t1] that brackets t.
-    const auto it  = std::lower_bound(t_pts.begin(), t_pts.end(), t);
-    const std::size_t idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
-    const Real t0 = t_pts[idx - 1],  t1 = t_pts[idx];
-    const Real I0 = I_pts[idx - 1],  I1 = I_pts[idx];
-    const Real I_t = I0 + (I1 - I0) * (t - t0) / (t1 - t0);
-
-    if (I_t == 0._rt) { return; }   // nothing to inject this step
-
-    // Inject current density for each drive/return pair.
-    //   Drive face:  J = +I(t) / pair.drive.A
-    //   Return face: J = -I(t) / pair.ret.A  (only when pair.has_return)
+    // Each pair has its own waveform (populated from the global file by default,
+    // or overridden by warpx.current_injection.pair_N.file).
+    // Perform linear interpolation per pair, so pairs with different waveforms
+    // are handled correctly.
     using ablastr::fields::Direction;
     const auto& geom0  = Geom(0);
     const auto prob_lo = geom0.ProbLoArray();
     const auto dx      = geom0.CellSizeArray();
 
-    // Host-side helper: inject J_inj into all cells inside a CIFace bounding box.
+    // Host-side helper: add J_inj to all cells inside the CIFace bounding box.
     auto inject_face = [&](const CIFace& face, Real J_inj) {
         auto* J_mf = m_fields.get(FieldType::current_fp,
                                    Direction{face.dir}, 0);
@@ -1552,6 +1537,21 @@ WarpX::InjectPrescribedCurrent (amrex::Real t)
     };
 
     for (const auto& pair : m_ci_pairs) {
+        // Linear interpolation for this pair's waveform.
+        // Skip pair if t is outside its time range (I = 0 for this pair).
+        const auto& t_pts = pair.time;
+        const auto& I_pts = pair.current;
+
+        if (t <= t_pts.front() || t >= t_pts.back()) { continue; }
+
+        const auto it  = std::lower_bound(t_pts.begin(), t_pts.end(), t);
+        const std::size_t idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
+        const Real t0 = t_pts[idx - 1],  t1 = t_pts[idx];
+        const Real I0 = I_pts[idx - 1],  I1 = I_pts[idx];
+        const Real I_t = I0 + (I1 - I0) * (t - t0) / (t1 - t0);
+
+        if (I_t == 0._rt) { continue; }   // nothing to inject for this pair
+
         inject_face(pair.drive, +I_t / pair.drive.A);
         if (pair.has_return) {
             inject_face(pair.ret, -I_t / pair.ret.A);

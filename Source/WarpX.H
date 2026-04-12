@@ -1349,13 +1349,15 @@ private:
         CIFace drive;               //!< Drive face; injects J = +I(t) / drive.A
         CIFace ret;                 //!< Return face; injects J = -I(t) / ret.A  (rarely used)
         bool has_return{false};     //!< true only when an explicit return gap is configured
+        /** Per-pair waveform.  Populated from the global file by default; can be
+         *  overridden by setting  warpx.current_injection.pair_N.file = "path".  */
+        std::vector<amrex::Real> time;
+        std::vector<amrex::Real> current;
     };
 
     /** Enable prescribed current injection.  Set via warpx.current_injection = 1. */
     bool m_current_injection = false;
-    std::string m_ci_file;                        //!< Path to waveform file (t[s] I[A])
-    std::vector<amrex::Real> m_ci_time;           //!< Loaded time points [s]
-    std::vector<amrex::Real> m_ci_current;        //!< Loaded current points [A]
+    std::string m_ci_file;                        //!< Path to global waveform file (t[s] I[A])
     std::vector<CIPair>      m_ci_pairs;          //!< All drive/return pairs
 
     // Electrostatic solver

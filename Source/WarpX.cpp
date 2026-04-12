@@ -451,52 +451,41 @@ WarpX::WarpX ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 m_em_solver_medium == MediumForEM::Macroscopic,
                 "warpx.current_injection requires algo.em_solver_medium = macroscopic");
-            // Path to the two-column waveform file: t[s]  I[A]
-            pp_warpx.get("current_injection.file", m_ci_file);
-            std::ifstream wf_stream(m_ci_file);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                wf_stream.is_open(),
-                "warpx.current_injection.file: cannot open '" + m_ci_file + "'");
-            std::string line;
-            while (std::getline(wf_stream, line)) {
-                // Skip blank lines and comment lines beginning with '#'
-                const auto first = line.find_first_not_of(" \t\r\n");
-                if (first == std::string::npos || line[first] == '#') { continue; }
-                std::istringstream iss(line);
-                amrex::Real t_val, I_val;
-                if (iss >> t_val >> I_val) {
-                    m_ci_time.push_back(t_val);
-                    m_ci_current.push_back(I_val);
+
+            // Helper: load a two-column waveform file into (time, current) vectors.
+            auto load_waveform = [](const std::string& path,
+                                    std::vector<amrex::Real>& tvec,
+                                    std::vector<amrex::Real>& ivec)
+            {
+                std::ifstream wf_stream(path);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    wf_stream.is_open(),
+                    "warpx.current_injection: cannot open waveform file '" + path + "'");
+                std::string line;
+                while (std::getline(wf_stream, line)) {
+                    const auto first = line.find_first_not_of(" \t\r\n");
+                    if (first == std::string::npos || line[first] == '#') { continue; }
+                    std::istringstream iss(line);
+                    amrex::Real t_val, I_val;
+                    if (iss >> t_val >> I_val) {
+                        tvec.push_back(t_val);
+                        ivec.push_back(I_val);
+                    }
                 }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    tvec.size() >= 2,
+                    "warpx.current_injection: waveform file '" + path +
+                    "' must contain at least 2 data rows");
+            };
+
+            // Load global waveform (required unless every pair has its own file).
+            std::vector<amrex::Real> global_time, global_current;
+            const bool has_global_file = pp_warpx.query("current_injection.file", m_ci_file);
+            if (has_global_file) {
+                load_waveform(m_ci_file, global_time, global_current);
             }
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                m_ci_time.size() >= 2,
-                "warpx.current_injection.file must contain at least 2 data rows");
 
             // Read injection pairs.
-            // Each pair has a required drive face and an optional return face.
-            // Format (n pairs, zero-indexed):
-            //   warpx.current_injection.n_pairs = N
-            //   warpx.current_injection.pair_0.drive.xlo = ...
-            //   warpx.current_injection.pair_0.drive.xhi = ...
-            //   warpx.current_injection.pair_0.drive.ylo = ...
-            //   warpx.current_injection.pair_0.drive.yhi = ...
-            //   warpx.current_injection.pair_0.drive.zlo = ...
-            //   warpx.current_injection.pair_0.drive.zhi = ...
-            //   warpx.current_injection.pair_0.drive.A   = ...  (face area [m^2])
-            //   warpx.current_injection.pair_0.drive.dir = 0    (0=Jx,1=Jy,2=Jz)
-            //   # return face: omit for all coil sims with on-grid copper conductor.
-            //   # Only specify a return block when the full loop has NO conducting
-            //   # body inside the domain (e.g. vacuum TEM line with external plates).
-            //   warpx.current_injection.pair_0.return.xlo = ...
-            //   warpx.current_injection.pair_0.return.xhi = ...
-            //   warpx.current_injection.pair_0.return.ylo = ...
-            //   warpx.current_injection.pair_0.return.yhi = ...
-            //   warpx.current_injection.pair_0.return.zlo = ...
-            //   warpx.current_injection.pair_0.return.zhi = ...
-            //   warpx.current_injection.pair_0.return.A   = ...
-            //   warpx.current_injection.pair_0.return.dir = 0   # optional, defaults to drive.dir
-            //   (repeat for pair_1, pair_2, ...)
             int n_pairs = 0;
             pp_warpx.query("current_injection.n_pairs", n_pairs);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -522,11 +511,7 @@ WarpX::WarpX ()
                     pair.drive.dir >= 0 && pair.drive.dir <= 2,
                     "current_injection pair_" + std::to_string(p) + ".drive.dir must be 0, 1, or 2");
 
-                // Return face: absent in all standard coil runs (copper conductor
-                // in domain carries the return current automatically via macroscopic
-                // sigma).  Only present when the loop has no on-grid conductor.
-                // Detect by probing return.xlo; if present read the full return face.
-                // return.dir is optional and defaults to drive.dir.
+                // Return face (optional).
                 pair.ret.dir = pair.drive.dir;
                 pair.has_return = (utils::parser::queryWithParser(pp_warpx,
                     (rp+"xlo").c_str(), pair.ret.xlo) > 0);
@@ -537,12 +522,27 @@ WarpX::WarpX ()
                     utils::parser::queryWithParser(pp_warpx, (rp+"zlo").c_str(), pair.ret.zlo);
                     utils::parser::queryWithParser(pp_warpx, (rp+"zhi").c_str(), pair.ret.zhi);
                     utils::parser::queryWithParser(pp_warpx, (rp+"A"  ).c_str(), pair.ret.A);
-                    pp_warpx.query((rp+"dir").c_str(), pair.ret.dir);  // optional override
+                    pp_warpx.query((rp+"dir").c_str(), pair.ret.dir);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         pair.ret.dir >= 0 && pair.ret.dir <= 2,
                         "current_injection pair_" + std::to_string(p) + ".return.dir must be 0, 1, or 2");
                 }
 
+                // Per-pair waveform override.
+                // If pair_N.file is specified, load it; otherwise copy global waveform.
+                std::string pair_file;
+                if (pp_warpx.query((base + ".file").c_str(), pair_file)) {
+                    load_waveform(pair_file, pair.time, pair.current);
+                } else {
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        has_global_file,
+                        "warpx.current_injection: pair_" + std::to_string(p) +
+                        " has no per-pair file and no global warpx.current_injection.file is set");
+                    pair.time    = global_time;
+                    pair.current = global_current;
+                }
+
+                const std::string& used_file = pair_file.empty() ? m_ci_file : pair_file;
                 amrex::Print()
                     << "[CurrentInjection] pair " << p
                     << "  drive: dir=" << pair.drive.dir
@@ -560,15 +560,9 @@ WarpX::WarpX ()
                 } else {
                     amrex::Print() << "  (drive-only, no return face)";
                 }
-                amrex::Print() << "\n";
+                amrex::Print()
+                    << "  waveform: " << pair.time.size() << " pts from '" << used_file << "'\n";
             }
-            amrex::Print()
-                << "[CurrentInjection] loaded " << m_ci_time.size() << " points from '"
-                << m_ci_file << "'\n"
-                << "[CurrentInjection] t_range=[" << m_ci_time.front()
-                << ", " << m_ci_time.back() << "] s"
-                << "  I_range=[" << *std::min_element(m_ci_current.begin(), m_ci_current.end())
-                << ", " << *std::max_element(m_ci_current.begin(), m_ci_current.end()) << "] A\n";
         }
     }
     // ------------------------------------------------------------------------
