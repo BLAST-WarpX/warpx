@@ -89,6 +89,14 @@ class Species(picmistandard.PICMI_Species):
     warpx_do_not_gather: bool, default=False
         Whether or not to gather the fields from grids for this species
 
+    warpx_do_initial_velocity_check: bool, default=True
+        Whether to check during initialization if particles have velocities that would
+        cause them to cross multiple cells per timestep. This check evaluates momentum
+        functions at all cell centers where particles will be initialized and issues
+        warnings if the displacement exceeds safe limits (>1, >sqrt(2), or >sqrt(3)
+        cells/timestep). Excessive velocities lead to physically incorrect results.
+        Set to False to disable for special use cases (e.g., passive test particles).
+
     warpx_radial_numpercell_power: float, default=0.
         With cylindrical geometry, specifies the radial power of the number of particles per cell
 
@@ -267,6 +275,7 @@ class Species(picmistandard.PICMI_Species):
         self.do_not_deposit = kw.pop("warpx_do_not_deposit", None)
         self.do_not_push = kw.pop("warpx_do_not_push", None)
         self.do_not_gather = kw.pop("warpx_do_not_gather", None)
+        self.do_initial_velocity_check = kw.pop("warpx_do_initial_velocity_check", None)
         self.radial_numpercell_power = kw.pop("warpx_radial_numpercell_power", None)
         self.random_theta = kw.pop("warpx_random_theta", None)
 
@@ -367,6 +376,7 @@ class Species(picmistandard.PICMI_Species):
             do_not_deposit=self.do_not_deposit,
             do_not_push=self.do_not_push,
             do_not_gather=self.do_not_gather,
+            do_initial_velocity_check=self.do_initial_velocity_check,
             radial_numpercell_power=self.radial_numpercell_power,
             random_theta=self.random_theta,
             do_resampling=self.do_resampling,
