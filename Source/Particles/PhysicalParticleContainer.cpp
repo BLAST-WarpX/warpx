@@ -362,8 +362,11 @@ PhysicalParticleContainer::AllocData ()
         using ablastr::fields::Direction;
 
         auto& warpx = WarpX::GetInstance();
-        ablastr::fields::MultiLevelVectorField J_vf =
+        ablastr::fields::ConstMultiLevelVectorField const& J_vf =
             warpx.m_fields.get_mr_levels_alldirs(warpx::fields::FieldType::current_fp, warpx.finestLevel());
+
+        ablastr::fields::ConstMultiLevelScalarField const& rho_sf =
+            warpx.m_fields.get_mr_levels(warpx::fields::FieldType::rho_fp, warpx.finestLevel());
 
         const std::string T_field_name = "T_" + species_name;
 
@@ -376,6 +379,15 @@ PhysicalParticleContainer::AllocData ()
                 warpx.m_fields.alloc_init(T_field_name, Direction{idir},
                     lev, ba, dm, WarpX::ncomps, ng, 0.0_rt);
             }
+
+            warpx.m_fields.alloc_init(
+                "Tavg_" + species_name,
+                lev,
+                rho_sf[lev]->boxArray(),
+                rho_sf[lev]->DistributionMap(),
+                WarpX::ncomps,
+                rho_sf[lev]->nGrowVect(),
+                0.0_rt);
         }
 
         ablastr::fields::MultiLevelVectorField T_vf =
@@ -2182,4 +2194,76 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         // temperature in K in T_vf
         local_temperature_arrays->ConvertVarianceToTemperatureAndFilter(T_vf, Tnorm, WarpX::use_filter);
     }
+}
+
+void
+PhysicalParticleContainer::InterpolateAndAverageTemperatureVectorToScalar (
+    ablastr::fields::ConstMultiLevelVectorField const & T_vf,
+    ablastr::fields::MultiLevelScalarField const & Tavg_sf)
+{
+
+    const auto& warpx = WarpX::GetInstance();
+    const int finestLevel = warpx.finestLevel();
+
+    amrex::GpuArray<int, 3> const& coarsen = {1, 1, 1};
+
+    for (lev = 0; lev <= finestlevel; ++lev)
+    {
+        // Copy Staggerings to GPU Vectors
+        amrex::IntVect Tx_stag = T_vf[lev][0]->ixType().toIntVect();
+        amrex::IntVect Ty_stag = T_vf[lev][1]->ixType().toIntVect();
+        amrex::IntVect Tz_stag = T_vf[lev][2]->ixType().toIntVect();
+        amrex::IntVect Tavg_stag = Tavg_sf[lev]->ixType().toIntVect();
+
+        amrex::GpuVect<int, 3> Tx_stag_gpu;
+        amrex::GpuVect<int, 3> Ty_stag_gpu;
+        amrex::GpuVect<int, 3> Tz_stag_gpu;
+        amrex::GpuVect<int, 3> Tavg_stag_gpu;
+
+        // copy data to device
+        for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            Tx_stag_gpu[idim]    = Tx_stag[idim];
+            Ty_stag_gpu[idim]    = Ty_stag[idim];
+            Tz_stag_gpu[idim]    = Tz_stag[idim];
+            Tavg_stag_gpu[idim]  = Tavg_stag[idim];
+        }
+
+        amrex::Gpu::streamSynchronize();
+
+        // This function interpolates to the vector components to the scalar field and combines
+        // into a single scalar temperature
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( amrex::MFIter mfi(*T_sf[lev], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+
+            amrex::Array4<const amrex::Real> const& Tx_arr = T_vf[lev][0]->const_array(mfi);
+            amrex::Array4<const amrex::Real> const& Ty_arr = T_vf[lev][1]->const_array(mfi);
+            amrex::Array4<const amrex::Real> const& Tz_arr = T_vf[lev][2]->const_array(mfi);
+            amrex::Array4<amrex::Real> const& Tavg_arr = Tavg_sf[lev][2]->const_array(mfi);
+
+            const IntVect& Tavg_staggering = Tavg_sf[lev]->ixType().toIntVect();
+
+            const amrex::Box& tb  = mfi.tilebox( Tavg_stag );
+
+            // Update Mean and Variance values after running through weight deposition loop
+            amrex::ParallelFor(tb,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    const amrex::Real Tx_interp = Interp(Tx_arr, Tx_stag_gpu, Tavg_stag_gpu, coarsen, i, j, k, 0);
+                    const amrex::Real Ty_interp = Interp(Ty_arr, Ty_stag_gpu, Tavg_stag_gpu, coarsen, i, j, k, 0);
+                    const amrex::Real Tz_interp = Interp(Tz_arr, Tz_stag_gpu, Tavg_stag_gpu, coarsen, i, j, k, 0);
+                    Tavg_arr(i,j,k,0) = (Tx_interp + Ty_interp + Tz_interp)/3._rt;
+                });
+            }
+        }
+
+        amrex::Gpu::streamSynchronize();
+
+        ablastr::utils::communication::FillBoundary(
+            *Tavg_sf[lev],
+            WarpX::do_single_precision_comms,
+            warpx.Geom(lev).periodicity(),
+            true);
+
+        amrex::Gpu::streamSynchronize();
 }

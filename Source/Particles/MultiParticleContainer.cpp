@@ -604,6 +604,33 @@ MultiParticleContainer::DepositCurrent (
 }
 
 void
+MultiParticleContainer::DepositSpeciesCurrent (
+    ablastr::fields::MultiLevelVectorField const & J,
+    const amrex::Real dt, const amrex::Real relative_time,
+    const std::string & species_name)
+{
+    // Reset the J arrays
+    for (const auto& J_lev : J)
+    {
+        J_lev[0]->setVal(0.0_rt);
+        J_lev[1]->setVal(0.0_rt);
+        J_lev[2]->setVal(0.0_rt);
+    }
+
+    // Call the deposition kernel for given named species
+    auto & pc = self->GetParticleContainerFromName(species_name);
+    pc->DepositCurrent(J, dt, relative_time);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int lev = 0; lev < J.size(); ++lev)
+    {
+        WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
+            J[lev][0], J[lev][1], J[lev][2], lev);
+    }
+#endif
+}
+
+void
 MultiParticleContainer::DepositCharge (
     const ablastr::fields::MultiLevelScalarField& rho,
     const amrex::Real relative_time)
@@ -655,7 +682,7 @@ MultiParticleContainer::DepositTemperatures (
 
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
-        ablastr::fields::MultiLevelVectorField T_vf =
+        ablastr::fields::MultiLevelVectorField const& T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
         // Clear temperature MF for this species
@@ -667,6 +694,13 @@ MultiParticleContainer::DepositTemperatures (
 
         // Accumulate velocities for this species
         pc->AccumulateVelocitiesAndComputeTemperature(T_vf, relative_time);
+
+        // Compute average temperature from components
+        pc->InterpolateAndAverageTemperatureVectorToScalar(
+            T_vf,
+            fields.get_mr_levels_alldirs("Tavg_" + species_names[pc->getSpeciesId()],
+                                         WarpX::GetInstance().finestLevel())
+            );
     }
 }
 

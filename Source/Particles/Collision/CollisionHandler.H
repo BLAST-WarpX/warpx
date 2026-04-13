@@ -28,6 +28,8 @@ public:
     /* Perform all of the collisions */
     void doCollisions (int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
 
+    void addCollision (const std::string & name, const std::string & type )
+
 private:
 
     amrex::Vector<std::string> collision_names;

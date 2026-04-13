@@ -184,6 +184,8 @@ public:
     /** Electron pressure scaling exponent */
     amrex::Real m_gamma = 5.0/3.0;
 
+    std::vector<std::string> m_ion_species_names;
+
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
 

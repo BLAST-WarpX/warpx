@@ -88,6 +88,11 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                );
         }
+        else if (type == "hybrid_resistive_drag") {
+            allcollisions[i] =
+               std::make_unique<HybridResistiveDrag>(
+                    collision_names[i], mypc
+               );
         else if (type == "linear_compton") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<LinearComptonCollisionFunc, ParticleCreationFunc>>(
