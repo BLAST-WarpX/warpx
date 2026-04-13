@@ -215,6 +215,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("split_type", split_type);
     pp_species_name.query("do_not_deposit", do_not_deposit);
     pp_species_name.query("do_not_gather", do_not_gather);
+    pp_species_name.query("do_not_gather", do_not_gather_external_fields);
     pp_species_name.query("do_not_push", do_not_push);
 
     pp_species_name.query("do_continuous_injection", do_continuous_injection);
@@ -1252,7 +1253,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             enum exteb_flags : int { no_exteb, has_exteb };
 
-            const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+            const int exteb_runtime_flag = (getExternalEB.isNoOp() || do_not_gather_external_fields)? no_exteb : has_exteb;
 
             amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
                                {exteb_runtime_flag},

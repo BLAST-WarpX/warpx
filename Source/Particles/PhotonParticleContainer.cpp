@@ -174,7 +174,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     enum exteb_flags : int { no_exteb, has_exteb };
     enum qed_flags : int { no_qed, has_qed };
 
-    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+    const int exteb_runtime_flag = (getExternalEB.isNoOp() || do_not_gather_external_fields) ? no_exteb : has_exteb;
 #ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_breit_wheeler) ? has_qed : no_qed;
 #else

@@ -1457,6 +1457,10 @@ Particle initialization
     If `1` is given, field gather from grids will not be done,
     thus that species will not be affected by the field on grids.
 
+* ``<species_name>.do_not_gather_external_fields`` (`0` or `1` optional; default `0`)
+    If `1` is given, this species will not feel the external fields
+    (but will still feel the fields from the grid.)
+
 * ``<species_name>.do_not_push`` (`0` or `1` optional; default `0`)
     If `1` is given, this species will not be pushed
     by any pusher during the simulation.
