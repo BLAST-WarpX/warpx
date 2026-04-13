@@ -182,8 +182,8 @@ for pti in electrons.iterator(level=0):
 electrons.deposit_current(
     "current_fp", 0, sim.extension.warpx.getdt(0), -0.5 * sim.extension.warpx.getdt(0)
 )
-assert (np.max(np.abs(sim.fields.get("current_fp", "x", 0)[...])) > 0)
-assert (np.max(np.abs(sim.fields.get("current_fp", "z", 0)[...])) > 0)
+assert np.max(np.abs(sim.fields.get("current_fp", "x", 0)[...])) > 0
+assert np.max(np.abs(sim.fields.get("current_fp", "z", 0)[...])) > 0
 
 ##########################
 # take the final sim step
