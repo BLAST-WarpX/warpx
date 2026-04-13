@@ -73,12 +73,19 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         // Minimum allowed energy of the virtual photons
         amrex::Real vphoton_min_energy = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_min_energy", vphoton_min_energy);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            vphoton_min_energy > 0.0_rt,
+            "qed_virtual_photons_min_energy must be strictly positive.");
 
         // Sampling factor (a.k.a. multiplier):
         // the number of virtual photons generated is multiplied by this factor,
         // the weight of each virtual photon is divided by this factor
         amrex::Real sampling_factor = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            sampling_factor > 0.0_rt,
+            "qed_virtual_photons_multiplier must be strictly positive.");
+
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
         amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
