@@ -72,6 +72,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_collision_iso_subcycle  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_collision_iso_subcycle  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_collision_xyz  # name
     3  # dims
     1  # nprocs
