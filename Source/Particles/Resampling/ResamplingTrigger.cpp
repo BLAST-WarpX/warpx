@@ -38,7 +38,7 @@ bool ResamplingTrigger::triggered (const int timestep, const amrex::Real global_
 void ResamplingTrigger::initialize_global_numcells () const
 {
     auto & warpx = WarpX::GetInstance();
-    for (int lev = 0; lev <= warpx.maxLevel(); lev++)
+    for (int lev = 0; lev <= warpx.finestLevel(); lev++)
     {
         m_global_numcells +=  warpx.boxArray(lev).numPts();
     }

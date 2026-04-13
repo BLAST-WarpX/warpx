@@ -358,9 +358,9 @@ LaserParticleContainer::InitData ()
 {
     if (!m_enabled) { return; }
 
-    // Call InitData on max level to inject one laser particle per
+    // Call InitData on the finest level to inject one laser particle per
     // finest cell.
-    InitData(maxLevel());
+    InitData(finestLevel());
 
     if(!do_continuous_injection && (TotalNumberOfParticles() == 0)){
         ablastr::warn_manager::WMRecordWarning("Laser",

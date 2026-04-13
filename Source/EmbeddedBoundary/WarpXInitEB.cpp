@@ -119,7 +119,7 @@ WarpX::ComputeDistanceToEB ()
     BL_PROFILE("ComputeDistanceToEB");
     using warpx::fields::FieldType;
     const amrex::EB2::IndexSpace& eb_is = amrex::EB2::IndexSpace::top();
-    for (int lev=0; lev<=maxLevel(); lev++) {
+    for (int lev=0; lev<=finestLevel(); lev++) {
         const amrex::EB2::Level& eb_level = eb_is.getLevel(Geom(lev));
         auto const eb_fact = fieldEBFactory(lev);
         amrex::FillSignedDistance(*m_fields.get(FieldType::distance_to_eb, lev), eb_level, eb_fact, 1);

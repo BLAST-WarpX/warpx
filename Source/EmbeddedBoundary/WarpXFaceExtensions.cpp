@@ -495,7 +495,7 @@ WarpX::ComputeFaceExtensions ()
         throw std::runtime_error("ComputeFaceExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
-    amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, maxLevel());
+    amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, finestLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended in x:\t" + std::to_string(N_ext_faces(0)) + "\n"
             +"Faces to be extended in y:\t" + std::to_string(N_ext_faces(1)) + "\n"
@@ -503,11 +503,11 @@ WarpX::ComputeFaceExtensions ()
             ablastr::warn_manager::WarnPriority::low
     );
 
-    const auto Bfield = m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel());
-    ::init_borrowing(m_borrowing[maxLevel()], Bfield);
+    const auto Bfield = m_fields.get_alldirs(FieldType::Bfield_fp, finestLevel());
+    ::init_borrowing(m_borrowing[finestLevel()], Bfield);
     ComputeOneWayExtensions();
 
-    amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
+    amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, finestLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended after one way extension in x:\t"
             + std::to_string(N_ext_faces_after_one_way(0)) + "\n"
@@ -519,9 +519,9 @@ WarpX::ComputeFaceExtensions ()
     );
 
     ComputeEightWaysExtensions();
-    ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
+    ::shrink_borrowing(m_borrowing[finestLevel()], Bfield);
 
-    amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
+    amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, finestLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended after eight ways extension in x:\t"
             + std::to_string(N_ext_faces_after_eight_ways(0)) + "\n"
@@ -538,7 +538,7 @@ WarpX::ComputeFaceExtensions ()
 #if !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ)
     if (N_ext_faces_after_eight_ways(0) > 0) {
         ::ApplyBCKCorrection<0>(
-            CellSize(maxLevel()), m_fields, maxLevel(),
+            CellSize(finestLevel()), m_fields, finestLevel(),
             m_flag_ext_face, m_flag_info_face);
         using_bck = true;
     }
@@ -546,7 +546,7 @@ WarpX::ComputeFaceExtensions ()
 
     if (N_ext_faces_after_eight_ways(1) > 0) {
         ::ApplyBCKCorrection<1>(
-            CellSize(maxLevel()), m_fields, maxLevel(),
+            CellSize(finestLevel()), m_fields, finestLevel(),
             m_flag_ext_face, m_flag_info_face);
         using_bck = true;
     }
@@ -554,7 +554,7 @@ WarpX::ComputeFaceExtensions ()
 #if !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ)
     if (N_ext_faces_after_eight_ways(2) > 0) {
         ::ApplyBCKCorrection<2>(
-            CellSize(maxLevel()), m_fields, maxLevel(),
+            CellSize(finestLevel()), m_fields, finestLevel(),
             m_flag_ext_face, m_flag_info_face);
         using_bck = true;
     }
@@ -582,9 +582,9 @@ WarpX::ComputeOneWayExtensions ()
 #ifdef AMREX_USE_EB
     using ablastr::fields::Direction;
 #ifndef WARPX_DIM_RZ
-    auto const eb_fact = fieldEBFactory(maxLevel());
+    auto const eb_fact = fieldEBFactory(finestLevel());
 
-    auto const &cell_size = CellSize(maxLevel());
+    auto const &cell_size = CellSize(finestLevel());
 
     const amrex::Real dx = cell_size[0];
     const amrex::Real dy = cell_size[1];
@@ -600,13 +600,13 @@ WarpX::ComputeOneWayExtensions ()
         WARPX_ABORT_WITH_MESSAGE(
             "ComputeOneWayExtensions: Only implemented in 2D3V and 3D3V");
 #endif
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
+        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, finestLevel())); mfi.isValid(); ++mfi) {
 
             amrex::Box const &box = mfi.validbox();
-            auto const &S = m_fields.get(FieldType::face_areas, Direction{idim}, maxLevel())->array(mfi);
-            auto const &flag_ext_face = m_flag_ext_face[maxLevel()][idim]->array(mfi);
-            auto const &flag_info_face = m_flag_info_face[maxLevel()][idim]->array(mfi);
-            auto &borrowing = (*m_borrowing[maxLevel()][idim])[mfi];
+            auto const &S = m_fields.get(FieldType::face_areas, Direction{idim}, finestLevel())->array(mfi);
+            auto const &flag_ext_face = m_flag_ext_face[finestLevel()][idim]->array(mfi);
+            auto const &flag_info_face = m_flag_info_face[finestLevel()][idim]->array(mfi);
+            auto &borrowing = (*m_borrowing[finestLevel()][idim])[mfi];
             auto const &borrowing_inds_pointer = borrowing.inds_pointer.array();
             auto const &borrowing_size = borrowing.size.array();
             amrex::Long const ncells = box.numPts();
@@ -615,11 +615,11 @@ WarpX::ComputeOneWayExtensions ()
             amrex::Real* borrowing_area = borrowing.area.data();
             int& vecs_size = borrowing.vecs_size;
 
-            auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
+            auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, finestLevel())->array(mfi);
 
-            const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
-            const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
-            const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
+            const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, finestLevel())->array(mfi);
+            const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, finestLevel())->array(mfi);
+            const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, finestLevel())->array(mfi);
 
             vecs_size = amrex::Scan::PrefixSum<int>(ncells,
                                                     [=] AMREX_GPU_DEVICE (int icell) {
@@ -712,7 +712,7 @@ WarpX::ComputeEightWaysExtensions ()
     using ablastr::fields::Direction;
 
 #ifndef WARPX_DIM_RZ
-    auto const &cell_size = CellSize(maxLevel());
+    auto const &cell_size = CellSize(finestLevel());
 
     const amrex::Real dx = cell_size[0];
     const amrex::Real dy = cell_size[1];
@@ -728,14 +728,14 @@ WarpX::ComputeEightWaysExtensions ()
         WARPX_ABORT_WITH_MESSAGE(
             "ComputeEightWaysExtensions: Only implemented in 2D3V and 3D3V");
 #endif
-        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel())); mfi.isValid(); ++mfi) {
+        for (amrex::MFIter mfi(*m_fields.get(FieldType::Bfield_fp, Direction{idim}, finestLevel())); mfi.isValid(); ++mfi) {
 
             amrex::Box const &box = mfi.validbox();
 
-            auto const &S = m_fields.get(FieldType::face_areas, Direction{idim}, maxLevel())->array(mfi);
-            auto const &flag_ext_face = m_flag_ext_face[maxLevel()][idim]->array(mfi);
-            auto const &flag_info_face = m_flag_info_face[maxLevel()][idim]->array(mfi);
-            auto &borrowing = (*m_borrowing[maxLevel()][idim])[mfi];
+            auto const &S = m_fields.get(FieldType::face_areas, Direction{idim}, finestLevel())->array(mfi);
+            auto const &flag_ext_face = m_flag_ext_face[finestLevel()][idim]->array(mfi);
+            auto const &flag_info_face = m_flag_info_face[finestLevel()][idim]->array(mfi);
+            auto &borrowing = (*m_borrowing[finestLevel()][idim])[mfi];
             auto const &borrowing_inds_pointer = borrowing.inds_pointer.array();
             auto const &borrowing_size = borrowing.size.array();
             amrex::Long const ncells = box.numPts();
@@ -744,11 +744,11 @@ WarpX::ComputeEightWaysExtensions ()
             amrex::Real* borrowing_area = borrowing.area.data();
             int& vecs_size = borrowing.vecs_size;
 
-            auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
+            auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, finestLevel())->array(mfi);
 
-            const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
-            const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
-            const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
+            const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, finestLevel())->array(mfi);
+            const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, finestLevel())->array(mfi);
+            const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, finestLevel())->array(mfi);
 
             vecs_size += amrex::Scan::PrefixSum<int>(ncells,
                                                      [=] AMREX_GPU_DEVICE (int icell){

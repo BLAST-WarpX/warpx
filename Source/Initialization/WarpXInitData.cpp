@@ -1146,7 +1146,7 @@ WarpX::computeMaxStepBoostAccelerator() {
     // Divide by dt, and update value of max_step.
     const auto computed_max_step = (m_do_subcycling)?
         static_cast<int>(interaction_time_boost/dt[0]):
-        static_cast<int>(interaction_time_boost/dt[maxLevel()]);
+        static_cast<int>(interaction_time_boost/dt[finestLevel()]);
     max_step = computed_max_step;
     Print()<<"max_step computed in computeMaxStepBoostAccelerator: "
            <<max_step<<"\n";
@@ -1200,7 +1200,7 @@ void
 WarpX::PostRestart ()
 {
     mypc->PostRestart();
-    for (int lev = 0; lev <= maxLevel(); ++lev) {
+    for (int lev = 0; lev <= finestLevel(); ++lev) {
         LoadExternalFields(lev);
     }
 }
@@ -1576,7 +1576,7 @@ void WarpX::CheckGuardCells()
 void WarpX::InitializeEBGridData (int lev)
 {
 #ifdef AMREX_USE_EB
-    if (lev == maxLevel()) {
+    if (lev == finestLevel()) {
 
         auto const eb_fact = fieldEBFactory(lev);
 
@@ -1595,10 +1595,10 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::ScaleAreas(face_areas_lev, CellSize(lev));
 
                 // Compute additional quantities required for the ECT solver
-                const auto& area_mod = m_fields.get_alldirs(FieldType::area_mod, maxLevel());
+                const auto& area_mod = m_fields.get_alldirs(FieldType::area_mod, finestLevel());
                 warpx::embedded_boundary::MarkExtensionCells(
-                    CellSize(maxLevel()), m_flag_info_face[maxLevel()], m_flag_ext_face[maxLevel()],
-                    m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel()),
+                    CellSize(finestLevel()), m_flag_info_face[finestLevel()], m_flag_ext_face[finestLevel()],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, finestLevel()),
                     face_areas_lev,
                     edge_lengths_lev, area_mod);
                 ComputeFaceExtensions();
