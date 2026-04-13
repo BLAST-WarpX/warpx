@@ -50,14 +50,14 @@ public:
 
 private:
     /** skip cells with fewer than this number of macroparticles to obtain a sufficiently accurate average weight */
-    int m_min_ppc = 10;
+    int m_min_ppc = 8;
     /** split macroparticles with w > m_split_weight_koef * (cell mean weight) */
     amrex::Real m_split_weight_koef = 4.0;
-    /** if m_skip_split_if_ppc_above > 0, do not split in cells with more than this many macroparticles */
-    int m_skip_split_if_ppc_above = 0;
-    bool m_resampling_random_splitting_angle = true;
-    amrex::ParticleReal m_splitting_angle = 0.0_rt;
-    std::string m_splitting_type = "position_axes_aligned_split";
-    int m_splitting_type_id = 1; // 0: unchanged positions splitting type; 1: axes-aligned positions (default), 2: velocity-aligned positions
+    /** if m_split_max_ppc > 0, do not split in cells with more than this many macroparticles */
+    int m_split_max_ppc = -1; // -1: no limit
+    bool m_do_random_splitting_angle = false;
+    amrex::Real m_splitting_angle = 0.0_rt;
+    std::string m_splitting_type = "axis_aligned";
+    int m_splitting_type_id = 1; // 0: trivial (nothing changes except of weight); 1: axis-aligned (default), 2: velocity-aligned splitting type
 };
 #endif // WARPX_PARTICLE_SPLITTING_H_
