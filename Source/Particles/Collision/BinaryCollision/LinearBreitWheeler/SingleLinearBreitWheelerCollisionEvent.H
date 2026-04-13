@@ -83,7 +83,7 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
     // Compute linear Breit Wheeler cross section as a function of the kinetic energy
     // in the center of momentum frame
     auto lbw_cross_section = amrex::ParticleReal(0.);
-    lbw_cross_section = LinearBreitWheelerCrossSection(E_coll/2);
+    lbw_cross_section = LinearBreitWheelerCrossSection(0.5_prt*E_coll);
 
     // First estimate of probability to produce an electron-positron pair
     amrex::ParticleReal probability_estimate = multiplier_ratio * event_multiplier *
@@ -125,5 +125,4 @@ void SingleLinearBreitWheelerCollisionEvent (const amrex::ParticleReal& u1x, con
         p_mask[pair_index] = false;
     }
 }
-
 #endif // SINGLE_LINEAR_BREIT_WHEELER_COLLISION_EVENT_H_

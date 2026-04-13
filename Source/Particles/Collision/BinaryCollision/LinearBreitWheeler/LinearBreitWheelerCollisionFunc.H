@@ -268,5 +268,4 @@ private:
 
     Executor m_exe;
 };
-
 #endif // LINEAR_BREIT_WHEELER_COLLISION_FUNC_H_

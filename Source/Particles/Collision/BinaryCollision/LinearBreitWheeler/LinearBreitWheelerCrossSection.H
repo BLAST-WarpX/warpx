@@ -35,7 +35,6 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
 
     if (E_star < me*c_sq) {return 0._prt;}
 
-    constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
     constexpr amrex::ParticleReal pi = MathConst::pi;
     constexpr amrex::ParticleReal re2 = PhysConst::r_e * PhysConst::r_e;
     auto constexpr pow2 = [](auto const x) { return x*x; };
@@ -46,9 +45,58 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
 
     const amrex::ParticleReal term1 = (3._prt-pow4(beta))*std::log((1._prt+beta)/(1._prt-beta));
     const amrex::ParticleReal term2 = 2._prt*beta*(pow2(beta)-2._prt);
-    const amrex::ParticleReal cross_section = one_half_pr*pi*re2*(1._prt-pow2(beta))*(term1+term2);
+    const amrex::ParticleReal cross_section = 0.5_prt*pi*re2*(1._prt-pow2(beta))*(term1+term2);
 
     return cross_section;
 }
 
+/**
+ * \brief Indefinite integral of the unnormalized BW differential cross section
+ * with respect to cos(theta). Used for CDF inversion via Newton-Raphson.
+ *
+ * @param[in] beta velocity of the produced leptons in the CM frame (dimensionless)
+ * @param[in] x cos(theta), the cosine of the polar scattering angle
+ * @return the indefinite integral evaluated at x
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+amrex::ParticleReal LBWIntegralOfDifferentialCrossSection (
+    const amrex::ParticleReal& beta, const amrex::ParticleReal& x)
+{
+    using namespace amrex::literals;
+
+    const amrex::ParticleReal beta2 = beta * beta;
+    const amrex::ParticleReal beta4 = beta2 * beta2;
+    const amrex::ParticleReal term1 =
+        x / (1._prt - beta2 * x * x) * (-1._prt + 2._prt * beta2 - beta4) - x;
+    const amrex::ParticleReal term2 =
+        std::atanh(beta * x) / beta * (3._prt - beta4);
+    return term1 + term2;
+}
+
+/**
+ * \brief Unnormalized BW differential cross section dsigma/d(cos theta).
+ * The full differential cross section is:
+ *   dsigma/d(cos theta) = (pi * r_e^2 / 2) * (1 - beta^2) * f(beta, cos theta)
+ * This function returns f(beta, cos theta).
+ *
+ * Reference: Berestetskii, Lifshitz, Pitaevskii, "Quantum Electrodynamics", par. 86.
+ *
+ * @param[in] beta velocity of the produced leptons in the CM frame (dimensionless)
+ * @param[in] x cos(theta), the cosine of the polar scattering angle
+ * @return the unnormalized differential cross section f(beta, x)
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+amrex::ParticleReal LBWDifferentialCrossSection (
+    const amrex::ParticleReal& beta, const amrex::ParticleReal& x)
+{
+    using namespace amrex::literals;
+
+    const amrex::ParticleReal beta2 = beta * beta;
+    const amrex::ParticleReal beta4 = beta2 * beta2;
+    const amrex::ParticleReal x2 = x * x;
+    const amrex::ParticleReal num = 1._prt + 2._prt * beta2 - 2._prt * beta4
+        - 2._prt * beta2 * (1._prt - beta2) * x2 - beta4 * x2 * x2;
+    const amrex::ParticleReal den = (1._prt - beta2 * x2) * (1._prt - beta2 * x2);
+    return num / den;
+}
 #endif // LINEAR_BREIT_WHEELER_CROSS_SECTION_H

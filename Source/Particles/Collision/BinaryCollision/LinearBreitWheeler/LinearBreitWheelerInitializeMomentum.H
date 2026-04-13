@@ -34,7 +34,7 @@ namespace {
      * in a pair-production event. Here only two products are produced.
      * (In this case, conservation of energy and momentum determines
      * the amplitude of the momentum of the particles exactly.)
-     * We assume that the emission of the product is isotropic in the center-of-momentum frame.
+     * The polar angle is sampled from the Breit-Wheeler differential cross section.
      *
      * @param[in] soa1_in struct of array data of the first colliding photon species
      * @param[in] soa2_in struct of array data of the second colliding photon species
@@ -86,5 +86,4 @@ namespace {
         soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = uz2_out;
     }
 }
-
 #endif // LINEAR_BREIT_WHEELER_INITIALIZE_MOMENTUM_H
