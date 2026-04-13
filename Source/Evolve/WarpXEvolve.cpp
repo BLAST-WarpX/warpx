@@ -731,15 +731,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // only move by one or two cells per time step
         // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
         if (finest_level == 0) {
-            int num_redistribute_ghost = num_moved;
+            int max_cells_travelled = num_moved;
             if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
                 // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
-                num_redistribute_ghost += particle_max_grid_crossings + 1;
+                max_cells_travelled += particle_max_grid_crossings + 1;
             } else {
                 // Standard algorithm ; particles can move by up to the max number
-                num_redistribute_ghost += particle_max_grid_crossings;
+                max_cells_travelled += particle_max_grid_crossings;
             }
-            mypc->RedistributeLocal(num_redistribute_ghost);
+            mypc->RedistributeLocal(max_cells_travelled);
         }
         else {
             mypc->Redistribute();
