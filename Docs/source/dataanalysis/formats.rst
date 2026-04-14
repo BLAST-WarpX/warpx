@@ -88,4 +88,4 @@ Space
 
 .. warning::
 
-   Field quantities (see ``<diag_name>.fields_to_plot`` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged at cell centers.
+   Field quantities (see :pp:param:`<diag_name>.fields_to_plot` in :ref:`diagnostics <running-cpp-parameters-diagnostics>`) in the output files are averaged at cell centers.

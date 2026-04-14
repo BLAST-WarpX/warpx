@@ -17,7 +17,7 @@ Examples of inputs files can be found in the :ref:`Examples <usage-examples>` se
 
 .. note::
 
-   The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand side of all input parameters that consist of one or more integers or floats. Expressions like ``<species_name>.density_max = "0.1+2.3"`` and expressions that include user-defined constants are accepted.
+   The AMReX parser (see :ref:`running-cpp-parameters-parser`) is used for the right-hand side of all input parameters that consist of one or more integers or floats. Expressions like :pp:param:`<species_name>.density_max = "0.1+2.3"` and expressions that include user-defined constants are accepted.
 
 .. _running-cpp-parameters-parser:
 
@@ -398,7 +398,7 @@ Overall simulation parameters
         On the refined patches, the Poisson equation is solved with the multigrid solver.
         In electrostatic mode, this solver requires open field boundary conditions (:pp:param:`boundary.field_lo,hi = open`).
         In electromagnetic mode, this solver can be used to initialize the species' self fields
-        (``<species_name>.initialize_self_fields=1``) provided that the field BCs are PML (:pp:param:`boundary.field_lo,hi = PML`).
+        (:pp:param:`<species_name>.initialize_self_fields=1`) provided that the field BCs are PML (:pp:param:`boundary.field_lo,hi = PML`).
 
           * ``warpx.use_2d_slices_fft_solver`` (`bool`) optional (default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
@@ -563,7 +563,7 @@ We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal
 .. tip::
 
    For example, the following logic can be added to `Slurm batch scripts <https://docs.gwdg.de/doku.php?id=en:services:application_services:high_performance_computing:running_jobs_slurm:signals>`__ (`signal name to number mapping here <https://en.wikipedia.org/wiki/Signal_(IPC)#Default_action>`__) to gracefully shut down 6 min prior to walltime.
-   If you have a checkpoint diagnostics in your inputs file, this automatically will write a checkpoint due to the default ``<diag_name>.dump_last_timestep = 1`` option in WarpX.
+   If you have a checkpoint diagnostics in your inputs file, this automatically will write a checkpoint due to the default :pp:param:`<diag_name>.dump_last_timestep = 1` option in WarpX.
 
    .. code-block:: bash
 
@@ -1328,7 +1328,7 @@ Particle initialization
 
     The charge of one `physical` particle of this species.
     If ``species_type`` is specified, the charge will be set to the physical value and ``charge`` is optional.
-    When ``<species_name>.do_field_ionization = 1``, the physical particle charge is equal to ``ionization_initial_level * charge``, so latter parameter should be equal to q_e (which is defined in WarpX as the elementary charge in coulombs).
+    When :pp:param:`<species_name>.do_field_ionization = 1`, the physical particle charge is equal to ``ionization_initial_level * charge``, so latter parameter should be equal to q_e (which is defined in WarpX as the elementary charge in coulombs).
 
 .. pp:param:: <species_name>.mass
     :type: `float`
@@ -1365,13 +1365,13 @@ Particle initialization
     Names of additional injection sources. By default, WarpX assumes one injection source per species, hence all of the input
     parameters below describing the injection are parameters directly of the species. However, this option allows
     additional sources, the names of which are specified here. For each source, the name of the source is added to the
-    input parameters below. For instance, with ``<species_name>.injection_sources = source1 source2`` there can be the two input
+    input parameters below. For instance, with :pp:param:`<species_name>.injection_sources = source1 source2` there can be the two input
     parameters ``<species_name>.source1.injection_style`` and ``<species_name>.source2.injection_style``.
     For the parameters of each source, the parameter with the name of the source will be used.
     If it is not given, the value of the parameter without the source name will be used. This allows parameters used for all
     sources to be specified once. For example, if the ``source1`` and ``source2`` have the same value of ``uz_m``, then it can be
     set using ``<species_name>.uz_m`` instead of setting it for each source.
-    Note that since by default ``<species_name>.injection_style = none``, all injection sources can be input this way.
+    Note that since by default :pp:param:`<species_name>.injection_style = none`, all injection sources can be input this way.
     Note that if a moving window is used, the bulk velocity of all of the sources must be the same since it is used when updating the window.
 
 .. pp:param:: <species_name>.injection_style
@@ -1532,7 +1532,7 @@ Particle initialization
     :optional:
 
     When using RZ or RCYLINDER geometry, whether to randomize the azimuthal position of particles.
-    This is used when ``<species_name>.injection_style = NUniformPerCell``.
+    This is used when :pp:param:`<species_name>.injection_style = NUniformPerCell`.
 
 .. pp:param:: <species_name>.do_splitting
     :type: `bool`
@@ -1624,7 +1624,7 @@ Particle initialization
 .. pp:param:: <species_name>.flux_profile
     :type: `string`
 
-    Defines the expression of the flux, when using ``<species_name>.injection_style=NFluxPerCell``
+    Defines the expression of the flux, when using :pp:param:`<species_name>.injection_style=NFluxPerCell`
 
     * ``constant``: Constant flux. This requires the additional parameter ``<species_name>.flux``.
       i.e., the injection flux in :math:`m^{-2}.s^{-1}`.
@@ -2799,7 +2799,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
       Currently, WarpX supports deuterium-deuterium, deuterium-tritium, deuterium-helium and proton-boron fusion.
       When initializing the reactant and product species, you need to use ``species_type`` (see the documentation
       for this parameter), so that WarpX can identify the type of reaction to use.
-      (e.g. ``<species_name>.species_type = 'deuterium'``)
+      (e.g. :pp:param:`<species_name>.species_type = 'deuterium'`)
     - ``dsmc`` for pair-wise, non-Coulomb collisions between kinetic species.
       This is a "direct simulation Monte Carlo" treatment of collisions between
       kinetic species. See :ref:`DSMC section <multiphysics-collisions-dsmc>`.
@@ -3745,7 +3745,7 @@ Grid types (collocated, staggered, hybrid)
 
     The order of interpolation used with hybrid grids (:pp:param:`warpx.grid_type = hybrid`) to interpolate the currents from the cell nodes to the cell centers when :pp:param:`warpx.do_current_centering = 1`, before pushing the Maxwell fields on staggered grids.
 
-    Default: ``warpx.current_centering_no<x,y,z> = 8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
+    Default: :pp:param:`warpx.current_centering_no<x,y,z> = 8` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
 
 .. pp:param:: warpx.do_current_centering
     :type: `bool`, `0` or `1`
@@ -4009,7 +4009,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     * ``plotfile`` for native AMReX format.
 
-    * ``checkpoint`` for a checkpoint file, only works with ``<diag_name>.diag_type = Full``.
+    * ``checkpoint`` for a checkpoint file, only works with :pp:param:`<diag_name>.diag_type = Full`.
 
     * ``openpmd`` for OpenPMD format `openPMD <https://www.openPMD.org>`_.
       Requires to build WarpX with ``USE_OPENPMD=TRUE`` (see :ref:`instructions <building-openpmd>`).
@@ -4023,20 +4023,20 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 .. pp:param:: <diag_name>.sensei_config
     :type: `string`
 
-    Only read if ``<diag_name>.format = sensei``.
+    Only read if :pp:param:`<diag_name>.format = sensei`.
     Points to the SENSEI XML file which selects and configures the desired back end.
 
 .. pp:param:: <diag_name>.sensei_pin_mesh
     :type: `integer`
     :default: 0
 
-    Only read if ``<diag_name>.format = sensei``.
+    Only read if :pp:param:`<diag_name>.format = sensei`.
     When 1 lower left corner of the mesh is pinned to 0.,0.,0.
 
 .. pp:param:: <diag_name>.openpmd_backend
     :type: ``bp5``, ``bp4``, ``h5`` or ``json``
     :optional:
-    :comment: only used if ``<diag_name>.format = openpmd``
+    :comment: only used if :pp:param:`<diag_name>.format = openpmd`
 
     `I/O backend <https://openpmd-api.readthedocs.io/en/latest/backends/overview.html>`_ for `openPMD <https://www.openPMD.org>`_ data dumps.
     ``bp5``/``bp4`` is the `ADIOS I/O library <https://csmd.ornl.gov/adios>`_, ``h5`` is the `HDF5 format <https://www.hdfgroup.org/solutions/hdf5/>`_, and ``json`` is a `simple text format <https://en.wikipedia.org/wiki/JSON>`_.
@@ -4046,7 +4046,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 .. pp:param:: <diag_name>.openpmd_encoding
     :type: ``v`` (variable based), ``f`` (file based) or ``g`` (group based)
     :optional:
-    :comment: only read if ``<diag_name>.format = openpmd``.
+    :comment: only read if :pp:param:`<diag_name>.format = openpmd`.
 
     openPMD `file output encoding <https://openpmd-api.readthedocs.io/en/0.17.0/usage/concepts.html#iteration-and-series>`__.
     File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
@@ -4057,7 +4057,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :type: `integer`
     :default: s to 5
     :optional:
-    :comment: only read if ``<diag_name>.diag_type = BackTransformed``
+    :comment: only read if :pp:param:`<diag_name>.diag_type = BackTransformed`
 
     This parameter is intended for ADIOS backend to group every N buffers (N is the value of this parameter) and then flush to disk.
 
@@ -4126,7 +4126,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     ``T_<species_name>`` is the temperature in eV.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
-    Also, note that for ``<diag_name>.diag_type = BackTransformed``, the only scalar field currently supported is ``rho``.
+    Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
     Possible vector field components in Cartesian geometry: ``Ex`` ``Ey`` ``Ez`` ``Bx`` ``By`` ``Bz`` ``jx`` ``jy`` ``jz``.
     Possible vector field components in RZ and RCYLINDER geometry: ``Er`` ``Et`` ``Ez`` ``Br`` ``Bt`` ``Bz`` ``jr`` ``jt`` ``jz``.
     Possible vector field components in RSPHERE geometry: ``Er`` ``Et`` ``Ep`` ``Br`` ``Bt`` ``Bp`` ``jr`` ``jt`` ``jp``.
@@ -4150,7 +4150,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Note that the deposition onto the grid does not respect the particle shape factor, but instead uses nearest-grid point interpolation.
     Default is none.
     Parser functions for these field names are specified by :pp:param:`<diag_name>.particle_fields.<field_name>(x,y,z,ux,uy,uz)`.
-    Also, note that this option is only available for ``<diag_name>.diag_type = Full``
+    Also, note that this option is only available for :pp:param:`<diag_name>.diag_type = Full`
 
 .. pp:param:: <diag_name>.particle_fields_species
     :type: list of `strings`
@@ -4196,9 +4196,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     By default, the fields written in the plot files are averaged on the cell centers.
-    When ``<diag_name>.plot_raw_fields = 1``, then the raw (i.e. non-averaged)
+    When :pp:param:`<diag_name>.plot_raw_fields = 1`, then the raw (i.e. non-averaged)
     fields are also saved in the output files.
-    Only works with ``<diag_name>.format = plotfile``.
+    Only works with :pp:param:`<diag_name>.format = plotfile`.
     See `this section <https://yt-project.org/doc/examining/loading_data.html#viewing-raw-fields-in-warpx>`__
     in the yt documentation for more details on how to view raw fields.
 
@@ -4207,9 +4207,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :default: `0`
     :optional:
 
-    Only used when ``<diag_name>.plot_raw_fields = 1``.
+    Only used when :pp:param:`<diag_name>.plot_raw_fields = 1`.
     Whether to include the guard cells in the output of the raw fields.
-    Only works with ``<diag_name>.format = plotfile``.
+    Only works with :pp:param:`<diag_name>.format = plotfile`.
 
 .. pp:param:: <diag_name>.coarsening_ratio
     :type: list of `int`
@@ -4275,7 +4275,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Note that the fields gathered in the same way as during the simulation, and do not include any applied fields.
     Also, when writing to the OpenPMD format and when using the lab-frame electrostatic solver, ``phi`` (electrostatic potential, on the macroparticles) is also available.
     By default, positions, momenta, and weights are written out.
-    If ``<diag_name>.<species_name>.variables = none``, no particle data are written.
+    If :pp:param:`<diag_name>.<species_name>.variables = none`, no particle data are written.
 
 .. pp:param:: <diag_name>.<species_name>.additional_variables
     :type: list of `strings` separated by spaces
@@ -4291,14 +4291,14 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :type: `float`
     :optional:
 
-    If provided ``<diag_name>.<species_name>.random_fraction = a``, only `a` fraction of the particle data of this species will be dumped randomly in diag ``<diag_name>``, i.e. if `rand() < a`, this particle will be dumped, where `rand()` denotes a random number generator.
+    If provided :pp:param:`<diag_name>.<species_name>.random_fraction = a`, only `a` fraction of the particle data of this species will be dumped randomly in diag ``<diag_name>``, i.e. if `rand() < a`, this particle will be dumped, where `rand()` denotes a random number generator.
     The value `a` provided should be between 0 and 1.
 
 .. pp:param:: <diag_name>.<species_name>.uniform_stride
     :type: `int`
     :optional:
 
-    If provided ``<diag_name>.<species_name>.uniform_stride = n``,
+    If provided :pp:param:`<diag_name>.<species_name>.uniform_stride = n`,
     every `n` particle of this species will be dumped, selected uniformly.
     The value provided should be an integer greater than or equal to 0.
 
@@ -4362,7 +4362,7 @@ Time-Averaged Diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``TimeAveraged`` diagnostics are a special type of ``Full`` diagnostics that allows for the output of time-averaged field data.
-This type of diagnostics can be created using ``<diag_name>.diag_type = TimeAveraged``.
+This type of diagnostics can be created using :pp:param:`<diag_name>.diag_type = TimeAveraged`.
 We support only field data and related options from the list at `Full Diagnostics`_.
 
 .. note::
@@ -4415,7 +4415,7 @@ In addition, ``TimeAveraged`` diagnostic options include:
 BackTransformed Diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. For more details on back-transformed diagnostics (BTD), see :ref:`FAQ: What about Back-transformed diagnostics (BTD)? <faq_btd>`. This option can be set using ``<diag_name>.diag_type = BackTransformed``. We support the following list of options from `Full Diagnostics`_
+``BackTransformed`` diag type are used when running a simulation in a boosted frame, to reconstruct output data to the lab frame. For more details on back-transformed diagnostics (BTD), see :ref:`FAQ: What about Back-transformed diagnostics (BTD)? <faq_btd>`. This option can be set using :pp:param:`<diag_name>.diag_type = BackTransformed`. We support the following list of options from `Full Diagnostics`_
 
     :pp:param:`<diag_name>.format`, :pp:param:`<diag_name>.openpmd_backend`, :pp:param:`<diag_name>.dump_rz_modes`, :pp:param:`<diag_name>.file_prefix`, :pp:param:`<diag_name>.diag_lo`, :pp:param:`<diag_name>.diag_hi`, :pp:param:`<diag_name>.write_species`, :pp:param:`<diag_name>.species`.
 
@@ -5407,7 +5407,7 @@ Schwinger process
 Checkpoints and restart
 -----------------------
 WarpX supports checkpoints/restart via AMReX.
-The checkpoint capability can be turned with regular diagnostics: ``<diag_name>.format = checkpoint``.
+The checkpoint capability can be turned with regular diagnostics: :pp:param:`<diag_name>.format = checkpoint`.
 
 .. pp:param:: amr.restart
     :type: `string`
