@@ -204,13 +204,13 @@ namespace SpeciesUtils {
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwellian") {
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocity getVel(*h_mom_vel);

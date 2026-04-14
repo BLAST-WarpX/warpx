@@ -244,21 +244,37 @@ struct InjectorMomentumMaxwellian
                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
     {
         velocity.prepare(grids, dmap, ngrow, get_zlab);
+        temperature.prepare(grids, dmap, ngrow, get_zlab);
     }
 
     void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
     {
         velocity.prepare(pbox, moving_dir, moving_sign, get_zlab);
+        temperature.prepare(pbox, moving_dir, moving_sign, get_zlab);
     }
 
-    void prepare (int li) { velocity.prepare(li); }
+    void prepare (int li)
+    {
+        velocity.prepare(li);
+        temperature.prepare(li);
+    }
 
-    void clear () { velocity.clear(); }
+    void clear ()
+    {
+        velocity.clear();
+        temperature.clear();
+    }
 
-    [[nodiscard]] bool distributed () const noexcept { return velocity.distributed(); }
+    [[nodiscard]] bool distributed () const noexcept
+    {
+        return velocity.distributed() || temperature.distributed();
+    }
 
-    [[nodiscard]] bool needPreparation () const noexcept { return velocity.needPreparation(); }
+    [[nodiscard]] bool needPreparation () const noexcept
+    {
+        return velocity.needPreparation() || temperature.needPreparation();
+    }
 
 private:
     GetVelocityVector velocity;
