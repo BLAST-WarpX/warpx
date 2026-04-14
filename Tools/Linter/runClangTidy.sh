@@ -57,7 +57,7 @@ echo "This can be overridden by setting the environment"
 echo "variables CLANG, CLANGXX, and CLANGTIDY e.g.: "
 echo "$ export CLANG=clang-17"
 echo "$ export CLANGXX=clang++-17"
-echo "$ export CTIDCLANGTIDYY=clang-tidy-17"
+echo "$ export CLANGTIDY=clang-tidy-17"
 echo "$ ./Tools/Linter/runClangTidy.sh"
 echo
 echo "******************************************************"
