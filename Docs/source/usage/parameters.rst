@@ -1696,7 +1696,27 @@ Particle initialization
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
     * ``maxwellian``: Maxwellian momentum distribution where, in the drift frame, each of the three normalized-momentum components is sampled independently from a Gaussian distribution.
-      The mean and standard deviation of each component (bulk drift and thermal spread) are set using the Maxwellian parameter groups below:
+      The mean and standard deviation of each component (bulk drift and thermal spread) are defined by the Maxwellian parameter groups below:
+
+    * ``maxwell_boltzmann``: Maxwell-Boltzmann distribution that takes a dimensionless
+      temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
+      :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, :math:`c` is the speed of light, and :math:`m` is the mass of the species.
+      Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
+      For values of :math:`\theta > 0.01`, errors due to ignored relativistic terms exceed 1%.
+      Temperatures less than zero are not allowed.
+      The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
+      The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
+      :math:`\beta` can be positive or negative and is limited to the range :math:`-1 < \beta < 1`.
+      The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
+      Please leave no whitespace
+      between the sign and the character on input. A direction without a sign will be treated as
+      positive. The MB distribution is initialized in the drifting frame by sampling three Gaussian
+      distributions in each dimension using, the Box Mueller method, and then the distribution is
+      transformed to the simulation frame using the flipping method. The flipping method can be
+      found in Zenitani 2015 section III. B. (Phys. Plasmas 22, 042116).
+      By default, ``beta`` is equal to ``0.`` and ``bulk_vel_dir`` is ``+x``.
+>>>>>>> origin/development
+>>>>>>> bc1dc746399460eca769632ccc4d454a506ce9e7
 
       * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
       Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``. Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
