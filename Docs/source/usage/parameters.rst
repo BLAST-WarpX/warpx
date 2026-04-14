@@ -1360,18 +1360,10 @@ Particle initialization
         These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift frame, i.e. the thermal spread per axis.
         If any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` exceeds ``0.01``, ignored relativistic corrections can exceed about 1% and WarpX may record a warning.
         * If ``parser``, the following are required: ``<species_name>.ux_std_function(x,y,z)``, ``<species_name>.uy_std_function(x,y,z)``, ``<species_name>.uz_std_function(x,y,z)``.
-
-    * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
-        * If ``constant``, set any of:
-        * ``<species_name>.ux_std``: standard deviation of :math:`u_{x}`
-        * ``<species_name>.uy_std``: standard deviation of :math:`u_{y}`
-        * ``<species_name>.uz_std``: standard deviation of :math:`u_{z}`
-        These correspond to the thermal spread per axis in the drift frame.
-        Here, we assume that any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` does not exceed ``0.01``, ensuring relativistic corrections remain small (``<1%``).
-        * If ``parser``, the following are required:
-        * ``<species_name>.ux_std_function(x,y,z)``: standard deviation of :math:`u_{x}`
-        * ``<species_name>.uy_std_function(x,y,z)``: standard deviation of :math:`u_{y}`
-        * ``<species_name>.uz_std_function(x,y,z)``: standard deviation of :math:`u_{z}`
+        * If ``read_from_file``, the spatial thermal spread per axis is read from openPMD (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          Required: ``<species_name>.read_ux_std_from_path``, ``<species_name>.read_uy_std_from_path``, ``<species_name>.read_uz_std_from_path``.
+          Optional: ``<species_name>.ux_std_openpmd_mesh``, ``<species_name>.uy_std_openpmd_mesh``, ``<species_name>.uz_std_openpmd_mesh`` (default mesh record names ``ux_std``, ``uy_std``, ``uz_std``),
+          and ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) for parallel loading, analogous to ``read_u_mean_distributed``.
     * ``<species_name>.maxwellian_T_eV_distribution_type`` (`string`) is an alternative to ``maxwellian_u_std_distribution_type`` (mutually exclusive).
         This sets isotropic thermal spread from a temperature in electron-volts, using species mass from the input:
 

@@ -208,13 +208,13 @@ namespace SpeciesUtils {
             amrex::Real mass_local = 0._rt;
             PhysicalSpecies physical_species_local;
             extractSpeciesProperties(species_name, style, charge_local, mass_local, physical_species_local);
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, mass_local);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, mass_local, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocity getVel(*h_mom_vel);
