@@ -10,7 +10,6 @@
 #include "Particles/ParticleIO.H"
 
 #include "Fields.H"
-#include "Particles/Gather/GetExternalFields.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -22,7 +21,6 @@
 
 #include "ablastr/fields/MultiFabRegister.H"
 #include <ablastr/utils/text/StreamUtils.H>
-#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
@@ -253,10 +251,10 @@ MultiParticleContainer::WriteHeader (std::ostream& os) const
 }
 
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic ) {
 
-    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame) ||
@@ -307,244 +305,120 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
     }
 }
 
-namespace
-{
-// This template function is called with all the possible combinations
-// of the template parameters by storeEMFieldsOnParticles.
-// depos_order and galerkin_interpolation must be template parameters
-// because they are template parameters of doDirectGatherVectorField,
-// which is called by this function.
-template <int depos_order, bool galerkin_interpolation>
 void
-storeEMFieldsOnParticles_t (PinnedMemoryParticleContainer& tmp,
-                            ElectromagneticSolverAlgo electromagnetic_solver_id,
-                            const amrex::Array<bool, 6> fields_to_plot,
-                            const bool is_full_diagnostic)
-{
-/**
-    * \brief stores the electromagnetic fields on the particles as additional outputs
-    *
-    * \param tmp Particle container to store the gathered fields
-    * \param electromagnetic_solver_id The type of electromagnetic solver used
-    * \param fields_to_plot Array of booleans indicating which fields to plot
-    * \param is_full_diagnostic Whether this diagnostic is a full diagnostic
-*/
-    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
-    using Dir = ablastr::fields::Direction;
+storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnostic,
+                        bool save_Ex, bool save_Ey, bool save_Ez,
+                        bool save_Bx, bool save_By, bool save_Bz) {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        electromagnetic_solver_id != ElectromagneticSolverAlgo::None,
-        "output of the electromagnetic fields on the particles was requested, "
-        "but this is only available with an electromagnetic solver.");
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
+    using ablastr::fields::Direction;
+
+    // When this is not a full diagnostic, the particles are not written at the same physical time (i.e. PIC iteration)
+    // that they were collected. This happens for diagnostics that use buffering (e.g. BackTransformed, BoundaryScraping).
+    // Here the field is gathered at the iteration when particles are written (not collected) and is thus mismatched.
+    // To avoid confusion, we raise an error in this case.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         is_full_diagnostic,
-        "Output of the electromagnetic fields on the particles was requested, "
+        "Output of the fields on the particles was requested, "
         "but this is only available with `diag_type = Full`.");
 
-    auto& warpx = WarpX::GetInstance();
+    if (save_Ex) { tmp.AddRealComp("Ex"); }
+    if (save_Ey) { tmp.AddRealComp("Ey"); }
+    if (save_Ez) { tmp.AddRealComp("Ez"); }
+    if (save_Bx) { tmp.AddRealComp("Bx"); }
+    if (save_By) { tmp.AddRealComp("By"); }
+    if (save_Bz) { tmp.AddRealComp("Bz"); }
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        warpx.finestLevel() == 0,
-        "output of the electromagnetic fields on particles only works without mesh refinement"
-    );
+    int const Ex_index = save_Ex ? tmp.GetRealCompIndex("Ex") : -1;
+    int const Ey_index = save_Ey ? tmp.GetRealCompIndex("Ey") : -1;
+    int const Ez_index = save_Ez ? tmp.GetRealCompIndex("Ez") : -1;
+    int const Bx_index = save_Bx ? tmp.GetRealCompIndex("Bx") : -1;
+    int const By_index = save_By ? tmp.GetRealCompIndex("By") : -1;
+    int const Bz_index = save_Bz ? tmp.GetRealCompIndex("Bz") : -1;
 
-    constexpr auto lev0=0;
-    const amrex::XDim3 dinv = WarpX::InvCellSize(lev0);
+    auto & warpx = WarpX::GetInstance();
+    auto & fields = warpx.m_fields;
+
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+    const int nox = WarpX::nox;
+    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
 
-    auto fields_names = amrex::Array<std::string, 6>{
-        "Ex", "Ey", "Ez", "Bx", "By", "Bz"};
+    for (int lev=0; lev<=warpx.finestLevel(); lev++) {
 
-    auto fields_index = amrex::Array<int, 6>{-1,-1,-1,-1,-1,-1};
+        const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
 
-    enum Ex_flags { doEx, noEx };
-    enum Ey_flags { doEy, noEy };
-    enum Ez_flags { doEz, noEz };
-    enum Bx_flags { doBx, noBx };
-    enum By_flags { doBy, noBy };
-    enum Bz_flags { doBz, noBz };
-
-    const auto Ex_runtime_flag = (fields_to_plot[0]) ? doEx : noEx;
-    const auto Ey_runtime_flag = (fields_to_plot[1]) ? doEy : noEy;
-    const auto Ez_runtime_flag = (fields_to_plot[2]) ? doEz : noEz;
-    const auto Bx_runtime_flag = (fields_to_plot[3]) ? doBx : noBx;
-    const auto By_runtime_flag = (fields_to_plot[4]) ? doBy : noBy;
-    const auto Bz_runtime_flag = (fields_to_plot[5]) ? doBz : noBz;
-
-    for (int i = 0; i < 6; i++){
-        if (fields_to_plot[i]){
-            tmp.AddRealComp(fields_names[i]);
-            fields_index[i] = tmp.GetRealCompIndex(fields_names[i]);
-        }
-    }
-
-    amrex::MultiFab const& Ex = *warpx.m_fields.get(FieldType::Efield_aux, Dir{0}, lev0);
-    amrex::MultiFab const& Ey = *warpx.m_fields.get(FieldType::Efield_aux, Dir{1}, lev0);
-    amrex::MultiFab const& Ez = *warpx.m_fields.get(FieldType::Efield_aux, Dir{2}, lev0);
-    amrex::MultiFab const& Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{0}, lev0);
-    amrex::MultiFab const& By = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{1}, lev0);
-    amrex::MultiFab const& Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Dir{2}, lev0);
+        amrex::MultiFab & Ex = *fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        amrex::MultiFab & Ey = *fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        amrex::MultiFab & Ez = *fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+        #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (PinnedParIter pti(tmp, lev0); pti.isValid(); ++pti) {
+        for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
 
-        const auto Ex_grid = Ex[pti].array();
-        const auto Ey_grid = Ey[pti].array();
-        const auto Ez_grid = Ez[pti].array();
-        const auto Bx_grid = Bx[pti].array();
-        const auto By_grid = By[pti].array();
-        const auto Bz_grid = Bz[pti].array();
+            amrex::Box box = pti.tilebox();
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const Dim3 lo = lbound(box);
 
-        const auto ex_type = Ex.ixType();
-        const auto ey_type = Ey.ixType();
-        const auto ez_type = Ez.ixType();
-        const auto bx_type = Bx.ixType();
-        const auto by_type = By.ixType();
-        const auto bz_type = Bz.ixType();
+            FArrayBox const* exfab = &Ex[pti];
+            FArrayBox const* eyfab = &Ey[pti];
+            FArrayBox const* ezfab = &Ez[pti];
+            FArrayBox const* bxfab = &Bx[pti];
+            FArrayBox const* byfab = &By[pti];
+            FArrayBox const* bzfab = &Bz[pti];
 
-        const auto getPosition = GetParticlePosition<PIdx>(pti);
+            amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
+            amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
+            amrex::Array4<const amrex::Real> const& ez_arr = ezfab->array();
+            amrex::Array4<const amrex::Real> const& bx_arr = bxfab->array();
+            amrex::Array4<const amrex::Real> const& by_arr = byfab->array();
+            amrex::Array4<const amrex::Real> const& bz_arr = bzfab->array();
 
-        amrex::ParticleReal* Ex_particle_arr = (fields_to_plot[0]) ? pti.GetStructOfArrays().GetRealData(fields_index[0]).dataPtr() : nullptr;
-        amrex::ParticleReal* Ey_particle_arr = (fields_to_plot[1]) ? pti.GetStructOfArrays().GetRealData(fields_index[1]).dataPtr() : nullptr;
-        amrex::ParticleReal* Ez_particle_arr = (fields_to_plot[2]) ? pti.GetStructOfArrays().GetRealData(fields_index[2]).dataPtr() : nullptr;
-        amrex::ParticleReal* Bx_particle_arr = (fields_to_plot[3]) ? pti.GetStructOfArrays().GetRealData(fields_index[3]).dataPtr() : nullptr;
-        amrex::ParticleReal* By_particle_arr = (fields_to_plot[4]) ? pti.GetStructOfArrays().GetRealData(fields_index[4]).dataPtr() : nullptr;
-        amrex::ParticleReal* Bz_particle_arr = (fields_to_plot[5]) ? pti.GetStructOfArrays().GetRealData(fields_index[5]).dataPtr() : nullptr;
+            amrex::IndexType const ex_type = exfab->box().ixType();
+            amrex::IndexType const ey_type = eyfab->box().ixType();
+            amrex::IndexType const ez_type = ezfab->box().ixType();
+            amrex::IndexType const bx_type = bxfab->box().ixType();
+            amrex::IndexType const by_type = byfab->box().ixType();
+            amrex::IndexType const bz_type = bzfab->box().ixType();
 
-        const auto box = pti.tilebox();
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev0, 0._rt);
-        const Dim3 lo = lbound(box);
+            const auto getPosition = GetParticlePosition<PIdx>(pti);
 
-        // Loop over the particles and compute the EM field using the doDirectGatherVectorField function
-        amrex::ParallelFor(
-            TypeList<CompileTimeOptions<doEx, noEx>, CompileTimeOptions<doEy, noEy>, CompileTimeOptions<doEz, noEz>,
-            CompileTimeOptions<doBx, noBx>, CompileTimeOptions<doBy, noBy>, CompileTimeOptions<doBz, noBz>>{},
-            {Ex_runtime_flag, Ey_runtime_flag, Ez_runtime_flag, Bx_runtime_flag, By_runtime_flag, Bz_runtime_flag},
-            pti.numParticles(),
-            [=] AMREX_GPU_DEVICE (long ip, auto ex_control, auto ey_control, auto ez_control,
-                auto bx_control, auto by_control, auto bz_control)
-                {
-                amrex::ParticleReal xp, yp, zp;
-                getPosition(ip, xp, yp, zp);
+            amrex::ParticleReal* Ex_particle_arr = save_Ex ? pti.GetStructOfArrays().GetRealData(Ex_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Ey_particle_arr = save_Ey ? pti.GetStructOfArrays().GetRealData(Ey_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Ez_particle_arr = save_Ez ? pti.GetStructOfArrays().GetRealData(Ez_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Bx_particle_arr = save_Bx ? pti.GetStructOfArrays().GetRealData(Bx_index).dataPtr() : nullptr;
+            amrex::ParticleReal* By_particle_arr = save_By ? pti.GetStructOfArrays().GetRealData(By_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Bz_particle_arr = save_Bz ? pti.GetStructOfArrays().GetRealData(Bz_index).dataPtr() : nullptr;
 
-                [[maybe_unused]] amrex::ParticleReal Ex_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal Ey_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal Ez_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal Bx_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal By_particle = 0._rt;
-                [[maybe_unused]] amrex::ParticleReal Bz_particle = 0._rt;
+            // Loop over the particles and update their position
+            amrex::ParallelFor( pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long ip) {
+
+                    amrex::ParticleReal xp, yp, zp;
+                    getPosition(ip, xp, yp, zp);
+
+                    amrex::ParticleReal Exp = 0., Eyp = 0., Ezp = 0.;
+                    amrex::ParticleReal Bxp = 0., Byp = 0., Bzp = 0.;
+
+                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                   ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                   ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
+                                   nox, galerkin_interpolation);
 
 
-                amrex::ignore_unused(Ex_grid, Ey_grid, Ez_grid,
-                    Bx_grid, By_grid, Bz_grid, ex_type, ey_type, ez_type,
-                    bx_type, by_type, bz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                    if (Ex_particle_arr) Ex_particle_arr[ip] = Exp;
+                    if (Ey_particle_arr) Ey_particle_arr[ip] = Eyp;
+                    if (Ez_particle_arr) Ez_particle_arr[ip] = Ezp;
+                    if (Bx_particle_arr) Bx_particle_arr[ip] = Bxp;
+                    if (By_particle_arr) By_particle_arr[ip] = Byp;
+                    if (Bz_particle_arr) Bz_particle_arr[ip] = Bzp;
 
-                if constexpr ((ex_control == doEx || ey_control == doEy || ez_control == doEy) && (bx_control == doBx || by_control == doBy || bz_control == doBz))
-                {
-                    // if E and B are both requested, doGatherShapeN is faster than two calls to doDirectGatherVectorField
-                    doGatherShapeN(
-                        xp, yp, zp,
-                        Ex_particle, Ey_particle, Ez_particle,
-                        Bx_particle, By_particle, Bz_particle,
-                        Ex_grid, Ey_grid, Ez_grid,
-                        Bx_grid, By_grid, Bz_grid,
-                        ex_type, ey_type, ez_type,
-                        bx_type, by_type, bz_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes, depos_order, galerkin_interpolation
-                    );
                 }
-                else if constexpr (ex_control == doEx || ey_control == doEy || ez_control == doEz)
-                {
-                    doDirectGatherVectorField<depos_order, depos_order - galerkin_interpolation>(
-                        xp, yp, zp,
-                        Ex_particle, Ey_particle, Ez_particle,
-                        Ex_grid, Ey_grid, Ez_grid,
-                        ex_type, ey_type, ez_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes
-                    );
-                }
-                else if constexpr (bx_control == doBx || by_control == doBy || bz_control == doBz)
-                {
-                    doDirectGatherVectorField<depos_order - galerkin_interpolation, depos_order>(
-                        xp, yp, zp,
-                        Bx_particle, By_particle, Bz_particle,
-                        Bx_grid, By_grid, Bz_grid,
-                        bx_type, by_type, bz_type,
-                        dinv, xyzmin, lo, n_rz_azimuthal_modes
-                    );
-                }
-
-                // first capture of the variables in constexpr is not supported with NVCC
-                // so we have to define these references here
-                auto& rEx_particle = Ex_particle_arr;
-                auto& rEy_particle = Ey_particle_arr;
-                auto& rEz_particle = Ez_particle_arr;
-                auto& rBx_particle = Bx_particle_arr;
-                auto& rBy_particle = By_particle_arr;
-                auto& rBz_particle = Bz_particle_arr;
-
-                amrex::ignore_unused(rEx_particle, rEy_particle, rEz_particle,
-                    rBx_particle, rBy_particle, rBz_particle);
-
-                if constexpr (ex_control == doEx) {
-                    rEx_particle[ip] = Ex_particle;
-                }
-                if constexpr (ey_control == doEy) {
-                    rEy_particle[ip] = Ey_particle;
-                }
-                if constexpr (ez_control == doEz) {
-                    rEz_particle[ip] = Ez_particle;
-                }
-                if constexpr (bx_control == doBx) {
-                    rBx_particle[ip] = Bx_particle;
-                }
-                if constexpr (by_control == doBy) {
-                    rBy_particle[ip] = By_particle;
-                }
-                if constexpr (bz_control == doBz) {
-                    rBz_particle[ip] = Bz_particle;
-                }
-            });
-    }
-
-}
-} // namespace
-
-void storeEMFieldsOnParticles(PinnedMemoryParticleContainer& tmp,
-                              ElectromagneticSolverAlgo electromagnetic_solver_id,
-                              const amrex::Array<bool, 6> fields_to_plot,
-                              const int depos_order,
-                              const bool galerkin_interpolation,
-                              const bool is_full_diagnostic)
-{
-    if (depos_order < 1 || depos_order > 4) {
-        ablastr::warn_manager::WMRecordWarning(
-            "Diagnostics",
-            "Particle shape order must be 1, 2, 3 or 4",
-            ablastr::warn_manager::WarnPriority::medium
-        );
-    }
-    if (galerkin_interpolation) {
-        if (depos_order == 1) {
-            ::storeEMFieldsOnParticles_t<1, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 2) {
-            ::storeEMFieldsOnParticles_t<2, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 3) {
-            ::storeEMFieldsOnParticles_t<3, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 4) {
-            ::storeEMFieldsOnParticles_t<4, 1>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        }
-    } else {
-        if (depos_order == 1) {
-            ::storeEMFieldsOnParticles_t<1, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 2) {
-            ::storeEMFieldsOnParticles_t<2, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 3) {
-            ::storeEMFieldsOnParticles_t<3, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
-        } else if (depos_order == 4) {
-            ::storeEMFieldsOnParticles_t<4, 0>(tmp, electromagnetic_solver_id, fields_to_plot, is_full_diagnostic);
+            );
         }
     }
 }

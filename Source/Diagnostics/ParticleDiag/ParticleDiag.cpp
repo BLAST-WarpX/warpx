@@ -16,7 +16,7 @@ using namespace amrex;
 
 ParticleDiag::ParticleDiag (
     const std::string& diag_name, const std::string& name,
-    WarpXParticleContainer* pc, PinnedMemoryParticleContainer* pinned_pc):
+    WarpXParticleContainer* pc, WarpXParticleContainer::Base* pinned_pc):
     m_diag_name(diag_name), m_name(name), m_pc(pc), m_pinned_pc(pinned_pc)
 {
     //variable to set m_plot_flags size
@@ -47,16 +47,14 @@ ParticleDiag::ParticleDiag (
 #endif
                 if (var == "phi") {
                     m_plot_phi = true;
-                } else if (var == "Ex" || var == "Ey" || var == "Ez" ||
-                           var == "Bx" || var == "By" || var == "Bz") {
-                    m_plot_EM = true;
-                    if (var == "Ex") {m_plot_EM_flags[0] = true;}
-                    if (var == "Ey") {m_plot_EM_flags[1] = true;}
-                    if (var == "Ez") {m_plot_EM_flags[2] = true;}
-                    if (var == "Bx") {m_plot_EM_flags[3] = true;}
-                    if (var == "By") {m_plot_EM_flags[4] = true;}
-                    if (var == "Bz") {m_plot_EM_flags[5] = true;}
-                } else {
+                }
+                else if (var == "Ex") { m_plot_Ex = true; }
+                else if (var == "Ey") { m_plot_Ey = true; }
+                else if (var == "Ez") { m_plot_Ez = true; }
+                else if (var == "Bx") { m_plot_Bx = true; }
+                else if (var == "By") { m_plot_By = true; }
+                else if (var == "Bz") { m_plot_Bz = true; }
+                else {
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc->HasRealComp(var),
                         "variables argument '" + var
                         +"' is not an existing attribute for this species");
@@ -75,6 +73,22 @@ ParticleDiag::ParticleDiag (
                 diag_name + "." + name + ".variables contains no particle positions!",
                 ablastr::warn_manager::WarnPriority::high
             );
+        }
+    }
+
+    amrex::Vector<std::string> additional_variables;
+    pp_diag_name_species_name.queryarr("additional_variables", additional_variables);
+    for (auto& var : additional_variables) {
+        if (var == "phi") { m_plot_phi = true; }
+        else if (var == "Ex") { m_plot_Ex = true; }
+        else if (var == "Ey") { m_plot_Ey = true; }
+        else if (var == "Ez") { m_plot_Ez = true; }
+        else if (var == "Bx") { m_plot_Bx = true; }
+        else if (var == "By") { m_plot_By = true; }
+        else if (var == "Bz") { m_plot_Bz = true; }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+                "additional_variables argument '" + var + "' is not a valid variable");
         }
     }
 

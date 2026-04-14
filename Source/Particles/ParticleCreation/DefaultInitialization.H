@@ -95,44 +95,43 @@ namespace ParticleCreation {
      * attributes, which have been in principle externally set elsewhere.
      *
      * @tparam PTile The type of the particle tile to operate on (e.g. could use different allocators)
+     * @tparam DstPC the destination particle container type
      * @param[inout] ptile the tile in which attributes are initialized
+     * @param[in] pc the destination particle container
+     * @param[in] do_qed_comps whether to initialize the qed components (these are usually handled by
+     * SmartCopy, but NOT when adding particles in AddNParticles)
+     * @param[in] start the index to start initializing particles
+     * @param[in] stop the index to stop initializing particles
      * @param[in] n_external_attr_real The number of real attributes that have been externally set.
      * These are NOT initialized by this function.
      * @param[in] n_external_attr_int The number of integer attributes that have been externally set.
      * These are NOT initialized by this function.
-     * @param[in] user_real_attribs The names of the real components for this particle tile
-     * @param[in] user_int_attribs The names of the int components for this particle tile
-     * @param[in] particle_comps particle component names for real comps
-     * @param[in] particle_icomps particle component names for int comps
-     * @param[in] user_real_attrib_parser the parser functions used to initialize the user real components
-     * @param[in] user_int_attrib_parser the parser functions used to initialize the user int components
-     * @param[in] do_qed_comps whether to initialize the qed components (these are usually handled by
-     * SmartCopy, but NOT when adding particles in AddNParticles)
-     * @param[in] p_bw_engine the engine to use for setting the breit-wheeler component for QED
-     * @param[in] p_qs_engine the engine to use for setting the quantum synchrotron component for QED
-     * @param[in] ionization_initial_level the ionization level particles created should start at
-     * @param[in] start the index to start initializing particles
-     * @param[in] stop the index to stop initializing particles
      */
-template <typename PTile>
+template <typename PTile, typename DstPC>
 void DefaultInitializeRuntimeAttributes (PTile& ptile,
-                                         const int n_external_attr_real,
-                                         const int n_external_attr_int,
-                                         const std::vector<std::string>& user_real_attribs,
-                                         const std::vector<std::string>& user_int_attribs,
-                                         const std::vector<std::string>& particle_comps,
-                                         const std::vector<std::string>& particle_icomps,
-                                         const std::vector<amrex::Parser*>& user_real_attrib_parser,
-                                         const std::vector<amrex::Parser*>& user_int_attrib_parser,
+                                         const DstPC& pc,
+                                         int start, int stop,
+                                         const int n_external_attr_real = 0,
+                                         const int n_external_attr_int = 0
 #ifdef WARPX_QED
-                                         const bool do_qed_comps,
-                                         BreitWheelerEngine* p_bw_engine,
-                                         QuantumSynchrotronEngine* p_qs_engine,
+                                         , const bool do_qed_comps = false )
+#else
+                                         )
 #endif
-                                         const int ionization_initial_level,
-                                         int start, int stop)
 {
         using namespace amrex::literals;
+
+        const std::vector<std::string>& user_real_attribs = pc.getUserRealAttribs();
+        const std::vector<std::string>& user_int_attribs  = pc.getUserIntAttribs();
+        const std::vector<std::string>& particle_comps  = pc.GetRealSoANames();
+        const std::vector<std::string>& particle_icomps = pc.GetIntSoANames();
+        const std::vector<amrex::Parser*>& user_real_attrib_parser = pc.getUserRealAttribParser();
+        const std::vector<amrex::Parser*>& user_int_attrib_parser  = pc.getUserIntAttribParser();
+#ifdef WARPX_QED
+        BreitWheelerEngine*       p_bw_engine = pc.get_breit_wheeler_engine_ptr();
+        QuantumSynchrotronEngine* p_qs_engine = pc.get_quantum_sync_engine_ptr();
+#endif
+        const int ionization_initial_level = pc.getIonizationInitialLevel();
 
         // Preparing data needed for user defined attributes
         const auto n_user_real_attribs = static_cast<int>(user_real_attribs.size());

@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_2d_collisions_split_momentum_push
+
+# test input parameters
+algo.current_deposition = esirkepov
+algo.particle_pusher = vay
