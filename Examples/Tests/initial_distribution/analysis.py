@@ -327,7 +327,7 @@ assert f7_error < tolerance
 # ==============================================
 # maxwellian with bulk velocity from openpmd file
 # ==============================================
-ts = OpenPMDTimeSeries("./diags/diag")
+ts = OpenPMDTimeSeries("./diags/diag1")
 
 for iteration in ts.iterations:
     uy, z = ts.get_particle(
