@@ -46,9 +46,10 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         encoding = openPMD::IterationEncoding::fileBased;
     }
 
+    const bool isBP5 = (openpmd_backend == "bp5" || openpmd_backend == "bp");
+
     // BP5 does not support groupBased (metadata explosion)
-    if ((openpmd_backend == "bp5" || openpmd_backend == "bp") &&
-        (encoding == openPMD::IterationEncoding::groupBased))
+    if (isBP5 && encoding == openPMD::IterationEncoding::groupBased)
     {
         throw std::runtime_error("BeamMonitor: groupBased encoding not supported for BP5.");
     }
@@ -57,12 +58,17 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     pp_diag_name.get("diag_type", diag_type_str);
     if (diag_type_str == "BackTransformed")
     {
-        if ( ( openPMD::IterationEncoding::fileBased != encoding ) &&
-            ( openPMD::IterationEncoding::groupBased != encoding ) )
+        if (isBP5 && encoding != openPMD::IterationEncoding::fileBased)
         {
-            const std::string warnMsg = diag_name+" Unable to support BTD with streaming. Using GroupBased ";
+            const std::string warnMsg = diag_name + " BTD with BP5 only supports file-based openPMD encoding. Overriding to fileBased.";
             ablastr::warn_manager::WMRecordWarning("Diagnostics", warnMsg);
-            encoding = openPMD::IterationEncoding::groupBased;
+            encoding = openPMD::IterationEncoding::fileBased;
+        }
+        else if (encoding == openPMD::IterationEncoding::variableBased)
+        {
+            const std::string warnMsg = diag_name + " BTD does not support variable-based openPMD encoding. Overriding to fileBased.";
+            ablastr::warn_manager::WMRecordWarning("Diagnostics", warnMsg);
+            encoding = openPMD::IterationEncoding::fileBased;
         }
 
         pp_diag_name.query("buffer_flush_limit_btd", m_NumAggBTDBufferToFlush);
