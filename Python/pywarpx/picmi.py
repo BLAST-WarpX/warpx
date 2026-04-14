@@ -197,34 +197,23 @@ class Species(picmistandard.PICMI_Species):
     """
 
     def init(self, kw):
-        if self.particle_type == "electron":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "positron":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "proton":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_p"
-        elif self.particle_type == "anti-proton":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_p"
+        self.species_type = None
+        if self.particle_type in [
+            "unspecified",
+            "electron",
+            "positron",
+            "muon",
+            "antimuon",
+            "photon",
+            "neutron",
+            "proton",
+            "antiproton",
+            "alpha",
+        ]:
+            self.species_type = self.particle_type
         else:
             if self.charge is None and self.charge_state is not None:
-                if self.charge_state == +1.0:
-                    self.charge = "q_e"
-                elif self.charge_state == -1.0:
-                    self.charge = "-q_e"
-                else:
-                    self.charge = self.charge_state * constants.q_e
+                self.charge = f"{self.charge_state}*q_e"
             if self.particle_type is not None:
                 # Match a string of the format '#nXx', with the '#n' optional isotope number.
                 m = re.match(r"(?P<iso>#[\d+])*(?P<sym>[A-Za-z]+)", self.particle_type)
@@ -347,6 +336,7 @@ class Species(picmistandard.PICMI_Species):
 
         self.species = pywarpx.Bucket.Bucket(
             self.name,
+            species_type=self.species_type,
             mass=self.mass,
             charge=self.charge,
             injection_style=None,
@@ -489,17 +479,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         # --- Only PseudoRandomLayout is supported
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
-        # --- Calculate the total charge. Note that charge might be a string instead of a number.
-        charge = species.charge
-        if charge == "q_e" or charge == "+q_e":
-            charge = constants.q_e
-        elif charge == "-q_e":
-            charge = -constants.q_e
-        species.add_new_group_attr(
-            source_name, "q_tot", self.n_physical_particles * charge
-        )
+        # --- Total number of real particles
+        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "q_tot", density_scale)
+            species.add_new_group_attr(source_name, "npart_real", density_scale)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
