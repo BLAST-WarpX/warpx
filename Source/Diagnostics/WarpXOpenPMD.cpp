@@ -449,17 +449,6 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
     m_dirPrefix = dirPrefix;
     m_file_min_digits = file_min_digits;
 
-    if( ! isBTD ) {
-        if (m_CurrentStep >= ts) {
-            // note m_Series is reset in Init(), so using m_Series->iterations.contains(ts) is only able to check the
-            // last written step in m_Series's life time, but not other earlier written steps by other m_Series
-            ablastr::warn_manager::WMRecordWarning("Diagnostics",
-                    " Warning from openPMD writer: Already written iteration:"
-                    + std::to_string(ts)
-                );
-        }
-    }
-
     m_CurrentStep = ts;
     Init(openPMD::Access::CREATE, isBTD);
 }
