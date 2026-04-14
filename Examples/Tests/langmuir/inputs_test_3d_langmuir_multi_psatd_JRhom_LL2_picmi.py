@@ -135,8 +135,15 @@ particle_diag1_positrons = picmi.ParticleDiagnostic(
     species=[positrons],
     data_list=["x", "y", "z", "uz"],
 )
+field_on_particle_diag = picmi.ParticleDiagnostic(
+    name="openpmd",
+    period=40,
+    data_list=["x", "y", "z", "Ex", "Ey", "Ez"],
+    warpx_format="openpmd",
+)
 sim.add_diagnostic(particle_diag1_electrons)
 sim.add_diagnostic(particle_diag1_positrons)
+sim.add_diagnostic(field_on_particle_diag)
 
 sim.write_input_file(file_name="inputs_test_3d_langmuir_multi_psatd_JRhom_LL2_picmi")
 
