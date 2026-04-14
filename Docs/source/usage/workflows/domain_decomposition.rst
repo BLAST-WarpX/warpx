@@ -25,7 +25,7 @@ The first and simplest method is to provide the :pp:param:`warpx.numprocs = nx n
 
 The second way of specifying the domain decomposition provides greater flexibility and enables dynamic load balancing, but is not as easy to use. In this method, the user specifies inputs parameters :pp:param:`amr.max_grid_size` and ``amr.blocking_factor``, which can be thought of as the maximum and minimum allowed `Box` sizes. Now, the overall problem domain (specified by the ``amr.ncell`` input parameter) will be broken up into some number of `Boxes` with the specified characteristics. By default, WarpX will make the `Boxes` as big as possible given the constraints.
 
-For example, if ``amr.ncell = 768 768 768``, :pp:param:`amr.max_grid_size =  128`, and ``amr.blocking_factor = 32``, then AMReX will make 6 `Boxes` in each direction, for a total of 216 (the ``amr.blocking_factor`` does not factor in yet; however, see the section on mesh refinement below). If this problem is then run on 54 MPI ranks, there will be 4 boxes per rank initially. This problem could be run on as many as 216 ranks without performing any splitting.
+For example, if ``amr.ncell = 768 768 768``, :pp:param:`amr.max_grid_size = 128`, and ``amr.blocking_factor = 32``, then AMReX will make 6 `Boxes` in each direction, for a total of 216 (the ``amr.blocking_factor`` does not factor in yet; however, see the section on mesh refinement below). If this problem is then run on 54 MPI ranks, there will be 4 boxes per rank initially. This problem could be run on as many as 216 ranks without performing any splitting.
 
 .. note::
 

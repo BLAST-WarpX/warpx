@@ -48,7 +48,7 @@ Note that, while this applies to most reduced diagnostics, there are a few that 
 Asynchronous IO
 ^^^^^^^^^^^^^^^
 
-When using the AMReX `plotfile` format, users can set the :pp:param:`amrex.async_out=1`
+When using the AMReX `plotfile` format, users can set the :pp:param:`amrex.async_out = 1`
 option to perform I/O in a non-blocking fashion: the simulation continues while an I/O thread
 writes data to disk. This can significantly reduce the overall time spent in I/O. It is
 primarily intended for large runs on supercomputers (e.g., at OLCF or NERSC); depending on

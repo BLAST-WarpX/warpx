@@ -195,7 +195,7 @@ In these examples, the individual lines for recording a trace profile are:
 * ``-t``: select a couple of APIs to trace
 * ``--mpi--impl``: optional, hint the MPI flavor
 * ``./warpx...``: select the WarpX executable and a good inputs file
-* :pp:param:`warpx.numprocs=...`: make the run short, reasonably small, and run only a few steps
+* :pp:param:`warpx.numprocs = ...`: make the run short, reasonably small, and run only a few steps
 
 Now open the created trace files (per rank) in the Nsight-Systems GUI.
 This can be done on another system than the one that recorded the traces.

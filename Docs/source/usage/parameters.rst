@@ -398,7 +398,7 @@ Overall simulation parameters
         On the refined patches, the Poisson equation is solved with the multigrid solver.
         In electrostatic mode, this solver requires open field boundary conditions (:pp:param:`boundary.field_lo,hi = open`).
         In electromagnetic mode, this solver can be used to initialize the species' self fields
-        (:pp:param:`<species_name>.initialize_self_fields=1`) provided that the field BCs are PML (:pp:param:`boundary.field_lo,hi = PML`).
+        (:pp:param:`<species_name>.initialize_self_fields = 1`) provided that the field BCs are PML (:pp:param:`boundary.field_lo,hi = PML`).
 
           * ``warpx.use_2d_slices_fft_solver`` (`bool`) optional (default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
@@ -1624,7 +1624,7 @@ Particle initialization
 .. pp:param:: <species_name>.flux_profile
     :type: `string`
 
-    Defines the expression of the flux, when using :pp:param:`<species_name>.injection_style=NFluxPerCell`
+    Defines the expression of the flux, when using :pp:param:`<species_name>.injection_style = NFluxPerCell`
 
     * ``constant``: Constant flux. This requires the additional parameter ``<species_name>.flux``.
       i.e., the injection flux in :math:`m^{-2}.s^{-1}`.
@@ -2390,19 +2390,19 @@ Laser initialization
 
 .. pp:param:: warpx.mirror_z
     :type: list of `float`
-    :comment: required if :pp:param:`warpx.num_mirrors>0`
+    :comment: required if :pp:param:`warpx.num_mirrors > 0`
 
     ``z`` location of the front of the mirrors.
 
 .. pp:param:: warpx.mirror_z_width
     :type: list of `float`
-    :comment: required if :pp:param:`warpx.num_mirrors>0`
+    :comment: required if :pp:param:`warpx.num_mirrors > 0`
 
     ``z`` width of the mirrors.
 
 .. pp:param:: warpx.mirror_z_npoints
     :type: list of `int`
-    :comment: required if :pp:param:`warpx.num_mirrors>0`
+    :comment: required if :pp:param:`warpx.num_mirrors > 0`
 
     In the boosted frame, depending on `gamma_boost`, :pp:param:`warpx.mirror_z_width`
     can be smaller than the cell size, so that the mirror would not work. This
@@ -2501,8 +2501,8 @@ are applied to the grid directly. In particular, these fields can be seen in the
         warpx.B_external_grid
     :type: list of `3 floats`
 
-    required when :pp:param:`warpx.E_ext_grid_init_style="constant"`
-    and when :pp:param:`warpx.B_ext_grid_init_style="constant"`, respectively.
+    required when :pp:param:`warpx.E_ext_grid_init_style = "constant"`
+    and when :pp:param:`warpx.B_ext_grid_init_style = "constant"`, respectively.
     External uniform and constant electrostatic and magnetostatic field added
     to the grid at initialization. Use with caution as these fields are used for
     the field solver. In particular, do not use any other boundary condition
@@ -3249,7 +3249,7 @@ Particle push, charge and current deposition, field gathering
 
        The current density is deposited as described in :cite:t:`param-VayJCP2013` (see section :ref:`current_deposition` for more details).
        This option guarantees charge conservation only when used in combination
-       with :pp:param:`psatd.periodic_single_box_fft=1`, that is, only for periodic single-box
+       with :pp:param:`psatd.periodic_single_box_fft = 1`, that is, only for periodic single-box
        simulations with global FFTs without guard cells. The implementation for domain
        decomposition with local FFTs over guard cells is planned but not yet completed.
 
@@ -3380,7 +3380,7 @@ Maxwell solver: PSATD method
     :default: `1`, with the exceptions mentioned below
 
     If true, a current correction scheme in Fourier space is applied in order to guarantee charge conservation.
-    The default value is :pp:param:`psatd.current_correction=1`, unless a charge-conserving current deposition scheme is used (by setting :pp:param:`algo.current_deposition=esirkepov` or :pp:param:`algo.current_deposition=vay`) or unless the ``div(E)`` cleaning scheme is used (by setting :pp:param:`warpx.do_dive_cleaning=1`).
+    The default value is :pp:param:`psatd.current_correction = 1`, unless a charge-conserving current deposition scheme is used (by setting :pp:param:`algo.current_deposition = esirkepov` or :pp:param:`algo.current_deposition = vay`) or unless the ``div(E)`` cleaning scheme is used (by setting :pp:param:`warpx.do_dive_cleaning = 1`).
 
     If :pp:param:`psatd.v_galilean` is zero, the spectral solver used is the standard PSATD scheme described in :cite:t:`param-VayJCP2013` and the current correction reads
 
@@ -3405,11 +3405,11 @@ Maxwell solver: PSATD method
 
     If true, the update equation for the electric field is expressed in terms of both the current density and the charge density, namely :math:`\widehat{\boldsymbol{J}}^{\,n+1/2}`, :math:`\widehat\rho^{n}`, and :math:`\widehat\rho^{n+1}`.
     If false, instead, the update equation for the electric field is expressed in terms of the current density :math:`\widehat{\boldsymbol{J}}^{\,n+1/2}` only.
-    If charge is expected to be conserved (by setting, for example, :pp:param:`psatd.current_correction=1`), then the two formulations are expected to be equivalent.
+    If charge is expected to be conserved (by setting, for example, :pp:param:`psatd.current_correction = 1`), then the two formulations are expected to be equivalent.
 
     If :pp:param:`psatd.v_galilean` is zero, the spectral solver used is the standard PSATD scheme described in :cite:t:`param-VayJCP2013`:
 
-    1. if :pp:param:`psatd.update_with_rho=0`, the update equation for the electric field reads
+    1. if :pp:param:`psatd.update_with_rho = 0`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3421,7 +3421,7 @@ Maxwell solver: PSATD method
        (\boldsymbol{k}\cdot\widehat{\boldsymbol{J}}^{\,n+1/2}) \boldsymbol{k}
        \end{split}
 
-    2. if :pp:param:`psatd.update_with_rho=1`, the update equation for the electric field reads
+    2. if :pp:param:`psatd.update_with_rho = 1`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3437,7 +3437,7 @@ Maxwell solver: PSATD method
 
     If :pp:param:`psatd.v_galilean` is non-zero, the spectral solver used is the Galilean PSATD scheme described in :cite:t:`param-LehePRE2016`:
 
-    1. if :pp:param:`psatd.update_with_rho=0`, the update equation for the electric field reads
+    1. if :pp:param:`psatd.update_with_rho = 0`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3452,7 +3452,7 @@ Maxwell solver: PSATD method
        (\boldsymbol{k}\cdot\widehat{\boldsymbol{J}}^{\,n+1/2}) \boldsymbol{k}
        \end{split}
 
-    2. if :pp:param:`psatd.update_with_rho=1`, the update equation for the electric field reads
+    2. if :pp:param:`psatd.update_with_rho = 1`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3468,8 +3468,8 @@ Maxwell solver: PSATD method
     The coefficients :math:`C`, :math:`S`, :math:`\theta`, :math:`\nu`, :math:`\chi_1`, :math:`\chi_2`, and :math:`\chi_3` are defined in :cite:t:`param-LehePRE2016`.
 
     The default value for :pp:param:`psatd.update_with_rho` is ``1`` if :pp:param:`psatd.v_galilean` is non-zero and ``0`` otherwise.
-    The option :pp:param:`psatd.update_with_rho=0` is not implemented with the following algorithms:
-    comoving PSATD (:pp:param:`psatd.v_comoving`), time averaging (:pp:param:`psatd.do_time_averaging=1`), div(E) cleaning (:pp:param:`warpx.do_dive_cleaning=1`), and PSATD JRhom (:pp:param:`psatd.JRhom`).
+    The option :pp:param:`psatd.update_with_rho = 0` is not implemented with the following algorithms:
+    comoving PSATD (:pp:param:`psatd.v_comoving`), time averaging (:pp:param:`psatd.do_time_averaging = 1`), div(E) cleaning (:pp:param:`warpx.do_dive_cleaning = 1`), and PSATD JRhom (:pp:param:`psatd.JRhom`).
 
     Note that the update with and without rho is also supported in RZ geometry.
 
@@ -3541,7 +3541,7 @@ Maxwell solver: macroscopic media
     To initialize spatially varying conductivity, permittivity, and permeability, respectively,
     using a mathematical function in the input. Constants required in the
     mathematical expression can be set using ``my_constants``. These parameters are parsed
-    if :pp:param:`algo.em_solver_medium=macroscopic`.
+    if :pp:param:`algo.em_solver_medium = macroscopic`.
 
 .. pp:param:: macroscopic.sigma/epsilon/mu
     :link_aliases:
@@ -5329,7 +5329,7 @@ Schwinger process
     If :pp:param:`warpx.do_qed_schwinger = 1`, Schwinger product species must be specified with
     :pp:param:`qed_schwinger.ele_product_species` and :pp:param:`qed_schwinger.pos_product_species`.
     Schwinger process requires either :pp:param:`warpx.grid_type = collocated` or
-    :pp:param:`algo.field_gathering=momentum-conserving` (so that different field components are computed
+    :pp:param:`algo.field_gathering = momentum-conserving` (so that different field components are computed
     at the same location in the grid) and does not currently support mesh refinement, cylindrical
     coordinates or single precision.
 
@@ -5461,7 +5461,7 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
     If the threshold is set, warning messages with priority greater than or
     equal to the threshold trigger an immediate abort.
     It is mainly intended for debug purposes, and is best used with
-    :pp:param:`warpx.always_warn_immediately=1`.
+    :pp:param:`warpx.always_warn_immediately = 1`.
 
 .. pp:param:: amrex.abort_on_unused_inputs
     :type: ``0`` or ``1``
