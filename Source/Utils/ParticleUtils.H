@@ -16,6 +16,97 @@
 #include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
+#include <AMReX_Vector.H>
+
+#include <cmath>
+
+namespace ScatteringUtils {
+
+    /**
+     * \brief Sample the cosine of the fusion scattering angle by inverting the anisotropic CDF
+     * with a Newton-Raphson iteration.
+     *
+     * @param[in] a_An pointer to the anisotropic polynomial coefficients
+     * @param[in] a_N number of coefficients in \c a_An
+     * @param[in] a_U uniform random number in [0,1]
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosThetaAnisotropic (
+        amrex::ParticleReal const* a_An,
+        int const a_N,
+        amrex::ParticleReal const a_U)
+    {
+        using namespace amrex::literals;
+
+        amrex::ParticleReal x = 0.0_prt;
+        amrex::ParticleReal f, dfdx, sum_f, sum_dfdx;
+        constexpr amrex::ParticleReal rel_tol = 1.0e-8_prt;
+        constexpr int iter_max = 100;
+
+        amrex::ParticleReal alpha_even = 0.0_prt;
+        amrex::ParticleReal alpha_odd = 0.0_prt;
+        for (int i = 0; i < a_N; ++i) {
+            auto const coeff = a_An[i];
+            auto const denom = static_cast<amrex::ParticleReal>(i + 1);
+            // Accumulate the even/odd normalization terms used by f(x)
+            if (i % 2 == 0) {
+                alpha_even += coeff / denom;
+            } else {
+                alpha_odd += coeff / denom;
+            }
+        }
+
+        amrex::ParticleReal rel_diff = 1.0_prt;
+        int iter = 0;
+        // Bound iterations in the loop condition instead of aborting in-loop
+        while (rel_diff > rel_tol && iter < iter_max) {
+            sum_f = 0.0_prt;
+            sum_dfdx = 0.0_prt;
+
+            amrex::ParticleReal x_power_f = x;
+            amrex::ParticleReal x_power_dfdx = 1.0_prt;
+            for (int i = 0; i < a_N; ++i) {
+                auto const coeff = a_An[i];
+                // Use iterative powers here: amrex::pow has no scalar overload in this context.
+                sum_f += coeff / static_cast<amrex::ParticleReal>(i + 1) * x_power_f;
+                sum_dfdx += coeff * x_power_dfdx;
+                x_power_f *= x;
+                x_power_dfdx *= x;
+            }
+
+            f = a_U - 0.5_prt * (1.0_prt + alpha_odd / alpha_even)
+                + 0.5_prt * sum_f / alpha_even;
+            dfdx = 0.5_prt * sum_dfdx / alpha_even;
+            // This check is needed to avoid division by zero in the Newton-Raphson update
+            if (std::abs(dfdx) <= rel_tol) {
+                break;
+            }
+
+            amrex::ParticleReal const delta = f / dfdx;
+            x -= delta;
+            // Clamp to the physical cosine range for robustness
+            x = amrex::max(-1.0_prt + rel_tol, amrex::min(1.0_prt - rel_tol, x));
+            rel_diff = std::abs(delta);
+            ++iter;
+        }
+
+        return x;
+    }
+
+    /**
+     * \brief Convenience overload of \c getRandomCosThetaAnisotropic for coefficient vectors stored on host.
+     *
+     * @param[in] a_An anisotropic polynomial coefficients
+     * @param[in] a_U uniform random number in [0,1]
+     */
+    AMREX_INLINE
+    amrex::ParticleReal getRandomCosThetaAnisotropic (
+        amrex::Vector<amrex::ParticleReal> const& a_An,
+        amrex::ParticleReal const a_U)
+    {
+        return getRandomCosThetaAnisotropic(a_An.data(), static_cast<int>(a_An.size()), a_U);
+    }
+}
 
 namespace ParticleUtils {
 
@@ -200,7 +291,12 @@ namespace ParticleUtils {
             cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
         }
         else if (scattering_angle_model == ScatteringAngleModel::Anisotropic) {
-            // TODO Anisotropic scattering: the angle of emission of the products in the center of mass frame is determined by an anisotropic model
+            // Keep WarpX's sign convention while using Higginson's Newton-Raphson solve.
+            // Reaction-specific anisotropic coefficients are not yet threaded through this API,
+            // so use the isotropic limit of the fusion polynomial for now.
+            constexpr amrex::ParticleReal fusion_coefficients[] = {1.0_prt};
+            cos_theta = -ScatteringUtils::getRandomCosThetaAnisotropic(
+                fusion_coefficients, 1, amrex::Random(engine));
         }
         return cos_theta;
     }
