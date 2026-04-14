@@ -544,64 +544,8 @@ class WarpXDomain(ParmParseDomain):
     label = "WarpX"
 
 
-def warpx_source_read(app: Sphinx, docname: str, source: list[str]):
-    # Add default-role defintion at beginning of each document.
-    # This makes `XYZ` equivalent to :pp:param:`XYZ`.
-    for i in range(len(source)):
-        new_doc_txt = ".. default-role:: pp:param\n"
-        new_doc_txt += "\n"
-        new_doc_txt += source[i]
-        source[i] = new_doc_txt
-
-    # Replace double backticks with single backticks.
-    #
-    # This makes ``...`` effectively the same as the default role `...`.
-    # This, along with setting the default role to :pp:param:, avoids having to
-    # find and edit every instance of a parameter currently enclosed in double
-    # backticks in the documentation files. This is also makes things more
-    # convenient and consistent for future contributors to the docs.
-    #
-    # This is implemented by replacing the pattern "``XYZ``" with "\ `XYZ`".
-    # The backslash-escaped whitespace is a hack to preserve the same string
-    # length as ``XYZ`` while rendering the same as `XYZ`. The purpose is to
-    # avoid breaking the RST tables, which are sensitive to whitespace
-    # alignment. For example:
-    #
-    # Before:
-    # =============  ==================================
-    # ``q_e``        Elementary charge (C)
-    # ``m_e``        Electron mass (kg)
-    # ``m_p``        Proton mass (kg)
-    # ``m_u``        Unified atomic mass unit (kg)
-    # ...
-    # =============  ==================================
-    #
-    # After:
-    # =============  ==================================
-    # \ `q_e`        Elementary charge (C)
-    # \ `m_e`        Electron mass (kg)
-    # \ `m_p`        Proton mass (kg)
-    # \ `m_u`        Unified atomic mass unit (kg)
-    # ...
-    # =============  ==================================
-    #
-    # Backslash-escaped whitespace characters are removed from the document:
-    # https://docutils.sourceforge.io/0.4/docs/ref/rst/restructuredtext.html#escaping-mechanism
-
-    # Pattern for ``XYZ``
-    literal_pattern = re.compile(r"``(?=\S)([^`]+)(?<=\S)``", re.DOTALL)
-
-    def literal_repl(m: re.Match[str]):
-        # Replace r"``XYZ``" with r"\ `XYZ`"
-        return r"\ `" + m.group(1) + r"`"
-
-    for i in range(len(source)):
-        source[i] = literal_pattern.sub(literal_repl, source[i])
-
-
 def setup(app: Sphinx) -> dict:
     app.add_domain(WarpXDomain)
-    app.connect("source-read", warpx_source_read)
     return {
         "version": "0.1.0",
         "parallel_read_safe": True,
