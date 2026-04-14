@@ -466,7 +466,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         else if (bc_type == FieldBoundaryType::None) { // None is for axis
                             val0 = 2.0_rt;
                             val1 = 4.0_rt;
-                            val2 = 0.0_rt;
+                            val2 = 4.0_rt;
                         }
                     }
 #endif

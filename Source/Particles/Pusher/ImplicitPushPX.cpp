@@ -281,7 +281,7 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
     amrex::ParallelFor(
         np_to_push, [=] AMREX_GPU_DEVICE (long ip)
@@ -330,7 +330,7 @@ PhysicalParticleContainer::SetupSuborbitParticles (WarpXParIter & pti,
     auto& attribs = pti.GetAttribs();
     amrex::ParticleReal* const AMREX_RESTRICT w  = attribs[PIdx::w ].dataPtr() + offset;
 
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
     auto num_previous = unconverged_indices.size();
     unconverged_indices.resize(num_previous + num_unconverged_particles);
@@ -535,7 +535,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     const bool local_has_quantum_sync = has_quantum_sync();
     if (local_has_quantum_sync) {
         evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
+        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr() + offset;
     }
 #endif
 
@@ -554,7 +554,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset: nullptr);
 
     // Using this version of ParallelFor with compile time options
     // improves performance when qed or external EB are not used by reducing
@@ -729,13 +729,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     // If no particles, do not do anything
     if (num_unconverged_particles == 0) { return; }
 
-    const auto depos_type = WarpX::current_deposition_algo;
-
-    if (depos_type != CurrentDepositionAlgo::Villasenor ) {
-        ablastr::warn_manager::WMRecordWarning("ImplicitPushXPSubOrbits",
-            "When particle suborbits are used during the implicit particle push, only Villasenor "
-            "current deposition is supported.");
-    }
+    // Fused deposition kernels become too large when all orders/types are included.
+    // Suborbit uses Villasenor current deposition only. For energy conservation,
+    // the push must use the matching gather, so we override depos_type here to
+    // Villasenor (instead of the runtime-selected type).
+    const auto depos_type = CurrentDepositionAlgo::Villasenor;
 
     // Get cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));

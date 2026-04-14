@@ -21,7 +21,6 @@ def check_particle_filter(
     ad_filtered = ds_filtered.all_data()
 
     ## Build the mapping from local variable names to yt field names, based on dimensionality.
-    ## Components whose yt field name matches skip_component are excluded.
     components = {
         "px": "particle_momentum_x",
         "py": "particle_momentum_y",
@@ -65,9 +64,7 @@ def check_particle_filter(
         "cpus_filtered_warpx": cpus_filtered_warpx,
         **data,
     }
-    (ind_filtered_python,) = np.where(
-        eval(filter_expression, {"__builtins__": {}}, eval_ns)
-    )
+    (ind_filtered_python,) = np.where(eval(filter_expression, eval_ns))
 
     ## Sort the indices of the filtered arrays by particle id.
     sorted_ind_filtered_python = ind_filtered_python[
