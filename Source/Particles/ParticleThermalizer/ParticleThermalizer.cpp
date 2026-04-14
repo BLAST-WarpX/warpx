@@ -20,14 +20,13 @@
 using namespace amrex::literals;
 
 ParticleThermalizer::ParticleThermalizer()
-  : m_defined(false),
-    m_normal(-1), m_start(0._rt), m_end(-1._rt),
+    m_start(0._rt), m_end(-1._rt),
     m_momentum_threshold(-1._rt), m_theta(-1._rt)
 {
   const amrex::ParmParse pp("particle_thermalizer");
 
   // Read normal as a string (x, y, or z)
-  std::string normal_str = "";
+  std::string normal_str;
   const bool thermalizer_present = pp.query("normal", normal_str);
   if (!thermalizer_present) {
     // If no normal is specified, the thermalizer is not defined
@@ -92,7 +91,7 @@ bool ParticleThermalizer::defined() const {
   return m_defined;
 }
 
-void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
+void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc) const
 {
   if (m_species_names.empty()) {
     // No species filter: apply to all species.
@@ -108,7 +107,7 @@ void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
   }
 }
 
-void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
+void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc) const
 {
     for (int lev = 0; lev < pc.numLevels(); ++lev) {
         const auto& geom = pc.Geom(lev);

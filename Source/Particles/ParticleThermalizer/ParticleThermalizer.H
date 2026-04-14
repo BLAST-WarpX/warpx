@@ -26,11 +26,11 @@ public:
     [[nodiscard]] bool defined () const;
 
     // Apply the thermalizer to particles in the provided MultiParticleContainer.
-    void applyThermalizer (MultiParticleContainer &mpc);
+    void applyThermalizer (MultiParticleContainer &mpc) const;
 
     // Per-species overload; operates on a single WarpXParticleContainer.
     // Should be protected, but can't be because it has an extended __device__ lambda
-    void applyThermalizer (WarpXParticleContainer &pcont);
+    void applyThermalizer (WarpXParticleContainer &pcont) const;
 
 private:
     bool m_defined{false};

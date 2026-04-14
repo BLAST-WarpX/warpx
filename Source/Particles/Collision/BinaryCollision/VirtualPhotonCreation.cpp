@@ -48,7 +48,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         }
 
         // Get the virtual photon species corresponding to this primary species
-        int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
+        const int vphotons_index = primary.getVirtualPhotonSpeciesIndex();
         auto& vphotons = mypc->GetParticleContainer(vphotons_index);
         const amrex::ParmParse pp_species_name(mypc->GetSpeciesNames()[vphotons_index]);
 #if defined (WARPX_DIM_3D)
@@ -109,7 +109,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
 
                     // `n_photons` must be an integer, but must average to `r_photons` over many realizations
                     // This is achieved by adding a random number between 0 and 1, and taking the integer part.
-                    const amrex::Long n_photons = (amrex::Long)( r_photons + amrex::Random(engine) );
+                    const auto n_photons = static_cast<amrex::Long>( r_photons + amrex::Random(engine) );
 
                     num_vp_data[i] = n_photons;
                 });
