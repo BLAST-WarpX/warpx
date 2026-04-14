@@ -92,24 +92,24 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 amrex::ParallelForRNG(num,
                 [=] AMREX_GPU_DEVICE (amrex::Long i, amrex::RandomEngine const& engine) noexcept
                 {
-                    amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i]; // u=v*gamma=p/m_e
-                    amrex::ParticleReal uy = soa.m_rdata[PIdx::uy][i];
-                    amrex::ParticleReal uz = soa.m_rdata[PIdx::uz][i];
+                    const amrex::ParticleReal ux = soa.m_rdata[PIdx::ux][i]; // u=v*gamma=p/m_e
+                    const amrex::ParticleReal uy = soa.m_rdata[PIdx::uy][i];
+                    const amrex::ParticleReal uz = soa.m_rdata[PIdx::uz][i];
 
                     // Formula 99.16 in Berestetskii et al., Quantum Electrodynamics
                     // integrated over the photon energies from vphoton_min_energy to the energy of the primary particle
                     // A similar formula is 15.58 in Jackson's, Classical Electrodynamics
                     // but neglect longitudinal field, assume relativistic velocities, and integrate in energy
-                    amrex::ParticleReal gamma = std::sqrt( 1.0_rt +  (ux*ux + uy*uy + uz*uz) * inv_c2 );
+                    const amrex::ParticleReal gamma = std::sqrt( 1.0_rt +  (ux*ux + uy*uy + uz*uz) * inv_c2 );
                     // Minimum fractional (w.r.t. the primary) photon energy
-                    amrex::ParticleReal y_min = vphoton_min_energy * inv_c2 / (gamma * mass);
-                    amrex::ParticleReal lny = std::log( y_min );
+                    const amrex::ParticleReal y_min = vphoton_min_energy * inv_c2 / (gamma * mass);
+                    const amrex::ParticleReal lny = std::log( y_min );
                     // Number of virtual photons per primary particle
-                    amrex::Real r_photons = alpha_over_pi * lny * lny * sampling_factor;
+                    const amrex::Real r_photons = alpha_over_pi * lny * lny * sampling_factor;
 
                     // `n_photons` must be an integer, but must average to `r_photons` over many realizations
                     // This is achieved by adding a random number between 0 and 1, and taking the integer part.
-                    amrex::Long n_photons = (amrex::Long)( r_photons + amrex::Random(engine) );
+                    const amrex::Long n_photons = (amrex::Long)( r_photons + amrex::Random(engine) );
 
                     num_vp_data[i] = n_photons;
                 });
@@ -161,46 +161,46 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 [=] AMREX_GPU_DEVICE (amrex::Long i,  amrex::RandomEngine const& engine) noexcept
                 {
                     // Primary particle
-                    amrex::ParticleReal ux_primary = soa.m_rdata[PIdx::ux][i];
-                    amrex::ParticleReal uy_primary = soa.m_rdata[PIdx::uy][i];
-                    amrex::ParticleReal uz_primary = soa.m_rdata[PIdx::uz][i];
-                    amrex::ParticleReal u_primary = std::sqrt(ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary);
-                    amrex::ParticleReal nx = ux_primary / u_primary; // normalized ux
-                    amrex::ParticleReal ny = uy_primary / u_primary; // normalized uy
-                    amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
-                    amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
+                    const amrex::ParticleReal ux_primary = soa.m_rdata[PIdx::ux][i];
+                    const amrex::ParticleReal uy_primary = soa.m_rdata[PIdx::uy][i];
+                    const amrex::ParticleReal uz_primary = soa.m_rdata[PIdx::uz][i];
+                    const amrex::ParticleReal u_primary = std::sqrt(ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary);
+                    const amrex::ParticleReal nx = ux_primary / u_primary; // normalized ux
+                    const amrex::ParticleReal ny = uy_primary / u_primary; // normalized uy
+                    const amrex::ParticleReal nz = uz_primary / u_primary; // normalized uz
+                    const amrex::ParticleReal gamma_primary = std::sqrt( 1.0_rt + (ux_primary*ux_primary + uy_primary*uy_primary + uz_primary*uz_primary)*inv_c2 );
 
 #if defined (WARPX_DIM_3D)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-                    amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
-                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal y  = soa.m_rdata[PIdx::y][i];
+                    const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
 #elif defined (WARPX_DIM_XZ)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
 #elif defined (WARPX_DIM_RZ)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
-                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+                    const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
 #elif defined (WARPX_DIM_1D_Z)
-                    amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
+                    const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
 #elif defined (WARPX_DIM_RCYLINDER)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
 #elif defined(WARPX_DIM_RSPHERE)
-                    amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
-                    amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
-                    amrex::ParticleReal phi  = soa.m_rdata[PIdx::phi][i];
+                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
+                    const amrex::ParticleReal phi  = soa.m_rdata[PIdx::phi][i];
 #endif
-                    amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
+                    const amrex::ParticleReal w  = soa.m_rdata[PIdx::w][i];
 
                     // TODO: add a runtime attribute to the virtual photon species
                     // that containes the pid of the parent particle = soa.m_idcpu[i]
                     // This will allow to update the parent lepton if needed
 
                     // Minimum fractional (wrt primary particle) photon energy
-                    amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
-                    amrex::Real umin = 0._rt;
-                    amrex::Real umax = std::log(y_min) * std::log(y_min);
+                    const amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
+                    const amrex::Real umin = 0._rt;
+                    const amrex::Real umax = std::log(y_min) * std::log(y_min);
 
                     for (int j = 0; j < num_vp_data[i]; j++)
                     {
@@ -210,14 +210,14 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         // using the method of the inverse cumulative distributionfunction
 
                         // Draw a random number between umin and umax
-                        amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
+                        const amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
                         // Fractional energy of the photon, often denoted as y (or x)
-                        amrex::ParticleReal frac_energy = std::exp( - std::sqrt(rnd) );
+                        const amrex::ParticleReal frac_energy = std::exp( - std::sqrt(rnd) );
                         // Energy of the virtual photon
-                        amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
+                        const amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
 
                         // Photon index for the current primary
-                        amrex::Long ip = offset_vp_data[i] + j;
+                        const amrex::Long ip = offset_vp_data[i] + j;
                         pa_vp[PIdx::ux][ip] = vphoton_energy * nx; // will be multiplied by m_e before dumping the outputs
                         pa_vp[PIdx::uy][ip] = vphoton_energy * ny; // will be multiplied by m_e before dumping the outputs
                         pa_vp[PIdx::uz][ip] = vphoton_energy * nz; // will be multiplied by m_e before dumping the outputs
@@ -237,25 +237,25 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                             // which implies that Q2 can be sampled as
                             // Q2 = Q2_min * (Q2_max / Q2_min)^(rnd)
                             // where rnd is a random number uniformly distributed between 0 and 1
-                            amrex::ParticleReal radius = PhysConst::reduced_compton_wavelength * std::pow(frac_energy,  -amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
+                            const amrex::ParticleReal radius = PhysConst::reduced_compton_wavelength * std::pow(frac_energy,  -amrex::Random(engine))  / std::sqrt(1._rt - frac_energy);
 
-                            amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
-                            amrex::ParticleReal cos_theta = std::cos(theta);
-                            amrex::ParticleReal sin_theta = std::sin(theta);
+                            const amrex::ParticleReal theta = 2.0_rt * MathConst::pi * amrex::Random(engine);
+                            const amrex::ParticleReal cos_theta = std::cos(theta);
+                            const amrex::ParticleReal sin_theta = std::sin(theta);
 
                             // The displacement must be perpendicular to the momentum
                             // Find two unit vectors perpendicular to the momentum
-                            amrex::ParticleReal x_dot_n = x * nx + y * ny + z * nz;
-                            amrex::ParticleReal x_perp1 = x - x_dot_n * nx;
-                            amrex::ParticleReal y_perp1 = y - x_dot_n * ny;
-                            amrex::ParticleReal z_perp1 = z - x_dot_n * nz;
-                            amrex::ParticleReal perp1_norm = std::sqrt(x_perp1*x_perp1 + y_perp1*y_perp1 + z_perp1*z_perp1);
-                            amrex::ParticleReal nx_perp1 = x_perp1 / perp1_norm;
-                            amrex::ParticleReal ny_perp1 = y_perp1 / perp1_norm;
-                            amrex::ParticleReal nz_perp1 = z_perp1 / perp1_norm;
-                            amrex::ParticleReal nx_perp2 = ny*nz_perp1-nz*ny_perp1;
-                            amrex::ParticleReal ny_perp2 = nz*nx_perp1-nx*nz_perp1;
-                            amrex::ParticleReal nz_perp2 = nx*ny_perp1-ny*nx_perp1;
+                            const amrex::ParticleReal x_dot_n = x * nx + y * ny + z * nz;
+                            const amrex::ParticleReal x_perp1 = x - x_dot_n * nx;
+                            const amrex::ParticleReal y_perp1 = y - x_dot_n * ny;
+                            const amrex::ParticleReal z_perp1 = z - x_dot_n * nz;
+                            const amrex::ParticleReal perp1_norm = std::sqrt(x_perp1*x_perp1 + y_perp1*y_perp1 + z_perp1*z_perp1);
+                            const amrex::ParticleReal nx_perp1 = x_perp1 / perp1_norm;
+                            const amrex::ParticleReal ny_perp1 = y_perp1 / perp1_norm;
+                            const amrex::ParticleReal nz_perp1 = z_perp1 / perp1_norm;
+                            const amrex::ParticleReal nx_perp2 = ny*nz_perp1-nz*ny_perp1;
+                            const amrex::ParticleReal ny_perp2 = nz*nx_perp1-nx*nz_perp1;
+                            const amrex::ParticleReal nz_perp2 = nx*ny_perp1-ny*nx_perp1;
 
                             // Move the photon position by radius along a random direction perpendicular to the momentum
                             pa_vp[PIdx::x][ip] += radius * (cos_theta * nx_perp1 + sin_theta * nx_perp2);
