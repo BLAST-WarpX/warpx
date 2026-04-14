@@ -314,7 +314,7 @@ storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnost
 
     // When this is not a full diagnostic, the particles are not written at the same physical time (i.e. PIC iteration)
     // that they were collected. This happens for diagnostics that use buffering (e.g. BackTransformed, BoundaryScraping).
-    // Here `phi` is gathered at the iteration when particles are written (not collected) and is thus mismatched.
+    // Here the field is gathered at the iteration when particles are written (not collected) and is thus mismatched.
     // To avoid confusion, we raise an error in this case.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         is_full_diagnostic,
