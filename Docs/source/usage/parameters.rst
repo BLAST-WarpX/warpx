@@ -205,13 +205,13 @@ Overall simulation parameters
     :type: `string` or `int` > 0
     :optional:
 
-    If provided ``warpx.random_seed = random``, the random seed will be determined
+    If provided :pp:param:`warpx.random_seed = random`, the random seed will be determined
     using `std::random_device` and `std::clock()`,
     thus every simulation run produces different random numbers.
-    If provided ``warpx.random_seed = n``, and it is required that `n > 0`,
+    If provided :pp:param:`warpx.random_seed = n`, and it is required that `n > 0`,
     the random seed for each MPI rank is `(mpi_rank+1) * n`,
     where `mpi_rank` starts from 0.
-    `n = 1` and ``warpx.random_seed = default``
+    `n = 1` and :pp:param:`warpx.random_seed = default`
     produce the default random seed.
     Note that when GPU threading is used,
     one should not expect to obtain the same random numbers,
@@ -238,9 +238,9 @@ Overall simulation parameters
         Exact energy conservation requires matching gather and deposition.
         The following depositions support this:
 
-        - ``algo.current_deposition = direct``
-        - ``algo.current_deposition = villasenor``
-        - ``algo.current_deposition = esirkepov`` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
+        - :pp:param:`algo.current_deposition = direct`
+        - :pp:param:`algo.current_deposition = villasenor`
+        - :pp:param:`algo.current_deposition = esirkepov` (Not compatible with ``implicit_evolve.use_mass_matrices_jacobian = true``.)
 
       - **Numerical stability:**
 
@@ -353,7 +353,7 @@ Overall simulation parameters
       above apply here as well (except that :math:`\theta` is fixed to 0.5 and that charge will not be conserved).
       In this version, the advance is Strang split, with a half advance of the source free Maxwell's equation (with a spectral solver), a full advance of the particles plus longitudinal E field, and a second half advance of the source free Maxwell's equations.
       The advantage of this method is that with the Spectral advance of the fields, it is dispersionless.
-      Note that exact energy convergence is achieved only with one grid block and ``psatd.periodic_single_box_fft = 1``. Otherwise,
+      Note that exact energy convergence is achieved only with one grid block and :pp:param:`psatd.periodic_single_box_fft = 1`. Otherwise,
       the energy conservation is spoiled because of the inconsistency of the periodic assumption of the spectral solver and the
       non-periodic behavior of the individual blocks.
 
@@ -396,9 +396,9 @@ Overall simulation parameters
         It only works in 3D and it requires the compilation flag ``-DWarpX_FFT=ON``.
         If mesh refinement is enabled, this solver only works on the coarsest level.
         On the refined patches, the Poisson equation is solved with the multigrid solver.
-        In electrostatic mode, this solver requires open field boundary conditions (``boundary.field_lo,hi = open``).
+        In electrostatic mode, this solver requires open field boundary conditions (:pp:param:`boundary.field_lo,hi = open`).
         In electromagnetic mode, this solver can be used to initialize the species' self fields
-        (``<species_name>.initialize_self_fields=1``) provided that the field BCs are PML (``boundary.field_lo,hi = PML``).
+        (``<species_name>.initialize_self_fields=1``) provided that the field BCs are PML (:pp:param:`boundary.field_lo,hi = PML`).
 
           * ``warpx.use_2d_slices_fft_solver`` (`bool`) optional (default: 0): Select the type of Integrated Green Function solver.
             If 0, solve Poisson equation in full 3D geometry.
@@ -728,7 +728,7 @@ Setting up the field mesh
     :type: `integer`
     :optional:
 
-    Default: ``warpx.n_field_gather_buffer = n_current_deposition_buffer + 1`` (one cell larger than ``n_current_deposition_buffer`` on the fine grid).
+    Default: :pp:param:`warpx.n_field_gather_buffer = n_current_deposition_buffer + 1` (one cell larger than ``n_current_deposition_buffer`` on the fine grid).
 
     When using mesh refinement, particles that are located inside a refinement patch, but within ``n_field_gather_buffer`` cells of the edge of the patch, gather the fields from the lower refinement level, instead of gathering the fields from the refinement patch itself.
     This avoids some of the spurious effects that can occur inside the refinement patch, close to its edge.
@@ -836,7 +836,7 @@ Domain Boundary Conditions
     :default: `0`
 
     Gives the value of the electric potential, in Volts, at the boundaries, for ``pec`` boundaries. With electrostatic solvers
-    (i.e., with ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
+    (i.e., with :pp:param:`warpx.do_electrostatic = ...`), this is used in order to compute the potential
     in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
     setting these variables will trigger an electrostatic solve at ``t=0``, to compute the initial
     electric field produced by the boundaries.
@@ -933,7 +933,7 @@ Additional PML parameters
     :type: `float`
     :default: 1
 
-    When ``warpx.do_pml_j_damping = 1``, the assumed velocity of the particles to be absorbed in the PML, in units of the speed of light `c`.
+    When :pp:param:`warpx.do_pml_j_damping = 1`, the assumed velocity of the particles to be absorbed in the PML, in units of the speed of light `c`.
 
 .. pp:param:: warpx.do_pml_dive_cleaning
     :type: `bool`
@@ -987,7 +987,7 @@ additionally define the electric potential at the embedded boundary with an anal
 
     Gives the value of the electric potential, in Volts, at the surface of the embedded boundary,
     as a function of  `x`, `y`, `z` and `t`. With electrostatic solvers (i.e., with
-    ``warpx.do_electrostatic = ...``), this is used in order to compute the potential
+    :pp:param:`warpx.do_electrostatic = ...`), this is used in order to compute the potential
     in the simulation volume at each timestep. When using other solvers (e.g. Maxwell solver),
     setting this variable will trigger an electrostatic solve at ``t=0``, to compute the initial
     electric field produced by the boundaries. Note that this function is also evaluated
@@ -1125,13 +1125,13 @@ Distribution across MPI ranks and parallelization
     If the the ratio of the proposed to current distribution mapping *efficiency* (i.e.,
     average cost per MPI process; efficiency is a number in the range [0, 1]) is greater
     than the threshold value, the proposed distribution mapping is adopted.  The suggested
-    range of values is ``algo.load_balance_efficiency_ratio_threshold >= 1``, which ensures
+    range of values is :pp:param:`algo.load_balance_efficiency_ratio_threshold >= 1`, which ensures
     that the new distribution mapping is adopted only if doing so would improve the load
     balance efficiency. The higher the threshold value, the more conservative is the criterion
     for adoption of a proposed distribution; for example, with
-    ``algo.load_balance_efficiency_ratio_threshold = 1``, the proposed distribution is
+    :pp:param:`algo.load_balance_efficiency_ratio_threshold = 1`, the proposed distribution is
     adopted *any* time the proposed distribution improves load balancing; if instead
-    ``algo.load_balance_efficiency_ratio_threshold = 2``, the proposed distribution is
+    :pp:param:`algo.load_balance_efficiency_ratio_threshold = 2`, the proposed distribution is
     adopted only if doing so would yield a 100% to the load balance efficiency (with this
     threshold value, if the  current efficiency is ``0.45``, the new distribution would only be
     adopted if the proposed efficiency were greater than ``0.9``).
@@ -1356,7 +1356,7 @@ Particle initialization
     :optional:
 
     When :pp:param:`<species_name>.xmin` and :pp:param:`<species_name>.xmax` are set, they delimit the region within which particles are injected.
-    If periodic boundary conditions are used in direction ``i``, then the default (i.e. if the range is not specified) range will be the simulation box, ``[geometry.prob_hi[i], geometry.prob_lo[i]]``.
+    If periodic boundary conditions are used in direction ``i``, then the default (i.e. if the range is not specified) range will be the simulation box, :pp:param:`[geometry.prob_hi[i], geometry.prob_lo[i]]`.
 
 .. pp:param:: <species_name>.injection_sources
     :type: ``list of strings``
@@ -2390,19 +2390,19 @@ Laser initialization
 
 .. pp:param:: warpx.mirror_z
     :type: list of `float`
-    :comment: required if ``warpx.num_mirrors>0``
+    :comment: required if :pp:param:`warpx.num_mirrors>0`
 
     ``z`` location of the front of the mirrors.
 
 .. pp:param:: warpx.mirror_z_width
     :type: list of `float`
-    :comment: required if ``warpx.num_mirrors>0``
+    :comment: required if :pp:param:`warpx.num_mirrors>0`
 
     ``z`` width of the mirrors.
 
 .. pp:param:: warpx.mirror_z_npoints
     :type: list of `int`
-    :comment: required if ``warpx.num_mirrors>0``
+    :comment: required if :pp:param:`warpx.num_mirrors>0`
 
     In the boosted frame, depending on `gamma_boost`, :pp:param:`warpx.mirror_z_width`
     can be smaller than the cell size, so that the mirror would not work. This
@@ -2501,8 +2501,8 @@ are applied to the grid directly. In particular, these fields can be seen in the
         warpx.B_external_grid
     :type: list of `3 floats`
 
-    required when ``warpx.E_ext_grid_init_style="constant"``
-    and when ``warpx.B_ext_grid_init_style="constant"``, respectively.
+    required when :pp:param:`warpx.E_ext_grid_init_style="constant"`
+    and when :pp:param:`warpx.B_ext_grid_init_style="constant"`, respectively.
     External uniform and constant electrostatic and magnetostatic field added
     to the grid at initialization. Use with caution as these fields are used for
     the field solver. In particular, do not use any other boundary condition
@@ -3223,11 +3223,11 @@ Particle push, charge and current deposition, field gathering
     This parameter selects the algorithm for the deposition of the current density.
     Available options are: ``direct``, ``esirkepov``, ``villasenor``, and ``vay``. The default choice
     is ``esirkepov`` for FDTD maxwell solvers but ``direct`` for standard or
-    Galilean PSATD solver (i.e. with ``algo.maxwell_solver = psatd``) and
-    for the hybrid-PIC solver (i.e. with ``algo.maxwell_solver = hybrid``) and for
+    Galilean PSATD solver (i.e. with :pp:param:`algo.maxwell_solver = psatd`) and
+    for the hybrid-PIC solver (i.e. with :pp:param:`algo.maxwell_solver = hybrid`) and for
     diagnostics output with the electrostatic solvers (i.e., with
-    ``warpx.do_electrostatic = ...``).
-    Note that ``vay`` is only available for ``algo.maxwell_solver = psatd``.
+    :pp:param:`warpx.do_electrostatic = ...`).
+    Note that ``vay`` is only available for :pp:param:`algo.maxwell_solver = psatd`.
 
     1. ``direct``
 
@@ -3249,7 +3249,7 @@ Particle push, charge and current deposition, field gathering
 
        The current density is deposited as described in :cite:t:`param-VayJCP2013` (see section :ref:`current_deposition` for more details).
        This option guarantees charge conservation only when used in combination
-       with ``psatd.periodic_single_box_fft=1``, that is, only for periodic single-box
+       with :pp:param:`psatd.periodic_single_box_fft=1`, that is, only for periodic single-box
        simulations with global FFTs without guard cells. The implementation for domain
        decomposition with local FFTs over guard cells is planned but not yet completed.
 
@@ -3274,7 +3274,7 @@ Particle push, charge and current deposition, field gathering
        the nodes, and then gather from the nodes.
 
 
-    Default: ``algo.field_gathering = energy-conserving`` with collocated or staggered grids (note that ``energy-conserving`` and ``momentum-conserving`` are equivalent with collocated grids), ``algo.field_gathering = momentum-conserving`` with hybrid grids.
+    Default: :pp:param:`algo.field_gathering = energy-conserving` with collocated or staggered grids (note that ``energy-conserving`` and ``momentum-conserving`` are equivalent with collocated grids), :pp:param:`algo.field_gathering = momentum-conserving` with hybrid grids.
 
 .. pp:param:: algo.particle_pusher
     :type: `string`
@@ -3380,7 +3380,7 @@ Maxwell solver: PSATD method
     :default: `1`, with the exceptions mentioned below
 
     If true, a current correction scheme in Fourier space is applied in order to guarantee charge conservation.
-    The default value is ``psatd.current_correction=1``, unless a charge-conserving current deposition scheme is used (by setting ``algo.current_deposition=esirkepov`` or ``algo.current_deposition=vay``) or unless the ``div(E)`` cleaning scheme is used (by setting ``warpx.do_dive_cleaning=1``).
+    The default value is :pp:param:`psatd.current_correction=1`, unless a charge-conserving current deposition scheme is used (by setting :pp:param:`algo.current_deposition=esirkepov` or :pp:param:`algo.current_deposition=vay`) or unless the ``div(E)`` cleaning scheme is used (by setting :pp:param:`warpx.do_dive_cleaning=1`).
 
     If :pp:param:`psatd.v_galilean` is zero, the spectral solver used is the standard PSATD scheme described in :cite:t:`param-VayJCP2013` and the current correction reads
 
@@ -3405,11 +3405,11 @@ Maxwell solver: PSATD method
 
     If true, the update equation for the electric field is expressed in terms of both the current density and the charge density, namely :math:`\widehat{\boldsymbol{J}}^{\,n+1/2}`, :math:`\widehat\rho^{n}`, and :math:`\widehat\rho^{n+1}`.
     If false, instead, the update equation for the electric field is expressed in terms of the current density :math:`\widehat{\boldsymbol{J}}^{\,n+1/2}` only.
-    If charge is expected to be conserved (by setting, for example, ``psatd.current_correction=1``), then the two formulations are expected to be equivalent.
+    If charge is expected to be conserved (by setting, for example, :pp:param:`psatd.current_correction=1`), then the two formulations are expected to be equivalent.
 
     If :pp:param:`psatd.v_galilean` is zero, the spectral solver used is the standard PSATD scheme described in :cite:t:`param-VayJCP2013`:
 
-    1. if ``psatd.update_with_rho=0``, the update equation for the electric field reads
+    1. if :pp:param:`psatd.update_with_rho=0`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3421,7 +3421,7 @@ Maxwell solver: PSATD method
        (\boldsymbol{k}\cdot\widehat{\boldsymbol{J}}^{\,n+1/2}) \boldsymbol{k}
        \end{split}
 
-    2. if ``psatd.update_with_rho=1``, the update equation for the electric field reads
+    2. if :pp:param:`psatd.update_with_rho=1`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3437,7 +3437,7 @@ Maxwell solver: PSATD method
 
     If :pp:param:`psatd.v_galilean` is non-zero, the spectral solver used is the Galilean PSATD scheme described in :cite:t:`param-LehePRE2016`:
 
-    1. if ``psatd.update_with_rho=0``, the update equation for the electric field reads
+    1. if :pp:param:`psatd.update_with_rho=0`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3452,7 +3452,7 @@ Maxwell solver: PSATD method
        (\boldsymbol{k}\cdot\widehat{\boldsymbol{J}}^{\,n+1/2}) \boldsymbol{k}
        \end{split}
 
-    2. if ``psatd.update_with_rho=1``, the update equation for the electric field reads
+    2. if :pp:param:`psatd.update_with_rho=1`, the update equation for the electric field reads
 
     .. math::
        \begin{split}
@@ -3468,8 +3468,8 @@ Maxwell solver: PSATD method
     The coefficients :math:`C`, :math:`S`, :math:`\theta`, :math:`\nu`, :math:`\chi_1`, :math:`\chi_2`, and :math:`\chi_3` are defined in :cite:t:`param-LehePRE2016`.
 
     The default value for :pp:param:`psatd.update_with_rho` is ``1`` if :pp:param:`psatd.v_galilean` is non-zero and ``0`` otherwise.
-    The option ``psatd.update_with_rho=0`` is not implemented with the following algorithms:
-    comoving PSATD (:pp:param:`psatd.v_comoving`), time averaging (``psatd.do_time_averaging=1``), div(E) cleaning (``warpx.do_dive_cleaning=1``), and PSATD JRhom (:pp:param:`psatd.JRhom`).
+    The option :pp:param:`psatd.update_with_rho=0` is not implemented with the following algorithms:
+    comoving PSATD (:pp:param:`psatd.v_comoving`), time averaging (:pp:param:`psatd.do_time_averaging=1`), div(E) cleaning (:pp:param:`warpx.do_dive_cleaning=1`), and PSATD JRhom (:pp:param:`psatd.JRhom`).
 
     Note that the update with and without rho is also supported in RZ geometry.
 
@@ -3481,7 +3481,7 @@ Maxwell solver: PSATD method
     Defines the Galilean velocity.
     A non-zero velocity activates the Galilean algorithm, which suppresses numerical Cherenkov instabilities (NCI) in boosted-frame simulations (see the section :ref:`Numerical Stability and alternate formulation in a Galilean frame <theory-boostedframe-galilean>` for more information).
     This requires the code to be compiled with the spectral solver.
-    It also requires the use of the direct current deposition algorithm (by setting ``algo.current_deposition = direct``).
+    It also requires the use of the direct current deposition algorithm (by setting :pp:param:`algo.current_deposition = direct`).
 
 .. pp:param:: psatd.use_default_v_galilean
     :type: `0` or `1`
@@ -3496,7 +3496,7 @@ Maxwell solver: PSATD method
     :default: ``0. 0. 0.``
 
     Defines the comoving velocity in the comoving PSATD scheme.
-    A non-zero comoving velocity selects the comoving PSATD algorithm, which suppresses the numerical Cherenkov instability (NCI) in boosted-frame simulations, under certain assumptions. This option requires that WarpX is compiled with ``USE_FFT = TRUE``. It also requires the use of direct current deposition (``algo.current_deposition = direct``) and has neither been implemented nor tested with other current deposition schemes.
+    A non-zero comoving velocity selects the comoving PSATD algorithm, which suppresses the numerical Cherenkov instability (NCI) in boosted-frame simulations, under certain assumptions. This option requires that WarpX is compiled with ``USE_FFT = TRUE``. It also requires the use of direct current deposition (:pp:param:`algo.current_deposition = direct`) and has neither been implemented nor tested with other current deposition schemes.
 
 .. pp:param:: psatd.do_time_averaging
     :type: `0` or `1`
@@ -3508,7 +3508,7 @@ Maxwell solver: PSATD method
     :type: ``string``
 
     This determines whether the PSATD JRhom algorithm is used, where current deposition and field update are performed multiple times within one time step, while field gathering is performed only once.
-    For simulations with strong numerical Cherenkov instability (NCI), the PSATD JRhom algorithm is recommended in combination with ``psatd.do_time_averaging = 1``.
+    For simulations with strong numerical Cherenkov instability (NCI), the PSATD JRhom algorithm is recommended in combination with :pp:param:`psatd.do_time_averaging = 1`.
     The input parameter is a string composed by two characters and one digit.
     The first character represents the time dependency of J within the time step over which the electromagnetic fields are evolved, e.g., "C" for constant in time, "L" for linear in time, "Q" for quadratic in time.
     The second character represents the time dependency of rho within the time step over which the electromagnetic fields are evolved, following the same naming convention as for J.
@@ -3541,7 +3541,7 @@ Maxwell solver: macroscopic media
     To initialize spatially varying conductivity, permittivity, and permeability, respectively,
     using a mathematical function in the input. Constants required in the
     mathematical expression can be set using ``my_constants``. These parameters are parsed
-    if ``algo.em_solver_medium=macroscopic``.
+    if :pp:param:`algo.em_solver_medium=macroscopic`.
 
 .. pp:param:: macroscopic.sigma/epsilon/mu
     :link_aliases:
@@ -3564,12 +3564,12 @@ Maxwell solver: kinetic-fluid hybrid
     **Required Parameters:**
 
     - :pp:param:`hybrid_pic_model.elec_temp` must be specified when using the hybrid solver.
-    - :pp:param:`hybrid_pic_model.n0_ref` should be specified if ``hybrid_pic_model.gamma != 1``.
+    - :pp:param:`hybrid_pic_model.n0_ref` should be specified if :pp:param:`hybrid_pic_model.gamma != 1`.
 
     **Best Practices**
 
     - *Grid type:* Setting `warpx.grid_type = collocated` is recommended
-    - *Particle shape:* Linear particles (``algo.particle_shape = 1``) are recommended based on :cite:t:`param-Stanier2020`.
+    - *Particle shape:* Linear particles (:pp:param:`algo.particle_shape = 1`) are recommended based on :cite:t:`param-Stanier2020`.
 
 .. warning::
 
@@ -3577,7 +3577,7 @@ Maxwell solver: kinetic-fluid hybrid
 
     - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if ``lev > 0``.
     - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
-    - *External vector potential:* If using ``hybrid_pic_model.add_external_fields = true``, then :pp:param:`external_vector_potential.fields` must be non-empty.
+    - *External vector potential:* If using :pp:param:`hybrid_pic_model.add_external_fields = true`, then :pp:param:`external_vector_potential.fields` must be non-empty.
     - *Time-dependent A fields:* When using expressions for external vector potentials, time variation must be specified via ``A_time_external_function(t)``, not directly in the ``A[x,y,z]_external_grid_function(x,y,z)`` expressions.
 
 .. pp:param:: hybrid_pic_model.elec_temp
@@ -3702,20 +3702,20 @@ Grid types (collocated, staggered, hybrid)
     a staggered grid (fields defined on a Yee grid), or a hybrid grid (fields
     and currents are interpolated back and forth between a staggered grid and a
     nodal grid, must be used with momentum-conserving field gathering algorithm,
-    ``algo.field_gathering = momentum-conserving``).
+    :pp:param:`algo.field_gathering = momentum-conserving`).
     The option ``hybrid`` is currently not supported in RZ, RCYLINDER, and RSPHERE geometries.
 
-    Default: ``warpx.grid_type = staggered``.
+    Default: :pp:param:`warpx.grid_type = staggered`.
 
 .. pp:param:: interpolation.galerkin_scheme
     :type: `0` or `1`
 
     Whether to use a Galerkin scheme when gathering fields to particles.
     When set to ``1``, the interpolation orders used for field-gathering are reduced for certain field components along certain directions.
-    For example, :math:`E_z` is gathered using :pp:param:`algo.particle_shape` along :math:`(x,y)` and ``algo.particle_shape - 1`` along :math:`z`.
+    For example, :math:`E_z` is gathered using :pp:param:`algo.particle_shape` along :math:`(x,y)` and :pp:param:`algo.particle_shape - 1` along :math:`z`.
     See equations (21)-(23) of :cite:t:`param-Godfrey2013` and associated references for details.
 
-    Default: ``interpolation.galerkin_scheme = 0`` with collocated grids, or momentum-conserving field gathering, or when ``algo.current_deposition = direct`` ; ``interpolation.galerkin_scheme = 1`` otherwise.
+    Default: :pp:param:`interpolation.galerkin_scheme = 0` with collocated grids, or momentum-conserving field gathering, or when :pp:param:`algo.current_deposition = direct` ; :pp:param:`interpolation.galerkin_scheme = 1` otherwise.
 
     .. warning::
 
@@ -3730,7 +3730,7 @@ Grid types (collocated, staggered, hybrid)
     :type: `integer`
     :optional:
 
-    The order of interpolation used with staggered or hybrid grids (``warpx.grid_type = staggered`` or ``warpx.grid_type = hybrid``) and momentum-conserving field gathering (``algo.field_gathering = momentum-conserving``) to interpolate the electric and magnetic fields from the cell centers to the cell nodes, before gathering the fields from the cell nodes to the particle positions.
+    The order of interpolation used with staggered or hybrid grids (:pp:param:`warpx.grid_type = staggered` or :pp:param:`warpx.grid_type = hybrid`) and momentum-conserving field gathering (:pp:param:`algo.field_gathering = momentum-conserving`) to interpolate the electric and magnetic fields from the cell centers to the cell nodes, before gathering the fields from the cell nodes to the particle positions.
 
     Default: ``warpx.field_centering_no<x,y,z> = 2`` with staggered grids, ``warpx.field_centering_no<x,y,z> = 8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
 
@@ -3743,7 +3743,7 @@ Grid types (collocated, staggered, hybrid)
     :type: `integer`
     :optional:
 
-    The order of interpolation used with hybrid grids (``warpx.grid_type = hybrid``) to interpolate the currents from the cell nodes to the cell centers when ``warpx.do_current_centering = 1``, before pushing the Maxwell fields on staggered grids.
+    The order of interpolation used with hybrid grids (:pp:param:`warpx.grid_type = hybrid`) to interpolate the currents from the cell nodes to the cell centers when :pp:param:`warpx.do_current_centering = 1`, before pushing the Maxwell fields on staggered grids.
 
     Default: ``warpx.current_centering_no<x,y,z> = 8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
 
@@ -3752,7 +3752,7 @@ Grid types (collocated, staggered, hybrid)
 
     If true, the current is deposited on a nodal grid and then centered to a staggered grid (Yee grid), using finite-order interpolation.
 
-    Default: ``warpx.do_current_centering = 0`` with collocated or staggered grids, ``warpx.do_current_centering = 1`` with hybrid grids.
+    Default: :pp:param:`warpx.do_current_centering = 0` with collocated or staggered grids, :pp:param:`warpx.do_current_centering = 1` with hybrid grids.
 
 Additional parameters
 ^^^^^^^^^^^^^^^^^^^^^
@@ -3803,7 +3803,7 @@ Additional parameters
     evolves with its own time step, set to its own CFL limit. In practice, it
     means that when level 0 performs one iteration, level 1 performs two
     iterations. Currently, this option is only supported when
-    ``amr.max_level = 1``. More information can be found at
+    :pp:param:`amr.max_level = 1`. More information can be found at
     https://ieeexplore.ieee.org/document/8659392.
 
 .. pp:param:: warpx.override_sync_intervals
@@ -3976,7 +3976,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Name of each diagnostics.
-    example: ``diagnostics.diags_names = diag1 my_second_diag``.
+    example: :pp:param:`diagnostics.diags_names = diag1 my_second_diag`.
 
 .. pp:param:: <diag_name>.intervals
     :type: `string`
@@ -5326,10 +5326,10 @@ Schwinger process
     :optional:
 
     If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
-    If ``warpx.do_qed_schwinger = 1``, Schwinger product species must be specified with
+    If :pp:param:`warpx.do_qed_schwinger = 1`, Schwinger product species must be specified with
     :pp:param:`qed_schwinger.ele_product_species` and :pp:param:`qed_schwinger.pos_product_species`.
-    Schwinger process requires either ``warpx.grid_type = collocated`` or
-    ``algo.field_gathering=momentum-conserving`` (so that different field components are computed
+    Schwinger process requires either :pp:param:`warpx.grid_type = collocated` or
+    :pp:param:`algo.field_gathering=momentum-conserving` (so that different field components are computed
     at the same location in the grid) and does not currently support mesh refinement, cylindrical
     coordinates or single precision.
 
@@ -5391,7 +5391,7 @@ Schwinger process
     Will use the Hybrid QED Maxwell solver when pushing fields: a QED correction is added to the
     field solver to solve non-linear Maxwell's equations, according to :cite:t:`param-GrismayerNJP2021`.
     Note that this option can only be used with the PSATD build. Furthermore, one must set
-    ``warpx.grid_type = collocated`` (which otherwise would be ``staggered`` by default).
+    :pp:param:`warpx.grid_type = collocated` (which otherwise would be ``staggered`` by default).
     This feature does not require to compile with ``-DWarpX_QED=ON``.
 
 .. pp:param:: warpx.quantum_xi
@@ -5461,7 +5461,7 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
     If the threshold is set, warning messages with priority greater than or
     equal to the threshold trigger an immediate abort.
     It is mainly intended for debug purposes, and is best used with
-    ``warpx.always_warn_immediately=1``.
+    :pp:param:`warpx.always_warn_immediately=1`.
 
 .. pp:param:: amrex.abort_on_unused_inputs
     :type: ``0`` or ``1``
