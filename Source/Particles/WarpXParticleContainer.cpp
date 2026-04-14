@@ -1155,6 +1155,8 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
     const bool full_mass_matrices = (Szz->nComp() > 1);
 
+    const int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
+
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #if !defined(WARPX_DIM_1D_Z)
@@ -1175,8 +1177,6 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 #else
         const ParticleReal* zp_n_data = nullptr;
 #endif
-
-        int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
 
         if (WarpX::nox == 1 && full_mass_matrices) {
             doVillasenorSigmaDeposition<1,true>(
@@ -1285,7 +1285,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
         if        (WarpX::nox == 1 && full_mass_matrices) {
             doDirectSigmaDeposition<1,true>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1296,7 +1296,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if  (WarpX::nox == 1 && !full_mass_matrices) {
             doDirectSigmaDeposition<1,false>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1307,7 +1307,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
             doDirectSigmaDeposition<2,true>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1318,7 +1318,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
             doDirectSigmaDeposition<2,false>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1329,7 +1329,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
             doDirectSigmaDeposition<3,true>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1340,7 +1340,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
             doDirectSigmaDeposition<3,false>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1351,7 +1351,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
             doDirectSigmaDeposition<4,true>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,
@@ -1362,7 +1362,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
             doDirectSigmaDeposition<4,false>(
-                    GetPosition, wp.dataPtr() + offset,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
                     uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
                     uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
                     Sxx_arr, Sxy_arr, Sxz_arr,

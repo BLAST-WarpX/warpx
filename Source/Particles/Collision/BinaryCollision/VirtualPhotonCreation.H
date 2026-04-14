@@ -1,4 +1,4 @@
-/* Copyright 2025 Arianna Formenti
+/* Copyright 2025 Arianna Formenti, Peter Kicsiny
  *
  * This file is part of WarpX.
  *
@@ -35,7 +35,5 @@ namespace collision::binarycollision::virtualphotons
  * \param[in] mypc MultiParticleContainer calling this method
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc);
-
-} // close namespace
 
 #endif // WARPX_VIRTUAL_PHOTONS_H_
