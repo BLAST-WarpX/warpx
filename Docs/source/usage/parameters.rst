@@ -184,6 +184,21 @@ Overall simulation parameters
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
 
+.. pp:param:: warpx.epsilon_r
+    :type: `float`
+    :default: ``1.0``
+
+    Relative permittivity applied uniformly to Ampere's law in the FDTD solver.
+    Setting this to a value greater than ``1.0`` scales the ``curl(B)`` and ``J`` terms in the E-field update by ``1/epsilon_r``, effectively reducing the EM wave propagation speed to ``c/sqrt(epsilon_r)`` and relaxing the CFL condition.
+    Faraday's law and the particle pusher are not modified.
+    Must be ``>= 1.0``.
+    Only supported with the explicit FDTD solver (``algo.evolve_scheme = explicit``).
+
+    .. warning::
+        This approximation is only valid when the plasma frequency
+        and particle velocities are much smaller than ``c/sqrt(epsilon_r)``.
+        Use with care and verify that results are physically consistent.
+
 .. pp:param:: warpx.gamma_boost
     :type: `float`
 

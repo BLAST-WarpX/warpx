@@ -28,6 +28,7 @@
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 /**
@@ -74,23 +75,29 @@ WarpX::ComputeDt ()
         deltat = cfl * minDim(dx) / PhysConst::c;
     } else {
         // Computation of dt for FDTD algorithm
+        amrex::Real const sqrt_epsilon_r = std::sqrt(WarpX::epsilon_r);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // - In RZ geometry
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
-            deltat = cfl * CylindricalYeeAlgorithm::ComputeMaxDt(dx,  n_rz_azimuthal_modes);
+            deltat = cfl * CylindricalYeeAlgorithm::ComputeMaxDt(dx,  n_rz_azimuthal_modes)
+                   * sqrt_epsilon_r;
 #elif defined(WARPX_DIM_RSPHERE)
         // - In RZ geometry
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
-            deltat = cfl * SphericalYeeAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * SphericalYeeAlgorithm::ComputeMaxDt(dx)
+                   * sqrt_epsilon_r;
 #else
         // - In Cartesian geometry
         if (grid_type == GridType::Collocated) {
-            deltat = cfl * CartesianNodalAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianNodalAlgorithm::ComputeMaxDt(dx)
+                   * sqrt_epsilon_r;
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
                     || electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-            deltat = cfl * CartesianYeeAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianYeeAlgorithm::ComputeMaxDt(dx)
+                   * sqrt_epsilon_r;
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
-            deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
+            deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx)
+                   * sqrt_epsilon_r;
 #endif
         } else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");

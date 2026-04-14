@@ -14,6 +14,8 @@
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
+#include "WarpX.H"
 
 #include <AMReX.H>
 #include <AMReX_Array4.H>
@@ -73,7 +75,7 @@ void FiniteDifferenceSolver::EvolveGCartesian (
     amrex::Real const dt)
 {
 
-    amrex::Real constexpr c2 = PhysConst::c * PhysConst::c;
+    amrex::Real const c2 = PhysConst::c * PhysConst::c / WarpX::epsilon_r;
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
