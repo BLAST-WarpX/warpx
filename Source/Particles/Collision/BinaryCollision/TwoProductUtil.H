@@ -9,6 +9,7 @@
 #define WARPX_TWO_PRODUCT_UTIL_H
 
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Math.H>
@@ -42,10 +43,7 @@ namespace {
      * @param[out] u2z_out normalized momentum of the second product macroparticles along z (in m.s^-1)
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
-     * @param[in] isotropic_scattering flag to indicate whether the particles are scattered isotropically.
-     * If true, the particles are scattered isotropically in the center-of-mass frame.
-     * If false, the particles momentum do not change direction, in the center-of-mass frame.
-     * (but the magnitude of the momentum may change, esp. if E_reaction is non-zero)
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -67,7 +65,7 @@ namespace {
                             amrex::ParticleReal& u2z_out,
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
-                            const bool isotropic_scattering,
+                            ScatteringAngleModel scattering_angle_model,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -132,16 +130,16 @@ namespace {
         const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_c2 );
 
         // Compute momentum of first product in the center of mass frame
-        amrex::ParticleReal px_star_out, py_star_out, pz_star_out;
-        if (isotropic_scattering) {
-            // Assume isotropic scattering in the center-of-mass frame
+        amrex::ParticleReal px_star_out = 0.0_prt;
+        amrex::ParticleReal py_star_out = 0.0_prt;
+        amrex::ParticleReal pz_star_out = 0.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
             ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
                                              engine);
         }
-        else {
-            // Assume that the momentum of the products has the same direction
-            // as that of the incident particle in the center of mass frame
-
+        else if (scattering_angle_model == ScatteringAngleModel::Forward) {
+            // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
             {
