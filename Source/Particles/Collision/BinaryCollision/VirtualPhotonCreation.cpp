@@ -29,6 +29,7 @@
 namespace collision::binarycollision::virtualphotons{
 
 using namespace amrex::literals;
+using namespace ParticleUtils;
 using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
 void GenerateVirtualPhotons (MultiParticleContainer* mypc){
