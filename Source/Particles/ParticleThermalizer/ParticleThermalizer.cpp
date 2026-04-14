@@ -149,7 +149,7 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc) const
             // Parallel loop over particles in the tile.
             amrex::ParallelForRNG(np, [=] AMREX_GPU_DEVICE (long ip, amrex::RandomEngine const& engine) noexcept {
                 amrex::ParticleReal x, y, z;
-                amrex::ParticleReal norm_pos = 0.0_prt;
+                amrex::ParticleReal norm_pos = 0.0_prt; //NOLINT (misc-const-correctness)
 
                 getPosition(ip, x, y, z);
 #if defined(WARPX_DIM_1D_Z)
