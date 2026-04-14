@@ -48,15 +48,15 @@ Note that, while this applies to most reduced diagnostics, there are a few that 
 Asynchronous IO
 ^^^^^^^^^^^^^^^
 
-When using the AMReX `plotfile` format, users can set the ``amrex.async_out=1``
+When using the AMReX `plotfile` format, users can set the :pp:param:`amrex.async_out=1`
 option to perform I/O in a non-blocking fashion: the simulation continues while an I/O thread
 writes data to disk. This can significantly reduce the overall time spent in I/O. It is
 primarily intended for large runs on supercomputers (e.g., at OLCF or NERSC); depending on
 your MPI implementation, you may not see a benefit on a workstation.
 
 When writing plotfiles, each rank writes to a separate file, up to a maximum number (by
-default 64). This maximum can be adjusted using the ``amrex.async_out_nfiles`` input
-parameter. To use asynchronous I/O with more than ``amrex.async_out_nfiles`` MPI ranks,
+default 64). This maximum can be adjusted using the :pp:param:`amrex.async_out_nfiles` input
+parameter. To use asynchronous I/O with more than :pp:param:`amrex.async_out_nfiles` MPI ranks,
 WarpX must be configured with ``-DWarpX_MPI_THREAD_MULTIPLE=ON``. See
 :ref:`the building instructions <install-build-cmake>` for details.
 
