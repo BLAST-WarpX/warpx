@@ -19,7 +19,7 @@
 
 using namespace amrex::literals;
 
-ParticleThermalizer::ParticleThermalizer()
+ParticleThermalizer::ParticleThermalizer():
     m_start(0._rt), m_end(-1._rt),
     m_momentum_threshold(-1._rt), m_theta(-1._rt)
 {
