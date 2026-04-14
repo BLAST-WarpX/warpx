@@ -18,47 +18,48 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
     ad = ds.all_data()
     ad_filtered = ds_filtered.all_data()
 
+    ## Build the mapping from local variable names to yt field names, based on dimensionality.
+    components = {
+        "px": "particle_momentum_x",
+        "py": "particle_momentum_y",
+        "pz": "particle_momentum_z",
+        "w": "particle_weight",
+    }
+    if dim == "2d":
+        components["x"] = "particle_position_x"
+        components["z"] = "particle_position_y"
+    elif dim == "3d":
+        components["x"] = "particle_position_x"
+        components["y"] = "particle_position_y"
+        components["z"] = "particle_position_z"
+    elif dim == "rz":
+        components["r"] = "particle_position_x"
+        components["z"] = "particle_position_y"
+        components["theta"] = "particle_theta"
+
     ## Load arrays from the unfiltered diagnostic
     ids = ad[species_name, "particle_id"].to_ndarray()
     cpus = ad[species_name, "particle_cpu"].to_ndarray()
-    px = ad[species_name, "particle_momentum_x"].to_ndarray()
-    pz = ad[species_name, "particle_momentum_z"].to_ndarray()
-    py = ad[species_name, "particle_momentum_y"].to_ndarray()
-    w = ad[species_name, "particle_weight"].to_ndarray()
-    if dim == "2d":
-        x = ad[species_name, "particle_position_x"].to_ndarray()
-        z = ad[species_name, "particle_position_y"].to_ndarray()
-    elif dim == "3d":
-        x = ad[species_name, "particle_position_x"].to_ndarray()
-        y = ad[species_name, "particle_position_y"].to_ndarray()
-        z = ad[species_name, "particle_position_z"].to_ndarray()
-    elif dim == "rz":
-        r = ad[species_name, "particle_position_x"].to_ndarray()
-        z = ad[species_name, "particle_position_y"].to_ndarray()
-        theta = ad[species_name, "particle_theta"].to_ndarray()
+    data = {k: ad[species_name, v].to_ndarray() for k, v in components.items()}
 
     ## Load arrays from the filtered diagnostic
     ids_filtered_warpx = ad_filtered[species_name, "particle_id"].to_ndarray()
     cpus_filtered_warpx = ad_filtered[species_name, "particle_cpu"].to_ndarray()
-    px_filtered_warpx = ad_filtered[species_name, "particle_momentum_x"].to_ndarray()
-    pz_filtered_warpx = ad_filtered[species_name, "particle_momentum_z"].to_ndarray()
-    py_filtered_warpx = ad_filtered[species_name, "particle_momentum_y"].to_ndarray()
-    w_filtered_warpx = ad_filtered[species_name, "particle_weight"].to_ndarray()
-    if dim == "2d":
-        x_filtered_warpx = ad_filtered[species_name, "particle_position_x"].to_ndarray()
-        z_filtered_warpx = ad_filtered[species_name, "particle_position_y"].to_ndarray()
-    elif dim == "3d":
-        x_filtered_warpx = ad_filtered[species_name, "particle_position_x"].to_ndarray()
-        y_filtered_warpx = ad_filtered[species_name, "particle_position_y"].to_ndarray()
-        z_filtered_warpx = ad_filtered[species_name, "particle_position_z"].to_ndarray()
-    elif dim == "rz":
-        r_filtered_warpx = ad_filtered[species_name, "particle_position_x"].to_ndarray()
-        z_filtered_warpx = ad_filtered[species_name, "particle_position_y"].to_ndarray()
-        theta_filtered_warpx = ad_filtered[species_name, "particle_theta"].to_ndarray()
+    data_filtered = {
+        k: ad_filtered[species_name, v].to_ndarray() for k, v in components.items()
+    }
 
     ## Reproduce the filter in python: this returns the indices of the filtered particles in the
     ## unfiltered arrays.
-    (ind_filtered_python,) = np.where(eval(filter_expression))
+    eval_ns = {
+        "np": np,
+        "ids": ids,
+        "cpus": cpus,
+        "ids_filtered_warpx": ids_filtered_warpx,
+        "cpus_filtered_warpx": cpus_filtered_warpx,
+        **data,
+    }
+    (ind_filtered_python,) = np.where(eval(filter_expression, eval_ns))
 
     ## Sort the indices of the filtered arrays by particle id.
     sorted_ind_filtered_python = ind_filtered_python[
@@ -77,57 +78,10 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
 
     ## Finally, we check that the sum of the particles quantities are the same to machine precision
     tolerance_checksum = 1.0e-12
-    check_array_sum(
-        px[sorted_ind_filtered_python],
-        px_filtered_warpx[sorted_ind_filtered_warpx],
-        tolerance_checksum,
-    )
-    check_array_sum(
-        pz[sorted_ind_filtered_python],
-        pz_filtered_warpx[sorted_ind_filtered_warpx],
-        tolerance_checksum,
-    )
-    check_array_sum(
-        py[sorted_ind_filtered_python],
-        py_filtered_warpx[sorted_ind_filtered_warpx],
-        tolerance_checksum,
-    )
-    check_array_sum(
-        w[sorted_ind_filtered_python],
-        w_filtered_warpx[sorted_ind_filtered_warpx],
-        tolerance_checksum,
-    )
-    check_array_sum(
-        z[sorted_ind_filtered_python],
-        z_filtered_warpx[sorted_ind_filtered_warpx],
-        tolerance_checksum,
-    )
-    if dim == "2d":
+    for k in components:
         check_array_sum(
-            x[sorted_ind_filtered_python],
-            x_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-    elif dim == "3d":
-        check_array_sum(
-            x[sorted_ind_filtered_python],
-            x_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-        check_array_sum(
-            y[sorted_ind_filtered_python],
-            y_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-    elif dim == "rz":
-        check_array_sum(
-            r[sorted_ind_filtered_python],
-            r_filtered_warpx[sorted_ind_filtered_warpx],
-            tolerance_checksum,
-        )
-        check_array_sum(
-            theta[sorted_ind_filtered_python],
-            theta_filtered_warpx[sorted_ind_filtered_warpx],
+            data[k][sorted_ind_filtered_python],
+            data_filtered[k][sorted_ind_filtered_warpx],
             tolerance_checksum,
         )
 
