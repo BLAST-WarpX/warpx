@@ -182,23 +182,49 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate a random unit vector with isotropic distribution,
-     * following the method described in equations (27)-(31) of
+     * \brief Generate a random angle with isotropic or anisotropic distribution,
+     * following the method described in equations (27)-(31) or (36)-(42) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
+     *
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosTheta (
+        amrex::RandomEngine const& engine,
+        ScatteringAngleModel scattering_angle_model)
+    {
+        amrex::ParticleReal cos_theta = 1.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
+            cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Anisotropic) {
+            // TODO Anisotropic scattering: the angle of emission of the products in the center of mass frame is determined by an anisotropic model
+        }
+        return cos_theta;
+    }
+
+    /**
+     * \brief Generate a random unit vector with isotropic or anisotropic distribution,
+     * following the method described in equations (27)-(31) or (36)-(42) of
      * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
      * @param[out] x x-component of the random unit vector
      * @param[out] y y-component of the random unit vector
      * @param[out] z z-component of the random unit vector
-     * @param[in] engine the random-engine
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
-                           amrex::ParticleReal& z, amrex::RandomEngine const& engine )
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine,
+                           ScatteringAngleModel scattering_angle_model)
     {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const cos_theta = getRandomCosTheta(engine, scattering_angle_model);
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
@@ -213,16 +239,18 @@ namespace ParticleUtils {
      * @param[in,out] ux, uy, uz colliding particle's velocity
      * @param[in] vp velocity magnitude of the colliding particle after collision.
      * @param[in] engine the random-engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
                              amrex::ParticleReal& uz,
                              const amrex::ParticleReal vp,
-                             amrex::RandomEngine const& engine )
+                             amrex::RandomEngine const& engine,
+                             ScatteringAngleModel scattering_angle_model)
     {
         amrex::ParticleReal x, y, z;
         // generate random unit vector for the new velocity direction
-        getRandomVector(x, y, z, engine);
+        getRandomVector(x, y, z, engine, scattering_angle_model);
 
         // scale new vector to have the desired magnitude
         ux = x * vp;

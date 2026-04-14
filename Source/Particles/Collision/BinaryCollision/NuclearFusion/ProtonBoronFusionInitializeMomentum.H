@@ -125,7 +125,7 @@ namespace {
 
         // Compute momentum of second alpha in Beryllium rest frame, assuming isotropic distribution
         amrex::ParticleReal px_Bestar, py_Bestar, pz_Bestar;
-        ParticleUtils::RandomizeVelocity(px_Bestar, py_Bestar, pz_Bestar, p_Bestar, engine);
+        ParticleUtils::RandomizeVelocity(px_Bestar, py_Bestar, pz_Bestar, p_Bestar, engine, ScatteringAngleModel::Isotropic);
 
         // Next step is to convert momentum of second alpha to lab frame
         amrex::ParticleReal px_alpha2, py_alpha2, pz_alpha2;

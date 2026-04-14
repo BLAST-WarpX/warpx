@@ -9,6 +9,7 @@
 #define LINEAR_BREIT_WHEELER_UTIL_H
 
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Math.H>
@@ -94,7 +95,7 @@ namespace {
         // distribution
         amrex::ParticleReal px_star, py_star, pz_star;
         ParticleUtils::RandomizeVelocity(px_star, py_star, pz_star, std::sqrt(p_star_sq),
-                                         engine);
+                                         engine, ScatteringAngleModel::Isotropic);
 
         // Next step is to convert momenta to lab frame
         amrex::ParticleReal p1x_out, p1y_out, p1z_out;

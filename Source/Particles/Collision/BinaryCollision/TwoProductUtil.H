@@ -133,12 +133,7 @@ namespace {
         amrex::ParticleReal px_star_out = 0.0_prt;
         amrex::ParticleReal py_star_out = 0.0_prt;
         amrex::ParticleReal pz_star_out = 0.0_prt;
-        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
-            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
-            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
-                                             engine);
-        }
-        else if (scattering_angle_model == ScatteringAngleModel::Forward) {
+        if (scattering_angle_model == ScatteringAngleModel::Forward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
@@ -166,6 +161,12 @@ namespace {
             px_star_out = p1x_star_in * scaling;
             py_star_out = p1y_star_in * scaling;
             pz_star_out = p1z_star_in * scaling;
+        }
+        else {
+            // Isotropic or anisotropic scattering: the angle of emission of the products in the center of mass frame
+            // is random or determined by an anisotropic model
+            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
+                                             engine, scattering_angle_model);
         }
 
         // Next step is to convert momenta to lab frame

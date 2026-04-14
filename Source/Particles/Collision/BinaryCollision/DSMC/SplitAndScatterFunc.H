@@ -283,7 +283,7 @@ public:
                 if (mask[i] == int(ScatteringProcessType::ELASTIC)) {
                     // randomly rotate the velocity vector for the first particle
                     ParticleUtils::RandomizeVelocity(
-                        ux0, uy0, uz0, std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0), engine
+                        ux0, uy0, uz0, std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0), engine, ScatteringAngleModel::Isotropic
                     );
                     // set the second particles velocity so that the total momentum
                     // is zero
