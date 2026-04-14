@@ -13,6 +13,7 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 
+#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 
