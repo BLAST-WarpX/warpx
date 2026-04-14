@@ -12,7 +12,9 @@ import yt
 
 ## This is a generic function to test a particle filter. We reproduce the filter in python and
 ## verify that the results are the same as with the WarpX filtered diagnostic.
-def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name):
+def check_particle_filter(
+    fn, filtered_fn, filter_expression, dim, species_name, skip_component=None
+):
     ds = yt.load(fn)
     ds_filtered = yt.load(filtered_fn)
     ad = ds.all_data()
@@ -36,6 +38,9 @@ def check_particle_filter(fn, filtered_fn, filter_expression, dim, species_name)
         components["r"] = "particle_position_x"
         components["z"] = "particle_position_y"
         components["theta"] = "particle_theta"
+
+    if skip_component is not None:
+        components = {k: v for k, v in components.items() if v != skip_component}
 
     ## Load arrays from the unfiltered diagnostic
     ids = ad[species_name, "particle_id"].to_ndarray()
@@ -95,7 +100,9 @@ def check_array_sum(array1, array2, tolerance_checksum):
 
 ## This function is specifically used to test the random filter. First, we check that the number of
 ## dumped particles is as expected. Next, we call the generic check_particle_filter function.
-def check_random_filter(fn, filtered_fn, random_fraction, dim, species_name):
+def check_random_filter(
+    fn, filtered_fn, random_fraction, dim, species_name, skip_component=None
+):
     ds = yt.load(fn)
     ds_filtered = yt.load(filtered_fn)
     ad = ds.all_data()
@@ -120,4 +127,6 @@ def check_random_filter(fn, filtered_fn, random_fraction, dim, species_name):
     random_filter_expression = (
         "np.isin(ids + 0.1*cpus,ids_filtered_warpx + 0.1*cpus_filtered_warpx)"
     )
-    check_particle_filter(fn, filtered_fn, random_filter_expression, dim, species_name)
+    check_particle_filter(
+        fn, filtered_fn, random_filter_expression, dim, species_name, skip_component
+    )
