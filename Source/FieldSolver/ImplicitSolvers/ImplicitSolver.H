@@ -190,11 +190,6 @@ protected:
     bool m_particle_suborbits = false;
 
     /**
-     * \brief whether to save the old electric field at step n
-     */
-    bool m_save_old_electric_field = false;
-
-    /**
      * \brief whether the details of unconverged particles are printed out during
      * the particle evolve loops
      */
