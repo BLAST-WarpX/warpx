@@ -1,4 +1,4 @@
-/* Copyright 2025 Arianna Formenti
+/* Copyright 2025 Arianna Formenti, Peter Kicsiny
  *
  * This file is part of WarpX.
  *
