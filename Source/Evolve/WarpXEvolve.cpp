@@ -1068,10 +1068,10 @@ WarpX::OneStep_sub1 (Real cur_time)
     // check that MR has exactly two levels and a refinement ratio of 2 in all directions when subcycling is used
     const int fine_lev = 1;
     const int coarse_lev = 0;
-    const amrex::IntVect& ref_ratio = this->refRatio(coarse_lev);
+    const amrex::IntVect& crse_to_fine_ref_ratio = this->refRatio(coarse_lev);
     bool ref_ratio_is_uniform_two = true;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if (ref_ratio[idim] != 2) {
+        if (crse_to_fine_ref_ratio[idim] != 2) {
             ref_ratio_is_uniform_two = false;
             break;
         }
@@ -1084,7 +1084,7 @@ WarpX::OneStep_sub1 (Real cur_time)
             << ", refRatio(" << coarse_lev << ") = (";
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            msg << ref_ratio[idim];
+            msg << crse_to_fine_ref_ratio[idim];
             if (idim < AMREX_SPACEDIM - 1) msg << ", ";
         }
         msg << ")";
