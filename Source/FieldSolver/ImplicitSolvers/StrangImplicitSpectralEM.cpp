@@ -97,7 +97,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
             amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
         }
     }
-    m_Eold.Copy(FieldType::E_old);
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
     amrex::Real const half_time = start_time + 0.5_rt*m_dt;
 

@@ -123,7 +123,7 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
             amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
         }
     }
-    m_Eold.Copy(FieldType::E_old);
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
