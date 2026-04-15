@@ -96,6 +96,13 @@ Diagnostics::BaseReadParameters ()
         );
     }
 
+    // Sanity check if user requests to plot E_old
+    if (utils::algorithms::any_of_is_in(m_varnames_fields, amrex::Vector<std::string>({"Ex_old", "Ey_old", "Ez_old", "Er_old", "Et_old", "Ep_old"}))){
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            warpx.HasImplicitSolver(),
+            "plot E_old only works for implicit evolve routines");
+    }
+
     // Sanity check if user requests to plot A
     if (utils::algorithms::any_of_is_in(m_varnames_fields, amrex::Vector<std::string>({"Ax", "Ay", "Az", "Ar", "At"}))){
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

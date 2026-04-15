@@ -304,7 +304,7 @@ WarpX::InitFromCheckpoint ()
             }
         }
 
-        if (WarpX::SaveOldElectricField()) {
+        if (m_fields.has_vector(FieldType::E_old, lev)) {
             VisMF::Read(*m_fields.get(FieldType::E_old, Direction{0}, lev),
                         amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ex_old"));
             VisMF::Read(*m_fields.get(FieldType::E_old, Direction{1}, lev),

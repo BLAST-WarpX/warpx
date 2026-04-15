@@ -529,21 +529,6 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 
 }
 
-void ImplicitSolver::DefineEoldMultifab ()
-{
-    using ablastr::fields::Direction;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
-        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
-        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
-        const auto& dmE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
-        const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{0}, lev, ba_Ex, dmE, 1, ngE, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{1}, lev, ba_Ey, dmE, 1, ngE, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{2}, lev, ba_Ez, dmE, 1, ngE, 0.0_rt);
-    }
-}
-
 void ImplicitSolver::SaveEoldMultifab ()
 {
     // E_old multifab is needed for diagnostics and saving at checkpoints

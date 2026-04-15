@@ -48,7 +48,7 @@ public:
      * \brief Read user-provided parameters that control the implicit solver.
      * Allocate internal arrays for intermediate field values needed by the solver.
      */
-    virtual void Define (WarpX*  a_WarpX, bool from_restart) = 0;
+    virtual void Define (WarpX* a_WarpX, bool from_restart) = 0;
 
     [[nodiscard]] bool IsDefined () const { return m_is_defined; }
 
@@ -57,8 +57,6 @@ public:
     void CreateParticleAttributes () const;
 
     bool DoParticleSuborbits () { return m_particle_suborbits; }
-
-    bool SaveOldElectricField () { return m_save_old_electric_field; }
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
@@ -257,8 +255,6 @@ protected:
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
-
-    void DefineEoldMultifab ();
 
     void SaveEoldMultifab ();
 

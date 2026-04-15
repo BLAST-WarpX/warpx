@@ -12,7 +12,7 @@
 using namespace warpx::fields;
 using namespace amrex::literals;
 
-void StrangImplicitSpectralEM::Define (WarpX* const a_WarpX, bool  a_from_restart)
+void StrangImplicitSpectralEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
@@ -25,9 +25,8 @@ void StrangImplicitSpectralEM::Define (WarpX* const a_WarpX, bool  a_from_restar
     m_E.Define(m_WarpX, "Efield_fp");
     m_Eold.Define(m_E);
 
-    // Define E_old MultiFab and set initial values for Eold solver vector
-    DefineEoldMultifab();
-    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp);
+    // Set initial values for Eold solver vector
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
     // Parse nonlinear solver parameters
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");

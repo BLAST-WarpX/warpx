@@ -126,6 +126,10 @@ public:
     [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
                                                const int  bdry_side ) const;
 
+    [[nodiscard]] bool HasImplicitSolver() const noexcept {
+        return static_cast<bool>(m_implicit_solver);
+    }
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -154,7 +158,6 @@ public:
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
-    [[nodiscard]] bool SaveOldElectricField() const noexcept;
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }

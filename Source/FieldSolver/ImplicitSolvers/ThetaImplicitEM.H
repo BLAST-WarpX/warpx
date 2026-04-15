@@ -53,9 +53,7 @@ class ThetaImplicitEM : public ImplicitSolver
 {
 public:
 
-    ThetaImplicitEM() {
-        m_save_old_electric_field = true;
-    }
+    ThetaImplicitEM() = default;
 
     ~ThetaImplicitEM() override = default;
 

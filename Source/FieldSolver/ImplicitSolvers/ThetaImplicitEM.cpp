@@ -28,9 +28,9 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
     m_E.Define(m_WarpX, "Efield_fp");
     m_Eold.Define(m_E);
 
-    // Define E_old MultiFab and set initial values for Eold solver vector
-    DefineEoldMultifab();
-    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp);
+    // Set initial values for Eold solver vector
+    m_E.Copy(FieldType::Efield_fp);
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
     // Define B_old MultiFab
     using ablastr::fields::Direction;

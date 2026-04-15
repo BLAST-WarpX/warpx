@@ -86,7 +86,7 @@ FlushFormatCheckpoint::WriteToFile (
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ey_fp"));
         VisMF::Write(*warpx.m_fields.get(FieldType::Efield_fp, Direction{2}, lev),
                      amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ez_fp"));
-        if (warpx.SaveOldElectricField()) {
+        if (warpx.m_fields.has_vector(FieldType::E_old, lev)) {
             VisMF::Write(*warpx.m_fields.get(FieldType::E_old, Direction{0}, lev),
                          amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, "Ex_old"));
             VisMF::Write(*warpx.m_fields.get(FieldType::E_old, Direction{1}, lev),

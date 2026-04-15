@@ -44,9 +44,7 @@ class StrangImplicitSpectralEM : public ImplicitSolver
 {
 public:
 
-    StrangImplicitSpectralEM() {
-        m_save_old_electric_field = true;
-    }
+    StrangImplicitSpectralEM() = default;
 
     ~StrangImplicitSpectralEM() override = default;
 
@@ -56,7 +54,7 @@ public:
     StrangImplicitSpectralEM(StrangImplicitSpectralEM&&) = delete;
     StrangImplicitSpectralEM& operator=(StrangImplicitSpectralEM&&) = delete;
 
-    void Define (WarpX*  a_WarpX, bool a_from_restart) override;
+    void Define (WarpX* a_WarpX, bool a_from_restart) override;
 
     void PrintParameters () const override;
 
