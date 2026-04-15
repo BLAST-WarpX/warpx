@@ -258,10 +258,9 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
-    /**
-     * \brief Define E_old multifab
-     */
     void DefineEoldMultifab ();
+
+    void SaveEoldMultifab ();
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver

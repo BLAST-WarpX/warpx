@@ -79,14 +79,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
     // Save Eg at start of time step
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
-        for (int n = 0; n < 3; ++n) {
-            // E_old is needed for diagnostics and saving at checkpoints
-            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
-        }
-    }
+    SaveEoldMultifab();
     m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}

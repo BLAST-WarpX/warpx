@@ -104,19 +104,18 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     // (i.e., Eg used to advance the system from step n-1 to step n)
     m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
-    // Save E and B values at start of time step
+    // Save Eg at start of time step
+    SaveEoldMultifab();
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+
+    // Save Bg at start of time step
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
-        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
         ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
-        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
         for (int n = 0; n < 3; ++n) {
             amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(), B_old[n]->nGrowVect());
-            // E_old is needed for diagnostics and saving at checkpoints
-            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
         }
     }
-    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
