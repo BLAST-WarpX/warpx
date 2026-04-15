@@ -12,7 +12,7 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
-void SemiImplicitEM::Define ( WarpX*  a_WarpX )
+void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
 {
     BL_PROFILE("SemiImplicitEM::Define()");
 
@@ -24,12 +24,27 @@ void SemiImplicitEM::Define ( WarpX*  a_WarpX )
     m_WarpX = a_WarpX;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, "Efield_fp" );
-    m_Eold.Define( m_E );
+    m_E.Define(m_WarpX, "Efield_fp");
+    m_Eold.Define(m_E);
+
+    // Define E_old MultiFab
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
+        const auto& dmE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{0}, lev, ba_Ex, dmE, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{1}, lev, ba_Ey, dmE, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{2}, lev, ba_Ez, dmE, 1, ngE, 0.0_rt);
+    }
+
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp);
 
     // Parse implicit solver parameters
     const amrex::ParmParse pp("implicit_evolve");
-    parseNonlinearSolverParams( pp );
+    parseNonlinearSolverParams(pp);
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -68,10 +83,22 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     // Particles have up^{n} and xp^{n}.
 
     // Save up and xp at the start of the time step
-    m_WarpX->SaveParticlesAtImplicitStepStart ( );
+    m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save Eg at the start of the time step
-    m_Eold.Copy( FieldType::Efield_fp );
+    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+    // (i.e., Eg used to advance the system from step n-1 to step n)
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
+
+    // Save Eg at start of time step
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
+        for (int n = 0; n < 3; ++n) {
+            // E_old is needed for diagnostics and saving at checkpoints
+            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
+        }
+    }
+    m_Eold.Copy(FieldType::E_old);
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::FirstHalf, start_time);
@@ -81,11 +108,10 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
 
     // Solve nonlinear system for Eg at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_E.Copy(m_Eold); // initial guess for Eg^{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E, half_time );
+    m_WarpX->SetElectricFieldAndApplyBCs(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
@@ -93,7 +119,7 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
 
     // Advance Eg from time n+1/2 to time n+1
     // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
-    m_E.linComb( 2._rt, m_E, -1._rt, m_Eold );
+    m_E.linComb(2._rt, m_E, -1._rt, m_Eold);
     const amrex::Real new_time = start_time + m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
 

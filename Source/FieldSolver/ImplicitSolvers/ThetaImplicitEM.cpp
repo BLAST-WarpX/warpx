@@ -12,7 +12,7 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
-void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
+void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 {
     BL_PROFILE("ThetaImplicitEM::Define()");
 
@@ -24,22 +24,33 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     m_WarpX = a_WarpX;
     m_num_amr_levels = 1;
 
-    // Define E and Eold vectors
-    m_E.Define( m_WarpX, "Efield_fp" );
-    m_Eold.Define( m_E );
+    // Define E, Eold, vectors
+    m_E.Define(m_WarpX, "Efield_fp");
+    m_Eold.Define(m_E);
 
-    // Define B_old MultiFabs
+    // Define B_old and E_old MultiFabs
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Bx = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_By = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev)->boxArray();
         const auto& ba_Bz = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)->boxArray();
-        const auto& dm = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->DistributionMap();
-        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{0}, lev, ba_Bx, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{1}, lev, ba_By, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{2}, lev, ba_Bz, dm, 1, ngb, 0.0_rt);
+        const auto& dmB = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngB = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{0}, lev, ba_Bx, dmB, 1, ngB, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{1}, lev, ba_By, dmB, 1, ngB, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{2}, lev, ba_Bz, dmB, 1, ngB, 0.0_rt);
+
+        const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Ez = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{2}, lev)->boxArray();
+        const auto& dmE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{0}, lev, ba_Ex, dmE, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{1}, lev, ba_Ey, dmE, 1, ngE, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::E_old, Direction{2}, lev, ba_Ez, dmE, 1, ngE, 0.0_rt);
     }
+
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp);
 
     // Parse theta-implicit solver specific parameters
     const amrex::ParmParse pp("implicit_evolve");
@@ -94,28 +105,32 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     m_dt = a_dt;
 
     // Save up and xp at the start of the time step
-    m_WarpX->SaveParticlesAtImplicitStepStart ( );
+    m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save Eg at the start of the time step
-    m_Eold.Copy( FieldType::Efield_fp );
+    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+    // (i.e., Eg used to advance the system from step n-1 to step n)
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
-    const int num_levels = 1;
-    for (int lev = 0; lev < num_levels; ++lev) {
+    // Save E and B values at start of time step
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
         ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
+        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
         for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(),
-                                  B_old[n]->nGrowVect() );
+            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(), B_old[n]->nGrowVect());
+            // E_old is needed for diagnostics and saving at checkpoints
+            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
         }
     }
+    m_Eold.Copy(FieldType::E_old);
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
-    m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
-    UpdateWarpXFields( m_E, start_time );
+    UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
@@ -123,7 +138,7 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
 
     // Advance Eg and Bg from time n+theta to time n+1
     const amrex::Real end_time = start_time + m_dt;
-    FinishFieldUpdate( end_time );
+    FinishFieldUpdate(end_time);
 
 }
 

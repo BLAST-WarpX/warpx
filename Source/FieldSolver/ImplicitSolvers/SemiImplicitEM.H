@@ -43,7 +43,9 @@ class SemiImplicitEM : public ImplicitSolver
 {
 public:
 
-    SemiImplicitEM() = default;
+    SemiImplicitEM() {
+        m_save_old_electric_field = true;
+    }
 
     ~SemiImplicitEM() override = default;
 
@@ -53,7 +55,7 @@ public:
     SemiImplicitEM(SemiImplicitEM&&) = delete;
     SemiImplicitEM& operator=(SemiImplicitEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX*  a_WarpX, bool  a_from_restart) override;
 
     void PrintParameters () const override;
 

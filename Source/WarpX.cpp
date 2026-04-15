@@ -25,6 +25,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #ifdef WARPX_USE_FFT
 #   include "FieldSolver/SpectralSolver/SpectralKSpace.H"
 #   ifdef WARPX_DIM_RZ
@@ -1943,6 +1944,9 @@ int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
     return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
 }
 
+[[nodiscard]] bool WarpX::SaveOldElectricField() const noexcept {
+    return m_implicit_solver && m_implicit_solver->SaveOldElectricField();
+}
 
 void
 WarpX::BackwardCompatibility ()

@@ -53,7 +53,9 @@ class ThetaImplicitEM : public ImplicitSolver
 {
 public:
 
-    ThetaImplicitEM() = default;
+    ThetaImplicitEM() {
+        m_save_old_electric_field = true;
+    }
 
     ~ThetaImplicitEM() override = default;
 
@@ -63,7 +65,7 @@ public:
     ThetaImplicitEM(ThetaImplicitEM&&) = delete;
     ThetaImplicitEM& operator=(ThetaImplicitEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX*  a_WarpX, bool  from_restart) override;
 
     void PrintParameters () const override;
 
