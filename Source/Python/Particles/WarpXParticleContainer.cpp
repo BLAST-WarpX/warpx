@@ -136,6 +136,7 @@ void init_WarpXParticleContainer (py::module& m)
             },
             py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time"),
             R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions
+
 Parameters
 ----------
 mf_name: string
