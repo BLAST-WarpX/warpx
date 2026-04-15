@@ -184,7 +184,9 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_ZINDEX)
     auto * const AMREX_RESTRICT z = soa.GetRealData(PIdx::z).data();
 #endif
-
+#if defined(WARPX_DIM_RZ)
+    auto * const AMREX_RESTRICT theta = soa.GetRealData(PIdx::theta).data();
+#endif
     auto * const AMREX_RESTRICT ux = soa.GetRealData(PIdx::ux).data();
     auto * const AMREX_RESTRICT uy = soa.GetRealData(PIdx::uy).data();
     auto * const AMREX_RESTRICT uz = soa.GetRealData(PIdx::uz).data();
@@ -212,7 +214,7 @@ void ParticleSplitting::operator() (
             if (n_split_parents == 0) { return; }
 
             // calculate cell-dependent position offset
-            const amrex::Real offset_fraction = 1.0_prt / (4.0_prt);
+            const amrex::Real offset_fraction = 1.0_prt / (5.0_prt);
 #if !defined(WARPX_DIM_1D_Z)
             amrex::ParticleReal offset_x = dx[0] * offset_fraction;
 #endif
@@ -270,6 +272,9 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_ZINDEX)
                         z[idx] = zp;
 #endif
+#if defined(WARPX_DIM_RZ)
+                        theta[idx] = theta[parent_idx];
+#endif
                         ux[idx] = ux[parent_idx];
                         uy[idx] = uy[parent_idx];
                         uz[idx] = uz[parent_idx];
@@ -282,30 +287,35 @@ void ParticleSplitting::operator() (
                 }
                 else if (splitting_type_id == 1) {
                     // split particle in 2 along z axis
+                    bool do_trivial_split = false;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    for (int k = 0; k < np_split_per_parent; ++k) {
+                        const int sx = (k & 1) ? 1 : -1;
+                        amrex::Real r_child = xp + sx * offset_x;
+                        if (r_child < 0.0) {
+                            do_trivial_split = true;
+                            break;
+                        }
+                    }
+#endif
                     for (int k = 0; k < np_split_per_parent; ++k) {
                         const int idx = child_base + k;
 #if defined(WARPX_DIM_1D_Z)
                         const int sz = (k == 0) ? -1 : 1;
                         z[idx] = zp + sz * offset_z;
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     // split particle in 4 particles: split in the x–z plane with a rotation by splitting_angle around the z-axis.
                         const int sx = (k & 1) ? 1 : -1;
                         const int sz = (k & 2) ? 1 : -1;
-
-                        x[idx] = xp + sx * offset_x;
-                        z[idx] = zp + sz * offset_z;
-#elif defined(WARPX_DIM_RZ)
-                        if (xp - offset_x >= 0._rt) {
-                            // Safe diagonal split: (r + sx * offset_x, z + sz * offset_z)
-                            const int sx = (k & 1) ? 1 : -1;
-                            const int sz = (k & 2) ? 1 : -1;
+                        if (!do_trivial_split) {
                             x[idx] = xp + sx * offset_x;
                             z[idx] = zp + sz * offset_z;
                         } else {
-                            // Near-axis fallback: trivial splitting
                             x[idx] = xp;
-                            z[idx] = zp;
+                            z[idx] = zp; // if split would produce negative radius, do trivial split instead
                         }
+                        theta[idx] = theta[parent_idx];
+
 #elif defined(WARPX_DIM_3D)
                     // split parent particle in 6 particles
                         const int sign_offset = (k % 2 == 0) ? -1 : 1;
@@ -325,14 +335,11 @@ void ParticleSplitting::operator() (
                             y[idx] = yp;
                             z[idx] = zp + sign_offset * offset_z;
                         }
-
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                         const int sx = (k == 0) ? -1 : 1;
-                        if (xp - offset_x >= 0._rt) {
-                            // Safe radial split: (r - offset_x), (r + offset_z)
+                        if (!do_trivial_split) {
                             x[idx] = xp + sx * offset_x;
                         } else {
-                            // Near-axis fallback: trivial splitting
                             x[idx] = xp;
                         }
 #endif
@@ -392,7 +399,6 @@ void ParticleSplitting::operator() (
                             z[idx] = zp; // if velocity is zero, split is trivial
 #endif
                         }
-
                         ux[idx] = ux[parent_idx];
                         uy[idx] = uy[parent_idx];
                         uz[idx] = uz[parent_idx];
