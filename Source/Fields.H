@@ -134,6 +134,7 @@ namespace warpx::fields
         FieldType::Efield_avg_cp,
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
+        FieldType::E_old,
         FieldType::Efield_fp_save,
         FieldType::current_fp_non_suborbit,
         FieldType::MassMatrices_X,
