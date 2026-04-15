@@ -295,6 +295,20 @@ public:
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
+     * \brief Deposit current density, sum guard values, and apply boundary conditions.
+     *
+     * \param[in,out] mf_name Name of vector field in which current density should be deposited
+     * \param[in] lev Mesh refinement level for deposition
+     * \param[in] dt Time step for particle level
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    void DepositCurrent (std::string mf_name, int lev,
+                         amrex::Real dt, amrex::Real relative_time);
+
+    /**
      * \brief Deposit charge density.
      *
      * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
