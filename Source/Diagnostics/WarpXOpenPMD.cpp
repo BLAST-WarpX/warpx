@@ -449,17 +449,6 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
     m_dirPrefix = dirPrefix;
     m_file_min_digits = file_min_digits;
 
-    if( ! isBTD ) {
-        if (m_CurrentStep >= ts) {
-            // note m_Series is reset in Init(), so using m_Series->iterations.contains(ts) is only able to check the
-            // last written step in m_Series's life time, but not other earlier written steps by other m_Series
-            ablastr::warn_manager::WMRecordWarning("Diagnostics",
-                    " Warning from openPMD writer: Already written iteration:"
-                    + std::to_string(ts)
-                );
-        }
-    }
-
     m_CurrentStep = ts;
     Init(openPMD::Access::CREATE, isBTD);
 }
@@ -607,6 +596,12 @@ for (const auto & particle_diag : particle_diags) {
     // Gather the electrostatic potential (phi) on the macroparticles
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
+    }
+    if (particle_diag.m_plot_Ex || particle_diag.m_plot_Ey || particle_diag.m_plot_Ez ||
+        particle_diag.m_plot_Bx || particle_diag.m_plot_By || particle_diag.m_plot_Bz) {
+        storeFieldOnParticles(tmp, !use_pinned_pc,
+                              particle_diag.m_plot_Ex, particle_diag.m_plot_Ey, particle_diag.m_plot_Ez,
+                              particle_diag.m_plot_Bx, particle_diag.m_plot_By, particle_diag.m_plot_Bz);
     }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
