@@ -134,7 +134,18 @@ void init_WarpXParticleContainer (py::module& m)
             {
                 pc.DepositCurrent(mf_name, lev, dt, relative_time);
             },
-            py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time")
+            py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time"),
+            R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions
+Parameters
+----------
+mf_name: string
+  Name of the vector field in which to deposit current density
+lev: int
+  Mesh refinement level for deposition
+dt: float
+  Time step for particle level
+relative_time: float
+  Time at which to deposit J, relative to the time of the current positions of the particles)pbdoc"
         )
         .def("get_number_density",
             [](WarpXParticleContainer& pc, int lev)
