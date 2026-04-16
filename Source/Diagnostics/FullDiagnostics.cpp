@@ -426,12 +426,6 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("E"+field_names[idir]), ncomp);
                 }
-            else if   ( m_varnames_fields[comp] == "E"+field_names[idir]+"_old" ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::E_old_aux,
-                                                            Direction{idir}, lev), lev, m_crse_ratio, false, ncomp);
-                if (update_varnames) {
-                    AddRZModesToOutputNames(std::string("E"+field_names[idir]), ncomp);
-                }
             } else if ( m_varnames_fields[comp] == "B"+field_names[idir] ){
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Bfield_aux,
                                                             Direction{idir}, lev), lev, m_crse_ratio, false, ncomp);
