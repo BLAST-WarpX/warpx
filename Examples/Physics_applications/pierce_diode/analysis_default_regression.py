@@ -76,6 +76,7 @@ if __name__ == "__main__":
             OpenPMDTimeSeries(args.path)
         except Exception:
             print("Could not open the file as a plotfile or an openPMD time series")
+            args.format = "openpmd"
         else:
             args.format = "openpmd"
     else:
