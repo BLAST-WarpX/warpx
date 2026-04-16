@@ -604,6 +604,10 @@ for (const auto & particle_diag : particle_diags) {
         particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
     }
 
+    // On GPU backends, copyParticles may be asynchronous; synchronize before
+    // passing pinned-memory pointers to openPMD's storeChunkRaw.
+    amrex::Gpu::streamSynchronize();
+
     // Gather the electrostatic potential (phi) on the macroparticles
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );

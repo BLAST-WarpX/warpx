@@ -175,6 +175,27 @@ class LibWarpX:
             del self.warpx
             # The call to warpx_finalize causes a crash - don't know why
             # self.libwarpx_so.warpx_finalize()
+
+            # On SYCL/Intel PVC, amrex_finalize() → amrex::Finalize() crashes in
+            # Device::Finalize() → streamSynchronizeAll() because the static
+            # external_stream_stack Vector may have already been destroyed by the
+            # C++ static destructor before this Python atexit handler runs.
+            # Work around by exiting immediately via os._exit(0) on SYCL, which
+            # skips all C++ destructors and lets the OS/PALS launcher clean up.
+            # MPI_Barrier ensures all ranks exit together so the launcher does
+            # not kill stragglers with a signal.
+            # See: https://github.com/AMReX-Codes/amrex/issues/XXXX (upstream fix needed)
+            try:
+                if self.libwarpx_so.Config.gpu_backend == "SYCL":
+                    try:
+                        from mpi4py import MPI
+                        MPI.COMM_WORLD.Barrier()
+                    except Exception:
+                        pass
+                    os._exit(0)
+            except Exception:
+                pass
+
             self.libwarpx_so.amrex_finalize()
 
             from pywarpx import callbacks
