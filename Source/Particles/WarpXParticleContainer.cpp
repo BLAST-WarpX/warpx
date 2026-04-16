@@ -1431,7 +1431,7 @@ WarpXParticleContainer::DepositCurrent (
 }
 
 void WarpXParticleContainer::DepositCurrent (
-    std::string mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
+    const std::string& mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
 ) {
     auto& warpx = WarpX::GetInstance();
     // allocate temporary multifab to deposit current density into
