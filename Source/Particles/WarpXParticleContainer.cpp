@@ -1494,7 +1494,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                        const int thread_num, const int lev, const int depos_lev)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        rho->nComp() >= icomp - 1,
+        rho->nComp() >= (icomp + 1) * WarpX::ncomps,
         "Cannot deposit charge in rho component icomp=" + std::to_string(icomp) +
         ": not enough components allocated (" + std::to_string(rho->nComp()) + "!"
     );
@@ -1825,7 +1825,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
                                        const int icomp)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        rho->nComp() >= icomp - 1,
+        rho->nComp() >= (icomp + 1) * WarpX::ncomps,
         "Cannot deposit charge in rho component icomp=" + std::to_string(icomp) +
         ": not enough components allocated (" + std::to_string(rho->nComp()) + "!"
     );
