@@ -4,6 +4,7 @@ FILE = inputs_base_2d
 # test input parameters
 algo.maxwell_solver = psatd
 amr.max_level = 1
+amr.max_grid_size = 128
 amr.ref_ratio = 4
 diag1.electrons.variables = x z w ux uy uz
 diag1.positrons.variables = x z w ux uy uz
