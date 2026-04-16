@@ -184,7 +184,7 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_ZINDEX)
     auto * const AMREX_RESTRICT z = soa.GetRealData(PIdx::z).data();
 #endif
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ)|| defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT theta = soa.GetRealData(PIdx::theta).data();
 #endif
 #if defined(WARPX_DIM_RSPHERE)
@@ -385,8 +385,19 @@ void ParticleSplitting::operator() (
                     offset = amrex::min(offset, offset_z);
 #endif
                     u_norm = std::sqrt(u2);
-                    bool do_trivial_split = (u_norm <= 0._rt);
-
+                    bool do_trivial_split = (u_norm == 0._rt);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    if (!do_trivial_split) {
+                        for (int k = 0; k < np_split_per_parent; ++k) {
+                            const int sx = (k & 1) ? 1 : -1;
+                            amrex::Real r_child = xp + sx * offset * ux[parent_idx] / u_norm;
+                            if (r_child< 0.0_rt) {
+                                do_trivial_split = true;
+                                break;
+                            }
+                        }
+                    }
+#endif
                     for (int k = 0; k < 2; ++k) {
                         const int sign_offset = (k == 0) ? -1 : 1;
                         const int idx = child_base + k;
