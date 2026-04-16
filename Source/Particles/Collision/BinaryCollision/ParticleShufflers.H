@@ -305,28 +305,25 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets_1, T_index *i
     amrex::ParallelForRNG(2*n_cells,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
+            int i_cell = i < n_cells ? i : i - n_cells;
+
+            // The particles from species1 that are in the cell `i_cell` are
+            // given by the `indices_1[cell_start_1:cell_stop_1]`
+            index_type const cell_start_1 = cell_offsets_1[i_cell];
+            index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+            // Same for species 2
+            index_type const cell_start_2 = cell_offsets_2[i_cell];
+            index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+
+            // Do not collide if one species is missing in the cell
+            if ( cell_stop_1 - cell_start_1 < 1 ||
+                 cell_stop_2 - cell_start_2 < 1 ) { return; }
+
             if (i < n_cells) {
-                // The particles from species1 that are in the cell `i_cell` are
-                // given by the `indices_1[cell_start:cell_stop]`
-                int const i_cell = i;
-                T_index const cell_start = cell_offsets_1[i_cell];
-                T_index const cell_stop  = cell_offsets_1[i_cell + 1];
-
-                // Do not shuffle if there is only one particle in the cell
-                if ( cell_stop - cell_start <= 1 ) { return; }
-
-                ShuffleFisherYates(indices_1, cell_start, cell_stop, engine);
+              ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
             } else {
-                // The particles from species2 that are in the cell `i_cell` are
-                // given by the `indices_2[cell_start:cell_stop]`
-                int const i_cell = i - n_cells;
-                T_index const cell_start = cell_offsets_2[i_cell];
-                T_index const cell_stop  = cell_offsets_2[i_cell + 1];
-
-                // Do not shuffle if there is only one particle in the cell
-                if ( cell_stop - cell_start <= 1 ) { return; }
-
-                ShuffleFisherYates(indices_2, cell_start, cell_stop, engine);
+              ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
             }
         }
     );
