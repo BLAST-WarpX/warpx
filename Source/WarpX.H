@@ -126,10 +126,6 @@ public:
     [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
                                                const int  bdry_side ) const;
 
-    [[nodiscard]] bool HasImplicitSolver() const noexcept {
-        return static_cast<bool>(m_implicit_solver);
-    }
-
     void InitData ();
 
     void Evolve (int numsteps = -1);
