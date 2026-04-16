@@ -184,8 +184,11 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_ZINDEX)
     auto * const AMREX_RESTRICT z = soa.GetRealData(PIdx::z).data();
 #endif
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT theta = soa.GetRealData(PIdx::theta).data();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+    auto * const AMREX_RESTRICT phi = soa.GetRealData(PIdx::phi).data();
 #endif
     auto * const AMREX_RESTRICT ux = soa.GetRealData(PIdx::ux).data();
     auto * const AMREX_RESTRICT uy = soa.GetRealData(PIdx::uy).data();
@@ -272,8 +275,11 @@ void ParticleSplitting::operator() (
 #if defined(WARPX_ZINDEX)
                         z[idx] = zp;
 #endif
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                         theta[idx] = theta[parent_idx];
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                        phi[idx] = phi[parent_idx];
 #endif
                         ux[idx] = ux[parent_idx];
                         uy[idx] = uy[parent_idx];
@@ -314,8 +320,6 @@ void ParticleSplitting::operator() (
                             x[idx] = xp;
                             z[idx] = zp; // if split would produce negative radius, do trivial split instead
                         }
-                        theta[idx] = theta[parent_idx];
-
 #elif defined(WARPX_DIM_3D)
                     // split parent particle in 6 particles
                         const int sign_offset = (k % 2 == 0) ? -1 : 1;
@@ -342,6 +346,12 @@ void ParticleSplitting::operator() (
                         } else {
                             x[idx] = xp;
                         }
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        theta[idx] = theta[parent_idx];
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                        phi[idx] = phi[parent_idx];
 #endif
                         ux[idx] = ux[parent_idx];
                         uy[idx] = uy[parent_idx];
@@ -399,6 +409,12 @@ void ParticleSplitting::operator() (
                             z[idx] = zp; // if velocity is zero, split is trivial
 #endif
                         }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        theta[idx] = theta[parent_idx];
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                        phi[idx] = phi[parent_idx];
+#endif
                         ux[idx] = ux[parent_idx];
                         uy[idx] = uy[parent_idx];
                         uz[idx] = uz[parent_idx];
