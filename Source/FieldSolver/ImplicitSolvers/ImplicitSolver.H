@@ -48,7 +48,7 @@ public:
      * \brief Read user-provided parameters that control the implicit solver.
      * Allocate internal arrays for intermediate field values needed by the solver.
      */
-    virtual void Define ( WarpX*  a_WarpX ) = 0;
+    virtual void Define (WarpX* a_WarpX, bool from_restart) = 0;
 
     [[nodiscard]] bool IsDefined () const { return m_is_defined; }
 
@@ -250,6 +250,8 @@ protected:
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
+
+    void SaveEoldMultifab ();
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
