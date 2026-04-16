@@ -1430,6 +1430,32 @@ WarpXParticleContainer::DepositCurrent (
     }
 }
 
+void WarpXParticleContainer::DepositCurrent (
+    std::string mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
+) {
+    auto& warpx = WarpX::GetInstance();
+    // allocate temporary multifab to deposit current density into
+    ablastr::fields::MultiLevelVectorField current {
+        warpx.m_fields.get_alldirs(mf_name, lev)
+    };
+
+    DepositCurrent(current, dt, relative_time);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        warpx.ApplyInverseVolumeScalingToCurrentDensity(
+            current[lev][0], current[lev][1], current[lev][2], lev
+        );
+#endif
+
+    // Sum guard cells
+    warpx.SyncCurrent(mf_name);
+
+    // Apply boundary conditions
+    warpx.ApplyJfieldBoundary(
+        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
+    );
+}
+
 /* \brief Charge Deposition for thread thread_num
  * \param pti         Particle iterator
  * \param wp          Array of particle weights
