@@ -12,6 +12,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_collision_z_modulus_shuffle  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_collision_z_modulus_shuffle  # inputs
+    "analysis_collision_1d.py diags/diag1000600"  # analysis
+    "analysis_default_regression.py --path diags/diag1000600"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_collision_z_correct_conservation  # name
     1  # dims
     2  # nprocs
