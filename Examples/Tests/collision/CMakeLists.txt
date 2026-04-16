@@ -62,10 +62,10 @@ add_warpx_test(
 )
 
 add_warpx_test(
-    test_3d_collision_iso_modulus  # name
+    test_3d_collision_iso_modulus_shuffle  # name
     3  # dims
     1  # nprocs
-    inputs_test_3d_collision_iso_modulus  # inputs
+    inputs_test_3d_collision_iso_modulus_shuffle  # inputs
     "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
