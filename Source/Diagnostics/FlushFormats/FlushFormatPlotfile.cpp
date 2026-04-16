@@ -636,6 +636,15 @@ FlushFormatPlotfile::WriteAllRawFields(
                     default_level_prefix, "By_fp", lev, plot_raw_fields_guards );
         WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev), dm, raw_pltname,
                     default_level_prefix, "Bz_fp", lev, plot_raw_fields_guards );
+        if (warpx.m_fields.has(FieldType::E_old, lev))
+        {
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{0}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ex_old", lev, plot_raw_fields_guards );
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{1}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ey_old", lev, plot_raw_fields_guards );
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{2}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ez_old", lev, plot_raw_fields_guards );
+        }
         if (warpx.m_fields.has(FieldType::F_fp, lev))
         {
             WriteRawMF( *warpx.m_fields.get(FieldType::F_fp, lev), dm, raw_pltname,
