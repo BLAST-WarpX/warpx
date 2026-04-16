@@ -309,12 +309,12 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets_1, T_index *i
 
             // The particles from species1 that are in the cell `i_cell` are
             // given by the `indices_1[cell_start_1:cell_stop_1]`
-            index_type const cell_start_1 = cell_offsets_1[i_cell];
-            index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+            T_index const cell_start_1 = cell_offsets_1[i_cell];
+            T_index const cell_stop_1  = cell_offsets_1[i_cell+1];
 
             // Same for species 2
-            index_type const cell_start_2 = cell_offsets_2[i_cell];
-            index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
+            T_index const cell_start_2 = cell_offsets_2[i_cell];
+            T_index const cell_stop_2  = cell_offsets_2[i_cell+1];
 
             // Do not collide if one species is missing in the cell
             if ( cell_stop_1 - cell_start_1 < 1 ||
@@ -336,14 +336,14 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets_1, T_index *i
       The number of independent pairs is equivalent to the number of particles per cell in
       whichever species has the fewer number of macroparticles.
 */
-template <typename index_type>
+template <typename T_index>
 struct IndependentPairHelper
 {
     int m_n_cells;
-    index_type const* AMREX_RESTRICT m_cell_offsets_1;
-    index_type const* AMREX_RESTRICT m_cell_offsets_2;
-    amrex::Gpu::DeviceVector<index_type> m_n_ind_pairs_in_each_cell;
-    amrex::Gpu::DeviceVector<index_type> m_coll_offsets;
+    T_index const* AMREX_RESTRICT m_cell_offsets_1;
+    T_index const* AMREX_RESTRICT m_cell_offsets_2;
+    amrex::Gpu::DeviceVector<T_index> m_n_ind_pairs_in_each_cell;
+    amrex::Gpu::DeviceVector<T_index> m_coll_offsets;
     int m_n_independent_pairs;
 
     /**
@@ -355,8 +355,8 @@ struct IndependentPairHelper
      *
      */
     IndependentPairHelper (int a_n_cells,
-               index_type const* AMREX_RESTRICT a_cell_offsets_1,
-               index_type const* AMREX_RESTRICT a_cell_offsets_2)
+               T_index const* AMREX_RESTRICT a_cell_offsets_1,
+               T_index const* AMREX_RESTRICT a_cell_offsets_2)
     : m_n_cells(a_n_cells), m_cell_offsets_1(a_cell_offsets_1), m_cell_offsets_2(a_cell_offsets_2)
     {
         m_n_ind_pairs_in_each_cell.resize(m_n_cells+1);
@@ -370,10 +370,10 @@ struct IndependentPairHelper
     void Initialize () {
         // Compute the number of independent pairs in each cell. This is equal to
         // the number of particles in whichever species has fewer
-        index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = m_n_ind_pairs_in_each_cell.dataPtr();
+        T_index* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = m_n_ind_pairs_in_each_cell.dataPtr();
         int n_cells = m_n_cells;
-        index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
-        index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
+        T_index const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
+        T_index const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
         amrex::ParallelFor( n_cells+1, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
         {
             if (i_cell < n_cells)
@@ -400,18 +400,18 @@ struct IndependentPairHelper
      * @param[inout] a_indices_2 the indices of the particles sorted by cell for species 2
      *
      */
-    void shuffle (index_type* AMREX_RESTRICT a_indices_1,
-          index_type* AMREX_RESTRICT a_indices_2)
+    void shuffle (T_index* AMREX_RESTRICT a_indices_1,
+          T_index* AMREX_RESTRICT a_indices_2)
     {
         // shuffle each species.
         int n_cells = m_n_cells;
-        index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
-        index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
+        T_index const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
+        T_index const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
         FisherYatesShuffle (n_cells, cell_offsets_1, a_indices_1, cell_offsets_2, a_indices_2);
     }
 
     int numIndependentPairs () const {return m_n_independent_pairs;}
-    const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
+    const T_index* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
 };
 
 #endif // WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
