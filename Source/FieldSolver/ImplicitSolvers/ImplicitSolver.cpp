@@ -531,6 +531,7 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 
 void ImplicitSolver::SaveEoldMultifab ()
 {
+    using warpx::fields::FieldType;
     // E_old multifab is needed for diagnostics and saving at checkpoints
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
