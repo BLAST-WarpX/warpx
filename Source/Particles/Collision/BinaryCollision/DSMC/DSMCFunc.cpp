@@ -36,7 +36,7 @@ DSMCFunc::DSMCFunc (
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
+        pp_collision_name.query(kw_cross_section, cross_section_file);
 
         // if the scattering process is excitation, ionization, forward or
         // two-product reaction get the energy associated with that process

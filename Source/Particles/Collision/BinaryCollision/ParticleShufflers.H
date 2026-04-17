@@ -305,7 +305,7 @@ void FisherYatesShuffle (int n_cells, T_index const * cell_offsets_1, T_index *i
     amrex::ParallelForRNG(2*n_cells,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            int i_cell = i < n_cells ? i : i - n_cells;
+            const int i_cell = i < n_cells ? i : i - n_cells;
 
             // The particles from species1 that are in the cell `i_cell` are
             // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -371,7 +371,7 @@ struct IndependentPairHelper
         // Compute the number of independent pairs in each cell. This is equal to
         // the number of particles in whichever species has fewer
         T_index* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = m_n_ind_pairs_in_each_cell.dataPtr();
-        int n_cells = m_n_cells;
+        const int n_cells = m_n_cells;
         T_index const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
         T_index const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
         amrex::ParallelFor( n_cells+1, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
@@ -404,7 +404,7 @@ struct IndependentPairHelper
           T_index* AMREX_RESTRICT a_indices_2)
     {
         // shuffle each species.
-        int n_cells = m_n_cells;
+        const int n_cells = m_n_cells;
         T_index const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
         T_index const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
         FisherYatesShuffle (n_cells, cell_offsets_1, a_indices_1, cell_offsets_2, a_indices_2);

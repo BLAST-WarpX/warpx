@@ -25,7 +25,7 @@ struct GetExternalEBField
 
     GetExternalEBField () = default;
 
-    GetExternalEBField (const WarpXParIter& a_pti, long a_offset = 0) noexcept;
+    explicit GetExternalEBField (const WarpXParIter& a_pti, long a_offset = 0) noexcept;
 
     ExternalFieldInitType m_Etype;
     ExternalFieldInitType m_Btype;

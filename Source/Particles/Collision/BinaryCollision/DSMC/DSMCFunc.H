@@ -60,7 +60,7 @@ public:
      */
     DSMCFunc ( const std::string& collision_name,
                [[maybe_unused]] MultiParticleContainer const * mypc,
-               const bool isSameSpecies );
+               bool isSameSpecies );
 
     struct Executor {
         /**
