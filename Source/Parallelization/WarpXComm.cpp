@@ -822,7 +822,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
     }
     else
     {
-        amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
         if (nodal_sync)
         {
             amrex::FillBoundaryAndSync_nowait(vec_mf, period);
@@ -904,7 +904,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
     }
     else
     {
-        amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
         if (nodal_sync)
         {
             amrex::FillBoundaryAndSync_nowait(vec_mf, period);

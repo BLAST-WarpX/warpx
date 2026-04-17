@@ -96,7 +96,7 @@ public:
 
         // calculate kinetic energy
         constexpr auto eV = PhysConst::q_e;
-        E_coll = Algorithms::KineticEnergy<double>(ux, uy, uz, m_mass)/eV;
+        E_coll = Algorithms::KineticEnergy<double>(ux, uy, uz, static_cast<amrex::ParticleReal>(m_mass))/eV;
 
         // get collision cross-section
         const ParticleReal sigma_E = m_mcc_process.getCrossSection(static_cast<amrex::ParticleReal>(E_coll));

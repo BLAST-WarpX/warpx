@@ -4,7 +4,6 @@
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "Particles/Filter/FilterFunctors.H"
-#include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleIO.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Interpolate.H"

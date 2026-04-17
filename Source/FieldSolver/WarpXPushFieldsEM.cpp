@@ -143,7 +143,7 @@ namespace {
      *        from the current J (computed from D according to the Vay deposition scheme)
      */
     void PSATDSubtractCurrentPartialSumsAvg (
-        [[maybe_unused]] const amrex::Vector<std::array<Real,3>> cell_size_at_all_levels,
+        [[maybe_unused]] const amrex::Vector<std::array<Real,3>>& cell_size_at_all_levels,
         [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
     {
         using ablastr::fields::Direction;

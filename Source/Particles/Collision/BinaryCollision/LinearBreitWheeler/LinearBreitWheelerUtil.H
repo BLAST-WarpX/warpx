@@ -11,6 +11,7 @@
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
+#include <AMReX_Math.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
 
@@ -56,11 +57,11 @@ namespace {
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
+        using namespace amrex::Math;
 
         constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
         constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
         constexpr amrex::ParticleReal me = PhysConst::m_e;
-        auto constexpr pow2 = [](double const x) { return x*x; };
         constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
         constexpr auto one_pr = amrex::ParticleReal(1.);
 
@@ -71,8 +72,8 @@ namespace {
         const amrex::ParticleReal p2x_in = u2x_in * me;
         const amrex::ParticleReal p2y_in = u2y_in * me;
         const amrex::ParticleReal p2z_in = u2z_in * me;
-        const amrex::ParticleReal p1_in = std::sqrt(pow2(p1x_in)+pow2(p1y_in)+pow2(p1z_in));
-        const amrex::ParticleReal p2_in = std::sqrt(pow2(p2x_in)+pow2(p2y_in)+pow2(p2z_in));
+        const amrex::ParticleReal p1_in = std::sqrt(powi<2>(p1x_in)+powi<2>(p1y_in)+powi<2>(p1z_in));
+        const amrex::ParticleReal p2_in = std::sqrt(powi<2>(p2x_in)+powi<2>(p2y_in)+powi<2>(p2z_in));
 
         // Compute cosine of the angle between the two photon momenta in the lab frame
         const amrex::ParticleReal cos_ang = (p1x_in*p2x_in+p1y_in*p2y_in+p1z_in*p2z_in)/(p1_in*p2_in);
@@ -87,7 +88,7 @@ namespace {
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
         const amrex::ParticleReal E_ratio = std::sqrt(E_star_sq)/(2._prt*me*c_sq);
-        const amrex::ParticleReal p_star_sq = me*me*c_sq * ( pow2(2._prt*E_ratio) - 1._prt );
+        const amrex::ParticleReal p_star_sq = me*me*c_sq * ( powi<2>(2._prt*E_ratio) - 1._prt );
 
         // Compute momentum of first product in the center of mass frame, assuming isotropic
         // distribution

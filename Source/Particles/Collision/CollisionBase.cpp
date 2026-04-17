@@ -11,9 +11,9 @@
 
 #include <AMReX_ParmParse.H>
 
-CollisionBase::CollisionBase (const std::string& collision_name)
+CollisionBase::CollisionBase (const std::string& collision_name) :
+    m_collision_name{collision_name}
 {
-    m_collision_name = collision_name;
     BackwardCompatibility();
 
     // read collision species

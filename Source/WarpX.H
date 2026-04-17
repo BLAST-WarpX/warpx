@@ -123,8 +123,8 @@ public:
         return field_boundary_hi;
     }
 
-    [[nodiscard]] int GetPECInsulator_IsESet ( const int  bdry_dir,
-                                               const int  bdry_side ) const;
+    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
+                                               int  bdry_side ) const;
 
     void InitData ();
 
@@ -456,13 +456,13 @@ public:
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
     void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
-    void EvolveF (         amrex::Real dt, int const rho_comp);
-    void EvolveF (int lev, amrex::Real dt, int const rho_comp);
+    void EvolveF (         amrex::Real dt, int rho_comp);
+    void EvolveF (int lev, amrex::Real dt, int rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
     void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
-    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
+    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
 
     void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);

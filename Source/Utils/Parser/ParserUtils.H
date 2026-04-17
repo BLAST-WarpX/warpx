@@ -225,7 +225,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.
@@ -242,7 +242,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.
@@ -280,7 +280,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.
@@ -326,7 +326,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.
@@ -342,7 +342,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.
@@ -380,7 +380,7 @@ namespace utils::parser
     {
         const bool is_specified_without_group = a_pp.contains(str);
         const std::string grp_str = group + "." + std::string(str);
-        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str.c_str()));
+        const bool is_specified_with_group = (group.empty() ? false : a_pp.contains(grp_str));
 
         if (is_specified_without_group && !is_specified_with_group) {
             // If found without the group but not with the group, then use the one without the group.

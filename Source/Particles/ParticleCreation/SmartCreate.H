@@ -99,6 +99,7 @@ class SmartCreateFactory
 
 public:
     template <class PartTileData>
+    explicit
     SmartCreateFactory (const PartTileData& part) noexcept:
         m_policy_real{getPolicies(part.GetRealSoANames())},
         m_policy_int{getPolicies(part.GetIntSoANames())},

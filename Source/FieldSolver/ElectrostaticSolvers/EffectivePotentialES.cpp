@@ -24,9 +24,9 @@ void EffectivePotentialES::InitData() {
     // Initialize "sigma" MF which stores the dressing of the Poisson equation.
     // It is a cell-centered multifab.
     auto& fields = warpx.GetMultiFabRegister();
-    auto rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
+    auto* rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
     fields.alloc_init(
-        warpx::fields::FieldType::effective_potential_sigma, /*lev=*/0,
+        warpx::fields::FieldType::effective_potential_sigma, /*level=*/ 0,
         convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
         rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
     );
@@ -144,7 +144,7 @@ void EffectivePotentialES::ComputeSigma (
     }
 
     // grab sigma from the multifab registry
-    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
+    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
 
     // scale sigma down from current value for time filtering
     sigma->mult(1.0_rt - time_filter_param, 0);
@@ -268,7 +268,7 @@ void EffectivePotentialES::computePhi (
     }
 
     // grab sigma from the multifab registry
-    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
+    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
 
     ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,

@@ -314,7 +314,7 @@ MultiParticleContainer::ReadParameters ()
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            const int spec_size = species_names.size();
+            const auto spec_size = static_cast<int>(species_names.size());
             for (int spec_index = 0; spec_index < spec_size; ++spec_index){
 
                 const auto name = species_names[spec_index];
@@ -655,7 +655,7 @@ MultiParticleContainer::DepositTemperatures (
 
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
-        ablastr::fields::MultiLevelVectorField T_vf =
+        const ablastr::fields::MultiLevelVectorField T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
         // Clear temperature MF for this species
@@ -697,7 +697,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
     WarpX & warpx = WarpX::GetInstance();
 
-    if (allcontainers.size() == 0) { return; }
+    if (allcontainers.empty()){ return; }
 
     // Is there a nicer way to get the number of levels?
     // This grabs it from the first species.
@@ -709,7 +709,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
             amrex::BoxArray const & ba = warpx.boxArray(lev);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
             int const ncomps = 1;
-            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
             bool const remake = true;
             bool const redistribute_on_remake = false;
             warpx.m_fields.alloc_init(FieldType::global_debye_length, lev, ba, dmap, ncomps, ng, 0.,
@@ -732,7 +732,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
             for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
             {
-                amrex::Box box = mfi.tilebox();
+                const amrex::Box box = mfi.tilebox();
 
                 amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
                 amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
@@ -752,7 +752,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
         for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Box box = mfi.tilebox();
+            const amrex::Box box = mfi.tilebox();
 
             amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
 
@@ -1390,7 +1390,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), static_cast<std::streamsize>(data.size()));
     }
 
     ParallelDescriptor::Barrier();
@@ -1474,7 +1474,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), static_cast<std::streamsize>(data.size()));
     }
 
     ParallelDescriptor::Barrier();

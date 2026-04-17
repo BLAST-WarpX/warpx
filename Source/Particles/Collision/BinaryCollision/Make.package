@@ -1,5 +1,6 @@
 CEXE_sources += BinaryCollisionUtils.cpp
 CEXE_sources += ParticleCreationFunc.cpp
+CEXE_sources += VirtualPhotonCreation.cpp
 
 include $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/DSMC/Make.package
 include $(WARPX_HOME)/Source/Particles/Collision/BinaryCollision/Bremsstrahlung/Make.package

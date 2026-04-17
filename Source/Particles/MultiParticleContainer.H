@@ -70,7 +70,7 @@ class MultiParticleContainer
 
 public:
 
-    MultiParticleContainer (amrex::AmrCore* amr_core);
+    explicit MultiParticleContainer (amrex::AmrCore* amr_core);
 
     ~MultiParticleContainer() = default;
 
@@ -249,7 +249,7 @@ public:
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int num_ghost);
+    void RedistributeLocal (int max_cells_travelled);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */

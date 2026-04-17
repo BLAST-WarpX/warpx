@@ -468,7 +468,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleC
                           ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize");
                           auto np_to_add = amrex::get<0>(reduce_data.value());
                           auto new_np = dst_index + np_to_add;
-                          amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                          const amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
                           // reserve space to avoid many small resize operations for performance reasons
                           // the resize below will not shrink the capacity
                           if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }
@@ -582,7 +582,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                         ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles::resize_eb");
                         auto np_to_add = amrex::get<0>(reduce_data.value());
                         auto new_np = dst_index + np_to_add;
-                        amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
+                        const amrex::Long capacity = ptile_buffer.capacity() / species_buffer.superParticleSize();
                         // reserve space to avoid many small resize operations for performance reasons
                           // the resize below will not shrink the capacity
                         if (new_np > capacity) { ptile_buffer.reserve(2*new_np); }

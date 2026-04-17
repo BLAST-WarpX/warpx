@@ -19,33 +19,32 @@
 
 using namespace amrex::literals;
 
-ParticleThermalizer::ParticleThermalizer()
-  : m_defined(false),
-    m_normal(-1), m_start(0._rt), m_end(-1._rt),
+ParticleThermalizer::ParticleThermalizer():
+    m_start(0._rt), m_end(-1._rt),
     m_momentum_threshold(-1._rt), m_theta(-1._rt)
 {
   const amrex::ParmParse pp("particle_thermalizer");
 
   // Read normal as a string (x, y, or z)
-  m_normal_str = "";
-  bool thermalizer_present = pp.query("normal", m_normal_str);
+  std::string normal_str;
+  const bool thermalizer_present = pp.query("normal", normal_str);
   if (!thermalizer_present) {
     // If no normal is specified, the thermalizer is not defined
     return;
   }
 
   // normalize to lowercase
-  std::transform(m_normal_str.begin(), m_normal_str.end(), m_normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
+  std::transform(normal_str.begin(), normal_str.end(), normal_str.begin(), [](unsigned char c){ return std::tolower(c); });
 #if defined(WARPX_DIM_1D_Z)
-  if (m_normal_str == "z") {
+  if (normal_str == "z") {
     m_normal = 0;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'z' in 1D simulations");
   }
 #elif defined(WARPX_DIM_XZ)
-  if (m_normal_str == "x") {
+  if (normal_str == "x") {
     m_normal = 0;
-  } else if (m_normal_str == "z") {
+  } else if (normal_str == "z") {
     m_normal = 1;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'x' or 'z' in 2D simulations");
@@ -57,11 +56,11 @@ ParticleThermalizer::ParticleThermalizer()
 #elif defined(WARPX_DIM_RSPHERE)
   amrex::Abort("particle_thermalizer: thermalizer not supported in RSPHERE geometry");
 #elif defined(WARPX_DIM_3D)
-  if (m_normal_str == "x") {
+  if (normal_str == "x") {
     m_normal = 0;
-  } else if (m_normal_str == "y") {
+  } else if (normal_str == "y") {
     m_normal = 1;
-  } else if (m_normal_str == "z") {
+  } else if (normal_str == "z") {
     m_normal = 2;
   } else {
     amrex::Abort("particle_thermalizer: normal must be 'x', 'y', or 'z'");
@@ -92,12 +91,12 @@ bool ParticleThermalizer::defined() const {
   return m_defined;
 }
 
-void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
+void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc) const
 {
   if (m_species_names.empty()) {
     // No species filter: apply to all species.
     for (auto &pc_uptr : mpc) {
-      if (!pc_uptr) continue;
+      if (!pc_uptr) { continue; }
       applyThermalizer(*pc_uptr);
     }
   } else {
@@ -108,13 +107,13 @@ void ParticleThermalizer::applyThermalizer(MultiParticleContainer &mpc)
   }
 }
 
-void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
+void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc) const
 {
     for (int lev = 0; lev < pc.numLevels(); ++lev) {
         const auto& geom = pc.Geom(lev);
         const auto& dx = geom.CellSizeArray();
         const auto& problo = geom.ProbLoArray();
-        int dir = static_cast<int>(m_normal);
+        const auto dir = static_cast<int>(m_normal);
 
         amrex::RealBox thermalizer_region = geom.ProbDomain();
         thermalizer_region.setLo(dir, m_start);
@@ -141,16 +140,16 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
             amrex::ParticleReal* uy = pti.GetAttribs(PIdx::uy).data();
             amrex::ParticleReal* uz = pti.GetAttribs(PIdx::uz).data();
 
-            amrex::Real loend = thermalizer_region.lo(dir);
-            amrex::Real hiend = thermalizer_region.hi(dir);
+            const amrex::Real loend = thermalizer_region.lo(dir);
+            const amrex::Real hiend = thermalizer_region.hi(dir);
 
-            amrex::Real u_threshold = m_momentum_threshold;
-            amrex::Real theta = m_theta;
+            const amrex::Real u_threshold = m_momentum_threshold;
+            const amrex::Real theta = m_theta;
 
             // Parallel loop over particles in the tile.
             amrex::ParallelForRNG(np, [=] AMREX_GPU_DEVICE (long ip, amrex::RandomEngine const& engine) noexcept {
                 amrex::ParticleReal x, y, z;
-                amrex::ParticleReal norm_pos = 0.0_prt;
+                amrex::ParticleReal norm_pos = 0.0_prt; //NOLINT (misc-const-correctness)
 
                 getPosition(ip, x, y, z);
 #if defined(WARPX_DIM_1D_Z)
@@ -173,16 +172,16 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc)
                 } else if (norm_pos > hiend - dx[dir]) {
                   prob = 1._rt;
                 } else {
-                  prob = 1.0 - std::pow((hiend - dx[dir] - norm_pos) /
-                                        (hiend - dx[dir] - loend),
-                                        0.25_rt);
+                  prob = 1.0_rt - std::pow((hiend - dx[dir] - norm_pos) /
+                                           (hiend - dx[dir] - loend),
+                                            0.25_rt);
                 }
 
                 if (amrex::Random(engine) > prob) {
                     return; // do not thermalize this particle
                 } else {
                     // assign new momentum from thermal distribution
-                    amrex::Real vave = std::sqrt(theta);
+                    const amrex::Real vave = std::sqrt(theta);
                     if (amrex::Math::abs(ux[ip]) > u_threshold*PhysConst::c) {
                         ux[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, ux[ip]);
                     }

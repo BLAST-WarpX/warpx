@@ -751,7 +751,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
             // Keep these double to avoid bug in single precision
-            double x_new = (rp_new - xyzmin.x)*dinv.x;
+            double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
@@ -783,23 +783,23 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
             // Keep these double to avoid bug in single precision
-            double x_new = (rp_new - xyzmin.x)*dinv.x;
+            double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #else
 #if !defined(WARPX_DIM_1D_Z)
             // Keep these double to avoid bug in single precision
-            double x_new = (xp - xyzmin.x + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv)*dinv.x;
+            double const x_new = (xp - xyzmin.x + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv)*dinv.x;
             double const x_old = x_new - dt*dinv.x*uxp[ip]*gaminv;
 #endif
 #endif
 #if defined(WARPX_DIM_3D)
             // Keep these double to avoid bug in single precision
-            double y_new = (yp - xyzmin.y + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv)*dinv.y;
+            double const y_new = (yp - xyzmin.y + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv)*dinv.y;
             double const y_old = y_new - dt*dinv.y*uyp[ip]*gaminv;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
-            double z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
+            double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
 #endif
 
@@ -2346,6 +2346,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
+            //NOLINTNEXTLINE(readability-suspicious-call-argument)
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,

@@ -176,7 +176,7 @@ public:
         for (int i = 0; i < m_num_product_species; i++)
         {
             // Add the number of product producing events to the species involved in those processes.
-            int num_products = m_num_products_host[i];
+            const int num_products = m_num_products_host[i];
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }

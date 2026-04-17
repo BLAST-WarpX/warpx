@@ -55,7 +55,7 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     LinearComptonCollisionFunc (
-            const std::string collision_name,
+            const std::string& collision_name,
             MultiParticleContainer const * const /*mypc*/,
             const bool isSameSpecies) :
         m_isSameSpecies(isSameSpecies)
@@ -66,19 +66,18 @@ public:
         WARPX_ABORT_WITH_MESSAGE("Linear Compton scattering module does not currently work with single precision");
 #endif
 
-        amrex::ParmParse pp_collision_name(collision_name);
+        const amrex::ParmParse pp_collision_name(collision_name);
 
-        // default event multiplier
-        m_event_multiplier = 1.0_prt;
+        constexpr auto default_event_multiplier = 1.0_prt;
+        m_event_multiplier = default_event_multiplier;
         utils::parser::queryWithParser(
             pp_collision_name, "event_multiplier", m_event_multiplier);
 
-        // default probability threshold
-        m_probability_threshold = 0.02_prt;
+        constexpr auto default_probability_threshold = 0.02_prt;
+        m_probability_threshold = default_probability_threshold;
         utils::parser::queryWithParser(
             pp_collision_name, "probability_threshold", m_probability_threshold);
 
-        // default probability target_value
         constexpr auto default_probability_target_value = 0.002_prt;
         m_probability_target_value = default_probability_target_value;
         utils::parser::queryWithParser(

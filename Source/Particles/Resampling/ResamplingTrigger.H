@@ -33,7 +33,7 @@ public:
      * \brief Constructor of the ResamplingTrigger class. Reads the resampling trigger parameters
      * from the input file.
      */
-    ResamplingTrigger (const std::string& species_name);
+    explicit ResamplingTrigger (const std::string& species_name);
 
     /**
      * \brief A method that returns true if resampling should be done for the considered species
