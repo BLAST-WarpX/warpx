@@ -203,7 +203,58 @@ Diagnostics::BaseReadParameters ()
         m_varnames_fields.clear();
     }
 
-    m_varnames = m_varnames_fields;
+    // Expand multi-component diagnostic entries in m_varnames.
+    // m_varnames_fields retains single entries (one functor slot per diagnostic),
+    // while m_varnames expands them into individual component names.
+    // Also validate species names and store species indices.
+    {
+        amrex::Vector<std::string> expanded_varnames;
+        for (const auto& f : m_varnames_fields) {
+            if (f.rfind("P_", 0) == 0) {
+                // Pressure tensor: 6 components (Pxx, Pxy, Pxz, Pyy, Pyz, Pzz)
+                const std::string sp = f.substr(2);
+                bool species_name_is_wrong = true;
+                for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                    if (sp == m_all_species_names[i]) {
+                        m_P_per_species_index.push_back(i);
+                        species_name_is_wrong = false;
+                    }
+                }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !species_name_is_wrong,
+                    "Input error: string " + f + " in " + m_diag_name
+                    + ".fields_to_plot does not match any species"
+                );
+                expanded_varnames.push_back("Pxx_" + sp);
+                expanded_varnames.push_back("Pxy_" + sp);
+                expanded_varnames.push_back("Pxz_" + sp);
+                expanded_varnames.push_back("Pyy_" + sp);
+                expanded_varnames.push_back("Pyz_" + sp);
+                expanded_varnames.push_back("Pzz_" + sp);
+            } else if (f.rfind("Q_", 0) == 0) {
+                // Heat flux: 3 components (Qx, Qy, Qz)
+                const std::string sp = f.substr(2);
+                bool species_name_is_wrong = true;
+                for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                    if (sp == m_all_species_names[i]) {
+                        m_Q_per_species_index.push_back(i);
+                        species_name_is_wrong = false;
+                    }
+                }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !species_name_is_wrong,
+                    "Input error: string " + f + " in " + m_diag_name
+                    + ".fields_to_plot does not match any species"
+                );
+                expanded_varnames.push_back("Qx_" + sp);
+                expanded_varnames.push_back("Qy_" + sp);
+                expanded_varnames.push_back("Qz_" + sp);
+            } else {
+                expanded_varnames.push_back(f);
+            }
+        }
+        m_varnames = expanded_varnames;
+    }
     // Generate names of averaged particle fields and append to m_varnames
     for (const auto& fname : m_pfield_varnames) {
         for (const auto& sname : m_pfield_species) {
