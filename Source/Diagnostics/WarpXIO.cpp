@@ -304,6 +304,15 @@ WarpX::InitFromCheckpoint ()
             }
         }
 
+        if (m_fields.has_vector(FieldType::E_old, lev)) {
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{0}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ex_old"));
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{1}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ey_old"));
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{2}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ez_old"));
+        }
+
         VisMF::Read(*m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
                     amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ex_fp"));
         VisMF::Read(*m_fields.get(FieldType::Efield_fp, Direction{1}, lev),
@@ -412,8 +421,7 @@ WarpX::InitFromCheckpoint ()
     mypc->Restart(restart_chkfile);
 
     if (m_implicit_solver) {
-
-        m_implicit_solver->Define(this);
+        m_implicit_solver->Define(this, restart_chkfile.empty());
         m_implicit_solver->CreateParticleAttributes();
     }
 

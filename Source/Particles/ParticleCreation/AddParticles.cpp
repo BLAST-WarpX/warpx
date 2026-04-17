@@ -810,8 +810,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                 get_zlab);
     } else {
         // Continuous particle injection due to moving window
-        int moving_dir = WarpX::moving_window_dir;
-        int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
+        const int moving_dir = WarpX::moving_window_dir;
+        const int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
         plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
     }
 

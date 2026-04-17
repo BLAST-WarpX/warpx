@@ -435,7 +435,7 @@ public:
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
 
-    bool use_global_debye_length() { return m_use_global_debye_length; }
+    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 
 private:
 

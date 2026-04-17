@@ -223,7 +223,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
             indep_pairs.shuffle(indices_1, indices_2);
 
-            int n_independent_pairs = indep_pairs.numIndependentPairs();
+            const int n_independent_pairs = indep_pairs.numIndependentPairs();
             const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs

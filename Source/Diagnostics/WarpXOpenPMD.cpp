@@ -671,7 +671,7 @@ for (const auto & particle_diag : particle_diags) {
 void
 WarpXOpenPMDPlot::FlushBTDToDisk()
 {
-    bool isBTD = true;
+    constexpr bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
     const bool flattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
@@ -1430,7 +1430,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
     // collective open
     series_iteration.open();
 
-    bool hasADIOS =  (m_Series->backend() == "ADIOS2");
+    const bool hasADIOS =  (m_Series->backend() == "ADIOS2");
 
     auto meshes = series_iteration.meshes;
     if (first_write_to_iteration) {

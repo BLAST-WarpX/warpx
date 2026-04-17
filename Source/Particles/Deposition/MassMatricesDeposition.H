@@ -71,8 +71,8 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
     const amrex::ParticleReal bzp = alpha*Bzp;
 
     // Compute Mass Matrix kernels (non-relativistic for now)
-    amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
-    amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
+    const amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
+    const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
 
     fpxx = arogp*(bxp*bxp + 1.0_rt);
     fpxy = arogp*(bxp*byp + bzp);
@@ -279,8 +279,8 @@ void doDirectJandSigmaDepositionKernel ( [[maybe_unused]] const amrex::ParticleR
         if constexpr (full_mass_matrices) {
             for (int aa=0; aa<=depos_order; aa++){
 
-                int col_base = depos_order + aa - iz;
-                int Nc;
+                const int col_base = depos_order + aa - iz;
+                int Nc = 0;
 
                 // Reduced deposit for diagonal mass matrices
                 if (aa <= iz) {
@@ -1735,6 +1735,7 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::Array4<amrex::Real> const dummy_Jy{};
             amrex::Array4<amrex::Real> const dummy_Jz{};
 
+            //NOLINTNEXTLINE(readability-suspicious-call-argument)
             doVillasenorJandSigmaDepositionKernel<depos_order,full_mass_matrices,/*deposit_J=*/false>(
                                                                 xp_n, yp_n, zp_n,
                                                                 xp_np1, yp_np1, zp_np1,

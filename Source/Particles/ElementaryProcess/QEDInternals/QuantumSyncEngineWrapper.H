@@ -192,6 +192,7 @@ public:
      *
      * @param[in] table_view a view of a QS_phot_em_table lookup table
      */
+    explicit
     QuantumSynchrotronPhotonEmission (
         const QS_phot_em_table_view table_view):
         m_table_view{table_view}{}
