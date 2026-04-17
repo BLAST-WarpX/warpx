@@ -63,7 +63,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                                      2*ncomp, // {local, global} for each comp
                                                                      this_array[n]->nGrowVect() );
 
-                auto* mask = a_WarpX->getFieldDotMaskPointer(m_array_type, lev, ablastr::fields::Direction{n});
+                const auto* mask = a_WarpX->getFieldDotMaskPointer(m_array_type, lev, ablastr::fields::Direction{n});
                 fill_local_dof(*m_array[lev][n], *mask);
             }
         }
@@ -85,7 +85,7 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
                                                                2*ncomp, // {local, global} for each comp
                                                                this_mf->nGrowVect() );
 
-            auto* mask = a_WarpX->getFieldDotMaskPointer(m_scalar_type, lev, ablastr::fields::Direction{0});
+            const auto* mask = a_WarpX->getFieldDotMaskPointer(m_scalar_type, lev, ablastr::fields::Direction{0});
             fill_local_dof(*m_scalar[lev], *mask);
         }
 
@@ -113,23 +113,23 @@ void WarpXSolverDOF::Define ( WarpX* const        a_WarpX,
 
 void WarpXSolverDOF::fill_local_dof (iMultiFab& dof, iMultiFab const& mask)
 {
-    int ncomp = dof.nComp() / 2; // /2 because both local and global ids are stored in dof
+    const int ncomp = dof.nComp() / 2; // /2 because both local and global ids are stored in dof
 
     AMREX_ALWAYS_ASSERT(dof.boxArray().numPts()*ncomp < static_cast<Long>(std::numeric_limits<int>::max()));
 
     dof.setVal(std::numeric_limits<int>::lowest());
 
 #ifdef AMREX_USE_MPI
-    int nprocs = ParallelDescriptor::NProcs();
+    const int nprocs = ParallelDescriptor::NProcs();
 #endif
 
     for (MFIter mfi(dof); mfi.isValid(); ++mfi) {
         Box const& vbx = mfi.validbox();
-        int npts = vbx.numPts();
-        BoxIndexer boxindex(vbx);
+        const auto npts = static_cast<int>(vbx.numPts());
+        const BoxIndexer boxindex(vbx);
         auto const& m = mask.const_array(mfi);
         auto const& d = dof.array(mfi);
-        auto start_id = m_nDoFs_l;
+        const auto start_id = static_cast<int>(m_nDoFs_l);
         auto ndofs = Scan::PrefixSum<int>(
             npts,
             [=] AMREX_GPU_DEVICE (int offset) -> int
@@ -174,7 +174,7 @@ void WarpXSolverDOF::fill_global_dof ()
 #ifndef AMREX_USE_MPI
     m_nDoFs_g = m_nDoFs_l;
 #else
-    int nprocs = ParallelDescriptor::NProcs();
+    const int nprocs = ParallelDescriptor::NProcs();
     if (nprocs == 1) {
         m_nDoFs_g = m_nDoFs_l;
     } else {
@@ -183,7 +183,7 @@ void WarpXSolverDOF::fill_global_dof ()
                       ndofs_allprocs.data(), 1, ParallelDescriptor::Mpi_typemap<Long>::type(),
                       ParallelDescriptor::Communicator());
         Long proc_begin = 0;
-        int myproc = ParallelDescriptor::MyProc();
+        const int myproc = ParallelDescriptor::MyProc();
         m_nDoFs_g = 0;
         for (int iproc = 0; iproc < nprocs; ++iproc) {
             if (iproc < myproc) {
