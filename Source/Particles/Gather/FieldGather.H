@@ -225,8 +225,8 @@ void doDirectGatherVectorField (
         }
     }
 
-    const amrex::Real costheta = (rp > 0. ? xp/rp: 1._rt);
-    const amrex::Real sintheta = (rp > 0. ? yp/rp: 0.);
+    const auto costheta = static_cast<amrex::Real>(rp > 0._rt ? xp/rp: 1._rt);
+    const auto sintheta = static_cast<amrex::Real>(rp > 0._rt ? yp/rp: 0._rt);
     const Complex xy0 = Complex{costheta, -sintheta};
     Complex xy = xy0; // Throughout the following loop, xy takes the value e^{-i m theta}
 
@@ -1141,7 +1141,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             for (int k=dkl_B; k<=depos_order+1-dku_B; k++) {
                 sdzk += (sz_B_old[k] - sz_B_new[k]);
                 auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_E_new-1+k)*sdzkov*sdzij;
+                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdzkov*sdzij;
             }
         }
     }
@@ -1189,8 +1189,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
     const amrex::Real xp_mid = xp_nph;
     const amrex::Real yp_mid = yp_nph;
     const amrex::Real rp_mid = (rp_new + rp_old)/2._rt;
-    const amrex::Real costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
-    const amrex::Real sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
+    const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid: 1._rt);
+    const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid: 0._rt);
     const Complex xy_mid0 = Complex{costheta_mid, -sintheta_mid};
     Complex xy_mid = xy_mid0;
 
@@ -1449,7 +1449,7 @@ void doGatherPicnicShapeN (
     amrex::Real const yp_mid = yp_nph;
     amrex::Real const rp_mid = (rp_new + rp_old)*0.5_rt;
     amrex::Real const costheta_mid = (rp_mid > 0. ? xp_mid/rp_mid: 1._rt);
-    amrex::Real const sintheta_mid = (rp_mid > 0. ? yp_mid/rp_mid: 0.);
+    amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid: 0._rt);
 #if defined(WARPX_DIM_RZ)
     const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
 #endif

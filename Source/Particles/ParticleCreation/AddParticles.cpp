@@ -19,7 +19,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXConst.H"
 #include "EmbeddedBoundary/Enabled.H"
 #ifdef AMREX_USE_EB
@@ -28,6 +27,7 @@
 #endif
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/utils/Communication.H>
 
@@ -194,7 +194,7 @@ namespace
 void
 PhysicalParticleContainer::AddParticles (int lev)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddParticles()");
+    ABLASTR_PROFILE("PhysicalParticleContainer::AddParticles()");
 
     for (auto const& plasma_injector : plasma_injectors) {
 
@@ -745,7 +745,7 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 void
 PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddPlasma()");
+    ABLASTR_PROFILE("PhysicalParticleContainer::AddPlasma()");
 
     // If no part_realbox is provided, initialize particles in the whole domain
     const Geometry& geom = Geom(lev);
@@ -810,8 +810,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                 get_zlab);
     } else {
         // Continuous particle injection due to moving window
-        int moving_dir = WarpX::moving_window_dir;
-        int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
+        const int moving_dir = WarpX::moving_window_dir;
+        const int moving_sign = (WarpX::moving_window_v > 0) ? 1 : -1;
         plasma_injector.prepare(part_realbox, moving_dir, moving_sign, get_zlab);
     }
 
@@ -1238,7 +1238,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 void
 PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt)
 {
-    WARPX_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()");
+    ABLASTR_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()");
 
     const Geometry& geom = Geom(0);
     const amrex::RealBox& part_realbox = geom.ProbDomain();

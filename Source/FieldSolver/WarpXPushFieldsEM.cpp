@@ -24,10 +24,10 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpXPushFieldsEM_K.H"
 #include "WarpX_FDTD.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -143,7 +143,7 @@ namespace {
      *        from the current J (computed from D according to the Vay deposition scheme)
      */
     void PSATDSubtractCurrentPartialSumsAvg (
-        [[maybe_unused]] const amrex::Vector<std::array<Real,3>> cell_size_at_all_levels,
+        [[maybe_unused]] const amrex::Vector<std::array<Real,3>>& cell_size_at_all_levels,
         [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
     {
         using ablastr::fields::Direction;
@@ -956,7 +956,7 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real st
 void
 WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveB()");
+    ABLASTR_PROFILE("WarpX::EvolveB()");
     EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
     if (lev > 0)
     {
@@ -1011,7 +1011,7 @@ WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveE()");
+    ABLASTR_PROFILE("WarpX::EvolveE()");
     EvolveE(lev, PatchType::fine, a_dt, start_time);
     if (lev > 0)
     {
@@ -1108,7 +1108,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 {
     if (!do_dive_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveF()");
+    ABLASTR_PROFILE("WarpX::EvolveF()");
 
     // Evolve F field in regular cells
     if (patch_type == PatchType::fine) {
@@ -1166,7 +1166,7 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveG()");
+    ABLASTR_PROFILE("WarpX::EvolveG()");
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1200,7 +1200,7 @@ WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
-    WARPX_PROFILE("WarpX::MacroscopicEvolveE()");
+    ABLASTR_PROFILE("WarpX::MacroscopicEvolveE()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         lev == 0,

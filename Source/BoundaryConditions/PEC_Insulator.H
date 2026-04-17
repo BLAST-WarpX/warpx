@@ -167,14 +167,14 @@ public:
      * \param[in] iside side to check, 0 is lower, 1 is upper
      * \return whether the E field is set on the boundary
      */
-    int IsESet(int idim, int iside) const { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
+    [[nodiscard]] int IsESet(int idim, int iside) const { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
 
     /* \brief Returns whether any B field is set on a boundary
      * \param[in] idim dimension to check
      * \param[in] iside side to check, 0 is lower, 1 is upper
      * \return whether the B field is set on the boundary
      */
-    int IsBSet(int idim, int iside) const { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
+    [[nodiscard]] int IsBSet(int idim, int iside) const { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
 
     /* \brief Returns whether the E field is set on a boundary
      * \param[in] idim dimension to check
@@ -182,7 +182,7 @@ public:
      * \param[in] ifield which field to check, 0, 1, or 2
      * \return whether the E field is set on the boundary
      */
-    int IsESet(int idim, int iside, int ifield) const;
+    [[nodiscard]] int IsESet(int idim, int iside, int ifield) const;
 
     /* \brief Returns whether the B field is set on a boundary
      * \param[in] idim dimension to check
@@ -190,7 +190,7 @@ public:
      * \param[in] ifield which field to check, 0, 1, or 2
      * \return whether the B field is set on the boundary
      */
-    int IsBSet(int idim, int iside, int ifield) const;
+    [[nodiscard]] int IsBSet(int idim, int iside, int ifield) const;
 
 private:
 

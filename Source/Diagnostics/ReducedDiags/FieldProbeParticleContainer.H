@@ -61,7 +61,7 @@ public:
     static constexpr int NReal = FieldProbePIdx::nattribs;
     static constexpr int NInt = 0;
 
-    FieldProbeParticleContainer (amrex::AmrCore* amr_core);
+    explicit FieldProbeParticleContainer (amrex::AmrCore* amr_core);
     ~FieldProbeParticleContainer() override = default;
 
     FieldProbeParticleContainer ( FieldProbeParticleContainer const &)             = delete;

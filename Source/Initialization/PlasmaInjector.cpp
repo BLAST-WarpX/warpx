@@ -52,6 +52,17 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Default radial_numpercell_power is uniform number of particles per cell
+    radial_numpercell_power{0._rt},
+#endif
+    // Unlimited boundaries
+    xmin{std::numeric_limits<amrex::Real>::lowest()},
+    xmax{std::numeric_limits<amrex::Real>::max()},
+    ymin{std::numeric_limits<amrex::Real>::lowest()},
+    ymax{std::numeric_limits<amrex::Real>::max()},
+    zmin{std::numeric_limits<amrex::Real>::lowest()},
+    zmax{std::numeric_limits<amrex::Real>::max()},
     species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
@@ -67,21 +78,10 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::ParmParse pp_species(species_name);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Default radial_numpercell_power is uniform number of particles per cell
-    radial_numpercell_power = 0._rt;
     utils::parser::queryWithParser(pp_species, source_name, "radial_numpercell_power", radial_numpercell_power);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radial_numpercell_power > -1.,
         "The radial_numpercell_power must be greater than -1");
 #endif
-
-    // Unlimited boundaries
-    xmin = std::numeric_limits<amrex::Real>::lowest();
-    ymin = std::numeric_limits<amrex::Real>::lowest();
-    zmin = std::numeric_limits<amrex::Real>::lowest();
-
-    xmax = std::numeric_limits<amrex::Real>::max();
-    ymax = std::numeric_limits<amrex::Real>::max();
-    zmax = std::numeric_limits<amrex::Real>::max();
 
     // NOTE: When periodic boundaries are used, default injection range is set to mother grid dimensions.
     if( geom.isPeriodic(0) ) {
@@ -438,12 +438,15 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
 #else
     constexpr int num_required_ppc_each_dim = 3;
 #endif
-    utils::parser::getArrWithParser(pp_species, source_name, "num_particles_per_cell_each_dim", num_particles_per_cell_each_dim,
-                        0, num_required_ppc_each_dim);
+    utils::parser::getArrWithParser(pp_species, source_name, "num_particles_per_cell_each_dim", num_particles_per_cell_each_dim);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<int>(num_particles_per_cell_each_dim.size()) == num_required_ppc_each_dim,
+                                     "num_particles_per_cell_each_dim must have " + std::to_string(num_required_ppc_each_dim) + " elements specified");
+
     // overwrite extra dimensions with 1
-    for (int i=num_required_ppc_each_dim ; i < 3 ; i++) {
+    for (int i = num_required_ppc_each_dim ; i < 3 ; i++) {
         num_particles_per_cell_each_dim.push_back(1);
     }
+
 #if WARPX_DIM_RZ
     if (WarpX::n_rz_azimuthal_modes > 1) {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -540,7 +543,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
             if (mass_is_specified) {
                 ablastr::warn_manager::WMRecordWarning("Species",
                     "Both '" + ps_name + ".mass' and '" +
-                        ps_name + ".injection_file' specify a charge.\n'" +
+                        ps_name + ".injection_file' specify a mass.\n'" +
                         ps_name + ".mass' will take precedence.\n");
             }
             else if (species_is_specified) {

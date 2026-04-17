@@ -41,8 +41,7 @@ Functions can be called at the following times:
 * ``afterdiagnostics``: after diagnostic output
 * ``oncheckpointsignal``: on a checkpoint signal
 * ``onbreaksignal``: on a break signal. These callbacks will be the last ones executed before the simulation ends.
-* ``particlescraper``: just after the particle boundary conditions are applied
-  but before lost particles are processed
+* ``particlescraper``: before particle boundary conditions are applied
 * ``particleloader``: at the time that the standard particle loader is called
 * ``particleinjection``: called when particle injection happens, after the position
   advance and before deposition is called, allowing a user

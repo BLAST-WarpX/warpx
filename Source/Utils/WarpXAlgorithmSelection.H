@@ -174,18 +174,27 @@ AMREX_ENUM(PushType,
 /** \brief For advanced collision algorithms that split the particle push in substeps */
 AMREX_ENUM(
     PositionPushType,
+    None,
     Full,
-    FirstHalf,
-    SecondHalf,
     Default = Full
 );
 
 /** \brief For advanced collision algorithms that split the particle push in substeps */
 AMREX_ENUM(
     MomentumPushType,
-    None,
     Full,
+    FirstHalf,
+    SecondHalf,
     Default = Full
+);
+
+/** \brief For binary collision algorithms, the strategy to determine
+ *  the scattering angle in the center of mass frame */
+AMREX_ENUM(
+    ScatteringAngleModel,
+    Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
+    Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
+    Default = Isotropic  /**< Isotropic */
 );
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

@@ -70,7 +70,7 @@ class MultiParticleContainer
 
 public:
 
-    MultiParticleContainer (amrex::AmrCore* amr_core);
+    explicit MultiParticleContainer (amrex::AmrCore* amr_core);
 
     ~MultiParticleContainer() = default;
 
@@ -119,6 +119,12 @@ public:
     );
 
     /**
+     * \brief Deposit mass matrices.
+    */
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                              int lev, amrex::Real dt);
+
+    /**
     * \brief This pushes the particle positions by one time step for all the species in the
     * MultiParticleContainer.
     */
@@ -132,7 +138,8 @@ public:
     */
     void PushP (int lev, amrex::Real dt,
                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
-                const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
+                const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                MomentumPushType momentum_push_type);
 
     /**
     * \brief This returns a MultiFAB filled with zeros. It is used to return the charge density
@@ -248,7 +255,7 @@ public:
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int num_ghost);
+    void RedistributeLocal (int max_cells_travelled);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */

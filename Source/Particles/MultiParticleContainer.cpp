@@ -37,7 +37,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "EmbeddedBoundary/ParticleScraper.H"
 #include "EmbeddedBoundary/ParticleBoundaryProcess.H"
@@ -45,6 +44,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -314,7 +314,7 @@ MultiParticleContainer::ReadParameters ()
             // Get photon species
             std::vector<std::string> photon_species;
             pp_particles.queryarr("photon_species", photon_species);
-            const int spec_size = species_names.size();
+            const auto spec_size = static_cast<int>(species_names.size());
             for (int spec_index = 0; spec_index < spec_size; ++spec_index){
 
                 const auto name = species_names[spec_index];
@@ -486,20 +486,23 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         if (fields.has(FieldType::current_buf, Direction{2}, lev)) { fields.get(FieldType::current_buf, Direction{2}, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_fp, lev)) { fields.get(FieldType::rho_fp, lev)->setVal(0.0); }
         if (fields.has(FieldType::rho_buf, lev)) { fields.get(FieldType::rho_buf, lev)->setVal(0.0); }
-        if (implicit_options && implicit_options->deposit_mass_matrices) {
-            fields.get(FieldType::current_fp_MM, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::current_fp_MM, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::current_fp_MM, Direction{2}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_X, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_X, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_X, Direction{2}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Y, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Y, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Y, Direction{2}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Z, Direction{0}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Z, Direction{1}, lev)->setVal(0.0);
-            fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)->setVal(0.0);
-            if (implicit_options->use_mass_matrices_pc) {
+        if (implicit_options) {
+            // Non-suborbit particles are deposited to current_fp_non_suborbit.
+            // Since only sub-orbit particles are advanced at linear stage of JFNK when using MM
+            // for the Jacobian, skip resetting current_fp_non_suborbit to zero in that case.
+            const bool zero_current_fp_non_suborbit = !(implicit_options->use_mass_matrices_jacobian &&
+                                              implicit_options->linear_stage_of_jfnk);
+            if (zero_current_fp_non_suborbit) {
+                fields.get(FieldType::current_fp_non_suborbit, Direction{0}, lev)->setVal(0.0);
+                fields.get(FieldType::current_fp_non_suborbit, Direction{1}, lev)->setVal(0.0);
+                fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev)->setVal(0.0);
+            }
+
+            // If using a preconditioner (pc), suborbit particles deposit their contribution
+            // during the nonlinear-stage of JFNK. Do not reset if from linear stage of JNK.
+            const bool zero_mass_matrices_pc = implicit_options->use_mass_matrices_pc &&
+                                              !implicit_options->linear_stage_of_jfnk;
+            if (zero_mass_matrices_pc) {
                 fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
                 fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
                 fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
@@ -508,6 +511,23 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     }
     for (auto& pc : allcontainers) {
         pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
+    }
+}
+
+void
+MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                                             int lev, amrex::Real dt)
+{
+    using ablastr::fields::Direction;
+
+    for (int n = 0; n < 3; ++n) {
+        fields.get(FieldType::MassMatrices_X, Direction{n}, lev)->setVal(0.0);
+        fields.get(FieldType::MassMatrices_Y, Direction{n}, lev)->setVal(0.0);
+        fields.get(FieldType::MassMatrices_Z, Direction{n}, lev)->setVal(0.0);
+    }
+
+    for (auto& pc : allcontainers) {
+        pc->DepositMassMatrices(fields, lev, dt);
     }
 }
 
@@ -522,10 +542,11 @@ MultiParticleContainer::PushX (Real dt)
 void
 MultiParticleContainer::PushP (int lev, Real dt,
                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                               const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                               MomentumPushType momentum_push_type)
 {
     for (auto& pc : allcontainers) {
-        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz);
+        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type);
     }
 }
 
@@ -634,7 +655,7 @@ MultiParticleContainer::DepositTemperatures (
 
         // Generate Name to look up temperature MF in the register
         const std::string temperature_vf_str = "T_" + species_names[pc->getSpeciesId()];
-        ablastr::fields::MultiLevelVectorField T_vf =
+        const ablastr::fields::MultiLevelVectorField T_vf =
             fields.get_mr_levels_alldirs(temperature_vf_str, WarpX::GetInstance().finestLevel());
 
         // Clear temperature MF for this species
@@ -676,7 +697,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
     WarpX & warpx = WarpX::GetInstance();
 
-    if (allcontainers.size() == 0) { return; }
+    if (allcontainers.empty()){ return; }
 
     // Is there a nicer way to get the number of levels?
     // This grabs it from the first species.
@@ -688,7 +709,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
             amrex::BoxArray const & ba = warpx.boxArray(lev);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
             int const ncomps = 1;
-            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
             bool const remake = true;
             bool const redistribute_on_remake = false;
             warpx.m_fields.alloc_init(FieldType::global_debye_length, lev, ba, dmap, ncomps, ng, 0.,
@@ -711,7 +732,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
             for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
             {
-                amrex::Box box = mfi.tilebox();
+                const amrex::Box box = mfi.tilebox();
 
                 amrex::Array4<amrex::Real> const& debye_array = debye_length->array(mfi);
                 amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
@@ -731,7 +752,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
 #endif
         for (amrex::MFIter mfi(global_debye_length, TilingIfNotGPU()); mfi.isValid(); ++mfi )
         {
-            amrex::Box box = mfi.tilebox();
+            const amrex::Box box = mfi.tilebox();
 
             amrex::Array4<amrex::Real> const& global_debye_array = global_debye_length.array(mfi);
 
@@ -828,10 +849,12 @@ MultiParticleContainer::deleteInvalidParticles ()
 }
 
 void
-MultiParticleContainer::RedistributeLocal (const int num_ghost)
+MultiParticleContainer::RedistributeLocal (const int max_cells_travelled)
 {
     for (auto& pc : allcontainers) {
-        pc->Redistribute(0, 0, 0, num_ghost);
+        // The local argument specifies the number of cells a particle
+        // might have travelled outside its current tile / box.
+        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/0, /*local=*/max_cells_travelled);
     }
 }
 
@@ -1077,7 +1100,7 @@ MultiParticleContainer::doFieldIonization (int lev,
                                            const MultiFab& By,
                                            const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doFieldIonization()");
+    ABLASTR_PROFILE("MultiParticleContainer::doFieldIonization()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1137,7 +1160,7 @@ MultiParticleContainer::doFieldIonization (int lev,
 void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
-    WARPX_PROFILE("MultiParticleContainer::doCollisions()");
+    ABLASTR_PROFILE("MultiParticleContainer::doCollisions()");
     collisionhandler->doCollisions(step, cur_time, dt, this);
 }
 
@@ -1408,7 +1431,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 
         m_shr_p_qs_engine->compute_lookup_tables(ctrl, qs_minimum_chi_part);
         const auto data = m_shr_p_qs_engine->export_lookup_tables_data();
-        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), static_cast<std::streamsize>(data.size()));
     }
 
     ParallelDescriptor::Barrier();
@@ -1492,7 +1515,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 
         m_shr_p_bw_engine->compute_lookup_tables(ctrl, bw_minimum_chi_part);
         const auto data = m_shr_p_bw_engine->export_lookup_tables_data();
-        std::ofstream{table_name, std::ios::binary}.write(data.data(), data.size());
+        std::ofstream{table_name, std::ios::binary}.write(data.data(), static_cast<std::streamsize>(data.size()));
     }
 
     ParallelDescriptor::Barrier();
@@ -1511,7 +1534,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 void
 MultiParticleContainer::doQEDSchwinger ()
 {
-    WARPX_PROFILE("MultiParticleContainer::doQEDSchwinger()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQEDSchwinger()");
 
     if (!m_do_qed_schwinger) {return;}
 
@@ -1687,7 +1710,7 @@ void MultiParticleContainer::doQedEvents (int lev,
                                           const MultiFab& By,
                                           const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedEvents()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedEvents()");
 
     doQedBreitWheeler(lev, Ex, Ey, Ez, Bx, By, Bz);
     doQedQuantumSync(lev, Ex, Ey, Ez, Bx, By, Bz);
@@ -1701,7 +1724,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
                                                 const MultiFab& By,
                                                 const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedBreitWheeler()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
@@ -1784,7 +1807,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
                                                const MultiFab& By,
                                                const MultiFab& Bz)
 {
-    WARPX_PROFILE("MultiParticleContainer::doQedQuantumSync()");
+    ABLASTR_PROFILE("MultiParticleContainer::doQedQuantumSync()");
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 

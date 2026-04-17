@@ -17,7 +17,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
@@ -44,6 +43,7 @@
 #include <AMReX_Tuple.H>
 #include <AMReX_Vector.H>
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <algorithm>
@@ -123,7 +123,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
 #if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
     amrex::ignore_unused(step);
 #else
-    WARPX_PROFILE("DifferentialLuminosity::ComputeDiags");
+    ABLASTR_PROFILE("DifferentialLuminosity::ComputeDiags");
 
     using namespace amrex;
     using ParticleTileType = WarpXParticleContainer::ParticleTileType;
@@ -139,10 +139,6 @@ void DifferentialLuminosity::ComputeDiags (int step)
 
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
-    const Real dt = warpx.getdt(0);
-    // get cell volume
-    Geometry const & geom = warpx.Geom(0);
-    const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
 
     // declare local variables
     auto const num_bins = m_bin_num;
@@ -165,13 +161,18 @@ void DifferentialLuminosity::ComputeDiags (int step)
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev < nlevs; ++lev) {
+        // get cell volume and timestep at current level
+        Geometry const & geom = warpx.Geom(lev);
+        const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+        const Real dt = warpx.getdt(lev);
+
         for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
-            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_1 );
-            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( warpx.Geom(lev), mfi, ptile_2 );
+            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( geom, mfi, ptile_1 );
+            ParticleBins bins_2 = ParticleUtils::findParticlesInEachCell( geom, mfi, ptile_2 );
 
             // Species 1
             const auto soa_1 = ptile_1.getParticleTileData();
@@ -202,7 +203,7 @@ void DifferentialLuminosity::ComputeDiags (int step)
             IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
             indep_pairs.shuffle(indices_1, indices_2);
 
-            int n_independent_pairs = indep_pairs.numIndependentPairs();
+            const int n_independent_pairs = indep_pairs.numIndependentPairs();
             const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
