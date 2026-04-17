@@ -297,7 +297,7 @@ public:
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
      *
-     * \param[in,out] mf_name Name of vector field in which current density should be deposited
+     * \param[in] mf_name Name of vector field in which current density should be deposited
      * \param[in] lev Mesh refinement level for deposition
      * \param[in] dt Time step for particle level
      * \param[in] relative_time Time at which to deposit J, relative to the time of the
@@ -305,7 +305,7 @@ public:
      *                          the particle position will be temporarily modified to match
      *                          the time of the deposition.
      */
-    void DepositCurrent (std::string mf_name, int lev,
+    void DepositCurrent (const std::string& mf_name, int lev,
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
@@ -394,10 +394,10 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
     std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
-    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);

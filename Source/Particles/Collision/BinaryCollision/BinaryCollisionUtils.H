@@ -39,9 +39,9 @@ namespace BinaryCollisionUtils{
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,
                                                MultiParticleContainer const * mypc);
 
-    void CheckFusionEnergy (const NuclearFusionType fusion_type,
-                            const amrex::ParticleReal mass_before,
-                            const amrex::ParticleReal mass_after);
+    void CheckFusionEnergy (NuclearFusionType fusion_type,
+                            amrex::ParticleReal mass_before,
+                            amrex::ParticleReal mass_after);
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
@@ -76,22 +76,16 @@ namespace BinaryCollisionUtils{
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     bool is_two_product_fusion_type (const CollisionType collision_type)
     {
-        if ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
+        return ((collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion) ||
             (collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion) ||
             (collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion) ||
-            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion))
-        {
-            return true;
-        }
-        else {
-            return false;
-        }
+            (collision_type == CollisionType::DeuteriumHeliumToProtonHeliumFusion));
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     bool is_two_product_fusion_type (const NuclearFusionType fusion_type)
     {
-        CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
+        const CollisionType collision_type = nuclear_fusion_type_to_collision_type(fusion_type);
         return is_two_product_fusion_type(collision_type);
     }
 

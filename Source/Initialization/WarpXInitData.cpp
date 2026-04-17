@@ -111,6 +111,7 @@ namespace
                        injection_style.begin(),
                        ::tolower);
 
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (injection_style == "singleparticle") {
             nppc = 1;
         } else if (injection_style == "multipleparticles") {
@@ -422,19 +423,24 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             auto w = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
                               [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
             {
-                Real x = 0, y = 0, z = 0;
 #if defined(WARPX_DIM_1D_Z)
-                z = problo[0] + (i+Real(0.5))*dx[0];
+                const auto x = 0.0_rt;
+                const auto y = 0.0_rt;
+                const auto z = problo[0] + (i+Real(0.5))*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
-                x = problo[0] + (i+Real(0.5))*dx[0];
-                z = problo[1] + (j+Real(0.5))*dx[1];
+                const auto x = problo[0] + (i+Real(0.5))*dx[0];
+                const auto y = 0.0_rt;
+                const auto z = problo[1] + (j+Real(0.5))*dx[1];
 #else
-                AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
-                             y = problo[1] + (j+Real(0.5))*dx[1];,
-                             z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_TERM(const auto x = problo[0] + (i+Real(0.5))*dx[0];,
+                             const auto y = problo[1] + (j+Real(0.5))*dx[1];,
+                             const auto z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_PICK(const auto y = 0.0_rt; const auto z = 0.0_rt;,
+                             const auto z = 0.0_rt;,
+                             /*x,y,z already defined*/);
 #endif
-                Real v = density_exe(x,y,z);
-                Real r = (v >= density_min) ? nppc : Real(0);
+                const Real v = density_exe(x,y,z);
+                const Real r = (v >= density_min) ? nppc : Real(0);
                 rhoma[b](i,j,k) += r;
                 return r;
             });
@@ -468,11 +474,11 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                         // threshold, we split this Box in its longest
                         // direction.
                         int dir;
-                        int len = bx.longside(dir); // longest side of the box
+                        const int len = bx.longside(dir); // longest side of the box
                         if (len <= split_high_density_boxes_min_box_size) { // Box is already very small.
                             new_boxes.push_back(bx);
                         } else {
-                            int chop_pnt = bx.smallEnd(dir) + len/2;
+                            const int chop_pnt = bx.smallEnd(dir) + len/2;
                             auto bx2 = bx.chop(dir, chop_pnt);
                             // bx is now chopped into bx and bx2.
                             test_boxes.push_back(bx);
@@ -490,7 +496,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             if (new_boxes.size() > ba0.size()) {
                 // If the size is the same as before, we don't need to build
                 // a new BoxArray.
-                ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+                ba0 = BoxArray(new_boxes.data(), static_cast<int>(new_boxes.size()));
             }
         }
     }
@@ -886,7 +892,7 @@ WarpX::InitData ()
         for (auto const& species : *mypc) {
             has_initialize_self_fields |= species->initialize_self_fields;
         }
-        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        const bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
         if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
              has_initialize_self_fields ||
              has_boundary_potential)
@@ -1787,8 +1793,8 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
-    bool distributed = true;
+    const Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    const bool distributed = true;
     ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
                                               problo, dx, pbox, distributed);
     external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
@@ -1824,10 +1830,10 @@ WarpX::ReadExternalFieldFromFile (
                 // Physical coordinates of the grid point
                 // 0,1,2 denote x,y,z in 3D xyz.
                 // 0,1 denote r,z in 2D rz.
-                amrex::RealVect pos
-                    (AMREX_D_DECL(problo[0] + ii*dx[0],
+                const auto pos = amrex::RealVect{
+                    AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
-                                  problo[2] + k *dx[2]));
+                                  problo[2] + k *dx[2])};
                 mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 

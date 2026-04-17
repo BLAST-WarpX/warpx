@@ -1908,8 +1908,7 @@ WarpX::ReadParameters ()
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
     pp_collisions.queryarr("collision_names", collision_names);
-    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
-    if (collisions) {
+    if (!collision_names.empty()) {
         if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;
         }
@@ -3585,7 +3584,7 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
         // high density boxes until the next load balance is
         // performed. Thus, we are going building SFC assuming every boxes
         // have the same weight.
-        amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
+        const amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
         return amrex::DistributionMapping::makeSFC(wgt, ba, false);
     } else {
         return amrex::AmrCore::MakeDistributionMap(lev, ba);

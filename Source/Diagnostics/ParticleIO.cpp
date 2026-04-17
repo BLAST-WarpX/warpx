@@ -358,7 +358,7 @@ storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnost
 #endif
         for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
 
-            amrex::Box box = pti.tilebox();
+            const amrex::Box box = pti.tilebox();
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
             const Dim3 lo = lbound(box);
 
@@ -409,12 +409,12 @@ storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnost
                                    nox, galerkin_interpolation);
 
 
-                    if (Ex_particle_arr) Ex_particle_arr[ip] = Exp;
-                    if (Ey_particle_arr) Ey_particle_arr[ip] = Eyp;
-                    if (Ez_particle_arr) Ez_particle_arr[ip] = Ezp;
-                    if (Bx_particle_arr) Bx_particle_arr[ip] = Bxp;
-                    if (By_particle_arr) By_particle_arr[ip] = Byp;
-                    if (Bz_particle_arr) Bz_particle_arr[ip] = Bzp;
+                    if (Ex_particle_arr) { Ex_particle_arr[ip] = Exp; }
+                    if (Ey_particle_arr) { Ey_particle_arr[ip] = Eyp; }
+                    if (Ez_particle_arr) { Ez_particle_arr[ip] = Ezp; }
+                    if (Bx_particle_arr) { Bx_particle_arr[ip] = Bxp; }
+                    if (By_particle_arr) { By_particle_arr[ip] = Byp; }
+                    if (Bz_particle_arr) { Bz_particle_arr[ip] = Bzp; }
 
                 }
             );
