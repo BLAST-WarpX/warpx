@@ -53,12 +53,12 @@ jobs:
         export CXX=$(which clang++-17)
         export CC=$(which clang-17)
 
-        ##### CLEAR CACHE: TO BE REMOVED BEFORE MERGING ####
-        # we need to clear the cache in order to run clang-tidy
-        # on every file. Once all the issues are fixed, this
-        # can be removed
-        ccache -C --verbose
-        ####################################################
+        ##### FOR DEBUG ONLY: CLEAR CACHE ######################
+        # clearing the cache forces running clang-tidy on all
+        # the files. This can be useful for debugging purposes,
+        # but it should be commented out in production.
+        # ccache -C --verbose
+        ########################################################
 
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
