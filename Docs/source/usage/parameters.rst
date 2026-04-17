@@ -1715,8 +1715,6 @@ Particle initialization
       transformed to the simulation frame using the flipping method. The flipping method can be
       found in Zenitani 2015 section III. B. (Phys. Plasmas 22, 042116).
       By default, ``beta`` is equal to ``0.`` and ``bulk_vel_dir`` is ``+x``.
->>>>>>> origin/development
->>>>>>> bc1dc746399460eca769632ccc4d454a506ce9e7
 
       * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
       Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``. Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
