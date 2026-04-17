@@ -32,8 +32,8 @@
  * \param ms              Species mass
  * \param dt              Simulation time step
  * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
- * \param uxp,uyp,uzp     Proper velocity of particle (time-centered)
- * \param Bxp,Byp,Bzp     Magnetic field vector components on particle
+ * \param upx,upy,upz     Proper velocity of particle (time-centered)
+ * \param Bpx,Bpy,Bpz     Magnetic field vector components on particle
  * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
  * \param fpyx,fpyy,fpyz  Mass matrices kernels corresponding to dJy
  * \param fpzx,fpzy,fpzz  Mass matrices kernels corresponding to dJz
@@ -43,12 +43,12 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
                               const amrex::ParticleReal ms,
                               const amrex::ParticleReal dt,
                               const amrex::ParticleReal rhop,
-                              const amrex::ParticleReal uxp,
-                              const amrex::ParticleReal uyp,
-                              const amrex::ParticleReal uzp,
-                              const amrex::ParticleReal Bxp,
-                              const amrex::ParticleReal Byp,
-                              const amrex::ParticleReal Bzp,
+                              const amrex::ParticleReal upx,
+                              const amrex::ParticleReal upy,
+                              const amrex::ParticleReal upz,
+                              const amrex::ParticleReal Bpx,
+                              const amrex::ParticleReal Bpy,
+                              const amrex::ParticleReal Bpz,
                               amrex::ParticleReal& fpxx,
                               amrex::ParticleReal& fpxy,
                               amrex::ParticleReal& fpxz,
@@ -64,27 +64,27 @@ void setMassMatricesKernels ( const amrex::ParticleReal qs,
     constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
 
     // Convert B on particle to normalized cyclotron units with dt/2.0
-    const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (uxp*uxp + uyp*uyp + uzp*uzp)*inv_c2);
+    const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (upx*upx + upy*upy + upz*upz)*inv_c2);
     const amrex::ParticleReal alpha = qs/ms*0.5_prt*dt/gamma_bar;
-    const amrex::ParticleReal bxp = alpha*Bxp;
-    const amrex::ParticleReal byp = alpha*Byp;
-    const amrex::ParticleReal bzp = alpha*Bzp;
+    const amrex::ParticleReal bpx = alpha*Bpx;
+    const amrex::ParticleReal bpy = alpha*Bpy;
+    const amrex::ParticleReal bpz = alpha*Bpz;
 
     // Compute Mass Matrix kernels (non-relativistic for now)
-    const amrex::ParticleReal bpsq = bxp*bxp + byp*byp + bzp*bzp;
+    const amrex::ParticleReal bpsq = bpx*bpx + bpy*bpy + bpz*bpz;
     const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
 
-    fpxx = arogp*(bxp*bxp + 1.0_rt);
-    fpxy = arogp*(bxp*byp + bzp);
-    fpxz = arogp*(bxp*bzp - byp);
+    fpxx = arogp*(bpx*bpx + 1.0_rt);
+    fpxy = arogp*(bpx*bpy + bpz);
+    fpxz = arogp*(bpx*bpz - bpy);
 
-    fpyx = arogp*(byp*bxp - bzp);
-    fpyy = arogp*(byp*byp + 1.0_rt);
-    fpyz = arogp*(byp*bzp + bxp);
+    fpyx = arogp*(bpy*bpx - bpz);
+    fpyy = arogp*(bpy*bpy + 1.0_rt);
+    fpyz = arogp*(bpy*bpz + bpx);
 
-    fpzx = arogp*(bzp*bxp + byp);
-    fpzy = arogp*(bzp*byp - bxp);
-    fpzz = arogp*(bzp*bzp + 1.0_rt);
+    fpzx = arogp*(bpz*bpx + bpy);
+    fpzy = arogp*(bpz*bpy - bpx);
+    fpzz = arogp*(bpz*bpz + 1.0_rt);
 
 }
 
