@@ -1,5 +1,7 @@
 #include "ImplicitSolver.H"
+#include "SparseJacobianMatrix.H"
 #include "Fields.H"
+#include "NonlinearSolvers/LinearSolverLibrary.H"
 #include "WarpX.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -551,10 +553,23 @@ void ImplicitSolver::InitializeMassMatrices ()
     // dJy = MassMatrices_yx*dEx + MassMatrices_yy*dEy + MassMatrices_yz*dEz
     // dJz = MassMatrices_zx*dEx + MassMatrices_zy*dEy + MassMatrices_zz*dEz
 
-    // check that PC is being used by nonlinear solver
+    // Check that PC mass matrices are needed (by PC or by linear solver with use_pcmat)
     if (m_use_mass_matrices_pc) {
         const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
-        if (pc_type == PreconditionerType::none) {
+        bool linsol_use_pcmat = true;
+        {
+            LinearSolverType linsol_type = LinearSolverType::amrex_gmres;
+            const ParmParse pp_newton("newton");
+            pp_newton.query("linear_solver", linsol_type);
+            if (linsol_type == LinearSolverType::weighted_jacobi ||
+                linsol_type == LinearSolverType::chebyshev) {
+                const ParmParse pp_l(getEnumNameString(linsol_type));
+                pp_l.query("use_pcmat", linsol_use_pcmat);
+            } else {
+                linsol_use_pcmat = false;
+            }
+        }
+        if (pc_type == PreconditionerType::none && !linsol_use_pcmat) {
             m_use_mass_matrices_pc = false;
         }
         if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
@@ -762,6 +777,17 @@ void ImplicitSolver::InitializeMassMatrices ()
     if (m_use_mass_matrices_pc) {
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
             m_mmpc_mfarrvec.push_back(m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev));
+        }
+    }
+
+    // Set pointers to diagonal blocks (XX, YY, ZZ) of original mass matrices
+    if (m_use_mass_matrices_jacobian) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            m_mm_diag_mfarrvec.push_back({
+                m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+                m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+                m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)
+            });
         }
     }
 
@@ -1182,4 +1208,64 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
             amrex::Print() << "    ncomp_zz:  " << m_ncomp_zz << ";  ncomp_pc_zz:  " << m_ncomp_pc_zz << "\n";
         }
     }
+}
+
+void ImplicitSolver::AssemblePCMatrix (const WarpXSolverVec& a_U)
+{
+    BL_PROFILE("ImplicitSolver::AssemblePCMatrix()");
+
+    // Lazy initialization on first call
+    if (!m_sparse_jacobian) {
+        InitializePCMatrixFields();
+        m_sparse_jacobian = std::make_unique<SparseJacobianMatrix>();
+        m_sparse_jacobian->Define(
+            static_cast<int>(a_U.nDOF_local()),
+            static_cast<int>(a_U.nDOF_global()));
+    }
+
+    // Gather geometry
+    Vector<Geometry> geom(m_num_amr_levels);
+    for (int lev = 0; lev < m_num_amr_levels; lev++) {
+        geom[lev] = GetGeometry(lev);
+    }
+
+    // Gather BC masks
+    Vector<Array<const MultiFab*,3>> bc_masks(m_num_amr_levels);
+    for (int lev = 0; lev < m_num_amr_levels; lev++) {
+        for (int dir = 0; dir < 3; dir++) {
+            bc_masks[lev][dir] = GetCurl2BCmask(lev, dir);
+        }
+    }
+
+    // Gather mass matrix ncomp info
+    Array<IntVect,3> mm_ncomp;
+    for (int field_dir = 0; field_dir < 3; field_dir++) {
+        for (int d = 0; d < AMREX_SPACEDIM; d++) {
+            mm_ncomp[field_dir][d] = GetMassMatricesPCnComp(field_dir, d);
+        }
+    }
+
+    const Real theta_dt = GetThetaForPC() * m_dt;
+
+    m_sparse_jacobian->Update(
+        a_U.getDOFsObject().get(),
+        geom,
+        theta_dt,
+        bc_masks,
+        GetMassMatricesCoeff(),
+        mm_ncomp);
+}
+
+void ImplicitSolver::GetPCMatrix (
+    Gpu::DeviceVector<int>& a_r_indices_g,
+    Gpu::DeviceVector<int>& a_num_nz,
+    Gpu::DeviceVector<int>& a_c_indices_g,
+    Gpu::DeviceVector<Real>& a_a_ij,
+    int& a_n, int& a_ncols_max)
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_sparse_jacobian != nullptr,
+        "ImplicitSolver::GetPCMatrix() called before AssemblePCMatrix()");
+    m_sparse_jacobian->GetMatrix(a_r_indices_g, a_num_nz, a_c_indices_g,
+                                 a_a_ij, a_n, a_ncols_max);
 }

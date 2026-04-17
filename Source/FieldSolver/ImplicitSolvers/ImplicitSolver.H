@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus, Debojyoti Ghosh
+/* Copyright 2024-2026 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -9,14 +9,19 @@
 
 #include "ImplicitSolver_fwd.H"
 
+#include "Utils/WarpXConst.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "FieldSolver/ImplicitSolvers/SparseJacobianMatrix.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
 #include <AMReX_LO_BCTYPES.H>
+
+#include <memory>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -101,11 +106,26 @@ public:
     [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> GetLinOpBCHi () const;
 
     /**
-     * \brief Return pointer to MultiFab array for mass matrix
+     * \brief Return pointer to MultiFab array for PC mass matrices
      */
     [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesCoeff() const {
         if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
+    }
+
+    /**
+     * \brief Return pointer to diagonal blocks (XX, YY, ZZ) of the original mass matrices
+     */
+    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetMassMatricesJacDiag() const {
+        if (m_use_mass_matrices_jacobian) { return &m_mm_diag_mfarrvec; }
+        else { return nullptr; }
+    }
+
+    /**
+     * \brief Return the scaling factor c^2 * mu0 * theta * dt for the mass matrix diagonal
+     */
+    [[nodiscard]] amrex::Real GetMassMatrixDiagScale () const {
+        return PhysConst::c * PhysConst::c * PhysConst::mu0 * m_theta * m_dt;
     }
 
     /**
@@ -133,6 +153,30 @@ public:
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
+
+    /**
+     * \brief Assemble the sparse Jacobian matrix for the preconditioner.
+     *        Creates the SparseJacobianMatrix on first call (lazy init).
+     */
+    void AssemblePCMatrix (const WarpXSolverVec& a_U);
+
+    /**
+     * \brief Copy the assembled sparse matrix data to caller-provided device vectors.
+     */
+    void GetPCMatrix (amrex::Gpu::DeviceVector<int>& a_r_indices_g,
+                      amrex::Gpu::DeviceVector<int>& a_num_nz,
+                      amrex::Gpu::DeviceVector<int>& a_c_indices_g,
+                      amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
+                      int& a_n, int& a_ncols_max);
+
+    /**
+     * \brief Get a const pointer to the SparseJacobianMatrix (for calling
+     *        MatVecMult, MatJacobiSweep, etc.)
+     */
+    [[nodiscard]] const SparseJacobianMatrix* GetSparseJacobian () const
+    {
+        return m_sparse_jacobian.get();
+    }
 
     void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
 
@@ -247,6 +291,16 @@ protected:
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
     /**
+     * \brief Array of multifab pointers to diagonal blocks (XX, YY, ZZ) of original mass matrices
+     */
+    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mm_diag_mfarrvec;
+
+    /**
+     * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)
+     */
+    std::unique_ptr<SparseJacobianMatrix> m_sparse_jacobian;
+
+    /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
@@ -286,6 +340,13 @@ protected:
      * \brief Save E at start of each Newton step
      */
     void SaveE ();
+
+    /**
+     * \brief Called once before the first sparse matrix assembly.
+     *        Derived classes override to allocate fields needed by the assembly
+     *        (e.g., curl-curl BC masks). Default is a no-op.
+     */
+    virtual void InitializePCMatrixFields () {}
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

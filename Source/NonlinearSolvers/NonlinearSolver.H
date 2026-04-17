@@ -1,7 +1,7 @@
 #ifndef WARPX_NONLINEAR_SOLVER_H_
 #define WARPX_NONLINEAR_SOLVER_H_
 
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
