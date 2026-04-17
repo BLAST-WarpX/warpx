@@ -63,7 +63,7 @@ public:
     ThetaImplicitEM(ThetaImplicitEM&&) = delete;
     ThetaImplicitEM& operator=(ThetaImplicitEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX*  a_WarpX, bool  from_restart) override;
 
     void PrintParameters () const override;
 

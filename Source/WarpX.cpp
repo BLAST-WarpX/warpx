@@ -1942,7 +1942,6 @@ int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
     return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
 }
 
-
 void
 WarpX::BackwardCompatibility ()
 {
@@ -2487,6 +2486,13 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                             amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{2}, lev,
                             amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+
+        m_fields.alloc_init(FieldType::E_old, Direction{0}, lev,
+                            amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{1}, lev,
+                            amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{2}, lev,
+                            amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
     if (do_current_centering)
