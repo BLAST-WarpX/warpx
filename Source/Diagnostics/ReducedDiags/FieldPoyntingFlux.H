@@ -363,6 +363,7 @@ namespace Poynting {
             [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
             {
 
+                using namespace amrex::literals;
                 constexpr int comp = 0;
 
                 // This is needed by the GPU compilers where captured variables cannot first appear
