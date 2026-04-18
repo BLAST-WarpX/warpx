@@ -33,8 +33,8 @@
  * \param dt              Simulation time step
  * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
  * \param direct_algo     true if using direct deposition. False otherwise.
- * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
- * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
+ * \param xp_n  ,yp_n  ,zp_n    Old particle positions (nominally at start of step)
+ * \param xp_np1,yp_np1,zp_np1  New particle positions (nominally at end of step)
  * \param upx,upy,upz     Proper velocity of particle (time-centered)
  * \param Bpx,Bpy,Bpz     Magnetic field vector components on particle
  * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
@@ -46,13 +46,15 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
                              const amrex::ParticleReal ms,
                              const amrex::ParticleReal dt,
                              const amrex::ParticleReal rhop,
-                             [[maybe_unused]] const bool direct_algo,
-                             [[maybe_unused]] const amrex::ParticleReal xp_old,
-                             [[maybe_unused]] const amrex::ParticleReal yp_old,
-                             [[maybe_unused]] const amrex::ParticleReal zp_old,
-                             [[maybe_unused]] const amrex::ParticleReal xp_new,
-                             [[maybe_unused]] const amrex::ParticleReal yp_new,
-                             [[maybe_unused]] const amrex::ParticleReal zp_new,
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                             const bool direct_algo,
+                             const amrex::ParticleReal xp_n,
+                             const amrex::ParticleReal yp_n,
+                             [[maybe_unused]] const amrex::ParticleReal zp_n,
+                             const amrex::ParticleReal xp_np1,
+                             const amrex::ParticleReal yp_np1,
+                             [[maybe_unused]] const amrex::ParticleReal zp_np1,
+#endif
                              const amrex::ParticleReal upx,
                              const amrex::ParticleReal upy,
                              const amrex::ParticleReal upz,
@@ -97,11 +99,11 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     fpzz = arogp*(bpz*bpz + 1.0_rt);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
-    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
+    amrex::Real const xp_mid = (xp_np1 + xp_n)*0.5_rt;
+    amrex::Real const yp_mid = (yp_np1 + yp_n)*0.5_rt;
     amrex::Real const rp_mid = ( direct_algo ? std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid) :
-                                       0.5_rt*(std::sqrt(xp_new*xp_new + yp_new*yp_new)
-                                             + std::sqrt(xp_old*xp_old + yp_old*yp_old)) );
+                                       0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
+                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n)) );
     amrex::Real const costh = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
     amrex::Real const sinth = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
 
@@ -690,9 +692,12 @@ void doDirectSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_d
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels(qs, ms, dt, rhop, direct_algo,
+            setMassMatricesKernels(qs, ms, dt, rhop,
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                                   direct_algo,
                                    xp_n, yp_n, zp_n,
                                    xp_np1, yp_np1, zp_np1,
+#endif
                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                    Bxp, Byp, Bzp,
                                    fpxx, fpxy, fpxz,
@@ -1912,9 +1917,12 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
-            setMassMatricesKernels(qs, ms, dt, rhop, direct_algo,
+            setMassMatricesKernels(qs, ms, dt, rhop,
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                                   direct_algo,
                                    xp_n, yp_n, zp_n,
                                    xp_np1, yp_np1, zp_np1,
+#endif
                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                    Bxp, Byp, Bzp,
                                    fpxx, fpxy, fpxz,
