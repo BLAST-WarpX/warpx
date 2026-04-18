@@ -208,7 +208,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
-    pp_species_name.query("random_theta", m_rz_random_theta);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    pp_species_name.query("random_theta", m_random_theta);
+#if defined(WARPX_DIM_RSPHERE)
+    pp_species_name.query("random_phi", m_random_phi);
+#endif
+#endif
 
     // Initialize splitting
     pp_species_name.query("do_splitting", do_splitting);
