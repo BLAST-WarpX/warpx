@@ -32,9 +32,14 @@
  * \param ms              Species mass
  * \param dt              Simulation time step
  * \param rhop            qs*wp*invvol*2.0/(gamma_n + gamma_np1)
- * \param direct_algo     true if using direct deposition. False otherwise.
- * \param xp_n  ,yp_n  ,zp_n    Old particle positions (nominally at start of step)
- * \param xp_np1,yp_np1,zp_np1  New particle positions (nominally at end of step)
+ */
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+/**
+ * \param costh           cos(theta) for CAR to CYL mapping
+ * \param sinth           sin(theta) for CAR to CYL mapping
+ */
+#endif
+/**
  * \param upx,upy,upz     Proper velocity of particle (time-centered)
  * \param Bpx,Bpy,Bpz     Magnetic field vector components on particle
  * \param fpxx,fpxy,fpxz  Mass matrices kernels corresponding to dJx
@@ -47,13 +52,8 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
                              const amrex::ParticleReal dt,
                              const amrex::ParticleReal rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                             const bool direct_algo,
-                             const amrex::ParticleReal xp_n,
-                             const amrex::ParticleReal yp_n,
-                             [[maybe_unused]] const amrex::ParticleReal zp_n,
-                             const amrex::ParticleReal xp_np1,
-                             const amrex::ParticleReal yp_np1,
-                             [[maybe_unused]] const amrex::ParticleReal zp_np1,
+                             const amrex::ParticleReal costh,
+                             const amrex::ParticleReal sinth,
 #endif
                              const amrex::ParticleReal upx,
                              const amrex::ParticleReal upy,
@@ -99,13 +99,6 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     fpzz = arogp*(bpz*bpz + 1.0_rt);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    amrex::Real const xp_mid = (xp_np1 + xp_n)*0.5_rt;
-    amrex::Real const yp_mid = (yp_np1 + yp_n)*0.5_rt;
-    amrex::Real const rp_mid = ( direct_algo ? std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid) :
-                                       0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
-                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n)) );
-    amrex::Real const costh = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
-    amrex::Real const sinth = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
 
     // [fprr fprt fprz] = [ costh sinth 0][fpxx fpxy fpxz][costh -sinth 0]
     // [fptr fptt fptz] = [-sinth costh 0][fpyx fpyy fpyz][sinth  costh 0]
@@ -580,7 +573,6 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
  * \tparam depos_order             deposition order
  * \tparam full_mass_matrices      Whether to deposit the full mass matrices
  * \tparam deposit_J               Whether to deposit J
- * \param xp_n_data,yp_n_data,zp_n_data Pointer to arrays of particle position at time level n.
  * \param GetPosition              A functor for returning the particle position.
  * \param nsuborbits               Pointer to the number of suborbits for this particle.
  * \param wp                       Pointer to array of particle weights.
@@ -601,10 +593,7 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
  * \param ms                       Species mass.
  */
 template <int depos_order, bool full_mass_matrices>
-void doDirectSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_data,
-                              [[maybe_unused]] const amrex::ParticleReal* yp_n_data,
-                              [[maybe_unused]] const amrex::ParticleReal* zp_n_data,
-                              const GetParticlePosition<PIdx>& GetPosition,
+void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
                               [[maybe_unused]] const int* nsuborbits,
                               const amrex::ParticleReal* wp,
                               const amrex::ParticleReal* uxp_n,
@@ -654,18 +643,11 @@ void doDirectSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_d
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            amrex::ParticleReal const xp_n = (xp_n_data ? xp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
-            amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
-
             // Compute magnetic field on particle
             amrex::ParticleReal Bxp = 0.0;
             amrex::ParticleReal Byp = 0.0;
             amrex::ParticleReal Bzp = 0.0;
-            const bool direct_algo = true;
             doDirectGatherVectorField</*depos_order_perp=*/depos_order,/*depos_order_para=*/depos_order>(
-                                    direct_algo,
-                                    xp_n, yp_n, zp_n,
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
@@ -683,10 +665,11 @@ void doDirectSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_d
             const amrex::Real vy = uyp_nph[ip]*gaminv;
             const amrex::Real vz = uzp_nph[ip]*gaminv;
 
-            // Compute position at time n + 1
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            amrex::Real const rp_mid = std::sqrt(xp_nph*xp_nph + yp_nph*yp_nph);
+            amrex::Real const costh = (rp_mid > 0._rt ? xp_nph/rp_mid : 1._rt);
+            amrex::Real const sinth = (rp_mid > 0._rt ? yp_nph/rp_mid : 0._rt);
+#endif
 
             // Set the Mass Matrices kernels
             amrex::ParticleReal fpxx, fpxy, fpxz;
@@ -694,9 +677,7 @@ void doDirectSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp_n_d
             amrex::ParticleReal fpzx, fpzy, fpzz;
             setMassMatricesKernels(qs, ms, dt, rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                                   direct_algo,
-                                   xp_n, yp_n, zp_n,
-                                   xp_np1, yp_np1, zp_np1,
+                                   costh, sinth,
 #endif
                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                    Bxp, Byp, Bzp,
@@ -1884,17 +1865,35 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
             amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
+            // Compute position at time n + 1
+            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
+            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
+            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
+                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n));
+            amrex::Real const costh = (rp_mid > 0._rt ? xp_nph/rp_mid : 1._rt);
+            amrex::Real const sinth = (rp_mid > 0._rt ? yp_nph/rp_mid : 0._rt);
+#elif defined(WARPX_DIM_RSPHERE)
+            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1)
+                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n));
+#endif
+
             // Compute magnetic field on particle
             amrex::ParticleReal Bxp = 0.0;
             amrex::ParticleReal Byp = 0.0;
             amrex::ParticleReal Bzp = 0.0;
             const int depos_order_perp = 1;
             const int depos_order_para = 1;
-            const bool direct_algo = false;
             doDirectGatherVectorField<depos_order_perp,depos_order_para>(
-                                    direct_algo,
-                                    xp_n, yp_n, zp_n,
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                                    rp_mid, 0.0_prt, 0.0_prt,
+#elif defined(WARPX_DIM_RZ)
+                                    rp_mid, 0.0_prt, zp_nph,
+#else
                                     xp_nph, yp_nph, zp_nph,
+#endif
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
@@ -1908,20 +1907,13 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             const amrex::Real wq_invvol = qs*wp[ip]*invvol;
             const amrex::Real rhop = wq_invvol*gaminv;
 
-            // Compute position at time n + 1
-            amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
-            amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
-            amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
-
             // Set the Mass Matrices kernels
             amrex::ParticleReal fpxx, fpxy, fpxz;
             amrex::ParticleReal fpyx, fpyy, fpyz;
             amrex::ParticleReal fpzx, fpzy, fpzz;
             setMassMatricesKernels(qs, ms, dt, rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                                   direct_algo,
-                                   xp_n, yp_n, zp_n,
-                                   xp_np1, yp_np1, zp_np1,
+                                   costh, sinth,
 #endif
                                    uxp_nph[ip], uyp_nph[ip], uzp_nph[ip],
                                    Bxp, Byp, Bzp,

@@ -22,8 +22,6 @@
  * \tparam depos_order_perp       Particle shape order in parallel direction
  * \tparam depos_order_para       Particle shape order in perpendicular direction
  *
- * \param direct_algo             True if called from direct deposition. False otherwise
- * \param xp_n,yp_n,zp_n          Particle position coordinates at start of step
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle
  * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
@@ -36,10 +34,6 @@
 template <int depos_order_perp, int depos_order_para>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void doDirectGatherVectorField (
-                     [[maybe_unused]] const bool direct_algo,
-                     [[maybe_unused]] const amrex::ParticleReal xp_n,
-                     [[maybe_unused]] const amrex::ParticleReal yp_n,
-                     [[maybe_unused]] const amrex::ParticleReal zp_n,
                      [[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      [[maybe_unused]] const amrex::ParticleReal zp,
@@ -63,12 +57,7 @@ void doDirectGatherVectorField (
 
     // Compute particle position in grid units
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    const double xp_np1 = 2.0*xp - xp_n;
-    const double yp_np1 = 2.0*yp - yp_n;
-    const double rp_n   = std::sqrt(xp_n*xp_n     + yp_n*yp_n);
-    const double rp_np1 = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1);
-    const double rp = ( direct_algo ? std::sqrt(xp*xp + yp*yp) :
-                                      0.5*(rp_n + rp_np1) );
+    const double rp = std::sqrt(xp*xp + yp*yp);
     const double x_bar = (rp - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
     const double rp = std::sqrt(xp*xp + yp*yp + zp*zp);
@@ -2100,10 +2089,14 @@ void doGatherPicnicShapeN (
     // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
-    const bool direct_algo = false;
-    doDirectGatherVectorField<depos_order_perp,depos_order_para>(direct_algo,
-                                    xp_n, yp_n, zp_n,
+    doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                                    rp_mid, 0.0_prt, 0.0_prt,
+#elif defined(WARPX_DIM_RZ)
+                                    rp_mid, 0.0_prt, zp_nph,
+#else
                                     xp_nph, yp_nph, zp_nph,
+#endif
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
