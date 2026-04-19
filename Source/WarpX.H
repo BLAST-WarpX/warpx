@@ -311,6 +311,12 @@ public:
     //! If true, the initial conditions from random number generators are serialized (useful for reproducible testing with OpenMP)
     static bool serialize_initial_conditions;
 
+    //! Relative permittivity applied to Ampere's law (default 1.0, no modification).
+    //! Scales the curl(B) and J terms in the E-field update by 1/epsilon_r,
+    //! effectively reducing the EM wave speed to c/sqrt(epsilon_r).
+    //! Set via warpx.epsilon_r.
+    static amrex::Real epsilon_r;
+
     //! Lorentz factor of the boosted frame in which a boosted-frame simulation is run
     static amrex::Real gamma_boost;
     //! Beta value corresponding to the Lorentz factor of the boosted frame of the simulation

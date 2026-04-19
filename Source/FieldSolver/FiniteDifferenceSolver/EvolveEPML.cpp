@@ -19,6 +19,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
+#include "WarpX.H"
 
 #include <AMReX.H>
 #include <AMReX_Array4.H>
@@ -110,7 +111,7 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
     MultiSigmaBox const& sigba,
     amrex::Real const dt, bool pml_has_particles ) {
 
-    Real constexpr c2 = PhysConst::c * PhysConst::c;
+    Real const c2 = PhysConst::c * PhysConst::c / WarpX::epsilon_r;
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -240,7 +241,7 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
             int const y_lo = 0;
             int const z_lo = sigba[mfi].sigma[1].lo();
 #endif
-            const Real mu_c2_dt = (PhysConst::mu0*PhysConst::c*PhysConst::c) * dt;
+            const Real mu_c2_dt = (PhysConst::mu0 * PhysConst::c * PhysConst::c / WarpX::epsilon_r) * dt;
 
             amrex::ParallelFor( tex, tey, tez,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
