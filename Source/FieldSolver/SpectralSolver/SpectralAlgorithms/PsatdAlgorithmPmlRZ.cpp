@@ -92,7 +92,7 @@ PsatdAlgorithmPmlRZ::pushSpectralFields (SpectralFieldDataRZ & f)
             int const ir = i + nr*mode;
             amrex::Real const kr = kr_arr[ir];
 
-            constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             Complex const I = Complex{0._rt,1._rt};
             amrex::Real const C = C_arr(i,j,k,mode);
             amrex::Real const S_ck = S_ck_arr(i,j,k,mode);

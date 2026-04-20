@@ -146,9 +146,9 @@ public:
         namespace pxr_qs = picsar::multi_physics::phys::quantum_sync;
 
         constexpr amrex::ParticleReal m_e = PhysConst::m_e;
-        constexpr amrex::ParticleReal inv_c2 = 1._rt/(PhysConst::c*PhysConst::c);
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         const amrex::ParticleReal gamma = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)*inv_c2);
-        const auto energy = gamma*m_e*PhysConst::c*PhysConst::c;
+        const auto energy = gamma*m_e*PhysConst::c2;
 
         const auto chi_part = QedUtils::chi_ele_pos(
             m_e*ux, m_e*uy, m_e*uz, ex, ey, ez, bx, by, bz);

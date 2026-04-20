@@ -207,7 +207,7 @@ public:
         const auto E_out = static_cast<amrex::ParticleReal>((E_coll - m_energy_cost) / 2.0_prt * eV);
 
         // precalculate often used value
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
         const auto mc2 = m_mass1*c2;
 
         const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;

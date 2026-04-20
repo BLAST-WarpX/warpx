@@ -1193,7 +1193,7 @@ void MultiParticleContainer::InitQuantumSync ()
 
     //If specified, use a user-defined energy threshold for photon creation
     ParticleReal temp;
-    constexpr auto mec2 = PhysConst::c * PhysConst::c * PhysConst::m_e;
+    constexpr auto mec2 = PhysConst::c2 * PhysConst::m_e;
     if(utils::parser::queryWithParser(
         pp_qed_qs, "photon_creation_energy_threshold", temp)){
         temp *= mec2;

@@ -304,7 +304,7 @@ void PhysicalParticleContainer::MapParticletoBoostedFrame (
     const amrex::ParticleReal uz_boost = WarpX::gamma_boost*WarpX::beta_boost*PhysConst::c;
 
     // tpr is the particle's time in the boosted frame
-    const amrex::ParticleReal tpr = WarpX::gamma_boost*t_lab - uz_boost*z/(PhysConst::c*PhysConst::c);
+    const amrex::ParticleReal tpr = WarpX::gamma_boost*t_lab - uz_boost*z/PhysConst::c2;
 
     // The particle's transformed location in the boosted frame
     const amrex::ParticleReal xpr = x;
@@ -312,11 +312,11 @@ void PhysicalParticleContainer::MapParticletoBoostedFrame (
     const amrex::ParticleReal zpr = WarpX::gamma_boost*z - uz_boost*t_lab;
 
     // transform u and gamma to the boosted frame
-    const amrex::ParticleReal gamma_lab = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)/(PhysConst::c*PhysConst::c));
+    const amrex::ParticleReal gamma_lab = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)/PhysConst::c2);
     // ux = ux;
     // uy = uy;
     uz = WarpX::gamma_boost*uz - uz_boost*gamma_lab;
-    const amrex::ParticleReal gammapr = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)/(PhysConst::c*PhysConst::c));
+    const amrex::ParticleReal gammapr = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)/PhysConst::c2);
 
     const amrex::ParticleReal vxpr = ux/gammapr;
     const amrex::ParticleReal vypr = uy/gammapr;
