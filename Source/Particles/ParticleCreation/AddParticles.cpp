@@ -960,6 +960,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         auto *const poffset = offset.data();
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const bool random_theta = m_random_theta;
+        const bool randomize_theta_offset = m_randomize_theta_offset;
 #endif
 #if defined(WARPX_DIM_RSPHERE)
         const bool random_phi = m_random_phi;
@@ -970,6 +971,10 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
             amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            const amrex::Real theta_offset = (randomize_theta_offset ? 2._rt * MathConst::pi * amrex::Random(engine) : 0._rt);
+#endif
 
             const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts[index]);
             for (int i_part = 0; i_part < pcounts[index]; ++i_part)
@@ -1007,9 +1012,16 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and density.
-                const amrex::Real theta = (random_theta ?
+                amrex::Real theta = (random_theta ?
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y));
+
+                // Add randomize offset to theta, but keep it in (-pi, pi]
+                if (randomize_theta_offset) {
+                    theta += theta_offset;
+                    theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
+                    theta -= MathConst::pi;
+                }
 
                 // Adjust the particle radius to produce the correct distribution.
                 // Note that this may shift particles outside of the current tile,
@@ -1030,7 +1042,15 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // These x, y, and z are used to get the momentum and density.
                 const amrex::Real theta = (random_theta ?
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
-                    MathConst::pi*(1._rt - 2._rt*r.y));
+                    MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
+
+                // Add randomize offset to theta, but keep it in (-pi, pi]
+                if (randomize_theta_offset) {
+                    theta += theta_offset;
+                    theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
+                    theta -= MathConst::pi;
+                }
+
                 const amrex::Real sin_phi = (random_phi ?
                                    1._rt - 2._rt*amrex::Random(engine) :
                                    1._rt - 2._rt*r.z);
