@@ -11,8 +11,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
+
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -40,7 +41,7 @@ InverseBremsstrahlung::InverseBremsstrahlung (std::string const& collision_name,
 void
 InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("InverseBremsstrahlung::doCollisions()");
+    ABLASTR_PROFILE("InverseBremsstrahlung::doCollisions()");
     using namespace amrex::literals;
 
     auto& photons = mypc->GetParticleContainerFromName(m_species_names[0]);
