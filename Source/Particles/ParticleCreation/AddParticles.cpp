@@ -1018,7 +1018,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
                 // Add randomize offset to theta, but keep it in (-pi, pi]
                 if (randomize_theta_offset) {
-                    theta += MathConst::pi
+                    theta += MathConst::pi;
                     theta = std::fmod(theta, 2._rt * MathConst::pi);
                     theta -= MathConst::pi;
                 }
