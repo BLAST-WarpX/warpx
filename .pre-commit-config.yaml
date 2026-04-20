@@ -15,6 +15,9 @@
 # Do not check/format anything from third parties
 exclude: '^share/openPMD/thirdParty'
 
+ci:
+  autoupdate_schedule: monthly
+
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
