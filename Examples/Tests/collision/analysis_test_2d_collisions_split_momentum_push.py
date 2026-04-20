@@ -11,6 +11,7 @@ needs to be relaxed to one order of magnitude higher.
 """
 
 import argparse
+import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -22,6 +23,7 @@ from input_file_parser import parse_input_file
 
 
 def analyze(args: argparse.Namespace) -> None:
+    test_has_charge_exchange = "charge_exchange" in os.path.basename(os.getcwd())
     # compute energies from the reduced diagnostics
     field_energy_data = np.loadtxt(fname=f"{args.path}/field_energy.txt", skiprows=1)
     particle_energy_data = np.loadtxt(
@@ -51,10 +53,11 @@ def analyze(args: argparse.Namespace) -> None:
         )
         else False
     )
-    if electrostatic:
-        equipartition_value = 1 / (6 * num_particles_per_cell + 1)
-    else:
-        equipartition_value = 5 / (6 * num_particles_per_cell + 5)
+    if not test_has_charge_exchange:
+        if electrostatic:
+            equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+        else:
+            equipartition_value = 5 / (6 * num_particles_per_cell + 5)
 
     # normalize the field energy variation
     electron_temperature = float(input_dict["my_constants.Te"][0])
@@ -87,14 +90,15 @@ def analyze(args: argparse.Namespace) -> None:
         field_energy_error,
         label="Field energy error",
     )
-    ax[1].hlines(
-        y=equipartition_value,
-        xmin=field_energy_data[0, 1] * plasma_frequency,
-        xmax=field_energy_data[-1, 1] * plasma_frequency,
-        colors="C1",
-        linestyles="dashed",
-        label="Equipartition value",
-    )
+    if not test_has_charge_exchange:
+        ax[1].hlines(
+            y=equipartition_value,
+            xmin=field_energy_data[0, 1] * plasma_frequency,
+            xmax=field_energy_data[-1, 1] * plasma_frequency,
+            colors="C1",
+            linestyles="dashed",
+            label="Equipartition value",
+        )
     ax[1].set_xlabel(r"$\omega_p t$")
     ax[1].set_ylabel(r"$\Delta U_{field} / (3 n T_e (10 c / \omega_p)^2)$")
     ax[1].set_yscale("symlog", linthresh=1e-6)
@@ -106,7 +110,8 @@ def analyze(args: argparse.Namespace) -> None:
 
     print(f"Total energy error: \n{total_energy_error}")
     print(f"Field energy error: \n{field_energy_error}")
-    print(f"Equipartition value: {equipartition_value}")
+    if not test_has_charge_exchange:
+        print(f"Equipartition value: {equipartition_value}")
 
     # verify the total energy conservation
     total_energy_error_norm = np.max(np.abs(total_energy_error))
@@ -116,16 +121,20 @@ def analyze(args: argparse.Namespace) -> None:
             f"Total energy conservation failed with a maximum relative error of {total_energy_error_norm}"
         )
 
-    # compare the final value of the field energy variation to the reference equipartition value
-    relative_tolerance = 1e-1 if electrostatic else 5e-1
-    # average over the last 100 time steps to reduce noise
-    field_energy_error_avg = np.mean(field_energy_error[-100:])
-    if not np.isclose(
-        field_energy_error_avg, equipartition_value, rtol=relative_tolerance
-    ):
-        raise ValueError(
-            f"Averaged field energy error {field_energy_error_avg} is not close to the reference equipartition value {equipartition_value}"
-        )
+    if not test_has_charge_exchange:
+        # compare the final value of the field energy variation to the reference equipartition value
+        relative_tolerance = 1e-1 if electrostatic else 5e-1
+        # average over the last 100 time steps to reduce noise
+        field_energy_error_avg = np.mean(field_energy_error[-100:])
+        if not np.isclose(
+            field_energy_error_avg, equipartition_value, rtol=relative_tolerance
+        ):
+            raise ValueError(
+                f"Averaged field energy error {field_energy_error_avg} is not close to the reference equipartition value {equipartition_value}"
+            )
+    else:
+        # In the case of charge exchange, skip the check of the field energy variation against the reference equipartition value.
+        pass
 
 
 if __name__ == "__main__":
