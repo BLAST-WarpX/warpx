@@ -1531,16 +1531,14 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly in :math:`(-\pi, \pi]`, or fixed to :math:`0`.
-    This is used when ``<species_name>.injection_style = NUniformPerCell``.
+    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly or uniformly spaced in :math:`(-\pi, \pi]`.
 
 .. pp:param:: <species_name>.random_phi
     :type: ``bool``
     :default: ``1``
     :optional:
 
-    When using RSPHERE geometry, the polar position of particles is either set randomly in :math:`(-\pi/2, \pi/2]`, or fixed to :math:`0`.
-    This is used when ``<species_name>.injection_style = NUniformPerCell``.
+    When using RSPHERE geometry, the polar position of particles is either set randomly or uniformly in :math:`(-\pi/2, \pi/2]`.
 
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``
