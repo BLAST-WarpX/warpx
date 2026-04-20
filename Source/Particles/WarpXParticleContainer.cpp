@@ -1155,10 +1155,13 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
     const bool full_mass_matrices = (Szz->nComp() > 1);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
     const int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 =======
 >>>>>>> 3838b804f (address issues flagged by the readability-simplify-boolean-expr check)
+=======
+>>>>>>> a2e25f324b1611ec20b80018bd552561f50d2517
 
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {

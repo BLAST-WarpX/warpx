@@ -487,9 +487,9 @@ namespace
         return n_borrow;
     }
 
-#endif //WARPX_DIM_RZ
+    #endif //WARPX_DIM_RZ
 
-#endif //AMREX_USE_EB
+    #endif //AMREX_USE_EB
 }
 
 

@@ -36,6 +36,6 @@ namespace collision::binarycollision::virtualphotons
  */
 void GenerateVirtualPhotons (MultiParticleContainer* mypc);
 
-}
+} // close namespace
 
 #endif // WARPX_VIRTUAL_PHOTONS_H_
