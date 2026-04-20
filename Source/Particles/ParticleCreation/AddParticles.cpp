@@ -1014,12 +1014,12 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // These x and y are used to get the momentum and density.
                 amrex::Real theta = (random_theta ?
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
-                    MathConst::pi*(1._rt - 2._rt*r.y));
+                    MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
                 // Add randomize offset to theta, but keep it in (-pi, pi]
                 if (randomize_theta_offset) {
-                    theta += theta_offset;
-                    theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
+                    theta += MathConst::pi
+                    theta = std::fmod(theta, 2._rt * MathConst::pi);
                     theta -= MathConst::pi;
                 }
 
@@ -1046,7 +1046,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
                 // Add randomize offset to theta, but keep it in (-pi, pi]
                 if (randomize_theta_offset) {
-                    theta += theta_offset;
+                    theta += MathConst::pi;
                     theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
                     theta -= MathConst::pi;
                 }
