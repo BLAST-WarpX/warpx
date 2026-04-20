@@ -973,10 +973,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
             amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
-#if defined(WARPX_DIM_RZ)
-            amrex::Real theta_offset = 0._rt;
-            if (random_theta) { theta_offset = amrex::Random(engine) * 2._rt * MathConst::pi; }
-#endif
 
             const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts[index]);
             for (int i_part = 0; i_part < pcounts[index]; ++i_part)
@@ -1014,15 +1010,9 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and density.
-                // With only 1 mode, the angle doesn't matter so choose it randomly.
-#if defined(WARPX_DIM_RZ)
-                const amrex::Real theta = (nmodes == 1 && random_theta ?
-                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
-                    2._rt*MathConst::pi*r.y + theta_offset);
-#elif defined(WARPX_DIM_RCYLINDER)
                 const amrex::Real theta = (random_theta ?
-                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) : 0._rt);
-#endif
+                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
+                    MathConst::pi*(1._rt - 2._rt*r.y));
 
                 // Adjust the particle radius to produce the correct distribution.
                 // Note that this may shift particles outside of the current tile,
@@ -1590,17 +1580,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 amrex::Real const radial_position = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
 
                 // Conversion from cylindrical to Cartesian coordinates
-                // Replace the x and y, setting an angle theta.
+                // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and flux.
-                // With only 1 mode, the angle doesn't matter so choose it randomly.
-#if defined(WARPX_DIM_RZ)
-                const amrex::Real theta = (nmodes == 1 && random_theta ?
-                    MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt) :
-                    2._prt*MathConst::pi*r.y);
-#elif defined(WARPX_DIM_RCYLINDER)
                 const amrex::Real theta = (random_theta ?
-                    MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt) : 0._rt);
-#endif
+                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
+                    MathConst::pi*(1._rt - 2._rt*r.y));
+
                 amrex::Real const cos_theta = std::cos(theta);
                 amrex::Real const sin_theta = std::sin(theta);
                 // Rotate the position
