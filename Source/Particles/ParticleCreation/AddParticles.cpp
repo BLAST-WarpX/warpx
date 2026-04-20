@@ -973,6 +973,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             const auto index = overlap_box.index(iv);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Add random offset to theta on a cell-by-cell basis
             const amrex::Real theta_offset = (randomize_theta_offset ? 2._rt * MathConst::pi * amrex::Random(engine) : 0._rt);
 #endif
 
@@ -1016,7 +1017,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
-                // Add randomize offset to theta, but keep it in (-pi, pi]
+                // Enforce the angle to be in (-pi, pi]
                 if (randomize_theta_offset) {
                     theta += MathConst::pi;
                     theta = std::fmod(theta, 2._rt * MathConst::pi);
@@ -1044,7 +1045,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
-                // Add randomize offset to theta, but keep it in (-pi, pi]
+                // Enforce the angle to be in (-pi, pi]
                 if (randomize_theta_offset) {
                     theta += MathConst::pi;
                     theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
