@@ -587,7 +587,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     amrex::Real Uz = (NUz_arr(i, j, k) / N_arr(i,j,k));
 
                     // Compute useful quantities for J
-                    const amrex::Real c2 = clight*clight;
+                   constexpr amrex::Real c2 = PhysConst::c2;
                     const amrex::Real gamma = std::sqrt(1.0_rt + (Ux*Ux + Uy*Uy + Uz*Uz)/c2 );
                     const amrex::Real inv_c2_gamma3 = 1._rt/(c2*gamma*gamma*gamma);
 
