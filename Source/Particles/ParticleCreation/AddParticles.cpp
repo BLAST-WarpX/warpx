@@ -1017,7 +1017,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
-                // Enforce the angle to be in (-pi, pi]
+                // Enforce angle theta to be in (-pi, pi]
                 if (randomize_theta_offset) {
                     theta += MathConst::pi;
                     theta = std::fmod(theta, 2._rt * MathConst::pi);
@@ -1045,7 +1045,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
-                // Enforce the angle to be in (-pi, pi]
+                // Enforce angle theta to be in (-pi, pi]
                 if (randomize_theta_offset) {
                     theta += MathConst::pi;
                     theta = std::fmod(theta + MathConst::pi, 2._rt * MathConst::pi);
