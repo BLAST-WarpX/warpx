@@ -190,10 +190,10 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
             // compute photon energy
             amrex::ParticleReal const Ephoton_J = Algorithms::KineticEnergyPhotons(upx, upy, upz);
-            amrex::ParticleReal const nuIB = std::pow(cell_Ewpe_J/Ephoton_J, 2)*cell_nuei*0.5_prt;
+            amrex::ParticleReal const nuIB = std::pow(cell_Ewpe_J/Ephoton_J, 2._prt)*cell_nuei*0.5_prt;
 
             // update photon weight based on absorption
-            amrex::ParticleReal const dt_prt = static_cast<amrex::ParticleReal>(dt);
+            auto const dt_prt = static_cast<amrex::ParticleReal>(dt);
             amrex::ParticleReal dw = wp*std::min(nuIB*dt_prt, 1.0_prt); // weight to be removed from photon
 
             if (dw < wp) {
@@ -208,11 +208,10 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
             // update total energy and momentum lost
             // note that the photon upx, y, z is scaled by m_e
-            amrex::ParticleReal constexpr m_e = static_cast<amrex::ParticleReal>(PhysConst::m_e);
             amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], dw*Ephoton_J);
-            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*m_e);
-            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*m_e);
-            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*m_e);
+            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*PhysConst::m_e);
 
             // update probe for energy gain via absorption
             /* m_deltaE_IBremsstrahlung += sum_deltaE_J*PhysConst::q_e; // Joules */
@@ -256,8 +255,8 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
     amrex::Long* failed_corrections_ptr = failed_corrections.data();
 
-    amrex::ParticleReal energy_fraction = m_energy_fraction;
-    amrex::ParticleReal energy_fraction_max = m_energy_fraction_max;
+    const amrex::ParticleReal energy_fraction = m_energy_fraction;
+    const amrex::ParticleReal energy_fraction_max = m_energy_fraction_max;
 
     // Distribute any remaining energy to the electrons using the pairwise
     // operation (that does not affect the total momentum)
@@ -271,7 +270,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
             if (deltaEp_subtract != 0.) {
                 // Adjust electrons to absorb deltaEp_subtract.
-                bool correction_failed =
+                const bool correction_failed =
                      ParticleUtils::ModifyEnergyPairwise(ux_electrons, uy_electrons, uz_electrons, w_electrons,
                                                          indices_electrons,
                                                          cell_start_electrons, cell_stop_electrons, m_electrons,
