@@ -506,13 +506,18 @@ WarpX::WarpX ()
                 utils::parser::queryWithParser(pp_warpx, (dp+"zlo").c_str(), pair.drive.zlo);
                 utils::parser::queryWithParser(pp_warpx, (dp+"zhi").c_str(), pair.drive.zhi);
                 utils::parser::queryWithParser(pp_warpx, (dp+"A"  ).c_str(), pair.drive.A);
-                pp_warpx.query((dp+"dir").c_str(), pair.drive.dir);
+                pp_warpx.query((dp+"dir" ).c_str(), pair.drive.dir);
+                pp_warpx.query((dp+"sign").c_str(), pair.drive.sign);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     pair.drive.dir >= 0 && pair.drive.dir <= 2,
                     "current_injection pair_" + std::to_string(p) + ".drive.dir must be 0, 1, or 2");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    pair.drive.sign == 1 || pair.drive.sign == -1,
+                    "current_injection pair_" + std::to_string(p) + ".drive.sign must be +1 or -1");
 
                 // Return face (optional).
-                pair.ret.dir = pair.drive.dir;
+                pair.ret.dir  = pair.drive.dir;
+                pair.ret.sign = pair.drive.sign;
                 pair.has_return = (utils::parser::queryWithParser(pp_warpx,
                     (rp+"xlo").c_str(), pair.ret.xlo) > 0);
                 if (pair.has_return) {
@@ -522,10 +527,14 @@ WarpX::WarpX ()
                     utils::parser::queryWithParser(pp_warpx, (rp+"zlo").c_str(), pair.ret.zlo);
                     utils::parser::queryWithParser(pp_warpx, (rp+"zhi").c_str(), pair.ret.zhi);
                     utils::parser::queryWithParser(pp_warpx, (rp+"A"  ).c_str(), pair.ret.A);
-                    pp_warpx.query((rp+"dir").c_str(), pair.ret.dir);
+                    pp_warpx.query((rp+"dir" ).c_str(), pair.ret.dir);
+                    pp_warpx.query((rp+"sign").c_str(), pair.ret.sign);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         pair.ret.dir >= 0 && pair.ret.dir <= 2,
                         "current_injection pair_" + std::to_string(p) + ".return.dir must be 0, 1, or 2");
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        pair.ret.sign == 1 || pair.ret.sign == -1,
+                        "current_injection pair_" + std::to_string(p) + ".return.sign must be +1 or -1");
                 }
 
                 // Per-pair waveform override.
@@ -546,6 +555,7 @@ WarpX::WarpX ()
                 amrex::Print()
                     << "[CurrentInjection] pair " << p
                     << "  drive: dir=" << pair.drive.dir
+                    << "  sign=" << pair.drive.sign
                     << "  A=" << pair.drive.A << " m^2"
                     << "  box=[" << pair.drive.xlo << "," << pair.drive.xhi << "]"
                     << "x[" << pair.drive.ylo << "," << pair.drive.yhi << "]"

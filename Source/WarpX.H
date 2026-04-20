@@ -1332,14 +1332,15 @@ private:
         amrex::Real xlo{0}, xhi{0};
         amrex::Real ylo{0}, yhi{0};
         amrex::Real zlo{0}, zhi{0};
-        amrex::Real A{1};   //!< Face area perpendicular to dir [m^2]
-        int dir{0};         //!< Current direction: 0=Jx, 1=Jy, 2=Jz
+        amrex::Real A{1};    //!< Face area perpendicular to dir [m^2]
+        int dir{0};          //!< Current direction: 0=Jx, 1=Jy, 2=Jz
+        int sign{1};         //!< Current sign: +1 or -1. Injected J = sign * I(t) / A
     };
 
     /** One drive / return pair.
      *  Input keys:
-     *    warpx.current_injection.pair_N.drive.{xlo,xhi,ylo,yhi,zlo,zhi,A,dir}
-     *    warpx.current_injection.pair_N.return.{xlo,xhi,ylo,yhi,zlo,zhi,A[,dir]}  (optional)
+     *    warpx.current_injection.pair_N.drive.{xlo,xhi,ylo,yhi,zlo,zhi,A,dir[,sign]}
+     *    warpx.current_injection.pair_N.return.{xlo,xhi,ylo,yhi,zlo,zhi,A[,dir][,sign]}  (optional)
      *  The return.* block is only needed when there is no conducting body in
      *  the domain to carry the return current naturally.  For coils with an
      *  on-grid conductor (macroscopic sigma) omit the return.* keys entirely.

@@ -1552,9 +1552,9 @@ WarpX::InjectPrescribedCurrent (amrex::Real t)
 
         if (I_t == 0._rt) { continue; }   // nothing to inject for this pair
 
-        inject_face(pair.drive, +I_t / pair.drive.A);
+        inject_face(pair.drive, static_cast<Real>(pair.drive.sign) * I_t / pair.drive.A);
         if (pair.has_return) {
-            inject_face(pair.ret, -I_t / pair.ret.A);
+            inject_face(pair.ret, static_cast<Real>(pair.ret.sign) * I_t / pair.ret.A);
         }
     }
 }
