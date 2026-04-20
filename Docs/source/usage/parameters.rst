@@ -1531,7 +1531,7 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly or uniformly spaced in :math:`(-\pi, \pi]`.
+    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly or uniformly in :math:`(-\pi, \pi]`.
 
 .. pp:param:: <species_name>.random_phi
     :type: ``bool``
