@@ -147,6 +147,14 @@ class LibWarpX:
         register_warpx_WarpXParticleContainer_extension(self.libwarpx_so)
 
     def amrex_init(self, argv, mpi_comm=None):
+        # Import mpi4py before AMReX initialization so that mpi4py calls
+        # MPI_Init_thread first.  With the Cray MPICH version on Polaris,
+        # if AMReX calls MPI_Init before mpi4py, mpi4py's COMM_WORLD
+        # collectives hang.
+        try:
+            from mpi4py import MPI  # noqa: F811,F401
+        except ImportError:
+            pass
         if mpi_comm is None:  # or MPI is None:
             self.libwarpx_so.amrex_init(argv)
         else:
@@ -176,22 +184,13 @@ class LibWarpX:
             # The call to warpx_finalize causes a crash - don't know why
             # self.libwarpx_so.warpx_finalize()
 
-            # On SYCL/Intel PVC, amrex_finalize() → amrex::Finalize() crashes in
-            # Device::Finalize() → streamSynchronizeAll() because the static
-            # external_stream_stack Vector may have already been destroyed by the
-            # C++ static destructor before this Python atexit handler runs.
-            # Work around by exiting immediately via os._exit(0) on SYCL, which
-            # skips all C++ destructors and lets the OS/PALS launcher clean up.
-            # MPI_Barrier ensures all ranks exit together so the launcher does
-            # not kill stragglers with a signal.
-            # See: https://github.com/AMReX-Codes/amrex/issues/XXXX (upstream fix needed)
+            # GPU finalization workaround: amrex_finalize() crashes on GPU
+            # backends (SYCL/CUDA/HIP) because Device::Finalize() calls
+            # streamSynchronizeAll() after static C++ objects are destroyed.
+            # Skip finalization entirely via os._exit(0) and let the job
+            # launcher (PALS/mpiexec) handle coordinated multi-rank shutdown.
             try:
-                if self.libwarpx_so.Config.gpu_backend == "SYCL":
-                    try:
-                        from mpi4py import MPI
-                        MPI.COMM_WORLD.Barrier()
-                    except Exception:
-                        pass
+                if self.libwarpx_so.Config.gpu_backend in ("SYCL", "CUDA", "HIP"):
                     os._exit(0)
             except Exception:
                 pass
