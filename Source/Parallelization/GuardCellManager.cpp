@@ -60,12 +60,14 @@ guardCellManager::Init (
     const bool use_filter,
     const amrex::IntVect& bilinear_filter_stencil_length)
 {
+    constexpr int FGcell[4] = {0,1,1,2}; // Index is nox
+
     // When using subcycling, the particles on the fine level perform two pushes
     // before being redistributed ; therefore, we need one extra guard cell
     // (the particles may move by 2*c*dt)
-    int ngx_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
-    int ngy_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
-    int ngz_tmp = (max_level > 0 && do_subcycling) ? nox+1 : nox;
+    int ngx_tmp = (max_level > 0 && do_subcycling) ? FGcell[nox]+1 : FGcell[nox];
+    int ngy_tmp = (max_level > 0 && do_subcycling) ? FGcell[nox]+1 : FGcell[nox];
+    int ngz_tmp = (max_level > 0 && do_subcycling) ? FGcell[nox]+1 : FGcell[nox];
 
     const bool galilean = (v_galilean[0] != 0. || v_galilean[1] != 0. || v_galilean[2] != 0.);
     const bool comoving = (v_comoving[0] != 0. || v_comoving[1] != 0. || v_comoving[2] != 0.);
@@ -335,12 +337,11 @@ guardCellManager::Init (
             ng_MovingWindow = ng_alloc_EB;
         }
     } else {
-        // Compute number of cells required for Field Gather:
-        // When increasing the shape by order by one, support of the shape
+        // Compute number of guard cells required for field gather:
+        // when increasing the shape order by one, the support of the shape
         // factor grows symmetrically by half a cell on each side. So every
         // +2 orders, one touches one more cell point.
-        int const FGcell = (nox + 1) / 2;  // integer division
-        auto ng_FieldGather_noNCI = IntVect(AMREX_D_DECL(FGcell,FGcell,FGcell));
+        auto ng_FieldGather_noNCI = amrex::IntVect(AMREX_D_DECL(FGcell[nox], FGcell[nox], FGcell[nox]));
         ng_FieldGather_noNCI = ng_FieldGather_noNCI.min(ng_alloc_EB);
 
         // If NCI filter, add guard cells in the z direction
