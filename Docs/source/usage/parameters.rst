@@ -1531,7 +1531,15 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ or RCYLINDER geometry, whether to randomize the azimuthal position of particles.
+    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly in :math:`[0, 2\pi]`, or fixed to :math:`0`.
+    This is used when ``<species_name>.injection_style = NUniformPerCell``.
+
+.. pp:param:: <species_name>.random_phi
+    :type: ``bool``
+    :default: ``1``
+    :optional:
+
+    When using RSPHERE geometry, the polar position of particles is either set randomly in :math:`[-\pi/2, \pi/2]`, or fixed to :math:`0`.
     This is used when ``<species_name>.injection_style = NUniformPerCell``.
 
 .. pp:param:: <species_name>.do_splitting
