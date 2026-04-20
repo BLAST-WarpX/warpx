@@ -81,10 +81,10 @@ def check_restart(filename, tolerance=1e-12):
             f for f in ds_benchmark.field_list if f[0] == species
         ]
 
-        id_r = ad_restart[(species, "particle_id")].squeeze().v
-        id_b = ad_benchmark[(species, "particle_id")].squeeze().v
-        cpu_r = ad_restart[(species, "particle_cpu")].squeeze().v
-        cpu_b = ad_benchmark[(species, "particle_cpu")].squeeze().v
+        id_r = np.atleast_1d(ad_restart[(species, "particle_id")].squeeze().v)
+        id_b = np.atleast_1d(ad_benchmark[(species, "particle_id")].squeeze().v)
+        cpu_r = np.atleast_1d(ad_restart[(species, "particle_cpu")].squeeze().v)
+        cpu_b = np.atleast_1d(ad_benchmark[(species, "particle_cpu")].squeeze().v)
 
         sort_r = np.lexsort((id_r, cpu_r))
         sort_b = np.lexsort((id_b, cpu_b))
@@ -92,8 +92,8 @@ def check_restart(filename, tolerance=1e-12):
         for field in species_fields:
             if field[1] in ("particle_id", "particle_cpu"):
                 continue
-            dr = ad_restart[field].squeeze().v[sort_r]
-            db = ad_benchmark[field].squeeze().v[sort_b]
+            dr = np.atleast_1d(ad_restart[field].squeeze().v)[sort_r]
+            db = np.atleast_1d(ad_benchmark[field].squeeze().v)[sort_b]
             error = np.amax(np.abs(dr - db))
             if np.amax(np.abs(db)) != 0.0:
                 error /= np.amax(np.abs(db))
