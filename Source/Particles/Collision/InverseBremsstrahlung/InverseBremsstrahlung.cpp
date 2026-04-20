@@ -208,10 +208,11 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
             // update total energy and momentum lost
             // note that the photon upx, y, z is scaled by m_e
+            auto constexpr m_e_prt = static_cast<amrex::ParticleReal>(PhysConst::m_e);
             amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], dw*Ephoton_J);
-            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*PhysConst::m_e);
-            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*PhysConst::m_e);
-            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*PhysConst::m_e);
+            amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], dw*upx*m_e_prt);
+            amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], dw*upy*m_e_prt);
+            amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], dw*upz*m_e_prt);
 
             // update probe for energy gain via absorption
             /* m_deltaE_IBremsstrahlung += sum_deltaE_J*PhysConst::q_e; // Joules */
