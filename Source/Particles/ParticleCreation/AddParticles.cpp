@@ -1032,9 +1032,11 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
                 // These x, y, and z are used to get the momentum and density.
                 const amrex::Real theta = (random_theta ?
-                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) : 0._rt);
+                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
+                    MathConst::pi*(1._rt - 2._rt*r.y));
                 const amrex::Real sin_phi = (random_phi ?
-                                   1._rt - 2._rt*amrex::Random(engine) : 0._rt);
+                                   1._rt - 2._rt*amrex::Random(engine) :
+                                   1._rt - 2._rt*r.z);
                 const amrex::Real cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 const amrex::Real phi = std::atan2(sin_phi, cos_phi);
 
@@ -1621,9 +1623,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
                 // These x, y, and z are used to get the momentum and flux.
                 const amrex::Real theta = (random_theta ?
-                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) : 0._rt);
+                    MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
+                    MathConst::pi*(1._rt - 2._rt*r.y));
                 const amrex::Real sin_phi = (random_phi ?
-                                   1._rt - 2._rt*amrex::Random(engine) : 0._rt);
+                                   1._rt - 2._rt*amrex::Random(engine) :
+                                   1._rt - 2._rt*r.z);
                 amrex::Real const cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 amrex::Real const phi = std::atan2(sin_phi, cos_phi);
                 amrex::Real const cos_theta = std::cos(theta);
