@@ -783,9 +783,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     const amrex::Real density_min = plasma_injector.density_min;
     const amrex::Real density_max = plasma_injector.density_max;
 
-#if defined(WARPX_DIM_RZ)
-    const int nmodes = WarpX::n_rz_azimuthal_modes;
-#endif
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
@@ -1277,9 +1274,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     constexpr int level_zero = 0;
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
-#if defined(WARPX_DIM_RZ)
-    const int nmodes = WarpX::n_rz_azimuthal_modes;
-#endif
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const bool random_theta = m_random_theta;
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
