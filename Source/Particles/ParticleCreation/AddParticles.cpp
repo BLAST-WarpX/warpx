@@ -1041,7 +1041,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #elif defined(WARPX_DIM_RSPHERE)
                 // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
                 // These x, y, and z are used to get the momentum and density.
-                const amrex::Real theta = (random_theta ?
+                amrex::Real theta = (random_theta ?
                     MathConst::pi*(1._rt - 2._rt*amrex::Random(engine)) :
                     MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset);
 
