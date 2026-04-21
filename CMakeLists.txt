@@ -477,12 +477,16 @@ foreach(D IN LISTS WarpX_DIMS)
 endforeach()
 
 if(WarpX_PYTHON)
-    # copy PICMI and other Python scripts to build directory
-    add_custom_command(TARGET pyWarpX_${WarpX_DIMS_LAST} POST_BUILD
+    # populate the build-tree Python package for ctest and direct build-tree imports
+    add_custom_target(pyWarpX_python_sources ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            $<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${WarpX_SOURCE_DIR}/Python/pywarpx
-        $<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>
+            ${WarpX_SOURCE_DIR}/Python/pywarpx
+            $<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>
+        VERBATIM
     )
+    add_dependencies(pyWarpX_python_sources pyWarpX_${WarpX_DIMS_LAST})
 endif()
 
 add_subdirectory(Source/ablastr)
@@ -791,6 +795,7 @@ if(WarpX_PYTHON)
             ${WarpX_BINARY_DIR}
         DEPENDS
             ${pyWarpX_INSTALL_TARGET_NAMES}
+            pyWarpX_python_sources
     )
 
     # this will also upgrade/downgrade dependencies, e.g., when the version of picmistandard changes

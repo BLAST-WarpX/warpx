@@ -52,7 +52,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (const std::string& rd_name);
+    explicit ReducedDiags (const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism
