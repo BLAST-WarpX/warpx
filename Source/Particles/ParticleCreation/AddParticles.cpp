@@ -1036,7 +1036,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // These x, y, and z are used to get the momentum and density.
                 amrex::Real theta = MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset;
 
-                // Enforce angle theta to be in (-pi, pi] (only needed for theta_ofset > 0)
+                // Enforce angle theta to be in (-pi, pi] (only needed for theta_offset > 0)
                 if (theta > MathConst::pi) {
                     theta -= 2._rt*MathConst::pi;
                 }
