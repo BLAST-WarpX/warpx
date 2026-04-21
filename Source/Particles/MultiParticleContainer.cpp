@@ -772,7 +772,7 @@ MultiParticleContainer::CalculateNuei (std::string const & electron_species_name
 {
     WarpX & warpx = WarpX::GetInstance();
 
-    if (allcontainers.size() == 0) { return; }
+    if (allcontainers.empty()) { return; }
 
     auto& electron_species = GetParticleContainerFromName(electron_species_name);
 
@@ -786,10 +786,10 @@ MultiParticleContainer::CalculateNuei (std::string const & electron_species_name
         if (!warpx.m_fields.has(field_name, lev)) {
             amrex::BoxArray const & ba = warpx.boxArray(lev);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
-            int const ncomps = 1;
-            amrex::IntVect ng = amrex::IntVect::TheZeroVector();
-            bool const remake = true;
-            bool const redistribute_on_remake = false;
+            const int ncomps = 1;
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const bool remake = true;
+            const bool redistribute_on_remake = false;
             warpx.m_fields.alloc_init(field_name, lev, ba, dmap, ncomps, ng, 0.,
                                       remake, redistribute_on_remake);
         }

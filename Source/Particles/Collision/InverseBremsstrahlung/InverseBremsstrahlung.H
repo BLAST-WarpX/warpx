@@ -58,7 +58,7 @@ public:
      */
     void doInverseBremsstrahlungWithinTile (amrex::Real dt, int lev, amrex::MFIter const& mfi,
                                             WarpXParticleContainer& photons,
-                                            WarpXParticleContainer& electrons);
+                                            WarpXParticleContainer& electrons) const;
 
 private:
 

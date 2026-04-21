@@ -87,7 +87,7 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
 void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
         amrex::Real dt, int lev, amrex::MFIter const& mfi,
         WarpXParticleContainer& photons,
-        WarpXParticleContainer& electrons)
+        WarpXParticleContainer& electrons) const
 {
     using namespace amrex::literals;
 

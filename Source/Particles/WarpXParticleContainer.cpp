@@ -1928,7 +1928,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     auto const& ba = m_gdb->ParticleBoxArray(lev);
     auto const& dm = m_gdb->DistributionMap(lev);
     int const ncomps = 1;
-    amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+    amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
     bool const remake = true;
     bool const redistribute_on_remake = false;
     if (!warpx.m_fields.has(T_field_name, lev)) {
@@ -2052,7 +2052,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal vxr = ux*gaminv - vx_array(ii, jj, kk);
                 const amrex::ParticleReal vyr = uy*gaminv - vy_array(ii, jj, kk);
                 const amrex::ParticleReal vzr = uz*gaminv - vz_array(ii, jj, kk);
-                const amrex::Real vsq = (amrex::Real)(w*(vxr*vxr + vyr*vyr + vzr*vzr));
+                const auto vsq = (amrex::Real)(w*(vxr*vxr + vyr*vyr + vzr*vzr));
                 amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), vsq);
             });
     }
@@ -2103,8 +2103,8 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     int const ng = 0;
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
-    amrex::Real const rmass = (amrex::Real)(m_mass);
-    amrex::Real const rcharge = (amrex::Real)(charge);
+    auto const rmass = static_cast<amrex::Real>(m_mass);
+    auto const rcharge = static_cast<amrex::Real>(charge);
     amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
@@ -2203,8 +2203,8 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
     amrex::MultiFab const & Ne_mf = *warpx.m_fields.get("N_" + electron_species.species_name, lev);
     amrex::MultiFab const & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
 
-    amrex::Real const rimass = static_cast<amrex::Real>(m_mass);
-    amrex::Real const Zi = static_cast<amrex::Real>(charge)/PhysConst::q_e;
+    auto const rimass = static_cast<amrex::Real>(m_mass);
+    auto const Zi = static_cast<amrex::Real>(charge)/PhysConst::q_e;
 
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 
@@ -2273,9 +2273,9 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
 
                 // Nanbu 1998: gab^2 = 3*Ta/ma + 3*Tb/mb + |Ua - Ub|^2
                 amrex::Real const g12sq = 3.0_rt*VTe*VTe + 3.0_rt*VTi*VTi
-                                          + std::pow(vxe_array(i,j,k) - vxi_array(i,j,k), 2)
-                                          + std::pow(vye_array(i,j,k) - vyi_array(i,j,k), 2)
-                                          + std::pow(vze_array(i,j,k) - vzi_array(i,j,k), 2);
+                                          + std::pow(vxe_array(i,j,k) - vxi_array(i,j,k), 2._rt)
+                                          + std::pow(vye_array(i,j,k) - vyi_array(i,j,k), 2._rt)
+                                          + std::pow(vze_array(i,j,k) - vzi_array(i,j,k), 2._rt);
                 amrex::Real const g12sq_norm = g12sq/(PhysConst::c*PhysConst::c);
                 amrex::Real constexpr b0_factor = PhysConst::q_e/(PhysConst::c*PhysConst::c)/
                                                   (2.0_rt*MathConst::pi*PhysConst::epsilon_0*PhysConst::m_e)*PhysConst::q_e; // [m]
@@ -2289,10 +2289,10 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
                 amrex::Real const Clog = std::max(2.0_rt, 0.5_rt*std::log(1.0_rt + LDe*LDe/bmin/bmin));
 
                 // compute nuei in this cell for this ion species and add to the total
-                amrex::Real const nuei_factor = std::sqrt(2.0_rt)*std::pow(PhysConst::q_e, 4)/
-                                                (12.0_rt*std::pow(MathConst::pi, 1.5_rt)*std::pow(PhysConst::epsilon_0*PhysConst::m_e, 2));
+                amrex::Real const nuei_factor = std::sqrt(2.0_rt)*std::pow(PhysConst::q_e, 4._rt)/
+                                                (12.0_rt*std::pow(MathConst::pi, 1.5_rt)*std::pow(PhysConst::epsilon_0*PhysConst::m_e, 2._rt));
 
-                amrex::Real const nuei_local = nuei_factor*ni*Zi*Zi*Clog/std::pow(VTe, 3); // [Hz]
+                amrex::Real const nuei_local = nuei_factor*ni*Zi*Zi*Clog/std::pow(VTe, 3._rt); // [Hz]
                 nuei_array(i,j,k) += nuei_local;
 
             });
