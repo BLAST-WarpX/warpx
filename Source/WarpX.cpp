@@ -445,7 +445,7 @@ WarpX::WarpX ()
 
     // --- Prescribed current injection (file-driven) -------------------------
     {
-        ParmParse pp_warpx("warpx");
+        const ParmParse pp_warpx("warpx");
         pp_warpx.query("current_injection", m_current_injection);
         if (m_current_injection) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -506,8 +506,8 @@ WarpX::WarpX ()
                 utils::parser::queryWithParser(pp_warpx, (dp+"zlo").c_str(), pair.drive.zlo);
                 utils::parser::queryWithParser(pp_warpx, (dp+"zhi").c_str(), pair.drive.zhi);
                 utils::parser::queryWithParser(pp_warpx, (dp+"A"  ).c_str(), pair.drive.A);
-                pp_warpx.query((dp+"dir" ).c_str(), pair.drive.dir);
-                pp_warpx.query((dp+"sign").c_str(), pair.drive.sign);
+                pp_warpx.query(dp+"dir", pair.drive.dir);
+                pp_warpx.query(dp+"sign", pair.drive.sign);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     pair.drive.dir >= 0 && pair.drive.dir <= 2,
                     "current_injection pair_" + std::to_string(p) + ".drive.dir must be 0, 1, or 2");
@@ -527,8 +527,8 @@ WarpX::WarpX ()
                     utils::parser::queryWithParser(pp_warpx, (rp+"zlo").c_str(), pair.ret.zlo);
                     utils::parser::queryWithParser(pp_warpx, (rp+"zhi").c_str(), pair.ret.zhi);
                     utils::parser::queryWithParser(pp_warpx, (rp+"A"  ).c_str(), pair.ret.A);
-                    pp_warpx.query((rp+"dir" ).c_str(), pair.ret.dir);
-                    pp_warpx.query((rp+"sign").c_str(), pair.ret.sign);
+                    pp_warpx.query(rp+"dir", pair.ret.dir);
+                    pp_warpx.query(rp+"sign", pair.ret.sign);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         pair.ret.dir >= 0 && pair.ret.dir <= 2,
                         "current_injection pair_" + std::to_string(p) + ".return.dir must be 0, 1, or 2");
@@ -540,7 +540,7 @@ WarpX::WarpX ()
                 // Per-pair waveform override.
                 // If pair_N.file is specified, load it; otherwise copy global waveform.
                 std::string pair_file;
-                if (pp_warpx.query((base + ".file").c_str(), pair_file)) {
+                if (pp_warpx.query(base + ".file", pair_file)) {
                     load_waveform(pair_file, pair.time, pair.current);
                 } else {
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

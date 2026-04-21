@@ -1545,7 +1545,7 @@ WarpX::InjectPrescribedCurrent (amrex::Real t)
         if (t <= t_pts.front() || t >= t_pts.back()) { continue; }
 
         const auto it  = std::lower_bound(t_pts.begin(), t_pts.end(), t);
-        const std::size_t idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
+        const auto idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
         const Real t0 = t_pts[idx - 1],  t1 = t_pts[idx];
         const Real I0 = I_pts[idx - 1],  I1 = I_pts[idx];
         const Real I_t = I0 + (I1 - I0) * (t - t0) / (t1 - t0);
