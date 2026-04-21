@@ -325,7 +325,7 @@ sim = picmi.Simulation(
     max_steps=max_steps,
     warpx_embedded_boundary=embedded_boundary,
     warpx_amrex_the_arena_is_managed=1,
-    warpx_random_seed=1,
+    warpx_random_seed=1983,
 )
 
 layout1 = picmi.GriddedLayout(
