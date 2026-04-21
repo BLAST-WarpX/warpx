@@ -183,20 +183,26 @@ class LibWarpX:
         """
         # TODO: simplify, part of pyAMReX already
         if self.initialized:
-            del self.warpx
-            # The call to warpx_finalize causes a crash - don't know why
-            # self.libwarpx_so.warpx_finalize()
-
-            # GPU finalization workaround: amrex_finalize() crashes on GPU
-            # backends (SYCL/CUDA/HIP) because Device::Finalize() calls
-            # streamSynchronizeAll() after static C++ objects are destroyed.
-            # Skip finalization entirely via os._exit(0) and let the job
-            # launcher (PALS/mpiexec) handle coordinated multi-rank shutdown.
+            # GPU finalization workaround: on GPU backends, destroying the C++
+            # WarpX object (del self.warpx) or calling amrex_finalize() can
+            # crash in SYCL/CUDA/HIP Device::Finalize() when it tries to
+            # synchronize streams whose backing static objects are already gone.
+            # Exit immediately via os._exit(0) BEFORE any C++ destructors run,
+            # and let the job launcher (PALS/mpiexec) handle cleanup.
             try:
                 if self.libwarpx_so.Config.gpu_backend in ("SYCL", "CUDA", "HIP"):
+                    try:
+                        from mpi4py import MPI
+                        MPI.COMM_WORLD.Barrier()
+                    except Exception:
+                        pass
                     os._exit(0)
             except Exception:
                 pass
+
+            del self.warpx
+            # The call to warpx_finalize causes a crash - don't know why
+            # self.libwarpx_so.warpx_finalize()
 
             self.libwarpx_so.amrex_finalize()
 
