@@ -1531,7 +1531,14 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is given a random offset value on a cell-by-cell basis. The azimuthal angle is still in the range :math:`(-\pi, \pi]`.
+    When using RZ, RCYLINDER, or RSPHERE geometry, particle azimuthal angles are always defined in the range :math:`(-\pi, \pi]`.
+
+    * For ``<species_name>.injection_style = NUniformPerCell``, a random azimuthal offset is applied independently in each cell. This rotates the particle distribution randomly from cell to cell while keeping angles within :math:`(-\pi, \pi]`.
+
+    * For ``<species_name>.injection_style = NFluxPerCell``, this flag controls how azimuthal angles are assigned:
+
+      * if enabled, angles are sampled randomly in :math:`(-\pi, \pi]`
+      * if disabled, angles are distributed uniformly over :math:`(-\pi, \pi]`
 
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``

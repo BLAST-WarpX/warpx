@@ -959,7 +959,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         // next redistribute.
         auto *const poffset = offset.data();
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        const bool random_theta_offset = m_random_theta_offset;
+        const bool random_theta = m_random_theta; // Note that use of random_theta is different here
+                                                  // than how it is used in AddPlasmaFlux()
 #endif
         amrex::ParallelForRNG(overlap_box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -970,7 +971,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Add random offset to theta on a cell-by-cell basis
-            const amrex::Real theta_offset = (random_theta_offset ? 2._rt * MathConst::pi * amrex::Random(engine) : 0._rt);
+            const amrex::Real theta_offset = (random_theta ? 2._rt * MathConst::pi * amrex::Random(engine) : 0._rt);
 #endif
 
             const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts[index]);
@@ -1011,8 +1012,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // These x and y are used to get the momentum and density.
                 amrex::Real theta = MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset;
 
-                // Enforce angle theta to be in (-pi, pi]
-                if (random_theta_offset && theta > MathConst::pi) {
+                // Enforce angle theta to be in (-pi, pi] (only needed for theta_offset > 0)
+                if (theta > MathConst::pi) {
                     theta -= 2._rt*MathConst::pi;
                 }
 
@@ -1035,8 +1036,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // These x, y, and z are used to get the momentum and density.
                 amrex::Real theta = MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset;
 
-                // Enforce angle theta to be in (-pi, pi]
-                if (random_theta_offset && theta > MathConst::pi) {
+                // Enforce angle theta to be in (-pi, pi] (only needed for theta_ofset > 0)
+                if (theta > MathConst::pi) {
                     theta -= 2._rt*MathConst::pi;
                 }
 
@@ -1282,6 +1283,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const bool random_theta = m_random_theta; // Note that use of random_theta here is different
+                                              // than how it is used in AddParticles()
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
 
@@ -1581,7 +1584,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Conversion from cylindrical to Cartesian coordinates
                 // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and flux.
-                const amrex::Real theta = MathConst::pi*(1._rt - 2._rt*r.y);
+                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex:Random(engine) :
+                                                                          1._rt - 2._rt*r.y);
 
                 amrex::Real const cos_theta = std::cos(theta);
                 amrex::Real const sin_theta = std::sin(theta);
@@ -1617,7 +1621,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
                 // These x, y, and z are used to get the momentum and flux.
-                const amrex::Real theta = MathConst::pi*(1._rt - 2._rt*r.y);
+                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex:Random(engine) :
+                                                                          1._rt - 2._rt*r.y);
                 const amrex::Real sin_phi = 1._rt - 2._rt*r.z;
                 amrex::Real const cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 amrex::Real const phi = std::atan2(sin_phi, cos_phi);
