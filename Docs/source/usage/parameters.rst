@@ -1528,24 +1528,10 @@ Particle initialization
 
 .. pp:param:: <species_name>.random_theta
     :type: ``bool``
-    :default: ``0``
-    :optional:
-
-    When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is either set randomly or uniformly in :math:`(-\pi, \pi]`.
-
-.. pp:param:: <species_name>.randomize_theta_offset
-    :type: ``bool``
     :default: ``1``
     :optional:
 
     When using RZ, RCYLINDER, or RSPHERE geometry, the azimuthal position of particles is given a random offset value on a cell-by-cell basis. The azimuthal angle is still in the range :math:`(-\pi, \pi]`.
-
-.. pp:param:: <species_name>.random_phi
-    :type: ``bool``
-    :default: ``0``
-    :optional:
-
-    When using RSPHERE geometry, the polar position of particles is either set randomly or uniformly in :math:`(-\pi/2, \pi/2]`.
 
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``
