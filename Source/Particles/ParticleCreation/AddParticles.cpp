@@ -1584,7 +1584,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Conversion from cylindrical to Cartesian coordinates
                 // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and flux.
-                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex:Random(engine) :
+                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex::Random(engine) :
                                                                           1._rt - 2._rt*r.y);
 
                 amrex::Real const cos_theta = std::cos(theta);
@@ -1621,7 +1621,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
                 // These x, y, and z are used to get the momentum and flux.
-                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex:Random(engine) :
+                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex::Random(engine) :
                                                                           1._rt - 2._rt*r.y);
                 const amrex::Real sin_phi = 1._rt - 2._rt*r.z;
                 amrex::Real const cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
