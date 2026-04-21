@@ -71,6 +71,17 @@ class LibWarpX:
                 "Please write separate scripts for each geometry."
             )
 
+        # Import mpi4py before the pyAMReX (amrex.space*d) shared library is
+        # loaded so that mpi4py calls MPI_Init_thread first.  With the Cray
+        # MPICH on Polaris/Sirius, if the AMReX shared library is loaded before
+        # mpi4py initializes MPI, mpi4py's later MPI_Init_thread conflicts with
+        # the already-loaded MPI symbols and causes hangs or unbounded memory
+        # allocation during amrex::Initialize().
+        try:
+            from mpi4py import MPI  # noqa: F811,F401
+        except ImportError:
+            pass
+
         # --- Use geometry to determine whether to import the 1D, 2D, 3D or RZ version.
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
         try:
@@ -147,15 +158,7 @@ class LibWarpX:
         register_warpx_WarpXParticleContainer_extension(self.libwarpx_so)
 
     def amrex_init(self, argv, mpi_comm=None):
-        # Import mpi4py before AMReX initialization so that mpi4py calls
-        # MPI_Init_thread first.  With the Cray MPICH version on Polaris,
-        # if AMReX calls MPI_Init before mpi4py, mpi4py's COMM_WORLD
-        # collectives hang.
-        try:
-            from mpi4py import MPI  # noqa: F811,F401
-        except ImportError:
-            pass
-        if mpi_comm is None:  # or MPI is None:
+        if mpi_comm is None:
             self.libwarpx_so.amrex_init(argv)
         else:
             raise Exception("mpi_comm argument not yet supported")
