@@ -1,0 +1,172 @@
+#################################
+########## CONSTANTS ############
+#################################
+
+###   characteristic plasma values
+my_constants.n0 = 1.e23    # plasma density [1/m^3]
+my_constants.T0 = 1.       # plasma temperature [eV]
+my_constants.R0 = 1.5e-2   # plasma radius [m]
+my_constants.I0 = 200.e3   # pinch current [Amps]
+
+my_constants.AD = 2.01410  # atomic number deuterium
+my_constants.mD = AD*m_u - m_e   # deuterium mass [kg]
+
+###   derived characteristic pinch values
+my_constants.B0 = mu0*I0/(2*pi*R0)  # B at r=R0 [Tesla]
+my_constants.PB0 = B0^2/(2.0*mu0)   # B pressure at r=R0
+my_constants.rho0 = AD*m_u*n0       # mass density [kg/m^3]
+my_constants.u0 = sqrt(PB0/rho0)    # implosion speed [m/s]
+my_constants.t0 = R0/u0             # implosion time [m/s]
+
+###   simulation parameters
+my_constants.tsim = 164.e-9       # sim time = 1.35*t0 [s]
+my_constants.rise_time = t0/20.0  # current rise time [s]
+my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
+my_constants.Nppc = 400           # particles per cell per dim
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+stop_time = tsim
+max_step = 20
+amr.n_cell =  224
+amr.max_level = 0
+warpx.numprocs = 2
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.60e-2
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = none
+boundary.field_hi = pec_insulator
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+boundary.verboncoeur_axis_correction = false
+
+insulator.area_x_hi(y,z) = 1.0
+insulator.Bz_x_hi(y,z,t) = 0.0
+insulator.By_x_hi(y,z,t) = min(t/rise_time,1)*B0*R0/1.60e-2
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.limit_verbose_step = false
+warpx.const_dt = dt
+warpx.use_filter = 0
+
+amrex.fpe_trap_invalid = 1
+amrex.fpe_trap_overflow = 1
+amrex.fpe_trap_zero = 1
+
+algo.maxwell_solver = Yee
+algo.evolve_scheme = "theta_implicit_em"
+
+implicit_evolve.theta = 0.5
+implicit_evolve.max_particle_iterations = 11
+implicit_evolve.particle_tolerance = 1.0e-12
+implicit_evolve.particle_suborbits = true
+
+implicit_evolve.nonlinear_solver = "newton"
+newton.verbose = true
+newton.linear_solver = petsc_ksp
+newton.max_iterations = 100
+newton.relative_tolerance = 1.0e-10
+newton.absolute_tolerance = 0.0
+newton.require_convergence = true
+newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
+newton.diagnostic_interval = 10
+
+gmres.verbose_int = 2
+gmres.max_iterations = 1000
+gmres.relative_tolerance = 1.0e-6
+gmres.absolute_tolerance = 0.0
+
+implicit_evolve.use_mass_matrices_jacobian = true
+implicit_evolve.skip_particle_picard_init = true
+implicit_evolve.use_mass_matrices_pc = true
+implicit_evolve.mass_matrices_pc_width = 1
+jacobian.pc_type = pc_petsc
+pc_petsc.verbose = true
+pc_petsc.type = asm
+pc_petsc.asm_overlap = 8
+pc_petsc.sub_type = lu
+
+particles.max_grid_crossings = 2
+algo.particle_pusher = "higuera"
+algo.particle_shape = 2
+algo.current_deposition = "villasenor"
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons deuterium
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = Nppc 1
+electrons.radial_numpercell_power = 1.
+electrons.random_theta = false
+electrons.profile = constant
+electrons.density = n0
+electrons.xmax = R0
+electrons.momentum_distribution_type = "gaussian"
+electrons.ux_th = sqrt(T0*q_e/m_e)/clight
+electrons.uy_th = sqrt(T0*q_e/m_e)/clight
+electrons.uz_th = sqrt(T0*q_e/m_e)/clight
+
+deuterium.charge = q_e
+deuterium.mass = mD
+deuterium.injection_style = "NUniformPerCell"
+deuterium.num_particles_per_cell_each_dim = Nppc 1
+deuterium.radial_numpercell_power = 1.
+deuterium.random_theta = false
+deuterium.profile = constant
+deuterium.density = n0
+deuterium.xmax = R0
+deuterium.momentum_distribution_type = "gaussian"
+deuterium.ux_th = sqrt(T0*q_e/mD)/clight
+deuterium.uy_th = sqrt(T0*q_e/mD)/clight
+deuterium.uz_th = sqrt(T0*q_e/mD)/clight
+
+###   Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 20
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Et Ez Br Bt Bz rho divE
+diag1.electrons.variables = x theta w ux uy uz
+diag1.deuterium.variables = x theta w ux uy uz
+
+###   reduced diagnostics
+warpx.reduced_diags_names = particle_energy field_energy poynting_flux
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 10
+particle_energy.precision = 18
+particle_energy.path = diags/reduced_files/
+
+field_energy.type = FieldEnergy
+field_energy.intervals = 10
+field_energy.precision = 18
+field_energy.path = diags/reduced_files/
+
+poynting_flux.type = FieldPoyntingFlux
+poynting_flux.intervals = 10
+poynting_flux.precision = 18
+poynting_flux.path = diags/reduced_files/
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = collision1 collision2 collision3
+
+collision1.species = electrons electrons
+collision2.species = deuterium deuterium
+collision3.species = electrons deuterium
+collision1.CoulombLog = 10.0
+collision2.CoulombLog = 10.0
+collision3.CoulombLog = 10.0
