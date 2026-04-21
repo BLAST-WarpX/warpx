@@ -4797,24 +4797,61 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         ``2``, since costs are not recorded until step ``1``.
 
     * ``MemoryPerRank``
-        This diagnostic uses ``AMReX::Arena::PrintUsageToFiles`` to output detailed memory
-        usage information for each MPI rank. It logs information including:
+        This diagnostic uses ``amrex::Arena::PrintUsageToFiles`` to write detailed memory
+        usage information for each MPI rank. It logs, per rank:
 
-        * Total/free GPU memory when applicable
-        * Memory usage statistics for different Arena memory pools (Main, Device, Managed, Pinned, Comms)
-        * Per-rank memory allocation and usage details
+        * Total/free GPU memory (when applicable)
+        * Memory usage statistics for the ``Main``, ``Device``, ``Managed`` and ``Pinned``
+          Arena memory pools (allocated/used MB, alloc/busy/free block counts)
+        * Host-process memory usage (``VmPeak``, ``VmSize``, ``VmHWM``, ``VmRSS`` on Linux)
+        * MPI rank, host name and GPU device id
 
-        This is useful for tracking memory consumption patterns throughout simulation runs,
-        particularly when debugging memory usage issues or optimizing performance on GPUs.
-        The data is saved into separate text files (one per MPI rank) in the specified output directory.
+        This is primarily useful for debugging out-of-memory (OOM) crashes on large,
+        multi-GPU runs. A typical workflow is to restart from a checkpoint and enable this
+        diagnostic without otherwise changing the input file, so the crash signature is
+        preserved while detailed per-rank memory information is captured right up until the
+        failure. The data is saved into separate text files (one per MPI rank) in the
+        specified output directory (``<reduced_diags_name>.path``).
 
         * ``<reduced_diags_name>.file_prefix`` (`string`)
-            The prefix for the output files. The default is `"<reduced_diags_name>"`.
+            The basename of the per-rank output files, to which ``.<MPI rank>`` is appended.
+            The default is ``"<reduced_diags_name>"``.
+
+        * ``<reduced_diags_name>.rank_stride`` (`int`, default ``1``)
+            Only every ``rank_stride``-th MPI rank writes a file (i.e. ranks for which
+            ``MyProc() % rank_stride == 0``). The default ``1`` writes one file per rank;
+            on very large runs a larger stride can be used to reduce the number of files
+            created on the shared filesystem.
+
+        Example output (``MPR.0``)::
+
+            Memory usage at step 0, time = 0.00000000000000e+00
+                Total GPU global memory (MB): 7966
+                Free  GPU global memory (MB): 1571
+                [The         Arena] space allocated (MB): 2987
+                [The         Arena] space used      (MB): 53
+                [The         Arena]: 1 allocs, 261 busy blocks, 2 free blocks
+                [The Managed Arena] space allocated (MB): 8
+                [The Managed Arena] space used      (MB): 0
+                [The Managed Arena]: 1 allocs, 0 busy blocks, 1 free blocks
+                [The  Pinned Arena] space allocated (MB): 24
+                [The  Pinned Arena] space used      (MB): 0
+                [The  Pinned Arena]: 3 allocs, 64 busy blocks, 6 free blocks
+                [Rank] MPI rank: 0 / 4
+                [Rank] hostname: host-123
+                [Rank] GPU device id: 0
+                [Process] VmPeak: 7632384 kB
+                [Process] VmSize: 7632384 kB
+                [Process] VmHWM:  1024512 kB
+                [Process] VmRSS:  1024512 kB
 
         .. note::
 
             Use sparingly on larger production runs.
-            The diagnostic produces one text file per rank and appends to it at each timestep according to ``<reduced_diags_name>.intervals``.
+            The diagnostic produces one text file per (participating) rank and appends to it
+            at each timestep in ``<reduced_diags_name>.intervals``. For very large rank counts,
+            combine with ``rank_stride`` and/or point ``<reduced_diags_name>.path`` to a
+            filesystem with good small-file performance.
 
     * ``ParticleHistogram``
         This type computes a user defined particle histogram.
