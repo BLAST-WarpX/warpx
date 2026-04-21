@@ -123,7 +123,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -160,7 +160,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -396,7 +396,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         int const numCell = (cell_stop - cell_start);
 

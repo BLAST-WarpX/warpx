@@ -73,7 +73,7 @@ void FiniteDifferenceSolver::EvolveGCartesian (
     amrex::Real const dt)
 {
 
-    amrex::Real constexpr c2 = PhysConst::c * PhysConst::c;
+    amrex::Real constexpr c2 = PhysConst::c2;
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())

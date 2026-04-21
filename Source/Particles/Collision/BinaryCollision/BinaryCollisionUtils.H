@@ -111,7 +111,7 @@ namespace BinaryCollisionUtils{
         using namespace amrex::Math;
 
         constexpr double c = PhysConst::c;
-        constexpr double c_sq = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2_v<double>;
         constexpr double inv_c = 1./PhysConst::c;
 
         // Cast input parameters to double before computing collision properties
@@ -133,18 +133,18 @@ namespace BinaryCollisionUtils{
 
         // Total energy in the lab frame
         // Note the use of `double` for energy since this calculation is prone to error with single precision.
-        const double E1_lab = std::sqrt( m1_sq * c_sq + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * c;
-        const double E2_lab = std::sqrt( m2_sq * c_sq + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * c;
+        const double E1_lab = std::sqrt( m1_sq * c2 + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * c;
+        const double E2_lab = std::sqrt( m2_sq * c2 + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * c;
         const double E_lab = E1_lab + E2_lab;
         // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
         // of the four-momentum norm
-        const double E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
+        const double E_star_sq = E_lab*E_lab - c2*p_total_sq;
 
         // Kinetic energy in the center of mass frame
         const double E_star = std::sqrt(E_star_sq);
 
         // Cast back to chosen precision for output
-        E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c_sq);
+        E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c2);
 
         // Find the norm of the momentum of each particles in the center of mass frame
         // This is done by solving the following system (in the COM frame)
@@ -164,14 +164,14 @@ namespace BinaryCollisionUtils{
         } else {
             // The expression below is specifically written in a form that avoids returning
             // small negative numbers due to machine precision errors, for low-energy particles
-            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c_sq);
-            p_star_sq = m1_dbl*m2_dbl*c_sq * ( powi<2>(E_ratio) - 1.0 )
-                + powi<2>(m1_dbl - m2_dbl)*c_sq/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
+            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c2);
+            p_star_sq = m1_dbl*m2_dbl*c2 * ( powi<2>(E_ratio) - 1.0 )
+                + powi<2>(m1_dbl - m2_dbl)*c2/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
         }
 
         // Energy of each particle in the center of mass frame
-        const double E1_star = std::sqrt(m1_sq*c_sq + p_star_sq) * c;
-        const double E2_star = std::sqrt(m2_sq*c_sq + p_star_sq) * c;
+        const double E1_star = std::sqrt(m1_sq*c2 + p_star_sq) * c;
+        const double E2_star = std::sqrt(m2_sq*c2 + p_star_sq) * c;
 
         // relative velocity in the center of mass frame, cast back to chosen precision
         v_rel_COM = PhysConst::c * static_cast<amrex::ParticleReal>(std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
