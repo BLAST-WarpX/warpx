@@ -1537,11 +1537,6 @@ Particle initialization
 
     * For ``<species_name>.injection_style = NRandomPerCell``, this flag essentially does nothing since particle positions are set randomly anyway.
 
-    * For ``<species_name>.injection_style = NFluxPerCell``, this flag controls how azimuthal angles are assigned:
-
-      * if ``true``, angles are sampled randomly in :math:`(-\pi, \pi]`
-      * if ``false``, angles are distributed uniformly over :math:`(-\pi, \pi]`
-
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``
     :default: ``0``

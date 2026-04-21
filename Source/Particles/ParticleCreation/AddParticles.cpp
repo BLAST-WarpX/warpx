@@ -959,8 +959,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         // next redistribute.
         auto *const poffset = offset.data();
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        const bool random_theta = m_random_theta; // Note that use of random_theta is different here
-                                                  // than how it is used in AddPlasmaFlux()
+        const bool random_theta = m_random_theta;
 #endif
         amrex::ParallelForRNG(overlap_box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -1275,8 +1274,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const bool random_theta = m_random_theta; // Note that use of random_theta here is different
-                                              // than how it is used in AddParticles()
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
 
@@ -1564,8 +1561,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 // Replace the x and y, setting an angle theta in (-pi, pi].
                 // These x and y are used to get the momentum and flux.
-                const amrex::Real theta = MathConst::pi * (random_theta ? 1._rt - 2._rt*amrex::Random(engine) :
-                                                                          1._rt - 2._rt*r.y);
+                const amrex::Real theta = MathConst::pi * (1._rt - 2._rt*r.y);
 #endif
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
