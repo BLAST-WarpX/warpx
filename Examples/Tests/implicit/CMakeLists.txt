@@ -84,7 +84,7 @@ if(AMReX_PETSC)
 
     add_warpx_test(
         test_rz_theta_implicit_dynamic_pinch  # name
-        RCYLINDER  # dims
+        RZ  # dims
         2  # nprocs
         inputs_test_rz_theta_implicit_dynamic_pinch  # inputs
         "analysis_pinch.py diags/diag1000020"  # analysis
