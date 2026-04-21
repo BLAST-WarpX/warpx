@@ -25,7 +25,7 @@ class ElectrostaticSolver
 {
 public:
     ElectrostaticSolver() = default;
-    ElectrostaticSolver( int nlevs_max );
+    explicit ElectrostaticSolver( int nlevs_max );
 
     virtual ~ElectrostaticSolver();
 

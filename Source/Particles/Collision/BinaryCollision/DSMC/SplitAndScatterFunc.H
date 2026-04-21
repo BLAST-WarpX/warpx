@@ -15,6 +15,7 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 /**
  * \brief This class defines an operator to create product particles from DSMC
@@ -177,7 +178,7 @@ public:
         for (int i = 0; i < m_num_product_species; i++)
         {
             // Add the number of product producing events to the species involved in those processes.
-            int num_products = m_num_products_host[i];
+            const int num_products = m_num_products_host[i];
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }
@@ -383,7 +384,7 @@ public:
                     -reaction_energy*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    false,
+                    ScatteringAngleModel::Forward,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the reactant particle, in the center-of-mass frame
                     engine);
