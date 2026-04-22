@@ -32,6 +32,8 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_species_names.size() == 1,
         "PulsedDecay: pulsed_decay must have exactly one species.");
 
+    using namespace amrex::literals;
+
     const amrex::ParmParse pp_collision_name(collision_name);
 
     // Get the product species
