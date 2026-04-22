@@ -318,13 +318,15 @@ public:
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
         // dV is level-specific: cell volume at this refinement level (smaller on fine levels).
         amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
+#if defined(WARPX_DIM_RZ)
         auto const lo = lbound(cbx);
         auto const hi = ubound(cbx);
         int const nz = hi.y - lo.y + 1;
 #endif
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(cbx, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
         auto const dr = geom_lev.CellSize(0);
 #endif
 
@@ -333,18 +335,18 @@ public:
             // Return the radial factor for the volume element, dV
             int const ri = (i_cell - i_cell%nz)/nz;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RCYLINDER)
             int const ri = i_cell;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
 #elif defined(WARPX_DIM_RSPHERE)
             // This needs double checking
             int const ri = i_cell;
             // rr is radius at the cell center
-            amrex::ParticleReal const rr = (ri + 0.5_prt)*dr;
+            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
             return 4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr*rr;
 #else
             // No factor is needed for Cartesian
@@ -512,7 +514,7 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
-                    int const u1x_ni = std::distance(real_names1.begin(), pos1);
+                    auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
                     u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
                     u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
                     u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
@@ -555,7 +557,7 @@ public:
                             amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ip]*u1x[ip]*m1);
                             amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ip]*u1y[ip]*m1);
                             amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ip]*u1z[ip]*m1);
-                            amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[ip], u1y[ip], u1z[ip], m1);
+                            const amrex::ParticleReal KE = Algorithms::KineticEnergy(u1x[ip], u1y[ip], u1z[ip], m1);
                             amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[ip]*KE);
                         }
 
@@ -567,9 +569,9 @@ public:
 
                         // compute local temperature [Joules]
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                            amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                            amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                            const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                            auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+                            const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                             amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                             amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
                             amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
@@ -689,6 +691,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_1,
                                                     product_species_vector,
@@ -759,7 +762,7 @@ public:
 
                         if (deltaEp1 != 0.) {
                             // Adjust species 1 particles to absorb deltaEp1.
-                            bool correction_failed =
+                            const bool correction_failed =
                                  ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
                                                                      cell_start_1, cell_stop_1, m1,
                                                                      energy_fraction, energy_fraction_max, deltaEp1);
@@ -993,7 +996,7 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
-                    int const u1x_ni = std::distance(real_names1.begin(), pos1);
+                    auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
                     u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
                     u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
                     u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
@@ -1018,7 +1021,7 @@ public:
                 std::vector<std::string> const & real_names2 = species_2.GetRealSoANames();
                 auto const pos2 = std::find(real_names2.begin(), real_names2.end(), "ux_n");
                 if (pos2 != real_names2.end()) {
-                    int const u2x_ni = std::distance(real_names2.begin(), pos2);
+                    auto const u2x_ni = static_cast<int>(std::distance(real_names2.begin(), pos2));
                     u2x_before_ptr = soa_2.m_runtime_rdata[u2x_ni];
                     u2y_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 1];
                     u2z_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 2];
@@ -1063,7 +1066,7 @@ public:
                                 amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
                                 amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
                                 amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
-                                amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
+                                const amrex::ParticleReal KE1 = Algorithms::KineticEnergy(u1x[i1], u1y[i1], u1z[i1], m1);
                                 amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w1[i1]*KE1);
                             }
 
@@ -1082,7 +1085,7 @@ public:
                                 amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[i2]*u2x[i2]*m2);
                                 amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[i2]*u2y[i2]*m2);
                                 amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[i2]*u2z[i2]*m2);
-                                amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[i2], u2y[i2], u2z[i2], m2);
+                                const amrex::ParticleReal KE2 = Algorithms::KineticEnergy(u2x[i2], u2y[i2], u2z[i2], m2);
                                 amrex::Gpu::Atomic::AddNoRet(&KE_in_each_cell[i_cell], w2[i2]*KE2);
                             }
                         }
@@ -1102,9 +1105,9 @@ public:
                         // compute local temperatures [Joules]
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
                             if (ip < np1) {
-                                amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                                amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                                const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
+                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+                                const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
                                 amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
@@ -1112,9 +1115,9 @@ public:
                                 amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
                             }
                             if (ip < np2) {
-                                amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
-                                amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
+                                const amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
+                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+                                const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
                                 amrex::Gpu::Atomic::AddNoRet(&vy2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2y[ip]/gm);
@@ -1132,7 +1135,7 @@ public:
             ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
             amrex::ParallelFor( 2*n_cells, [=] AMREX_GPU_DEVICE (int i) noexcept
             {
-                int i_cell = i < n_cells ? i : i - n_cells;
+                const int i_cell = i < n_cells ? i : i - n_cells;
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -1176,7 +1179,7 @@ public:
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
-          int i_cell = i < n_cells ? i : i - n_cells;
+          const int i_cell = i < n_cells ? i : i - n_cells;
 
           // The particles from species1 that are in the cell `i_cell` are
           // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -1271,6 +1274,7 @@ public:
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_2,
                                                     product_species_vector,

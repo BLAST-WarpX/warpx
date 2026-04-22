@@ -63,7 +63,7 @@ public:
     ThetaImplicitEM(ThetaImplicitEM&&) = delete;
     ThetaImplicitEM& operator=(ThetaImplicitEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX*  a_WarpX, bool  from_restart) override;
 
     void PrintParameters () const override;
 
@@ -87,12 +87,12 @@ public:
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
-    [[nodiscard]] virtual amrex::Real  GetThetaForPC () const override { return m_theta; }
+    [[nodiscard]] amrex::Real  GetThetaForPC () const override { return m_theta; }
 
     /**
      * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
-    [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int field_dir) const override;
+    [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (int lev, int field_dir) const override;
 
     /**
      * \brief Inititialize the BC masks for the curl curl operator

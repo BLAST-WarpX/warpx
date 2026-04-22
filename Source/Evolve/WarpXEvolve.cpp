@@ -23,6 +23,7 @@
 #       include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #   endif
 #endif
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -271,6 +272,11 @@ WarpX::Evolve (int numsteps)
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
+        // Apply particle thermalizer (no-op until implemented)
+        if (m_particle_thermalizer.defined()) {
+            m_particle_thermalizer.applyThermalizer(*mypc);
+        }
+
         if (m_implicit_solver) {
             ExecutePythonCallback("beforecollisions");
             mypc->doCollisions(step, cur_time, dt[0]);
@@ -508,7 +514,6 @@ WarpX::OneStep_nosub (
     // Deposit current j^{n+1/2}
     // Deposit charge density rho^{n}
 
-    ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
 
     // with collisions placed in the middle of the momentum push
@@ -709,6 +714,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 {
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
+    ExecutePythonCallback("particlescraper");
+
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
@@ -723,16 +730,16 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // Electromagnetic solver: due to CFL condition, particles can
         // only move by one or two cells per time step
         // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
-        if (max_level == 0) {
-            int num_redistribute_ghost = num_moved;
+        if (finest_level == 0) {
+            int max_cells_travelled = num_moved;
             if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
                 // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
-                num_redistribute_ghost += particle_max_grid_crossings + 1;
+                max_cells_travelled += particle_max_grid_crossings + 1;
             } else {
                 // Standard algorithm ; particles can move by up to the max number
-                num_redistribute_ghost += particle_max_grid_crossings;
+                max_cells_travelled += particle_max_grid_crossings;
             }
-            mypc->RedistributeLocal(num_redistribute_ghost);
+            mypc->RedistributeLocal(max_cells_travelled);
         }
         else {
             mypc->Redistribute();
@@ -745,6 +752,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+        // Remove particles that have been flagged to be scraped
         mypc->deleteInvalidParticles();
     }
 
