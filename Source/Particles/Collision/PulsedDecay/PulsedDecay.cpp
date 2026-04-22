@@ -206,7 +206,7 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
             // Get grid information needed to compute physical cell center coordinates
             const amrex::Box& box = mfi.tilebox();
-            const amrex::XDim3 xyzmin = WarpX::GetInstance().LowerCorner(box, lev, 0.0_rt);
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0.0_rt);
             const amrex::Dim3 lo = lbound(box);
             const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom_lev.CellSizeArray();
 
@@ -235,7 +235,7 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
                     // Compute total weight of products to create in this cell
                     const amrex::ParticleReal nu_izn = nu_func(xyz_cc.x, xyz_cc.y, xyz_cc.z, cur_time);
-                    const amrex::ParticleReal total_product = wtot1*(1.0 - std::exp(-nu_izn*dt));
+                    const amrex::ParticleReal total_product = wtot1*(1.0_prt - std::exp(-nu_izn*dt));
 
                     // Compute number of products macro particles to create in this cell
                     const amrex::ParticleReal num_expected = total_product/fixed_product_weight;
@@ -322,7 +322,7 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         const index_type ip_B = old_npB + new_idx;
 
                         // Get a random particle index from species 1 in this cell
-                        index_type k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
+                        auto k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
 
                         // Probe until a valid particle is found (should always be at least one)
                         index_type ip  = -1;
