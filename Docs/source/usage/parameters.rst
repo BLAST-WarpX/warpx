@@ -3046,11 +3046,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
 
-.. pp:param:: <collision_name>.decay_rate
-    :type: `float`
+.. pp:param:: <collision_name>.decay_rate(x,y,z,t)
+    :type: `string`
 
     The parent species decay rate (only for ``pulsed_decay``).
-    Can also provide ``<collision_name>.pulsed_decay(x,y,z,t)`` using the parser for spatial and temporal variation.
 
 .. pp:param:: <collision_name>.fixed_product_weight
     :type: `float`
