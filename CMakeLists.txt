@@ -221,11 +221,11 @@ include(CTest)
 # Old GCCs: std::filesystem as a separate library
 try_compile(CXX_HAS_STD_FS "${WarpX_BINARY_DIR}/temp"
     "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
-    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON
 )
 try_compile(CXX_HAS_STD_FS_WITH_LINK "${WarpX_BINARY_DIR}/temp"
     "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
-    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON
     LINK_LIBRARIES stdc++fs
 )
 
@@ -589,13 +589,7 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        if(WarpX_SIMD)
-            # vir::cvt
-            # https://github.com/mattkretz/vir-simd/issues/45
-            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
-        else()
-            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
-        endif()
+        target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF

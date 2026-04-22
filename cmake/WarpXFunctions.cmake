@@ -1,11 +1,8 @@
-# Set C++17 for the whole build if not otherwise requested
-#
-# This is the easiest way to push up a C++17 requirement for AMReX, PICSAR and
-# openPMD-api until they increase their requirement.
+# Set C++20 for the whole build if not otherwise requested
 #
 macro(set_cxx17_superbuild)
     if(NOT DEFINED CMAKE_CXX_STANDARD)
-        set(CMAKE_CXX_STANDARD 17)
+        set(CMAKE_CXX_STANDARD 20)
     endif()
     if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
         set(CMAKE_CXX_EXTENSIONS OFF)
@@ -15,7 +12,7 @@ macro(set_cxx17_superbuild)
     endif()
 
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
-        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD 20)
     endif()
     if(NOT DEFINED CMAKE_CUDA_EXTENSIONS)
         set(CMAKE_CUDA_EXTENSIONS OFF)
