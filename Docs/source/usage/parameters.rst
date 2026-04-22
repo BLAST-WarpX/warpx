@@ -4837,7 +4837,8 @@ This shifts analysis from post-processing to runtime calculation of reduction op
                 [The  Pinned Arena] space allocated (MB): 24
                 [The  Pinned Arena] space used      (MB): 0
                 [The  Pinned Arena]: 3 allocs, 64 busy blocks, 6 free blocks
-                [Rank] MPI rank: 0 / 4
+                [Rank] MPI rank: 0
+                [Rank] MPI size: 4
                 [Rank] hostname: host-123
                 [Rank] GPU device id: 0
                 [Process] VmPeak: 7632384 kB

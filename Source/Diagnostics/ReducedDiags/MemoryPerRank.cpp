@@ -133,8 +133,10 @@ void MemoryPerRank::ComputeDiags (int step)
     std::ofstream ofs(per_rank_file, std::ios_base::app);
     if (!ofs.is_open()) { return; }
 
-    ofs << "    [Rank] MPI rank: " << amrex::ParallelDescriptor::MyProc()
-        << " / " << amrex::ParallelDescriptor::NProcs() << "\n";
+    ofs << "    [Rank] MPI rank: "
+        << amrex::ParallelDescriptor::MyProc() << "\n";
+    ofs << "    [Rank] MPI size: "
+        << amrex::ParallelDescriptor::NProcs() << "\n";
     ofs << "    [Rank] hostname: " << GetHostName() << "\n";
 #ifdef AMREX_USE_GPU
     ofs << "    [Rank] GPU device id: "
