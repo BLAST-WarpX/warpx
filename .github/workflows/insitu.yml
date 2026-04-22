@@ -23,8 +23,8 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
-      CXX: clang++
-      CC: clang
+      CXX: clang++-14
+      CC: clang-14
       CXXFLAGS: "-Werror -Wshadow -Woverloaded-virtual -Wunreachable-code -Wno-error=pass-failed"
       CMAKE_GENERATOR: Ninja
       CMAKE_PREFIX_PATH: /root/install/sensei/v4.0.0/lib64/cmake
@@ -33,6 +33,9 @@ jobs:
       image: senseiinsitu/ci:fedora35-amrex-20220613
     steps:
     - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        dnf install -y clang14
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@v2
     - name: Configure
