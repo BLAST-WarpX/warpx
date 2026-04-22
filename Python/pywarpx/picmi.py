@@ -4584,6 +4584,17 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
     weighting_function: string, optional
         For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge
 
+    file_prefix: string, optional
+        For diagnostic type 'MemoryPerRank', the basename of the per-rank output
+        files. The MPI rank is appended automatically, producing files named
+        ``<path>/<file_prefix>.<rank>``. Defaults to the diagnostic name.
+
+    rank_stride: integer, optional
+        For diagnostic type 'MemoryPerRank', only every ``rank_stride``-th MPI rank
+        writes a file (i.e. ranks for which ``MyProc() % rank_stride == 0``). The
+        default ``1`` writes one file per rank; on very large runs a larger stride
+        can be used to reduce the number of files on the shared filesystem.
+
     reduction_type: {'Maximum', 'Minimum', or 'Integral'}
         For diagnostic type 'FieldReduction', the type of reduction
 
@@ -4642,6 +4653,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         # different reduced diagnostic types.
 
         # The simple diagnostics do not require any additional arguments
+        # (any extra kwargs such as file_prefix/rank_stride for MemoryPerRank
+        # are set on the diagnostic instance directly via handle_init).
         self._simple_reduced_diagnostics = [
             "ParticleEnergy",
             "ParticleMomentum",
@@ -4653,6 +4666,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             "ParticleNumber",
             "LoadBalanceCosts",
             "LoadBalanceEfficiency",
+            "MemoryPerRank",
             "Timestep",
         ]
         # The species diagnostics require a species to be provided
@@ -4664,7 +4678,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         ]
 
         if self.type in self._simple_reduced_diagnostics:
-            pass
+            if self.type == "MemoryPerRank":
+                kw = self._handle_memory_per_rank(**kw)
         elif self.type in self._species_reduced_diagnostics:
             species = kw.pop("species")
             self.species = species.name
@@ -4801,6 +4816,12 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
 
+        return kw
+
+    def _handle_memory_per_rank(self, **kw):
+        """Utility function to pop MemoryPerRank-specific kwargs."""
+        self.file_prefix = kw.pop("file_prefix", None)
+        self.rank_stride = kw.pop("rank_stride", None)
         return kw
 
     def _handle_charge_on_eb(self, **kw):
