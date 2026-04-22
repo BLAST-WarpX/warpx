@@ -75,12 +75,13 @@ namespace {
 
 // Constructor
 MemoryPerRank::MemoryPerRank (const std::string& rd_name)
-    : ReducedDiags{rd_name}
+    : ReducedDiags{rd_name},
+      // Default basename for the per-rank files (the MPI rank is appended
+      // by amrex::Arena::PrintUsageToFiles, giving
+      // "<m_path><m_filename>.<MPI rank>"). m_rd_name is initialized by the
+      // base ReducedDiags ctor above and is already usable here.
+      m_filename{m_rd_name}
 {
-    // Default basename for the per-rank files (the MPI rank is appended by
-    // amrex::Arena::PrintUsageToFiles, giving "<m_path><m_filename>.<rank>").
-    m_filename = m_rd_name;
-
     // Read per-diagnostic parameters
     const amrex::ParmParse pp_name(m_rd_name);
 
