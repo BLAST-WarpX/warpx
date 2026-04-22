@@ -4801,8 +4801,11 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         usage information for each MPI rank. It logs, per rank:
 
         * Total/free GPU memory (when applicable)
-        * Memory usage statistics for the ``Main``, ``Device``, ``Managed`` and ``Pinned``
-          Arena memory pools (allocated/used MB, alloc/busy/free block counts)
+        * Memory usage statistics for the ``Main``, ``Device``, ``Managed``, ``Pinned`` and
+          ``Comms`` Arena memory pools (allocated/used MB, alloc/busy/free block counts).
+          The ``Comms`` Arena holds MPI staging buffers; it is only reported as a separate
+          block when it is distinct from the ``Device`` and ``Pinned`` Arenas, which typically
+          happens on GPU-aware MPI builds.
         * Host-process memory usage (``VmPeak``, ``VmSize``, ``VmHWM``, ``VmRSS`` on Linux)
         * MPI rank, host name and GPU device id
 
@@ -4837,6 +4840,9 @@ This shifts analysis from post-processing to runtime calculation of reduction op
                 [The  Pinned Arena] space allocated (MB): 24
                 [The  Pinned Arena] space used      (MB): 0
                 [The  Pinned Arena]: 3 allocs, 64 busy blocks, 6 free blocks
+                [The   Comms Arena] space allocated (MB): 8
+                [The   Comms Arena] space used      (MB): 0
+                [The   Comms Arena]: 1 allocs, 0 busy blocks, 1 free blocks
                 [Rank] MPI rank: 0
                 [Rank] MPI size: 4
                 [Rank] hostname: host-123
