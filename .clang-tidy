@@ -61,7 +61,8 @@ Checks: '
         -readability-uppercase-literal-suffix,
 -readability-container-contains,
 -readability-redundant-inline-specifier,
--readability-redundant-member-init
+-readability-redundant-member-init,
+-readability-reference-to-constructed-temporary
     '
 
 CheckOptions:
@@ -90,5 +91,7 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # Other checks that we may consider enabling
 # -bugprone-unused-local-non-trivial-variable
 # -performance-enum-size
+# -readability-container-contains
 # -readability-redundant-inline-specifier
 # -readability-redundant-member-init
+# -readability-reference-to-constructed-temporary
