@@ -10,4 +10,5 @@ endforeach()
 
 add_subdirectory(BinaryCollision)
 add_subdirectory(BackgroundMCC)
+add_subdirectory(PulsedDecay)
 add_subdirectory(BackgroundStopping)
