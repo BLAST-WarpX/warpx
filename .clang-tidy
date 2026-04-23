@@ -5,6 +5,7 @@ Checks: '
         -bugprone-implicit-widening-of-multiplication-result,
         -bugprone-misplaced-widening-cast,
         -bugprone-unchecked-optional-access,
+-bugprone-unused-local-non-trivial-variable,
     cert-*,
         -cert-err58-cpp,
     clang-analyzer-*,
@@ -44,6 +45,7 @@ Checks: '
 -modernize-use-starts-ends-with,
     mpi-*,
     performance-*,
+-performance-enum-size,
     portability-*,
     readability-*,
         -readability-convert-member-functions-to-static,
@@ -54,8 +56,10 @@ Checks: '
         -readability-isolate-declaration,
         -readability-magic-numbers,
         -readability-named-parameter,
+        -readability-redundant-casting,
         -readability-uppercase-literal-suffix,
--readability-container-contains
+-readability-container-contains,
+-readability-redundant-inline-specifier
     '
 
 CheckOptions:
@@ -80,3 +84,8 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -modernize-use-integer-sign-comparison
 # -modernize-use-starts-ends-with
 # -readability-container-contains
+
+# Other checks that we may consider enabling
+# -bugprone-unused-local-non-trivial-variable
+# -performance-enum-size
+# -readability-redundant-inline-specifier
