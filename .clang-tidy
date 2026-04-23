@@ -59,7 +59,8 @@ Checks: '
         -readability-redundant-casting,
         -readability-uppercase-literal-suffix,
 -readability-container-contains,
--readability-redundant-inline-specifier
+-readability-redundant-inline-specifier,
+-readability-redundant-member-init
     '
 
 CheckOptions:
@@ -89,3 +90,4 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -bugprone-unused-local-non-trivial-variable
 # -performance-enum-size
 # -readability-redundant-inline-specifier
+# -readability-redundant-member-init
