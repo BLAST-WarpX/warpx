@@ -151,20 +151,44 @@ check_charge_conservation(data)
 dim = "rz"
 species_name = "electrons"
 
+# if test_name equals test_rz_langmuir_multi_psatd or test_rz_langmuir_multi_psatd_current_correction,
+# we skip the check of the particle momentum along 'x', since it is not included in the output
+skip_component = None
+if test_name in [
+    "test_rz_langmuir_multi_psatd",
+    "test_rz_langmuir_multi_psatd_current_correction",
+]:
+    skip_component = "particle_momentum_x"
+
 parser_filter_fn = "diags/diag_parser_filter000080"
 parser_filter_expression = "(py-pz < 0) * (r<10e-6) * (z > 0)"
 post_processing_utils.check_particle_filter(
-    fn, parser_filter_fn, parser_filter_expression, dim, species_name
+    fn,
+    parser_filter_fn,
+    parser_filter_expression,
+    dim,
+    species_name,
+    skip_component,
 )
 
 uniform_filter_fn = "diags/diag_uniform_filter000080"
 uniform_filter_expression = "ids%3 == 0"
 post_processing_utils.check_particle_filter(
-    fn, uniform_filter_fn, uniform_filter_expression, dim, species_name
+    fn,
+    uniform_filter_fn,
+    uniform_filter_expression,
+    dim,
+    species_name,
+    skip_component,
 )
 
 random_filter_fn = "diags/diag_random_filter000080"
 random_fraction = 0.66
 post_processing_utils.check_random_filter(
-    fn, random_filter_fn, random_fraction, dim, species_name
+    fn,
+    random_filter_fn,
+    random_fraction,
+    dim,
+    species_name,
+    skip_component,
 )

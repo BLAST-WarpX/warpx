@@ -449,17 +449,6 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
     m_dirPrefix = dirPrefix;
     m_file_min_digits = file_min_digits;
 
-    if( ! isBTD ) {
-        if (m_CurrentStep >= ts) {
-            // note m_Series is reset in Init(), so using m_Series->iterations.contains(ts) is only able to check the
-            // last written step in m_Series's life time, but not other earlier written steps by other m_Series
-            ablastr::warn_manager::WMRecordWarning("Diagnostics",
-                    " Warning from openPMD writer: Already written iteration:"
-                    + std::to_string(ts)
-                );
-        }
-    }
-
     m_CurrentStep = ts;
     Init(openPMD::Access::CREATE, isBTD);
 }
@@ -612,6 +601,12 @@ for (const auto & particle_diag : particle_diags) {
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
+    if (particle_diag.m_plot_Ex || particle_diag.m_plot_Ey || particle_diag.m_plot_Ez ||
+        particle_diag.m_plot_Bx || particle_diag.m_plot_By || particle_diag.m_plot_Bz) {
+        storeFieldOnParticles(tmp, !use_pinned_pc,
+                              particle_diag.m_plot_Ex, particle_diag.m_plot_Ey, particle_diag.m_plot_Ez,
+                              particle_diag.m_plot_Bx, particle_diag.m_plot_By, particle_diag.m_plot_Bz);
+    }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
     auto const rn = tmp.GetRealSoANames();
@@ -680,7 +675,7 @@ for (const auto & particle_diag : particle_diags) {
 void
 WarpXOpenPMDPlot::FlushBTDToDisk()
 {
-    bool isBTD = true;
+    constexpr bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
     const bool flattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
@@ -1439,7 +1434,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
     // collective open
     series_iteration.open();
 
-    bool hasADIOS =  (m_Series->backend() == "ADIOS2");
+    const bool hasADIOS =  (m_Series->backend() == "ADIOS2");
 
     auto meshes = series_iteration.meshes;
     if (first_write_to_iteration) {

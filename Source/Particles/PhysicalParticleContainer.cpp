@@ -378,7 +378,7 @@ PhysicalParticleContainer::AllocData ()
             }
         }
 
-        ablastr::fields::MultiLevelVectorField T_vf =
+        const ablastr::fields::MultiLevelVectorField T_vf =
             warpx.m_fields.get_mr_levels_alldirs(T_field_name, warpx.finestLevel());
 
         // Allocate Accumulation Arrays
@@ -1607,7 +1607,7 @@ PhysicalParticleContainer::InitIonizationModule ()
     constexpr auto a3 = PhysConst::alpha*PhysConst::alpha*PhysConst::alpha;
     constexpr auto a4 = a3 * PhysConst::alpha;
     constexpr Real wa = a3 * PhysConst::c / PhysConst::r_e;
-    constexpr Real Ea = PhysConst::m_e * PhysConst::c*PhysConst::c /PhysConst::q_e *
+    constexpr Real Ea = PhysConst::m_e * PhysConst::c2 /PhysConst::q_e *
         a4/PhysConst::r_e;
     constexpr Real UH = utils::physics::table_ionization_energies[0];
     const Real l_eff = std::sqrt(UH/h_ionization_energies[0]) - 1._rt;
@@ -1865,7 +1865,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Number of guard cells for local deposition of J
     const WarpX& warpx = WarpX::GetInstance();
 
-    amrex::IntVect ng_J = warpx.get_ng_depos_J();
+    const amrex::IntVect ng_J = warpx.get_ng_depos_J();
 
     // Extract deposition order and check that particles shape fits within the guard cells.
     // NOTE: In specific situations where the staggering of J and the current deposition algorithm
@@ -2127,47 +2127,50 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
 
 
-            bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (nx_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wx_arr(i,j,k);
-                        amrex::Real sumwv = vxbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nx_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wx_arr(i,j,k);
+                        const amrex::Real sumwv = vxbar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(nx_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vxbar_arr(i,j,k) = sumwv/sumw;
                         varx_arr(i,j,k) = norm*w2x_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             varx_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (ny_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wy_arr(i,j,k);
-                        amrex::Real sumwv = vybar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(ny_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wy_arr(i,j,k);
+                        const amrex::Real sumwv = vybar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(ny_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vybar_arr(i,j,k) = sumwv/sumw;
                         vary_arr(i,j,k) = norm*w2y_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             vary_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (nz_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wz_arr(i,j,k);
-                        amrex::Real sumwv = vzbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nz_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wz_arr(i,j,k);
+                        const amrex::Real sumwv = vzbar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(nz_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vzbar_arr(i,j,k) = sumwv/sumw;
                         varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass) {
                             varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 });
 
@@ -2176,7 +2179,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::Gpu::streamSynchronize();
 
         // Multiply variance by species mass over the Boltzmann constant to convert to temperature in K
-        amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
+        const amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
 
         // Sum boundaries for accumulation MFs, apply normalization, and filter to end up with
         // temperature in K in T_vf

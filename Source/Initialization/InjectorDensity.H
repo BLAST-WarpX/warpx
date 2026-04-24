@@ -28,7 +28,7 @@
 // struct whose getDensity returns constant density.
 struct InjectorDensityConstant
 {
-    InjectorDensityConstant (amrex::Real a_rho) noexcept : m_rho(a_rho) {}
+    explicit InjectorDensityConstant (amrex::Real a_rho) noexcept : m_rho(a_rho) {}
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -45,7 +45,7 @@ private:
 // struct whose getDensity returns local density computed from parser.
 struct InjectorDensityParser
 {
-    InjectorDensityParser (amrex::ParserExecutor<3> const& a_parser) noexcept
+    explicit InjectorDensityParser (amrex::ParserExecutor<3> const& a_parser) noexcept
         : m_parser(a_parser) {}
 
     [[nodiscard]]
