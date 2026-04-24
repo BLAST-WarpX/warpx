@@ -236,9 +236,9 @@ struct InjectorMomentumMaxwellian
             amrex::Abort("Magnitude of mean normalized momentum |u_mean| >= 1.");
         }
 
-        amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
-        amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
-        amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
+        const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
+        const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
+        const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
         return amrex::XDim3 {ux_std, uy_std, uz_std};
     }
 

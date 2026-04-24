@@ -1288,10 +1288,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             ParticleBoxArray(0), ParticleDistributionMap(0), amrex::IntVect(0), get_zlab_flux);
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    const int nmodes = WarpX::n_rz_azimuthal_modes;
-    const bool rz_random_theta = m_rz_random_theta;
-#endif
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
