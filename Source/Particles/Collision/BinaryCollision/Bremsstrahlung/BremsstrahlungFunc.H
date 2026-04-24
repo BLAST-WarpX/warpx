@@ -336,7 +336,7 @@ public:
         {
             using namespace amrex::literals;
 
-            constexpr auto c2 = PhysConst::c * PhysConst::c;
+            constexpr auto c2 = PhysConst::c2;
 
             // compute gamma for particles 1 (electron) and 2 (ion)
             amrex::ParticleReal const u1sq = (u1x*u1x + u1y*u1y + u1z*u1z);
@@ -435,7 +435,7 @@ public:
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
 
-    bool use_global_debye_length() { return m_use_global_debye_length; }
+    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 
 private:
 

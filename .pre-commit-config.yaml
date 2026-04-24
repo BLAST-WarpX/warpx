@@ -15,6 +15,9 @@
 # Do not check/format anything from third parties
 exclude: '^share/openPMD/thirdParty'
 
+ci:
+  autoupdate_schedule: monthly
+
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
@@ -73,7 +76,7 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.10
+  rev: v0.15.11
   hooks:
     # Run the linter
     - id: ruff-check
