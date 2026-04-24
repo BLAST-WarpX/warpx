@@ -77,9 +77,7 @@ def check_restart(filename, tolerance=1e-12):
     # Redistribute() after checkpoint-restart may reorder particles across
     # tiles/ranks. The (cpu, id) pair is the unique particle key in AMReX.
     for species in sorted(particle_species):
-        species_fields = [
-            f for f in ds_benchmark.field_list if f[0] == species
-        ]
+        species_fields = [f for f in ds_benchmark.field_list if f[0] == species]
 
         id_r = np.atleast_1d(ad_restart[(species, "particle_id")].squeeze().v)
         id_b = np.atleast_1d(ad_benchmark[(species, "particle_id")].squeeze().v)

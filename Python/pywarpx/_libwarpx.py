@@ -193,6 +193,7 @@ class LibWarpX:
                 if self.libwarpx_so.Config.gpu_backend in ("SYCL", "CUDA", "HIP"):
                     try:
                         from mpi4py import MPI
+
                         MPI.COMM_WORLD.Barrier()
                     except Exception:
                         pass
