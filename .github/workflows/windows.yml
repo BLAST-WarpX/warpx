@@ -18,7 +18,7 @@ jobs:
     uses: ./.github/workflows/check_changes.yml
 
   build_win_msvc:
-    name: MSVC C++17 w/o MPI
+    name: MSVC C++20 w/o MPI
     runs-on: windows-latest
     # disabled due to issues in #5230
     if: 0
@@ -72,7 +72,7 @@ jobs:
 #  --diagformat=openpmd
 
   build_win_clang:
-    name: Clang C++17 w/ OMP w/o MPI
+    name: Clang C++20 w/ OMP w/o MPI
     runs-on: windows-2022
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
