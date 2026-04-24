@@ -159,7 +159,7 @@ def analyze_rz(ds_init, ds_final):
     error, and its amplitude is bounded by the initial B0.
 
     We therefore check:
-      1. |Bz_final| stays within ±10% of B0 (catches runaway growth or decay
+      1. |Bz_final| stays within +/-10% of B0 (catches runaway growth or decay
          while tolerating the ~2% oscillation seen in practice).
       2. The kz=1 z-mode remains dominant (mode structure preserved).
       3. Et is non-zero (PSATD correctly couples Bz to Et).
