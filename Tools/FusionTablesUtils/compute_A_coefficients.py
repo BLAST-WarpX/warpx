@@ -18,12 +18,14 @@ def parse_args():
         description="Convert even Legendre L coefficients to A coefficients."
     )
     parser.add_argument(
-        "input",
+        "--input",
+        required=True,
         type=Path,
         help="input table path",
     )
     parser.add_argument(
-        "output",
+        "--output",
+        required=True,
         type=Path,
         help="output table path",
     )
