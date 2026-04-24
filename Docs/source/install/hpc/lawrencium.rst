@@ -60,13 +60,13 @@ And since Lawrencium does not yet provide a module for them, install ADIOS2, BLA
    # BLAS++ (for PSATD+RZ)
    git clone https://github.com/icl-utk-edu/blaspp.git src/blaspp
    rm -rf src/blaspp-v100-build
-   cmake -S src/blaspp -B src/blaspp-v100-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/blaspp-master
+   cmake -S src/blaspp -B src/blaspp-v100-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/blaspp-master
    cmake --build src/blaspp-v100-build --target install --parallel 12
 
    # LAPACK++ (for PSATD+RZ)
    git clone https://github.com/icl-utk-edu/lapackpp.git src/lapackpp
    rm -rf src/lapackpp-v100-build
-   cmake -S src/lapackpp -B src/lapackpp-v100-build -DCMAKE_CXX_STANDARD=17 -Dgpu_backend=cuda -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/lapackpp-master -Duse_cmake_find_lapack=ON -DBLAS_LIBRARIES=${LAPACK_DIR}/lib/libblas.a -DLAPACK_LIBRARIES=${LAPACK_DIR}/lib/liblapack.a
+   cmake -S src/lapackpp -B src/lapackpp-v100-build -DCMAKE_CXX_STANDARD=20 -Dgpu_backend=cuda -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=$HOME/sw/v100/lapackpp-master -Duse_cmake_find_lapack=ON -DBLAS_LIBRARIES=${LAPACK_DIR}/lib/libblas.a -DLAPACK_LIBRARIES=${LAPACK_DIR}/lib/liblapack.a
    cmake --build src/lapackpp-v100-build --target install --parallel 12
 
 Optionally, download and install Python packages for :ref:`PICMI <usage-picmi>` or dynamic ensemble optimizations (`libEnsemble <https://libensemble.readthedocs.io/en/main/>`__):
