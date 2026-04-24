@@ -27,7 +27,8 @@ cell centres.
 
 import argparse
 
-from scipy.special import j0 as scipy_j0, j1 as scipy_j1
+from scipy.special import j0 as scipy_j0
+from scipy.special import j1 as scipy_j1
 
 parser = argparse.ArgumentParser(
     description="RZ PSATD Hankel eigenmode precision test.",
@@ -109,6 +110,7 @@ sim = picmi.Simulation(
     verbose=0,
 )
 
+
 # Full eigenmode initialization via Python callback.
 # scipy_j0/j1 evaluate Bessel functions exactly at the Yee cell centres
 # reported by mesh("r") / mesh("z"), bypassing the AMReX parser.
@@ -170,7 +172,9 @@ def _fill_mfab_from_numpy(mfab, values_2d):
             pin_arr = mf_pin.array(mfi).to_numpy(copy=False, order="F")
             nr_valid = r_hi - r_lo + 1
             nz_valid = z_hi - z_lo + 1
-            pin_2d = pin_arr[ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...]
+            pin_2d = pin_arr[
+                ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...
+            ]
             pin_2d.squeeze()[:] = local_patch
         amr.htod_memcpy(mfab, mf_pin)
     else:
@@ -188,7 +192,9 @@ def _fill_mfab_from_numpy(mfab, values_2d):
             arr_np = mfab.array(mfi).to_numpy(copy=False, order="F")
             nr_valid = r_hi - r_lo + 1
             nz_valid = z_hi - z_lo + 1
-            arr_2d = arr_np[ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...]
+            arr_2d = arr_np[
+                ngrow_r : ngrow_r + nr_valid, ngrow_z : ngrow_z + nz_valid, ...
+            ]
             arr_2d.squeeze()[:] = local_patch
 
 
