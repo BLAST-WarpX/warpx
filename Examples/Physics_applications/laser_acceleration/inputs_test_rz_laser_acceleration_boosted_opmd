@@ -66,6 +66,17 @@ warpx.grid_type = collocated
 #interpolation.current_centering_noy = 8
 #interpolation.current_centering_noz = 8
 
+# Parabolic plasma channel profile: n0*(1 + 4*(x^2+y^2)/(kp^2*rc^4)) * n_long(z)
+# with kp = q_e/clight * sqrt(n0/(m_e*epsilon0))
+# and n_long(z) a cosine up-ramp, constant plateau, cosine down-ramp
+my_constants.z_start   = 0.e-3
+my_constants.ramp_up   = 0.5e-3
+my_constants.plateau   = 50.e-3
+my_constants.ramp_down = 0.5e-3
+my_constants.rc        = 15.e-6
+my_constants.n0        = 1.e24
+my_constants.kp        = q_e/clight*sqrt(n0/(m_e*epsilon0))
+
 # Plasma
 particles.species_names = electrons ions
 
@@ -78,10 +89,14 @@ electrons.xmin = 0
 electrons.xmax =  40.e-6
 electrons.zmin = -0.08289214668121057
 electrons.zmax = 0.08289214668121057
-electrons.profile                 = "parse_density_function"
-electrons.predefined_profile_name = "parabolic_channel"
-#         predefined_profile_params = z_start   ramp_up   plateau   ramp_down   rc       n0
-electrons.predefined_profile_params = 0.e-3      0.5e-3      50.e-3      0.5e-3      15.e-6     1.e24
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
+    "*if(z<z_start, 0," \
+    "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
+    "   if(z<z_start+ramp_up+plateau, 1," \
+    "   if(z<z_start+ramp_up+plateau+ramp_down, 0.5*(1+cos(pi*(z-z_start-ramp_up-plateau)/ramp_down))," \
+    "   0))))"
 electrons.do_continuous_injection = 1
 
 ions.charge = q_e
@@ -93,10 +108,14 @@ ions.xmin = 0
 ions.xmax =  40.e-6
 ions.zmin = -0.08289214668121057
 ions.zmax = 0.08289214668121057
-ions.profile                 = "parse_density_function"
-ions.predefined_profile_name = "parabolic_channel"
-#         predefined_profile_params = z_start   ramp_up   plateau   ramp_down   rc       n0
-ions.predefined_profile_params = 0.e-3      0.5e-3      50.e-3      0.5e-3      15.e-6     1.e24
+ions.profile                 = parse_density_function
+ions.density_function(x,y,z) = \
+    "n0*(1+4*(x**2+y**2)/(kp**2*rc**4))" \
+    "*if(z<z_start, 0," \
+    "   if(z<z_start+ramp_up, 0.5*(1-cos(pi*(z-z_start)/ramp_up))," \
+    "   if(z<z_start+ramp_up+plateau, 1," \
+    "   if(z<z_start+ramp_up+plateau+ramp_down, 0.5*(1+cos(pi*(z-z_start-ramp_up-plateau)/ramp_down))," \
+    "   0))))"
 ions.do_continuous_injection = 1
 
 # laser
