@@ -403,6 +403,8 @@ def main():
         error = analyze_rz_hankel(ds_init, ds_final)
         tolerance = 1.0e-2
         label = "RZ Hankel"
+    else:
+        raise ValueError(f"Unknown dim value: {args.dim}")
 
     if args.tolerance is not None:
         tolerance = args.tolerance
