@@ -1531,8 +1531,11 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ or RCYLINDER geometry, whether to randomize the azimuthal position of particles.
-    This is used when :pp:param:`<species_name>.injection_style = NUniformPerCell`.
+    When using RZ, RCYLINDER, or RSPHERE geometry, particle azimuthal angles are always defined in the range :math:`(-\pi, \pi]`.
+
+    * For :pp:param:`<species_name>.injection_style = NUniformPerCell` and this flag set to ``true``, a random azimuthal offset is applied independently in each cell. This rotates the particle distribution randomly from cell to cell while keeping angles within :math:`(-\pi, \pi]`.
+
+    * For :pp:param:`<species_name>.injection_style = NRandomPerCell`, this flag essentially does nothing since particle positions are set randomly anyway.
 
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``

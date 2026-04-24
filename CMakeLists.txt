@@ -36,9 +36,9 @@ endif()
 
 # C++ Standard in Superbuilds #################################################
 #
-# This is the easiest way to push up a C++17 requirement for AMReX, PICSAR and
+# This is the easiest way to push up a C++20 requirement for AMReX, PICSAR and
 # openPMD-api until they increase their requirement.
-set_cxx17_superbuild()
+set_cxx20_superbuild()
 
 
 # CCache Support ##############################################################
@@ -221,11 +221,11 @@ include(CTest)
 # Old GCCs: std::filesystem as a separate library
 try_compile(CXX_HAS_STD_FS "${WarpX_BINARY_DIR}/temp"
     "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
-    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON
 )
 try_compile(CXX_HAS_STD_FS_WITH_LINK "${WarpX_BINARY_DIR}/temp"
     "${WarpX_SOURCE_DIR}/cmake/has_filesystem.cpp"
-    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    CMAKE_FLAGS -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON
     LINK_LIBRARIES stdc++fs
 )
 
@@ -304,7 +304,7 @@ foreach(D IN LISTS WarpX_DIMS)
         if(CXX_HAS_STD_FS_WITH_LINK)
             target_link_libraries(ablastr_${SD} PUBLIC stdc++fs)
         else()
-            message(FATAL_ERROR "Your compiler does not support C++17 "
+            message(FATAL_ERROR "Your compiler does not support C++20 "
                     "<filesystem> Please use a newer C++ compiler.")
         endif()
     endif()
@@ -574,14 +574,14 @@ foreach(D IN LISTS WarpX_DIMS)
     endif()
 endforeach()
 
-# C++ properties: at least a C++17 capable compiler is needed
+# C++ properties: at least a C++20 capable compiler is needed
 if(WarpX_COMPUTE STREQUAL CUDA)
     # AMReX helper function: propagate CUDA specific target & source properties
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
         setup_target_for_cuda_compilation(${warpx_tgt})
     endforeach()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        target_compile_features(${warpx_tgt} PUBLIC cuda_std_17)
+        target_compile_features(${warpx_tgt} PUBLIC cuda_std_20)
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CUDA_EXTENSIONS OFF
@@ -589,13 +589,7 @@ if(WarpX_COMPUTE STREQUAL CUDA)
     )
 else()
     foreach(warpx_tgt IN LISTS _ALL_TARGETS)
-        if(WarpX_SIMD)
-            # vir::cvt
-            # https://github.com/mattkretz/vir-simd/issues/45
-            target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
-        else()
-            target_compile_features(${warpx_tgt} PUBLIC cxx_std_17)
-        endif()
+        target_compile_features(${warpx_tgt} PUBLIC cxx_std_20)
     endforeach()
     set_target_properties(${_ALL_TARGETS} PROPERTIES
         CXX_EXTENSIONS OFF
