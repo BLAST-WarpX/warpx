@@ -50,7 +50,7 @@ struct GetVelocity
      * \param[in] vel: const reference to the VelocityProperties object that will be used to
      * populate the functor
      */
-    GetVelocity (VelocityProperties const& vel) noexcept;
+    explicit GetVelocity (VelocityProperties const& vel) noexcept;
 
     /**
      * \brief Functor call. Returns the value of velocity at the location (x,y,z)

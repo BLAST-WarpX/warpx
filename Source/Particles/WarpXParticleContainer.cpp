@@ -1153,7 +1153,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     auto& uyp_n = pti.GetAttribs("uy_n");
     auto& uzp_n = pti.GetAttribs("uz_n");
 
-    const bool full_mass_matrices = (Szz->nComp() > 1 ? true : false);
+    const bool full_mass_matrices = (Szz->nComp() > 1);
 
     const int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
@@ -1428,6 +1428,32 @@ WarpXParticleContainer::DepositCurrent (
         }
 #endif
     }
+}
+
+void WarpXParticleContainer::DepositCurrent (
+    const std::string& mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
+) {
+    auto& warpx = WarpX::GetInstance();
+    // allocate temporary multifab to deposit current density into
+    ablastr::fields::MultiLevelVectorField current {
+        warpx.m_fields.get_alldirs(mf_name, lev)
+    };
+
+    DepositCurrent(current, dt, relative_time);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        warpx.ApplyInverseVolumeScalingToCurrentDensity(
+            current[lev][0], current[lev][1], current[lev][2], lev
+        );
+#endif
+
+    // Sum guard cells
+    warpx.SyncCurrent(mf_name);
+
+    // Apply boundary conditions
+    warpx.ApplyJfieldBoundary(
+        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
+    );
 }
 
 /* \brief Charge Deposition for thread thread_num
@@ -1961,13 +1987,13 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
                 const amrex::ParticleReal ux = uxp[ip] - sum_array(ii, jj, kk, 1);
                 const amrex::ParticleReal uy = uyp[ip] - sum_array(ii, jj, kk, 2);
                 const amrex::ParticleReal uz = uzp[ip] - sum_array(ii, jj, kk, 3);
-                const amrex::Real usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
+                const auto usq = (amrex::Real)(w*(ux*ux + uy*uy + uz*uz));
                 amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), usq);
             });
     }
 
     // Divide the squares by number of particles for average and calculate the temperature
-    amrex::ParticleReal mass = m_mass;
+    const amrex::ParticleReal mass = m_mass;
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2101,8 +2127,8 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     int const ng = 0;
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
-    amrex::Real const rmass = (amrex::Real)(m_mass);
-    amrex::Real const rcharge = (amrex::Real)(charge);
+    auto const rmass = static_cast<amrex::Real>(m_mass);
+    auto const rcharge = static_cast<amrex::Real>(charge);
     amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
 #ifdef AMREX_USE_OMP
@@ -2220,7 +2246,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
     amrex::Long np_total = 0;
 
-    const amrex::ParticleReal inv_clight_sq = 1.0_prt/PhysConst::c/PhysConst::c;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const int nLevels = finestLevel();
 
@@ -2245,7 +2271,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
                                {
                                    amrex::ParticleReal usq = (uxp[i]*uxp[i] +
                                                               uyp[i]*uyp[i] +
-                                                              uzp[i]*uzp[i])*inv_clight_sq;
+                                                              uzp[i]*uzp[i])*inv_c2;
                                    const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq);
                                    return {uxp[i]*gaminv,  uyp[i]*gaminv, uzp[i]*gaminv};
                                });
@@ -2273,7 +2299,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
                 np_total += pti.numParticles();
 
                 for (unsigned long i = 0; i < ux.size(); i++) {
-                    const amrex::ParticleReal usq = (ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i])*inv_clight_sq;
+                    const amrex::ParticleReal usq = (ux[i]*ux[i] + uy[i]*uy[i] + uz[i]*uz[i])*inv_c2;
                     const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq);
                     vx_total += ux[i]*gaminv;
                     vy_total += uy[i]*gaminv;
@@ -2300,7 +2326,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 
 amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
-    const amrex::ParticleReal inv_clight_sq = 1.0_prt/(PhysConst::c*PhysConst::c);
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 
@@ -2318,7 +2344,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
             reduce_op.eval(pti.numParticles(), reduce_data,
                 [=] AMREX_GPU_DEVICE (int ip)
-                { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_clight_sq; });
+                { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_c2; });
         }
     }
 
