@@ -9,13 +9,11 @@ import argparse
 import math
 from pathlib import Path
 
-DEGREES = range(0, 17, 2)
-
 
 def parse_args():
     # Require explicit file paths so the script is easy to reuse.
     parser = argparse.ArgumentParser(
-        description="Convert even Legendre L coefficients to A coefficients."
+        description="Convert Legendre L coefficients to A coefficients."
     )
     parser.add_argument(
         "--input",
@@ -40,10 +38,10 @@ def binom(a, k):
     return value
 
 
-def compute_a(n, l_coeffs):
-    # Only even j contribute for this table; absent higher L_j values are zero.
+def compute_a(n, max_degree, l_coeffs):
+    # Absent L_j values are treated as zero.
     total = 0.0
-    for j in range(n, 17, 2):
+    for j in range(n, max_degree + 1):
         total += (
             l_coeffs.get(j, 0.0) * 2**j * math.comb(j, n) * binom(0.5 * (j + n - 1), j)
         )
@@ -70,10 +68,12 @@ def main():
         line.split() for line in input_path.read_text().splitlines() if line.strip()
     ]
     header = lines[0]
-    # Header labels are E L0 L2 ... L16.
+    # Header labels are E L0 L1 ... or E L0 L2 ...
     l_degrees = [int(label[1:]) for label in header[1:]]
+    max_degree = max(l_degrees)
+    a_degrees = range(max_degree + 1)
 
-    output_rows = [["E", *(f"A{n}" for n in DEGREES)]]
+    output_rows = [["E", *(f"A{n}" for n in a_degrees)]]
     for fields in lines[1:]:
         energy = fields[0]
         l_coeffs = {
@@ -82,7 +82,7 @@ def main():
         output_rows.append(
             [
                 energy,
-                *(f"{compute_a(n, l_coeffs):.12g}" for n in DEGREES),
+                *(f"{compute_a(n, max_degree, l_coeffs):.12g}" for n in a_degrees),
             ]
         )
 
