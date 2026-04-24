@@ -144,13 +144,13 @@ jobs:
         cmake-easyinstall --prefix=/usr/local           \
           git+https://github.com/icl-utk-edu/blaspp.git \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
-          -DCMAKE_CXX_STANDARD=17                       \
+          -DCMAKE_CXX_STANDARD=20                       \
           -Duse_openmp=OFF -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
         # LAPACK++
         cmake-easyinstall --prefix=/usr/local             \
           git+https://github.com/icl-utk-edu/lapackpp.git \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)   \
-          -DCMAKE_CXX_STANDARD=17                         \
+          -DCMAKE_CXX_STANDARD=20                         \
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
       # Remove system copy of Matplotlib to avoid conflict
