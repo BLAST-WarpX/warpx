@@ -12,7 +12,7 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
-void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
+void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 {
     BL_PROFILE("ThetaImplicitEM::Define()");
 
@@ -25,10 +25,14 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     m_num_amr_levels = 1;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, "Efield_fp" );
-    m_Eold.Define( m_E );
+    m_E.Define(m_WarpX, "Efield_fp");
+    m_Eold.Define(m_E);
 
-    // Define B_old MultiFabs
+    // Set initial values for E and Eold vectors
+    m_E.Copy(FieldType::Efield_fp);
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
+
+    // Define B_old MultiFab
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Bx = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->boxArray();
@@ -94,28 +98,31 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     m_dt = a_dt;
 
     // Save up and xp at the start of the time step
-    m_WarpX->SaveParticlesAtImplicitStepStart ( );
+    m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save Eg at the start of the time step
-    m_Eold.Copy( FieldType::Efield_fp );
+    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+    // (i.e., Eg used to advance the system from step n-1 to step n)
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
-    const int num_levels = 1;
-    for (int lev = 0; lev < num_levels; ++lev) {
+    // Save Eg at start of time step
+    SaveEoldMultifab();
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+
+    // Save Bg at start of time step
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
         ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
         for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(),
-                                  B_old[n]->nGrowVect() );
+            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(), B_old[n]->nGrowVect());
         }
     }
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
-    m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
-    UpdateWarpXFields( m_E, start_time );
+    UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
@@ -123,7 +130,7 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
 
     // Advance Eg and Bg from time n+theta to time n+1
     const amrex::Real end_time = start_time + m_dt;
-    FinishFieldUpdate( end_time );
+    FinishFieldUpdate(end_time);
 
 }
 
@@ -146,6 +153,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
+
 }
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
@@ -196,11 +204,17 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
         yhat\cdot[\nabla\times\nabla E] = d/dy[dEx/dx + dEz/dz] - [d2/dx2 + d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx + dEy/dy] - [d2/dx2 + d2/dy2]Ez
     2D: xhat\cdot[\nabla\times\nabla E] = d/dx[dEz/dz] - [d2/dz2]Ex
-        yhat\cdot[\nabla\times\nabla E] = - [d2/dx2 + d2/dz2]Ey
+        yhat\cdot[\nabla\times\nabla E] = -[d2/dx2 + d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = d/dz[dEx/dx] - [d2/dx2]Ez
-    1D: xhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ex
-        yhat\cdot[\nabla\times\nabla E] = - [d2/dz2]Ey
+    1D: xhat\cdot[\nabla\times\nabla E] = -[d2/dz2]Ex
+        yhat\cdot[\nabla\times\nabla E] = -[d2/dz2]Ey
         zhat\cdot[\nabla\times\nabla E] = 0
+    RCYL: rhat\cdot[\nabla\times\nabla E] = 0
+          that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
+          zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
+    RZ: rhat\cdot[\nabla\times\nabla E] = d/dr[dEz/dz] - [d2/dz2]Er
+        that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
+        zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 
     In general, one mask is needed for each derivative in each component of the operator.
     However, for a second order Yee grid where E lives on cell edges, no masks are
@@ -290,42 +304,80 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                 if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
 
                 // Set the BC-dependent mask values
-                amrex::Real val0 = 1.0;
-                amrex::Real val1 = 1.0;
+                amrex::Real val0 = 1.0_rt;
+                amrex::Real val1 = 1.0_rt;
                 const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
                 if (bc_type == FieldBoundaryType::PEC){
-                    val0 = 0.0;
-                    val1 = 0.0;
+                    val0 = 0.0_rt;
+                    val1 = 0.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::PMC){
-                    val0 = 1.0;
-                    val1 = 2.0;
+                    val0 = 1.0_rt;
+                    val1 = 2.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
-                    val0 = 0.5;
-                    val1 = 1.0;
+                    val0 = 0.5_rt;
+                    val1 = 1.0_rt;
                 }
                 if (bc_type == FieldBoundaryType::PECInsulator) {
                     const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                     if (voltage_driven) { // Dirichlet boundary for E
-                        val0 = 0.0;
-                        val1 = 0.0;
+                        val0 = 0.0_rt;
+                        val1 = 0.0_rt;
                     }
                     else { // Dirichlet boundary for B
-                        val0 = 0.5;
-                        val1 = 1.0;
+                        val0 = 0.5_rt;
+                        val1 = 1.0_rt;
                     }
                 }
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                amrex::Real val0_Et = val0;
+                amrex::Real val1_Et = val1;
+#if defined(WARPX_DIM_RCYLINDER)
+                amrex::Real val0_Ez = val0;
+                amrex::Real val1_Ez = val1;
+#endif
 
-                // Set mask values on the boundary cells (same for Ex and Ey for 1D_Z)
+                // Need to overwrite BC masks for certain BCs in this geometry
+                if (bc_type == FieldBoundaryType::PECInsulator &&
+                   !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
+                    const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
+                                                                   : static_cast<amrex::Real>(domain_hi[bdry_dir]));
+                    const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5_rt);
+                    const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5_rt);
+                    val0_Et = (bdry_side == 0 ? geom_p : geom_m) / (geom_p + geom_m);
+                    val1_Et = 1.0_rt;
+#if defined(WARPX_DIM_RCYLINDER)
+                    val0_Ez = 0.5_rt * (bdry_side == 0 ? 1.0_rt/geom_p : 1.0_rt/geom_m);
+                    val1_Ez = 1.0_rt;
+#endif
+                }
+                else if (bc_type == FieldBoundaryType::None) { // None is for axis
+                    val0_Et = 0.0_rt;
+                    val1_Et = 0.0_rt;
+#if defined(WARPX_DIM_RCYLINDER)
+                    val0_Ez = 2.0_rt;
+                    val1_Ez = 4.0_rt;
+#endif
+                }
+                val0 = val0_Et;
+                val1 = val1_Et;
+#endif
+
+                // Set mask values on the boundary cells for the relevant field components
 #if defined(WARPX_DIM_1D_Z)
                 amrex::Array4<amrex::Real> const& maskEx_arr = curl2_BC_mask[0]->array(mfi);
+#elif defined(WARPX_DIM_RCYLINDER)
+                amrex::Array4<amrex::Real> const& maskEz_arr = curl2_BC_mask[2]->array(mfi);
 #endif
                 amrex::Array4<amrex::Real> const& maskEy_arr = curl2_BC_mask[1]->array(mfi);
                 amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 #if defined(WARPX_DIM_1D_Z)
                     maskEx_arr(i,j,k,2*bdry_dir  ) = val0;
                     maskEx_arr(i,j,k,2*bdry_dir+1) = val1;
+#elif defined(WARPX_DIM_RCYLINDER)
+                    maskEz_arr(i,j,k,2*bdry_dir  ) = val0_Ez;
+                    maskEz_arr(i,j,k,2*bdry_dir+1) = val1_Ez;
 #endif
                     maskEy_arr(i,j,k,2*bdry_dir  ) = val0;
                     maskEy_arr(i,j,k,2*bdry_dir+1) = val1;
@@ -377,36 +429,57 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     if (bdry_side == 1) { bdry_box.setSmall(bdry_dir,domain_hi[bdry_dir]); }
 
                     // Set the BC-dependent mask values
-                    amrex::Real val0 = 1.0;
-                    amrex::Real val1 = 1.0;
-                    amrex::Real val2 = 1.0;
+                    amrex::Real val0 = 1.0_rt;
+                    amrex::Real val1 = 1.0_rt;
+                    amrex::Real val2 = 1.0_rt;
                     const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
                     if (bc_type == FieldBoundaryType::PEC){
-                        val0 = 0.0;
-                        val1 = 0.0;
-                        val2 = 0.0;
+                        val0 = 0.0_rt;
+                        val1 = 0.0_rt;
+                        val2 = 0.0_rt;
                     }
                     if (bc_type == FieldBoundaryType::PMC){
-                        val0 = 1.0;
-                        val1 = 2.0;
-                        val2 = 2.0;
+                        val0 = 1.0_rt;
+                        val1 = 2.0_rt;
+                        val2 = 2.0_rt;
                     }
                     if (bc_type == FieldBoundaryType::PECInsulator) {
                         const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                         if (voltage_driven) { // Dirichlet boundary for E
-                            val0 = 0.0;
-                            val1 = 0.0;
-                            val2 = 0.0;
+                            val0 = 0.0_rt;
+                            val1 = 0.0_rt;
+                            val2 = 0.0_rt;
                         }
                         else { // Dirichlet boundary for B
-                            val0 = 0.5;
-                            val1 = 1.0;
-                            val2 = 1.0;
+                            val0 = 0.5_rt;
+                            val1 = 1.0_rt;
+                            val2 = 1.0_rt;
                         }
                     }
 
+#if defined(WARPX_DIM_RZ)
+                    // Need to overwrite BC masks for certain BCs in this geometry
+                    if (bdry_dir == 0) {
+                        if (bc_type == FieldBoundaryType::PECInsulator &&
+                           !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
+                            const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
+                                                                           : static_cast<amrex::Real>(domain_hi[bdry_dir]));
+                            const amrex::Real geom_p = ibdry_real / (ibdry_real + 0.5_rt);
+                            const amrex::Real geom_m = ibdry_real / (ibdry_real - 0.5_rt);
+                            val0 = 0.5_rt * (bdry_side == 0 ? 1.0_rt/geom_p : 1.0_rt/geom_m);
+                            val1 = 1.0_rt;
+                            val2 = 1.0_rt;
+                        }
+                        else if (bc_type == FieldBoundaryType::None) { // None is for axis
+                            val0 = 2.0_rt;
+                            val1 = 4.0_rt;
+                            val2 = 4.0_rt;
+                        }
+                    }
+#endif
+
                     // Set mask values on the boundary cells
-                    const int comp_shift = (tdir1 == bdry_dir) ? 0:3;
+                    const int comp_shift = (tdir1 == bdry_dir) ? 0 : 3;
                     amrex::Array4<amrex::Real> const& mask_arr = curl2_BC_mask[field_dir]->array(mfi);
                     amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         mask_arr(i,j,k,comp_shift+0) = val0;

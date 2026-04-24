@@ -89,12 +89,12 @@ public:
     void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E
-    );
+    ) const;
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev
-    );
+    ) const;
 
     /**
      * \brief
