@@ -9,7 +9,7 @@
 [![Supported Platforms](https://img.shields.io/badge/platforms-linux%20|%20osx%20|%20win-blue)](https://warpx.readthedocs.io/en/latest/install/users.html)
 [![GitHub commits since last release](https://img.shields.io/github/commits-since/BLAST-WarpX/warpx/latest/development.svg)](https://github.com/BLAST-WarpX/warpx/compare/development)
 [![HPSF](https://img.shields.io/badge/hosted%20by-HPSF-orange)](https://hpsf.io)
-[![Language: C++17](https://img.shields.io/badge/language-C%2B%2B17-orange.svg)](https://isocpp.org/)
+[![Language: C++20](https://img.shields.io/badge/language-C%2B%2B20-orange.svg)](https://isocpp.org/)
 [![Language: Python](https://img.shields.io/badge/language-Python-orange.svg)](https://python.org/)  
 [![License WarpX](https://img.shields.io/badge/license-BSD--3--Clause--LBNL-blue.svg)](https://spdx.org/licenses/BSD-3-Clause-LBNL.html)
 [![DOI (source)](https://img.shields.io/badge/DOI%20(source)-10.5281/zenodo.4571577-blue.svg)](https://doi.org/10.5281/zenodo.4571577)

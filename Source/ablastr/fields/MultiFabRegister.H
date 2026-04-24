@@ -77,16 +77,26 @@ namespace ablastr::fields
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         static const Direction r;
         static const Direction theta;
+
+        inline static const std::string r_string = "r";
+        inline static const std::string theta_string = "theta";
 #endif
 #if defined(WARPX_DIM_RSPHERE)
         static const Direction phi;
+
+        inline static const std::string phi_string = "phi";
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
         static const Direction x;
         static const Direction y;
+
+        inline static const std::string x_string = "x";
+        inline static const std::string y_string = "y";
 #endif
 #if !defined(WARPX_DIM_RSPHERE)
         static const Direction z;
+
+        inline static const std::string z_string = "z";
 #endif
 
         bool operator<(const Direction& other) const
@@ -94,42 +104,42 @@ namespace ablastr::fields
             return other.dir < this->dir;
         }
 
-        operator std::string() const
+        operator std::string() const // NOLINT(google-explicit-constructor)
         {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (dir == r) { return "r"; }
-            if (dir == theta) { return "theta"; }
+            if (dir == r) { return r_string; }
+            if (dir == theta) { return theta_string; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-            if (dir == phi) { return "phi"; }
+            if (dir == phi) { return phi_string; }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
-            if (dir == x) { return "x"; }
-            if (dir == y) { return "y"; }
+            if (dir == x) { return x_string; }
+            if (dir == y) { return y_string; }
 #endif
 #if !defined(WARPX_DIM_RSPHERE)
-            if (dir == z) { return "z"; }
+            if (dir == z) { return z_string; }
 #endif
             throw std::runtime_error("invalid direction: " + std::to_string(dir));
             return std::to_string(dir);
         }
 
-        Direction (std::string const & s)
+        Direction (std::string const & s) : // NOLINT(google-explicit-constructor)
+            dir{-1}
         {
-            dir = -1;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (s.compare(r) == 0) { dir = r; }
-            if (s.compare(theta) == 0) { dir = theta; }
+            if (s == r_string) { dir = r; }
+            if (s == theta_string) { dir = theta; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-            if (s.compare(phi) == 0) { dir = phi; }
+            if (s == phi_string) { dir = phi; }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
-            if (s.compare(x) == 0) { dir = x; }
-            if (s.compare(y) == 0) { dir = y; }
+            if (s == x_string) { dir = x; }
+            if (s == y_string) { dir = y; }
 #endif
 #if !defined(WARPX_DIM_RSPHERE)
-            if (s.compare(z) == 0) { dir = z; }
+            if (s == z_string) { dir = z; }
 #endif
 
             if (dir == -1) {
@@ -138,10 +148,10 @@ namespace ablastr::fields
         }
 
         // e.g., "x"
-        Direction (char const * c) : dir{Direction{c}} {}
+        Direction (char const * c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
 
         // e.g., 'x'
-        Direction (char const c) : dir{Direction{c}} {}
+        Direction (char const c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
 
         // rule of five: define default constructors and the destructor
         //   because we defined a special one above for char
@@ -152,7 +162,7 @@ namespace ablastr::fields
         Direction& operator= (Direction&&) = default;
 
         /* TODO: just temporary int compatibility */
-        operator int() const { return dir; }
+        operator int() const { return dir; } // NOLINT(google-explicit-constructor)
 
     };
 

@@ -2806,6 +2806,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_mcc`` for collisions between particles and a neutral background.
       This is a relativistic Monte Carlo treatment for particles colliding
       with a neutral background gas. See :ref:`MCC section <multiphysics-collisions-mcc>`.
+    - ``pulsed_decay`` for decay of a parent species into two product species with a user-defined decay rate.
+      See :ref:`Pulsed Decay section <multiphysics-collisions-pulseddecay>`.
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
@@ -2835,7 +2837,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
-    In this case, only one species name should be given.
+    If using ``pulsed_decay`` type this should be the name of the parent species.
+    In these three cases, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 
@@ -2850,6 +2853,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
     If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
+    If using ``pulsed_decay``, the sum of the product species charges and mass must equal those of the parent species.
 
 .. pp:param:: <collision_name>.ndt_supercycle
     :type: ``int``
@@ -3041,6 +3045,29 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
+
+.. pp:param:: <collision_name>.decay_rate(x,y,z,t)
+    :type: `string`
+
+    The parent species decay rate (only for ``pulsed_decay``).
+
+.. pp:param:: <collision_name>.fixed_product_weight
+    :type: `float`
+
+    Fixed particle weight of product species (only for ``pulsed_decay``).
+    Can be estimated as :math:`n_{\text{target}}dV/N_{ppc}`, where :math:`n_{\text{target}}` is the target density of the product species, :math:`dV` is the cell volume, and :math:`N_{ppc}` is the target number of particle per cell for each product species.
+
+.. pp:param:: <collision_name>.productA_temperature_eV
+    :type: `float array, size 3`
+
+    Direction-dependent temperature used to assign a random thermal velocity to product species A (only for ``pulsed_decay``).
+    Example: ``<collision_name>.productA_temperature_eV = 0.1 0.2 0.3``.
+
+.. pp:param:: <collision_name>.productB_temperature_eV
+    :type: `float array, size 3`
+
+    Direction-dependent temperature used to assign a random thermal velocity to product species B (only for ``pulsed_decay``).
+    Example: ``<collision_name>.productB_temperature_eV = 0.1 0.2 0.3``.
 
 .. pp:param:: <collision_name>.Z
     :type: ``integer``
