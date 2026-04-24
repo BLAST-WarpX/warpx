@@ -80,7 +80,7 @@ class LibWarpX:
         try:
             from mpi4py import MPI  # noqa: F811,F401
         except ImportError:
-            pass
+            pass  # mpi4py is optional; MPI_Init handled by AMReX if absent
 
         # --- Use geometry to determine whether to import the 1D, 2D, 3D or RZ version.
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
@@ -196,10 +196,10 @@ class LibWarpX:
 
                         MPI.COMM_WORLD.Barrier()
                     except Exception:
-                        pass
+                        pass  # best-effort barrier; proceeding to _exit
                     os._exit(0)
             except Exception:
-                pass
+                pass  # Config may not be available; fall through to normal cleanup
 
             del self.warpx
             # The call to warpx_finalize causes a crash - don't know why
