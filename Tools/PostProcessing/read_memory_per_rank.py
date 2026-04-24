@@ -33,7 +33,6 @@ from typing import Any, Iterable
 import pandas as pd
 import yaml
 
-
 # Columns we want to pull up to top-level for easy plotting. All MemoryPerRank
 # memory values are emitted as float MB with 3-decimal precision.
 _PROCESS_KEYS = ["vm_peak_mb", "vm_size_mb", "vm_hwm_mb", "vm_rss_mb"]
@@ -167,7 +166,9 @@ def plot(
     # be imported in headless contexts without pulling GUI deps.
     import matplotlib.pyplot as plt
 
-    alloc_cols = [c for c in df.columns if c.startswith("arena_") and c.endswith("_allocated_mb")]
+    alloc_cols = [
+        c for c in df.columns if c.startswith("arena_") and c.endswith("_allocated_mb")
+    ]
     df = df.copy()
     df["arena_total_allocated_mb"] = df[alloc_cols].sum(axis=1, min_count=1)
 
