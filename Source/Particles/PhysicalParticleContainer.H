@@ -473,7 +473,7 @@ protected:
     // particle and the time of the boosted frame.
     bool boost_adjust_transverse_positions = false;
     bool do_backward_propagation = false;
-    bool m_rz_random_theta = true;
+    bool m_random_theta = true;
 
     // Impose t_lab from the openPMD file for externally loaded species
     bool impose_t_lab_from_file = false;
