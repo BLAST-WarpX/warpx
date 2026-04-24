@@ -32,7 +32,7 @@ jobs:
     - name: install dependencies
       if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
-        .github/workflows/dependencies/clang.sh 17
+        .github/workflows/dependencies/clang.sh 18
     - name: set up cache
       if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       uses: actions/cache@v4
@@ -50,8 +50,16 @@ jobs:
         export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
         export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
         ccache -z
-        export CXX=$(which clang++-17)
-        export CC=$(which clang-17)
+        export CXX=$(which clang++-18)
+        export CC=$(which clang-18)
+
+        ##### FOR DEBUG ONLY: CLEAR CACHE ######################
+        # clearing the cache forces running clang-tidy on all
+        # the files. This can be useful for debugging purposes,
+        # but it should be commented out in production.
+        # ccache -C --verbose
+        ########################################################
+
         cmake -S . -B build_clang_tidy      \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="${{ matrix.dim }}"  \
@@ -66,7 +74,7 @@ jobs:
         cmake --build build_clang_tidy -j 4
         ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
         make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
-            CLANG_TIDY=clang-tidy-17 \
+            CLANG_TIDY=clang-tidy-18 \
             CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
         ccache -s
         du -hs ~/.cache/ccache
