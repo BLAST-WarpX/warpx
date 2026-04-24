@@ -87,8 +87,8 @@ bool test_roundtrip_1d ()
     std::vector<Real> h_real(N);
     const int k0 = 5;
     for (int i = 0; i < N; ++i) {
-        h_real[i] = std::sin(2.0 * M_PI * k0 * i / N)
-                  + 0.3 * std::cos(2.0 * M_PI * 11 * i / N);
+        h_real[i] = static_cast<Real>(std::sin(2.0 * M_PI * k0 * i / N)
+                  + 0.3 * std::cos(2.0 * M_PI * 11 * i / N));
     }
     std::vector<Real> h_orig(h_real);
 
@@ -98,7 +98,7 @@ bool test_roundtrip_1d ()
     Gpu::htod_memcpy(d_real.data(), h_real.data(), N * sizeof(Real));
 
     // Create plans
-    IntVect real_size(AMREX_D_DECL(N, 1, 1));
+    const IntVect real_size(AMREX_D_DECL(N, 1, 1));
     auto fwd = ablastr::math::anyfft::CreatePlan(
         real_size, d_real.data(), d_complex.data(),
         ablastr::math::anyfft::direction::R2C, 1);
@@ -116,16 +116,16 @@ bool test_roundtrip_1d ()
     // Check: result should be N * original
     Real max_err = 0.0;
     for (int i = 0; i < N; ++i) {
-        Real expected = h_orig[i] * N;
-        Real err = std::abs(h_real[i] - expected);
-        Real scale = std::max(std::abs(expected), Real(1.0));
+        const Real expected = h_orig[i] * N;
+        const Real err = std::abs(h_real[i] - expected);
+        const Real scale = std::max(std::abs(expected), Real(1.0));
         max_err = std::max(max_err, err / scale);
     }
 
     ablastr::math::anyfft::DestroyPlan(fwd);
     ablastr::math::anyfft::DestroyPlan(bwd);
 
-    bool pass = (max_err < tol);
+    const bool pass = (max_err < tol);
     amrex::Print() << "  max relative error = " << max_err
                    << " (tol = " << tol << ") ... "
                    << (pass ? "PASS" : "FAIL") << "\n";
@@ -149,14 +149,14 @@ bool test_spectral_peaks_1d ()
     // sin(2*pi*k0*i/N) -> DFT: imaginary peak at bin k0 with magnitude -N/2
     std::vector<Real> h_real(N);
     for (int i = 0; i < N; ++i) {
-        h_real[i] = amplitude * std::sin(2.0 * M_PI * k0 * i / N);
+        h_real[i] = static_cast<Real>(amplitude * std::sin(2.0 * M_PI * k0 * i / N));
     }
 
     Gpu::DeviceVector<Real> d_real(N);
     Gpu::DeviceVector<Complex> d_complex(Nc);
     Gpu::htod_memcpy(d_real.data(), h_real.data(), N * sizeof(Real));
 
-    IntVect real_size(AMREX_D_DECL(N, 1, 1));
+    const IntVect real_size(AMREX_D_DECL(N, 1, 1));
     auto fwd = ablastr::math::anyfft::CreatePlan(
         real_size, d_real.data(), d_complex.data(),
         ablastr::math::anyfft::direction::R2C, 1);
@@ -171,27 +171,26 @@ bool test_spectral_peaks_1d ()
 
     // Expected: bin k0 should have imaginary part = -amplitude*N/2
     //           all other bins should be zero
-    Real expected_imag = -amplitude * N / 2.0;
-    Real peak_mag2 = cabs2(h_complex[k0]);
-    Real expected_mag2 = expected_imag * expected_imag;
+    const Real expected_imag = static_cast<Real>(-amplitude * N / 2.0);
+    const Real peak_mag2 = cabs2(h_complex[k0]);
 
-    Real peak_err = std::abs(std::sqrt(peak_mag2) - std::abs(expected_imag))
-                  / std::abs(expected_imag);
+    const Real peak_err = std::abs(std::sqrt(peak_mag2) - std::abs(expected_imag))
+                        / std::abs(expected_imag);
 
     // Check that the real part at bin k0 is zero (sin is purely imaginary in DFT)
-    Real real_at_peak = std::abs(creal_part(h_complex[k0]));
-    Real peak_real_err = real_at_peak / (amplitude * N / 2.0);
+    const Real real_at_peak = std::abs(creal_part(h_complex[k0]));
+    const Real peak_real_err = static_cast<Real>(real_at_peak / (amplitude * N / 2.0));
 
     // Check that all non-peak bins are near zero
     Real max_noise = 0.0;
     for (int k = 0; k < Nc; ++k) {
         if (k == k0) { continue; }
-        Real mag = std::sqrt(cabs2(h_complex[k]));
+        const Real mag = std::sqrt(cabs2(h_complex[k]));
         max_noise = std::max(max_noise, mag);
     }
-    Real noise_ratio = max_noise / (amplitude * N / 2.0);
+    const Real noise_ratio = max_noise / (amplitude * N / 2.0);
 
-    bool pass = (peak_err < tol) && (peak_real_err < tol) && (noise_ratio < tol);
+    const bool pass = (peak_err < tol) && (peak_real_err < tol) && (noise_ratio < tol);
     amrex::Print() << "  peak magnitude error = " << peak_err << "\n"
                    << "  real part at peak    = " << peak_real_err << "\n"
                    << "  max noise ratio      = " << noise_ratio << "\n"
