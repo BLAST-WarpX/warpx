@@ -188,7 +188,7 @@ bool test_spectral_peaks_1d ()
         const Real mag = std::sqrt(cabs2(h_complex[k]));
         max_noise = std::max(max_noise, mag);
     }
-    const Real noise_ratio = max_noise / (amplitude * N / 2.0);
+    const Real noise_ratio = static_cast<Real>(max_noise / (amplitude * N / 2.0));
 
     const bool pass = (peak_err < tol) && (peak_real_err < tol) && (noise_ratio < tol);
     amrex::Print() << "  peak magnitude error = " << peak_err << "\n"
