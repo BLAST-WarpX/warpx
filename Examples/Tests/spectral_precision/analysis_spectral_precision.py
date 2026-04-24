@@ -146,6 +146,9 @@ def analyze_cartesian(ds_init, ds_final, ndim):
 
         return max(err_Ey, err_Bx)
 
+    else:
+        raise ValueError(f"analyze_cartesian: unsupported ndim={ndim}, expected 1, 2, or 3")
+
 
 def analyze_rz(ds_init, ds_final):
     """
