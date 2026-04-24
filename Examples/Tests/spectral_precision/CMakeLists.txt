@@ -53,7 +53,7 @@ if(WarpX_PYTHON)
             test_2d_spectral_precision  # name
             2    # dims
             1    # nprocs
-            inputs_test_2d_spectral_precision.py  # inputs
+            inputs_base_2d_spectral_precision.py  # inputs
             "analysis_spectral_precision.py --dim 2 --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -66,7 +66,7 @@ if(WarpX_PYTHON)
             test_2d_spectral_precision_multi  # name
             2    # dims
             4    # nprocs
-            "inputs_test_2d_spectral_precision.py --ncells 64 --max_grid_size 32"  # inputs
+            "inputs_base_2d_spectral_precision.py --ncells 64 --max_grid_size 32"  # inputs
             "analysis_spectral_precision.py --dim 2 --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -79,7 +79,7 @@ if(WarpX_PYTHON)
             test_3d_spectral_precision  # name
             3    # dims
             1    # nprocs
-            inputs_test_3d_spectral_precision.py  # inputs
+            inputs_base_3d_spectral_precision.py  # inputs
             "analysis_spectral_precision.py --dim 3 --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -97,7 +97,7 @@ if(WarpX_PYTHON)
             test_rz_spectral_precision  # name
             RZ   # dims
             1    # nprocs
-            inputs_test_rz_spectral_precision.py  # inputs
+            inputs_base_rz_spectral_precision.py  # inputs
             "analysis_spectral_precision.py --dim rz --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -110,7 +110,7 @@ if(WarpX_PYTHON)
             test_rz_spectral_precision_multi  # name
             RZ   # dims
             4    # nprocs
-            "inputs_test_rz_spectral_precision.py --nz 128 --max_grid_size 32"  # inputs
+            "inputs_base_rz_spectral_precision.py --nz 128 --max_grid_size 32"  # inputs
             "analysis_spectral_precision.py --dim rz --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -135,7 +135,7 @@ if(WarpX_PYTHON)
             test_rz_psatd_eigenmode  # name
             RZ   # dims
             1    # nprocs
-            inputs_test_rz_psatd_eigenmode.py  # inputs
+            inputs_base_rz_psatd_eigenmode.py  # inputs
             "analysis_spectral_precision.py --dim rz_eigenmode --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040 --tolerance ${_eigenmode_tol}"  # analysis
             OFF  # checksum
             OFF  # dependency
@@ -149,7 +149,7 @@ if(WarpX_PYTHON)
             test_rz_psatd_eigenmode_multi  # name
             RZ   # dims
             4    # nprocs
-            "inputs_test_rz_psatd_eigenmode.py --nz 128 --max_grid_size 32"  # inputs
+            "inputs_base_rz_psatd_eigenmode.py --nz 128 --max_grid_size 32"  # inputs
             "analysis_spectral_precision.py --dim rz_eigenmode --diag-dir-init diags/diag1000000 --diag-dir-final diags/diag1000040 --tolerance ${_eigenmode_tol}"  # analysis
             OFF  # checksum
             OFF  # dependency
