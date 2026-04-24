@@ -33,7 +33,7 @@ namespace utils::parser
         * the period). For example SliceParser(":1000:") is equivalent to SliceParser("0:1000:1").
         * @param[in] isBTD whether this is a back-transformed diagnostic
         */
-        SliceParser (const std::string& instr, bool isBTD=false);
+        explicit SliceParser (const std::string& instr, bool isBTD=false);
 
         /**
         * \brief A method that returns true if the input integer is contained in the slice. (e.g. if
@@ -114,7 +114,7 @@ namespace utils::parser
         * "x,y,z,...". This will call the constructor of SliceParser using x, y and z as input
         * arguments.
         */
-        IntervalsParser (const std::vector<std::string>& instr_vec);
+        explicit IntervalsParser (const std::vector<std::string>& instr_vec);
 
         /**
         * \brief A method that returns true if the input integer is contained in any of the slices
@@ -188,7 +188,7 @@ namespace utils::parser
         * "x,y,z,...". This will call the constructor of SliceParser using x, y and z as input
         * arguments.
         */
-        BTDIntervalsParser (const std::vector<std::string>& instr_vec);
+        explicit BTDIntervalsParser (const std::vector<std::string>& instr_vec);
 
         /**
          * @brief Return the total number of unique labframe snapshots

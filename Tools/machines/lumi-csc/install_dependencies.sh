@@ -54,7 +54,7 @@ cmake -S ${SRC_DIR}/blaspp                   \
       -B ${build_dir}/blaspp-lumi-gpu-build  \
       -Duse_openmp=OFF                       \
       -Dgpu_backend=hip                      \
-      -DCMAKE_CXX_STANDARD=17                \
+      -DCMAKE_CXX_STANDARD=20                \
       -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${build_dir}/blaspp-lumi-gpu-build --target install --parallel 16
 rm -rf ${build_dir}/blaspp-lumi-gpu-build
@@ -73,7 +73,7 @@ rm -rf ${build_dir}/lapackpp-lumi-gpu-build
 CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" \
 cmake -S ${SRC_DIR}/lapackpp                     \
       -B ${build_dir}/lapackpp-lumi-gpu-build    \
-      -DCMAKE_CXX_STANDARD=17                    \
+      -DCMAKE_CXX_STANDARD=20                    \
       -Dbuild_tests=OFF                          \
       -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON     \
       -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
