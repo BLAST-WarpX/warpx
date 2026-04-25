@@ -1276,8 +1276,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const bool random_theta = m_random_theta; // Note that use of random_theta here is different
-                                              // than how it is used in AddPlasma()
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
 
