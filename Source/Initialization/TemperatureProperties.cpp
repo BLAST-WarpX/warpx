@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <sstream>
+#include <ranges>
 
 namespace
 {
@@ -26,7 +27,7 @@ namespace
             return true;
         }
         if (!group.empty()) {
-            return pp.contains((group + '.' + name).c_str());
+            return pp.contains(group + '.' + name);
         }
         return false;
     }
@@ -48,12 +49,9 @@ namespace
             "uz_std_openpmd_mesh",
             "read_u_std_distributed"
         };
-        for (const char* k : keys) {
-            if (specified(pp, group, k)) {
-                return true;
-            }
-        }
-        return false;
+        return std::ranges::any_of(keys, [&](const char* k) {
+            return specified(pp, group, k);
+        });
     }
 }
 
@@ -67,10 +65,9 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
  *  or ``maxwellian_T_eV_*`` (constant ``T_eV`` needs ``species_mass`` [kg]). */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                                              amrex::Real species_mass, amrex::Geometry const& geom)
+    : m_species_mass(species_mass),
+      m_geom(geom)
 {
-    m_species_mass = species_mass;
-    m_geom = geom;
-
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
@@ -176,8 +173,8 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                     std::string const key_with_src =
                         source_name.empty() ? std::string("read_u_std_distributed")
                                             : source_name + ".read_u_std_distributed";
-                    if (pp.contains(key_with_src.c_str())) {
-                        pp.query(key_with_src.c_str(), m_read_u_std_distributed);
+                    if (pp.contains(key_with_src)) {
+                        pp.query(key_with_src, m_read_u_std_distributed);
                     } else {
                         pp.query("read_u_std_distributed", m_read_u_std_distributed);
                     }
