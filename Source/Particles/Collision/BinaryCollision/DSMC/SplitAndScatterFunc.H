@@ -357,8 +357,9 @@ public:
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
 
-                // For charge exchange, swap positions: each product appears at the position
-                // of the *other* reactant, reflecting the physical transfer of charge across space.
+                // For charge exchange, swap positions at which the products are created
+                // to ensure local charge conservation. For instance in the reaction 
+                // `A+ + B -> A + B+`, B+ will be created at the position of A+, instead of that of B.
                 // Position components occupy indices 0 through PIdx::w-1 in m_rdata.
                 if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
                     for (int idim = 0; idim < PIdx::w; ++idim) {

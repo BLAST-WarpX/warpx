@@ -1,6 +1,6 @@
 # 2D charge exchange collision test (DSMC), with electrostatic solver.
 # Electrons (neutralizing background) + He+ ions + He neutrals.
-# He+ and He undergo DSMC charge exchange using the He resonant cross-section.
+# He+ and He undergo DSMC charge exchange.
 # The electrostatic solver is active; total energy (field + particle) conservation
 # is verified using analysis_test_2d_collisions_split_momentum_push.py.
 
