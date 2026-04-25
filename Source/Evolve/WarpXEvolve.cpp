@@ -1087,11 +1087,13 @@ WarpX::OneStep_sub1 (Real cur_time)
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             msg << crse_to_fine_ref_ratio[idim];
-            if (idim < AMREX_SPACEDIM - 1) msg << ", ";
+            if (idim < AMREX_SPACEDIM - 1) {
+                msg << ", ";
+            }
         }
         msg << ")";
 
-        WARPX_ABORT_WITH_MESSAGE(msg.str().c_str());
+        WARPX_ABORT_WITH_MESSAGE(msg.str());
     }
 
     using warpx::fields::FieldType;
