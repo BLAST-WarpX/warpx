@@ -9,7 +9,7 @@
     "divE": 31889925631836.125,
     "rho": 282.30303002351866
   },
-  "electrons": {
+  "duterium": {
     "particle_momentum_x": 1.2403211244681398e-17,
     "particle_momentum_y": 1.2416083820807273e-17,
     "particle_momentum_z": 1.2393740394980333e-17,
@@ -18,7 +18,7 @@
     "particle_theta": 0.0,
     "particle_weight": 8.078381109230896e+16
   },
-  "deuterium": {
+  "electrons": {
     "particle_momentum_x": 2.045709329757865e-19,
     "particle_momentum_y": 2.0455159980896936e-19,
     "particle_momentum_z": 2.0447786601432662e-19,
