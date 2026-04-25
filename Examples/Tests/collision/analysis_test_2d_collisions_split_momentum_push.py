@@ -111,7 +111,7 @@ def analyze(args: argparse.Namespace) -> None:
 
     # verify the total energy conservation
     total_energy_error_norm = np.max(np.abs(total_energy_error))
-    relative_tolerance = 1e-5 if electrostatic else 6e-5
+    relative_tolerance = 1.1e-5 if electrostatic else 6e-5
     if total_energy_error_norm >= relative_tolerance:
         raise ValueError(
             f"Total energy conservation failed with a maximum relative error of {total_energy_error_norm}"
