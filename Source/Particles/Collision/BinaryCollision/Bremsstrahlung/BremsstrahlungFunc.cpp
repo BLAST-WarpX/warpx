@@ -53,7 +53,7 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_kdsigdk_map.count(Z) == 1,
         "Bremsstrahlung cross section not available for Z = " + std::to_string(Z) + "!");
 
-    constexpr auto m_e_eV = PhysConst::m_e*PhysConst::c*PhysConst::c/PhysConst::q_e; // 0.511e6
+    constexpr auto m_e_eV = PhysConst::m_e*PhysConst::c2/PhysConst::q_e; // 0.511e6
 
     constexpr auto koT1_grid_h_size = static_cast<int>(decltype(m_koT1_grid_h)::size());
     constexpr auto KEgrid_eV_h_size = static_cast<int>(decltype(m_KEgrid_eV_h)::size());

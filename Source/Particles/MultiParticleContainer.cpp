@@ -403,11 +403,12 @@ MultiParticleContainer::ReadParameters ()
 WarpXParticleContainer&
 MultiParticleContainer::GetParticleContainerFromName (const std::string& name) const
 {
-    auto it = std::find(species_names.begin(), species_names.end(), name);
+    auto species_and_lasers_names = GetSpeciesAndLasersNames();
+    auto it = std::find(species_and_lasers_names.begin(), species_and_lasers_names.end(), name);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        it != species_names.end(),
+        it != species_and_lasers_names.end(),
         "unknown species name");
-    const auto i = static_cast<int>(std::distance(species_names.begin(), it));
+    const auto i = static_cast<int>(std::distance(species_and_lasers_names.begin(), it));
     return *allcontainers[i];
 }
 
@@ -1193,7 +1194,7 @@ void MultiParticleContainer::InitQuantumSync ()
 
     //If specified, use a user-defined energy threshold for photon creation
     ParticleReal temp;
-    constexpr auto mec2 = PhysConst::c * PhysConst::c * PhysConst::m_e;
+    constexpr auto mec2 = PhysConst::c2 * PhysConst::m_e;
     if(utils::parser::queryWithParser(
         pp_qed_qs, "photon_creation_energy_threshold", temp)){
         temp *= mec2;

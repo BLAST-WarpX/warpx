@@ -521,10 +521,12 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
-                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
-                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
-                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
+                    int const u1x_runtime_ni = u1x_ni - n_builtin_real;
+                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni];
+                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 1];
+                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 2];
                 } else {
                     u1x_before.resize(np1);
                     u1y_before.resize(np1);
@@ -577,7 +579,7 @@ public:
                         // compute local temperature [Joules]
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
                             const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                            amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                            auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
                             const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                             amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                             amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
@@ -997,10 +999,12 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
-                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
-                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
-                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
+                    int const u1x_runtime_ni = u1x_ni - n_builtin_real;
+                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni];
+                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 1];
+                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 2];
                 } else {
                     u1x_before.resize(np1);
                     u1y_before.resize(np1);
@@ -1022,10 +1026,12 @@ public:
                 std::vector<std::string> const & real_names2 = species_2.GetRealSoANames();
                 auto const pos2 = std::find(real_names2.begin(), real_names2.end(), "ux_n");
                 if (pos2 != real_names2.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u2x_ni = static_cast<int>(std::distance(real_names2.begin(), pos2));
-                    u2x_before_ptr = soa_2.m_runtime_rdata[u2x_ni];
-                    u2y_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 1];
-                    u2z_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 2];
+                    int const u2x_runtime_ni = u2x_ni - n_builtin_real;
+                    u2x_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni];
+                    u2y_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni + 1];
+                    u2z_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni + 2];
                 } else {
                     u2x_before.resize(np2);
                     u2y_before.resize(np2);
@@ -1107,7 +1113,7 @@ public:
                         if (binary_collision_functor.m_computeSpeciesTemperatures) {
                             if (ip < np1) {
                                 const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
                                 const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
@@ -1117,7 +1123,7 @@ public:
                             }
                             if (ip < np2) {
                                 const amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
-                                amrex::ParticleReal constexpr inv_c2 = 1.0_prt / ( PhysConst::c * PhysConst::c );
+                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
                                 const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
                                 amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
                                 amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
