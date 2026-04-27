@@ -4840,7 +4840,9 @@ This shifts analysis from post-processing to runtime calculation of reduction op
             on very large runs a larger stride can be used to reduce the number of files
             created on the shared filesystem.
 
-        Example output (``MPR.0000.yaml``)::
+        Example output (``MPR.0000.yaml``):
+
+        .. code-block:: yaml
 
             ---
             step: 0

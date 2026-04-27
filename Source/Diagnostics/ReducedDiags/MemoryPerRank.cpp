@@ -35,17 +35,17 @@
 
 namespace {
 
-#ifdef __linux__
     /** Read a named field (e.g. "VmRSS") from /proc/self/status and return its
-     *  numeric part as an integer kB value, or -1 on failure. All Vm* fields in
-     *  /proc/self/status are reported in kB with a trailing " kB" unit.
+     *  numeric part as an integer kB value, or -1 on failure. All Vm* fields
+     *  in /proc/self/status are reported in kB with a trailing " kB" unit.
      *
-     *  The [[maybe_unused]] attribute silences a CodeQL
-     *  `cpp/unused-static-function` false positive: the function is defined and
-     *  used only inside `#ifdef __linux__` blocks, and the rule does not match
-     *  references across conditional-compilation boundaries reliably.
+     *  The function is defined unconditionally so it (and its sole caller) are
+     *  visible to CodeQL on every platform. On platforms without `/proc`
+     *  (macOS, Windows, ...) the file simply does not open and the function
+     *  returns -1 for every field; callers must treat -1 as "unavailable" and
+     *  skip emitting the corresponding output.
      */
-    [[maybe_unused]] long ReadProcStatusKB (const std::string& key)
+    long ReadProcStatusKB (const std::string& key)
     {
         std::ifstream ifs("/proc/self/status");
         if (!ifs.is_open()) { return -1; }
@@ -64,7 +64,6 @@ namespace {
         }
         return -1;
     }
-#endif
 
     /** Get a human-readable host name (MPI processor name if available,
      *  otherwise gethostname on Linux, otherwise "unknown").
@@ -243,28 +242,35 @@ void MemoryPerRank::ComputeDiags (int step)
         EmitArenaBlock(ofs, "comms", amrex::The_Comms_Arena());
     }
 
-#ifdef __linux__
-    // Host-process memory as reported by the kernel. The kernel emits kB in
-    // /proc/self/status; we convert to MB to keep the YAML unit-consistent
-    // with the arena and GPU values. This captures allocations that are not
-    // tracked by AMReX arenas (MPI buffers, I/O libraries, Python, plugin
-    // libraries, ...) and is often the first thing that matters when chasing
-    // OOM errors.
+    // Host-process memory as reported by the kernel. On Linux these come from
+    // /proc/self/status (kB) and are converted to MB to keep the YAML
+    // unit-consistent with the arena and GPU values. They capture allocations
+    // that AMReX arenas do not track (MPI buffers, I/O libraries, Python,
+    // plugin libraries, ...) and are often the first thing that matters when
+    // chasing OOM errors.
+    //
+    // The call is unconditional (no `#ifdef __linux__`) so CodeQL can see the
+    // reference to ReadProcStatusKB regardless of preprocessor configuration.
+    // On platforms without /proc, every field reads as -1, no entries are
+    // staged, and the `process:` block is omitted entirely.
     const std::pair<const char*, const char*> vm_fields[] = {
         {"VmPeak", "vm_peak_mb"},
         {"VmSize", "vm_size_mb"},
         {"VmHWM",  "vm_hwm_mb"},
         {"VmRSS",  "vm_rss_mb"},
     };
-    ofs << "process:\n";
+    std::ostringstream proc_buf;
+    proc_buf << std::fixed << std::setprecision(3);
     for (const auto& [field, yaml_key] : vm_fields) {
         const long kb = ReadProcStatusKB(field);
         if (kb >= 0) {
-            ofs << "  " << yaml_key << ": "
-                << (static_cast<double>(kb) / 1024.0) << "\n";
+            proc_buf << "  " << yaml_key << ": "
+                     << (static_cast<double>(kb) / 1024.0) << "\n";
         }
     }
-#endif
+    if (!proc_buf.str().empty()) {
+        ofs << "process:\n" << proc_buf.str();
+    }
 
     ofs.flush();
 }
