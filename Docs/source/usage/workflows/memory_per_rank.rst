@@ -85,16 +85,15 @@ The same helper exposes a one-line plotting function:
     fig = mpr.plot(df, output="mpr_timeline.png")
     plt.show()
 
-It produces two stacked panels:
+The figure adapts to the run: on GPU builds the headline panel shows GPU
+memory used per rank (the quantity that drives device OOM); on CPU-only
+builds it shows total AMReX arena allocation. A host-process ``VmRSS`` /
+``VmHWM`` panel is always included.
 
-* **Top** -- total AMReX arena memory *allocated* per rank (MB), one line per rank.
-  This is the memory AMReX explicitly reserved across all arenas (Main / Device /
-  Managed / Pinned / Comms, summed).
-* **Bottom** -- host-process resident memory (``VmRSS``, solid) and high-water mark
-  (``VmHWM``, dashed) per rank, in MB. This captures *everything*: AMReX arenas,
-  MPI buffers, I/O libraries, Python, plugin ``.so``\s, CUDA runtime internals.
-  When the bottom panel diverges from the top one, the difference is the memory
-  that AMReX does not see -- often the key information when chasing OOM crashes.
+The per-rank rendering mode is auto-selected from the rank count (one
+curve per rank for small runs, an envelope of min/median/max for medium
+runs, a rank x step heatmap for very large runs). See the script's
+module docstring and ``--help`` for the available modes and overrides.
 
 You can also run the helper as a script:
 
@@ -104,7 +103,8 @@ You can also run the helper as a script:
         diags/reducedfiles/MemoryPerRank/ \\
         --prefix MPR \\
         --output mpr_timeline.png \\
-        --csv    mpr_timeline.csv
+        --csv    mpr_timeline.csv \\
+        --mode   auto
 
 
 Spotting imbalance between ranks
