@@ -39,8 +39,13 @@ namespace {
     /** Read a named field (e.g. "VmRSS") from /proc/self/status and return its
      *  numeric part as an integer kB value, or -1 on failure. All Vm* fields in
      *  /proc/self/status are reported in kB with a trailing " kB" unit.
+     *
+     *  The [[maybe_unused]] attribute silences a CodeQL
+     *  `cpp/unused-static-function` false positive: the function is defined and
+     *  used only inside `#ifdef __linux__` blocks, and the rule does not match
+     *  references across conditional-compilation boundaries reliably.
      */
-    long ReadProcStatusKB (const std::string& key)
+    [[maybe_unused]] long ReadProcStatusKB (const std::string& key)
     {
         std::ifstream ifs("/proc/self/status");
         if (!ifs.is_open()) { return -1; }
