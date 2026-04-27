@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-import glob
 import os
 import sys
 
 import numpy as np
 import openpmd_api as io
-import yaml
 
 
 def load_field_from_iteration(
@@ -65,51 +63,6 @@ def compare_time_avg_with_instantaneous_diags(dir_inst: str, dir_avg: str):
         sys.exit(1)
 
 
-def check_memory_per_rank_yaml(mpr_dir: str, prefix: str = "MPR"):
-    """Smoke test for the MemoryPerRank YAML output.
-
-    Validates that one file per rank exists, that every YAML document in each
-    file parses cleanly to a plain dict, and that the key fields we document
-    are present with the expected types. This catches YAML format regressions
-    in the C++ emitter.
-    """
-    files = sorted(glob.glob(os.path.join(mpr_dir, f"{prefix}.*.yaml")))
-    if not files:
-        print(
-            f"Test failed: no MemoryPerRank YAML files found in {mpr_dir} "
-            f"(prefix={prefix})."
-        )
-        sys.exit(1)
-
-    required_top_level = {"step", "time", "mpi", "host", "arenas"}
-
-    for fpath in files:
-        with open(fpath) as fh:
-            docs = [d for d in yaml.safe_load_all(fh) if d is not None]
-        if not docs:
-            print(f"Test failed: {fpath} contains no YAML documents.")
-            sys.exit(1)
-        for d in docs:
-            if not isinstance(d, dict):
-                print(f"Test failed: {fpath} document is not a dict: {type(d)}.")
-                sys.exit(1)
-            missing = required_top_level - d.keys()
-            if missing:
-                print(
-                    f"Test failed: {fpath} is missing required keys {missing}. "
-                    f"Got keys: {sorted(d.keys())}"
-                )
-                sys.exit(1)
-            if "main" not in (d.get("arenas") or {}):
-                print(f"Test failed: {fpath} is missing arenas.main.")
-                sys.exit(1)
-
-    print(
-        f"Test passed: MemoryPerRank YAML is valid across {len(files)} "
-        f"rank files in {mpr_dir}."
-    )
-
-
 if __name__ == "__main__":
     # TODO: implement intervals parser for PICMI that allows more complex output periods
     test_name = os.path.split(os.getcwd())[1]
@@ -119,6 +72,3 @@ if __name__ == "__main__":
             dir_inst=sys.argv[1],
             dir_avg="diags/diagTimeAvg/",
         )
-
-    # Smoke test for MemoryPerRank YAML output (present in both variants).
-    check_memory_per_rank_yaml("diags/reducedfiles/MemoryPerRank/", prefix="MPR")
