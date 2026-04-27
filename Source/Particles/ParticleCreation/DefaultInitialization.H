@@ -14,12 +14,30 @@
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
 
+#include <AMReX_GpuAllocators.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
 
 #include <cmath>
 #include <map>
 #include <string>
+
+namespace ParticleCreation {
+/** Whether particle data with allocator Alloc lives on the GPU.
+ *  amrex::RunOnGpu is not specialised for PolymorphicArenaAllocator,
+ *  so we extend the check here.  PolymorphicArenaAllocator in WarpX
+ *  always wraps a device arena, so it is safe to treat it as GPU. */
+template <typename Alloc>
+constexpr bool particles_on_gpu ()
+{
+#ifdef AMREX_USE_GPU
+    return amrex::RunOnGpu<Alloc>::value
+        || amrex::IsPolymorphicArenaAllocator<Alloc>::value;
+#else
+    return false;
+#endif
+}
+} // namespace ParticleCreation
 
 /**
  * \brief This set of initialization policies describes what happens
@@ -158,7 +176,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 const QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt =
                                                 p_qs_engine->build_optical_depth_functor();
                 // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                if constexpr (ParticleCreation::particles_on_gpu<typename PTile::template AllocatorType<amrex::Real>>()) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
                                                   const int ip = i + start;
@@ -185,7 +203,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 const BreitWheelerGetOpticalDepth breit_wheeler_get_opt =
                                                 p_bw_engine->build_optical_depth_functor();;
                 // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                if constexpr (ParticleCreation::particles_on_gpu<typename PTile::template AllocatorType<amrex::Real>>()) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
                                                   const int ip = i + start;
@@ -214,7 +232,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                     const amrex::ParserExecutor<7> user_real_attrib_parserexec =
                                              user_real_attrib_parser[ia]->compile<7>();
                     // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                    if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                    if constexpr (ParticleCreation::particles_on_gpu<typename PTile::template AllocatorType<amrex::Real>>()) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;
@@ -246,7 +264,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             if (it_ioniz != particle_icomps.end() &&
                 std::distance(particle_icomps.begin(), it_ioniz) == j)
             {
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
+                if constexpr (ParticleCreation::particles_on_gpu<typename PTile::template AllocatorType<int>>()) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;
@@ -268,7 +286,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 {
                      const amrex::ParserExecutor<7> user_int_attrib_parserexec =
                                              user_int_attrib_parser[ia]->compile<7>();
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
+                if constexpr (ParticleCreation::particles_on_gpu<typename PTile::template AllocatorType<int>>()) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;

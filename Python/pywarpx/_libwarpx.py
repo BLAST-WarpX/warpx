@@ -71,6 +71,17 @@ class LibWarpX:
                 "Please write separate scripts for each geometry."
             )
 
+        # Import mpi4py before the pyAMReX (amrex.space*d) shared library is
+        # loaded so that mpi4py calls MPI_Init_thread first.  With the Cray
+        # MPICH on Polaris/Sirius, if the AMReX shared library is loaded before
+        # mpi4py initializes MPI, mpi4py's later MPI_Init_thread conflicts with
+        # the already-loaded MPI symbols and causes hangs or unbounded memory
+        # allocation during amrex::Initialize().
+        try:
+            from mpi4py import MPI  # noqa: F811,F401
+        except ImportError:
+            pass  # mpi4py is optional; MPI_Init handled by AMReX if absent
+
         # --- Use geometry to determine whether to import the 1D, 2D, 3D or RZ version.
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
         try:
@@ -147,7 +158,7 @@ class LibWarpX:
         register_warpx_WarpXParticleContainer_extension(self.libwarpx_so)
 
     def amrex_init(self, argv, mpi_comm=None):
-        if mpi_comm is None:  # or MPI is None:
+        if mpi_comm is None:
             self.libwarpx_so.amrex_init(argv)
         else:
             raise Exception("mpi_comm argument not yet supported")
@@ -172,9 +183,28 @@ class LibWarpX:
         """
         # TODO: simplify, part of pyAMReX already
         if self.initialized:
+            # GPU finalization workaround: on GPU backends, destroying the C++
+            # WarpX object (del self.warpx) or calling amrex_finalize() can
+            # crash in SYCL/CUDA/HIP Device::Finalize() when it tries to
+            # synchronize streams whose backing static objects are already gone.
+            # Exit immediately via os._exit(0) BEFORE any C++ destructors run,
+            # and let the job launcher (PALS/mpiexec) handle cleanup.
+            try:
+                if self.libwarpx_so.Config.gpu_backend in ("SYCL", "CUDA", "HIP"):
+                    try:
+                        from mpi4py import MPI
+
+                        MPI.COMM_WORLD.Barrier()
+                    except Exception:
+                        pass  # best-effort barrier; proceeding to _exit
+                    os._exit(0)
+            except Exception:
+                pass  # Config may not be available; fall through to normal cleanup
+
             del self.warpx
             # The call to warpx_finalize causes a crash - don't know why
             # self.libwarpx_so.warpx_finalize()
+
             self.libwarpx_so.amrex_finalize()
 
             from pywarpx import callbacks

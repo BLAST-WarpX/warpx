@@ -15,7 +15,7 @@ my_constants.dt = 0.1/wpe        # s
 #################################
 max_step = 20
 amr.n_cell =  40 40
-amr.max_grid_size = 8
+amr.max_grid_size = 16
 amr.blocking_factor = 8
 amr.max_level = 0
 geometry.dims = 2

@@ -49,11 +49,22 @@ def check_restart(filename, tolerance=1e-12):
         dims=ds_benchmark.domain_dimensions,
     )
 
-    # Loop over all fields (all particle species, all particle attributes, all grid fields)
-    # and compare output data generated from initial run with output data generated after restart
+    # Separate grid fields from particle fields. Particle fields use the
+    # species name as field type; grid fields use 'boxlib'.
+    particle_species = set()
+    grid_fields = []
+    for field in ds_benchmark.field_list:
+        ftype, fname = field
+        if ftype == "boxlib":
+            grid_fields.append(field)
+        elif ftype != "all":
+            particle_species.add(ftype)
+
     print(f"\ntolerance = {tolerance}")
     print()
-    for field in ds_benchmark.field_list:
+
+    # Compare grid fields directly (order is deterministic)
+    for field in grid_fields:
         dr = ad_restart[field].squeeze().v
         db = ad_benchmark[field].squeeze().v
         error = np.amax(np.abs(dr - db))
@@ -61,6 +72,31 @@ def check_restart(filename, tolerance=1e-12):
             error /= np.amax(np.abs(db))
         print(f"field: {field}; error = {error}")
         assert error < tolerance
+
+    # Compare particle fields sorted by (particle_cpu, particle_id), since
+    # Redistribute() after checkpoint-restart may reorder particles across
+    # tiles/ranks. The (cpu, id) pair is the unique particle key in AMReX.
+    for species in sorted(particle_species):
+        species_fields = [f for f in ds_benchmark.field_list if f[0] == species]
+
+        id_r = np.atleast_1d(ad_restart[(species, "particle_id")].squeeze().v)
+        id_b = np.atleast_1d(ad_benchmark[(species, "particle_id")].squeeze().v)
+        cpu_r = np.atleast_1d(ad_restart[(species, "particle_cpu")].squeeze().v)
+        cpu_b = np.atleast_1d(ad_benchmark[(species, "particle_cpu")].squeeze().v)
+
+        sort_r = np.lexsort((id_r, cpu_r))
+        sort_b = np.lexsort((id_b, cpu_b))
+
+        for field in species_fields:
+            if field[1] in ("particle_id", "particle_cpu"):
+                continue
+            dr = np.atleast_1d(ad_restart[field].squeeze().v)[sort_r]
+            db = np.atleast_1d(ad_benchmark[field].squeeze().v)[sort_b]
+            error = np.amax(np.abs(dr - db))
+            if np.amax(np.abs(db)) != 0.0:
+                error /= np.amax(np.abs(db))
+            print(f"field: {field}; error = {error}")
+            assert error < tolerance
     print()
 
 

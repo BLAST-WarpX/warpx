@@ -145,6 +145,8 @@ function(add_warpx_test
         )
         # FIXME Use helper function to handle Windows exceptions
         set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_PYTHON_OUTPUT_DIRECTORY}")
+        # allocate GPU memory on-demand for Python tests too (same reason as native tests below)
+        set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "AMREX_THE_ARENA_INIT_SIZE=0")
     else()
         # TODO Use these for Python tests too
         set(runtime_params
