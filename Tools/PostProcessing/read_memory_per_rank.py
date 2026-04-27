@@ -172,8 +172,9 @@ def _pick_mode(n_ranks: int) -> str:
     return "heatmap"
 
 
-def _draw_panel(ax, df: pd.DataFrame, x: str, y: str, ylabel: str,
-                mode: str, n_ranks: int):
+def _draw_panel(
+    ax, df: pd.DataFrame, x: str, y: str, ylabel: str, mode: str, n_ranks: int
+):
     """Render a single per-rank time-series panel in the requested mode.
 
     The panel renders a quantity ``y`` over an axis ``x`` (typically
@@ -195,25 +196,33 @@ def _draw_panel(ax, df: pd.DataFrame, x: str, y: str, ylabel: str,
         # Bold min/median/max envelopes across ranks at each x.
         agg = df.groupby(x)[y].agg(["min", "median", "max"]).dropna()
         if not agg.empty:
-            ax.plot(agg.index, agg["max"], color="red",
-                    linewidth=2, label="max")
-            ax.plot(agg.index, agg["median"], color="black",
-                    linewidth=1.5, label="median")
-            ax.plot(agg.index, agg["min"], color="blue",
-                    linewidth=1, alpha=0.7, label="min")
+            ax.plot(agg.index, agg["max"], color="red", linewidth=2, label="max")
+            ax.plot(
+                agg.index, agg["median"], color="black", linewidth=1.5, label="median"
+            )
+            ax.plot(
+                agg.index, agg["min"], color="blue", linewidth=1, alpha=0.7, label="min"
+            )
             ax.legend(loc="best", fontsize=8)
         ax.set_ylabel(ylabel)
     elif mode == "heatmap":
         pivot = df.pivot_table(index="rank", columns=x, values=y, aggfunc="last")
         if pivot.empty:
-            ax.text(0.5, 0.5, "no data", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(
+                0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes
+            )
             ax.set_ylabel("rank")
             return
         im = ax.imshow(
-            pivot.values, aspect="auto", origin="lower",
-            extent=[float(pivot.columns.min()), float(pivot.columns.max()),
-                    float(pivot.index.min()), float(pivot.index.max())],
+            pivot.values,
+            aspect="auto",
+            origin="lower",
+            extent=[
+                float(pivot.columns.min()),
+                float(pivot.columns.max()),
+                float(pivot.index.min()),
+                float(pivot.index.max()),
+            ],
         )
         plt.colorbar(im, ax=ax, label=ylabel)
         ax.set_ylabel("rank")
@@ -272,54 +281,62 @@ def plot(
     if mode == "auto":
         mode = _pick_mode(n_ranks)
 
-    has_gpu = (
-        "gpu_total_mb" in df.columns and df["gpu_total_mb"].notna().any()
-    )
+    has_gpu = "gpu_total_mb" in df.columns and df["gpu_total_mb"].notna().any()
 
     # Build the list of panels to draw, top to bottom.
     panels: list[dict] = []
 
     if has_gpu:
         df["gpu_used_mb"] = df["gpu_total_mb"] - df["gpu_free_mb"]
-        panels.append({
-            "y": "gpu_used_mb",
-            "ylabel": "GPU memory used (MB)\n(total \u2212 free)",
-            "ceiling_col": "gpu_total_mb",
-        })
+        panels.append(
+            {
+                "y": "gpu_used_mb",
+                "ylabel": "GPU memory used (MB)\n(total \u2212 free)",
+                "ceiling_col": "gpu_total_mb",
+            }
+        )
         device_cols = [c for c in _GPU_SIDE_ARENAS if c in df.columns]
         if device_cols:
             df["gpu_arena_total_mb"] = df[device_cols].sum(axis=1, min_count=1)
-            panels.append({
-                "y": "gpu_arena_total_mb",
-                "ylabel": "Device-side AMReX arenas\nallocated (MB)",
-            })
+            panels.append(
+                {
+                    "y": "gpu_arena_total_mb",
+                    "ylabel": "Device-side AMReX arenas\nallocated (MB)",
+                }
+            )
     else:
         alloc_cols = [
-            c for c in df.columns
+            c
+            for c in df.columns
             if c.startswith("arena_") and c.endswith("_allocated_mb")
         ]
         df["arena_total_allocated_mb"] = df[alloc_cols].sum(axis=1, min_count=1)
-        panels.append({
-            "y": "arena_total_allocated_mb",
-            "ylabel": "AMReX arenas total\nallocated (MB)",
-        })
+        panels.append(
+            {
+                "y": "arena_total_allocated_mb",
+                "ylabel": "AMReX arenas total\nallocated (MB)",
+            }
+        )
 
     # Host-process panel: always last when present.
     has_rss = "vm_rss_mb" in df.columns and df["vm_rss_mb"].notna().any()
     has_hwm = "vm_hwm_mb" in df.columns and df["vm_hwm_mb"].notna().any()
     if has_rss:
-        panels.append({
-            "y": "vm_rss_mb",
-            "ylabel": (
-                "Process memory (MB)\nsolid = VmRSS, dashed = VmHWM"
-                if has_hwm and mode == "spaghetti"
-                else "Process VmRSS (MB)"
-            ),
-            "extra_y": "vm_hwm_mb" if (has_hwm and mode == "spaghetti") else None,
-        })
+        panels.append(
+            {
+                "y": "vm_rss_mb",
+                "ylabel": (
+                    "Process memory (MB)\nsolid = VmRSS, dashed = VmHWM"
+                    if has_hwm and mode == "spaghetti"
+                    else "Process VmRSS (MB)"
+                ),
+                "extra_y": "vm_hwm_mb" if (has_hwm and mode == "spaghetti") else None,
+            }
+        )
 
     fig, axes = plt.subplots(
-        len(panels), 1,
+        len(panels),
+        1,
         figsize=(10, 3 + 2.5 * len(panels)),
         sharex=(mode != "heatmap"),
         squeeze=False,
@@ -327,8 +344,7 @@ def plot(
     axes = axes[:, 0]
 
     for ax, panel in zip(axes, panels):
-        _draw_panel(ax, df, "step", panel["y"], panel["ylabel"],
-                    mode, n_ranks)
+        _draw_panel(ax, df, "step", panel["y"], panel["ylabel"], mode, n_ranks)
         ax.grid(True, alpha=0.3)
 
         # Optional ceiling line (e.g. GPU total memory). Only meaningful in
@@ -336,8 +352,13 @@ def plot(
         ceiling_col = panel.get("ceiling_col")
         if ceiling_col and ceiling_col in df.columns and mode != "heatmap":
             ceiling = df[ceiling_col].median()
-            ax.axhline(ceiling, color="grey", linestyle="--", linewidth=1,
-                       label=f"GPU total ({ceiling:.0f} MB)")
+            ax.axhline(
+                ceiling,
+                color="grey",
+                linestyle="--",
+                linewidth=1,
+                label=f"GPU total ({ceiling:.0f} MB)",
+            )
             # Re-draw legend so the ceiling line shows up alongside any
             # per-rank / band labels.
             handles, labels = ax.get_legend_handles_labels()
@@ -348,8 +369,7 @@ def plot(
         extra_y = panel.get("extra_y")
         if extra_y and extra_y in df.columns and mode == "spaghetti":
             for _, g in df.groupby("rank"):
-                ax.plot(g["step"], g[extra_y], linestyle="--",
-                        alpha=0.5, linewidth=0.8)
+                ax.plot(g["step"], g[extra_y], linestyle="--", alpha=0.5, linewidth=0.8)
 
     # In heatmap mode the X axis on every panel shows step; in others only
     # the bottom panel labels it (sharex collapses the rest).
