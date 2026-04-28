@@ -43,11 +43,11 @@ vx0, vz0 = ux0 / gamma, uz0 / gamma
 # Before the impact, the trajectory is a straight line:
 #     (x(t), z(t)) = (x0 + vx0*t, z0 + vz0*t).
 # The impact condition x(t)^2 + z(t)^2 = R^2 yields the quadratic
-#     (vx0^2 + vz0^2) * t^2 + 2*z0*vz0 * t + (z0^2 - R^2) = 0
-# (using x0 = 0). The first impact corresponds to the smaller root.
+#     (vx0^2 + vz0^2) * t^2 + 2*(x0*vx0 + z0*vz0) * t + (x0^2 + z0^2 - R^2) = 0.
+# The first impact corresponds to the smaller root.
 a_q = vx0**2 + vz0**2
-b_q = 2.0 * z0 * vz0
-c_q = z0**2 - R**2
+b_q = 2.0 * (x0 * vx0 + z0 * vz0)
+c_q = x0**2 + z0**2 - R**2
 t_impact = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 
 # Position of the point of impact on the sphere.
