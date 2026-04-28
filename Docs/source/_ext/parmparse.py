@@ -398,7 +398,7 @@ class ParmParseXRefRole(XRefRole):
     # Matches an inline value expression.
     # Examples: "param_name = value", "param_name[=value]", etc.
     # The name portion (before = or [=) is captured as group 1.
-    _value_re = re.compile(r"^(.+?)(?:\s*=\s*.*|\[=.*\])$", re.DOTALL)
+    _value_re = re.compile(r"^(.+?)(?:\s*=\s*.*|\[=.*\]|\s+.*)$", re.DOTALL)
 
     def process_link(
         self,
