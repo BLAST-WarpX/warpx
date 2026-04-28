@@ -625,8 +625,6 @@ public:
                 ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
             } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
-            } else if (m_shuffling_method == ParticleShufflingMethod::Standard) {
-                StandardShuffle(n_cells, cell_offsets_1, indices_1);
             }
 
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
@@ -1188,8 +1186,6 @@ public:
             } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1,
                                             cell_offsets_2, indices_2);
-            } else if (m_shuffling_method == ParticleShufflingMethod::Standard) {
-                StandardShuffle(n_cells, cell_offsets_1, indices_1);
             }
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
 

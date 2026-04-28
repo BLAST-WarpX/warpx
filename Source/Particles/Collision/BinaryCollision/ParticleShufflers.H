@@ -219,26 +219,6 @@ void ModulusShuffle (int n_cells, T_index np, int nrounds, T_index const * cell_
     }
 }
 
-/* \brief Shuffle array using std::shuffle
-*/
-template <typename T_index>
-void StandardShuffle (int n_cells, T_index const * cell_offsets, T_index *indices)
-{
-#ifdef AMREX_USE_GPU
-    amrex::ignore_unused(n_cells, cell_offsets, indices);
-    WARPX_ABORT_WITH_MESSAGE("Standard shuffle not supported on GPU");
-#else
-    std::random_device rd;
-    std::mt19937 g(rd());
-
-    for (int i_cell = 0 ; i_cell < n_cells ; i_cell++) {
-        T_index const cell_start = cell_offsets[i_cell];
-        T_index const cell_stop  = cell_offsets[i_cell+1];
-        std::shuffle(indices+cell_start, indices+cell_stop-1, g);
-    }
-#endif
-}
-
 /* \brief Shuffle array according to Fisher-Yates algorithm.
  *        Only shuffle the part between is <= i < ie, n = ie-is.
  *        T_index shall be
