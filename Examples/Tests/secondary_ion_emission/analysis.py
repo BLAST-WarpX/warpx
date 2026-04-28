@@ -88,8 +88,9 @@ vx_e = ux_e * c / gamma_e
 vy_e = uy_e * c / gamma_e
 vz_e = uz_e * c / gamma_e
 
-# The tolerance covers only the EB discretization error (thermal kick is removed).
-tolerance = 0.01
+# The tolerance is expressed as a fraction of the sphere radius R, and covers
+# only the EB discretization error (the thermal kick is removed by back-propagation).
+tolerance = 0.05
 
 for i in range(0, N_sec_e):
     # For each candidate parent ion j, back-propagate the electron from ts.t[-1]
@@ -108,6 +109,7 @@ for i in range(0, N_sec_e):
     x_bp = x[i] - vx_e[i] * (ts.t[-1] - t_impact[j])
     y_bp = y[i] - vy_e[i] * (ts.t[-1] - t_impact[j])
     z_bp = z[i] - vz_e[i] * (ts.t[-1] - t_impact[j])
+    rel_dist = bp_distances[j] / R
     print("\n")
     print(f"Electron # {i}:")
     print(
@@ -120,9 +122,9 @@ for i in range(0, N_sec_e):
         f"(ion # {j}) x={x_impact[j]:5.5f}, y={y_impact[j]:5.5f}, z={z_impact[j]:5.5f}"
     )
     print(
-        f"Distance (back-propagated) to impact point = {bp_distances[j]:.5f} m (tolerance: {tolerance} m)"
+        f"Relative distance (back-propagated) to impact point = {rel_dist * 100:5.4f} % (tolerance: {tolerance * 100} %)"
     )
 
-    assert bp_distances[j] < tolerance, (
+    assert rel_dist < tolerance, (
         f"Electron {i} is too far from any ion impact point on the sphere"
     )
