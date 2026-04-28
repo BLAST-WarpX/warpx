@@ -73,20 +73,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # set args.format automatically
-    args.format = None  # default
     try:
         yt.load(args.path)
+        args.format = "plotfile"
     except Exception:
         try:
             OpenPMDTimeSeries(args.path)
-        except Exception:
-            pass  # neither format matched
-        else:
             args.format = "openpmd"
-    else:
-        args.format = "plotfile"
-    if args.format is None:
-        raise ValueError(f"Could not detect format for path: {args.path}")
+        except Exception:
+            raise ValueError(f"Could not detect format for path: {args.path}") from None
 
     # set args.do_fields (not parsed, based on args.skip_fields)
     args.do_fields = False if args.skip_fields else True
