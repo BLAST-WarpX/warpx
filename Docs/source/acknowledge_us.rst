@@ -17,8 +17,8 @@ WarpX logos in various image formats and color schemes are available in `this fo
 
 .. _acknowledge_warpx_generic:
 
-Acknowledgment in publications
-******************************
+Acknowledgement Sentence
+************************
 
 Please add the following acknowledgement sentence to your publications, it helps contributors keep in touch with the community and promote the project.
 
