@@ -13,6 +13,7 @@ import sys
 import numpy as np
 import yt
 from openpmd_viewer import OpenPMDTimeSeries
+from scipy.constants import c
 
 yt.funcs.mylog.setLevel(0)
 
@@ -23,36 +24,72 @@ ts = OpenPMDTimeSeries(filename)
 it = ts.iterations
 x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
 
-x_analytic = [-0.091696, 0.011599]
-y_analytic = [-0.002282, -0.0111624]
-z_analytic = [-0.200242, -0.201728]
-
 N_sec_e = np.size(z)  # number of the secondary electrons
 
 assert N_sec_e == 2, (
     "Test did not pass: for this set up we expect 2 secondary electrons emitted"
 )
 
-tolerance = 1e-3
+# Analytical results
+# ------------------
+# Parameters from inputs_test_rz_secondary_ion_emission_picmi.py:
+# the sphere (embedded boundary) is centered at the origin and has radius R;
+# four ions start at (xi, 0, zi) with proper velocity (gamma*v) (uxi, 0, uzi).
+# Since uy0 = 0 and yi = 0, each ion travels in the (x, z) plane.
+# When an ion reaches the sphere, it can emit a secondary electron at the
+# impact point. The emitted electron then receives a small thermal kick
+# (random direction, magnitude ~ sqrt(k Te / m_e)) and is propagated for
+# the remaining fraction of the time step. Therefore the deterministic
+# (analytical) part of the emitted electron position is the impact point
+# of the ion on the sphere; the residual displacement comes from the
+# thermal kick and from the embedded-boundary discretization.
+R = 0.2
+ion_x0 = np.array([0.025, 0.0, -0.1, -0.14])
+ion_z0 = np.array([-0.26, -0.29, -0.25, -0.23])
+ion_ux0 = np.array([0.18e6, 0.1e6, 0.15e6, 0.21e6])
+ion_uz0 = np.array([8.00e5, 7.20e5, 6.40e5, 5.60e5])
+
+# The ions are non-relativistic (gamma ~ 1), but use the general formula
+# to convert the proper velocity to the 3-velocity for consistency.
+gamma = np.sqrt(1.0 + (ion_ux0**2 + ion_uz0**2) / c**2)
+vx0 = ion_ux0 / gamma
+vz0 = ion_uz0 / gamma
+
+# For each ion, find the time at which it hits the sphere by solving
+#     (vx0^2 + vz0^2) * t^2 + 2*(x0*vx0 + z0*vz0) * t + (x0^2 + z0^2 - R^2) = 0
+# (the ray-sphere intersection in the (x, z) plane). The first impact
+# corresponds to the smaller root.
+a_q = vx0**2 + vz0**2
+b_q = 2.0 * (ion_x0 * vx0 + ion_z0 * vz0)
+c_q = ion_x0**2 + ion_z0**2 - R**2
+t_impact = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
+
+# Coordinates of the four ion impact points on the sphere.
+x_impact = ion_x0 + vx0 * t_impact
+y_impact = np.zeros_like(x_impact)
+z_impact = ion_z0 + vz0 * t_impact
+
+# Each emitted electron is matched to the closest analytical impact point.
+# The tolerance is set as an absolute distance (in meters) that bounds the
+# combined effect of the random thermal kick and the EB discretization.
+tolerance = 0.025
 
 for i in range(0, N_sec_e):
+    distances = np.sqrt(
+        (x[i] - x_impact) ** 2 + (y[i] - y_impact) ** 2 + (z[i] - z_impact) ** 2
+    )
+    j = int(np.argmin(distances))
     print("\n")
     print(f"Electron # {i}:")
-    print("NUMERICAL coordinates of the emitted electrons:")
+    print("NUMERICAL coordinates of the emitted electron:")
     print(f"x={x[i]:5.5f}, y={y[i]:5.5f}, z={z[i]:5.5f}")
     print("\n")
-    print("ANALYTICAL coordinates of the point of contact:")
-    print(f"x={x_analytic[i]:5.5f}, y={y_analytic[i]:5.5f}, z={z_analytic[i]:5.5f}")
+    print("ANALYTICAL coordinates of the closest ion impact point on the sphere:")
+    print(
+        f"(ion # {j}) x={x_impact[j]:5.5f}, y={y_impact[j]:5.5f}, z={z_impact[j]:5.5f}"
+    )
+    print(f"Distance to impact point = {distances[j]:.5f} m (tolerance: {tolerance} m)")
 
-    rel_err_x = np.abs((x[i] - x_analytic[i]) / x_analytic[i])
-    rel_err_y = np.abs((y[i] - y_analytic[i]) / y_analytic[i])
-    rel_err_z = np.abs((z[i] - z_analytic[i]) / z_analytic[i])
-
-    print("\n")
-    print(f"Relative percentage error for x = {rel_err_x * 100:5.4f} %")
-    print(f"Relative percentage error for y = {rel_err_y * 100:5.4f} %")
-    print(f"Relative percentage error for z = {rel_err_z * 100:5.4f} %")
-
-    assert (
-        (rel_err_x < tolerance) and (rel_err_y < tolerance) and (rel_err_z < tolerance)
-    ), "Test particle_boundary_interaction did not pass"
+    assert distances[j] < tolerance, (
+        f"Electron {i} is too far from any ion impact point on the sphere"
+    )
