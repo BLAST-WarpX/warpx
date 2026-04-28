@@ -187,7 +187,7 @@ void ModulusShuffleSingle (int n_cells, T_index np, int nsub, T_index const * ce
                 T_index const step = generate_modulus_step(nnsub, engine);
                 T_index const offset = amrex::Random_int(nnsub, engine);
                 for (T_index i1 = 0 ; i1 < nnsub ; i1++) {
-                    T_index const i2 = (T_index)(((amrex::Long)(i1)*step + offset) % nnsub);
+                    auto const i2 = (T_index)(((amrex::Long)(i1)*step + offset) % nnsub);
                     T_index const ip1 = cell_start + (istart + i1 + shift) % n;
                     T_index const ip2 = cell_start + (istart + i2 + shift) % n;
                     indices[ip1] = indices_copy[ip2];
@@ -214,7 +214,7 @@ void ModulusShuffle (int n_cells, T_index np, int nrounds, T_index const * cell_
 {
     for (int round = 0 ; round < nrounds ; round++) {
         // On the first round, always shuffle over all particles
-        int const nsub = round == 0 ? 1 : 1 + amrex::Random_int(4);
+        int const nsub = round == 0 ? 1 : 1 + static_cast<int>(amrex::Random_int(4));
         ModulusShuffleSingle(n_cells, np, nsub, cell_offsets, indices);
     }
 }
@@ -410,8 +410,8 @@ struct IndependentPairHelper
         FisherYatesShuffle (n_cells, cell_offsets_1, a_indices_1, cell_offsets_2, a_indices_2);
     }
 
-    int numIndependentPairs () const {return m_n_independent_pairs;}
-    const T_index* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
+    [[nodiscard]] int numIndependentPairs () const {return m_n_independent_pairs;}
+    [[nodiscard]] const T_index* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
 };
 
 #endif // WARPX_PARTICLES_COLLISION_PARTICLE_SHUFFLERS_H_
