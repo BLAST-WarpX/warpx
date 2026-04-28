@@ -18,7 +18,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <AMReX_Algorithm.H>
@@ -50,6 +49,7 @@
 #   include <openPMD/openPMD.hpp>
 #endif
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <algorithm>
@@ -139,7 +139,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 #if defined(WARPX_DIM_RZ)
     amrex::ignore_unused(step);
 #else
-    WARPX_PROFILE("DifferentialLuminosity2D::ComputeDiags");
+    ABLASTR_PROFILE("DifferentialLuminosity2D::ComputeDiags");
 
     using namespace amrex;
     using ParticleTileType = WarpXParticleContainer::ParticleTileType;
@@ -150,7 +150,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
     // Since this diagnostic *accumulates* the luminosity in the
     // table m_d_data_2D, we add contributions at *each timestep*, but
     // we only write the data to file at intervals specified by the user.
-    const Real c_sq = PhysConst::c*PhysConst::c;
+    constexpr Real c2 = PhysConst::c2;
     const Real c_over_qe = PhysConst::c/PhysConst::q_e;
 
     // output table data
@@ -158,10 +158,6 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 
     // get a reference to WarpX instance
     auto& warpx = WarpX::GetInstance();
-    const Real dt = warpx.getdt(0);
-    // get cell volume
-    Geometry const & geom = warpx.Geom(0);
-    const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
 
     // declare local variables
     auto const num_bins_1 = m_bin_num_1;
@@ -185,6 +181,11 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev < nlevs; ++lev) {
+        // get cell volume and timestep at current level
+        Geometry const & geom = warpx.Geom(lev);
+        const Real dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+        const Real dt = warpx.getdt(lev);
+
         for (amrex::MFIter mfi = species_1.MakeMFIter(lev); mfi.isValid(); ++mfi){
 
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
@@ -222,7 +223,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
             IndependentPairHelper<index_type> indep_pairs(n_cells, cell_offsets_1, cell_offsets_2);
             indep_pairs.shuffle(indices_1, indices_2);
 
-            int n_independent_pairs = indep_pairs.numIndependentPairs();
+            const int n_independent_pairs = indep_pairs.numIndependentPairs();
             const index_type*  AMREX_RESTRICT p_coll_offsets = indep_pairs.collisionOffsetsPtr();
 
             // Loop over independent pairs
@@ -276,7 +277,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         p1y = PhysConst::m_e*u1y[j_1];
                         p1z = PhysConst::m_e*u1z[j_1];
                     } else {
-                        p1t = m1*std::sqrt( c_sq + u1_sq );
+                        p1t = m1*std::sqrt( c2 + u1_sq );
                         p1x = m1*u1x[j_1];
                         p1y = m1*u1y[j_1];
                         p1z = m1*u1z[j_1];
@@ -291,7 +292,7 @@ void DifferentialLuminosity2D::ComputeDiags (int step)
                         p2y = PhysConst::m_e*u2y[j_2];
                         p2z = PhysConst::m_e*u2z[j_2];
                     } else {
-                        p2t = m2*std::sqrt( c_sq + u2_sq );
+                        p2t = m2*std::sqrt( c2 + u2_sq );
                         p2x = m2*u2x[j_2];
                         p2y = m2*u2y[j_2];
                         p2z = m2*u2z[j_2];

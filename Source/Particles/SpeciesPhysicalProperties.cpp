@@ -38,6 +38,7 @@ namespace {
         {"hydrogen3"  , PhysicalSpecies::hydrogen3},
         {"tritium"    , PhysicalSpecies::hydrogen3},
         {"proton"     , PhysicalSpecies::proton},
+        {"antiproton" , PhysicalSpecies::antiproton},
         {"helium"     , PhysicalSpecies::helium},
         {"helium3"    , PhysicalSpecies::helium3},
         {"helium4"    , PhysicalSpecies::helium4},
@@ -84,6 +85,7 @@ namespace {
         {PhysicalSpecies::neutron    , "neutron"},
         {PhysicalSpecies::hydrogen   , "hydrogen"},
         {PhysicalSpecies::proton     , "proton"},
+        {PhysicalSpecies::antiproton , "antiproton"},
         {PhysicalSpecies::hydrogen2  , "hydrogen2"},
         {PhysicalSpecies::hydrogen3  , "hydrogen3"},
         {PhysicalSpecies::helium     , "helium"},
@@ -153,6 +155,9 @@ namespace {
         {PhysicalSpecies::proton, Properties{
             PhysConst::m_p,
             PhysConst::q_e}},
+        {PhysicalSpecies::antiproton, Properties{
+            PhysConst::m_p,
+            -PhysConst::q_e}},
         {PhysicalSpecies::hydrogen, Properties{
              amrex::Real(1.00797) * PhysConst::m_u - amrex::Real(1) * PhysConst::m_e,
              amrex::Real(1) * PhysConst::q_e}},

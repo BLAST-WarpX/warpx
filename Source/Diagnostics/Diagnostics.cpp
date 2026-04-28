@@ -17,9 +17,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -83,10 +83,10 @@ Diagnostics::BaseReadParameters ()
     }
 
     // Sanity check if user requests to plot phi
-    if (utils::algorithms::is_in(m_varnames_fields, "phi") && !(
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential
+    if (utils::algorithms::is_in(m_varnames_fields, "phi") && (
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrame &&
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic &&
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameEffectivePotential
         )
     ){
         ablastr::warn_manager::WMRecordWarning(
@@ -149,7 +149,7 @@ Diagnostics::BaseReadParameters ()
     for (const auto& var : m_pfield_varnames) {
 
         bool do_average = true;
-        pp_diag_pfield.query((var + ".do_average").c_str(), do_average);
+        pp_diag_pfield.query(var + ".do_average", do_average);
         m_pfield_do_average.push_back(do_average);
         utils::parser::Store_parserString(
             pp_diag_pfield, (var + "(x,y,z,ux,uy,uz)"), parser_str);
@@ -163,7 +163,7 @@ Diagnostics::BaseReadParameters ()
 
         // Look for and record filter functions. If one is not found, the empty string will be
         // stored as the filter string, and will be ignored.
-        const bool do_parser_filter = pp_diag_pfield.query((var + ".filter(x,y,z,ux,uy,uz)").c_str(), filter_parser_str);
+        const bool do_parser_filter = pp_diag_pfield.query(var + ".filter(x,y,z,ux,uy,uz)", filter_parser_str);
         m_pfield_dofilter.push_back(do_parser_filter);
         m_pfield_filter_strings.push_back(filter_parser_str);
     }
@@ -324,22 +324,11 @@ Diagnostics::BaseReadParameters ()
         if (var.rfind("Tx_", 0) == 0 || var.rfind("Ty_", 0) == 0 || var.rfind("Tz_", 0) == 0) {
             // Extract species name from the string T_<species_name>
             const std::string species = var.substr(var.find("T") + 3);
-            // Boolean used to check if species name was misspelled
-            bool species_name_is_wrong = true;
-            // Loop over all species
-            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
-                // Check if species name extracted from the string T_<species_name>
-                // matches any of the species in the simulation
-                if (species == m_all_species_names[i]) {
-                    species_name_is_wrong = false;
-                }
-            }
-            // If species name was misspelled, abort with error message
+
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !species_name_is_wrong,
+                utils::algorithms::is_in(m_all_species_names, species),
                 "Input error: string " + var + " in " + m_diag_name
-                + ".fields_to_plot does not match any species"
-            );
+                + ".fields_to_plot does not match any species");
         }
     }
 
@@ -651,7 +640,7 @@ Diagnostics::ComputeAndPack ()
 void
 Diagnostics::FilterComputePackFlush (int step, bool force_flush)
 {
-    WARPX_PROFILE("Diagnostics::FilterComputePackFlush()");
+    ABLASTR_PROFILE("Diagnostics::FilterComputePackFlush()");
     MovingWindowAndGalileanDomainShift (step);
 
     if ( DoComputeAndPack (step, force_flush) ) {

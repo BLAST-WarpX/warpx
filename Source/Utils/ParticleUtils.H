@@ -123,7 +123,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -160,7 +160,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -181,28 +181,27 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate random unit vector in 3 dimensions
-     * https://mathworld.wolfram.com/SpherePointPicking.html
+     * \brief Generate a random unit vector with isotropic distribution,
+     * following the method described in equations (27)-(31) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
-     * @param[out] x x-component of resulting random vector
-     * @param[out] y y-component of resulting random vector
-     * @param[out] z z-component of resulting random vector
+     * @param[out] x x-component of the random unit vector
+     * @param[out] y y-component of the random unit vector
+     * @param[out] z z-component of the random unit vector
      * @param[in] engine the random-engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
                            amrex::ParticleReal& z, amrex::RandomEngine const& engine )
     {
-        using std::sqrt;
-        using std::cos;
-        using std::sin;
         using namespace amrex::literals;
 
-        auto const theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-        z = 2.0_prt * amrex::Random(engine) - 1.0_prt;
-        auto const xy = sqrt(1_prt - z*z);
-        x = xy * cos(theta);
-        y = xy * sin(theta);
+        auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
+        x = sin_theta * std::cos(phi);
+        y = sin_theta * std::sin(phi);
+        z = cos_theta;
     }
 
 
@@ -342,22 +341,20 @@ namespace ParticleUtils {
 #elif defined(WARPX_DIM_1D_Z)
         xp_grid[0] = (zp - xyzmin.z)*dinv.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+        const double rp = std::sqrt(xp*xp + yp*yp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
         xp_grid[1] = (zp - xyzmin.z)*dinv.z;
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
-        const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        const double rp = std::sqrt(xp*xp + yp*yp + zp*zp);
         xp_grid[0] = (rp - xyzmin.x)*dinv.x;
 #endif
 
         // Check if particle's position is out of bounds
         for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
-            if (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) {
-                return true;
-            }
-            else if (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1]) {
+            if ( (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) ||
+                 (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1])) {
                 return true;
             }
         }
@@ -385,10 +382,10 @@ namespace ParticleUtils {
      */
     template <typename T_index>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uyp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uzp,
-                               amrex::ParticleReal * const AMREX_RESTRICT w,
+    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uyp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uzp, //NOLINT(readability-non-const-parameter)
+                               const amrex::ParticleReal * const AMREX_RESTRICT w,
                                T_index const * const AMREX_RESTRICT indices,
                                T_index const cell_start,
                                T_index const cell_stop,
@@ -399,7 +396,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         int const numCell = (cell_stop - cell_start);
 
@@ -480,7 +477,7 @@ namespace ParticleUtils {
 
             const amrex::ParticleReal A = Etot - deltaEpair;
             const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-            const amrex::ParticleReal p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
+            const auto p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
             const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
 
             // Compute coefficients for quadratic equation for alpha.

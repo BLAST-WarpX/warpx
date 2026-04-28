@@ -197,34 +197,23 @@ class Species(picmistandard.PICMI_Species):
     """
 
     def init(self, kw):
-        if self.particle_type == "electron":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "positron":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "proton":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_p"
-        elif self.particle_type == "anti-proton":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_p"
+        self.species_type = None
+        if self.particle_type in [
+            "unspecified",
+            "electron",
+            "positron",
+            "muon",
+            "antimuon",
+            "photon",
+            "neutron",
+            "proton",
+            "antiproton",
+            "alpha",
+        ]:
+            self.species_type = self.particle_type
         else:
             if self.charge is None and self.charge_state is not None:
-                if self.charge_state == +1.0:
-                    self.charge = "q_e"
-                elif self.charge_state == -1.0:
-                    self.charge = "-q_e"
-                else:
-                    self.charge = self.charge_state * constants.q_e
+                self.charge = f"{self.charge_state}*q_e"
             if self.particle_type is not None:
                 # Match a string of the format '#nXx', with the '#n' optional isotope number.
                 m = re.match(r"(?P<iso>#[\d+])*(?P<sym>[A-Za-z]+)", self.particle_type)
@@ -347,6 +336,7 @@ class Species(picmistandard.PICMI_Species):
 
         self.species = pywarpx.Bucket.Bucket(
             self.name,
+            species_type=self.species_type,
             mass=self.mass,
             charge=self.charge,
             injection_style=None,
@@ -489,17 +479,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         # --- Only PseudoRandomLayout is supported
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
-        # --- Calculate the total charge. Note that charge might be a string instead of a number.
-        charge = species.charge
-        if charge == "q_e" or charge == "+q_e":
-            charge = constants.q_e
-        elif charge == "-q_e":
-            charge = -constants.q_e
-        species.add_new_group_attr(
-            source_name, "q_tot", self.n_physical_particles * charge
-        )
+        # --- Total number of real particles
+        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "q_tot", density_scale)
+            species.add_new_group_attr(source_name, "npart_real", density_scale)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
@@ -513,14 +496,21 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 
         # --- Note that WarpX takes gamma*beta as input
         if np.any(np.not_equal(self.velocity_divergence, 0.0)):
+            u_over_x = self.velocity_divergence[0] / constants.c
+            u_over_y = self.velocity_divergence[1] / constants.c
+            u_over_z = self.velocity_divergence[2] / constants.c
             species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "radial_expansion"
+                source_name, "momentum_distribution_type", "parse_momentum_function"
             )
             species.add_new_group_attr(
-                source_name, "u_over_r", self.velocity_divergence[0] / constants.c
+                source_name, "momentum_function_ux(x,y,z)", f"{u_over_x}*x"
             )
-            # species.add_new_group_attr(source_name, 'u_over_y', self.velocity_divergence[1]/constants.c)
-            # species.add_new_group_attr(source_name, 'u_over_z', self.velocity_divergence[2]/constants.c)
+            species.add_new_group_attr(
+                source_name, "momentum_function_uy(x,y,z)", f"{u_over_y}*y"
+            )
+            species.add_new_group_attr(
+                source_name, "momentum_function_uz(x,y,z)", f"{u_over_z}*z"
+            )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussian"
@@ -2761,15 +2751,37 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         Value of the Coulomb log to use in the collision cross section.
         If not supplied, it is calculated from the local conditions.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(self, name, species, CoulombLog=None, ndt=None, **kw):
+    def __init__(
+        self,
+        name,
+        species,
+        CoulombLog=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
         self.name = name
         self.species = species
         self.CoulombLog = CoulombLog
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2778,7 +2790,8 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.type = "pairwisecoulomb"
         collision.species = [species.name for species in self.species]
         collision.CoulombLog = self.CoulombLog
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
 
 class MCCCollisions(picmistandard.base._ClassWithInit):
@@ -2812,8 +2825,15 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         The maximum background density. When the background_density is an expression, this must also
         be specified.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
@@ -2825,7 +2845,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         scattering_processes,
         background_mass=None,
         max_background_density=None,
-        ndt=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
         **kw,
     ):
         self.name = name
@@ -2835,7 +2856,14 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.background_mass = background_mass
         self.scattering_processes = scattering_processes
         self.max_background_density = max_background_density
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2857,7 +2885,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
             collision.background_temperature = self.background_temperature
         collision.background_mass = self.background_mass
         collision.max_background_density = self.max_background_density
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -2888,18 +2917,39 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         The species produced by collision processes (currently both
         ionization and charge-exchange require defining the product species).
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
-        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+        self,
+        name,
+        species,
+        scattering_processes,
+        product_species=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
     ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
         self.product_species = product_species
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2911,7 +2961,8 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
             collision.product_species = [
                 species.name for species in self.product_species
             ]
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -3218,14 +3269,13 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_collisions: collision instance, optional
         The collision instance specifying the particle collisions
 
-    warpx_collisions_split_position_push: bool, default=1
-        If true, collisions are performed in the middle of the position push,
+    warpx_collisions_split_momentum_push: bool, default=1
+        If true, collisions are performed in the middle of the momentum push,
         which is split into two substeps.
         This improves energy conservation, as demonstrated in
         (Vay et al., Phys. Rev. E 111, 2025).
         This is only implemented for the explicit evolve scheme
         and is not available for the implicit evolve schemes.
-        It is also not available with embedded boundaries.
 
     warpx_embedded_boundary: embedded boundary instance, optional
 
@@ -3346,8 +3396,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
 
         self.collisions = kw.pop("warpx_collisions", None)
-        self.collisions_split_position_push = kw.pop(
-            "warpx_collisions_split_position_push", None
+        self.collisions_split_momentum_push = kw.pop(
+            "warpx_collisions_split_momentum_push", None
         )
 
         self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
@@ -3512,7 +3562,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             for collision in self.collisions:
                 pywarpx.collisions.collision_names.append(collision.name)
                 collision.collision_initialize_inputs()
-            pywarpx.collisions.split_position_push = self.collisions_split_position_push
+            pywarpx.collisions.split_momentum_push = self.collisions_split_momentum_push
 
         if self.embedded_boundary is not None:
             self.embedded_boundary.embedded_boundary_initialize_inputs(self.solver)
@@ -4277,8 +4327,8 @@ class LabFrameFieldDiagnostic(
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
+                elif dataname == "rho":
+                    # Add rho diagnostic
                     fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
