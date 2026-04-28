@@ -1391,8 +1391,10 @@ WarpX::ReadParameters ()
                 "ThetaImplicitHybrid scheme requires the HybridPIC solver");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
+                current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
                 current_deposition_algo == CurrentDepositionAlgo::Direct,
-                "Only Direct current deposition is supported with the implicit hybrid scheme");
+                "Only Esirkepov, Villasenor, or Direct current deposition is supported with the implicit hybrid scheme");
         }
 
         // Load balancing parameters

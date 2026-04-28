@@ -11,6 +11,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/ExternalVectorPotential.H"
 #include "WarpX.H"
 #include <ablastr/utils/Communication.H>
+#include <ablastr/coarsen/sample.H>
 
 using warpx::fields::FieldType;
 using namespace amrex::literals;
@@ -55,6 +56,18 @@ void ThetaImplicitHybrid::Define ( WarpX* const a_WarpX )
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_theta >= 0.5 && m_theta <= 1.0,
         "theta parameter must be between 0.5 and 1.0");
+
+    // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
+    m_alpha_mf.resize(m_num_amr_levels);
+    m_alpha_mfarrvec.resize(m_num_amr_levels);
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto* rho_mf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+        auto const& ba = amrex::convert(rho_mf->boxArray(),
+                                        amrex::IntVect::TheNodeVector());
+        m_alpha_mf[lev].define(ba, rho_mf->DistributionMap(),
+                               1, amrex::IntVect::TheZeroVector());
+        m_alpha_mfarrvec[lev] = &m_alpha_mf[lev];
+    }
 
     parseNonlinearSolverParams( pp );
     m_nlsolver->Define(m_E, this);
@@ -293,4 +306,70 @@ void ThetaImplicitHybrid::SubtractExternalEfield ()
                 m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
         }
     }
+}
+
+const amrex::Vector<amrex::MultiFab*>*
+ThetaImplicitHybrid::GetAlphaCoeff () const
+{
+    BL_PROFILE("ThetaImplicitHybrid::GetAlphaCoeff()");
+    using namespace amrex;
+    using namespace ablastr::coarsen::sample;
+
+    // If fields aren't initialized yet (called from Define()),
+    // return the pointer without computing — alpha_mf was
+    // initialized to 0 and will be filled properly in Update().
+    if (!m_is_defined) {
+        return &m_alpha_mfarrvec;
+    }
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const ablastr::fields::VectorField Bfield_fp =
+            m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        const MultiFab& rho_fp =
+            *m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+
+        const GpuArray<int, 3> Bx_stag = m_hybrid_pic_model->Bx_IndexType;
+        const GpuArray<int, 3> By_stag = m_hybrid_pic_model->By_IndexType;
+        const GpuArray<int, 3> Bz_stag = m_hybrid_pic_model->Bz_IndexType;
+        const GpuArray<int, 3> nodal   = {1, 1, 1};
+        const GpuArray<int, 3> coarsen = {1, 1, 1};
+
+        const Real rho_floor    = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+        const Real theta_dt     = m_theta * m_dt;
+        const Real one_over_mu0 = 1._rt / PhysConst::mu0;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(m_alpha_mf[lev], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+            Array4<Real>       const& alpha = m_alpha_mf[lev].array(mfi);
+            Array4<Real const> const& Bx    = Bfield_fp[0]->const_array(mfi);
+            Array4<Real const> const& By    = Bfield_fp[1]->const_array(mfi);
+            Array4<Real const> const& Bz    = Bfield_fp[2]->const_array(mfi);
+            Array4<Real const> const& rho   = rho_fp.const_array(mfi);
+
+            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // Interpolate B from Yee grid to nodal grid
+                const Real Bx_n = Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
+                const Real By_n = Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
+                const Real Bz_n = Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
+
+                // |B| at nodal point
+                const Real Bmag = std::sqrt(Bx_n*Bx_n + By_n*By_n + Bz_n*Bz_n);
+
+                // rho is nodal in the hybrid model - read directly, apply floor
+                const Real rho_limited = std::max(rho(i, j, k), rho_floor);
+
+                // alpha = theta*dt*|B| / (mu0 * rho_limited)
+                // derived from: alpha = theta*dt*|B| / (mu0 * n_e0 * e)
+                //               with rho = n_e0 * e
+                alpha(i, j, k) = theta_dt * Bmag * one_over_mu0 / rho_limited;
+            });
+        }
+    }
+
+    return &m_alpha_mfarrvec;
 }

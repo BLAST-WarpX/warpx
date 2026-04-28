@@ -86,6 +86,7 @@ public:
 
     // Hybrid model has no light waves, so return 0 for the PC theta parameter
     [[nodiscard]] amrex::Real GetThetaForPC () const override { return 0.0_rt; }
+    [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const override;
 
 private:
 
@@ -94,6 +95,14 @@ private:
      * This is owned by WarpX, not by this class.
      */
     HybridPICModel* m_hybrid_pic_model = nullptr;
+
+    /**
+     * \brief Persistent nodal MultiFab storing the spatially varying alpha
+     * coefficient (theta*dt*|B|/(mu0*n_e0*e)) for the curl-curl preconditioner.
+     * Refilled each Newton iteration via GetAlphaCoeff().
+     */
+    mutable amrex::Vector<amrex::MultiFab>  m_alpha_mf;
+    mutable amrex::Vector<amrex::MultiFab*> m_alpha_mfarrvec;
 
     /**
      * \brief Flag indicating whether external fields from vector potentials

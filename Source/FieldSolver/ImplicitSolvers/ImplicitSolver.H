@@ -102,6 +102,13 @@ public:
     }
 
     /**
+     * \brief Return pointer to nodal MultiFab vector for spatially varying alpha coefficient
+     */
+    [[nodiscard]] virtual const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const {
+        return nullptr;
+    }
+    
+    /**
      * \brief Return reference to the multifabs for curl curl mask
      */
     [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int dir) const

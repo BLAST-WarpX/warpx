@@ -121,6 +121,8 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
 
         bool m_beta_scalar = true;
 
+        bool m_alpha_scalar = true; // For hybrid solver, we need spatially varying alpha
+
         RT m_atol = 1.0e-16;
         RT m_rtol = 1.0e-4;
 
@@ -133,6 +135,8 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         amrex::IntVect m_gv;
 
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
+
+        const amrex::Vector<amrex::MultiFab*>* m_acoefs_pc = nullptr;
 
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_lo;
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> m_bc_hi;
@@ -159,6 +163,7 @@ void CurlCurlMLMGPC<T,Ops>::printParameters() const
     Print() << pc_name << " verbose:              " << (m_verbose?"true":"false") << "\n";
     Print() << pc_name << " bottom verbose:       " << (m_bottom_verbose?"true":"false") << "\n";
     Print() << pc_name << " beta coeff:           " << (m_beta_scalar?"scalar (1.0)":"MultiFab") << "\n";
+    Print() << pc_name << " alpha coeff:          " << (m_alpha_scalar?"scalar":"MultiFab") << "\n";
     Print() << pc_name << " max iter:             " << m_max_iter << "\n";
     Print() << pc_name << " agglomeration:        " << m_agglomeration << "\n";
     Print() << pc_name << " consolidation:        " << m_consolidation << "\n";
@@ -261,6 +266,9 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }
 
+    m_acoefs_pc = m_ops->GetAlphaCoeff();
+    if (m_acoefs_pc != nullptr) { m_alpha_scalar = false; }
+
     m_is_defined = true;
 }
 
@@ -278,16 +286,33 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     amrex::ignore_unused(a_U);
 
     // set the alpha coefficient for the curl-curl op
-    const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
-    if (thetaDt==0.) {
-        std::stringstream warningMsg;
-        warningMsg << "Light waves are not treated implicitly with the chosen time solver.\n";
-        warningMsg << "Use jacobian.pc_type = pc_jacobi for better performance.\n";
-        ablastr::warn_manager::WMRecordWarning("CurlCurlMLMGPC", warningMsg.str());
+    if (m_alpha_scalar) {
+        const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
+        if (thetaDt==0.) {
+            std::stringstream warningMsg;
+            warningMsg << "Light waves are not treated implicitly with the chosen time solver.\n";
+            warningMsg << "Use jacobian.pc_type = pc_jacobi for better performance.\n";
+            ablastr::warn_manager::WMRecordWarning("CurlCurlMLMGPC", warningMsg.str());
+        }
+        const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
+        m_curl_curl->setScalars(alpha, RT(1.0));
+        if (m_verbose) {
+            amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
+                           << ": theta*dt = " << thetaDt << ", "
+                           << " coefficients: "
+                           << "alpha = " << alpha << "\n";
+        }
+    } else {
+        m_curl_curl->setScalars(RT(1.0), RT(1.0));
+        const auto* acoefs_ptr = m_ops->GetAlphaCoeff();
+        amrex::Vector<amrex::MultiFab const*> acoefs(m_num_amr_levels);
+        for (int n = 0; n < m_num_amr_levels; n++) { acoefs[n] = (*acoefs_ptr)[n]; }
+        m_curl_curl->setAlpha(acoefs);
+        if (m_verbose) {
+            amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
+                           << ": alpha = spatially varying\n";
+        }
     }
-
-    const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
-    m_curl_curl->setScalars(alpha, RT(1.0));
 
     if (!m_beta_scalar) {
         for (int n = 0; n < m_num_amr_levels; n++) {
@@ -314,12 +339,6 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
         }
     }
 
-    if (m_verbose) {
-        amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_curl_curl_mlmg)
-                       << ": theta*dt = " << thetaDt << ", "
-                       << " coefficients: "
-                       << "alpha = " << alpha << "\n";
-    }
 }
 
 template <class T, class Ops>
