@@ -110,7 +110,9 @@ for i in range(0, N_sec_e):
     z_bp = z[i] - vz_e[i] * (ts.t[-1] - t_impact[j])
     print("\n")
     print(f"Electron # {i}:")
-    print("NUMERICAL coordinates of the emitted electron (back-propagated to impact time):")
+    print(
+        "NUMERICAL coordinates of the emitted electron (back-propagated to impact time):"
+    )
     print(f"x={x_bp:5.5f}, y={y_bp:5.5f}, z={z_bp:5.5f}")
     print("\n")
     print("ANALYTICAL coordinates of the closest ion impact point on the sphere:")
