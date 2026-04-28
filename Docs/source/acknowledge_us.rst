@@ -13,10 +13,12 @@ In presentations
 For your presentations, you can find a WarpX acknowledgment slide `here <https://docs.google.com/presentation/d/1irVUyGKc-1vaQbJN7HgdBpPGQICfD5ci_maOu6noypk/edit?usp=sharing>`__.
 Feel free to use it to acknowledge WarpX in your presentation.
 
+WarpX logos in various image formats and color schemes are available in `this folder <https://drive.google.com/drive/folders/1ohWRIybrMfpHLbIeQa7qr9LL8OWheCHB>`__ and can be featured on slides when acknowledging WarpX.
+
 .. _acknowledge_warpx_generic:
 
-Acknowledgement Sentence
-************************
+Acknowledgment in publications
+******************************
 
 Please add the following acknowledgement sentence to your publications, it helps contributors keep in touch with the community and promote the project.
 
