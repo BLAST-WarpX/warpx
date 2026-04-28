@@ -9,8 +9,11 @@ An input file inputs_test_rz_particle_boundary_interaction_picmi.py is used.
 
 import sys
 
+sys.path.append("../../../Tools/Parser/")
+
 import numpy as np
 import yt
+from input_file_parser import parse_input_file
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c
 
@@ -25,14 +28,18 @@ x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1]
 
 # Analytical results
 # ------------------
-# Parameters from inputs_test_rz_particle_boundary_interaction_picmi.py:
+# Parameters read from warpx_used_inputs:
 # the sphere (embedded boundary) is centered at the origin and has radius R;
 # a single electron starts at (x0, 0, z0) with relativistic proper velocity
 # (gamma*v) (ux0, 0, uz0). Since uy0 = 0 and y0 = 0, the motion is confined
 # to the (x, z) plane.
-R = 0.2
-x0, z0 = 0.0, -0.25
-ux0, uz0 = 0.5e10, 1.0e10
+# Note: WarpX stores proper velocities normalized by c in warpx_used_inputs.
+input_dict = parse_input_file("./warpx_used_inputs")
+R = float(input_dict["my_constants.radius"][0])
+x0 = float(input_dict["electrons.multiple_particles_pos_x"][0])
+z0 = float(input_dict["electrons.multiple_particles_pos_z"][0])
+ux0 = float(input_dict["electrons.multiple_particles_ux"][0]) * c
+uz0 = float(input_dict["electrons.multiple_particles_uz"][0]) * c
 
 # The electron is relativistic, so we first compute the Lorentz factor and
 # the corresponding (constant) 3-velocity from the proper velocity.

@@ -10,8 +10,11 @@ close to the embedded boundary.
 
 import sys
 
+sys.path.append("../../../Tools/Parser/")
+
 import numpy as np
 import yt
+from input_file_parser import parse_input_file
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c
 
@@ -32,7 +35,7 @@ assert N_sec_e == 2, (
 
 # Analytical results
 # ------------------
-# Parameters from inputs_test_rz_secondary_ion_emission_picmi.py:
+# Parameters read from warpx_used_inputs:
 # the sphere (embedded boundary) is centered at the origin and has radius R;
 # four ions start at (xi, 0, zi) with proper velocity (gamma*v) (uxi, 0, uzi).
 # Since uy0 = 0 and yi = 0, each ion travels in the (x, z) plane.
@@ -43,11 +46,13 @@ assert N_sec_e == 2, (
 # (analytical) part of the emitted electron position is the impact point
 # of the ion on the sphere; the residual displacement comes from the
 # thermal kick and from the embedded-boundary discretization.
-R = 0.2
-ion_x0 = np.array([0.025, 0.0, -0.1, -0.14])
-ion_z0 = np.array([-0.26, -0.29, -0.25, -0.23])
-ion_ux0 = np.array([0.18e6, 0.1e6, 0.15e6, 0.21e6])
-ion_uz0 = np.array([8.00e5, 7.20e5, 6.40e5, 5.60e5])
+# Note: WarpX stores proper velocities normalized by c in warpx_used_inputs.
+input_dict = parse_input_file("./warpx_used_inputs")
+R = float(input_dict["my_constants.radius"][0])
+ion_x0 = np.array([float(v) for v in input_dict["ions.multiple_particles_pos_x"]])
+ion_z0 = np.array([float(v) for v in input_dict["ions.multiple_particles_pos_z"]])
+ion_ux0 = np.array([float(v) for v in input_dict["ions.multiple_particles_ux"]]) * c
+ion_uz0 = np.array([float(v) for v in input_dict["ions.multiple_particles_uz"]]) * c
 
 # The ions are non-relativistic (gamma ~ 1), but use the general formula
 # to convert the proper velocity to the 3-velocity for consistency.
