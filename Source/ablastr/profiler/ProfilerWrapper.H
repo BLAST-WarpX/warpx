@@ -25,9 +25,11 @@
 #include <AMReX_Print.H>
 
 #define _PROFILER_TRACER(name)                                               \
-        if (amrex::ParallelDescriptor::MyProc() == 0) {                      \
-            amrex::Print() << name << "\n";                                  \
-            std::cout.flush();                                               \
+        {                                                                    \
+        amrex::AllPrint() << "[Rank "                                        \
+                          << amrex::ParallelDescriptor::MyProc()             \
+                          << "] " << name << "\n";                           \
+        std::cout.flush();                                                   \
         }
 
 #define ABLASTR_PROFILE(fname) _PROFILER_TRACER(fname)
