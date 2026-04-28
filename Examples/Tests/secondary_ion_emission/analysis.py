@@ -25,7 +25,9 @@ filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
 
 it = ts.iterations
-x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
+x, y, z, ux_e, uy_e, uz_e = ts.get_particle(
+    ["x", "y", "z", "ux", "uy", "uz"], species="electrons", iteration=it[-1]
+)
 
 N_sec_e = np.size(z)  # number of the secondary electrons
 
@@ -74,27 +76,51 @@ x_impact = ion_x0 + vx0 * t_impact
 y_impact = np.zeros_like(x_impact)
 z_impact = ion_z0 + vz0 * t_impact
 
-# Each emitted electron is matched to the closest analytical impact point.
-# The tolerance is set as an absolute distance (in meters) that bounds the
-# combined effect of the random thermal kick and the EB discretization.
-tolerance = 0.025
+# Each emitted electron is back-propagated to the analytical ion impact time
+# and then matched to the closest analytical impact point. Back-propagating
+# removes the thermal-kick displacement, leaving only the EB discretization
+# error in the comparison.
+#
+# OpenPMDTimeSeries returns proper velocities normalized by c (u/c), so
+# gamma = sqrt(1 + ux^2 + uy^2 + uz^2) and the 3-velocity is v = (u/c)*c/gamma.
+gamma_e = np.sqrt(1.0 + ux_e**2 + uy_e**2 + uz_e**2)
+vx_e = ux_e * c / gamma_e
+vy_e = uy_e * c / gamma_e
+vz_e = uz_e * c / gamma_e
+
+# The tolerance covers only the EB discretization error (thermal kick is removed).
+tolerance = 0.01
 
 for i in range(0, N_sec_e):
-    distances = np.sqrt(
-        (x[i] - x_impact) ** 2 + (y[i] - y_impact) ** 2 + (z[i] - z_impact) ** 2
+    # For each candidate parent ion j, back-propagate the electron from ts.t[-1]
+    # to t_impact[j] and compute the distance to the analytical impact point.
+    bp_distances = np.array(
+        [
+            np.sqrt(
+                (x[i] - vx_e[i] * (ts.t[-1] - t_impact[j]) - x_impact[j]) ** 2
+                + (y[i] - vy_e[i] * (ts.t[-1] - t_impact[j]) - y_impact[j]) ** 2
+                + (z[i] - vz_e[i] * (ts.t[-1] - t_impact[j]) - z_impact[j]) ** 2
+            )
+            for j in range(len(x_impact))
+        ]
     )
-    j = int(np.argmin(distances))
+    j = int(np.argmin(bp_distances))
+    x_bp = x[i] - vx_e[i] * (ts.t[-1] - t_impact[j])
+    y_bp = y[i] - vy_e[i] * (ts.t[-1] - t_impact[j])
+    z_bp = z[i] - vz_e[i] * (ts.t[-1] - t_impact[j])
     print("\n")
     print(f"Electron # {i}:")
-    print("NUMERICAL coordinates of the emitted electron:")
-    print(f"x={x[i]:5.5f}, y={y[i]:5.5f}, z={z[i]:5.5f}")
+    print("NUMERICAL coordinates of the emitted electron (back-propagated to impact time):")
+    print(f"x={x_bp:5.5f}, y={y_bp:5.5f}, z={z_bp:5.5f}")
     print("\n")
     print("ANALYTICAL coordinates of the closest ion impact point on the sphere:")
     print(
         f"(ion # {j}) x={x_impact[j]:5.5f}, y={y_impact[j]:5.5f}, z={z_impact[j]:5.5f}"
     )
-    print(f"Distance to impact point = {distances[j]:.5f} m (tolerance: {tolerance} m)")
+    print(
+        f"Distance (back-propagated) to impact point = {bp_distances[j]:.5f} m (tolerance: {tolerance} m)"
+    )
 
-    assert distances[j] < tolerance, (
+    assert bp_distances[j] < tolerance, (
         f"Electron {i} is too far from any ion impact point on the sphere"
     )
