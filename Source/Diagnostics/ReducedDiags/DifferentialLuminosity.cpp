@@ -86,9 +86,10 @@ DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
     m_bin_min = bin_min;
     m_bin_size = (bin_max - bin_min) / bin_num;
 
-    // resize and zero-out data array
-    m_data.resize(m_bin_num,0.0_rt);
-    d_data.resize(m_bin_num,0.0_rt);
+    // resize and zero-out data array.
+    // The last entry is the total luminosity accumulated without binning.
+    m_data.resize(m_bin_num+1,0.0_rt);
+    d_data.resize(m_bin_num+1,0.0_rt);
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
@@ -111,6 +112,15 @@ DifferentialLuminosity::DifferentialLuminosity (const std::string& rd_name)
                 const amrex::Real b = m_bin_min + m_bin_size*(amrex::Real(i)+0.5_rt);
                 ofs << "bin" << 1+i << "=" << b << "(eV)";
             }
+            ofs << m_sep;
+            ofs << "[" << off++ << "]";
+#if (defined WARPX_DIM_3D)
+            ofs << "total_luminosity(m^-2)";
+#elif (defined WARPX_DIM_XZ)
+            ofs << "total_luminosity(m^-1)";
+#else
+            ofs << "total_luminosity()";
+#endif
             ofs << "\n";
             // close file
             ofs.close();
@@ -278,14 +288,6 @@ void DifferentialLuminosity::ComputeDiags (int step)
                         p2z = m2*u2z[j_2];
                     }
 
-                    // center of mass energy in eV
-                    Real const E_com = c_over_qe * std::sqrt(m1*m1*c2 + m2*m2*c2 + 2*(p1t*p2t - p1x*p2x - p1y*p2y - p1z*p2z));
-
-                    // determine particle bin
-                    int const bin = int(Math::floor((E_com-bin_min)/bin_size));
-
-                    if ( bin<0 || bin>=num_bins ) { continue; } // discard if out-of-range
-
                     Real const inv_p1t = 1.0_rt/p1t;
                     Real const inv_p2t = 1.0_rt/p2t;
 
@@ -299,10 +301,21 @@ void DifferentialLuminosity::ComputeDiags (int step)
                     // we also use beta=v/c instead of v
 
                     Real const radicand = beta1_sq + beta2_sq - 2*beta1_dot_beta2 - beta1_sq*beta2_sq + beta1_dot_beta2*beta1_dot_beta2;
+                    Real const luminosity = PhysConst::c * std::sqrt(amrex::max(radicand, 0.0_rt)) * min_N * w1[j_1] * w2[j_2] / dV * dt;
+
+                    amrex::HostDevice::Atomic::Add(&dptr_data[num_bins], luminosity);
+
+                    // center of mass energy in eV
+                    Real const E_com = c_over_qe * std::sqrt(m1*m1*c2 + m2*m2*c2 + 2*(p1t*p2t - p1x*p2x - p1y*p2y - p1z*p2z));
+
+                    // determine particle bin
+                    int const bin = int(Math::floor((E_com-bin_min)/bin_size));
+
+                    if ( bin<0 || bin>=num_bins ) { continue; } // discard if out-of-range
 
                     // Scale the number of collisions by multiplying by `min_N`
                     // to reflect the fact that we only sampled `max_N` pairs instead of `NI1*NI2`
-                    Real const dL_dEcom = PhysConst::c * std::sqrt( radicand ) * min_N * w1[j_1] * w2[j_2] / dV / bin_size * dt; // m^-2 eV^-1
+                    Real const dL_dEcom = luminosity / bin_size; // m^-2 eV^-1
 
                     amrex::HostDevice::Atomic::Add(&dptr_data[bin], dL_dEcom);
 
