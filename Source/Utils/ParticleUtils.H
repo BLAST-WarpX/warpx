@@ -417,6 +417,7 @@ namespace ParticleUtils {
         T_index i1 = cell_start;
         bool correction_failed = false;
         bool deltaE_is_zero = false;
+        int Erel_negative_count = 0;
         while (!deltaE_is_zero && !correction_failed && loop_count <= max_loop_count) {
 
             T_index i2 = i1 + 1;
@@ -459,7 +460,20 @@ namespace ParticleUtils {
             const amrex::ParticleReal pztot = wpmp1*uz1 + wpmp2*uz2;
             const amrex::ParticleReal Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
             const amrex::ParticleReal Erel = Ecm - wpmp1*c2 - wpmp2*c2;
-            if (Erel <= 0.0) { continue; }
+            if (Erel <= 0.0) {
+                // This checks for the unlikely case where the Erel is negative for all
+                // pairs of particles
+                Erel_negative_count++;
+                if (Erel_negative_count >= numCell) {
+                    correction_failed = true;
+                    break;
+                }
+                continue;
+            } else {
+                // Reset the counter since the next time through the loop
+                // might use difference pairs of particles
+                Erel_negative_count = 0;
+            }
 
             // Set the amount of energy change for this pair based on the
             // relative energy in the center of momentum.

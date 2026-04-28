@@ -760,6 +760,10 @@ public:
 
                         index_type const cell_start_1 = cell_offsets_1[i_cell];
                         index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                        // No correction needed if there is only one particle in the cell
+                        if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+
                         amrex::ParticleReal deltaEp1 = -KE_in_each_cell[i_cell];
 
                         if (deltaEp1 != 0.) {
@@ -1423,7 +1427,7 @@ public:
 
                             bool correction1_failed = false;
                             bool correction2_failed = false;
-                            if (deltaEp1 != 0.) {
+                            if (deltaEp1 != 0. && cell_stop_1 - cell_start_1 > 1) {
                                 // Adjust species 1 particles to absorb deltaEp1.
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1431,7 +1435,7 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp1);
                             }
 
-                            if (deltaEp2 != 0.) {
+                            if (deltaEp2 != 0. && cell_stop_2 - cell_start_2 > 1) {
                                 // Adjust species 2 particles to absorb deltaEp2.
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
