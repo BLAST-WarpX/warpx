@@ -1427,7 +1427,7 @@ public:
 
                             bool correction1_failed = false;
                             bool correction2_failed = false;
-                            if (deltaEp1 != 0. && cell_stop_1 - cell_start_1 > 1) {
+                            if (deltaEp1 != 0. && numCell1 > 1) {
                                 // Adjust species 1 particles to absorb deltaEp1.
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1435,7 +1435,7 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp1);
                             }
 
-                            if (deltaEp2 != 0. && cell_stop_2 - cell_start_2 > 1) {
+                            if (deltaEp2 != 0. && numCell2 > 1) {
                                 // Adjust species 2 particles to absorb deltaEp2.
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
@@ -1443,9 +1443,11 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp2);
                             }
 
-                            if (correction1_failed || correction2_failed) {
-                                // If the correction failed, give up on the collision and restore the
-                                // momentum to what it was beforehand.
+                            if (correction1_failed || correction2_failed ||
+                                (numCell1 == 1 && numCell2 == 1)) {
+                                // If the correction failed, or if each species has only one particle
+                                // and the correction can not be applied, give up on the collision and
+                                // restore the momentum to what it was beforehand.
                                 for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                                     u1x[ indices_1[i1] ] = u1x_before_ptr[ indices_1[i1] ];
                                     u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
