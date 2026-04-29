@@ -514,10 +514,12 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
-                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
-                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
-                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
+                    int const u1x_runtime_ni = u1x_ni - n_builtin_real;
+                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni];
+                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 1];
+                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 2];
                 } else {
                     u1x_before.resize(np1);
                     u1y_before.resize(np1);
@@ -758,6 +760,10 @@ public:
 
                         index_type const cell_start_1 = cell_offsets_1[i_cell];
                         index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                        // No correction needed if there is only one particle in the cell
+                        if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+
                         amrex::ParticleReal deltaEp1 = -KE_in_each_cell[i_cell];
 
                         if (deltaEp1 != 0.) {
@@ -996,10 +1002,12 @@ public:
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
                 auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
                 if (pos1 != real_names1.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
-                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_ni];
-                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 1];
-                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_ni + 2];
+                    int const u1x_runtime_ni = u1x_ni - n_builtin_real;
+                    u1x_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni];
+                    u1y_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 1];
+                    u1z_before_ptr = soa_1.m_runtime_rdata[u1x_runtime_ni + 2];
                 } else {
                     u1x_before.resize(np1);
                     u1y_before.resize(np1);
@@ -1021,10 +1029,12 @@ public:
                 std::vector<std::string> const & real_names2 = species_2.GetRealSoANames();
                 auto const pos2 = std::find(real_names2.begin(), real_names2.end(), "ux_n");
                 if (pos2 != real_names2.end()) {
+                    int const n_builtin_real = PIdx::nattribs;
                     auto const u2x_ni = static_cast<int>(std::distance(real_names2.begin(), pos2));
-                    u2x_before_ptr = soa_2.m_runtime_rdata[u2x_ni];
-                    u2y_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 1];
-                    u2z_before_ptr = soa_2.m_runtime_rdata[u2x_ni + 2];
+                    int const u2x_runtime_ni = u2x_ni - n_builtin_real;
+                    u2x_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni];
+                    u2y_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni + 1];
+                    u2z_before_ptr = soa_2.m_runtime_rdata[u2x_runtime_ni + 2];
                 } else {
                     u2x_before.resize(np2);
                     u2y_before.resize(np2);
@@ -1417,7 +1427,7 @@ public:
 
                             bool correction1_failed = false;
                             bool correction2_failed = false;
-                            if (deltaEp1 != 0.) {
+                            if (deltaEp1 != 0. && cell_stop_1 - cell_start_1 > 1) {
                                 // Adjust species 1 particles to absorb deltaEp1.
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1425,7 +1435,7 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp1);
                             }
 
-                            if (deltaEp2 != 0.) {
+                            if (deltaEp2 != 0. && cell_stop_2 - cell_start_2 > 1) {
                                 // Adjust species 2 particles to absorb deltaEp2.
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
