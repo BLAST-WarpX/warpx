@@ -4,7 +4,6 @@ Checks: '
         -bugprone-easily-swappable-parameters,
         -bugprone-implicit-widening-of-multiplication-result,
         -bugprone-misplaced-widening-cast,
-        -bugprone-unchecked-optional-access,
         -bugprone-unused-local-non-trivial-variable,
     cert-*,
         -cert-err58-cpp,
