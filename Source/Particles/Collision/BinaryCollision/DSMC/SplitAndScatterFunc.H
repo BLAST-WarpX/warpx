@@ -140,9 +140,9 @@ public:
         index_type* AMREX_RESTRICT no_product_offsets_data = no_product_offsets.data();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return ((mask[i] > 0) &
-                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) &
+                return ((mask[i] > 0) &&
+                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &&
+                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) &&
                         (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
@@ -238,7 +238,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) & (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
+            if ((mask[i] > 0) && (mask[i] != int(ScatteringProcessType::IONIZATION)) && (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) && (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
