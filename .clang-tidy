@@ -45,7 +45,6 @@ Checks: '
         -modernize-use-starts-ends-with,
     mpi-*,
     performance-*,
-        -performance-enum-size,
     portability-*,
     readability-*,
         -readability-avoid-nested-conditional-operator,
@@ -90,7 +89,6 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 
 # TODO Consider enabling the following checks:
 # -bugprone-unused-local-non-trivial-variable
-# -performance-enum-size
 # -readability-container-contains
 # -readability-redundant-inline-specifier
 # -readability-redundant-member-init
