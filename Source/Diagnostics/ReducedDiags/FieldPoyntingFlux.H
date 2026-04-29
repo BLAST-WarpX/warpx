@@ -363,6 +363,7 @@ namespace Poynting {
             [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<amrex::Real>
             {
 
+                using namespace amrex::literals;
                 constexpr int comp = 0;
 
                 // This is needed by the GPU compilers where captured variables cannot first appear
@@ -371,7 +372,16 @@ namespace Poynting {
 
                 amrex::Real const af = area_factor(i,j,k);
                 if constexpr (normal_dir == 0) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    amrex::Real const afup1 = area_factor(i+1,j,k);
+                    amrex::Real const afdn1 = area_factor(i-1,j,k);
+                    amrex::Real const afuphalf = 0.5_rt*(af + afup1);
+                    amrex::Real const afdnhalf = 0.5_rt*(af + afdn1);
+                    return af*T_Algo::EyBz(i,j,k,comp,Ey_arr,Bz_arr)
+                           - (af == 0._rt ? 0.0_rt : Ez_arr(i,j,k,comp)*0.5_rt*(afdnhalf*By_arr(i-1,j,k,comp) + afuphalf*By_arr(i,j,k,comp)));
+#else
                     return af*(T_Algo::EyBz(i,j,k,comp,Ey_arr,Bz_arr) - T_Algo::EzBy(i,j,k,comp,Ez_arr,By_arr));
+#endif
                 }
 
                 else if constexpr (normal_dir == 1) {
