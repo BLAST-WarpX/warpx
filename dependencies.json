@@ -5,9 +5,9 @@
     "version_picsar": "25.06",
     "version_pybind11": "v3.0.4",
     "version_picmi": "0.34.0",
-    "commit_amrex": "0b56ec9a168c753497eb09b72d52d9b25b46f43d",
+    "commit_amrex": "05a28aa730e417366fc146bddd435ad79b3a6ae4",
     "commit_pyamrex": "feb67e81e9b6581470da620b4554f84cf9793500",
-    "commit_picsar": "25.06",
+    "commit_picsar": "7e4c13a90c00529c96f5b0ec0f25f15dd190a8e9",
     "commit_pybind11": "v3.0.4",
     "commit_picmi": "368db4a7fe7f98f4915209702930e08c59769717"
 }
