@@ -754,6 +754,11 @@ public:
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
                 amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
+                // The particles are sorted by weight in decreasing order. This gives more of the correction
+                // to the heavier particles, having a smallar effect on their momenta, and typically
+                // requiring fewer particles to absorb or give off the extra energy.
+                auto heatSortDecreasing = ParticleUtils::HeapSortDecreasing();
+
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                     {
@@ -767,6 +772,10 @@ public:
                         amrex::ParticleReal deltaEp1 = -KE_in_each_cell[i_cell];
 
                         if (deltaEp1 != 0.) {
+
+                            int const numCell1 = (cell_stop_1 - cell_start_1);
+                            heatSortDecreasing(indices_1, w1, cell_start_1, numCell1);
+
                             // Adjust species 1 particles to absorb deltaEp1.
                             const bool correction_failed =
                                  ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1372,6 +1381,11 @@ public:
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
                 amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
+                // The particles are sorted by weight in decreasing order. This gives more of the correction
+                // to the heavier particles, having a smallar effect on their momenta, and typically
+                // requiring fewer particles to absorb or give off the extra energy.
+                auto heatSortDecreasing = ParticleUtils::HeapSortDecreasing();
+
                 amrex::ParallelFor( n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell) noexcept
                     {
@@ -1428,6 +1442,7 @@ public:
                             bool correction1_failed = false;
                             bool correction2_failed = false;
                             if (deltaEp1 != 0. && cell_stop_1 - cell_start_1 > 1) {
+                                heatSortDecreasing(indices_1, w1, cell_start_1, numCell1);
                                 // Adjust species 1 particles to absorb deltaEp1.
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1436,6 +1451,7 @@ public:
                             }
 
                             if (deltaEp2 != 0. && cell_stop_2 - cell_start_2 > 1) {
+                                heatSortDecreasing(indices_2, w2, cell_start_2, numCell2);
                                 // Adjust species 2 particles to absorb deltaEp2.
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
