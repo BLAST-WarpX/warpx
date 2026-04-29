@@ -81,7 +81,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
 
-            amrex::Real velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
+            const amrex::Real velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
                                                   m_uy_mean*m_uy_mean +
                                                   m_uz_mean*m_uz_mean);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -118,8 +118,8 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                 std::string const key_with_src =
                     source_name.empty() ? std::string("read_u_mean_distributed")
                                         : source_name + ".read_u_mean_distributed";
-                if (pp.contains(key_with_src.c_str())) {
-                    pp.query(key_with_src.c_str(), m_read_u_mean_distributed);
+                if (pp.contains(key_with_src)) {
+                    pp.query(key_with_src, m_read_u_mean_distributed);
                 } else {
                     pp.query("read_u_mean_distributed", m_read_u_mean_distributed);
                 }

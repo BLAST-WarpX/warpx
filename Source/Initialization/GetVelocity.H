@@ -22,6 +22,7 @@
 
 #include <cmath>
 #include <functional>
+#include <memory>
 
 /** Get velocity at a point on the grid
  *
@@ -114,9 +115,9 @@ struct GetVelocityVector
     ExternalFieldView m_ux_mean_view;
     ExternalFieldView m_uy_mean_view;
     ExternalFieldView m_uz_mean_view;
-    ExternalFieldReader* m_ux_mean_reader{nullptr};
-    ExternalFieldReader* m_uy_mean_reader{nullptr};
-    ExternalFieldReader* m_uz_mean_reader{nullptr};
+    std::shared_ptr<ExternalFieldReader> m_ux_mean_reader{nullptr};
+    std::shared_ptr<ExternalFieldReader> m_uy_mean_reader{nullptr};
+    std::shared_ptr<ExternalFieldReader> m_uz_mean_reader{nullptr};
 #endif
 
     /**
