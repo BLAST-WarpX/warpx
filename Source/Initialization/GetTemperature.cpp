@@ -79,11 +79,11 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) n
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = temp.m_geom.CellSizeArray();
         amrex::Box const dombox = amrex::convert(temp.m_geom.Domain(), amrex::IntVect(1));
         bool const distributed = temp.m_read_u_std_distributed;
-        m_ux_std_reader = std::make_shared<ExternalFieldReader>(
+        m_ux_std_reader = new ExternalFieldReader(
             temp.m_read_ux_std_path, temp.m_ux_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uy_std_reader = std::make_shared<ExternalFieldReader>(
+        m_uy_std_reader = new ExternalFieldReader(
             temp.m_read_uy_std_path, temp.m_uy_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uz_std_reader = std::make_shared<ExternalFieldReader>(
+        m_uz_std_reader = new ExternalFieldReader(
             temp.m_read_uz_std_path, temp.m_uz_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
     }
 #endif
@@ -99,9 +99,9 @@ void GetTemperatureVector::prepare (
     if (m_type != TempFromFileVector) {
         return;
     }
-    prepareExternalFieldReader(m_ux_std_reader.get(), grids, dmap, ngrow, get_zlab, m_ux_std_view);
-    prepareExternalFieldReader(m_uy_std_reader.get(), grids, dmap, ngrow, get_zlab, m_uy_std_view);
-    prepareExternalFieldReader(m_uz_std_reader.get(), grids, dmap, ngrow, get_zlab, m_uz_std_view);
+    prepareExternalFieldReader(m_ux_std_reader, grids, dmap, ngrow, get_zlab, m_ux_std_view);
+    prepareExternalFieldReader(m_uy_std_reader, grids, dmap, ngrow, get_zlab, m_uy_std_view);
+    prepareExternalFieldReader(m_uz_std_reader, grids, dmap, ngrow, get_zlab, m_uz_std_view);
 #else
     amrex::ignore_unused(grids, dmap, ngrow, get_zlab);
 #endif
@@ -116,11 +116,11 @@ void GetTemperatureVector::prepare (
         return;
     }
     prepareExternalFieldReader(
-        m_ux_std_reader.get(), pbox, moving_dir, moving_sign, get_zlab, m_ux_std_view);
+        m_ux_std_reader, pbox, moving_dir, moving_sign, get_zlab, m_ux_std_view);
     prepareExternalFieldReader(
-        m_uy_std_reader.get(), pbox, moving_dir, moving_sign, get_zlab, m_uy_std_view);
+        m_uy_std_reader, pbox, moving_dir, moving_sign, get_zlab, m_uy_std_view);
     prepareExternalFieldReader(
-        m_uz_std_reader.get(), pbox, moving_dir, moving_sign, get_zlab, m_uz_std_view);
+        m_uz_std_reader, pbox, moving_dir, moving_sign, get_zlab, m_uz_std_view);
 #else
     amrex::ignore_unused(pbox, moving_dir, moving_sign, get_zlab);
 #endif
@@ -149,16 +149,19 @@ void GetTemperatureVector::prepare (int li)
 void GetTemperatureVector::clear ()
 {
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    m_ux_std_reader.reset();
-    m_uy_std_reader.reset();
-    m_uz_std_reader.reset();
+    delete m_ux_std_reader;
+    m_ux_std_reader = nullptr;
+    delete m_uy_std_reader;
+    m_uy_std_reader = nullptr;
+    delete m_uz_std_reader;
+    m_uz_std_reader = nullptr;
 #endif
 }
 
 bool GetTemperatureVector::distributed () const noexcept
 {
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    if (m_type != TempFromFileVector || !m_ux_std_reader) {
+    if (m_type != TempFromFileVector || m_ux_std_reader == nullptr) {
         return false;
     }
     return m_ux_std_reader->distributed();
