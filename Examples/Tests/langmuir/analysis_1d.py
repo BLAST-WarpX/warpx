@@ -12,7 +12,6 @@
 # The electric field in the simulation is given (in theory) by:
 # $$ E_z = \epsilon \,\frac{m_e c^2 k_z}{q_e}\sin(k_z z)\sin( \omega_p t)$$
 import os
-import re
 import sys
 
 import matplotlib
@@ -24,6 +23,7 @@ import yt
 yt.funcs.mylog.setLevel(50)
 
 import numpy as np
+from analysis_utils import check_charge_conservation
 from scipy.constants import c, e, epsilon_0, m_e
 
 # test name
@@ -31,12 +31,6 @@ test_name = os.path.split(os.getcwd())[1]
 
 # this will be the name of the plot file
 fn = sys.argv[1]
-
-# Parse test name and check if current correction (psatd.current_correction=1) is applied
-current_correction = True if re.search("current_correction", test_name) else False
-
-# Parse test name and check if Vay current deposition (algo.current_deposition=vay) is used
-vay_deposition = True if re.search("vay_deposition", test_name) else False
 
 # Parameters (these parameters must match the parameters in `inputs.multi.rt`)
 epsilon = 0.01
@@ -108,17 +102,6 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
 
-# Check relative L-infinity spatial norm of rho/epsilon_0 - div(E) when
-# current correction (psatd.do_current_correction=1) is applied or when
-# Vay current deposition (algo.current_deposition=vay) is used
-if current_correction or vay_deposition:
-    rho = data[("boxlib", "rho")].to_ndarray()
-    divE = data[("boxlib", "divE")].to_ndarray()
-    error_rel = np.amax(np.abs(divE - rho / epsilon_0)) / np.amax(
-        np.abs(rho / epsilon_0)
-    )
-    tolerance = 1.0e-9
-    print("Check charge conservation:")
-    print("error_rel = {}".format(error_rel))
-    print("tolerance = {}".format(tolerance))
-    assert error_rel < tolerance
+# Additional check on charge conservation for certain cases
+# (e.g., Esirkepov or Vay deposition, current correction)
+check_charge_conservation(data)

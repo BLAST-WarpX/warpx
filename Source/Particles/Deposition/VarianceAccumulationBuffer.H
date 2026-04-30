@@ -33,7 +33,7 @@ class VarianceAccumulationBuffer {
                                                 bool apply_filter);
 
     // Data MF Accessor
-    amrex::MultiFab* get(std::string arr, ablastr::fields::Direction dir, int lev);
+    amrex::MultiFab* get(const std::string& arr, ablastr::fields::Direction dir, int lev);
     amrex::iMultiFab* get_n(ablastr::fields::Direction dir, int lev);
 };
 

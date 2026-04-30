@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-This script analyzes the results of a 2D electrostatic simulation with collisions
-between electrons and protons placed in the middle of the position push. It computes the
+This script analyzes the results of a 2D electrostatic/electromagnetic simulation with collisions
+between electrons and protons placed in the middle of the momentum push. It computes the
 total energy (field + particle) variation over time and verifies that it is conserved
 within a given tolerance, as well as that the final value of the field energy variation
 is close to a reference (so-called equipartition) value. If collisions are placed before
-the position push (standard algorithm), the tolerance on the total energy conservation
+the momentum push (standard algorithm), the tolerance on the total energy conservation
 needs to be relaxed to one order of magnitude higher.
 """
 
@@ -43,7 +43,18 @@ def analyze(args: argparse.Namespace) -> None:
         [int(nppc) for nppc in num_particles_per_cell_list]
     )
     num_particles_per_cell = np.prod(num_particles_per_cell_array)
-    equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+    electrostatic = (
+        True
+        if (
+            "warpx.do_electrostatic" in input_dict
+            and input_dict["warpx.do_electrostatic"] != "none"
+        )
+        else False
+    )
+    if electrostatic:
+        equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+    else:
+        equipartition_value = 5 / (6 * num_particles_per_cell + 5)
 
     # normalize the field energy variation
     electron_temperature = float(input_dict["my_constants.Te"][0])
@@ -99,14 +110,14 @@ def analyze(args: argparse.Namespace) -> None:
 
     # verify the total energy conservation
     total_energy_error_norm = np.max(np.abs(total_energy_error))
-    relative_tolerance = 1e-5
+    relative_tolerance = 1e-5 if electrostatic else 6e-5
     if total_energy_error_norm >= relative_tolerance:
         raise ValueError(
             f"Total energy conservation failed with a maximum relative error of {total_energy_error_norm}"
         )
 
     # compare the final value of the field energy variation to the reference equipartition value
-    relative_tolerance = 1e-1
+    relative_tolerance = 1e-1 if electrostatic else 5e-1
     # average over the last 100 time steps to reduce noise
     field_energy_error_avg = np.mean(field_energy_error[-100:])
     if not np.isclose(

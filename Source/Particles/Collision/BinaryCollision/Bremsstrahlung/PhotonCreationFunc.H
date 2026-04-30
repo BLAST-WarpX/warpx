@@ -161,7 +161,7 @@ public:
         {
             if (p_mask[i])
             {
-                constexpr auto c2 = PhysConst::c * PhysConst::c;
+                constexpr auto c2 = PhysConst::c2;
 
                 int const i1 = static_cast<int>(p_pair_indices_1[i]);
                 int const i2 = static_cast<int>(p_pair_indices_2[i]);

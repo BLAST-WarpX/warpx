@@ -26,6 +26,7 @@ struct PDim3 {
     amrex::ParticleReal x, y, z;
 
     AMREX_GPU_HOST_DEVICE
+    explicit
     PDim3(const amrex::XDim3& a):
         x{static_cast<amrex::ParticleReal>(a.x)},
         y{static_cast<amrex::ParticleReal>(a.y)},

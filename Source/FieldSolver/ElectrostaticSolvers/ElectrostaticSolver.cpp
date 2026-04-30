@@ -16,7 +16,6 @@
 
 
 using namespace amrex;
-using warpx::fields::FieldType;
 
 ElectrostaticSolver::ElectrostaticSolver (int nlevs_max) : num_levels{nlevs_max}
 {

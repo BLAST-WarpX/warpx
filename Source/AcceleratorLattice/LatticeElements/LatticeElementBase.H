@@ -23,7 +23,7 @@ struct LatticeElementBase
      *
      * @param[in] element_name the name of the element type
      */
-    LatticeElementBase (std::string const& element_name);
+    explicit LatticeElementBase (std::string const& element_name);
 
     /**
      * \brief Read in an element base data and add it to the lists

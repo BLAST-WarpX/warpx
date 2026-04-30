@@ -43,7 +43,7 @@ public:
     *
     * @param[in] opt_depth_runtime_comp index of the optical depth runtime component
     */
-    PairGenerationFilterFunc(int const opt_depth_runtime_comp)
+    explicit PairGenerationFilterFunc(int const opt_depth_runtime_comp)
         : m_opt_depth_runtime_comp(opt_depth_runtime_comp)
         {}
 

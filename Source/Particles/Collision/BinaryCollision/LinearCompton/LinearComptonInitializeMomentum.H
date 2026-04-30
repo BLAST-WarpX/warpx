@@ -84,7 +84,7 @@ namespace {
         using namespace amrex::literals;
 
         constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( PhysConst::c * PhysConst::c );
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         // Extract the momenta of the incident particles
         amrex::ParticleReal const photon_ux = soa1_in.m_rdata[PIdx::ux][idx1_in];
@@ -98,7 +98,7 @@ namespace {
         // - Prepare parameters of the Lorentz transformation
         amrex::ParticleReal const lepton_u2 = (lepton_ux*lepton_ux + lepton_uy*lepton_uy + lepton_uz*lepton_uz);
         amrex::ParticleReal const lepton_u = std::sqrt(lepton_u2);
-        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_csq);
+        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_c2);
         amrex::ParticleReal const lepton_beta = lepton_u / lepton_gamma * inv_c;
         amrex::ParticleReal const lepton_nx = lepton_ux / lepton_u;
         amrex::ParticleReal const lepton_ny = lepton_uy / lepton_u;
@@ -187,22 +187,15 @@ namespace {
             new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz,
             lepton_gamma, lepton_beta, -lepton_nx, -lepton_ny, -lepton_nz);
 
-        // Fill momentum of product species (note that we actually
-        // create 4 products, 2 at the position of each incident particle)
+        // Fill momentum of product species
         // - Scattered photon
         soa1_out.m_rdata[PIdx::ux][idx1_out_start] = new_photon_ux;
         soa1_out.m_rdata[PIdx::uy][idx1_out_start] = new_photon_uy;
         soa1_out.m_rdata[PIdx::uz][idx1_out_start] = new_photon_uz;
-        soa1_out.m_rdata[PIdx::ux][idx1_out_start + 1] = new_photon_ux;
-        soa1_out.m_rdata[PIdx::uy][idx1_out_start + 1] = new_photon_uy;
-        soa1_out.m_rdata[PIdx::uz][idx1_out_start + 1] = new_photon_uz;
         // - Scattered electron (obtained by conserving momentum)
         soa2_out.m_rdata[PIdx::ux][idx2_out_start] = lepton_ux - (new_photon_ux - photon_ux);
         soa2_out.m_rdata[PIdx::uy][idx2_out_start] = lepton_uy - (new_photon_uy - photon_uy);
         soa2_out.m_rdata[PIdx::uz][idx2_out_start] = lepton_uz - (new_photon_uz - photon_uz);
-        soa2_out.m_rdata[PIdx::ux][idx2_out_start + 1] = lepton_ux - (new_photon_ux - photon_ux);
-        soa2_out.m_rdata[PIdx::uy][idx2_out_start + 1] = lepton_uy - (new_photon_uy - photon_uy);
-        soa2_out.m_rdata[PIdx::uz][idx2_out_start + 1] = lepton_uz - (new_photon_uz - photon_uz);
     }
 }
 

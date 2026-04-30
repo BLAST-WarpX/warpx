@@ -17,13 +17,7 @@ sudo apt-get install -y \
     build-essential     \
     ca-certificates     \
     cmake               \
-    g++-12              \
     gnupg               \
-    libboost-math-dev   \
-    libfftw3-dev        \
-    libfftw3-mpi-dev    \
-    libhdf5-openmpi-dev \
-    libopenmpi-dev      \
     ninja-build         \
     pkg-config          \
     wget

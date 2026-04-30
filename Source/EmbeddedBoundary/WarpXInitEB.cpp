@@ -38,6 +38,7 @@ namespace {
         : public amrex::GPUable
     {
     public:
+        explicit
         ParserIF (const amrex::ParserExecutor<3>& a_parser)
             : m_parser(a_parser)
             {}

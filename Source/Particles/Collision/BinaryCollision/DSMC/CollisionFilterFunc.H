@@ -53,12 +53,12 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 
     // For massless particles, the momentum is normalized to the electron mass
     constexpr amrex::ParticleReal me = PhysConst::m_e;
-    amrex::ParticleReal p1x = (m1 == 0) ? me*u1x : m1*u1x;
-    amrex::ParticleReal p1y = (m1 == 0) ? me*u1y : m1*u1y;
-    amrex::ParticleReal p1z = (m1 == 0) ? me*u1z : m1*u1z;
-    amrex::ParticleReal p2x = (m2 == 0) ? me*u2x : m2*u2x;
-    amrex::ParticleReal p2y = (m2 == 0) ? me*u2y : m2*u2y;
-    amrex::ParticleReal p2z = (m2 == 0) ? me*u2z : m2*u2z;
+    const amrex::ParticleReal p1x = (m1 == 0) ? me*u1x : m1*u1x;
+    const amrex::ParticleReal p1y = (m1 == 0) ? me*u1y : m1*u1y;
+    const amrex::ParticleReal p1z = (m1 == 0) ? me*u1z : m1*u1z;
+    const amrex::ParticleReal p2x = (m2 == 0) ? me*u2x : m2*u2x;
+    const amrex::ParticleReal p2y = (m2 == 0) ? me*u2y : m2*u2y;
+    const amrex::ParticleReal p2z = (m2 == 0) ? me*u2z : m2*u2z;
 
     BinaryCollisionUtils::get_collision_parameters(
         p1x, p1y, p1z, p2x, p2y, p2z, m1, m2,

@@ -76,7 +76,7 @@ then
 else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/blaspp.git ${WARPX_SW_DIR}/src/blaspp
 fi
-cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
+cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
 cmake --build ${build_dir}/blaspp-dane-build --target install --parallel 6
 
 # LAPACK++ (for PSATD+RZ)
@@ -89,7 +89,7 @@ then
 else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/lapackpp.git ${WARPX_SW_DIR}/src/lapackpp
 fi
-CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
+CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
 cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel 6
 
 

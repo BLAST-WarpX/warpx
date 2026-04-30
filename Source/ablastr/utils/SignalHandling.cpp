@@ -114,7 +114,7 @@ void
 SignalHandling::InitSignalHandling ()
 {
 #if defined(__linux__) || defined(__APPLE__)
-    struct sigaction sa;
+    struct sigaction sa{};
     sigemptyset(&sa.sa_mask);
     for (int signal_number = 0; signal_number < NUM_SIGNALS; ++signal_number) {
         signal_received_flags[signal_number] = false;

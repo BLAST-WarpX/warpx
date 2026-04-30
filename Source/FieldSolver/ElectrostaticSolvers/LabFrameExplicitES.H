@@ -15,7 +15,7 @@ class LabFrameExplicitES final : public ElectrostaticSolver
 {
 public:
 
-    LabFrameExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
+    explicit LabFrameExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
     }
 

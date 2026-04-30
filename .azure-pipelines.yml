@@ -41,7 +41,7 @@ jobs:
     matrix:
       # 1D Cartesian, Cylindrical, Spherical
       1d:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
@@ -50,7 +50,7 @@ jobs:
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cylindrical RZ
       cylindrical_rz:
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
         WARPX_RZ_FFT: 'TRUE'
       # single precision
       #single_precision:
@@ -144,13 +144,13 @@ jobs:
         cmake-easyinstall --prefix=/usr/local           \
           git+https://github.com/icl-utk-edu/blaspp.git \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
-          -DCMAKE_CXX_STANDARD=17                       \
+          -DCMAKE_CXX_STANDARD=20                       \
           -Duse_openmp=OFF -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
         # LAPACK++
         cmake-easyinstall --prefix=/usr/local             \
           git+https://github.com/icl-utk-edu/lapackpp.git \
           -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)   \
-          -DCMAKE_CXX_STANDARD=17                         \
+          -DCMAKE_CXX_STANDARD=20                         \
           -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF -DCMAKE_VERBOSE_MAKEFILE=ON
       fi
       # Remove system copy of Matplotlib to avoid conflict

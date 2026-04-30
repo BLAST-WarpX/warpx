@@ -118,7 +118,7 @@ public:
 
             index_type pair_index = cell_start_pair + coll_idx;
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
             amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
             amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
 #endif
@@ -132,8 +132,8 @@ public:
             for (index_type k = coll_idx; k < max_N; k += min_N)
             {
 
-#if (defined WARPX_DIM_RZ)
-                /* In RZ geometry, macroparticles can collide with other macroparticles
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
                  * in the same *cylindrical* cell. For this reason, collisions between macroparticles
                  * are actually not local in space. In this case, the underlying assumption is that
                  * particles within the same cylindrical cell represent a cylindrically-symmetry
@@ -155,7 +155,7 @@ public:
                     p_pair_reaction_weight, p_product_data,
                     engine);
 
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
                 u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
                 u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
@@ -336,7 +336,7 @@ public:
         {
             using namespace amrex::literals;
 
-            constexpr auto c2 = PhysConst::c * PhysConst::c;
+            constexpr auto c2 = PhysConst::c2;
 
             // compute gamma for particles 1 (electron) and 2 (ion)
             amrex::ParticleReal const u1sq = (u1x*u1x + u1y*u1y + u1z*u1z);
@@ -435,7 +435,7 @@ public:
 
     [[nodiscard]] Executor const& executor () const { return m_exe; }
 
-    bool use_global_debye_length() { return m_use_global_debye_length; }
+    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 
 private:
 

@@ -13,3 +13,4 @@ How-To Guides
    how_to_run_clang_tidy
    how_to_compile_locally
    how_to_write_the_docs
+   how_to_develop_with_llms

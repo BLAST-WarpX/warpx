@@ -116,7 +116,7 @@ void FillBoundary (amrex::MultiFab &mf,
 
 void FillBoundary (amrex::MultiFab &mf, bool do_single_precision_comms, const amrex::Periodicity &period, std::optional<bool> nodal_sync)
 {
-    amrex::IntVect const ng = mf.n_grow;
+    amrex::IntVect const ng = mf.nGrowVect();
     FillBoundary(mf, ng, do_single_precision_comms, period, nodal_sync);
 }
 

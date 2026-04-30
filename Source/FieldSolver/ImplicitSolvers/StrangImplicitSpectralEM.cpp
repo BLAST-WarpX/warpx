@@ -12,7 +12,7 @@
 using namespace warpx::fields;
 using namespace amrex::literals;
 
-void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
+void StrangImplicitSpectralEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_is_defined,
@@ -22,9 +22,12 @@ void StrangImplicitSpectralEM::Define ( WarpX* const a_WarpX )
     m_WarpX = a_WarpX;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, "Efield_fp" );
-    m_Eold.Define( m_E );
+    m_E.Define(m_WarpX, "Efield_fp");
+    m_Eold.Define(m_E);
 
+    // Set initial values for E and Eold vectors
+    m_E.Copy(FieldType::Efield_fp);
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
     // Parse nonlinear solver parameters
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
@@ -70,18 +73,22 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
     // Advance the fields to time n+1/2 source free
     m_WarpX->SpectralSourceFreeFieldAdvance(start_time);
 
-    // Save the fields at the start of the step
-    m_Eold.Copy( FieldType::Efield_fp );
-    m_E.Copy(m_Eold); // initial guess for E
+    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+    // (i.e., Eg used to advance the system from step n-1 to step n)
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
+
+    // Save Eg at start of time step
+    SaveEoldMultifab();
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
     amrex::Real const half_time = start_time + 0.5_rt*m_dt;
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
-    UpdateWarpXFields( m_E, half_time );
+    UpdateWarpXFields(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from time n+1/2 to time n+1
@@ -89,7 +96,7 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
 
     // Advance E and B fields from time n+1/2 to time n+1
     amrex::Real const new_time = start_time + m_dt;
-    FinishFieldUpdate( new_time );
+    FinishFieldUpdate(new_time);
 
     // Advance the fields to time n+1 source free
     m_WarpX->SpectralSourceFreeFieldAdvance(half_time);
@@ -114,7 +121,7 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;
     a_RHS.Copy(FieldType::current_fp, warpx::fields::FieldType::None, allow_type_mismatch);
-    amrex::Real constexpr coeff = PhysConst::c * PhysConst::c * PhysConst::mu0;
+    amrex::Real constexpr coeff = PhysConst::c2 * PhysConst::mu0;
     a_RHS.scale(-coeff * 0.5_rt*m_dt);
 
 }

@@ -54,7 +54,7 @@ public:
     StrangImplicitSpectralEM(StrangImplicitSpectralEM&&) = delete;
     StrangImplicitSpectralEM& operator=(StrangImplicitSpectralEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX* a_WarpX, bool a_from_restart) override;
 
     void PrintParameters () const override;
 

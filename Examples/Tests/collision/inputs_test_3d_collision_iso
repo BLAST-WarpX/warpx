@@ -50,7 +50,7 @@ electron.do_not_deposit = 1
 collisions.collision_names = collision1
 collision1.species = electron electron
 collision1.CoulombLog = 2.0
-collision1.ndt = 1
+
 
 # Diagnostics
 diagnostics.diags_names = diag1

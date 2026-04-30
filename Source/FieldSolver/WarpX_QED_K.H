@@ -92,7 +92,7 @@ using namespace amrex;
 
 // Defining constants to be used in the calculations
 
-constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
+constexpr amrex::Real c2 = PhysConst::c2;
 constexpr amrex::Real c2i = 1._rt/c2;
 const amrex::Real dxi = 1._rt/dx;
 const amrex::Real dzi = 1._rt/dz;

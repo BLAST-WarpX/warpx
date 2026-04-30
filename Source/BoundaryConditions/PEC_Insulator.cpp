@@ -41,11 +41,23 @@ namespace
         amrex::XDim3 result = {0._rt, 0._rt, 0._rt};
 
 #if defined(WARPX_DIM_3D) || defined(WARPX_ZINDEX)
-        amrex::Real const shiftx = (nodal[0] ? 0._rt : 0.5_rt);
-        result.x = (AMREX_SPACEDIM > 1 ? xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0] : 0._rt);
+        if constexpr (AMREX_SPACEDIM > 1){
+            amrex::Real const shiftx = (nodal[0] ? 0._rt : 0.5_rt);
+            result.x = xyzmin.x + (iv[0] - lo[0] + shiftx)*dx[0];
+        }
+        else{
+            result.x = 0._rt;
+        }
+
 #endif
-        amrex::Real const shifty = (AMREX_SPACEDIM == 3 ? (nodal[1] ? 0._rt : 0.5_rt) : 0._rt);
-        result.y = (AMREX_SPACEDIM == 3 ? xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1] : 0._rt);
+        if constexpr (AMREX_SPACEDIM == 3){
+            amrex::Real const shifty = nodal[1] ? 0._rt : 0.5_rt;
+            result.y = xyzmin.y + (iv[1] - lo[1] + shifty)*dx[1];
+        }
+        else{
+            result.y = 0._rt;
+        }
+
 #ifndef WARPX_DIM_1D_Z
 #if defined(WARPX_ZINDEX)
         amrex::Real const shiftz = (nodal[WARPX_ZINDEX] ? 0._rt : 0.5_rt);
@@ -539,7 +551,7 @@ PEC_Insulator::ZeroParallelFieldInConductor (
     // The field is zeroed out everywhere when the E field is being set,
     // and only in the conductor when the B field is being set.
     // since no fields are needed, dummy parsers are passed in
-    amrex::Vector<amrex::ParserExecutor<3>> dummy_parsers(3, amrex::ParserExecutor<3>());
+    const amrex::Vector<amrex::ParserExecutor<3>> dummy_parsers(3, amrex::ParserExecutor<3>());
     ApplyPEC_InsulatortoField(field, field_boundary_lo, field_boundary_hi, ng_fieldgather, geom,
                               lev, patch_type, ref_ratios, time, split_pml_field,
                               E_like, only_zero_parallel_field,
@@ -650,12 +662,12 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
             // and the guard-cell values of the E-field multifab will not be modified.
             amrex::IntVect ng = ng_fieldgather;
             ng.min(field[0]->nGrowVect());
-            amrex::Box tex = (split_pml_field) ? mfi.tilebox(field[0]->ixType().toIntVect())
-                                               : mfi.tilebox(field[0]->ixType().toIntVect(), ng);
-            amrex::Box tey = (split_pml_field) ? mfi.tilebox(field[1]->ixType().toIntVect())
-                                               : mfi.tilebox(field[1]->ixType().toIntVect(), ng);
-            amrex::Box tez = (split_pml_field) ? mfi.tilebox(field[2]->ixType().toIntVect())
-                                               : mfi.tilebox(field[2]->ixType().toIntVect(), ng);
+            const amrex::Box tex = (split_pml_field) ? mfi.tilebox(field[0]->ixType().toIntVect())
+                                                     : mfi.tilebox(field[0]->ixType().toIntVect(), ng);
+            const amrex::Box tey = (split_pml_field) ? mfi.tilebox(field[1]->ixType().toIntVect())
+                                                     : mfi.tilebox(field[1]->ixType().toIntVect(), ng);
+            const amrex::Box tez = (split_pml_field) ? mfi.tilebox(field[2]->ixType().toIntVect())
+                                                     : mfi.tilebox(field[2]->ixType().toIntVect(), ng);
 
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
@@ -700,7 +712,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 
                         amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fx_nodal);
-                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+                        ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fx ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
@@ -715,7 +727,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
                         amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fy_nodal);
-                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+                        ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
@@ -730,7 +742,7 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
                         amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, Fz_nodal);
-                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+                        ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
                         amrex::Real const field_value = (set_Fz ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
@@ -799,7 +811,7 @@ PEC_Insulator::ZeroParallelScalarInConductor (
 
             // Extract tilebox for which to loop.
             // Does not include guard cells.
-            amrex::Box tbox = mfi.tilebox(scalar->ixType().toIntVect());
+            const amrex::Box tbox = mfi.tilebox(scalar->ixType().toIntVect());
 
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
@@ -832,7 +844,7 @@ PEC_Insulator::ZeroParallelScalarInConductor (
                         amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
 
                         amrex::XDim3 const coords = ::ConvertIndexToCoordinate(iv, xyzmin, dx, lo, S_nodal);
-                        ::XDimTransverse tcoords = ::GetTransverseCoordinates(idim, coords);
+                        ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
 

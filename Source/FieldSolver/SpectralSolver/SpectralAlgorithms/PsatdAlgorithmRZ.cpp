@@ -8,9 +8,9 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <cmath>
 
 using namespace amrex::literals;
@@ -182,7 +182,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
             amrex::Real const kr = kr_arr[ir];
             amrex::Real const kz = modified_kz_arr[j];
 
-            constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
@@ -398,7 +398,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
 
             if (time_averaging && J_linear)
             {
-                constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
+                constexpr amrex::Real c2 = PhysConst::c2;
                 const amrex::Real dt3 = dt * dt * dt;
                 const amrex::Real om  = c * k_norm;
                 const amrex::Real om2 = om * om;
@@ -424,7 +424,7 @@ void
 PsatdAlgorithmRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
 {
     // Profiling
-    WARPX_PROFILE( "PsatdAlgorithmRZ::CurrentCorrection" );
+    ABLASTR_PROFILE( "PsatdAlgorithmRZ::CurrentCorrection" );
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 

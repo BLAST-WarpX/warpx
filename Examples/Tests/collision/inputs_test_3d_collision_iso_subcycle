@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_test_3d_collision_iso
+
+# Use a 10x larger PIC timestep with ndt_subcycle=10, so the collision
+# timestep remains unchanged (dt_collision = 1.4e-17 s, 100 iterations total)
+warpx.const_dt = 1.4e-16
+collision1.ndt_subcycle = 10
+diag1.intervals = 10

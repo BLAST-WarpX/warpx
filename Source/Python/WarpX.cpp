@@ -35,9 +35,11 @@
 #include <Utils/TextMsg.H>
 #include <Utils/WarpXAlgorithmSelection.H>
 #include <Utils/WarpXConst.H>
-#include <Utils/WarpXProfilerWrapper.H>
 #include <Utils/WarpXUtil.H>
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
+
+#include <ablastr/profiler/ProfilerWrapper.H>
+
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>

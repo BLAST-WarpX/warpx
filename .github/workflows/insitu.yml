@@ -17,33 +17,6 @@ jobs:
     name: Analyze
     uses: ./.github/workflows/check_changes.yml
 
-  sensei:
-    name: SENSEI
-    runs-on: ubuntu-24.04
-    needs: check_changes
-    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-    env:
-      CXX: clang++
-      CC: clang
-      CXXFLAGS: "-Werror -Wshadow -Woverloaded-virtual -Wunreachable-code -Wno-error=pass-failed"
-      CMAKE_GENERATOR: Ninja
-      CMAKE_PREFIX_PATH: /root/install/sensei/v4.0.0/lib64/cmake
-      OMP_NUM_THREADS: 1
-    container:
-      image: senseiinsitu/ci:fedora35-amrex-20220613
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@v2
-    - name: Configure
-      run: |
-        cmake -S . -B build     \
-          -DWarpX_SENSEI=ON     \
-          -DWarpX_COMPUTE=NOACC
-    - name: Build
-      run: |
-        cmake --build build -j 4
-
   ascent:
     name: Ascent
     runs-on: ubuntu-24.04

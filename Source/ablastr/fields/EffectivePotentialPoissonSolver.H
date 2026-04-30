@@ -13,12 +13,12 @@
 #define ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H
 
 #include <ablastr/constant.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/TextMsg.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "PoissonSolver.H"
 
 #if defined(WARPX_USE_FFT) && defined(WARPX_DIM_3D)

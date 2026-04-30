@@ -16,13 +16,13 @@
 #include "Filter/BilinearFilter.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
 #include "Particles/MultiParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/average.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
@@ -119,7 +119,7 @@ namespace
 void
 WarpX::UpdateAuxilaryData ()
 {
-    WARPX_PROFILE("WarpX::UpdateAuxilaryData()");
+    ABLASTR_PROFILE("WarpX::UpdateAuxilaryData()");
 
     using ablastr::fields::Direction;
 
@@ -808,14 +808,31 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
+    if (do_single_precision_comms)
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryE, requested more guard cells than allocated");
+        for (int i = 0; i < 3; ++i)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ng.allLE(mf[i]->nGrowVect()),
+                "Error: in FillBoundaryE, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+            const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+            ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+        }
+    }
+    else
+    {
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        if (nodal_sync)
+        {
+            amrex::FillBoundaryAndSync_nowait(vec_mf, period);
+            amrex::FillBoundaryAndSync_finish(vec_mf);
+        }
+        else
+        {
+            amrex::FillBoundary_nowait(vec_mf, period);
+            amrex::FillBoundary_finish(vec_mf);
+        }
     }
 }
 
@@ -873,14 +890,31 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
+    if (do_single_precision_comms)
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryB, requested more guard cells than allocated");
+        for (int i = 0; i < 3; ++i)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ng.allLE(mf[i]->nGrowVect()),
+                "Error: in FillBoundaryB, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+            const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+            ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+        }
+    }
+    else
+    {
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        if (nodal_sync)
+        {
+            amrex::FillBoundaryAndSync_nowait(vec_mf, period);
+            amrex::FillBoundaryAndSync_finish(vec_mf);
+        }
+        else
+        {
+            amrex::FillBoundary_nowait(vec_mf, period);
+            amrex::FillBoundary_finish(vec_mf);
+        }
     }
 }
 
@@ -1137,7 +1171,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 {
     using ablastr::fields::Direction;
 
-    WARPX_PROFILE("WarpX::SyncCurrent()");
+    ABLASTR_PROFILE("WarpX::SyncCurrent()");
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1312,7 +1346,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 void
 WarpX::SyncMassMatricesPC ()
 {
-    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
+    ABLASTR_PROFILE("WarpX::SyncMassMatricesPC()");
 
     ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
@@ -1348,7 +1382,7 @@ WarpX::SyncRho (
     const ablastr::fields::MultiLevelScalarField& charge_cp,
     ablastr::fields::MultiLevelScalarField const & charge_buffer)
 {
-    WARPX_PROFILE("WarpX::SyncRho()");
+    ABLASTR_PROFILE("WarpX::SyncRho()");
 
     if (!charge_fp[0]) { return; }
     const int ncomp = charge_fp[0]->nComp();

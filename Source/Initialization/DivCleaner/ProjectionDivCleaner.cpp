@@ -24,8 +24,8 @@
 #endif
 #include "Fields.H"
 #include <Initialization/ExternalField.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
-#include <Utils/WarpXProfilerWrapper.H>
 
 #include <map>
 
@@ -34,14 +34,14 @@ using namespace amrex;
 namespace warpx::initialization {
 
 ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential) :
-    m_field_name(a_field_name), m_vector_potential(a_vector_potential)
+    m_field_name{a_field_name},
+    m_grid_type{WarpX::grid_type},
+    m_vector_potential{a_vector_potential}
 {
     using ablastr::fields::Direction;
     ReadParameters();
 
     auto& warpx = WarpX::GetInstance();
-
-    m_grid_type = warpx.grid_type;
 
     // Only div clean level 0
     if (warpx.finestLevel() > 0) {
@@ -395,7 +395,7 @@ ProjectionDivCleaner::correctField ()
 
 void
 WarpX::ProjectionCleanDivB() {
-    WARPX_PROFILE("WarpX::ProjectionDivCleanB()");
+    ABLASTR_PROFILE("WarpX::ProjectionDivCleanB()");
 
     if ( (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
             ||  WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC

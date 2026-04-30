@@ -142,7 +142,7 @@ RUN git clone                  \
        -B /tmp/blaspp-build    \
        -Duse_openmp=OFF        \
        -Dgpu_backend=cuda      \
-       -DCMAKE_CXX_STANDARD=17 \
+       -DCMAKE_CXX_STANDARD=20 \
        -DCMAKE_INSTALL_PREFIX=/opt/warpx                         \
        -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libblas.so     \
        -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \
@@ -159,7 +159,7 @@ RUN git clone                     \
                                && \
     cmake -S /tmp/lapackpp        \
       -B /tmp/lapackpp-build      \
-      -DCMAKE_CXX_STANDARD=17     \
+      -DCMAKE_CXX_STANDARD=20     \
       -Dbuild_tests=OFF           \
       -DCMAKE_INSTALL_PREFIX=/opt/warpx \
       -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \

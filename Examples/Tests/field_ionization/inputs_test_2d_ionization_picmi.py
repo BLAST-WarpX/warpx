@@ -109,10 +109,10 @@ sim = picmi.Simulation(
 
 # Add electrons and ions
 sim.add_species(
-    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[0, 0, 0])
+    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[0, 0])
 )
 sim.add_species(
-    ions, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 1, 1])
+    ions, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[2, 1])
 )
 
 # Add field ionization

@@ -46,7 +46,7 @@ struct ExternalFieldParams
     * \brief The constructor reads and stores the parameters related to the external fields.
     * "pp_warpx" must point at the "warpx" parameter group in the inputfile.
     */
-    ExternalFieldParams(const amrex::ParmParse& pp_warpx);
+    explicit ExternalFieldParams(const amrex::ParmParse& pp_warpx);
 
     //! Initial electric field on the grid
     amrex::GpuArray<amrex::Real,3> E_external_grid = {0,0,0};

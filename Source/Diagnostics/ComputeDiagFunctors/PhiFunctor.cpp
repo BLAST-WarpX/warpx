@@ -69,7 +69,7 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
             beta, es_solver.self_fields_required_precision,
             es_solver.self_fields_absolute_tolerance,
             es_solver.self_fields_max_iters, es_solver.self_fields_verbosity,
-            /*is_igf_2d=*/false
+            /*is_igf_2d_slices*/ false
         );
 
         InterpolateMFForDiag(

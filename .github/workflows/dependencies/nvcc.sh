@@ -30,15 +30,15 @@ sudo apt-get install -y \
 $(dirname "$0")/ccache.sh
 
 # parse version number from command line argument
-VERSION_DOTTED=${1:-11.7}
+VERSION_DOTTED=${1:-12.2}
 VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
 
-# installation instructions from https://developer.nvidia.com/cuda-11-7-0-download-archive
+# installation instructions from https://developer.nvidia.com/cuda-12-2-0-download-archive
 # (Linux, x86_64, Ubuntu, 22.04, deb (local))
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
 sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
-wget https://developer.download.nvidia.com/compute/cuda/${VERSION_DOTTED}.0/local_installers/cuda-repo-ubuntu2204-${VERSION_DASHED}-local_${VERSION_DOTTED}.0-515.43.04-1_amd64.deb
-sudo dpkg -i cuda-repo-ubuntu2204-${VERSION_DASHED}-local_${VERSION_DOTTED}.0-515.43.04-1_amd64.deb
+wget https://developer.download.nvidia.com/compute/cuda/${VERSION_DOTTED}.0/local_installers/cuda-repo-ubuntu2204-${VERSION_DASHED}-local_${VERSION_DOTTED}.0-535.54.03-1_amd64.deb
+sudo dpkg -i cuda-repo-ubuntu2204-${VERSION_DASHED}-local_${VERSION_DOTTED}.0-535.54.03-1_amd64.deb
 sudo cp /var/cuda-repo-ubuntu2204-${VERSION_DASHED}-local/cuda-*-keyring.gpg /usr/share/keyrings/
 
 sudo apt-get update

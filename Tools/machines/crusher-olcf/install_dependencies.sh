@@ -55,7 +55,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-crusher-gpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-crusher-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-crusher-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $HOME/src/blaspp-crusher-gpu-build --target install --parallel 16
 rm -rf $HOME/src/blaspp-crusher-gpu-build
 
@@ -70,7 +70,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-crusher-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-crusher-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-crusher-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $HOME/src/lapackpp-crusher-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-crusher-gpu-build
 

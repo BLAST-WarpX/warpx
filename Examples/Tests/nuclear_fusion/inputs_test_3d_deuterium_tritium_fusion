@@ -33,8 +33,8 @@ algo.particle_shape = 1
 #################################
 particles.species_names = deuterium_1 tritium_1 helium4_1 neutron_1 deuterium_2 tritium_2 helium4_2 neutron_2
 
-my_constants.m_deuterium = 2.01410177812*m_u
-my_constants.m_tritium = 3.0160492779*m_u
+my_constants.m_deuterium = 2.01410177812*m_u - m_e
+my_constants.m_tritium = 3.0160492779*m_u - m_e
 my_constants.m_reduced = m_deuterium*m_tritium/(m_deuterium+m_tritium)
 my_constants.keV_to_J = 1.e3*q_e
 my_constants.Energy_step = 22. * keV_to_J

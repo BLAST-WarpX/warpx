@@ -21,7 +21,6 @@ void InjectorMomentum::clear () // NOLINT(readability-make-member-function-const
     case Type::boltzmann:
     case Type::juttner:
     case Type::constant:
-    case Type::radial_expansion:
     {
         break;
     }

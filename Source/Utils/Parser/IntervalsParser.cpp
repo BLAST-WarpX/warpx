@@ -166,7 +166,7 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
     // in order of increasing Slice start value
     for(const auto& inslc : insplit)
     {
-        const bool isBTD = true;
+        constexpr bool isBTD = true;
         const SliceParser temp_slice(inslc, isBTD);
         if (!m_slices.empty())
         {

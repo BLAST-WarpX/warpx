@@ -19,8 +19,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -276,6 +276,19 @@ WarpX::FinishImplicitParticleUpdate ()
                     uy[ip] = 2._rt*uy[ip] - uy_n[ip];
                     uz[ip] = 2._rt*uz[ip] - uz_n[ip];
 
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                    // rotate particles back to theta = 0.
+                    const amrex::ParticleReal rp = std::sqrt(xp*xp + yp*yp);
+                    const amrex::ParticleReal costh = (rp > 0. ? xp/rp : 1.0_prt);
+                    const amrex::ParticleReal sinth = (rp > 0. ? yp/rp : 0.0_prt);
+                    const amrex::ParticleReal upx = ux[ip];
+                    const amrex::ParticleReal upy = uy[ip];
+                    ux[ip] =  costh*upx + sinth*upy;
+                    uy[ip] = -sinth*upx + costh*upy;
+                    xp = rp;
+                    yp = 0.0;
+#endif
+
                     setPosition(ip, xp, yp, zp);
                 });
 
@@ -340,6 +353,22 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
+WarpX::DepositMassMatrices ( )
+{
+    ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        mypc->DepositMassMatrices(
+            m_fields,
+            lev,
+            dt[lev]
+        );
+    }
+
+}
+
+void
 WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
@@ -351,7 +380,7 @@ WarpX::ImplicitComputeRHSE (amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 void
 WarpX::ImplicitComputeRHSE (int lev, amrex::Real a_dt, WarpXSolverVec& a_Erhs_vec)
 {
-    WARPX_PROFILE("WarpX::ImplicitComputeRHSE()");
+    ABLASTR_PROFILE("WarpX::ImplicitComputeRHSE()");
     ImplicitComputeRHSE(lev, PatchType::fine, a_dt, a_Erhs_vec);
     if (lev > 0)
     {

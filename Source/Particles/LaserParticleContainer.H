@@ -79,7 +79,8 @@ public:
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
-                        const amrex::MultiFab& ) final;
+                        const amrex::MultiFab& ,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) final;
 
     void PostRestart () final;
 

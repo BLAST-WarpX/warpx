@@ -137,7 +137,7 @@ sim = picmi.Simulation(
 
 # Add plasma electrons
 sim.add_species(
-    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[1, 1, 1])
+    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[1, 1])
 )
 
 # Add beam electrons

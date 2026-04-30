@@ -24,10 +24,10 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpXPushFieldsEM_K.H"
 #include "WarpX_FDTD.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -143,7 +143,7 @@ namespace {
      *        from the current J (computed from D according to the Vay deposition scheme)
      */
     void PSATDSubtractCurrentPartialSumsAvg (
-        [[maybe_unused]] const amrex::Vector<std::array<Real,3>> cell_size_at_all_levels,
+        [[maybe_unused]] const amrex::Vector<std::array<Real,3>>& cell_size_at_all_levels,
         [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
     {
         using ablastr::fields::Direction;
@@ -956,7 +956,7 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real st
 void
 WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveB()");
+    ABLASTR_PROFILE("WarpX::EvolveB()");
     EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
     if (lev > 0)
     {
@@ -1011,7 +1011,7 @@ WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
-    WARPX_PROFILE("WarpX::EvolveE()");
+    ABLASTR_PROFILE("WarpX::EvolveE()");
     EvolveE(lev, PatchType::fine, a_dt, start_time);
     if (lev > 0)
     {
@@ -1108,7 +1108,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 {
     if (!do_dive_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveF()");
+    ABLASTR_PROFILE("WarpX::EvolveF()");
 
     // Evolve F field in regular cells
     if (patch_type == PatchType::fine) {
@@ -1166,7 +1166,7 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
     if (!do_divb_cleaning) { return; }
 
-    WARPX_PROFILE("WarpX::EvolveG()");
+    ABLASTR_PROFILE("WarpX::EvolveG()");
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1200,7 +1200,7 @@ WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 void
 WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
-    WARPX_PROFILE("WarpX::MacroscopicEvolveE()");
+    ABLASTR_PROFILE("WarpX::MacroscopicEvolveE()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         lev == 0,
@@ -1600,6 +1600,160 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
                 }
             }
 #endif
+        });
+    }
+}
+
+// This scales the mass matrices used in the PC by the inverse volume and
+// wraps around the deposition at negative radius.
+// It is faster to apply this on the grid than to do it particle by particle.
+// It is put here since there isn't another nice place for it.
+void
+WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, MultiFab* Szz, int lev) const
+{
+    const amrex::IntVect ngS = Sxx->nGrowVect();
+    const std::array<Real,3>& dx = CellSize(lev);
+    const Real dr = dx[0];
+
+    constexpr int NODE = amrex::IndexType::NODE;
+
+    // See Verboncoeur JCP 174, 421-427 (2001) for the modified volume factor
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
+#endif
+
+    for ( MFIter mfi(*Sxx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    {
+
+        Array4<Real> const& Srr_arr = Sxx->array(mfi);
+        Array4<Real> const& Stt_arr = Syy->array(mfi);
+        Array4<Real> const& Szz_arr = Szz->array(mfi);
+
+        Box const & tilebox = mfi.tilebox();
+        Box tbr = convert( tilebox, Sxx->ixType().toIntVect() );
+        Box tbt = convert( tilebox, Syy->ixType().toIntVect() );
+        Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
+
+        int const ncomp_rr = Sxx->nComp();
+        int const ncomp_tt = Syy->nComp();
+        int const ncomp_zz = Szz->nComp();
+
+        // Lower corner of tile box physical domain
+        // Note that this is done before the tilebox.grow so that
+        // these do not include the guard cells.
+        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        const Real rmin  = xyzmin.x;
+        const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const Dim3 lo = lbound(tilebox);
+        const int irmin = lo.x;
+
+        // For ishift, 1 means cell centered, 0 means node centered
+        int const ishift_r = (rminr > rmin ? 1 : 0);
+        int const ishift_t = (rmint > rmin ? 1 : 0);
+        int const ishift_z = (rminz > rmin ? 1 : 0);
+
+        // Grow the tileboxes to include the guard cells, except for the
+        // guard cells at negative radius.
+        if (rmin > 0._rt) {
+           tbr.growLo(0, ngS[0]);
+           tbt.growLo(0, ngS[0]);
+           tbz.growLo(0, ngS[0]);
+        }
+        tbr.growHi(0, ngS[0]);
+        tbt.growHi(0, ngS[0]);
+        tbz.growHi(0, ngS[0]);
+#if defined(WARPX_DIM_RZ)
+        tbr.grow(1, ngS[1]);
+        tbt.grow(1, ngS[1]);
+        tbz.grow(1, ngS[1]);
+#endif
+
+        // Rescale current in r-z mode since the inverse volume factor was not
+        // included in the current deposition.
+        amrex::ParallelFor(tbr, ncomp_rr,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            // Wrap the mass matrices deposited in the guard cells around
+            // to the cells above the axis.
+            // If Srr is node centered, Srr[0] is located on the boundary.
+            // If Srr is cell centered, Srr[0] is at 1/2 dr.
+            if (rmin == 0. && 1-ishift_r <= i && i < ngS[0]-ishift_r) {
+                Srr_arr(i,j,0,icomp) += Srr_arr(-ishift_r-i,j,0,icomp);
+            }
+            // Apply the inverse volume scaling
+            // Srr is forced to zero on axis
+            const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
+            if (r == 0._rt) {
+                Srr_arr(i,j,0,icomp) = 0.0_rt;
+            } else {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Srr_arr(i,j,0,icomp) /= 2.0_rt*MathConst::pi*r;
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Srr_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+#endif
+            }
+
+        });
+        amrex::ParallelFor(tbt, ncomp_tt,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            // Wrap the mass matrices deposited in the guard cells around
+            // to the cells above the axis.
+            // If Stt is node centered, Stt[0] is located on the boundary.
+            // If Stt is cell centered, Stt[0] is at 1/2 dr.
+            if (rmin == 0._rt && 1-ishift_t <= i && i <= ngS[0]-ishift_t) {
+                Stt_arr(i,j,0,icomp) += Stt_arr(-ishift_t-i,j,0,icomp);
+            }
+
+            // Apply the inverse volume scaling
+            // Stt is forced to zero on axis.
+            const amrex::Real r = amrex::Math::abs(rmint + (i - irmin)*dr);
+            if (r == 0._rt) {
+                Stt_arr(i,j,0,icomp) = 0.0_rt;
+            } else {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Stt_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Stt_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+#endif
+            }
+
+        });
+        amrex::ParallelFor(tbz, ncomp_zz,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            // Wrap the mass matrices deposited in the guard cells around
+            // to the cells above the axis.
+            // If Szz is node centered, Szz[0] is located on the boundary.
+            // If Szz is cell centered, Szz[0] is at 1/2 dr.
+            if (rmin == 0._rt && 1-ishift_z <= i && i <= ngS[0]-ishift_z) {
+                Szz_arr(i,j,0,icomp) += Szz_arr(-ishift_z-i,j,0,icomp);
+            }
+
+            // Apply the inverse volume scaling
+            const amrex::Real r = amrex::Math::abs(rminz + (i - irmin)*dr);
+            if (r == 0._rt) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Szz_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
+#elif defined(WARPX_DIM_RSPHERE)
+                Szz_arr(i,j,0,icomp) = 0.0_rt;
+#endif
+            } else {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                Szz_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                // leaving out the highest order term
+                Szz_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+#endif
+            }
+
         });
     }
 }

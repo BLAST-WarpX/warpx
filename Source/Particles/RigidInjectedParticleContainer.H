@@ -96,7 +96,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) override;
 
     void ReadHeader (std::istream& is) override;
 

@@ -27,7 +27,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    DifferentialLuminosity(const std::string& rd_name);
+    explicit DifferentialLuminosity(const std::string& rd_name);
 
     /// name of the two colliding species
     std::vector<std::string> m_beam_name;
