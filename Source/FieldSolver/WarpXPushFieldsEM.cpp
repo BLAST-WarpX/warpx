@@ -52,7 +52,7 @@
 #include <cmath>
 #include <memory>
 
-using namespace amrex;
+using namespace amrex::literals;
 using warpx::fields::FieldType;
 
 #ifdef WARPX_USE_FFT
@@ -143,7 +143,7 @@ namespace {
      *        from the current J (computed from D according to the Vay deposition scheme)
      */
     void PSATDSubtractCurrentPartialSumsAvg (
-        [[maybe_unused]] const amrex::Vector<std::array<Real,3>>& cell_size_at_all_levels,
+        [[maybe_unused]] const amrex::Vector<std::array<amrex::Real,3>>& cell_size_at_all_levels,
         [[maybe_unused]] ablastr::fields::MultiFabRegister& fields)
     {
         using ablastr::fields::Direction;
@@ -449,7 +449,7 @@ WarpX::PSATDBackwardTransformG ()
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         if (m_fields.has(FieldType::G_fp, lev)) {
-            MultiFab* G_fp = m_fields.get(FieldType::G_fp, lev);
+            amrex::MultiFab* G_fp = m_fields.get(FieldType::G_fp, lev);
 #ifdef WARPX_DIM_RZ
             spectral_solver_fp[lev]->BackwardTransform(lev, *G_fp, Idx.G);
 #else
@@ -462,7 +462,7 @@ WarpX::PSATDBackwardTransformG ()
         if (spectral_solver_cp[lev])
         {
             if (m_fields.has(FieldType::G_cp, lev)) {
-                MultiFab* G_cp = m_fields.get(FieldType::G_cp, lev);
+                amrex::MultiFab* G_cp = m_fields.get(FieldType::G_cp, lev);
 #ifdef WARPX_DIM_RZ
                 spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
 #else
@@ -819,7 +819,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
             // TODO Cumulative sums need to be fixed with periodic single box
-            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            auto cell_size_at_all_levels = amrex::Vector<std::array<amrex::Real,3>>{};
             for (int lev = 0; lev <= finest_level; ++lev){
                 cell_size_at_all_levels.push_back(CellSize(lev));
             }
@@ -876,7 +876,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             // Inverse FFT of J, subtract cumulative sums of D
             current_fp_string = "current_fp";
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
-            auto cell_size_at_all_levels = amrex::Vector<std::array<Real,3>>{};
+            auto cell_size_at_all_levels = amrex::Vector<std::array<amrex::Real,3>>{};
             for (int lev = 0; lev <= finest_level; ++lev){
                 cell_size_at_all_levels.push_back(CellSize(lev));
             }
@@ -1265,7 +1265,7 @@ WarpX::DampFieldsInGuards(const int lev,
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for ( amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
+            for (amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& Ex_arr = Efield[0]->array(mfi);
                 amrex::Array4<amrex::Real> const& Ey_arr = Efield[1]->array(mfi);
@@ -1397,11 +1397,11 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
 void
-WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev) const
+WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::MultiFab* Jy, amrex::MultiFab* Jz, int lev) const
 {
     const amrex::IntVect ngJ = Jx->nGrowVect();
-    const std::array<Real,3>& dx = CellSize(lev);
-    const Real dr = dx[0];
+    const std::array<amrex::Real,3>& dx = CellSize(lev);
+    const amrex::Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
 
@@ -1410,27 +1410,27 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
-    for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for (amrex::MFIter mfi(*Jx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
-        Array4<Real> const& Jr_arr = Jx->array(mfi);
-        Array4<Real> const& Jt_arr = Jy->array(mfi);
-        Array4<Real> const& Jz_arr = Jz->array(mfi);
+        amrex::Array4<amrex::Real> const& Jr_arr = Jx->array(mfi);
+        amrex::Array4<amrex::Real> const& Jt_arr = Jy->array(mfi);
+        amrex::Array4<amrex::Real> const& Jz_arr = Jz->array(mfi);
 
-        Box const & tilebox = mfi.tilebox();
-        Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
-        Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
-        Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
+        amrex::Box const & tilebox = mfi.tilebox();
+        amrex::Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
+        amrex::Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
+        amrex::Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
 
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Real rmin  = xyzmin.x;
-        const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Dim3 lo = lbound(tilebox);
+        const amrex::Real rmin  = xyzmin.x;
+        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Dim3 lo = lbound(tilebox);
         const int irmin = lo.x;
 
         // For ishift, 1 means cell centered, 0 means node centered
@@ -1605,11 +1605,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
+WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) const
 {
     const amrex::IntVect ngRho = Rho->nGrowVect();
-    const std::array<Real,3>& dx = WarpX::CellSize(lev);
-    const Real dr = dx[0];
+    const std::array<amrex::Real,3>& dx = WarpX::CellSize(lev);
+    const amrex::Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
 
@@ -1620,23 +1620,23 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (MultiFab* Rho, int lev) const
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
 #endif
 
-    Box tilebox;
+    amrex::Box tilebox;
 
-    for ( MFIter mfi(*Rho, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for (amrex::MFIter mfi(*Rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
-        Array4<Real> const& Rho_arr = Rho->array(mfi);
+        amrex::Array4<amrex::Real> const& Rho_arr = Rho->array(mfi);
 
         tilebox = mfi.tilebox();
-        Box tb = convert( tilebox, Rho->ixType().toIntVect() );
+        amrex::Box tb = convert( tilebox, Rho->ixType().toIntVect() );
 
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Dim3 lo = lbound(tilebox);
-        const Real rmin = xyzmin.x;
-        const Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Dim3 lo = lbound(tilebox);
+        const amrex::Real rmin = xyzmin.x;
+        const amrex::Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const int irmin = lo.x;
         const int ishift = (rminr > rmin ? 1 : 0);
 
