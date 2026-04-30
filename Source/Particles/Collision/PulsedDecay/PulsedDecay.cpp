@@ -209,7 +209,9 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             // Get grid information needed to compute physical cell center coordinates
             const amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0.0_rt);
+#if AMREX_SPACEDIM > 1
             const amrex::IntVect len = box.length();
+#endif
             const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom_lev.CellSizeArray();
 
             amrex::ParallelForRNG( n_cells,
