@@ -8,6 +8,8 @@
 
 #include "GetTemperature.H"
 
+#include <memory>
+
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 namespace
 {
@@ -56,7 +58,7 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
 }
 
 // Constructor for three-component (vector) temperature
-GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) noexcept
+GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp)
     : m_type{temp.m_type}
 {
     if (m_type == TempConstantVector) {
@@ -79,12 +81,17 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) n
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = temp.m_geom.CellSizeArray();
         amrex::Box const dombox = amrex::convert(temp.m_geom.Domain(), amrex::IntVect(1));
         bool const distributed = temp.m_read_u_std_distributed;
-        m_ux_std_reader = new ExternalFieldReader(
+        // std::make_unique for exception safety; raw pointers are required because
+        // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
+        auto ux = std::make_unique<ExternalFieldReader>(
             temp.m_read_ux_std_path, temp.m_ux_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uy_std_reader = new ExternalFieldReader(
+        auto uy = std::make_unique<ExternalFieldReader>(
             temp.m_read_uy_std_path, temp.m_uy_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uz_std_reader = new ExternalFieldReader(
+        auto uz = std::make_unique<ExternalFieldReader>(
             temp.m_read_uz_std_path, temp.m_uz_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
+        m_ux_std_reader = ux.release();
+        m_uy_std_reader = uy.release();
+        m_uz_std_reader = uz.release();
     }
 #endif
 }

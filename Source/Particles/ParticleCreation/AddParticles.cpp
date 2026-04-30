@@ -1283,7 +1283,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                         gamma_boost_flux, beta_boost_flux, t);
     };
     if (h_inj_mom_flux && h_inj_mom_flux->needPreparation()) {
-        PlasmaInjector& plasma_injector_nc = const_cast<PlasmaInjector&>(plasma_injector);
+        auto& plasma_injector_nc = const_cast<PlasmaInjector&>(plasma_injector);
         plasma_injector_nc.prepare(
             ParticleBoxArray(0), ParticleDistributionMap(0), amrex::IntVect(0), get_zlab_flux);
     }
