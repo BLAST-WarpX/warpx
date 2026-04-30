@@ -462,9 +462,9 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
 
             }
             else { // Deposit mass matrices for diagonal PC only
-                amrex::Gpu::Atomic::AddNoRet(&Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0), weight_Jy*fpyy);
-#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0), weight_Jx*fpxx);
+#if !defined(WARPX_EM_TEY)
+                amrex::Gpu::Atomic::AddNoRet(&Syy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0), weight_Jy*fpyy);
 #endif
                 amrex::Gpu::Atomic::AddNoRet(&Szz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0), weight_Jz*fpzz);
             }
