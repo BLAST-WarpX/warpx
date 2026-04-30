@@ -125,7 +125,7 @@ struct GetVelocityVector
      * \param[in] vel: const reference to the VelocityProperties object that will be used to
      * populate the functor
      */
-    explicit GetVelocityVector (VelocityProperties const& vel) noexcept;
+    explicit GetVelocityVector (VelocityProperties const& vel);
 
     //! True when bulk mean velocity is loaded from openPMD (cf. ``InjectorDensity`` ``fromfile``).
     [[nodiscard]] bool needPreparation () const noexcept

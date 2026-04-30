@@ -8,6 +8,8 @@
 
 #include "GetVelocity.H"
 
+#include <memory>
+
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 namespace
 {
@@ -54,7 +56,7 @@ GetVelocity::GetVelocity (VelocityProperties const& vel) noexcept
     }
 }
 
-GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
+GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
     : m_type{vel.m_type}
 {
     if (m_type == VelConstantVector) {
@@ -73,12 +75,17 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = vel.m_geom.CellSizeArray();
         amrex::Box const dombox = amrex::convert(vel.m_geom.Domain(), amrex::IntVect(1));
         bool const distributed = vel.m_read_u_mean_distributed;
-        m_ux_mean_reader = new ExternalFieldReader(
+        // std::make_unique for exception safety; raw pointers are required because
+        // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
+        auto ux = std::make_unique<ExternalFieldReader>(
             vel.m_read_ux_mean_path, vel.m_ux_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uy_mean_reader = new ExternalFieldReader(
+        auto uy = std::make_unique<ExternalFieldReader>(
             vel.m_read_uy_mean_path, vel.m_uy_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
-        m_uz_mean_reader = new ExternalFieldReader(
+        auto uz = std::make_unique<ExternalFieldReader>(
             vel.m_read_uz_mean_path, vel.m_uz_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
+        m_ux_mean_reader = ux.release();
+        m_uy_mean_reader = uy.release();
+        m_uz_mean_reader = uz.release();
     }
 #endif
 }

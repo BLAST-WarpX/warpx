@@ -105,7 +105,7 @@ struct GetTemperatureVector
      * \param[in] temp: const reference to the TemperatureProperties object that will be used to
      * populate the functor
      */
-    explicit GetTemperatureVector (TemperatureProperties const& temp) noexcept;
+    explicit GetTemperatureVector (TemperatureProperties const& temp);
 
     [[nodiscard]] bool needPreparation () const noexcept
     {
