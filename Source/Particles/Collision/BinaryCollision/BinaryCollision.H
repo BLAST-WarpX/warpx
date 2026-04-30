@@ -109,6 +109,7 @@ public:
         pp_collision_name.queryarr("product_species", m_product_species);
 
         m_shuffling_method = ParticleShufflingMethod::Default;
+        pp_collision.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
         pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
 
         if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
