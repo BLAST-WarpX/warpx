@@ -24,7 +24,6 @@
 
 #include <cmath>
 #include <functional>
-#include <memory>
 
 /**
  * \brief Get temperature at a point on the grid
@@ -96,9 +95,9 @@ struct GetTemperatureVector
     ExternalFieldView m_ux_std_view;
     ExternalFieldView m_uy_std_view;
     ExternalFieldView m_uz_std_view;
-    std::shared_ptr<ExternalFieldReader> m_ux_std_reader{nullptr};
-    std::shared_ptr<ExternalFieldReader> m_uy_std_reader{nullptr};
-    std::shared_ptr<ExternalFieldReader> m_uz_std_reader{nullptr};
+    ExternalFieldReader* m_ux_std_reader{nullptr};
+    ExternalFieldReader* m_uy_std_reader{nullptr};
+    ExternalFieldReader* m_uz_std_reader{nullptr};
 #endif
     /**
      * \brief Construct the functor with information provided by temp
