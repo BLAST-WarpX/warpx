@@ -2084,7 +2084,7 @@ void doGatherPicnicShapeN (
                                     Bxp, Byp, Bzp,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
-                                    dinv, xyzmin, lo, n_rz_azimuthal_modes );
+                                    dinv, xyzmin, lo, n_rz_azimuthal_modes);
 
 }
 
