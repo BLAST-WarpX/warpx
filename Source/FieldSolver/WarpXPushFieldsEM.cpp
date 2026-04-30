@@ -1400,8 +1400,8 @@ void
 WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, MultiFab* Jz, int lev) const
 {
     const amrex::IntVect ngJ = Jx->nGrowVect();
-    const std::array<Real,3>& dx = CellSize(lev);
-    const Real dr = dx[0];
+    const std::array<amrex::Real,3>& dx = CellSize(lev);
+    const amrex::Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
 
@@ -1410,27 +1410,27 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (MultiFab* Jx, MultiFab* Jy, Mu
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
-    for ( MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( amrex::MFIter mfi(*Jx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
 
-        Array4<Real> const& Jr_arr = Jx->array(mfi);
-        Array4<Real> const& Jt_arr = Jy->array(mfi);
-        Array4<Real> const& Jz_arr = Jz->array(mfi);
+        amrex::Array4<amrex::Real> const& Jr_arr = Jx->array(mfi);
+        amrex::Array4<amrex::Real> const& Jt_arr = Jy->array(mfi);
+        amrex::Array4<amrex::Real> const& Jz_arr = Jz->array(mfi);
 
-        Box const & tilebox = mfi.tilebox();
-        Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
-        Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
-        Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
+        amrex::Box const & tilebox = mfi.tilebox();
+        amrex::Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
+        amrex::Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
+        amrex::Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
 
         // Lower corner of tile box physical domain
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Real rmin  = xyzmin.x;
-        const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Dim3 lo = lbound(tilebox);
+        const amrex::Real rmin  = xyzmin.x;
+        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Dim3 lo = lbound(tilebox);
         const int irmin = lo.x;
 
         // For ishift, 1 means cell centered, 0 means node centered
