@@ -90,7 +90,7 @@ vz_e = uz_e * c / gamma_e
 
 # The tolerance is expressed as a fraction of the sphere radius R, and covers
 # only the EB discretization error (the thermal kick is removed by back-propagation).
-tolerance = 0.05
+tolerance = 0.02
 
 for i in range(0, N_sec_e):
     # For each candidate parent ion j, back-propagate the electron from ts.t[-1]
