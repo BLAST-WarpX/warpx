@@ -236,17 +236,15 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     const int ix = i_cell / len[1];
                     const int iz = i_cell % len[1];
-                    const amrex::IntVect iv(ix, iz); // local box indices
-                    xyz_cc.x = xyzmin.x + (iv[0] + half)*dx[0];
-                    xyz_cc.z = xyzmin.z + (iv[1] + half)*dx[1];
+                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
+                    xyz_cc.z = xyzmin.z + (iz + half)*dx[1];
 #elif defined(WARPX_DIM_3D)
                     const int ix = i_cell / (len[1] * len[2]);
                     const int iy = (i_cell / len[2]) % len[1];
                     const int iz = i_cell % len[2];
-                    const amrex::IntVect iv(ix, iy, iz); // local box indices
-                    xyz_cc.x = xyzmin.x + (iv[0] + half)*dx[0];
-                    xyz_cc.y = xyzmin.y + (iv[1] + half)*dx[1];
-                    xyz_cc.z = xyzmin.z + (iv[2] + half)*dx[2];
+                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
+                    xyz_cc.y = xyzmin.y + (iy + half)*dx[1];
+                    xyz_cc.z = xyzmin.z + (iz + half)*dx[2];
 #endif
 
                     // Compute total weight of products to create in this cell
