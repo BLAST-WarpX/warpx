@@ -105,21 +105,22 @@ public:
 
         m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
 
+        const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
         m_shuffling_method = ParticleShufflingMethod::Default;
-        pp_collision.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+        pp_collisions.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
         pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
 
         if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
             m_modulus_rounds = 5;
+            pp_collisions.query("modulus_rounds", m_modulus_rounds);
             pp_collision_name.query("modulus_rounds", m_modulus_rounds);
         }
 
         if (collision_type == CollisionType::PairwiseCoulomb) {
             // Input parameter set for all pairwise Coulomb collisions
-            const amrex::ParmParse pp_collisions("collisions");
             pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collisions.query("energy_fraction", m_energy_fraction);
