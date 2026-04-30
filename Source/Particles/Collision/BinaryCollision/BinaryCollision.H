@@ -778,6 +778,9 @@ public:
 
                         if (deltaEp1 != 0.) {
 
+                            // The ignore_unused is needed to fix the error "An extended __device__
+                            // lambda cannot first-capture variable in constexpr-if context"
+                            amrex::ignore_unused(heapSortDecreasing, indices_1, w1);
                             if constexpr (energy_correction_sort_by_weight_control == sort) {
                                 int const numCell1 = (cell_stop_1 - cell_start_1);
                                 heapSortDecreasing(indices_1, w1, cell_start_1, numCell1);
@@ -1448,6 +1451,10 @@ public:
                                 deltaEp1 = w1_sum*KE1_after/Etotdenom*deltaE/numCell1;
                                 deltaEp2 = w2_sum*KE2_after/Etotdenom*deltaE/numCell2;
                             }
+
+                            // The ignore_unused is needed to fix the error "An extended __device__
+                            // lambda cannot first-capture variable in constexpr-if context"
+                            amrex::ignore_unused(heapSortDecreasing);
 
                             bool correction1_failed = false;
                             bool correction2_failed = false;
