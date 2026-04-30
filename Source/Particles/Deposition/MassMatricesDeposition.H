@@ -249,12 +249,12 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
     }
 
     // Set the index shift parameter
-    if (j_node==j_cell) { shift[0] = 1; }
+    if (j_node == j_cell) { shift[0] = 1; }
 
     amrex::Real sx_jx[depos_order + 1] = {0._rt};
     amrex::Real sx_jy[depos_order + 1] = {0._rt};
     amrex::Real sx_jz[depos_order + 1] = {0._rt};
-    for (int ix=0; ix<=depos_order; ix++)
+    for (int ix = 0; ix <= depos_order; ix++)
     {
         sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
         sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
@@ -282,12 +282,12 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
     }
 
     // Set the index shift parameter
-    if (k_node==k_cell) { shift[1] = 1; }
+    if (k_node == k_cell) { shift[1] = 1; }
 
     amrex::Real sy_jx[depos_order + 1] = {0._rt};
     amrex::Real sy_jy[depos_order + 1] = {0._rt};
     amrex::Real sy_jz[depos_order + 1] = {0._rt};
-    for (int iy=0; iy<=depos_order; iy++)
+    for (int iy = 0; iy <= depos_order; iy++)
     {
         sy_jx[iy] = ((jx_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
         sy_jy[iy] = ((jy_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
@@ -441,7 +441,7 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
 
     for (int iz = 0; iz <= depos_order; iz++){
 
-        for (int ix=0; ix<=depos_order; ix++){
+        for (int ix = 0; ix <= depos_order; ix++){
 
             const amrex::Real weight_Jx = sx_jx[ix]*sz_jx[iz];
             const amrex::Real weight_Jy = sx_jy[ix]*sz_jy[iz];
@@ -934,7 +934,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     double y0_old = y_old;
     double z0_old = z_old;
 
-    for (int ns=0; ns<num_segments; ns++) {
+    for (int ns = 0; ns < num_segments; ns++) {
 
         if (ns == num_segments-1) { // final segment
 
@@ -1009,7 +1009,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
             const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(i0_cell_2, j0_cell_2, k0_cell_2);
-            for (int m=0; m<depos_order; m++) {
+            for (int m = 0; m < depos_order; m++) {
                 sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
                 sy_cell[m] = (4.0*sy_cell[m] + sy_old_cell[m] + sy_new_cell[m])/6.0;
                 sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
@@ -1576,7 +1576,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
 
             const int i_J = lo.x + i0_node[ns] + i;
             const amrex::Real weight_J = weight_node[ns][i];
-            for (int ms=0; ms<num_segments; ms++) {
+            for (int ms = 0; ms < num_segments; ms++) {
                 const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int iE = 0; iE <= depos_order; iE++) {
                     const amrex::Real weight_E = weight_node[ms][iE];
@@ -1668,7 +1668,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
             double sz_new_cell[depos_order] = {0.};
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(k0_cell_2);
-            for (int m=0; m<depos_order; m++) {
+            for (int m = 0; m < depos_order; m++) {
                 sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
             }
         }

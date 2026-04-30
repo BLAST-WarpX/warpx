@@ -1609,7 +1609,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
 void
-WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, MultiFab* Szz, int lev) const
+WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::MultiFab* Syy, amrex::MultiFab* Szz, int lev) const
 {
     const amrex::IntVect ngS = Sxx->nGrowVect();
     const std::array<amrex::Real,3>& dx = CellSize(lev);
@@ -1622,7 +1622,7 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, 
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
-    for ( amrex::MFIter mfi(*Sxx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( amrex::MFIter mfi(*Sxx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
 
         amrex::Array4<amrex::Real> const& Srr_arr = Sxx->array(mfi);
