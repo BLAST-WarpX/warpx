@@ -8,19 +8,21 @@
 
 # This script tests initial distributions.
 # 1 denotes gaussian distribution.
-# 2 denotes maxwell-boltzmann distribution.
+# 2 denotes maxwellian distribution.
 # 3 denotes maxwell-juttner distribution.
 # 4 denotes gaussian position distribution.
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
-# 6 denotes maxwell-boltzmann distribution w/ constant velocity
-# 7 denotes maxwell-boltzmann distribution w/ spatially-varying velocity
-# 8 denotes uniform distribution
-# 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
+# 6 denotes maxwellian distribution w/ constant velocity
+# 7 denotes maxwellian distribution w/ spatially-varying velocity
+# 8 denotes maxwellian distribution w/ spatially-varying velocity bulk velocity from openpmd file
+# 9 denotes uniform distribution
+# 10 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
 import scipy.constants as scc
 import scipy.special as scs
+from openpmd_viewer import OpenPMDTimeSeries
 from read_raw_data import read_reduced_diags, read_reduced_diags_histogram
 
 # print tolerance
@@ -28,7 +30,7 @@ tolerance = 0.02
 print("Tolerance:", tolerance)
 
 # ===============================
-# gaussian and maxwell-boltzmann
+# gaussian and maxwellian
 # ===============================
 
 # load data
@@ -60,7 +62,7 @@ f_peak = np.amax(f)
 
 # compute error
 # note that parameters are chosen such that gaussian and
-# maxwell-boltzmann distributions are identical
+# maxwellian distributions are identical
 f1_error = (
     np.sum(np.abs(f - h1x) + np.abs(f - h1y) + np.abs(f - h1z))
     / bin_value.size
@@ -73,7 +75,7 @@ f2_error = (
 )
 
 print("Gaussian distribution difference:", f1_error)
-print("Maxwell-Boltzmann distribution difference:", f2_error)
+print("Maxwellian distribution difference:", f2_error)
 
 assert f1_error < tolerance
 assert f2_error < tolerance
@@ -238,7 +240,7 @@ print("Maxwell-Juttner parser temperature difference:", f5_error)
 assert f5_error < tolerance
 
 # ==============================================
-# maxwell-boltzmann with constant bulk velocity
+# maxwellian with constant bulk velocity
 # ==============================================
 
 # load data
@@ -271,12 +273,12 @@ f6_error = (
     / f_peak
 )
 
-print("Maxwell-Boltzmann constant velocity difference:", f6_error)
+print("Maxwellian constant velocity difference:", f6_error)
 
 assert f6_error < tolerance
 
 # ============================================
-# maxwell-boltzmann with parser bulk velocity
+# maxwellian with parser bulk velocity
 # ============================================
 
 # load data
@@ -318,10 +320,25 @@ f7_error = (
     / f_peak
 )
 
-print("Maxwell-Boltzmann parser velocity difference:", f7_error)
+print("Maxwellian parser velocity difference:", f7_error)
 
 assert f7_error < tolerance
 
+# ==============================================
+# maxwellian with bulk velocity from openpmd file
+# ==============================================
+ts = OpenPMDTimeSeries("./diags/diag1")
+
+for iteration in ts.iterations:
+    uy, z = ts.get_particle(
+        ["uy", "z"], species="velocity_from_file", iteration=iteration
+    )
+
+    uy_theory = 0.2 * (z + 1) / 2
+    norm = np.max(np.abs(uy_theory))
+    rel_err = np.abs(uy - uy_theory) / norm
+
+    assert np.all(rel_err < 1e-3)
 
 # ============================================
 # Cuboid distribution in momentum space

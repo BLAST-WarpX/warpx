@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <sstream>
+#include <ranges>
 
 namespace
 {
@@ -26,7 +27,7 @@ namespace
             return true;
         }
         if (!group.empty()) {
-            return pp.contains((group + '.' + name).c_str());
+            return pp.contains(group + '.' + name);
         }
         return false;
     }
@@ -39,29 +40,34 @@ namespace
             "ux_std", "uy_std", "uz_std",
             "ux_std_function(x,y,z)",
             "uy_std_function(x,y,z)",
-            "uz_std_function(x,y,z)"
+            "uz_std_function(x,y,z)",
+            "read_ux_std_from_path",
+            "read_uy_std_from_path",
+            "read_uz_std_from_path",
+            "ux_std_openpmd_mesh",
+            "uy_std_openpmd_mesh",
+            "uz_std_openpmd_mesh",
+            "read_u_std_distributed"
         };
-        for (const char* k : keys) {
-            if (specified(pp, group, k)) {
-                return true;
-            }
-        }
-        return false;
+        return std::ranges::any_of(keys, [&](const char* k) {
+            return specified(pp, group, k);
+        });
     }
 }
 
-TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name)
-    : TemperatureProperties(pp, source_name, std::numeric_limits<amrex::Real>::quiet_NaN())
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                                amrex::Geometry const& geom)
+    : TemperatureProperties(pp, source_name, std::numeric_limits<amrex::Real>::quiet_NaN(), geom)
 {
 }
 
 /** Read ``momentum_distribution_type``: ``maxwell_juttner`` uses ``theta``, ``maxwellian`` uses ``u_std``
  *  or ``maxwellian_T_eV_*`` (constant ``T_eV`` needs ``species_mass`` [kg]). */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
-                                             amrex::Real species_mass)
+                                             amrex::Real species_mass, amrex::Geometry const& geom)
+    : m_species_mass(species_mass),
+      m_geom(geom)
 {
-    m_species_mass = species_mass;
-
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
@@ -154,6 +160,32 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 m_ptr_uz_std_parser =
                     std::make_unique<amrex::Parser>(utils::parser::makeParser(sz, {"x", "y", "z"}));
                 m_type = TempParserFunctionVector;
+            }
+            else if (u_std_dist_s == "read_from_file") {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+                utils::parser::get(pp, source_name, "read_ux_std_from_path", m_read_ux_std_path);
+                utils::parser::get(pp, source_name, "read_uy_std_from_path", m_read_uy_std_path);
+                utils::parser::get(pp, source_name, "read_uz_std_from_path", m_read_uz_std_path);
+                utils::parser::query(pp, source_name, "ux_std_openpmd_mesh", m_ux_std_openpmd_mesh);
+                utils::parser::query(pp, source_name, "uy_std_openpmd_mesh", m_uy_std_openpmd_mesh);
+                utils::parser::query(pp, source_name, "uz_std_openpmd_mesh", m_uz_std_openpmd_mesh);
+                {
+                    std::string const key_with_src =
+                        source_name.empty() ? std::string("read_u_std_distributed")
+                                            : source_name + ".read_u_std_distributed";
+                    if (pp.contains(key_with_src)) {
+                        pp.query(key_with_src, m_read_u_std_distributed);
+                    } else {
+                        pp.query("read_u_std_distributed", m_read_u_std_distributed);
+                    }
+                }
+                m_type = TempFromFileVector;
+#else
+                WARPX_ABORT_WITH_MESSAGE(
+                    "maxwellian_u_std_distribution_type = read_from_file requires "
+                    "WarpX built with openPMD support and is not supported in "
+                    "RCYLINDER/RSPHERE geometries.");
+#endif
             }
             else {
                 std::stringstream ss;

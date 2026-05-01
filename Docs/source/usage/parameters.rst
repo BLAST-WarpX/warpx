@@ -1531,8 +1531,11 @@ Particle initialization
     :default: ``1``
     :optional:
 
-    When using RZ or RCYLINDER geometry, whether to randomize the azimuthal position of particles.
-    This is used when ``<species_name>.injection_style = NUniformPerCell``.
+    When using RZ, RCYLINDER, or RSPHERE geometry, particle azimuthal angles are always defined in the range :math:`(-\pi, \pi]`.
+
+    * For ``<species_name>.injection_style = NUniformPerCell`` and this flag set to ``true``, a random azimuthal offset is applied independently in each cell. This rotates the particle distribution randomly from cell to cell while keeping angles within :math:`(-\pi, \pi]`.
+
+    * For ``<species_name>.injection_style = NRandomPerCell``, this flag essentially does nothing since particle positions are set randomly anyway.
 
 .. pp:param:: <species_name>.do_splitting
     :type: ``bool``
@@ -1709,17 +1712,27 @@ Particle initialization
         * ``<species_name>.uy_mean_function(x,y,z)``: mean :math:`u_{y}`
         * ``<species_name>.uz_mean_function(x,y,z)``: mean :math:`u_{z}`
 
-    * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
-        * If ``constant``, set any of:
-        * ``<species_name>.ux_std``: standard deviation of :math:`u_{x}`
-        * ``<species_name>.uy_std``: standard deviation of :math:`u_{y}`
-        * ``<species_name>.uz_std``: standard deviation of :math:`u_{z}`
-        These correspond to the thermal spread per axis in the drift frame.
-        Here, we assume that any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` does not exceed ``0.01``, ensuring relativistic corrections remain small (``<1%``).
-        * If ``parser``, the following are required:
-        * ``<species_name>.ux_std_function(x,y,z)``: standard deviation of :math:`u_{x}`
-        * ``<species_name>.uy_std_function(x,y,z)``: standard deviation of :math:`u_{y}`
-        * ``<species_name>.uz_std_function(x,y,z)``: standard deviation of :math:`u_{z}`
+      * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``)
+      Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``. Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
+      representing the normalized momentum, defined as :math:`u_mean = \gamma \beta`, where :math:`\beta = v/c` and :math:`\gamma = 1/\sqrt{1-\beta^2}`. The options are:
+        * If ``constant``, set any of ``<species_name>.ux_mean``, ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``). The magnitude :math:`|u_\mathrm{mean}|` must be strictly less than 1.
+        This is the bulk drift in the drift frame.
+        * If ``parser``, the following are required: ``<species_name>.ux_mean_function(x,y,z)``, ``<species_name>.uy_mean_function(x,y,z)``, ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, the spatial bulk drift is read from openPMD file (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          Required: ``<species_name>.read_ux_mean_from_path``, ``<species_name>.read_uy_mean_from_path``, ``<species_name>.read_uz_mean_from_path`` (each an openPMD file path).
+          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to load openPMD data in parallel, in the same way density is loaded from a file via ``read_density_distributed``.
+
+      * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``)
+       Specifies the distribution type for the thermal spread (standard deviation) of the particle momentum. Here, ``u_std`` is a 3D vector (with components ``ux_std``, ``uy_std``, ``uz_std``)
+       representing the standard deviation of the normalized momentum :math:`u_\mathrm{std} = \sqrt{\theta}`, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`.
+        * If ``constant``, set any of ``<species_name>.ux_std``, ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`) optional (default ``0``).
+        These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift frame, i.e. the thermal spread per axis.
+        If any of :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or :math:`u_{z,\mathrm{std}}^2` exceeds ``0.01``, ignored relativistic corrections can exceed about 1% and WarpX may record a warning.
+        * If ``parser``, the following are required: ``<species_name>.ux_std_function(x,y,z)``, ``<species_name>.uy_std_function(x,y,z)``, ``<species_name>.uz_std_function(x,y,z)``.
+        * If ``read_from_file``, the spatial thermal spread per axis is read from openPMD (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
+          Required: ``<species_name>.read_ux_std_from_path``, ``<species_name>.read_uy_std_from_path``, ``<species_name>.read_uz_std_from_path``.
+          Optional: ``<species_name>.ux_std_openpmd_mesh``, ``<species_name>.uy_std_openpmd_mesh``, ``<species_name>.uz_std_openpmd_mesh`` (default mesh record names ``ux_std``, ``uy_std``, ``uz_std``),
+          and ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) for parallel loading, analogous to ``read_u_mean_distributed``.
     * ``<species_name>.maxwellian_T_eV_distribution_type`` (`string`) is an alternative to ``maxwellian_u_std_distribution_type`` (mutually exclusive).
         This sets isotropic thermal spread from a temperature in electron-volts, using species mass from the input:
 
@@ -1761,15 +1774,26 @@ Particle initialization
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which gives the distribution of each component of the momentum as a function of space.
 
-* ``<species_name>.theta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` or ``maxwellian_T_eV_distribution_type*`` above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than zero are not allowed.
+.. pp:param:: <species_name>.theta_distribution_type
+    :type: ``string``
+    :default: ``constant``
+    :optional:
+
+    Only read if :pp:param:`<species_name>.momentum_distribution_type` is ``maxwell_juttner``
+    (for ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` or ``maxwellian_T_eV_distribution_type*`` above).
+    See documentation for these distributions (above) for constraints on values of theta. Temperatures less than zero are not allowed.
+
     * If ``constant``, use a constant temperature, given by the required float parameter ``<species_name>.theta``.
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.theta_function(x,y,z)``.
 
-* ``<species_name>.beta_distribution_type`` (`string`) optional (default ``constant``)
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
+.. pp:param:: <species_name>.beta_distribution_type
+    :type: ``string``
+    :default: ``constant``
+    :optional:
+
+    Only read if :pp:param:`<species_name>.momentum_distribution_type` is ``maxwell_juttner`` (for ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters above).
+    See documentation for these distributions (above) for constraints on values of beta.
+
     * If ``constant``, use a constant speed, given by the required float parameter ``<species_name>.beta``.
     * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.beta_function(x,y,z)``.
 

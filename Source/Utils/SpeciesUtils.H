@@ -34,6 +34,7 @@ namespace SpeciesUtils {
         std::unique_ptr<amrex::Parser>& uz_parser,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
+        amrex::Geometry const& geom,
         int flux_normal_axis=0, int flux_direction=0);
 
 }
