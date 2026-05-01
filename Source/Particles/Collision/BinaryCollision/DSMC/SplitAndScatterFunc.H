@@ -19,21 +19,6 @@
 
 #include <array>
 
-// Indices in PIdx of the spatial-position attributes, for the current dimensionality.
-#if defined(WARPX_DIM_1D_Z)
-    static constexpr std::array<int, 1> position_indices = {PIdx::z};
-#elif defined(WARPX_DIM_XZ)
-    static constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::z};
-#elif defined(WARPX_DIM_RZ)
-    static constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::z, PIdx::theta};
-#elif defined(WARPX_DIM_RCYLINDER)
-    static constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::theta};
-#elif defined(WARPX_DIM_RSPHERE)
-    static constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::theta, PIdx::phi};
-#elif defined(WARPX_DIM_3D)
-    static constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
-#endif
-
 /**
  * \brief This class defines an operator to create product particles from DSMC
  * collisions and sets the particle properties (position, momentum, weight).
@@ -378,6 +363,21 @@ public:
                 // to ensure local charge conservation. For instance in the reaction
                 // `A+ + B -> A + B+`, B+ will be created at the position of A+, instead of that of B.
                 if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
+                    // The SoA components that define the positions depend on the geometry.
+#if defined(WARPX_DIM_1D_Z)
+                    constexpr std::array<int, 1> position_indices = {PIdx::z};
+#elif defined(WARPX_DIM_XZ)
+                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::z};
+#elif defined(WARPX_DIM_RZ)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::z, PIdx::theta};
+#elif defined(WARPX_DIM_RCYLINDER)
+                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::theta};
+#elif defined(WARPX_DIM_RSPHERE)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::theta, PIdx::phi};
+#elif defined(WARPX_DIM_3D)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
+#endif
+                    // Loop over the components that define the positions and swap the positions of the products.
                     for (int idim : position_indices) {
                         soa_products_data[2].m_rdata[idim][slot2_idx] = soa_1.m_rdata[idim][src1_idx];
                         soa_products_data[3].m_rdata[idim][slot3_idx] = soa_0.m_rdata[idim][src0_idx];
