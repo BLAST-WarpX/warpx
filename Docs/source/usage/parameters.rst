@@ -3143,6 +3143,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, specifies whether the particles are sorted by weight when the energy correction is applied.
+    This can be set for each collision using :pp:param:`<collision_name>.energy_correction_sort_by_weight`.
     When the particles have a range of weights, sorting improves the correction by applying more of it to the heavier weighted particles, which has a proportionately smaller effect on their momenta, and typically reduces the number of particles that the correction is applied to.
 
 .. pp:param:: collisions.split_momentum_push
