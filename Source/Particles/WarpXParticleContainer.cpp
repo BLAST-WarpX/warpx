@@ -2355,7 +2355,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
         }
     }
 
-    const amrex::ParticleReal max_usq = (total_np > 0._prt ? amrex::get<0>(reduce_data.value()) : 0._prt);
+    const amrex::ParticleReal max_usq = (total_np > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
 
     const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + max_usq);
     amrex::ParticleReal max_v = gaminv * std::sqrt(max_usq) * PhysConst::c;
