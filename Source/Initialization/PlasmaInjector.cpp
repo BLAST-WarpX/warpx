@@ -302,12 +302,11 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 {
     utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
 #if WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles should be at least two times n_rz_azimuthal_modes "
-        "(Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "For accurate use of WarpX cylindrical geometry the number \n"
+            "of particles should be at least two times n_rz_azimuthal_modes \n"
+            "(Please visit PR#765 for more information.)\n");
     }
 #endif
     // Construct InjectorPosition with InjectorPositionRandom.
