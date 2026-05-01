@@ -51,7 +51,6 @@ def write_openpmd_file(filename, field_data):
         comp.store_chunk(data)
 
     series.flush()
-    del series
 
 
 # -----------------------------
