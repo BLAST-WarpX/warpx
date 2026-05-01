@@ -550,6 +550,64 @@ namespace ParticleUtils {
 
         return correction_failed;
     }
+
+    /**
+     * \brief A GPU compartible sort of a index vector vector
+     * based on another GPU vector's values, sorting to decreasing order.
+     * The heap-sort functions below were obtained from
+     * https://www.geeksforgeeks.org/iterative-heap-sort/ and
+     * modified for the current purpose. It achieves the same as
+     * ```
+     * std::sort(
+     *    sorted_indices_data + cell_start, sorted_indices_data + cell_stop,
+     *    [&momentum_bin_number_data](size_t i1, size_t i2) {
+     *        return momentum_bin_number_data[i1] > momentum_bin_number_data[i2];
+     *    }
+     * );
+     * ```
+     * but with support for device execution.
+    */
+    struct HeapSortDecreasing {
+
+        template <typename T_index>
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        void operator() (T_index index_array[], const amrex::ParticleReal bin_array[], const T_index start, const T_index n) const
+        {
+            // sort index_array into a max heap structure
+            for (T_index i = 1; i < n; i++)
+            {
+                auto j = i;
+                // move child through heap if it is less than its parent
+                while (j > 0 && bin_array[index_array[j+start]] < bin_array[index_array[(j - 1)/2 + start]]) {
+                    // swap child and parent until branch is properly ordered
+                    amrex::Swap(index_array[j+start], index_array[(j - 1)/2 + start]);
+                    j = (j - 1) / 2;
+                }
+            }
+
+            for (T_index i = n - 1; i > 0; i--)
+            {
+                // swap value of first (now the smallest value) to the new end point
+                amrex::Swap(index_array[start], index_array[i+start]);
+
+                // remake the max heap
+                T_index j = 0, index;
+                while (j < i) {
+                    index = 2 * j + 1;
+
+                    // if left child is larger than right child, point index variable to right child
+                    if (index + 1 < i && bin_array[index_array[index+start]] > bin_array[index_array[index+1+start]]) {
+                        index++;
+                    }
+                    // if parent is larger than child, swap parent with child having lower value
+                    if (index < i && bin_array[index_array[j+start]] > bin_array[index_array[index+start]]) {
+                        amrex::Swap(index_array[j+start], index_array[index+start]);
+                    }
+                    j = index;
+                }
+            }
+        }
+    };
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_
