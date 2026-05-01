@@ -45,6 +45,7 @@ namespace
 }
 #endif
 
+// Constructor for single-component (scalar) velocity
 GetVelocity::GetVelocity (VelocityProperties const& vel) noexcept
     : m_type{vel.m_type}, m_dir{vel.m_dir}, m_sign_dir{vel.m_sign_dir}
 {
@@ -56,6 +57,7 @@ GetVelocity::GetVelocity (VelocityProperties const& vel) noexcept
     }
 }
 
+// Constructor for three-component (vector) velocity
 GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
     : m_type{vel.m_type}
 {
