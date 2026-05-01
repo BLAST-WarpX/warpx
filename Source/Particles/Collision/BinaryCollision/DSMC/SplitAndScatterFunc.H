@@ -378,7 +378,7 @@ public:
                     constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
 #endif
                     // Loop over the components that define the positions and swap the positions of the products.
-                    for (int idim : position_indices) {
+                    for (int const idim : position_indices) {
                         soa_products_data[2].m_rdata[idim][slot2_idx] = soa_1.m_rdata[idim][src1_idx];
                         soa_products_data[3].m_rdata[idim][slot3_idx] = soa_0.m_rdata[idim][src0_idx];
                     }
