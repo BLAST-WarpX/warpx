@@ -80,8 +80,9 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::ELASTIC;
     } else if (scattering_process == "back") {
         return ScatteringProcessType::BACK;
-    } else if ((scattering_process == "charge_exchange") ||
-               (scattering_process == "two_product_reaction")) {
+    } else if (scattering_process == "charge_exchange") {
+        return ScatteringProcessType::CHARGE_EXCHANGE;
+    } else if (scattering_process == "two_product_reaction") {
         return ScatteringProcessType::TWOPRODUCT_REACTION;
     } else if (scattering_process == "ionization") {
         return ScatteringProcessType::IONIZATION;

@@ -1,11 +1,11 @@
 {
   "lev=0": {
-    "rho": 0.0007701705979872025
+    "rho": 0.0007712764213131624
   },
   "H": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 2530.8479274154333,
+    "particle_position_z": 2530.062259029084,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 5.948838493809116e-17,
@@ -23,7 +23,7 @@
   "H2plus": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 1021.6452859116588,
+    "particle_position_z": 1023.4987864862421,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 9.753884936303964e-28,
