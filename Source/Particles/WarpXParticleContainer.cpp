@@ -2331,19 +2331,20 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 
-    long total_np = 0;
+    amrex::Long np_total = 0;
 
     const int nLevels = finestLevel();
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#pragma omp parallel reduction(+:np_total) if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev <= nLevels; ++lev) {
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
-            const long np = pti.numParticles();
+            const amrex::Long np = pti.numParticles();
             if (np == 0) { continue; }
-            total_np += np;
+
+            np_total += np;
 
             auto *const ux = pti.GetAttribs(PIdx::ux).data();
             auto *const uy = pti.GetAttribs(PIdx::uy).data();
@@ -2355,7 +2356,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
         }
     }
 
-    const amrex::ParticleReal max_usq = (total_np > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
+    const amrex::ParticleReal max_usq = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
 
     const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + max_usq);
     amrex::ParticleReal max_v = gaminv * std::sqrt(max_usq) * PhysConst::c;
