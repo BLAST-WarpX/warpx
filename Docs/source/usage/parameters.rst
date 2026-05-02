@@ -3100,7 +3100,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0
     :optional:
 
-    For pairwisecoulomb collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
+    Only for ``pairwisecoulomb`` collisions, whether to correct the energy and momentum after the collisions so that they are conserved.
+    This can be set for each collision using :pp:param:`<collision_name>.correct_energy_momentum`.
     In binary collisions, if the weights of the colliding particles are not the same, the collision does not
     exactly conserve energy and momentum. When this option is on, after the collisions, small modifications are made to the
     particle momentum so that the energy and momentum are exactly conserved in each cell.
@@ -3111,7 +3112,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0.05
     :optional:
 
-    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
     This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
 
 .. pp:param:: collisions.energy_fraction_max
@@ -3119,16 +3121,29 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0.5
     :optional:
 
-    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, the energy correction is applied to pairs of particles in their center of momentum frame.
-    This parameter is the fraction of the total relative energy in the COM frame of all pairs that is used in the correction.
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
+    This can be set for each collision using :pp:param:`<collision_name>.energy_fraction_max`.
+    This parameter sets the maximum allowed value for :pp:param:`collisions.energy_fraction`.
+    If residual energy error remains after a pass over all particle pairs in a cell, the algorithm increases the effective correction fraction for the next pass based on an estimate of the remaining error.
+    If this computed value exceeds the limit imposed by this parameter, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``
     :default: 1.
     :optional:
 
-    For pairwisecoulomb collisions, when correcting the energy and momentum conservation, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, this parameter controls the exponent used on the particle weight when distributing the momentum correction.
+    This can be set for each collision using :pp:param:`<collision_name>.beta_weight_exponent`.
     With a value greater than 1, it will distribute more of the correction to particles with higher weights.
+
+.. pp:param:: collisions.energy_correction_sort_by_weight
+    :type: ``bool``
+    :default: 0
+    :optional:
+
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, specifies whether the particles are sorted by weight when the energy correction is applied.
+    This can be set for each collision using :pp:param:`<collision_name>.energy_correction_sort_by_weight`.
+    When the particles have a range of weights, sorting improves the correction by applying more of it to the heavier weighted particles, which has a proportionately smaller effect on their momenta, and typically reduces the number of particles that the correction is applied to.
 
 .. pp:param:: collisions.split_momentum_push
     :type: ``bool``
@@ -3139,30 +3154,6 @@ Details about the collision models can be found in the :ref:`theory section <mul
     This improves energy conservation, as demonstrated in (`Vay et al., Phys. Rev. E 111, 2025 <https://doi.org/10.1103/PhysRevE.111.025306>`__).
     This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes, because the implicit
     formulation is intrinsically energy-conserving when combined with MCC collisions, as shown in `Angus et al., J. Comput. Phys. 456, 2022 <https://doi.org/10.1016/j.jcp.2022.111030>`__.
-
-.. pp:param:: <collision_name>.correct_energy_momentum
-    :type: ``bool``
-    :optional:
-
-    For pairwisecoulomb collisions, override the parameter :pp:param:`collisions.correct_energy_momentum` for the specific collision.
-
-.. pp:param:: <collision_name>.energy_fraction
-    :type: ``float``
-    :optional:
-
-    For pairwisecoulomb collisions, override the parameter :pp:param:`collisions.energy_fraction` for the specific collision.
-
-.. pp:param:: <collision_name>.energy_fraction_max
-    :type: ``float``
-    :optional:
-
-    For pairwisecoulomb collisions, override the parameter :pp:param:`collisions.energy_fraction_max` for the specific collision.
-
-.. pp:param:: <collision_name>.beta_weight_exponent
-    :type: ``float``
-    :optional:
-
-    For pairwisecoulomb collisions, override the parameter :pp:param:`collisions.beta_weight_exponent` for the specific collision.
 
 .. pp:param:: collisions.shuffling_method
     :type: ``bool``
