@@ -24,7 +24,7 @@ Optional dependencies include:
 
   - `OpenMP 3.1+ <https://www.openmp.org>`__: for threaded CPU execution or
   - `CUDA Toolkit 12.2+ <https://developer.nvidia.com/cuda-downloads>`__: for Nvidia GPU support (see `matching host-compilers <https://gist.github.com/ax3l/9489132>`__) or
-  - `ROCm 5.5+ <https://gpuopen.com/learn/amd-lab-notes/amd-lab-notes-rocm-installation-readme/>`__: for AMD GPU support
+  - `ROCm 6.0+ <https://gpuopen.com/learn/amd-lab-notes/amd-lab-notes-rocm-installation-readme/>`__: for AMD GPU support
   - `oneAPI <https://www.intel.com/content/www/us/en/developer/tools/oneapi/overview.html>`__: for Intel GPU support
 - `FFTW3 <http://www.fftw.org>`__: for spectral solver (PSATD or IGF) support when running on CPU or SYCL
 
