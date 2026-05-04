@@ -3115,18 +3115,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
     This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
-    This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
-
-.. pp:param:: collisions.energy_fraction_max
-    :type: ``float``
-    :default: 0.5
-    :optional:
-
-    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
-    This can be set for each collision using :pp:param:`<collision_name>.energy_fraction_max`.
-    This parameter sets the maximum allowed value for :pp:param:`collisions.energy_fraction`.
-    If residual energy error remains after a pass over all particle pairs in a cell, the algorithm increases the effective correction fraction for the next pass based on an estimate of the remaining error.
-    If this computed value exceeds the limit imposed by this parameter, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
+    This parameter is the fraction of the relative energy in the COM frame that is used in the correction. If residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``
