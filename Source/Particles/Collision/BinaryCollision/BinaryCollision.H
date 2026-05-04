@@ -116,14 +116,12 @@ public:
             pp_collisions.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collisions.query("energy_fraction", m_energy_fraction);
-            pp_collisions.query("energy_fraction_max", m_energy_fraction_max);
 
             // Input parameter set for this collision
             pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collision_name.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collision_name.query("energy_fraction", m_energy_fraction);
-            pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
         }
 
         // If DSMC the colliding species are also product species.
@@ -557,7 +555,7 @@ public:
 
                             // Compute the local energy and momentum.
                             amrex::ParticleReal const w1_scaled = std::pow(w1[ip], beta_weight_exponent);
-                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
+                            amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled*m1);
                             amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[ip]*u1x[ip]*m1);
                             amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[ip]*u1y[ip]*m1);
                             amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[ip]*u1z[ip]*m1);
@@ -714,7 +712,6 @@ public:
             if (m_correct_energy_momentum) {
                 // Loop over cells and calculate the change in energy and momentum.
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
-                amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
                 amrex::ParallelFor( np1,
@@ -741,7 +738,7 @@ public:
                         const int i_cell = bins_1_ptr[i1];
 
                         amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                        amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt)/m1;
+                        amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt);
                         u1x[i1] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
                         u1y[i1] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
                         u1z[i1] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
@@ -752,9 +749,7 @@ public:
                 );
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
-                amrex::Gpu::Buffer<amrex::ParticleReal> remaining_energy({0.});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-                amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -790,7 +785,7 @@ public:
                             const bool correction_failed =
                                  ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
                                                                      cell_start_1, cell_stop_1, m1,
-                                                                     energy_fraction, energy_fraction_max, deltaEp1);
+                                                                     energy_fraction, deltaEp1);
                             if (correction_failed) {
                                 // If the correction failed, give up on the collision and restore the
                                 // momentum to what it was beforehand.
@@ -799,8 +794,10 @@ public:
                                     u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
                                     u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
                                 }
-                                amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
-                                amrex::Gpu::Atomic::Add(remaining_energy_ptr, deltaEp1);
+                                int const numCell1 = (cell_stop_1 - cell_start_1);
+                                if (numCell1 > 10) { // limit here is to reduce warning messages
+                                    amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+                                }
                             }
                         }
 
@@ -808,12 +805,10 @@ public:
                 );
 
                 amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
-                amrex::ParticleReal const total_remaining_energy = *(remaining_energy.copyToHost());
                 if (num_failed_corrections > 0) {
                     ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
                         "The energy correction failed for " + std::to_string(num_failed_corrections) + " cells " +
                         "for Coulomb collisions for species " + m_species_names[0] + ". " +
-                        "The remaining energy is " + std::to_string(total_remaining_energy/PhysConst::q_e) + " eV. " +
                         "The collisions in those cells was cancelled.");
                 }
 
@@ -1091,7 +1086,7 @@ public:
 
                                 // Compute the local energy and momentum.
                                 amrex::ParticleReal const w1_scaled = std::pow(w1[i1], beta_weight_exponent);
-                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled);
+                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w1_scaled*m1);
                                 amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w1[i1]*u1x[i1]*m1);
                                 amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w1[i1]*u1y[i1]*m1);
                                 amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w1[i1]*u1z[i1]*m1);
@@ -1110,7 +1105,7 @@ public:
 
                                 // Compute the local energy and momentum.
                                 amrex::ParticleReal const w2_scaled = std::pow(w2[i2], beta_weight_exponent);
-                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled);
+                                amrex::Gpu::Atomic::AddNoRet(&ww_weighted_sum_in_each_cell[i_cell], w2_scaled*m2);
                                 amrex::Gpu::Atomic::AddNoRet(&px_in_each_cell[i_cell], w2[i2]*u2x[i2]*m2);
                                 amrex::Gpu::Atomic::AddNoRet(&py_in_each_cell[i_cell], w2[i2]*u2y[i2]*m2);
                                 amrex::Gpu::Atomic::AddNoRet(&pz_in_each_cell[i_cell], w2[i2]*u2z[i2]*m2);
@@ -1322,7 +1317,6 @@ public:
             if (m_correct_energy_momentum) {
                 // Loop over cells and calculate the change in energy and momentum.
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
-                amrex::ParticleReal const energy_fraction_max = m_energy_fraction_max;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
                 amrex::ParallelFor( std::max(np1, np2),
@@ -1367,7 +1361,7 @@ public:
                             const int i_cell = bins_1_ptr[i1];
 
                             amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                            amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt)/m1;
+                            amrex::ParticleReal const w_factor = std::pow(w1[i1], beta_weight_exponent - 1._prt);
                             u1x[i1] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
                             u1y[i1] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
                             u1z[i1] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
@@ -1378,7 +1372,7 @@ public:
                             const int i_cell = bins_2_ptr[i2];
 
                             amrex::ParticleReal const ww_weighted_sum = ww_weighted_sum_in_each_cell[i_cell];
-                            amrex::ParticleReal const w_factor = std::pow(w2[i2], beta_weight_exponent - 1._prt)/m2;
+                            amrex::ParticleReal const w_factor = std::pow(w2[i2], beta_weight_exponent - 1._prt);
                             u2x[i2] += w_factor*px_in_each_cell[i_cell]/ww_weighted_sum;
                             u2y[i2] += w_factor*py_in_each_cell[i_cell]/ww_weighted_sum;
                             u2z[i2] += w_factor*pz_in_each_cell[i_cell]/ww_weighted_sum;
@@ -1387,9 +1381,7 @@ public:
                 );
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
-                amrex::Gpu::Buffer<amrex::ParticleReal> remaining_energy({0.});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-                amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -1466,7 +1458,7 @@ public:
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
                                                                          cell_start_1, cell_stop_1, m1,
-                                                                         energy_fraction, energy_fraction_max, deltaEp1);
+                                                                         energy_fraction, deltaEp1);
                             }
 
                             if (deltaEp2 != 0. && numCell2 > 1) {
@@ -1477,7 +1469,7 @@ public:
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
                                                                          cell_start_2, cell_stop_2, m2,
-                                                                         energy_fraction, energy_fraction_max, deltaEp2);
+                                                                         energy_fraction, deltaEp2);
                             }
 
                             if (correction1_failed || correction2_failed ||
@@ -1495,8 +1487,9 @@ public:
                                     u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
                                     u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
-                                amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
-                                amrex::Gpu::Atomic::Add(remaining_energy_ptr, deltaEp1 + deltaEp2);
+                                if ((numCell1 > 10 && correction1_failed) || (numCell2 > 10 && correction2_failed)) {
+                                    amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+                                }
                             }
 
                         }
@@ -1504,12 +1497,10 @@ public:
                 );
 
                 amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
-                amrex::ParticleReal const total_remaining_energy = *(remaining_energy.copyToHost());
                 if (num_failed_corrections > 0) {
                     ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
                         "The energy correction failed for " + std::to_string(num_failed_corrections) + " cells " +
                         "for Coulomb collisions between species " + m_species_names[0] + " and " + m_species_names[1] + ". " +
-                        "The remaining energy is " + std::to_string(total_remaining_energy/PhysConst::q_e) + " eV. " +
                         "The collisions in those cells was cancelled.");
                 }
 
@@ -1529,7 +1520,6 @@ private:
     bool m_energy_correction_sort_by_weight = false;
     amrex::ParticleReal m_beta_weight_exponent = 1.;
     amrex::ParticleReal m_energy_fraction = 0.05;
-    amrex::ParticleReal m_energy_fraction_max = 0.5;
 
     enum energy_correction_sort_by_weight_flags : int { no_sort, sort };
 
