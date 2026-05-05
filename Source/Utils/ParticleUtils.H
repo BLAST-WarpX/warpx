@@ -13,8 +13,11 @@
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_Particles.H>
+#include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
+
+#include <limits>
 
 namespace ParticleUtils {
 
@@ -478,7 +481,7 @@ namespace ParticleUtils {
                 const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
 
                 const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-                if (root >= 0.0_prt && a != 0.0_prt) {
+                if (root >= 0.0_prt && amrex::Math::abs(a) > std::numeric_limits<amrex::ParticleReal>::epsilon()) {
 
                     // Update particle velocities.
                     const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
