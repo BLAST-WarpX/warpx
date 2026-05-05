@@ -1722,6 +1722,11 @@ void doGatherPicnicShapeN (
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
+    // XZ: E1p = Exp, E2p = Eyp
+    // RZ: E1p = Erp, E2p = Ethp
+    amrex::ParticleReal E1p = 0.0_prt;
+    amrex::ParticleReal E2p = 0.0_prt;
+
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
     const auto i_new = static_cast<int>(x_new-shift);
@@ -1825,13 +1830,13 @@ void doGatherPicnicShapeN (
         for (int i=0; i<=depos_order-1; i++) {
             for (int k=0; k<=depos_order; k++) {
                 weight = sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
-                Exp += Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0)*weight;
+                E1p += Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0)*weight;
 #if defined(WARPX_DIM_RZ)
                 Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{-i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     const auto dEx = (+ Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode-1)*xy_mid.real()
                                       - Ex_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 2*imode)*xy_mid.imag());
-                    Exp += weight*dEx;
+                    E1p += weight*dEx;
                     xy_mid = xy_mid*xy_mid0;
                 }
 #endif
@@ -1846,13 +1851,13 @@ void doGatherPicnicShapeN (
                        +   sx_old_node[i]*sz_new_node[k]*one_sixth
                        +   sx_new_node[i]*sz_old_node[k]*one_sixth
                        +   sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
-                Eyp += Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0)*weight;
+                E2p += Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0)*weight;
 #if defined(WARPX_DIM_RZ)
                 Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{-i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     const auto dEy = (+ Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode-1)*xy_mid.real()
                                       - Ey_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 2*imode)*xy_mid.imag());
-                    Eyp += weight*dEy;
+                    E2p += weight*dEy;
                     xy_mid = xy_mid*xy_mid0;
                 }
 #endif
@@ -1885,13 +1890,12 @@ void doGatherPicnicShapeN (
     }
 
 #ifdef WARPX_DIM_RZ
-
-    // Convert Exp and Eyp (which are actually Erp and Ethp) to Exp and Eyp
-    const amrex::Real Erp = Exp;
-    const amrex::Real Ethp = Eyp;
-    Exp = costheta_mid*Erp  - sintheta_mid*Ethp;
-    Eyp = costheta_mid*Ethp + sintheta_mid*Erp;
-
+    // Convert E1p = Erp and E2p = Ethp to Exp and Eyp
+    Exp += costheta_mid*E1p - sintheta_mid*E2p;
+    Eyp += costheta_mid*E2p + sintheta_mid*E1p;
+#else
+    Exp += E1p;
+    Eyp += E2p;
 #endif
 
 #elif defined(WARPX_DIM_1D_Z)
@@ -1975,10 +1979,11 @@ void doGatherPicnicShapeN (
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
-    amrex::ParticleReal Erp = 0.;
-    amrex::ParticleReal Ethetap = 0.;
-    // Z for CYLINDER, phi for SPHERE
-    amrex::ParticleReal E3p = 0.;
+    // RCYLINDER: E1p = Erp, E2p = Ethp, E3p = Ezp
+    // RSPHERE:   E1p = Erp, E2p = Ethp, E3p = Ephp
+    amrex::ParticleReal E1p = 0.0_prt;
+    amrex::ParticleReal E2p = 0.0_prt;
+    amrex::ParticleReal E3p = 0.0_prt;
 
     // compute cell crossings in X-direction
     const auto i_old = static_cast<int>(x_old-shift);
@@ -2040,14 +2045,14 @@ void doGatherPicnicShapeN (
         // gather out-of-plane Ey and Ez for this segment
         for (int i=0; i<=depos_order; i++) {
             auto weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
-            Ethetap += Ey_arr(lo.x+i0_node+i, 0, 0)*weight;
+            E2p += Ey_arr(lo.x+i0_node+i, 0, 0)*weight;
             E3p += Ez_arr(lo.x+i0_node+i, 0, 0)*weight;
         }
 
         // gather Ex for this segment
         for (int i=0; i<=depos_order-1; i++) {
             auto weight = sx_cell[i]*seg_factor;
-            Erp += Ex_arr(lo.x+i0_cell+i, 0, 0)*weight;
+            E1p += Ex_arr(lo.x+i0_cell+i, 0, 0)*weight;
         }
 
         // update old segment values
@@ -2058,19 +2063,17 @@ void doGatherPicnicShapeN (
     }
 
 #if defined(WARPX_DIM_RCYLINDER)
-    // Convert Erp and Ethetap to Ex and Ey
-    Exp += costheta_mid*Erp - sintheta_mid*Ethetap;
-    Eyp += costheta_mid*Ethetap + sintheta_mid*Erp;
+    // Convert E1p = Erp and E2p = Ethp to Exp and Eyp
+    Exp += costheta_mid*E1p - sintheta_mid*E2p;
+    Eyp += costheta_mid*E2p + sintheta_mid*E1p;
     Ezp += E3p;
-
 #elif defined(WARPX_DIM_RSPHERE)
-
-    // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
-    Exp += costheta_mid*cosphi_mid*Erp - sintheta_mid*Ethetap - costheta_mid*sinphi_mid*E3p;
-    Eyp += sintheta_mid*cosphi_mid*Erp + costheta_mid*Ethetap - sintheta_mid*sinphi_mid*E3p;
-    Ezp += sinphi_mid*Erp + cosphi_mid*E3p;
-
+    // Convert E1p = Erp, E2p = Ethp, and E3p = Ephp to Exp, Eyp, and Ezp
+    Exp += costheta_mid*cosphi_mid*E1p - sintheta_mid*E2p - costheta_mid*sinphi_mid*E3p;
+    Eyp += sintheta_mid*cosphi_mid*E1p + costheta_mid*E2p - sintheta_mid*sinphi_mid*E3p;
+    Ezp += sinphi_mid*E1p + cosphi_mid*E3p;
 #endif
+
 #endif
 
     // Gather magnetic field
