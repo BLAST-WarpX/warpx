@@ -1889,7 +1889,7 @@ void doGatherPicnicShapeN (
 
     }
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
     // Convert E1p = Erp and E2p = Ethp to Exp and Eyp
     Exp += costheta_mid*E1p - sintheta_mid*E2p;
     Eyp += costheta_mid*E2p + sintheta_mid*E1p;
