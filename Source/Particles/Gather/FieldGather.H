@@ -1262,7 +1262,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
     Exp += costheta_mid*E1p - sintheta_mid*E2p;
     Eyp += costheta_mid*E2p + sintheta_mid*E1p;
 
-    // Convert B1p and B1p (which are actually Brp and Bthp) to Bxp and Byp
+    // Convert B1p and B2p (which are actually Brp and Bthp) to Bxp and Byp
     Bxp += costheta_mid*B1p - sintheta_mid*B2p;
     Byp += costheta_mid*B2p + sintheta_mid*B1p;
 #else
