@@ -423,6 +423,7 @@ computePhi (
                         relative_tolerance, absolute_tolerance );
         } else {
             amrex::GMRESMLMG gmsolve(mlmg);
+            gmsolve.setMaxIters(max_iters);
             gmsolve.solve( *phi[lev], *rho[lev], relative_tolerance, absolute_tolerance );
             linop->postSolve({phi[lev]});
         }
