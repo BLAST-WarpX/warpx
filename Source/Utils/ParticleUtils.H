@@ -17,8 +17,6 @@
 
 #include <AMReX_BaseFwd.H>
 
-#include <limits>
-
 namespace ParticleUtils {
 
     // Define shortcuts for frequently-used type names
@@ -481,7 +479,7 @@ namespace ParticleUtils {
                 const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
 
                 const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-                if (root >= 0.0_prt && amrex::Math::abs(a) > std::numeric_limits<amrex::ParticleReal>::epsilon()) {
+                if (root >= 0.0_prt && amrex::Math::abs(a) > 0.0_prt) {
 
                     // Update particle velocities.
                     const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
