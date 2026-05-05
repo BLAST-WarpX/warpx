@@ -1151,7 +1151,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
 
     amrex::Vector<amrex::Vector<ParticleReal>> attr;
     attr.push_back(wp);
-    const amrex::Vector<amrex::Vector<int>> attr_int;
+    const amrex::Vector<amrex::Vector<int>> attr_int{};
     pctmp_split.AddNParticles(lev,
                               np_split_to_add,
                               xp,
@@ -1557,6 +1557,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
         [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
         [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
+        [[maybe_unused]] auto foo_qed_dt = qed_dt;
         if constexpr (qed_control == has_qed) {
             if (local_has_quantum_sync) {
                 evolve_opt(ux[ip], uy[ip], uz[ip],

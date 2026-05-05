@@ -224,6 +224,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             [[maybe_unused]] auto *uy_tmp = uy;
             [[maybe_unused]] auto *uz_tmp = uz;
             [[maybe_unused]] auto dt_tmp = dt;
+            [[maybe_unused]] auto qed_dt_tmp = qed_dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            qed_dt, p_optical_depth_BW[i]);
