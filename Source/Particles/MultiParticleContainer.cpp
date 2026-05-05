@@ -731,6 +731,7 @@ MultiParticleContainer::GetGlobalPlasmaFrequency (int lev)
                 });
         }
     }
+    return global_plasma_frequency;
 }
 
 void
