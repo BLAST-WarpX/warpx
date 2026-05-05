@@ -95,6 +95,8 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  PositionPushType position_push_type,
                                  MomentumPushType momentum_push_type)
 {
+    amrex::ignore_unused(momentum_push_type);
+
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
