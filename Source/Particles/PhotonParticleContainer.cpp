@@ -93,7 +93,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  int lev, int gather_lev,
                                  amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half,
                                  PositionPushType position_push_type,
-                                 MomentumPushType /*momentum_push_type*/)
+                                 MomentumPushType momentum_push_type)
 {
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
@@ -121,6 +121,8 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #ifdef WARPX_QED
     BreitWheelerEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_BW = nullptr;
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
@@ -224,7 +226,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             [[maybe_unused]] auto dt_tmp = dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                           dt, p_optical_depth_BW[i]);
+                           qed_dt, p_optical_depth_BW[i]);
             }
 #else
             amrex::ignore_unused(qed_control);

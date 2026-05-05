@@ -1447,6 +1447,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const auto do_sync = m_do_qed_quantum_sync;
     amrex::Real t_chi_max = 0.0;
     if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
 
     QuantumSynchrotronEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
@@ -1559,7 +1561,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             if (local_has_quantum_sync) {
                 evolve_opt(ux[ip], uy[ip], uz[ip],
                            Exp, Eyp, Ezp,Bxp, Byp, Bzp,
-                           dt, p_optical_depth_QSR[ip]);
+                           qed_dt, p_optical_depth_QSR[ip]);
             }
         }
 #else
