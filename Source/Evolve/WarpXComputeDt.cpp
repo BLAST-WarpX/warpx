@@ -111,32 +111,70 @@ WarpX::ComputeDt ()
  * Determine the simulation timestep from the maximum speed of all particles
  * Sets timestep so that a particle can only cross cfl*dx cells per timestep.
  */
-void
-WarpX::UpdateDtFromParticleSpeeds ()
+std::optional<amrex::Real>
+WarpX::DtLimitFromParticleSpeeds ()
 {
     const amrex::Real* dx = geom[max_level].CellSize();
     const amrex::Real dx_min = minDim(dx);
 
     const amrex::ParticleReal max_v = mypc->maxParticleVelocity();
-    amrex::Real deltat_new = 0.;
 
-    // Protections from overly-large timesteps
-    if (max_v == 0) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(), "Particles at rest and no constant or maximum timestep specified. Aborting.");
-        deltat_new = m_max_dt.value();
+    if (max_v > 0.) {
+        return cfl * dx_min / max_v;
     } else {
-        deltat_new = cfl * dx_min / max_v;
+        return std::nullopt;
     }
 
-    // Restrict to be less than user-specified maximum timestep, if present
-    if (m_max_dt.has_value()) {
-        deltat_new = std::min(deltat_new, m_max_dt.value());
+}
+
+std::optional<amrex::Real>
+WarpX::DtLimitFromPlasmaFrequency ()
+{
+    if (!m_max_omegap_dt.has_value()) {
+        return std::nullopt;
     }
+
+    const std::unique_ptr<amrex::MultiFab> global_plasma_frequency = mypc->GetGlobalPlasmaFrequency(0);
+    const amrex::Real global_plasma_frequency_max = global_plasma_frequency->max(0);
+
+    if (global_plasma_frequency_max > 0.) {
+        return m_max_omegap_dt.value()/global_plasma_frequency_max;
+    } else {
+        return std::nullopt;
+    }
+}
+
+std::optional<amrex::Real>
+WarpX::DtLimitFromCyclotronFrequency ()
+{
+    return std::nullopt;
+}
+
+void
+WarpX::ApplyDtLimiters ()
+{
+    std::optional<amrex::Real> speed_limit = DtLimitFromParticleSpeeds();
+    std::optional<amrex::Real> opmegap_limit = DtLimitFromPlasmaFrequency();
+    std::optional<amrex::Real> opmegac_limit = DtLimitFromCyclotronFrequency();
+
+    amrex::Real dt_new = std::numeric_limits<amrex::Real>::max();
+    if (!speed_limit.has_value() &&
+        !opmegap_limit.has_value() &&
+        !opmegac_limit.has_value()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(),
+                                         "No valid time step size limit found, max_dt must be specified");
+        dt_new = m_max_dt.value();
+    }
+
+    if (speed_limit.has_value()) { dt_new = std::min(dt_new, speed_limit.value()); }
+    if (opmegap_limit.has_value()) { dt_new = std::min(dt_new, opmegap_limit.value()); }
+    if (opmegac_limit.has_value()) { dt_new = std::min(dt_new, opmegac_limit.value()); }
 
     // Update dt
-    dt[max_level] = deltat_new;
+    dt[max_level] = dt_new;
 
     for (int lev = max_level-1; lev >= 0; --lev) {
         dt[lev] = dt[lev+1] * refRatio(lev)[0];
     }
+
 }
