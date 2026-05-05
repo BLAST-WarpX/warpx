@@ -421,7 +421,7 @@ namespace ParticleUtils {
                 i2 = cell_start;
             }
 
-            int const sign = (deltaE < 0.0 ? -1 : 1);
+            int const sign = (deltaE < 0.0_prt ? -1 : 1);
 
             const amrex::ParticleReal ux1 = uxp[ indices[i1] ];
             const amrex::ParticleReal uy1 = uyp[ indices[i1] ];
@@ -469,8 +469,8 @@ namespace ParticleUtils {
 
                 const amrex::ParticleReal A = Etot - deltaEpair;
                 const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-                const auto p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
-                const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
+                const amrex::ParticleReal p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+                const amrex::ParticleReal ptdotu = pxtot*ux + pytot*uy + pztot*uz;
 
                 // Compute coefficients for quadratic equation for alpha.
                 const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
