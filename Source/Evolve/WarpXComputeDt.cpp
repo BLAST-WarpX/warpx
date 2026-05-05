@@ -199,11 +199,12 @@ WarpX::ApplyDtLimiters ()
     std::optional<amrex::Real> opmegac_limit = DtLimitFromCyclotronFrequency();
 
     amrex::Real dt_new = std::numeric_limits<amrex::Real>::max();
+
     if (!speed_limit.has_value() &&
         !opmegap_limit.has_value() &&
         !opmegac_limit.has_value()) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(),
-                                         "No valid time step size limit found, max_dt must be specified");
+                                         "No valid time step size limit found, warpx.max_dt must be specified");
         dt_new = m_max_dt.value();
     }
 
