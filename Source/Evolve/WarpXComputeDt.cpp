@@ -19,6 +19,7 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <AMReX.H>
 #include <AMReX_Geometry.H>
@@ -147,7 +148,47 @@ WarpX::DtLimitFromPlasmaFrequency ()
 std::optional<amrex::Real>
 WarpX::DtLimitFromCyclotronFrequency ()
 {
-    return std::nullopt;
+    using ablastr::fields::Direction;
+
+    if (!m_max_omegac_dt.has_value()) {
+        return std::nullopt;
+    }
+
+    const amrex::ParmParse pp_particles("particles");
+    amrex::Vector<amrex::Real> B_external_particle(3, 0.);
+    utils::parser::queryArrWithParser(pp_particles, "B_external_particle", B_external_particle);
+
+    amrex::MultiFab const & Bx = *m_fields.get("Bfield_fp", Direction{0}, 0);
+    amrex::MultiFab const & By = *m_fields.get("Bfield_fp", Direction{1}, 0);
+    amrex::MultiFab const & Bz = *m_fields.get("Bfield_fp", Direction{2}, 0);
+
+    amrex::Real B_max = 0.;
+
+    B_max = std::max(B_max, Bx.norm0(0));
+    B_max = std::max(B_max, By.norm0(0));
+    B_max = std::max(B_max, Bz.norm0(0));
+
+    B_max = std::max(B_max, std::abs(B_external_particle[0]));
+    B_max = std::max(B_max, std::abs(B_external_particle[1]));
+    B_max = std::max(B_max, std::abs(B_external_particle[2]));
+
+    amrex::Real omegac_max = 0.;
+
+    const int n_containers = mypc->nContainers();
+    for (int i = 0; i < n_containers; i++)
+    {
+        WarpXParticleContainer& pc = mypc->GetParticleContainer(i);
+        if (pc.getMass() > 0.) {
+            const amrex::Real pc_omegac = pc.getCharge()*B_max/pc.getMass();
+            omegac_max = std::max(omegac_max, pc_omegac);
+        }
+    }
+
+    if (omegac_max > 0.) {
+        return m_max_omegac_dt.value()/omegac_max;
+    } else {
+        return std::nullopt;
+    }
 }
 
 void
