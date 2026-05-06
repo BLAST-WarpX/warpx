@@ -3191,14 +3191,29 @@ Time step
     :default: ``-1``
     :optional:
 
-    How many iterations pass between timestep adaptations when using the electrostatic solver.
+    How many iterations pass between timestep adaptations when using the explicit electrostatic or theta-implicit solver.
     Must be greater than ``0`` to use adaptive timestepping, or else :pp:param:`warpx.const_dt` must be specified.
+
+.. pp:param:: warpx.max_omegap_dt
+    :type: ``float``
+    :optional:
+
+    The time step size is limited to be less than the value specified divided by the global plasma frequency.
+    The application is this limit is controlled by :pp:param:`warpx.dt_update_interval`, and is only applied when using the explicit electrostatic or theta-implicit solver..
+
+.. pp:param:: warpx.max_omegac_dt
+    :type: ``float``
+    :optional:
+
+    The time step size is limited to be less than the value specified divided by the maximum cyclotron frequency.
+    Note that the maximum B field is calculated from using only the constant applied B field (as set by :pp:param:`particles.B_external_particle`) and the B-field grid data.
+    The application is this limit is controlled by :pp:param:`warpx.dt_update_interval`, and is only applied when using the explicit electrostatic or theta-implicit solver..
 
 .. pp:param:: warpx.max_dt
     :type: ``float``
     :optional:
 
-    The maximum timestep permitted for the electrostatic solver, when using adaptive timestepping.
+    The maximum timestep permitted when using adaptive timestepping.
     If supplied, also sets the initial timestep for these simulations, before the first timestep update.
 
 Filtering
