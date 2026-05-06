@@ -1490,7 +1490,7 @@ public:
                                     u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
                                 if ((correction1_failed && numCell1 > np_warning_thresh) ||
-                                    (correction2_failed && numCell2 > np_warning_thresh) {
+                                    (correction2_failed && numCell2 > np_warning_thresh)) {
                                     amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
                                 }
                             }
