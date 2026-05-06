@@ -1552,7 +1552,6 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         }
 
 #ifdef WARPX_QED
-        [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
         [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
         [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
         if constexpr (qed_control == has_qed) {

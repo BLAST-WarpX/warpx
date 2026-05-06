@@ -216,12 +216,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             }
 
 #ifdef WARPX_QED
-            [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
-            [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
-            [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
-            [[maybe_unused]] auto *uy_tmp = uy;
-            [[maybe_unused]] auto *uz_tmp = uz;
-            [[maybe_unused]] auto dt_tmp = dt;
+            [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt; // workaround for nvcc
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                            dt, p_optical_depth_BW[i]);
