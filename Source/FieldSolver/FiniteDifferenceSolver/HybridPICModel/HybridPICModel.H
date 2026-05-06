@@ -26,6 +26,7 @@
 #include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Array.H>
+#include <AMReX_LO_BCTYPES.H>
 #include <AMReX_REAL.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_IntVect.H>
@@ -174,6 +175,22 @@ public:
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
 
+    /**
+     * \brief Darwin split: solve ∇²φ = ∇·E_Ohm (Helmholtz projection) and
+     * store E_long = ∇φ in hybrid_E_fp_long at the Yee-stagger of Efield_fp.
+     * E_Ohm is read from Efield_fp (must be current before calling).
+     * The scalar φ in hybrid_darwin_phi_fp is used as a warm-start seed.
+     *
+     * @param lev   refinement level
+     * @param lobc  lo-side LinOpBCType for the Poisson solve (from ImplicitSolver::GetLinOpBCLo())
+     * @param hibc  hi-side LinOpBCType for the Poisson solve (from ImplicitSolver::GetLinOpBCHi())
+     */
+    void ComputeLongitudinalE (
+        int lev,
+        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& lobc,
+        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc
+    ) const;
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B */
     int m_substeps = 10;
@@ -193,7 +210,7 @@ public:
     /** Plasma resistivity */
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
-    amrex::ParserExecutor<2> m_eta;
+    amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
 
     /** Plasma hyper-resisitivity */
@@ -211,6 +228,12 @@ public:
     std::array< amrex::ParserExecutor<4>, 3> m_J_external;
     bool m_has_external_current = true;
     bool m_external_current_has_time_dependence = false;
+
+    /** Darwin split Poisson solver parameters */
+    amrex::Real m_darwin_poisson_rel_tol = amrex::Real(1.e-6);
+    amrex::Real m_darwin_poisson_abs_tol = amrex::Real(0.);
+    int m_darwin_poisson_max_iter = 200;
+    int m_darwin_poisson_verbosity = 0;
 
     /** External E/B fields */
     bool m_add_external_fields = false;

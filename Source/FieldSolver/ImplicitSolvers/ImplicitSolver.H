@@ -280,9 +280,10 @@ protected:
     void SyncMassMatricesPCAndApplyBCs ();
 
     /**
-     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
+     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms.
+     * Derived classes (e.g. hybrid) may override to apply a different or no scaling.
      */
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    virtual void SetMassMatricesForPC ( amrex::Real a_theta_dt );
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step

@@ -92,7 +92,9 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
                 lbc[i] = LinOpBCType::symmetry;
             }
         } else if (a_fbc[i] == FieldBoundaryType::None) {
-            WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
+            // In RZ/cylindrical geometry the r=0 axis uses FieldBoundaryType::None;
+            // treat it as a symmetry (Neumann/reflecting) boundary for the MLMG operator.
+            lbc[i] = LinOpBCType::symmetry;
         } else if (a_fbc[i] == FieldBoundaryType::Open) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else {
@@ -832,9 +834,17 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // rho_fp is freshly deposited (via PushParticlesandDeposit) in all paths except the
+    // MM-Jacobian linear stage without suborbit particles, where no particle push occurs and
+    // rho_fp retains the already-scaled value from the last nonlinear iteration.
+    const bool rho_freshly_deposited = !(m_use_mass_matrices_jacobian && a_from_jacobian && !m_particle_suborbits);
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
+        if (rho_freshly_deposited && m_WarpX->m_fields.has(FieldType::rho_fp, lev)) {
+            m_WarpX->ApplyInverseVolumeScalingToChargeDensity(
+                m_WarpX->m_fields.get(FieldType::rho_fp, lev), lev);
+        }
     }
 #endif
 

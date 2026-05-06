@@ -13,6 +13,10 @@
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_MLEBNodeFDLaplacian.H>
+#include <AMReX_MLNodeTensorLaplacian.H>
+#include <AMReX_MLMG.H>
+
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
@@ -59,7 +63,7 @@ void HybridPICModel::ReadParameters ()
         Abort("hybrid_pic_model.n0_ref should be specified if hybrid_pic_model.gamma != 1");
     }
 
-    pp_hybrid.query("plasma_resistivity(rho,J)", m_eta_expression);
+    pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
@@ -79,6 +83,12 @@ void HybridPICModel::ReadParameters ()
     {
         m_has_external_current = false;
     }
+
+    // Darwin split Poisson solver parameters
+    utils::parser::queryWithParser(pp_hybrid, "darwin_poisson_rel_tol", m_darwin_poisson_rel_tol);
+    utils::parser::queryWithParser(pp_hybrid, "darwin_poisson_abs_tol", m_darwin_poisson_abs_tol);
+    pp_hybrid.query("darwin_poisson_max_iter", m_darwin_poisson_max_iter);
+    pp_hybrid.query("darwin_poisson_verbosity", m_darwin_poisson_verbosity);
 
     // external fields
     pp_hybrid.query("add_external_fields", m_add_external_fields);
@@ -157,6 +167,19 @@ void HybridPICModel::AllocateLevelMFs (
             dm, ncomps, IntVect(1), 0.0_rt);
     }
 
+    // Darwin split: nodal scalar potential (warm-start across steps) and longitudinal E
+    fields.alloc_init(FieldType::hybrid_darwin_phi_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+    for (int idim = 0; idim < 3; ++idim) {
+        const amrex::IntVect& E_flag = (idim == 0) ? Ex_nodal_flag
+                                     : (idim == 1) ? Ey_nodal_flag
+                                                   : Ez_nodal_flag;
+        fields.alloc_init(FieldType::hybrid_E_fp_long, Direction{idim},
+            lev, amrex::convert(ba, E_flag),
+            dm, ncomps, ngEB, 0.0_rt);
+    }
+
     if (m_add_external_fields) {
         m_external_vector_potential->AllocateLevelMFs(
             fields,
@@ -177,8 +200,8 @@ void HybridPICModel::AllocateLevelMFs (
 void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 {
     m_resistivity_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_eta_expression, {"rho","J"}));
-    m_eta = m_resistivity_parser->compile<2>();
+        utils::parser::makeParser(m_eta_expression, {"rho","J","t"}));
+    m_eta = m_resistivity_parser->compile<3>();
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
 
@@ -688,4 +711,123 @@ void HybridPICModel::FieldPush (
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
+}
+
+void HybridPICModel::ComputeLongitudinalE (
+    int lev,
+    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& lobc,
+    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc) const
+{
+    ABLASTR_PROFILE("HybridPICModel::ComputeLongitudinalE()");
+
+    using namespace amrex::literals;
+    using ablastr::fields::Direction;
+
+    auto& warpx = WarpX::GetInstance();
+    const auto& geom = warpx.Geom(lev);
+
+    // E_Ohm is in Efield_fp, already filled by HybridPICSolveE
+    ablastr::fields::VectorField Efield = warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev);
+    // Persistent warm-start potential (nodal)
+    amrex::MultiFab& phi = *warpx.m_fields.get(FieldType::hybrid_darwin_phi_fp, lev);
+    // Output longitudinal E at Yee stagger
+    ablastr::fields::VectorField EL = warpx.m_fields.get_alldirs(FieldType::hybrid_E_fp_long, lev);
+
+    // RHS: div(E_Ohm) on the nodal grid
+    amrex::MultiFab rhs(phi.boxArray(), phi.DistributionMap(), 1, 0);
+    warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield, rhs);
+    rhs.OverrideSync(geom.periodicity());
+
+    // Solve Laplacian(phi) = div(E_Ohm)
+    // For RZ: MLEBNodeFDLaplacian requires Neumann at the axis (lo-r), matching
+    // PoissonBoundaryHandler which unconditionally sets lobc[0]=Neumann in RZ.
+    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc_darwin = lobc;
+    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> hibc_darwin = hibc;
+#ifdef WARPX_DIM_RZ
+    lobc_darwin[0] = amrex::LinOpBCType::Neumann;
+#endif
+
+    amrex::LPInfo info;
+#ifdef WARPX_DIM_RZ
+    auto linop = std::make_unique<amrex::MLEBNodeFDLaplacian>(
+        amrex::Vector<amrex::Geometry>{geom},
+        amrex::Vector<amrex::BoxArray>{phi.boxArray()},
+        amrex::Vector<amrex::DistributionMapping>{phi.DistributionMap()},
+        info
+    );
+    linop->setRZ(true);
+    linop->setSigma({0._rt, 1._rt});
+#else
+    auto linop = std::make_unique<amrex::MLNodeTensorLaplacian>(
+        amrex::Vector<amrex::Geometry>{geom},
+        amrex::Vector<amrex::BoxArray>{phi.boxArray()},
+        amrex::Vector<amrex::DistributionMapping>{phi.DistributionMap()},
+        info
+    );
+    linop->setBeta({AMREX_D_DECL(0._rt, 0._rt, 0._rt)});
+#endif
+    linop->setDomainBC(lobc_darwin, hibc_darwin);
+
+    amrex::MLMG mlmg(*linop);
+    mlmg.setVerbose(m_darwin_poisson_verbosity);
+    mlmg.setMaxIter(m_darwin_poisson_max_iter);
+    mlmg.solve({&phi}, {&rhs}, m_darwin_poisson_rel_tol, m_darwin_poisson_abs_tol);
+
+    // Recover E_long = +grad(phi) at Yee stagger (forward difference, opposite sign from ES)
+    const Real* dx = geom.CellSize();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(phi, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real const> const phi_arr = phi.const_array(mfi);
+
+#if defined(WARPX_DIM_3D)
+        const Real inv_dx = 1._rt/dx[0];
+        const Real inv_dy = 1._rt/dx[1];
+        const Real inv_dz = 1._rt/dx[2];
+        amrex::Array4<amrex::Real> const ELx = EL[0]->array(mfi);
+        amrex::Array4<amrex::Real> const ELy = EL[1]->array(mfi);
+        amrex::Array4<amrex::Real> const ELz = EL[2]->array(mfi);
+        amrex::Box const& tbx = mfi.tilebox(EL[0]->ixType().toIntVect());
+        amrex::Box const& tby = mfi.tilebox(EL[1]->ixType().toIntVect());
+        amrex::Box const& tbz = mfi.tilebox(EL[2]->ixType().toIntVect());
+        amrex::ParallelFor(tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELx(i,j,k) = inv_dx*(phi_arr(i+1,j,k) - phi_arr(i,j,k));
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELy(i,j,k) = inv_dy*(phi_arr(i,j+1,k) - phi_arr(i,j,k));
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELz(i,j,k) = inv_dz*(phi_arr(i,j,k+1) - phi_arr(i,j,k));
+            }
+        );
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const Real inv_dx = 1._rt/dx[0];
+        const Real inv_dz = 1._rt/dx[1];
+        amrex::Array4<amrex::Real> const ELx = EL[0]->array(mfi);
+        amrex::Array4<amrex::Real> const ELz = EL[2]->array(mfi);
+        amrex::Box const& tbx = mfi.tilebox(EL[0]->ixType().toIntVect());
+        amrex::Box const& tbz = mfi.tilebox(EL[2]->ixType().toIntVect());
+        amrex::ParallelFor(tbx, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELx(i,j,k) = inv_dx*(phi_arr(i+1,j,k) - phi_arr(i,j,k));
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELz(i,j,k) = inv_dz*(phi_arr(i,j+1,k) - phi_arr(i,j,k));
+            }
+        );
+#else // WARPX_DIM_1D_Z: z maps to the i-index when AMREX_SPACEDIM=1
+        const Real inv_dz = 1._rt/dx[0];
+        amrex::Array4<amrex::Real> const ELz = EL[2]->array(mfi);
+        amrex::Box const& tbz = mfi.tilebox(EL[2]->ixType().toIntVect());
+        amrex::ParallelFor(tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                ELz(i,j,k) = inv_dz*(phi_arr(i+1,j,k) - phi_arr(i,j,k));
+            }
+        );
+#endif
+    }
 }

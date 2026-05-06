@@ -63,7 +63,7 @@ public:
     ThetaImplicitHybrid(ThetaImplicitHybrid&&) = delete;
     ThetaImplicitHybrid& operator=(ThetaImplicitHybrid&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX* a_WarpX, bool from_restart) override;
 
     void PrintParameters () const override;
 
@@ -85,8 +85,17 @@ public:
                       bool             a_from_jacobian ) override;
 
     // Hybrid model has no light waves, so return 0 for the PC theta parameter
-    [[nodiscard]] amrex::Real GetThetaForPC () const override { return 0.0_rt; }
+    [[nodiscard]] amrex::Real GetThetaForPC () const override { return 0.0; }
     [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const override;
+
+    /**
+     * \brief Override: skip the c²μ₀θΔt EM scaling from the base class (derived
+     * from Ampere's law, physically wrong for the hybrid solver where E comes from
+     * Ohm's law).  For the curl-curl MLMG preconditioner, still adds +1 to the
+     * diagonal of MassMatrices_PC so that beta >= 1 everywhere, preventing the
+     * curl-curl operator from being singular in vacuum cells.
+     */
+    void SetMassMatricesForPC ( amrex::Real a_theta_dt ) override;
 
 private:
 
@@ -97,9 +106,19 @@ private:
     HybridPICModel* m_hybrid_pic_model = nullptr;
 
     /**
+     * \brief When true, use Darwin split: JFNK solves only for E_T (transverse
+     * part of E_Ohm). E_L = ∇φ (curl-free part) is computed via a Poisson solve
+     * (∇²φ = ∇·E_Ohm) once per Newton step and frozen across GMRES matvecs.
+     * This decouples the longitudinal (Debye-scale) physics from the transverse
+     * Alfvén/Hall physics and improves JFNK conditioning.
+     */
+    bool m_use_darwin_split = false;
+
+    /**
      * \brief Persistent nodal MultiFab storing the spatially varying alpha
-     * coefficient (theta*dt*|B|/(mu0*n_e0*e)) for the curl-curl preconditioner.
-     * Refilled each Newton iteration via GetAlphaCoeff().
+     * coefficient (theta*dt*sqrt((|B|/rho)^2+eta^2)/mu0) for the curl-curl preconditioner.
+     * Derived from the hybrid Jacobian eigenvalue radius on the transverse (Er,Etheta) block.
+     * Reduces to theta*dt*|B|/(mu0*rho) for eta=0. Refilled each Newton iteration.
      */
     mutable amrex::Vector<amrex::MultiFab>  m_alpha_mf;
     mutable amrex::Vector<amrex::MultiFab*> m_alpha_mfarrvec;
@@ -136,6 +155,15 @@ private:
      * This is applied to both E and B fields.
      */
     void FinishFieldUpdate ( amrex::Real end_time );
+
+    /** Add E_L (hybrid_E_fp_long) to Efield_fp: E_fp += E_L */
+    void AddLongitudinalE ();
+
+    /** Subtract E_L from Efield_fp: E_fp -= E_L */
+    void SubtractLongitudinalE ();
+
+    /** Subtract E_L from a solver vector: a_vec -= E_L */
+    void SubtractLongitudinalE (WarpXSolverVec& a_vec);
 
     /**
      * \brief Add external B field to Bfield_fp: B_fp += B_external
