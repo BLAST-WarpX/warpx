@@ -696,7 +696,7 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
 std::unique_ptr<amrex::MultiFab>
 MultiParticleContainer::GetGlobalPlasmaFrequency (int lev)
 {
-    WarpX & warpx = WarpX::GetInstance();
+    const WarpX & warpx = WarpX::GetInstance();
 
     amrex::BoxArray const & ba = warpx.boxArray(lev);
     amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);

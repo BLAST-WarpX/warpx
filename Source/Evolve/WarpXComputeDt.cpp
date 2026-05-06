@@ -177,7 +177,7 @@ WarpX::DtLimitFromCyclotronFrequency ()
     const int n_containers = mypc->nContainers();
     for (int i = 0; i < n_containers; i++)
     {
-        WarpXParticleContainer& pc = mypc->GetParticleContainer(i);
+        const WarpXParticleContainer& pc = mypc->GetParticleContainer(i);
         if (pc.getMass() > 0.) {
             const amrex::Real pc_omegac = pc.getCharge()*B_max/pc.getMass();
             omegac_max = std::max(omegac_max, pc_omegac);

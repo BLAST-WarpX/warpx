@@ -2127,8 +2127,8 @@ WarpXParticleContainer::GetPlasmaFrequency (int lev)
     int const ng = 0;
     auto plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
-    amrex::Real const rmass = (amrex::Real)(m_mass);
-    amrex::Real const rcharge = (amrex::Real)(charge);
+    auto const rmass = (amrex::Real)(m_mass);
+    auto const rcharge = (amrex::Real)(charge);
     amrex::Real const Aconst = rcharge*rcharge/(rmass*PhysConst::epsilon_0);
 
 #ifdef AMREX_USE_OMP
