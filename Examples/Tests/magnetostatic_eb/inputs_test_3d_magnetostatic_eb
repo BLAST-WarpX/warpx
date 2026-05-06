@@ -29,7 +29,6 @@ algo.particle_shape = 1
 algo.current_deposition = direct
 
 particles.species_names = beam
-particles.do_tiling = 1
 beam.mass = m_e
 beam.charge = -q_e
 beam.injection_style = nuniformpercell

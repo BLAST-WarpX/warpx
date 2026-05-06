@@ -113,12 +113,14 @@ public:
             // Input parameter set for all pairwise Coulomb collisions
             const amrex::ParmParse pp_collisions("collisions");
             pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
+            pp_collisions.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collisions.query("energy_fraction", m_energy_fraction);
             pp_collisions.query("energy_fraction_max", m_energy_fraction_max);
 
             // Input parameter set for this collision
             pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
+            pp_collision_name.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collision_name.query("energy_fraction", m_energy_fraction);
             pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
@@ -754,15 +756,36 @@ public:
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
                 amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
-                amrex::ParallelFor( n_cells,
-                    [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+                // The particles are sorted by weight in decreasing order. This gives more of the correction
+                // to the heavier particles, having a smallar effect on their momenta, and typically
+                // requiring fewer particles to absorb or give off the extra energy.
+                const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
+                auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
+
+                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                                   {energy_correction_sort_by_weight_flag},
+                                   n_cells,
+                    [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
 
                         index_type const cell_start_1 = cell_offsets_1[i_cell];
                         index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+
+                        // No correction needed if there is only one particle in the cell
+                        if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
+
                         amrex::ParticleReal deltaEp1 = -KE_in_each_cell[i_cell];
 
                         if (deltaEp1 != 0.) {
+
+                            // The ignore_unused is needed to fix the error "An extended __device__
+                            // lambda cannot first-capture variable in constexpr-if context"
+                            amrex::ignore_unused(heapSortDecreasing, indices_1, w1);
+                            if constexpr (energy_correction_sort_by_weight_control == sort) {
+                                int const numCell1 = (cell_stop_1 - cell_start_1);
+                                heapSortDecreasing(indices_1, w1, cell_start_1, numCell1);
+                            }
+
                             // Adjust species 1 particles to absorb deltaEp1.
                             const bool correction_failed =
                                  ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1368,8 +1391,16 @@ public:
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
                 amrex::ParticleReal* remaining_energy_ptr = remaining_energy.data();
 
-                amrex::ParallelFor( n_cells,
-                    [=] AMREX_GPU_DEVICE (int i_cell) noexcept
+                // The particles are sorted by weight in decreasing order. This gives more of the correction
+                // to the heavier particles, having a smallar effect on their momenta, and typically
+                // requiring fewer particles to absorb or give off the extra energy.
+                const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
+                auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
+
+                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                                   {energy_correction_sort_by_weight_flag},
+                                   n_cells,
+                    [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
                         // The particles from species1 that are in the cell `i_cell` are
                         // given by the `indices_1[cell_start_1:cell_stop_1]`.
@@ -1421,9 +1452,16 @@ public:
                                 deltaEp2 = w2_sum*KE2_after/Etotdenom*deltaE/numCell2;
                             }
 
+                            // The ignore_unused is needed to fix the error "An extended __device__
+                            // lambda cannot first-capture variable in constexpr-if context"
+                            amrex::ignore_unused(heapSortDecreasing);
+
                             bool correction1_failed = false;
                             bool correction2_failed = false;
-                            if (deltaEp1 != 0.) {
+                            if (deltaEp1 != 0. && numCell1 > 1) {
+                                if constexpr (energy_correction_sort_by_weight_control == sort) {
+                                    heapSortDecreasing(indices_1, w1, cell_start_1, numCell1);
+                                }
                                 // Adjust species 1 particles to absorb deltaEp1.
                                 correction1_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u1x, u1y, u1z, w1, indices_1,
@@ -1431,7 +1469,10 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp1);
                             }
 
-                            if (deltaEp2 != 0.) {
+                            if (deltaEp2 != 0. && numCell2 > 1) {
+                                if constexpr (energy_correction_sort_by_weight_control == sort) {
+                                    heapSortDecreasing(indices_2, w2, cell_start_2, numCell2);
+                                }
                                 // Adjust species 2 particles to absorb deltaEp2.
                                 correction2_failed =
                                      ParticleUtils::ModifyEnergyPairwise(u2x, u2y, u2z, w2, indices_2,
@@ -1439,9 +1480,11 @@ public:
                                                                          energy_fraction, energy_fraction_max, deltaEp2);
                             }
 
-                            if (correction1_failed || correction2_failed) {
-                                // If the correction failed, give up on the collision and restore the
-                                // momentum to what it was beforehand.
+                            if (correction1_failed || correction2_failed ||
+                                (numCell1 == 1 && numCell2 == 1)) {
+                                // If the correction failed, or if each species has only one particle
+                                // and the correction can not be applied, give up on the collision and
+                                // restore the momentum to what it was beforehand.
                                 for (index_type i1=cell_start_1; i1<cell_stop_1; ++i1) {
                                     u1x[ indices_1[i1] ] = u1x_before_ptr[ indices_1[i1] ];
                                     u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
@@ -1483,9 +1526,12 @@ private:
     bool m_have_product_species;
 
     bool m_correct_energy_momentum = false;
+    bool m_energy_correction_sort_by_weight = false;
     amrex::ParticleReal m_beta_weight_exponent = 1.;
     amrex::ParticleReal m_energy_fraction = 0.05;
     amrex::ParticleReal m_energy_fraction_max = 0.5;
+
+    enum energy_correction_sort_by_weight_flags : int { no_sort, sort };
 
     amrex::Vector<std::string> m_product_species;
     // functor that performs collisions within a cell

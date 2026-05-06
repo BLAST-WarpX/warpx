@@ -417,6 +417,7 @@ namespace ParticleUtils {
         T_index i1 = cell_start;
         bool correction_failed = false;
         bool deltaE_is_zero = false;
+        int Erel_negative_count = 0;
         while (!deltaE_is_zero && !correction_failed && loop_count <= max_loop_count) {
 
             T_index i2 = i1 + 1;
@@ -459,7 +460,20 @@ namespace ParticleUtils {
             const amrex::ParticleReal pztot = wpmp1*uz1 + wpmp2*uz2;
             const amrex::ParticleReal Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
             const amrex::ParticleReal Erel = Ecm - wpmp1*c2 - wpmp2*c2;
-            if (Erel <= 0.0) { continue; }
+            if (Erel <= 0.0) {
+                // This checks for the unlikely case where the Erel is negative for all
+                // pairs of particles
+                Erel_negative_count++;
+                if (Erel_negative_count >= numCell) {
+                    correction_failed = true;
+                    break;
+                }
+                continue;
+            } else {
+                // Reset the counter since the next time through the loop
+                // might use difference pairs of particles
+                Erel_negative_count = 0;
+            }
 
             // Set the amount of energy change for this pair based on the
             // relative energy in the center of momentum.
@@ -536,6 +550,64 @@ namespace ParticleUtils {
 
         return correction_failed;
     }
+
+    /**
+     * \brief A GPU compartible sort of a index vector vector
+     * based on another GPU vector's values, sorting to decreasing order.
+     * The heap-sort functions below were obtained from
+     * https://www.geeksforgeeks.org/iterative-heap-sort/ and
+     * modified for the current purpose. It achieves the same as
+     * ```
+     * std::sort(
+     *    sorted_indices_data + cell_start, sorted_indices_data + cell_stop,
+     *    [&momentum_bin_number_data](size_t i1, size_t i2) {
+     *        return momentum_bin_number_data[i1] > momentum_bin_number_data[i2];
+     *    }
+     * );
+     * ```
+     * but with support for device execution.
+    */
+    struct HeapSortDecreasing {
+
+        template <typename T_index>
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        void operator() (T_index index_array[], const amrex::ParticleReal bin_array[], const T_index start, const T_index n) const
+        {
+            // sort index_array into a max heap structure
+            for (T_index i = 1; i < n; i++)
+            {
+                auto j = i;
+                // move child through heap if it is less than its parent
+                while (j > 0 && bin_array[index_array[j+start]] < bin_array[index_array[(j - 1)/2 + start]]) {
+                    // swap child and parent until branch is properly ordered
+                    amrex::Swap(index_array[j+start], index_array[(j - 1)/2 + start]);
+                    j = (j - 1) / 2;
+                }
+            }
+
+            for (T_index i = n - 1; i > 0; i--)
+            {
+                // swap value of first (now the smallest value) to the new end point
+                amrex::Swap(index_array[start], index_array[i+start]);
+
+                // remake the max heap
+                T_index j = 0, index;
+                while (j < i) {
+                    index = 2 * j + 1;
+
+                    // if left child is larger than right child, point index variable to right child
+                    if (index + 1 < i && bin_array[index_array[index+start]] > bin_array[index_array[index+1+start]]) {
+                        index++;
+                    }
+                    // if parent is larger than child, swap parent with child having lower value
+                    if (index < i && bin_array[index_array[j+start]] > bin_array[index_array[index+start]]) {
+                        amrex::Swap(index_array[j+start], index_array[index+start]);
+                    }
+                    j = index;
+                }
+            }
+        }
+    };
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_

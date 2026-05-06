@@ -33,7 +33,7 @@ Inputs File Configuration
 -------------------------
 Once WarpX has been compiled with Catalyst support, it will need to be enabled and configured at runtime.
 This is done using our usual inputs file (read with ``amrex::ParmParse``).
-The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with ``<diag_name>.format`` parameter set to ``catalyst``.
+The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with :pp:param:`<diag_name>.format` parameter set to ``catalyst``.
 
 In addition to configuring the diagnostics, the following parameters must be included:
     * ``catalyst.script_paths``: The locations of the pipeline scripts, separated by either a colon or semicolon (e.g. ``/path/to/script1.py;/path/to/script2.py``).

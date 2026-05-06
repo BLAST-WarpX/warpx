@@ -75,7 +75,7 @@ In the code, instead of using ``amrex::Warning`` to immediately print a warning 
 
 In this example, ``QED`` is the topic, ``Using [...]`` is the warning message and ``ablastr::warn_manager::WarnPriority::low`` is the priority.
 `RecordWarning` is **not** a collective call and should also be thread-safe (it can be called in OpenMP loops).
-In case the user wants to also print the warning messages immediately, the runtime parameter ``warpx.always_warn_immediately`` can be set to ``1``.
+In case the user wants to also print the warning messages immediately, the runtime parameter :pp:param:`warpx.always_warn_immediately` can be set to ``1``.
 The Warning manager is a singleton class defined in ``Source/ablastr/warn_manager/WarnManager.H```
 
 How to print the warning list
