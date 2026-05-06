@@ -794,16 +794,16 @@ public:
                                     u1y[ indices_1[i1] ] = u1y_before_ptr[ indices_1[i1] ];
                                     u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
                                 }
-                                int const numCell1 = (cell_stop_1 - cell_start_1);
-                                if (numCell1 > 10) { // limit here is to reduce warning messages
-                                    amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
-                                }
+#if defined(AMREX_DEBUG) || defined(DEBUG)
+                                amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
+#endif
                             }
                         }
 
                     }
                 );
 
+#if defined(AMREX_DEBUG) || defined(DEBUG)
                 amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
                 if (num_failed_corrections > 0) {
                     ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
@@ -811,6 +811,7 @@ public:
                         "for Coulomb collisions for species " + m_species_names[0] + ". " +
                         "The collisions in those cells was cancelled.");
                 }
+#endif
 
                 ABLASTR_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
             }
@@ -1487,15 +1488,18 @@ public:
                                     u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
                                     u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
-                                if ((numCell1 > 10 && correction1_failed) || (numCell2 > 10 && correction2_failed)) {
+#if defined(AMREX_DEBUG) || defined(DEBUG)
+                                if (correction1_failed || correction2_failed) {
                                     amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
                                 }
+#endif
                             }
 
                         }
                     }
                 );
 
+#if defined(AMREX_DEBUG) || defined(DEBUG)
                 amrex::Long const num_failed_corrections = *(failed_corrections.copyToHost());
                 if (num_failed_corrections > 0) {
                     ablastr::warn_manager::WMRecordWarning("BinaryCollision::doCollisionsWithinTile",
@@ -1503,6 +1507,7 @@ public:
                         "for Coulomb collisions between species " + m_species_names[0] + " and " + m_species_names[1] + ". " +
                         "The collisions in those cells was cancelled.");
                 }
+#endif
 
                 ABLASTR_PROFILE_VAR_STOP(prof_correctEnergyMomentum);
             }
