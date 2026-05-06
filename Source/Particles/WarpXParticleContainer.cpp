@@ -2403,7 +2403,7 @@ WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::Part
 
 #elif defined(WARPX_DIM_RSPHERE)
 
-            amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uy].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
             amrex::ParticleReal * AMREX_RESTRICT phi_data = attribs[PIdx::phi].dataPtr();
 
             if (sign < 0.) {
