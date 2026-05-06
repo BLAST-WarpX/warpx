@@ -116,6 +116,19 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
+     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
+     * are actually not local in space. In this case, the underlying assumption is that
+     * particles within the same cylindrical cell represent a cylindrically-symmetry
+     * momentum distribution function. Therefore, here, we temporarily rotate the
+     * momentum of the macroparticles to theta = 0.
+     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
+     * there is a corresponding assert statement at initialization.) */
+    mypc->RotateParticleAnglesByTheta(-1.);
+#endif
+
 #ifdef WARPX_QED
     // For QED incoherent processes (e.g. Bethe-Heitler, Landau-Lifschitz), the process is mediated by virtual photons.
     // The virtual photons are newly generated here and participate in the collisions.
@@ -147,5 +160,10 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
             }
         }
     }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Undo the rotation above
+    mypc->RotateParticleAnglesByTheta(+1.);
+#endif
 
 }

@@ -2366,6 +2366,45 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 }
 
 void
+WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::ParticleReal sign)
+{
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    using namespace amrex::literals;
+
+    const int nLevels = finestLevel();
+    for (int lev = 0; lev <= nLevels; ++lev) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    {
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+
+            // momenta are stored as a struct of array, in `attribs`
+            auto& attribs = pti.GetAttribs();
+            amrex::ParticleReal * AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT theta_data = attribs[PIdx::theta].dataPtr();
+
+            // Loop over the particles, rotating their velocities by theta
+            amrex::ParallelFor(pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long i) {
+                    const amrex::ParticleReal theta_sign = sign < 0. ? -1._prt : +1._prt;
+                    const amrex::ParticleReal theta = theta_sign*theta_data[i];
+                    const amrex::ParticleReal uxsave = ux[i];
+                    ux[i] = uxsave*std::cos(theta) - uy[i]*std::sin(theta);
+                    uy[i] = uxsave*std::sin(theta) + uy[i]*std::cos(theta);
+
+                }
+            );
+        }
+    }
+    }
+#endif
+}
+
+void
 WarpXParticleContainer::PushX (amrex::Real dt)
 {
     const int nLevels = finestLevel();

@@ -461,6 +461,8 @@ public:
 
     amrex::ParticleReal maxParticleVelocity(bool local = false);
 
+    void RotateParticleAnglesByTheta (amrex::ParticleReal sign);
+
     /**
      * \brief Adds n particles to the simulation
      *
