@@ -750,11 +750,7 @@ public:
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-#if defined(AMREX_DEBUG) || defined(DEBUG)
-                const int np_warning_thresh = 1;
-#else
-                const int np_warning_thresh = 20;
-#endif
+                const int np_warning_thresh = m_np_warning_thresh;
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -1387,11 +1383,7 @@ public:
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-#if defined(AMREX_DEBUG) || defined(DEBUG)
-                const int np_warning_thresh = 1;
-#else
-                const int np_warning_thresh = 20;
-#endif
+                const int np_warning_thresh = m_np_warning_thresh;
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -1529,6 +1521,11 @@ private:
 
     bool m_correct_energy_momentum = false;
     bool m_energy_correction_sort_by_weight = false;
+#if defined(AMREX_DEBUG) || defined(DEBUG)
+    const int m_np_warning_thresh = 1;
+#else
+    const int m_np_warning_thresh = 20;
+#endif
     amrex::ParticleReal m_beta_weight_exponent = 1.;
     amrex::ParticleReal m_energy_fraction = 0.05;
 
