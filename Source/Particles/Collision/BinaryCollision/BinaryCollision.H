@@ -1387,6 +1387,11 @@ public:
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
+#if defined(AMREX_DEBUG) || defined(DEBUG)
+                const int np_warning_thresh = 1;
+#else
+                const int np_warning_thresh = 20;
+#endif
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
