@@ -1871,26 +1871,31 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
-                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n));
-            amrex::Real const costh = (rp_mid > 0._rt ? xp_nph/rp_mid : 1._rt);
-            amrex::Real const sinth = (rp_mid > 0._rt ? yp_nph/rp_mid : 0._rt);
+            amrex::ParticleReal const rp_mid = 0.5_prt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
+                                             +          std::sqrt(xp_n*xp_n + yp_n*yp_n));
+            amrex::ParticleReal const costh = (rp_mid > 0._prt ? xp_nph/rp_mid : 1._prt);
+            amrex::ParticleReal const sinth = (rp_mid > 0._prt ? yp_nph/rp_mid : 0._prt);
 #elif defined(WARPX_DIM_RSPHERE)
-            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1)
-                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n));
+            amrex::ParticleReal const rp_mid = 0.5_prt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1)
+                                             +          std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n));
+            amrex::ParticleReal const rpxy_mid = std::sqrt(xp_nph*xp_nph + yp_nph*yp_nph);
+            amrex::ParticleReal const costh = (rpxy_mid > 0._prt ? xp_nph/rpxy_mid : 1._prt);
+            amrex::ParticleReal const sinth = (rpxy_mid > 0._prt ? yp_nph/rpxy_mid : 0._prt);
+            amrex::ParticleReal const cosph = (rp_mid > 0._prt ? rpxy_mid/rp_mid : 1._prt);
+            amrex::ParticleReal const sinph = (rp_mid > 0._prt ? zp_nph/rp_mid : 0._prt);
 #endif
 
             // Compute magnetic field on particle
-            amrex::ParticleReal Bxp = 0.0;
-            amrex::ParticleReal Byp = 0.0;
-            amrex::ParticleReal Bzp = 0.0;
+            amrex::ParticleReal Bxp = 0._prt;
+            amrex::ParticleReal Byp = 0._prt;
+            amrex::ParticleReal Bzp = 0._prt;
             const int depos_order_perp = 1;
             const int depos_order_para = 1;
             doDirectGatherVectorField<depos_order_perp,depos_order_para>(
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                    rp_mid, 0.0_prt, 0.0_prt,
+                                    rp_mid, 0._prt, 0._prt,
 #elif defined(WARPX_DIM_RZ)
-                                    rp_mid, 0.0_prt, zp_nph,
+                                    rp_mid, 0._prt, zp_nph,
 #else
                                     xp_nph, yp_nph, zp_nph,
 #endif
@@ -1898,6 +1903,25 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, /*n_rz_azimuthal_modes=*/0 );
+
+            // Because we pass rp_mid and 0. instead of xp_nph and yp_nph above for
+            // axisymmetric geometries, the returned fields on the particle are in mapped space.
+            // Need to convert them to Cartesian before passing to setMassMatricesKerenels().
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+            // Convert Bxp and Byp (which are actually Brp and Bthp) to Bxp and Byp
+            const amrex::ParticleReal Brp  = Bxp;
+            const amrex::ParticleReal Bthp = Byp;
+            Bxp = costh*Brp  - sinth*Bthp;
+            Byp = costh*Bthp + sinth*Brp;
+#elif defined(WARPX_DIM_RSPHERE)
+            // Convert Bxp, Byp, and Bzp (which are actually Brp, Bthp, and Bphip) to Bxp, Byp, and Bzp
+            const amrex::ParticleReal Brp  = Bxp;
+            const amrex::ParticleReal Bthp = Byp;
+            const amrex::ParticleReal Bphp = Bzp;
+            Bxp = costh*cosph*Brp - sinth*Bthp - costh*sinph*Bphp;
+            Byp = sinth*cosph*Brp + costh*Bthp - sinth*sinph*Bphp;
+            Bzp = sinph*Brp + cosph*Bphp;
+#endif
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
