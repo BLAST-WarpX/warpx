@@ -119,7 +119,8 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
-     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
+     * in the same *cylindrical* cell, or in RSPHERE the same *spherical* shell.
+     * For this reason, collisions between macroparticles
      * are actually not local in space. In this case, the underlying assumption is that
      * particles within the same cylindrical cell represent a cylindrically-symmetry
      * momentum distribution function. Therefore, here, we temporarily rotate the
