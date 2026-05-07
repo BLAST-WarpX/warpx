@@ -15,15 +15,19 @@
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #endif
+#include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/Parser/ParserUtils.H"
 
+#include <ablastr/coarsen/sample.H>
+
 #include <AMReX.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_MFIter.H>
 #include <AMReX_Print.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
@@ -149,6 +153,7 @@ std::optional<amrex::Real>
 WarpX::DtLimitFromCyclotronFrequency ()
 {
     using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
 
     if (!m_max_omegac_dt.has_value()) {
         return std::nullopt;
@@ -158,19 +163,77 @@ WarpX::DtLimitFromCyclotronFrequency ()
     amrex::Vector<amrex::Real> B_external_particle(3, 0.);
     utils::parser::queryArrWithParser(pp_particles, "B_external_particle", B_external_particle);
 
-    amrex::MultiFab const & Bx = *m_fields.get("Bfield_fp", Direction{0}, 0);
-    amrex::MultiFab const & By = *m_fields.get("Bfield_fp", Direction{1}, 0);
-    amrex::MultiFab const & Bz = *m_fields.get("Bfield_fp", Direction{2}, 0);
+    amrex::Real Bx_external = B_external_particle[0];
+    amrex::Real By_external = B_external_particle[1];
+    amrex::Real Bz_external = B_external_particle[2];
 
     amrex::Real B_max = 0.;
 
-    B_max = std::max(B_max, Bx.norm0(0));
-    B_max = std::max(B_max, By.norm0(0));
-    B_max = std::max(B_max, Bz.norm0(0));
+    // loop over refinement levels
+    for (int lev = 0; lev <= finestLevel(); ++lev)
+    {
+        // get MultiFab data at lev
+        const amrex::MultiFab & Bx = *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab & By = *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Bz = *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
-    B_max = std::max(B_max, std::abs(B_external_particle[0]));
-    B_max = std::max(B_max, std::abs(B_external_particle[1]));
-    B_max = std::max(B_max, std::abs(B_external_particle[2]));
+        // Prepare interpolation of field components to cell center
+        // The arrays below store the index type (staggering) of each MultiFab, with the third
+        // component set to zero in the two-dimensional case.
+        auto Bxtype = amrex::GpuArray<int,3>{0, 0, 0};
+        auto Bytype = amrex::GpuArray<int,3>{0, 0, 0};
+        auto Bztype = amrex::GpuArray<int,3>{0, 0, 0};
+        for (int i = 0; i < AMREX_SPACEDIM; ++i){
+            Bxtype[i] = Bx.ixType()[i];
+            Bytype[i] = By.ixType()[i];
+            Bztype[i] = Bz.ixType()[i];
+        }
+
+        // General preparation of interpolation and reduction operations
+        const amrex::GpuArray<int,3> cellCenteredtype{0,0,0};
+        const amrex::GpuArray<int,3> reduction_coarsening_ratio{1,1,1};
+        constexpr int reduction_comp = 0;
+
+        amrex::ReduceOps<amrex::ReduceOpMax> reduce_op;
+        amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
+
+        // MFIter loop to interpolate fields to cell center and get maximum value
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(Bx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            // Make the box cell centered in preparation for the interpolation (and to avoid
+            // including ghost cells in the calculation)
+            const amrex::Box & box = enclosedCells(mfi.nodaltilebox());
+            const auto& arrBx = Bx[mfi].array();
+            const auto& arrBy = By[mfi].array();
+            const auto& arrBz = Bz[mfi].array();
+
+            reduce_op.eval(box, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                const amrex::Real Bx_interp = ablastr::coarsen::sample::Interp(arrBx, Bxtype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+                const amrex::Real By_interp = ablastr::coarsen::sample::Interp(arrBy, Bytype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+                const amrex::Real Bz_interp = ablastr::coarsen::sample::Interp(arrBz, Bztype, cellCenteredtype,
+                                                                               reduction_coarsening_ratio, i, j, k, reduction_comp);
+                return {amrex::Math::powi<2>(Bx_interp + Bx_external) +
+                        amrex::Math::powi<2>(By_interp + By_external) +
+                        amrex::Math::powi<2>(Bz_interp + Bz_external)};
+            });
+        }
+
+        amrex::Real hv_Bsq = amrex::get<0>(reduce_data.value()); // highest value of |B|**2
+
+        B_max = std::max(B_max, std::sqrt(hv_Bsq));
+
+    }
+
+    // MPI reduce
+    amrex::ParallelDescriptor::ReduceRealMax({B_max});
 
     amrex::Real omegac_max = 0.;
 
