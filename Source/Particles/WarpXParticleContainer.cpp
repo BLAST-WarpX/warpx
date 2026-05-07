@@ -2411,14 +2411,14 @@ WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::Part
                 // Loop over the particles, rotating to theta = phi = 0
                 amrex::ParallelFor(pti.numParticles(),
                     [=] AMREX_GPU_DEVICE (long i) {
-                        const amrex::ParticleReal phi = phi_data[i];
                         const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
                         const amrex::ParticleReal uxsave = ux[i];
                         const amrex::ParticleReal uysave = uy[i];
                         const amrex::ParticleReal uzsave = uz[i];
-                        ux[i] = uxsave*std::cos(theta)*std::cos(phi) + uysave*std::sin(theta)*std::cos(phi) - uzsave*std::sin(phi);
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) + uysave*std::sin(theta)*std::cos(phi) + uzsave*std::sin(phi);
                         uy[i] = -uxsave*std::sin(theta) + uysave*std::cos(theta);
-                        uz[i] = uxsave*std::cos(theta)*std::sin(phi) + uysave*std::sin(theta)*std::sin(phi) + uzsave*std::cos(phi);
+                        uz[i] = -uxsave*std::cos(theta)*std::sin(phi) - uysave*std::sin(theta)*std::sin(phi) + uzsave*std::cos(phi);
                     }
                 );
 
@@ -2427,14 +2427,14 @@ WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::Part
                 // Loop over the particles, rotating from zero to theta and phi
                 amrex::ParallelFor(pti.numParticles(),
                     [=] AMREX_GPU_DEVICE (long i) {
-                        const amrex::ParticleReal phi = phi_data[i];
                         const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
                         const amrex::ParticleReal uxsave = ux[i];
                         const amrex::ParticleReal uysave = uy[i];
                         const amrex::ParticleReal uzsave = uz[i];
-                        ux[i] = uxsave*std::cos(theta)*std::cos(phi) - uysave*std::sin(theta) + uzsave*std::cos(theta)*std::sin(phi);
-                        uy[i] = uxsave*std::sin(theta)*std::cos(phi) + uysave*std::cos(theta) + uzsave*std::sin(theta)*std::sin(phi);
-                        uz[i] = -uxsave*std::sin(phi) + uzsave*std::cos(phi);
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) - uysave*std::sin(theta) - uzsave*std::cos(theta)*std::sin(phi);
+                        uy[i] = +uxsave*std::sin(theta)*std::cos(phi) + uysave*std::cos(theta) - uzsave*std::sin(theta)*std::sin(phi);
+                        uz[i] = +uxsave*std::sin(phi) + uzsave*std::cos(phi);
                     }
                 );
 
