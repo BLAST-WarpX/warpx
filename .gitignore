@@ -52,6 +52,7 @@ spack.lock
 #######
 # IDE #
 #######
+.cursor/
 .idea/
 cmake-build-*/
 .kdev?/

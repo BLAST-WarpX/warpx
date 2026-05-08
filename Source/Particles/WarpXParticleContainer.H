@@ -55,7 +55,7 @@
 /** Real Particle Attributes stored in amrex::ParticleContainer's struct of array
  *
  *  x, y, z  : position components
- *  ux uy uz : normalized momentum components
+ *  ux uy uz : momentum components, stored as proper velocity, i.e. gamma*v
  *  w        : weight
  *  theta    : azimuthal angle
  *  phi      : polar angle, relative to the x-y plane
@@ -108,10 +108,10 @@ struct DiagIdx
 };
 
 class WarpXParIter
-    : public amrex::ParIterSoA<PIdx::nattribs, 0>
+    : public amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>
 {
 public:
-    using amrex::ParIterSoA<PIdx::nattribs, 0>::ParIterSoA;
+    using amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>::ParIterSoA;
 
     WarpXParIter (ContainerType& pc, int level);
 
@@ -191,10 +191,12 @@ public:
  * derived classes, e.g., Evolve) or actual functions (e.g. CurrentDeposition).
  */
 class WarpXParticleContainer
-    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::DefaultAllocator>
+    : public amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>
 {
 public:
     friend MultiParticleContainer;
+
+    using Base = amrex::ParticleContainerPureSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
     // amrex::StructOfArrays with DiagIdx::nattribs amrex::ParticleReal components
     // and 0 int components for the particle data.
@@ -235,6 +237,16 @@ public:
                          MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
+    /**
+     * \brief virtual function to deposit mass matrices for charged particles
+     */
+    virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                                      int lev,
+                                      amrex::Real dt)
+    {
+        amrex::ignore_unused(fields,lev,dt);
+    }
+
     virtual void PostRestart () = 0;
 
     virtual void AllocData ();
@@ -244,7 +256,7 @@ public:
      * class.
      */
     virtual void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& pinned_tile,
         int n_external_attr_real,
         int n_external_attr_int) = 0;
 
@@ -265,7 +277,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) = 0;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) = 0;
 
     /**
      * \brief Deposit current density.
@@ -279,6 +292,20 @@ public:
      *                          the time of the deposition.
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
+                         amrex::Real dt, amrex::Real relative_time);
+
+    /**
+     * \brief Deposit current density, sum guard values, and apply boundary conditions.
+     *
+     * \param[in] mf_name Name of vector field in which current density should be deposited
+     * \param[in] lev Mesh refinement level for deposition
+     * \param[in] dt Time step for particle level
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    void DepositCurrent (const std::string& mf_name, int lev,
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
@@ -367,41 +394,37 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
     std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
-    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
-    virtual
-    void DepositCurrentAndMassMatrices ( WarpXParIter& pti,
-                                   const RealVector& wp,
-                                   const RealVector& uxp,
-                                   const RealVector& uyp,
-                                   const RealVector& uzp,
-                                         amrex::MultiFab* jx,
-                                         amrex::MultiFab* jy,
-                                         amrex::MultiFab* jz,
-                                         amrex::MultiFab* Sxx,
-                                         amrex::MultiFab* Sxy,
-                                         amrex::MultiFab* Sxz,
-                                         amrex::MultiFab* Syx,
-                                         amrex::MultiFab* Syy,
-                                         amrex::MultiFab* Syz,
-                                         amrex::MultiFab* Szx,
-                                         amrex::MultiFab* Szy,
-                                         amrex::MultiFab* Szz,
-                                   const amrex::FArrayBox* bxfab,
-                                   const amrex::FArrayBox* byfab,
-                                   const amrex::FArrayBox* bzfab,
-                                         long offset,
-                                         long np_to_deposit,
-                                         int thread_num,
-                                         int lev,
-                                         int depos_lev,
-                                         amrex::Real dt );
+    void DepositMassMatrices (WarpXParIter& pti,
+                        const RealVector& wp,
+                        const RealVector& uxp,
+                        const RealVector& uyp,
+                        const RealVector& uzp,
+                              amrex::MultiFab* Sxx,
+                              amrex::MultiFab* Sxy,
+                              amrex::MultiFab* Sxz,
+                              amrex::MultiFab* Syx,
+                              amrex::MultiFab* Syy,
+                              amrex::MultiFab* Syz,
+                              amrex::MultiFab* Szx,
+                              amrex::MultiFab* Szy,
+                              amrex::MultiFab* Szz,
+                        const amrex::FArrayBox* bxfab,
+                        const amrex::FArrayBox* byfab,
+                        const amrex::FArrayBox* bzfab,
+                              long offset,
+                              long np_to_deposit,
+                              int thread_num,
+                              int lev,
+                              int depos_lev,
+                              amrex::Real dt);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
@@ -534,6 +557,7 @@ public:
     virtual bool has_quantum_sync() const {return false;}
     virtual bool has_breit_wheeler() const {return false;}
     virtual bool has_virtual_photons() const {return false;}
+    virtual bool has_virtual_photons_beam_size_effect() const {return false;}
     virtual int getVirtualPhotonSpeciesIndex() const { return -1; }
     int DoQED() const { return has_quantum_sync() || has_breit_wheeler(); }
 #else

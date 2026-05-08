@@ -63,7 +63,7 @@ curl -Lo $HOME/src/boost-temp/boost.tar.gz https://archives.boost.io/release/1.8
 tar -xzf $HOME/src/boost-temp/boost.tar.gz -C $HOME/src/boost-temp
 cd $HOME/src/boost-temp/boost_1_82_0
 ./bootstrap.sh --with-libraries=math --prefix=${SW_DIR}/boost-1.82.0
-./b2 cxxflags="-std=c++17" install -j ${PARALLEL}
+./b2 cxxflags="-std=c++20" install -j ${PARALLEL}
 cd -
 rm -rf $HOME/src/boost-temp
 
@@ -108,7 +108,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-pm-gpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B ${build_dir}/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${build_dir}/blaspp-pm-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/blaspp-pm-gpu-build
 
@@ -123,7 +123,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-pm-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B ${build_dir}/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B ${build_dir}/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build ${build_dir}/lapackpp-pm-gpu-build --target install --parallel ${PARALLEL}
 rm -rf ${build_dir}/lapackpp-pm-gpu-build
 

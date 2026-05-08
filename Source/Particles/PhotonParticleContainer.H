@@ -80,8 +80,8 @@ public:
                         const amrex::MultiFab& /*Ez*/,
                         const amrex::MultiFab& /*Bx*/,
                         const amrex::MultiFab& /*By*/,
-                        const amrex::MultiFab& /*Bz*/) override {}
-
+                        const amrex::MultiFab& /*Bz*/,
+                        MomentumPushType /*momentum_push_type*/) override {}
 
     // DepositCharge should do nothing for photons
     void DepositCharge (WarpXParIter& /*pti*/,

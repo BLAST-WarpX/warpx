@@ -293,7 +293,7 @@ class CapacitiveDischargeExample(object):
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
                 product_species=[self.electrons, self.ions],
-                ndt=4,
+                ndt_supercycle=4,
                 scattering_processes=ionization,
             )
             electron_colls_mcc = picmi.MCCCollisions(
@@ -302,7 +302,7 @@ class CapacitiveDischargeExample(object):
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
                 background_mass=self.ions.mass,
-                ndt=self.mcc_subcycling_steps,
+                ndt_supercycle=self.mcc_subcycling_steps,
                 scattering_processes=electron_scattering_processes,
             )
             electron_colls = [electron_colls_mcc, electron_colls_dsmc]
@@ -313,7 +313,7 @@ class CapacitiveDischargeExample(object):
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
                 background_mass=self.ions.mass,
-                ndt=self.mcc_subcycling_steps,
+                ndt_supercycle=self.mcc_subcycling_steps,
                 scattering_processes=electron_scattering_processes,
             )
             electron_colls = [electron_colls_mcc]
@@ -327,7 +327,7 @@ class CapacitiveDischargeExample(object):
             ion_colls = picmi.DSMCCollisions(
                 name="coll_ion",
                 species=[self.ions, self.neutrals],
-                ndt=5,
+                ndt_supercycle=5,
                 scattering_processes=ion_scattering_processes,
             )
         else:
@@ -336,7 +336,7 @@ class CapacitiveDischargeExample(object):
                 species=self.ions,
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
-                ndt=self.mcc_subcycling_steps,
+                ndt_supercycle=self.mcc_subcycling_steps,
                 scattering_processes=ion_scattering_processes,
             )
         ion_colls = [ion_colls]
@@ -350,7 +350,7 @@ class CapacitiveDischargeExample(object):
             time_step_size=self.dt,
             max_steps=self.max_steps,
             warpx_collisions=electron_colls + ion_colls,
-            warpx_collisions_split_position_push=0,
+            warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
         self.solver.sim = self.sim
