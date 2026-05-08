@@ -1874,11 +1874,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     substeps: int, default=100
         Number of substeps for the B-field update. When ``use_rkf45=True``
-        (default) this is used only as the initial substep count estimate for
-        the adaptive solver. When ``use_rkf45=False`` it is the fixed number
-        of substeps per half-step.
+        this is used only as the initial substep count estimate for the
+        adaptive solver. When ``use_rkf45=False`` (default) it is the fixed
+        number of substeps per half-step.
 
-    use_rkf45: bool, default=True
+    use_rkf45: bool, default=False
         If True, use the adaptive Runge-Kutta-Fehlberg 4(5) integrator for
         the B-field substep advance, with step-size control governed by
         ``substep_rtol`` and ``substep_atol``. If False, use the fixed-step

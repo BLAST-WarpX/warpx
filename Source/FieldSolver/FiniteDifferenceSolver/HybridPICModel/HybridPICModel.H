@@ -205,7 +205,7 @@ public:
     /** Maximum number of substep attempts (accepted + rejected) before abort */
     int m_max_substep_attempts = 250;
     /** If true, use the adaptive RKF45 integrator; if false, use fixed-step RK4 */
-    bool m_use_rkf45 = true;
+    bool m_use_rkf45 = false;
 
     bool m_holmstrom_vacuum_region = false;
 
