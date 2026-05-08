@@ -13,6 +13,7 @@
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_Particles.H>
+#include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
 
@@ -377,7 +378,6 @@ namespace ParticleUtils {
      * \param[in] cell_stop start index of particles in the next cell
      * \param[in] mass mass of the particles
      * \param[in] energy_fraction fraction of pair's relative energy to change
-     * \param[in] energy_fraction_max max fracton of total relative energy that can be changed
      * \param[in/out] deltaE amount of energy to be distributed in this species
      */
     template <typename T_index>
@@ -391,7 +391,6 @@ namespace ParticleUtils {
                                T_index const cell_stop,
                                amrex::ParticleReal const mass,
                                amrex::ParticleReal const energy_fraction,
-                               amrex::ParticleReal const energy_fraction_max,
                                amrex::ParticleReal & deltaE )
     {
         using namespace amrex::literals;
@@ -400,25 +399,22 @@ namespace ParticleUtils {
 
         int const numCell = (cell_stop - cell_start);
 
+        if (numCell < 2) {
+            return true;
+        }
+
         // Adjust particle's momentum to absorb deltaE.
         // This loops over the particles, two at a time, distributing
         // the energy until all of it has been distributed or failing if not.
-        // If deltaE < 0, it should never fail since energy can always be added
-        // to the particles.
-        // if deltaE > 0, it will sometimes fail because energy cannot always be
-        // removed from the particles without changing the momentum.
         // The loop is setup to switch between even first and odd first pairs
         // each loop over the particles.
         int loop_count = 0;
         int const max_loop_count = 10;
-        amrex::ParticleReal Erel_cumm = 0.0_prt;
-        amrex::ParticleReal fmult_fact = 1.0_prt;
-        amrex::ParticleReal energy_frac_eff = 0.0_prt;
-        T_index i1 = cell_start;
+        int pair_offset = 0;
+        T_index i1 = cell_start + pair_offset;
         bool correction_failed = false;
         bool deltaE_is_zero = false;
-        int Erel_negative_count = 0;
-        while (!deltaE_is_zero && !correction_failed && loop_count <= max_loop_count) {
+        while (!deltaE_is_zero) {
 
             T_index i2 = i1 + 1;
             if (i2 == cell_stop) {
@@ -426,7 +422,7 @@ namespace ParticleUtils {
                 i2 = cell_start;
             }
 
-            int const sign = (deltaE < 0.0 ? -1 : 1);
+            int const sign = (deltaE < 0.0_prt ? -1 : 1);
 
             const amrex::ParticleReal ux1 = uxp[ indices[i1] ];
             const amrex::ParticleReal uy1 = uyp[ indices[i1] ];
@@ -460,92 +456,68 @@ namespace ParticleUtils {
             const amrex::ParticleReal pztot = wpmp1*uz1 + wpmp2*uz2;
             const amrex::ParticleReal Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
             const amrex::ParticleReal Erel = Ecm - wpmp1*c2 - wpmp2*c2;
-            if (Erel <= 0.0) {
-                // This checks for the unlikely case where the Erel is negative for all
-                // pairs of particles
-                Erel_negative_count++;
-                if (Erel_negative_count >= numCell) {
-                    correction_failed = true;
-                    break;
+
+            if (Erel > 0.0_prt) {
+
+                // Set the amount of energy change for this pair based on the
+                // relative energy in the center of momentum.
+                bool deltaE_finishes = false;
+                amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction)*Erel;
+                if (std::abs(deltaEpair) >= std::abs(deltaE)) {
+                    deltaEpair = deltaE;
+                    deltaE_finishes = true;
                 }
-                continue;
-            } else {
-                // Reset the counter since the next time through the loop
-                // might use difference pairs of particles
-                Erel_negative_count = 0;
+
+                const amrex::ParticleReal A = Etot - deltaEpair;
+                const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
+                const amrex::ParticleReal p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+                const amrex::ParticleReal ptdotu = pxtot*ux + pytot*uy + pztot*uz;
+
+                // Compute coefficients for quadratic equation for alpha.
+                const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
+                const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+                const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
+
+                const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
+                if (root >= 0.0_prt && amrex::Math::abs(a) > 0.0_prt) {
+
+                    // Update particle velocities.
+                    const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+                    const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
+                    const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
+                    uxp[ indices[i1] ] += ratio1*ux;
+                    uyp[ indices[i1] ] += ratio1*uy;
+                    uzp[ indices[i1] ] += ratio1*uz;
+                    uxp[ indices[i2] ] -= ratio2*ux;
+                    uyp[ indices[i2] ] -= ratio2*uy;
+                    uzp[ indices[i2] ] -= ratio2*uz;
+
+                    // Update energy violation.
+                    if (deltaE_finishes) {
+                        deltaE = 0.0_prt;
+                        deltaE_is_zero = true;
+                    }
+                    else {
+                        deltaE -= deltaEpair;
+                    }
+
+                }
+
             }
 
-            // Set the amount of energy change for this pair based on the
-            // relative energy in the center of momentum.
-            // If deltaE > 0, no more that Erel can be removed from this pair.
-            // If deltaE < 0, limit the energy added by Erel at first, but
-            // after the first loop, add whatever is left (using the adjusted fmult_fact).
-            amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction*fmult_fact)*Erel;
-            if (std::abs(deltaEpair) >= std::abs(deltaE)) {
-                deltaEpair = deltaE;
-                deltaE = 0.0_prt;
-                deltaE_is_zero = true;
-            } else {
-                deltaE -= deltaEpair;
-            }
-
-            const amrex::ParticleReal A = Etot - deltaEpair;
-            const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-            const auto p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
-            const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
-
-            // Compute coefficients for quadratic equation for alpha.
-            const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
-            const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-            const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
-
-            const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-            if (root < 0.0 || a == 0.0) { continue; }
-            const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
-
-            // Update particle velocities.
-            const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
-            const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
-            uxp[ indices[i1] ] += ratio1*ux;
-            uyp[ indices[i1] ] += ratio1*uy;
-            uzp[ indices[i1] ] += ratio1*uz;
-            uxp[ indices[i2] ] -= ratio2*ux;
-            uyp[ indices[i2] ] -= ratio2*uy;
-            uzp[ indices[i2] ] -= ratio2*uz;
-
-            Erel_cumm += Erel - deltaEpair;
-
+            // Update particle 1 index.
             if (i1 < cell_stop - 2) {
-                // If not done with the loop, increment to the next pair of particles
                 i1 = i2 + 1;
             } else {
                 loop_count++;
-                // On next time through the loop, use a different set of pairs.
-                // What index to start with depends on whether the number of particles
-                // is even or odd.
-                if (i1 == cell_stop - 2) {
-                    if ((numCell % 2) == 0) { i1 = cell_start + 1; }
-                    if ((numCell % 2) != 0) { i1 = cell_start; }
-                } else {
-                    if ((numCell % 2) == 0) { i1 = cell_start; }
-                    if ((numCell % 2) != 0) { i1 = cell_start + 1; }
-                }
-                // Compute the energy fraction to correct with one more loop.
-                // This is the remaining energy correction divided by the cummulated Erel,
-                // the amount of "free" energy available.
-                // If deltaE < 0, this check always passes since the amount of energy that
-                // can be added is unlimited.
-                energy_frac_eff = std::abs(deltaE)/Erel_cumm;
-                if (energy_frac_eff > energy_fraction_max || loop_count > max_loop_count) {
+                if (loop_count >= max_loop_count) {
                     correction_failed = true;
                     break;
-                } else if (deltaE < 0.) {
-                    // If after the first time around, there is energy left to distribute,
-                    // increase the multiplier to distribute the rest faster.
-                    fmult_fact = std::max(1._prt, energy_frac_eff/energy_fraction);
                 }
-            }
 
+                pair_offset = 1 - pair_offset; // 0, 1, 0, 1, ...
+                i1 = cell_start + pair_offset;
+            }
         }
 
         return correction_failed;
