@@ -422,9 +422,9 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
-MultiParticleContainer::MapMomentumToXAxis (bool forward) {
+MultiParticleContainer::TransformMomentumToCurvilinear (bool forward) {
     for (const auto &pc : allcontainers) {
-        pc->MapMomentumToXAxis(forward);
+        pc->TransformMomentumToCurvilinear(forward);
     }
 }
 

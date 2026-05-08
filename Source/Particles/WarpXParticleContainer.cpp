@@ -2366,7 +2366,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 }
 
 void
-WarpXParticleContainer::MapMomentumToXAxis ([[maybe_unused]]bool forward)
+WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool forward)
 {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     using namespace amrex::literals;

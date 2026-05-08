@@ -94,7 +94,7 @@ public:
 
     amrex::ParticleReal maxParticleVelocity();
 
-    void MapMomentumToXAxis (bool forward);
+    void TransformMomentumToCurvilinear (bool forward);
 
     void AllocData ();
 

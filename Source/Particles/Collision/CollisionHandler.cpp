@@ -127,7 +127,7 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
      * the momentum of the macroparticles to the common frame, to the x-axis.
      * (This is only valid if we use only the m=0 azimuthal mode in the simulation;
      * there is a corresponding assert statement at initialization.) */
-    mypc->MapMomentumToXAxis(/*forward*/true);
+    mypc->TransformMomentumToCurvilinear(/*forward*/true);
 #endif
 
 #ifdef WARPX_QED
@@ -164,7 +164,7 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Undo the rotation above
-    mypc->MapMomentumToXAxis(/*forward*/false);
+    mypc->TransformMomentumToCurvilinear(/*forward*/false);
 #endif
 
 }
