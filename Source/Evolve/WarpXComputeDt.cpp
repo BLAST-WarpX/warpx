@@ -163,9 +163,9 @@ WarpX::DtLimitFromCyclotronFrequency ()
     amrex::Vector<amrex::Real> B_external_particle(3, 0.);
     utils::parser::queryArrWithParser(pp_particles, "B_external_particle", B_external_particle);
 
-    amrex::Real Bx_external = B_external_particle[0];
-    amrex::Real By_external = B_external_particle[1];
-    amrex::Real Bz_external = B_external_particle[2];
+    const amrex::Real Bx_external = B_external_particle[0];
+    const amrex::Real By_external = B_external_particle[1];
+    const amrex::Real Bz_external = B_external_particle[2];
 
     amrex::Real B_max = 0.;
 
@@ -226,7 +226,7 @@ WarpX::DtLimitFromCyclotronFrequency ()
             });
         }
 
-        amrex::Real hv_Bsq = amrex::get<0>(reduce_data.value()); // highest value of |B|**2
+        const amrex::Real hv_Bsq = amrex::get<0>(reduce_data.value()); // highest value of |B|**2
 
         B_max = std::max(B_max, std::sqrt(hv_Bsq));
 
