@@ -1682,6 +1682,31 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
+class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the "theta implicit" hybrid-PIC evolve scheme
+
+    Parameters
+    ----------
+    nonlinear_solver: nonlinear solver instance
+        The nonlinear solver to use for the iterations
+
+    theta: float, optional
+        The "theta" parameter, determining the level of implicitness.
+    """
+
+    def __init__(self, nonlinear_solver, theta=None):
+        self.nonlinear_solver = nonlinear_solver
+        self.theta = theta
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "theta_implicit_hybrid"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.theta = self.theta
+
+        self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
+
 class PicardNonlinearSolver(picmistandard.base._ClassWithInit):
     """
     Sets up the iterative Picard nonlinear solver for the implicit evolve scheme

@@ -21,3 +21,5 @@ add_warpx_test(
     OFF  # dependency
 )
 label_warpx_test(test_rz_ohm_solver_em_modes_picmi slow)
+
+add_subdirectory(implicit)
