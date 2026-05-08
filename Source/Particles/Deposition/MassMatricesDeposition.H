@@ -537,7 +537,7 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
         amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
         {exteb_runtime_flag},
         np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long ip) {
+        [=] AMREX_GPU_DEVICE (long const ip, auto exteb_control) {
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }
