@@ -2366,7 +2366,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 }
 
 void
-WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::ParticleReal sign)
+WarpXParticleContainer::MapMomentumToXAxis ([[maybe_unused]]bool forward)
 {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     using namespace amrex::literals;
@@ -2392,7 +2392,7 @@ WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::Part
             // Loop over the particles, rotating their velocities by theta
             amrex::ParallelFor(pti.numParticles(),
                 [=] AMREX_GPU_DEVICE (long i) {
-                    const amrex::ParticleReal theta_sign = sign < 0. ? -1._prt : +1._prt;
+                    const amrex::ParticleReal theta_sign = forward ? -1._prt : +1._prt;
                     const amrex::ParticleReal theta = theta_sign*theta_data[i];
                     const amrex::ParticleReal uxsave = ux[i];
                     const amrex::ParticleReal uysave = uy[i];
@@ -2406,7 +2406,7 @@ WarpXParticleContainer::RotateParticleAnglesByTheta ([[maybe_unused]]amrex::Part
             amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
             amrex::ParticleReal * AMREX_RESTRICT phi_data = attribs[PIdx::phi].dataPtr();
 
-            if (sign < 0.) {
+            if (forward) {
 
                 // Loop over the particles, rotating to theta = phi = 0
                 amrex::ParallelFor(pti.numParticles(),

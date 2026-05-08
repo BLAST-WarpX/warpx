@@ -120,14 +120,14 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
      * in the same *cylindrical* cell, or in RSPHERE the same *spherical* shell.
-     * For this reason, collisions between macroparticles
-     * are actually not local in space. In this case, the underlying assumption is that
-     * particles within the same cylindrical cell represent a cylindrically-symmetry
-     * momentum distribution function. Therefore, here, we temporarily rotate the
-     * momentum of the macroparticles to theta = 0.
-     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
+     * Because of this, the colliding macroparticles would not nessecarily be spatially
+     * near each other. This would violate the underlying assumptions that particles within the
+     * same cylindrical or spherical cell represent a cylindrically- or spherically-symmetric
+     * momentum distribution function and are spatially local. Therefore, we temporarily rotate
+     * the momentum of the macroparticles to the common frame, to the x-axis.
+     * (This is only valid if we use only the m=0 azimuthal mode in the simulation;
      * there is a corresponding assert statement at initialization.) */
-    mypc->RotateParticleAnglesByTheta(-1.);
+    mypc->MapMomentumToXAxis(/*forward*/true);
 #endif
 
 #ifdef WARPX_QED
@@ -164,7 +164,7 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Undo the rotation above
-    mypc->RotateParticleAnglesByTheta(+1.);
+    mypc->MapMomentumToXAxis(/*forward*/false);
 #endif
 
 }

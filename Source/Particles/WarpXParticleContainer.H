@@ -461,7 +461,16 @@ public:
 
     amrex::ParticleReal maxParticleVelocity(bool local = false);
 
-    void RotateParticleAnglesByTheta (amrex::ParticleReal sign);
+    /**
+     * \brief Map the momentum of the particles to and from the X-axis, i.e. theta = 0
+     *        cylinderical and theta = phi = 0 for spherical. This mapping is used
+     *        for binary collisions to put the colliding particles in a spatially local
+     *        frame.
+     *
+     * \param[in] forward When true, maps to the X-axis, when false maps from the X-axis
+     *            to the original location
+     */
+    void MapMomentumToXAxis (bool forward);
 
     /**
      * \brief Adds n particles to the simulation
