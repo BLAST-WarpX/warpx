@@ -3196,6 +3196,12 @@ Time step
     When specified, :pp:param:`warpx.const_dt` must not also be specified.
     The time step size is updated using the limits specified by :pp:param:`warpx.cfl`, :pp:param:`warpx.max_omegap_dt`, and :pp:param:`warpx.max_omegac_dt`.
 
+.. pp:param:: warpx.dt_update_diagnostic_file
+    :type: ``string``
+    :optional:
+
+    When adaptive timestepping is activated, information about the new time step and the simulation conditions are output to the file specified by this parameter.
+
 .. pp:param:: warpx.max_omegap_dt
     :type: ``float``
     :optional:
