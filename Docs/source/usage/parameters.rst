@@ -3108,6 +3108,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
     particle momentum so that the energy and momentum are exactly conserved in each cell.
     This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
 
+.. pp:param:: collisions.np_warning_threshold
+    :type: ``int``
+    :default: 20.
+    :optional:
+
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, this parameter controls the minimum number of particles per cell for producing warning messages when the moment-correction method fails.
+
 .. pp:param:: collisions.energy_fraction
     :type: ``float``
     :default: 0.05
