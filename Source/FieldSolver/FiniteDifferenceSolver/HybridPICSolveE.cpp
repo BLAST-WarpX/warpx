@@ -475,7 +475,8 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     amrex::MultiFab const& Pefield,
     [[maybe_unused]]std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool solve_for_Faraday)
+    const bool solve_for_Faraday,
+    const bool solve_for_implicit)
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
@@ -484,14 +485,14 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            eb_update_E, lev, hybrid_model, solve_for_Faraday
+            eb_update_E, lev, hybrid_model, solve_for_Faraday, solve_for_implicit
         );
 
 #elif defined(WARPX_DIM_RSPHERE)
 
         HybridPICSolveESpherical <SphericalYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            lev, hybrid_model, solve_for_Faraday
+            lev, hybrid_model, solve_for_Faraday, solve_for_implicit
         );
 
 #else
@@ -499,12 +500,12 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            eb_update_E, lev, hybrid_model, solve_for_Faraday
+            eb_update_E, lev, hybrid_model, solve_for_Faraday, solve_for_implicit
         );
     } else {
         HybridPICSolveECartesian <CartesianNodalAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
-            eb_update_E, lev, hybrid_model, solve_for_Faraday
+            eb_update_E, lev, hybrid_model, solve_for_Faraday, solve_for_implicit
         );
     }
 #endif
@@ -525,7 +526,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     amrex::MultiFab const& Pefield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool solve_for_Faraday )
+    const bool solve_for_Faraday,
+    const bool solve_for_implicit )
 {
     // Both steps below do not currently support m > 0 and should be
     // modified if such support wants to be added
@@ -740,7 +742,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday || solve_for_implicit) ?
                         T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
                         : 0._rt;
 
@@ -879,7 +881,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
+                    const Real grad_Pe = (!solve_for_Faraday || solve_for_implicit) ?
                         T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
                         : 0._rt;
 
@@ -958,7 +960,8 @@ void FiniteDifferenceSolver::HybridPICSolveESpherical (
     amrex::MultiFab const& /*rhofield*/,
     amrex::MultiFab const& /*Pefield*/,
     int /*lev*/, HybridPICModel const* /*hybrid_model*/,
-    const bool /*solve_for_Faraday*/ )
+    const bool /*solve_for_Faraday*/,
+    const bool /*solve_for_implicit*/ )
 {
     WARPX_ABORT_WITH_MESSAGE("HybridPICSolveESphrical not fully implemented");
 }
@@ -974,7 +977,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     amrex::MultiFab const& Pefield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
     int lev, HybridPICModel const* hybrid_model,
-    const bool solve_for_Faraday )
+    const bool solve_for_Faraday,
+    const bool solve_for_implicit )
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
@@ -1179,7 +1183,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                const Real grad_Pe = (!solve_for_Faraday || solve_for_implicit) ?
                     T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
                     : 0._rt;
 
@@ -1243,7 +1247,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                const Real grad_Pe = (!solve_for_Faraday || solve_for_implicit) ?
                     T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
                     : 0._rt;
 
@@ -1307,7 +1311,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                const Real grad_Pe = (!solve_for_Faraday || solve_for_implicit) ?
                     T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
                     : 0._rt;
 

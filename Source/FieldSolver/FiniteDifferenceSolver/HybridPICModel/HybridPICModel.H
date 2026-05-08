@@ -106,7 +106,8 @@ public:
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        bool solve_for_Faraday) const;
+        bool solve_for_Faraday,
+        bool solve_for_implicit = false) const;
 
     void HybridPICSolveE (
         ablastr::fields::VectorField const& Efield,
@@ -114,7 +115,8 @@ public:
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
-        int lev, bool solve_for_Faraday) const;
+        int lev, bool solve_for_Faraday,
+        bool solve_for_implicit = false) const;
 
     void HybridPICSolveE (
         ablastr::fields::VectorField const& Efield,
@@ -122,7 +124,8 @@ public:
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
-        int lev, PatchType patch_type, bool solve_for_Faraday) const;
+        int lev, PatchType patch_type, bool solve_for_Faraday,
+        bool solve_for_implicit = false) const;
 
     void BfieldEvolveRK (
         ablastr::fields::MultiLevelVectorField const& Bfield,
