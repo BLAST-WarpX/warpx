@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <filesystem>
 
 /**
  * Compute the minimum of array x, where x has dimension AMREX_SPACEDIM
