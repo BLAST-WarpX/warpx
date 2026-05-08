@@ -68,10 +68,14 @@ Boundary Conditions
 Multiphysics Processes
 ======================
 
-.. toctree::
-   :maxdepth: 1
+WarpX includes various extensions to the traditional PIC loop which enable it to model additional physics.
 
-   multiphysics_extensions
+.. toctree::
+    :maxdepth: 2
+
+    multiphysics/collisions
+    multiphysics/ionization
+    multiphysics/qed
 
 Advanced Modes of Running
 =========================
