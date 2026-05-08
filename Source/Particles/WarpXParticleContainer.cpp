@@ -1308,6 +1308,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if  (WarpX::nox == 1 && !full_mass_matrices) {
@@ -1319,6 +1320,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
@@ -1330,6 +1332,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
@@ -1341,6 +1344,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
@@ -1352,6 +1356,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
@@ -1363,6 +1368,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
@@ -1374,6 +1380,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
@@ -1385,6 +1392,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         }

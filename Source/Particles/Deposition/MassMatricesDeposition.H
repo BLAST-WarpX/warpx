@@ -473,6 +473,8 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
  * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
+ * \param getExternalEB            Function for external magnetic field using parser
+ * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
@@ -505,6 +507,10 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
                               const amrex::IntVect& jx_type,
                               const amrex::IntVect& jy_type,
                               const amrex::IntVect& jz_type,
+                              GetExternalEBField const & getExternalEB,
+                              const amrex::ParticleReal Bx_ext,
+                              const amrex::ParticleReal By_ext,
+                              const amrex::ParticleReal Bz_ext,
                               const amrex::Array4<amrex::Real const>& Bx_arr,
                               const amrex::Array4<amrex::Real const>& By_arr,
                               const amrex::Array4<amrex::Real const>& Bz_arr,
@@ -523,10 +529,15 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    enum exteb_flags : int { no_exteb, has_exteb };
+    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+
     // Loop over particles and deposit mass matrices
     amrex::ParallelFor(
-            np_to_deposit,
-            [=] AMREX_GPU_DEVICE (long ip) {
+        amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
+        {exteb_runtime_flag},
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long ip) {
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }
@@ -534,10 +545,21 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            // Compute magnetic field on particle
-            amrex::ParticleReal Bxp = 0.0;
-            amrex::ParticleReal Byp = 0.0;
-            amrex::ParticleReal Bzp = 0.0;
+            // Initialize B on particle to uniform external B
+            amrex::ParticleReal Bxp = Bx_ext;
+            amrex::ParticleReal Byp = By_ext;
+            amrex::ParticleReal Bzp = Bz_ext;
+
+            // Increment with externally applied B-field with time and spatial variation
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+            if constexpr (exteb_control == has_exteb) {
+                amrex::ParticleReal Exp = 0._prt;
+                amrex::ParticleReal Eyp = 0._prt;
+                amrex::ParticleReal Ezp = 0._prt;
+                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+            }
+
+            // Gather magnetic field from the grid
             doDirectGatherVectorField</*depos_order_perp=*/depos_order,/*depos_order_para=*/depos_order>(
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
@@ -1588,6 +1610,8 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
+ * \param getExternalEB            Function for external magnetic field using parser
+ * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
