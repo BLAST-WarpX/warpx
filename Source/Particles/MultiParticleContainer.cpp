@@ -422,9 +422,9 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
-MultiParticleContainer::MapMomentumToXAxis (amrex::ParticleReal sign) {
+MultiParticleContainer::MapMomentumToXAxis (bool forward) {
     for (const auto &pc : allcontainers) {
-        pc->MapMomentumToXAxis(sign);
+        pc->MapMomentumToXAxis(forward);
     }
 }
 
