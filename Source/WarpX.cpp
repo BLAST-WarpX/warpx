@@ -802,6 +802,7 @@ WarpX::ReadParameters ()
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
         m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
         if (m_dt_update_interval.isActivated()) {
+            pp_warpx.query("dt_update_diagnostic_file", m_dt_update_diagnostic_file);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 !m_const_dt.has_value(),
                 "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."

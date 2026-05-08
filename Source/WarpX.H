@@ -424,9 +424,9 @@ public:
     /**
      * Determine the simulation timestep from the time step limiters
      */
-    std::optional<amrex::Real> DtLimitFromParticleSpeeds ();
-    std::optional<amrex::Real> DtLimitFromPlasmaFrequency ();
-    std::optional<amrex::Real> DtLimitFromCyclotronFrequency ();
+    amrex::Real ParticleGridSpeedMax ();
+    amrex::Real GlobalPlasmaFrequencyMax ();
+    amrex::Real GlobalCyclotronFrequencyMax ();
     void ApplyDtLimiters ();
 
     /** Print main PIC parameters to stdout */
@@ -1166,6 +1166,7 @@ private:
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
     utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    std::string m_dt_update_diagnostic_file;
 
     bool m_safe_guard_cells = false;
 

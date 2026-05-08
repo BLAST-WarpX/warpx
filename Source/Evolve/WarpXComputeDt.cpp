@@ -113,51 +113,33 @@ WarpX::ComputeDt ()
 }
 
 /**
- * Determine the simulation timestep from the maximum speed of all particles
- * Sets timestep so that a particle can only cross cfl*dx cells per timestep.
+ * Used to determine the simulation timestep from the maximum speed of all particles
+ * Timestep will be set so that a particle can cross at most cfl*dx cells per timestep.
  */
-std::optional<amrex::Real>
-WarpX::DtLimitFromParticleSpeeds ()
+amrex::Real
+WarpX::ParticleGridSpeedMax ()
 {
     const amrex::Real* dx = geom[max_level].CellSize();
     const amrex::Real dx_min = minDim(dx);
 
     const amrex::ParticleReal max_v = mypc->maxParticleVelocity();
 
-    if (max_v > 0.) {
-        return cfl * dx_min / max_v;
-    } else {
-        return std::nullopt;
-    }
-
+    return max_v/dx_min;
 }
 
-std::optional<amrex::Real>
-WarpX::DtLimitFromPlasmaFrequency ()
+amrex::Real
+WarpX::GlobalPlasmaFrequencyMax ()
 {
-    if (!m_max_omegap_dt.has_value()) {
-        return std::nullopt;
-    }
-
     const std::unique_ptr<amrex::MultiFab> global_plasma_frequency = mypc->GetGlobalPlasmaFrequency(0);
     const amrex::Real global_plasma_frequency_max = global_plasma_frequency->max(0);
-
-    if (global_plasma_frequency_max > 0.) {
-        return m_max_omegap_dt.value()/global_plasma_frequency_max;
-    } else {
-        return std::nullopt;
-    }
+    return global_plasma_frequency_max;
 }
 
-std::optional<amrex::Real>
-WarpX::DtLimitFromCyclotronFrequency ()
+amrex::Real
+WarpX::GlobalCyclotronFrequencyMax ()
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
-
-    if (!m_max_omegac_dt.has_value()) {
-        return std::nullopt;
-    }
 
     const amrex::ParmParse pp_particles("particles");
     amrex::Vector<amrex::Real> B_external_particle(3, 0.);
@@ -247,32 +229,34 @@ WarpX::DtLimitFromCyclotronFrequency ()
         }
     }
 
-    if (omegac_max > 0.) {
-        return m_max_omegac_dt.value()/omegac_max;
-    } else {
-        return std::nullopt;
-    }
+    return omegac_max;
 }
 
 void
 WarpX::ApplyDtLimiters ()
 {
-    std::optional<amrex::Real> speed_limit = DtLimitFromParticleSpeeds();
-    std::optional<amrex::Real> opmegap_limit = DtLimitFromPlasmaFrequency();
-    std::optional<amrex::Real> opmegac_limit = DtLimitFromCyclotronFrequency();
+    amrex::Real vmax_o_dx = ParticleGridSpeedMax();
+    amrex::Real omegap_max = m_max_omegap_dt.has_value() ? GlobalPlasmaFrequencyMax() : 0.;
+    amrex::Real omegac_max = m_max_omegac_dt.has_value() ? GlobalCyclotronFrequencyMax() : 0.;
 
-    if (!speed_limit.has_value() &&
-        !opmegap_limit.has_value() &&
-        !opmegac_limit.has_value()) {
+    if (vmax_o_dx == 0. &&
+        (!m_max_omegap_dt.has_value() || omegap_max == 0.) &&
+        (!m_max_omegac_dt.has_value() || omegac_max == 0.)) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(),
                                          "No valid time step size limit found, warpx.max_dt must be specified");
     }
 
     amrex::Real dt_new = std::numeric_limits<amrex::Real>::max();
 
-    if (speed_limit.has_value()) { dt_new = std::min(dt_new, speed_limit.value()); }
-    if (opmegap_limit.has_value()) { dt_new = std::min(dt_new, opmegap_limit.value()); }
-    if (opmegac_limit.has_value()) { dt_new = std::min(dt_new, opmegac_limit.value()); }
+    if (vmax_o_dx > 0.) {
+        dt_new = std::min(dt_new, cfl/vmax_o_dx);
+    }
+    if (m_max_omegap_dt.has_value() && omegap_max > 0.) {
+        dt_new = std::min(dt_new, m_max_omegap_dt.value()/omegap_max);
+    }
+    if (m_max_omegac_dt.has_value() && omegac_max > 0.) {
+        dt_new = std::min(dt_new, m_max_omegac_dt.value()/omegac_max);
+    }
 
     if (m_max_dt.has_value()) {
         dt_new = std::min(dt_new, m_max_dt.value());
@@ -285,4 +269,69 @@ WarpX::ApplyDtLimiters ()
         dt[lev] = dt[lev+1] * refRatio(lev)[0];
     }
 
+    // Write diagnostics if requested
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !m_dt_update_diagnostic_file.empty()
+        && !amrex::FileExists(m_dt_update_diagnostic_file)) {
+
+        std::filesystem::path const diagnostic_path(m_dt_update_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
+        if (!diagnostic_file.is_open()) {
+            amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
+        }
+
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]new_dt";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]vmax_dt";
+        if (m_max_omegap_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]omegap_dt";
+        }
+        if (m_max_omegac_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]omegac_dt";
+        }
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
+
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !m_dt_update_diagnostic_file.empty()) {
+
+        std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::app};
+        if (!diagnostic_file.is_open()) {
+            amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
+        }
+
+        diagnostic_file << std::setprecision(14);
+        diagnostic_file << istep[0] + 1;
+        diagnostic_file << " ";
+        diagnostic_file << t_new[0];
+        diagnostic_file << " ";
+        diagnostic_file << dt_new;
+        diagnostic_file << " ";
+        diagnostic_file << vmax_o_dx*dt_new;
+
+        if (m_max_omegap_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << omegap_max*dt_new;
+        }
+        if (m_max_omegac_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << omegac_max*dt_new;
+        }
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
 }
