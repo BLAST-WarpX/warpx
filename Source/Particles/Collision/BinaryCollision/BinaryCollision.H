@@ -114,12 +114,14 @@ public:
             const amrex::ParmParse pp_collisions("collisions");
             pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collisions.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
+            pp_collisions.query("np_warning_threshold", m_np_warning_threshold);
             pp_collisions.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collisions.query("energy_fraction", m_energy_fraction);
 
             // Input parameter set for this collision
             pp_collision_name.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collision_name.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
+            pp_collision_name.query("np_warning_threshold", m_np_warning_threshold);
             pp_collision_name.query("beta_weight_exponent", m_beta_weight_exponent);
             pp_collision_name.query("energy_fraction", m_energy_fraction);
         }
@@ -750,7 +752,7 @@ public:
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-                const int np_warning_thresh = m_np_warning_thresh;
+                const int np_warning_threshold = m_np_warning_threshold;
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -796,7 +798,7 @@ public:
                                     u1z[ indices_1[i1] ] = u1z_before_ptr[ indices_1[i1] ];
                                 }
                                 int const numCell1 = (cell_stop_1 - cell_start_1);
-                                if (numCell1 > np_warning_thresh) {
+                                if (numCell1 > np_warning_threshold) {
                                     amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
                                 }
                             }
@@ -1383,7 +1385,7 @@ public:
 
                 amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
                 amrex::Long* failed_corrections_ptr = failed_corrections.data();
-                const int np_warning_thresh = m_np_warning_thresh;
+                const int np_warning_threshold = m_np_warning_threshold;
 
                 // The particles are sorted by weight in decreasing order. This gives more of the correction
                 // to the heavier particles, having a smallar effect on their momenta, and typically
@@ -1489,8 +1491,8 @@ public:
                                     u2y[ indices_2[i2] ] = u2y_before_ptr[ indices_2[i2] ];
                                     u2z[ indices_2[i2] ] = u2z_before_ptr[ indices_2[i2] ];
                                 }
-                                if ((correction1_failed && numCell1 > np_warning_thresh) ||
-                                    (correction2_failed && numCell2 > np_warning_thresh)) {
+                                if ((correction1_failed && numCell1 > np_warning_threshold) ||
+                                    (correction2_failed && numCell2 > np_warning_threshold)) {
                                     amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
                                 }
                             }
@@ -1521,11 +1523,8 @@ private:
 
     bool m_correct_energy_momentum = false;
     bool m_energy_correction_sort_by_weight = false;
-#if defined(AMREX_DEBUG) || defined(DEBUG)
-    static constexpr int m_np_warning_thresh = 1;
-#else
-    static constexpr int m_np_warning_thresh = 20;
-#endif
+    int m_np_warning_threshold = 20;
+
     amrex::ParticleReal m_beta_weight_exponent = 1.;
     amrex::ParticleReal m_energy_fraction = 0.05;
 
