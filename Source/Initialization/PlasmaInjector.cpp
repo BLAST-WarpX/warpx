@@ -725,19 +725,8 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
                               amrex::IntVect const& ngrow,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
-    if (h_inj_rho) {
-        h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
-        inj_rho_distributed = h_inj_rho->distributed();
-#ifdef AMREX_USE_GPU
-        if (! inj_rho_distributed) {
-            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-            amrex::Gpu::streamSynchronize();
-        }
-#endif
-        inj_rho_prepared = true;
-    }
-
     if (h_inj_mom && h_inj_mom->needPreparation()) {
+        // Density read from file may use get_zlab, which needs the bulk momentum.
         h_inj_mom->prepare(grids, dmap, ngrow, get_zlab);
         inj_mom_mean_file_distributed = h_inj_mom->distributed();
 #ifdef AMREX_USE_GPU
@@ -751,24 +740,25 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
         inj_mom_mean_file_prepared = false;
         inj_mom_mean_file_distributed = false;
     }
+
+    if (h_inj_rho) {
+        h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
+        inj_rho_distributed = h_inj_rho->distributed();
+#ifdef AMREX_USE_GPU
+        if (! inj_rho_distributed) {
+            amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+            amrex::Gpu::streamSynchronize();
+        }
+#endif
+        inj_rho_prepared = true;
+    }
 }
 
 void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
-    if (h_inj_rho) {
-        h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
-#ifdef AMREX_USE_GPU
-        // In principle, we don't need to do the memcpy every time. But the
-        // logic can get complicated.
-        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
-        amrex::Gpu::streamSynchronize();
-#endif
-        inj_rho_distributed = false;
-        inj_rho_prepared = true;
-    }
-
     if (h_inj_mom && h_inj_mom->needPreparation()) {
+        // Density read from file may use get_zlab, which needs the bulk momentum.
         h_inj_mom->prepare(pbox, moving_dir, moving_sign, get_zlab);
 #ifdef AMREX_USE_GPU
         amrex::Gpu::htod_memcpy_async(d_inj_mom, h_inj_mom.get(), sizeof(InjectorMomentum));
@@ -779,5 +769,17 @@ void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int mo
     } else {
         inj_mom_mean_file_prepared = false;
         inj_mom_mean_file_distributed = false;
+    }
+
+    if (h_inj_rho) {
+        h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
+#ifdef AMREX_USE_GPU
+        // In principle, we don't need to do the memcpy every time. But the
+        // logic can get complicated.
+        amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
+        amrex::Gpu::streamSynchronize();
+#endif
+        inj_rho_distributed = false;
+        inj_rho_prepared = true;
     }
 }

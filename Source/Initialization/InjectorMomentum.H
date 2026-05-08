@@ -243,14 +243,18 @@ struct InjectorMomentumMaxwellian
                   amrex::IntVect const& ngrow,
                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
     {
-        velocity.prepare(grids, dmap, ngrow, get_zlab);
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(grids, dmap, ngrow, {});
         temperature.prepare(grids, dmap, ngrow, get_zlab);
     }
 
     void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                   std::function<amrex::Real(amrex::Real)> const& get_zlab)
     {
-        velocity.prepare(pbox, moving_dir, moving_sign, get_zlab);
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(pbox, moving_dir, moving_sign, {});
         temperature.prepare(pbox, moving_dir, moving_sign, get_zlab);
     }
 
