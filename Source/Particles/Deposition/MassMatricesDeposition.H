@@ -473,7 +473,7 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
  * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
- * \param getExternalEB            Function for external magnetic field using parser
+ * \param getExternalEB            Functor for assigning external fields on particles
  * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
@@ -1610,7 +1610,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
- * \param getExternalEB            Function for external magnetic field using parser
+ * \param getExternalEB            Functor for assigning external fields on particles
  * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
