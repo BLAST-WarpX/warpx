@@ -124,7 +124,7 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
      * near each other. This would violate the underlying assumptions that particles within the
      * same cylindrical or spherical cell represent a cylindrically- or spherically-symmetric
      * momentum distribution function and are spatially local. Therefore, we temporarily rotate
-     * the momentum of the macroparticles to the common frame, to the x-axis.
+     * the momentum of the macroparticles to the curvilinear frame, equivalent to the x-axis.
      * (This is only valid if we use only the m=0 azimuthal mode in the simulation;
      * there is a corresponding assert statement at initialization.) */
     mypc->TransformMomentumToCurvilinear(/*forward*/true);
