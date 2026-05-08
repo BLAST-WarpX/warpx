@@ -422,9 +422,9 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
-MultiParticleContainer::RotateParticleAnglesByTheta (amrex::ParticleReal sign) {
+MultiParticleContainer::MapMomentumToXAxis (amrex::ParticleReal sign) {
     for (const auto &pc : allcontainers) {
-        pc->RotateParticleAnglesByTheta(sign);
+        pc->MapMomentumToXAxis(sign);
     }
 }
 

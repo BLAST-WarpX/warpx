@@ -94,7 +94,7 @@ public:
 
     amrex::ParticleReal maxParticleVelocity();
 
-    void RotateParticleAnglesByTheta (amrex::ParticleReal sign);
+    void MapMomentumToXAxis (amrex::ParticleReal sign);
 
     void AllocData ();
 
