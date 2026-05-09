@@ -105,7 +105,7 @@ WarpX::InitEB ()
             pp_eb2.add("geom_type", geom_type); // use all_regular by default
         }
         // See the comment above on amrex::EB2::Build for the hard-wired number 20.
-        amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20, 4, false);
     }
 #endif
 }
