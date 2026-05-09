@@ -1959,6 +1959,7 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             // Convert B1p = Brp and B2p = Bthp to Bxp and Byp
             Bxp += costh*B1p - sinth*B2p;
             Byp += costh*B2p + sinth*B1p;
+            Bzp += B3p;
 #elif defined(WARPX_DIM_RSPHERE)
             // Convert B1p = Brp, B2p = Bthp, and B3p = Bphp to Bxp, Byp, and Bzp
             Bxp += costh*cosph*B1p - sinth*B2p - costh*sinph*B3p;
