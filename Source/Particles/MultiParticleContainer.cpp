@@ -693,6 +693,47 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
     return rho;
 }
 
+std::unique_ptr<amrex::MultiFab>
+MultiParticleContainer::GetGlobalPlasmaFrequency (int lev)
+{
+    const WarpX & warpx = WarpX::GetInstance();
+
+    amrex::BoxArray const & ba = warpx.boxArray(lev);
+    amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+    int const ncomps = 1;
+    const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+    auto global_plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dmap, ncomps, ng);
+    global_plasma_frequency->setVal(amrex::Real(0.0));
+
+    for (auto& pc : allcontainers) {
+
+        if (pc->getMass() == 0. || pc->getCharge() == 0.) {
+            continue;
+        }
+
+        std::unique_ptr<amrex::MultiFab> plasma_frequency = pc->GetPlasmaFrequency(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*global_plasma_frequency, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            const amrex::Box box = mfi.tilebox();
+
+            amrex::Array4<amrex::Real> const& omegap_array = plasma_frequency->array(mfi);
+            amrex::Array4<amrex::Real> const& global_omegap_array = global_plasma_frequency->array(mfi);
+
+            amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real const omegap = omegap_array(i,j,k);
+                    amrex::Real const global_omegap = global_omegap_array(i,j,k);
+                    global_omegap_array(i,j,k) = std::sqrt(global_omegap*global_omegap + omegap*omegap);
+                });
+        }
+    }
+    return global_plasma_frequency;
+}
+
 void
 MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
