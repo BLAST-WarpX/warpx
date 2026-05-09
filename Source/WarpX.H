@@ -422,10 +422,12 @@ public:
     void ComputeDt ();
 
     /**
-     * Determine the simulation timestep from the maximum speed of all particles
-     * Sets timestep so that a particle can only cross cfl*dx cells per timestep.
+     * Determine the simulation timestep from the time step limiters
      */
-    void UpdateDtFromParticleSpeeds ();
+    amrex::Real ParticleGridSpeedMax ();
+    amrex::Real GlobalPlasmaFrequencyMax ();
+    amrex::Real GlobalCyclotronFrequencyMax ();
+    void ApplyDtLimiters ();
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -1169,6 +1171,7 @@ private:
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
     utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    std::string m_dt_update_diagnostic_file;
 
     bool m_safe_guard_cells = false;
 
@@ -1287,6 +1290,8 @@ private:
     // Timestepping parameters
     std::optional<amrex::Real> m_const_dt;
     std::optional<amrex::Real> m_max_dt;
+    std::optional<amrex::Real> m_max_omegap_dt;
+    std::optional<amrex::Real> m_max_omegac_dt;
 
     // whether to use subcycling
     bool m_do_subcycling = false;
