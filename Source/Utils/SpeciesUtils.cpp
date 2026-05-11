@@ -94,9 +94,6 @@ namespace SpeciesUtils {
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));
-        } else if (rho_prof_s == "predefined") {
-            // Construct InjectorDensity with InjectorDensityPredefined.
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityPredefined*)nullptr,species_name));
         } else if (rho_prof_s == "parse_density_function") {
             std::string str_density_function;
             utils::parser::Store_parserString(pp_species, source_name, "density_function(x,y,z)", str_density_function);
