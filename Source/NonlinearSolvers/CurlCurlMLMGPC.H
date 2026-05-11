@@ -393,6 +393,13 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         } else {
             m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
         }
+#if defined(WARPX_EM_TEY)
+#if AMREX_SPACEDIM == 1
+        solution[1].setVal(0.0);
+#elif AMREX_SPACEDIM == 2
+        solution[2].setVal(0.0);
+#endif
+#endif
     }
 }
 
