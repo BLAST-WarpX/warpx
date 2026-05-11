@@ -34,7 +34,6 @@ InverseBremsstrahlung::InverseBremsstrahlung (std::string const& collision_name,
     const amrex::ParmParse pp_collision_name(collision_name);
 
     pp_collision_name.query("energy_fraction", m_energy_fraction);
-    pp_collision_name.query("energy_fraction_max", m_energy_fraction_max);
 
 }
 
@@ -257,7 +256,6 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     amrex::Long* failed_corrections_ptr = failed_corrections.data();
 
     const amrex::ParticleReal energy_fraction = m_energy_fraction;
-    const amrex::ParticleReal energy_fraction_max = m_energy_fraction_max;
 
     // Distribute any remaining energy to the electrons using the pairwise
     // operation (that does not affect the total momentum)
@@ -275,7 +273,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
                      ParticleUtils::ModifyEnergyPairwise(ux_electrons, uy_electrons, uz_electrons, w_electrons,
                                                          indices_electrons,
                                                          cell_start_electrons, cell_stop_electrons, m_electrons,
-                                                         energy_fraction, energy_fraction_max, deltaEp_subtract);
+                                                         energy_fraction, deltaEp_subtract);
                 KE_in_each_cell[i_cell] = -deltaEp_subtract;
                 if (correction_failed) {
                     amrex::Gpu::Atomic::Add(failed_corrections_ptr, amrex::Long(1));
