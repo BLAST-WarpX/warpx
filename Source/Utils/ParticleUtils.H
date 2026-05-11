@@ -343,6 +343,8 @@ namespace ParticleUtils {
      *
      * @param[in] engine the random engine
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy_MeV center-of-mass collision energy in MeV
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     amrex::ParticleReal getRandomCosTheta (
