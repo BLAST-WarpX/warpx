@@ -191,12 +191,14 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             index_type const* AMREX_RESTRICT bins_1_ptr = bins_1.binsPtr();
             amrex::ParticleReal* AMREX_RESTRICT wtot1_in_each_cell = wtot1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+            uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
             amrex::ParallelFor( np1,
                 [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
-                    amrex::Gpu::Atomic::AddNoRet(&wtot1_in_each_cell[bins_1_ptr[ip]],
-                                                 w1[ip]);
+                    if (idcpu1[ip] == amrex::ParticleIdCpus::Invalid) { return; }
+
+                    amrex::Gpu::Atomic::AddNoRet(&wtot1_in_each_cell[bins_1_ptr[ip]], w1[ip]);
                 }
             );
 
@@ -205,9 +207,11 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             index_type* AMREX_RESTRICT p_counts = num_products_vec.dataPtr();
 
             // Get grid information needed to compute physical cell center coordinates
-            const amrex::Box& box = mfi.tilebox();
+            const amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0.0_rt);
-            const amrex::Dim3 lo = lbound(box);
+#if AMREX_SPACEDIM > 1
+            const amrex::IntVect len = box.length();
+#endif
             const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom_lev.CellSizeArray();
 
             amrex::ParallelForRNG( n_cells,
@@ -216,21 +220,31 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                     const amrex::ParticleReal wtot1 = wtot1_in_each_cell[i_cell];
                     if (wtot1 == 0.0_prt) { return; }
 
-                    // Get physical coordinates at cell center
-                    const amrex::IntVect iv = box.atOffset(i_cell);
+                    // Note that ParticleUtils::findParticlesInEachCell() uses DenseBins,
+                    // which maps like i_cell = ix * nz + iz for 2D
+                    // and i_cell = ix * (ny * nz) + iy * nz + iz for 3D.
+                    // Don't use box.getOffset(i_cell), which assumes i_cell = ix + nx * iz
+                    // for 2D and i_cell = ix + nx * (iy + ny * iz) for 3D.
+
+                    // Get physical coordinates at cell center.
                     amrex::XDim3 xyz_cc = {0.0_rt, 0.0_rt, 0.0_rt};
                     const amrex::Real half = 0.5_rt;
 #if   defined(WARPX_DIM_1D_Z)
-                    xyz_cc.z = xyzmin.z + (iv[0] - lo.x + half)*dx[0];
+                    xyz_cc.z = xyzmin.z + (i_cell + half)*dx[0];
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
+                    xyz_cc.x = xyzmin.x + (i_cell + half)*dx[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
-                    xyz_cc.z = xyzmin.z + (iv[1] - lo.y + half)*dx[1];
+                    const int ix = i_cell / len[1];
+                    const int iz = i_cell % len[1];
+                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
+                    xyz_cc.z = xyzmin.z + (iz + half)*dx[1];
 #elif defined(WARPX_DIM_3D)
-                    xyz_cc.x = xyzmin.x + (iv[0] - lo.x + half)*dx[0];
-                    xyz_cc.y = xyzmin.y + (iv[1] - lo.y + half)*dx[1];
-                    xyz_cc.z = xyzmin.z + (iv[2] - lo.z + half)*dx[2];
+                    const int ix = i_cell / (len[1] * len[2]);
+                    const int iy = (i_cell / len[2]) % len[1];
+                    const int iz = i_cell % len[2];
+                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
+                    xyz_cc.y = xyzmin.y + (iy + half)*dx[1];
+                    xyz_cc.z = xyzmin.z + (iz + half)*dx[2];
 #endif
 
                     // Compute total weight of products to create in this cell
@@ -283,8 +297,6 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
             index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
             index_type const* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
-
-            uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
             amrex::ParticleReal* AMREX_RESTRICT wA  = soa_productA.m_rdata[PIdx::w];
             amrex::ParticleReal* AMREX_RESTRICT uAx = soa_productA.m_rdata[PIdx::ux];
