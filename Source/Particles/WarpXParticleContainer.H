@@ -400,6 +400,7 @@ public:
     void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
+    std::unique_ptr<amrex::MultiFab> GetPlasmaFrequency (int lev);
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositMassMatrices (WarpXParIter& pti,

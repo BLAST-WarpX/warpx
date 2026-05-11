@@ -19,38 +19,42 @@
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
-#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
-#include "Initialization/ExternalField_fwd.H"
-#include "Particles/ParticleBoundaryBuffer_fwd.H"
-#include "Particles/MultiParticleContainer_fwd.H"
-#include "Particles/WarpXParticleContainer_fwd.H"
-#include "Particles/ParticleThermalizer/ParticleThermalizer.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "Fluids/WarpXFluidContainer_fwd.H"
+#include "Initialization/ExternalField_fwd.H"
+#include "Particles/MultiParticleContainer_fwd.H"
+#include "Particles/ParticleBoundaryBuffer_fwd.H"
+#include "Particles/WarpXParticleContainer_fwd.H"
 
 #ifdef WARPX_USE_FFT
 #   ifdef WARPX_DIM_RZ
-#       include "FieldSolver/SpectralSolver/SpectralSolverRZ_fwd.H"
 #       include "BoundaryConditions/PML_RZ_fwd.H"
+#       include "FieldSolver/SpectralSolver/SpectralSolverRZ_fwd.H"
 #   else
 #       include "FieldSolver/SpectralSolver/SpectralSolver_fwd.H"
 #   endif
 #endif
+
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
+#include "Particles/ParticleThermalizer/ParticleThermalizer.H"
+#include "Utils/export.H"
 #include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/export.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
+
+#include <AMReX_BaseFwd.H>
+#include <AMReX_AmrCoreFwd.H>
 
 #include <AMReX.H>
 #include <AMReX_AmrCore.H>
@@ -67,9 +71,6 @@
 #include <AMReX_RealBox.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_Vector.H>
-
-#include <AMReX_BaseFwd.H>
-#include <AMReX_AmrCoreFwd.H>
 
 #include <array>
 #include <iostream>
@@ -421,10 +422,12 @@ public:
     void ComputeDt ();
 
     /**
-     * Determine the simulation timestep from the maximum speed of all particles
-     * Sets timestep so that a particle can only cross cfl*dx cells per timestep.
+     * Determine the simulation timestep from the time step limiters
      */
-    void UpdateDtFromParticleSpeeds ();
+    amrex::Real ParticleGridSpeedMax ();
+    amrex::Real GlobalPlasmaFrequencyMax ();
+    amrex::Real GlobalCyclotronFrequencyMax ();
+    void ApplyDtLimiters ();
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -564,13 +567,13 @@ public:
     void DampFieldsInGuards (int lev, amrex::MultiFab* mf);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
-                                                   amrex::MultiFab* Jy,
-                                                   amrex::MultiFab* Jz,
-                                                   int lev) const;
+    void ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx,
+                                                    amrex::MultiFab* Jy,
+                                                    amrex::MultiFab* Jz,
+                                                    int lev) const;
 
-    void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
-                                                  int lev) const;
+    void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
+                                                   int lev) const;
 #endif
 
     /**
@@ -1163,6 +1166,7 @@ private:
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
     utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    std::string m_dt_update_diagnostic_file;
 
     bool m_safe_guard_cells = false;
 
@@ -1281,6 +1285,8 @@ private:
     // Timestepping parameters
     std::optional<amrex::Real> m_const_dt;
     std::optional<amrex::Real> m_max_dt;
+    std::optional<amrex::Real> m_max_omegap_dt;
+    std::optional<amrex::Real> m_max_omegac_dt;
 
     // whether to use subcycling
     bool m_do_subcycling = false;
