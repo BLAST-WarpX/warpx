@@ -783,9 +783,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     const amrex::Real density_min = plasma_injector.density_min;
     const amrex::Real density_max = plasma_injector.density_max;
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    const int nmodes = WarpX::n_rz_azimuthal_modes;
-#endif
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
@@ -961,8 +958,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         // The invalid ones are given negative ID and are deleted during the
         // next redistribute.
         auto *const poffset = offset.data();
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        const bool rz_random_theta = m_rz_random_theta;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const bool random_theta = m_random_theta;
 #endif
         amrex::ParallelForRNG(overlap_box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
@@ -970,9 +967,10 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
             amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            amrex::Real theta_offset = 0._rt;
-            if (rz_random_theta) { theta_offset = amrex::Random(engine) * 2._rt * MathConst::pi; }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Add random offset to theta on a cell-by-cell basis
+            const amrex::Real theta_offset = (random_theta ? 2._rt * MathConst::pi * amrex::Random(engine) : 0._rt);
 #endif
 
             const amrex::Real scale_fac = compute_scale_fac_volume(dx, pcounts[index]);
@@ -1008,22 +1006,15 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     continue;
                 }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                // Replace the x and y, setting an angle theta.
-                // These x and y are used to get the momentum and density
-                // With only 1 mode, the angle doesn't matter so
-                // choose it randomly.
-                const amrex::Real theta = (nmodes == 1 && rz_random_theta)?
-#if defined(WARPX_DIM_RZ)
-                    // This should be updated to be the same as below, since theta
-                    // should range from -pi to +pi. This should be a separate PR
-                    // since it will break RZ CI tests.
-                    (2._rt*MathConst::pi*amrex::Random(engine)):
-#elif defined(WARPX_DIM_RCYLINDER)
-                    (MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt)):
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                // Replace the x and y, setting an angle theta in (-pi, pi].
+                // These x and y are used to get the momentum and density.
+                const amrex::Real theta_base = MathConst::pi*(1._rt - 2._rt*r.y) + theta_offset;
+                const amrex::Real theta = (theta_base > MathConst::pi ?
+                                     theta_base - 2._rt*MathConst::pi : theta_base);
 #endif
-                    (2._rt*MathConst::pi*r.y + theta_offset);
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Adjust the particle radius to produce the correct distribution.
                 // Note that this may shift particles outside of the current tile,
                 // but this is Ok since particles will be redistributed afterwards.
@@ -1039,10 +1030,9 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 pos.x = xb*std::cos(theta);
                 pos.y = xb*std::sin(theta);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Replace the x, y, and z, setting angles theta and phi.
-                // These x, y, and z are used to get the momentum and density
-                const amrex::Real theta = MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt);
-                const amrex::Real sin_phi = 2._rt*amrex::Random(engine) - 1._rt;
+                // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
+                // These x, y, and z are used to get the momentum and density.
+                const amrex::Real sin_phi = 1._rt - 2._rt*r.z;
                 const amrex::Real cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 const amrex::Real phi = std::atan2(sin_phi, cos_phi);
 
@@ -1174,11 +1164,13 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // Update the weight based on the specified power.
                 // The coefficient ensures that the correct density distribution is obtained.
                 const amrex::Real coeff = 2._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                 weight *= coeff*std::pow(xb/rmax, 1._rt - radial_numpercell_power);
 #elif defined(WARPX_DIM_RSPHERE)
                 const amrex::Real coeff = 4._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power )*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power )*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                 weight *= coeff*std::pow(xb/rmax, 2._rt - radial_numpercell_power);
 #endif
                 pa[PIdx::w ][ip] = weight;
@@ -1283,10 +1275,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     constexpr int level_zero = 0;
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    const int nmodes = WarpX::n_rz_azimuthal_modes;
-    const bool rz_random_theta = m_rz_random_theta;
-#endif
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
 #endif
@@ -1572,6 +1560,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 }
 #endif
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                // Replace the x and y, setting an angle theta in (-pi, pi].
+                // These x and y are used to get the momentum and flux.
+                const amrex::Real theta = MathConst::pi * (1._rt - 2._rt*r.y);
+#endif
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Adjust the particle radius to produce the correct distribution.
                 // Note that this may shift particles outside of the current tile,
@@ -1585,23 +1579,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 amrex::Real const radial_position = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
 
                 // Conversion from cylindrical to Cartesian coordinates
-                // Replace the x and y, setting an angle theta.
-                // These x and y are used to get the momentum and flux
-                // With only 1 mode, the angle doesn't matter so
-                // choose it randomly.
-                const amrex::Real theta = (nmodes == 1 && rz_random_theta)?
-#if defined(WARPX_DIM_RZ)
-                    // This should be updated to be the same as below, since theta
-                    // should range from -pi to +pi. This should be a separate PR
-                    // since it will break RZ CI tests.
-                    (2._rt*MathConst::pi*amrex::Random(engine)):
-#elif defined(WARPX_DIM_RCYLINDER)
-                    (MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt)):
-#endif
-                    (2._prt*MathConst::pi*r.y);
                 amrex::Real const cos_theta = std::cos(theta);
                 amrex::Real const sin_theta = std::sin(theta);
-                // Rotate the position
                 ppos.x = radial_position*cos_theta;
                 ppos.y = radial_position*sin_theta;
                 if ((loc_flux_normal_axis != 2)
@@ -1631,10 +1610,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const radial_position = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
 
-                // Replace the x, y, and z, setting angles theta and phi.
-                // These x, y, and z are used to get the momentum and flux
-                amrex::Real const theta = MathConst::pi*(2._rt*amrex::Random(engine) - 1._rt);
-                amrex::Real const sin_phi = 2._rt*amrex::Random(engine) - 1._rt;
+                // Replace the x, y, and z, setting angles theta in (-pi, pi] and phi in (-pi/2, pi/2].
+                // These x, y, and z are used to get the momentum and flux.
+                const amrex::Real sin_phi = 1._rt - 2._rt*r.z;
                 amrex::Real const cos_phi = std::sqrt(1._rt - sin_phi*sin_phi);
                 amrex::Real const phi = std::atan2(sin_phi, cos_phi);
                 amrex::Real const cos_theta = std::cos(theta);
@@ -1696,7 +1674,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Update the weight based on the specified power.
                     // The coefficient ensures that the correct density distribution is obtained.
                     const amrex::Real coeff = 2._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                     t_weight *= coeff*std::pow(radial_position/rmax, 1._rt - radial_numpercell_power);
                 }
 
@@ -1713,7 +1692,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Update the weight based on the specified power.
                     // The coefficient ensures that the correct density distribution is obtained.
                     const amrex::Real coeff = 4._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                     t_weight *= coeff*std::pow(radial_position/rmax, 2._rt - radial_numpercell_power);
                 }
                 const amrex::Real weight = t_weight;
