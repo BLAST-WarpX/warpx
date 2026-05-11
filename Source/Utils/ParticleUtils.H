@@ -353,6 +353,7 @@ namespace ParticleUtils {
         ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
         amrex::ParticleReal const collision_energy_MeV)
     {
+        using namespace amrex::literals;
         amrex::ParticleReal cos_theta = 1.0_prt;
         if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
             // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
