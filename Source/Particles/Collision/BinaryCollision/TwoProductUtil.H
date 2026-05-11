@@ -44,6 +44,7 @@ namespace {
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -66,6 +67,8 @@ namespace {
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
                             ScatteringAngleModel scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const&
+                                anisotropic_coefficients,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -112,6 +115,10 @@ namespace {
         // total kinetic energy.
         const amrex::ParticleReal E_star_f_sq = powi<2>(std::sqrt(E_star_sq)
                                                          - E_rest_in + E_rest_out + E_reaction);
+        const amrex::ParticleReal E_kin_star = std::sqrt(E_star_sq) - E_rest_in;
+        constexpr amrex::ParticleReal joule_to_MeV = 1.e-6_prt / PhysConst::q_e;
+        const amrex::ParticleReal E_kin_star_MeV =
+            ((E_kin_star > 0._prt) ? E_kin_star : 0._prt) * joule_to_MeV;
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -165,8 +172,9 @@ namespace {
         else {
             // Isotropic or anisotropic scattering: the angle of emission of the products in the center of mass frame
             // is random or determined by an anisotropic model
-            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
-                                             engine, scattering_angle_model);
+            ParticleUtils::RandomizeVelocity(
+                px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
+                engine, scattering_angle_model, anisotropic_coefficients, E_kin_star_MeV);
         }
 
         // Next step is to convert momenta to lab frame

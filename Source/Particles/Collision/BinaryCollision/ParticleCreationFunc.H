@@ -175,6 +175,14 @@ public:
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
         const ScatteringAngleModel t_scattering_angle_model = m_scattering_angle_model;
+        const ScatteringUtils::AnisotropicCoefficientTable t_anisotropic_coefficients{
+            m_fusion_angular_distribution_energies.empty() ? nullptr
+                : m_fusion_angular_distribution_energies.data(),
+            m_fusion_angular_distribution_coefficients.empty() ? nullptr
+                : m_fusion_angular_distribution_coefficients.data(),
+            m_fusion_angular_distribution_num_energies,
+            m_fusion_angular_distribution_num_coefficients
+        };
 
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
@@ -234,20 +242,23 @@ public:
                     ProtonBoronFusionInitializeMomentum(soa_1, soa_2, soa_products_data[0],
                                                         p_pair_indices_1[i], p_pair_indices_2[i],
                                                         product_start_index, m1, m2,
-                                                        t_scattering_angle_model, engine);
+                                                        t_scattering_angle_model,
+                                                        t_anisotropic_coefficients, engine);
                 }
                 else if (BinaryCollisionUtils::is_two_product_fusion_type(t_collision_type))
                 {
                     const amrex::ParticleReal mass_before = m1 + m2;
-                    const amrex::ParticleReal mass_after = products_mass_data[0] + products_mass_data[1];
-                    const amrex::ParticleReal fusion_energy = (mass_before - mass_after)*PhysConst::c2;
+                    const amrex::ParticleReal mass_after =
+                        products_mass_data[0] + products_mass_data[1];
+                    const amrex::ParticleReal fusion_energy =
+                        (mass_before - mass_after)*PhysConst::c2;
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy,
-                        t_scattering_angle_model, engine);
+                        t_scattering_angle_model, t_anisotropic_coefficients, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
                     LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
@@ -292,6 +303,10 @@ private:
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
     ScatteringAngleModel m_scattering_angle_model{ScatteringAngleModel::Default};
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_fusion_angular_distribution_energies;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_fusion_angular_distribution_coefficients;
+    int m_fusion_angular_distribution_num_energies = 0;
+    int m_fusion_angular_distribution_num_coefficients = 0;
 };
 
 

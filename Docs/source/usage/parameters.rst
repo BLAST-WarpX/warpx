@@ -2942,9 +2942,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``nuclearfusion``. The scattering angle for the products of the fusion reaction.
-    The possible values are ``isotropic`` and ``forward``.
+    The possible values are ``isotropic``, ``forward``, and ``anisotropic``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant.
+    With ``anisotropic``, the scattering angle is drawn from the anisotropic distribution as given by the differential cross section of the fusion reaction.
 
 .. pp:param:: <collision_name>.background_density
     :type: ``float``

@@ -379,6 +379,7 @@ public:
                     ScatteringAngleModel::Forward,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the reactant particle, in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{},
                     engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))

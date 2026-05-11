@@ -75,6 +75,8 @@ DDNHeF1.species = deuterium_1 hydrogen2_1
 DDNHeF1.product_species = helium3_1 neutron_1
 DDNHeF1.type = nuclearfusion
 DDNHeF1.event_multiplier = 1.e50
+DDNHeF1.scattering_angle_model = anisotropic
+DDNHeF1.fusion_angular_distribution_coefficients = "../../../indc-aus-0019-D.d.n.He3-A.txt"
 
 # Diagnostics
 diagnostics.diags_names = diag1
