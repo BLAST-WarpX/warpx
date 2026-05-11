@@ -369,9 +369,11 @@ WarpX::Evolve (int numsteps)
         if (checkStopSimulation(cur_time)) {
             break;
         }
+
         if (m_tiny_profiler_flush_interval.contains(step+1)) {
             BL_PROFILE_TINY_FLUSH();
         }
+
     } // End loop on time steps
 
     // This if statement is needed for PICMI, which allows the Evolve routine to be
