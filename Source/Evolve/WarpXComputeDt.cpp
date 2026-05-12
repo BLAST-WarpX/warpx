@@ -225,7 +225,7 @@ WarpX::GlobalCyclotronFrequencyMax ()
     {
         const WarpXParticleContainer& pc = mypc->GetParticleContainer(i);
         if (pc.getMass() > 0.) {
-            const amrex::Real pc_omegac = pc.getCharge()*B_max/pc.getMass();
+            const amrex::Real pc_omegac = std::abs(pc.getCharge())*B_max/pc.getMass();
             omegac_max = std::max(omegac_max, pc_omegac);
         }
     }
