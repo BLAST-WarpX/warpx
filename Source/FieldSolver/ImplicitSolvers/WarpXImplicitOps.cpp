@@ -270,19 +270,6 @@ WarpX::FinishImplicitParticleUpdate ()
                     uy[ip] = 2._rt*uy[ip] - uy_n[ip];
                     uz[ip] = 2._rt*uz[ip] - uz_n[ip];
 
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
-                    // rotate particles back to theta = 0.
-                    const amrex::ParticleReal rp = std::sqrt(xp*xp + yp*yp);
-                    const amrex::ParticleReal costh = (rp > 0. ? xp/rp : 1.0_prt);
-                    const amrex::ParticleReal sinth = (rp > 0. ? yp/rp : 0.0_prt);
-                    const amrex::ParticleReal upx = ux[ip];
-                    const amrex::ParticleReal upy = uy[ip];
-                    ux[ip] =  costh*upx + sinth*upy;
-                    uy[ip] = -sinth*upx + costh*upy;
-                    xp = rp;
-                    yp = 0.0;
-#endif
-
                     setPosition(ip, xp, yp, zp);
                 });
 
