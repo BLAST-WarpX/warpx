@@ -30,7 +30,7 @@ my_constants.Nppc_z = 2           # particles per cell in z
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = tsim
-max_step = 20
+max_step = 10
 amr.n_cell =  224 8
 amr.max_grid_size = 8
 amr.max_level = 0
@@ -113,7 +113,7 @@ electrons.charge = -q_e
 electrons.mass = m_e
 electrons.injection_style = "NUniformPerCell"
 electrons.num_particles_per_cell_each_dim = Nppc_r Nppc_t Nppc_z
-electrons.radial_numpercell_power = 0.
+electrons.radial_numpercell_power = 1.
 electrons.random_theta = true
 electrons.profile = constant
 electrons.density = n0
@@ -127,7 +127,7 @@ deuterium.charge = q_e
 deuterium.mass = mD
 deuterium.injection_style = "NUniformPerCell"
 deuterium.num_particles_per_cell_each_dim = Nppc_r Nppc_t Nppc_z
-deuterium.radial_numpercell_power = 0.
+deuterium.radial_numpercell_power = 1.
 deuterium.random_theta = false
 deuterium.profile = constant
 deuterium.density = n0
@@ -167,11 +167,6 @@ poynting_flux.path = diags/reduced_files/
 ############ COLLISION ##########
 #################################
 collisions.collision_names = collision1 collision2 collision3
-
-collisions.correct_energy_momentum = true
-collisions.energy_correction_sort_by_weight = true
-collisions.energy_fraction = 0.05
-collisions.beta_weight_exponent = 1.0
 
 collision1.species = electrons electrons
 collision2.species = deuterium deuterium
