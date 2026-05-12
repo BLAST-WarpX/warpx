@@ -164,6 +164,11 @@ poynting_flux.path = diags/reduced_files/
 #################################
 collisions.collision_names = collision1 collision2 collision3
 
+collisions.correct_energy_momentum = true
+collisions.energy_correction_sort_by_weight = true
+collisions.energy_fraction = 0.05
+collisions.beta_weight_exponent = 1.0
+
 collision1.species = electrons electrons
 collision2.species = deuterium deuterium
 collision3.species = electrons deuterium
