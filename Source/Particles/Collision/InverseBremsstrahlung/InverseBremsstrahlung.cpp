@@ -121,11 +121,15 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
     amrex::Geometry const& geom = warpx.Geom(lev);
     auto const dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
+#if defined(WARPX_DIM_RZ)
     auto const lo = lbound(cbx);
     auto const hi = ubound(cbx);
     int const nz = hi.y - lo.y + 1;
+#endif
+    amrex::XDim3 const xyzmin = WarpX::LowerCorner(cbx, lev, 0._rt);
+    amrex::Real const rmin = xyzmin.x;
     auto const dr = geom.CellSize(0);
 #endif
 
