@@ -95,7 +95,6 @@ bremsstrahlung.multiplier = 100.
 inverse_bremsstrahlung.type = inverse_bremsstrahlung
 inverse_bremsstrahlung.species = photons electrons
 inverse_bremsstrahlung.energy_fraction = 0.05
-inverse_bremsstrahlung.energy_fraction_max = 0.5
 
 # Diagnostics
 diagnostics.diags_names = diag1
