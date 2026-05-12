@@ -194,12 +194,14 @@ WarpX::Evolve (int numsteps)
 
         // Update the timestep for solvers that support adaptive timestepping
         // (electrostatic and theta-implicit EM), provided const_dt is not specified.
-        if (m_dt_update_interval.contains(step+1)) {
-            if (verbose_step) {
-                amrex::Print() << Utils::TextMsg::Info("updating timestep");
-            }
+        if (m_dt_update_interval.contains(step+1) || (step == 0 && m_max_dt.has_value())) {
             SynchronizeVelocityWithPosition();
-            UpdateDtFromParticleSpeeds();
+            ApplyDtLimiters();
+            if (verbose_step) {
+                std::ostringstream oss;
+                oss << "updating timestep to DT = " << std::scientific << std::setprecision(6) << dt[0];
+                amrex::Print() << Utils::TextMsg::Info(oss.str());
+            }
         }
 
         // If position and velocity are synchronized, push velocity backward one half step
