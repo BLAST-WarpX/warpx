@@ -2112,12 +2112,11 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
+    WarpX & warpx = WarpX::GetInstance();
+
     // This assumes that this is the first place these are needed each step
     // In addition to the temperature, this also calculates Vbar and N
     DepositTotalNGPTemperature(lev);
-
-    WarpX & warpx = WarpX::GetInstance();
-
     amrex::MultiFab & particle_number = *warpx.m_fields.get("N_" + species_name, lev);
     amrex::MultiFab & temperature = *warpx.m_fields.get("T_" + species_name, lev);
 
@@ -2268,11 +2267,18 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
                 amrex::Real const Ne = Ne_array(i,j,k); // particle number
                 if (Ne == 0.0) { return; }
 
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Return the radial factor for the volume element, dV
                 amrex::Real const r = rmin + (i - box_lo_r)*dr;
                 // This is (pi*(r+dr)**2 - pi*r**2)/dr
                 amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                // Return the radial factor for the volume element, dV
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (4/3*pi*(r+dr)**3 - 4/3*pi*r**3)/dr, leaving out the
+                // highest order term
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
 #else
                 // No factor is needed for Cartesian
                 amrex::Real constexpr volume_factor = 1._rt;

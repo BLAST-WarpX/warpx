@@ -130,14 +130,27 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 #endif
 
     auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ)
         // Return the radial factor for the volume element, dV
         int const ri = (i_cell - i_cell%nz)/nz;
-        return MathConst::pi*(2.0_prt*ri + 1.0_prt)*dr;
+        // rr is radius at the cell center
+        amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
+        return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
+#elif defined(WARPX_DIM_RCYLINDER)
+        int const ri = i_cell;
+        // rr is radius at the cell center
+        amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
+        return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
+#elif defined(WARPX_DIM_RSPHERE)
+        // This needs double checking
+        int const ri = i_cell;
+        // rr is radius at the cell center
+        amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
+        return 4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr*rr;
 #else
         // No factor is needed for Cartesian
         amrex::ignore_unused(i_cell);
-        return 1._prt;
+        return 1.0_prt;
 #endif
     };
 
