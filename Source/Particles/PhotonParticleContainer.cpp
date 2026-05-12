@@ -96,6 +96,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  MomentumPushType momentum_push_type)
 {
     amrex::ignore_unused(momentum_push_type);
+    // Photons are massless and neutral (q=0), so the Lorentz force equation
+    // is not applicable. They are not advanced using a particle pusher.
+    // That's why this argument MomentumPushType /momentum_push_type/ is ignored.
 
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));

@@ -3108,6 +3108,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
     particle momentum so that the energy and momentum are exactly conserved in each cell.
     This uses the algorithm described in https://doi.org/10.1016/j.jcp.2025.113927.
 
+.. pp:param:: collisions.np_warning_threshold
+    :type: ``int``
+    :default: 20.
+    :optional:
+
+    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, this parameter controls the minimum number of particles per cell for producing warning messages when the moment-correction method fails.
+
 .. pp:param:: collisions.energy_fraction
     :type: ``float``
     :default: 0.05
@@ -3115,18 +3122,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
     This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
-    This parameter is the fraction of the relative energy in the COM frame that is used in the correction.
-
-.. pp:param:: collisions.energy_fraction_max
-    :type: ``float``
-    :default: 0.5
-    :optional:
-
-    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
-    This can be set for each collision using :pp:param:`<collision_name>.energy_fraction_max`.
-    This parameter sets the maximum allowed value for :pp:param:`collisions.energy_fraction`.
-    If residual energy error remains after a pass over all particle pairs in a cell, the algorithm increases the effective correction fraction for the next pass based on an estimate of the remaining error.
-    If this computed value exceeds the limit imposed by this parameter, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
+    This parameter is the fraction of the relative energy in the COM frame that is used in the correction. If residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``
@@ -3188,17 +3184,40 @@ Time step
 
 .. pp:param:: warpx.dt_update_interval
     :type: ``string``
-    :default: ``-1``
     :optional:
 
-    How many iterations pass between timestep adaptations when using the electrostatic solver.
-    Must be greater than ``0`` to use adaptive timestepping, or else :pp:param:`warpx.const_dt` must be specified.
+    This controls adaptive timestepping, where the time step size is updated based on the conditions of the simulation, and only applies when using the explicit electrostatic or theta-implicit solvers.
+    This specifies time step intervals when the time step size is updated.
+    The value must be greater than ``0``.
+    When specified, :pp:param:`warpx.const_dt` must not also be specified.
+    The time step size is updated using the limits specified by :pp:param:`warpx.cfl`, :pp:param:`warpx.max_omegap_dt`, and :pp:param:`warpx.max_omegac_dt`.
+
+.. pp:param:: warpx.dt_update_diagnostic_file
+    :type: ``string``
+    :optional:
+
+    When adaptive timestepping is activated, information about the new time step and the simulation conditions are output to the file specified by this parameter.
+
+.. pp:param:: warpx.max_omegap_dt
+    :type: ``float``
+    :optional:
+
+    With adaptive timestepping, the time step size is limited to be less than or equal to the value specified divided by the global plasma frequency.
+    The application of this limit is controlled by :pp:param:`warpx.dt_update_interval`, and is only applied when using the explicit electrostatic or theta-implicit solver..
+
+.. pp:param:: warpx.max_omegac_dt
+    :type: ``float``
+    :optional:
+
+    With adaptive timestepping, the time step size is limited to be less than or equal to the value specified divided by the maximum cyclotron frequency.
+    Note that the maximum B-field is calculated from using only the constant applied B field (as set by :pp:param:`particles.B_external_particle`) and the B-field grid data.
+    The application of this limit is controlled by :pp:param:`warpx.dt_update_interval`, and is only applied when using the explicit electrostatic or theta-implicit solver..
 
 .. pp:param:: warpx.max_dt
     :type: ``float``
     :optional:
 
-    The maximum timestep permitted for the electrostatic solver, when using adaptive timestepping.
+    The maximum timestep permitted when using adaptive timestepping.
     If supplied, also sets the initial timestep for these simulations, before the first timestep update.
 
 Filtering
