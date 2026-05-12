@@ -523,7 +523,9 @@ MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& 
 
     for (int n = 0; n < 3; ++n) {
         fields.get(FieldType::MassMatrices_X, Direction{n}, lev)->setVal(0.0);
+#if !defined(WARPX_EM_TEY)
         fields.get(FieldType::MassMatrices_Y, Direction{n}, lev)->setVal(0.0);
+#endif
         fields.get(FieldType::MassMatrices_Z, Direction{n}, lev)->setVal(0.0);
     }
 
