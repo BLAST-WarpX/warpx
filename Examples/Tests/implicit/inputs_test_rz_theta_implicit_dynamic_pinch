@@ -30,7 +30,7 @@ my_constants.Nppc_z = 2           # particles per cell in z
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = tsim
-max_step = 10
+max_step = 20
 amr.n_cell =  224 8
 amr.max_grid_size = 8
 amr.max_level = 0
