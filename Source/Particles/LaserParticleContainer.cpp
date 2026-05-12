@@ -786,7 +786,8 @@ LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
                                MomentumPushType /*momentum_push_type*/)
 {
-    // I don't think we need to do anything.
+    // Laser particles are not advanced using a particle pusher.
+    // Therefore, PushP does nothing in this implementation.
 }
 
 /* \brief compute particles position in laser plane coordinate.
