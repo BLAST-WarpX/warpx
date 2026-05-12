@@ -2238,7 +2238,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
     {
         amrex::Box const & box = mfi.tilebox();
 
-#if defined WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const box_lo_r = box.smallEnd(0);
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
