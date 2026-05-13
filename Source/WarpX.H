@@ -572,6 +572,11 @@ public:
                                                     amrex::MultiFab* Jz,
                                                     int lev) const;
 
+    void ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx,
+                                                    amrex::MultiFab* Syy,
+                                                    amrex::MultiFab* Szz,
+                                                    int lev) const;
+
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
                                                    int lev) const;
 #endif
