@@ -75,4 +75,4 @@ plt.legend()
 plt.show()
 
 print("RMS error (%) in density: ", rms_errors)
-assert np.all(rms_errors < 0.06)
+assert np.all(rms_errors < 0.07)

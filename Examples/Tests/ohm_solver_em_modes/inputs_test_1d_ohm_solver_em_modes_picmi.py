@@ -56,7 +56,7 @@ class EMModes(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = [[1e-7, 1e-7], [1e-7, 1e-5], [1e-7, 1e-4]]
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 40
 
     def __init__(self, test, dim, B_dir, verbose):
         """Get input parameters for the specific case desired."""

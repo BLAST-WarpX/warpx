@@ -23,6 +23,7 @@
 #       include "FieldSolver/SpectralSolver/SpectralSolver.H"
 #   endif
 #endif
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
@@ -33,8 +34,8 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -134,7 +135,8 @@ WarpX::SynchronizeVelocityWithPosition () {
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = true;
@@ -144,8 +146,8 @@ WarpX::SynchronizeVelocityWithPosition () {
 void
 WarpX::Evolve (int numsteps)
 {
-    WARPX_PROFILE_REGION("WarpX::Evolve()");
-    WARPX_PROFILE("WarpX::Evolve()");
+    ABLASTR_PROFILE_REGION("WarpX::Evolve()");
+    ABLASTR_PROFILE("WarpX::Evolve()");
 
     using ablastr::fields::Direction;
 
@@ -162,7 +164,7 @@ WarpX::Evolve (int numsteps)
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
-        WARPX_PROFILE("WarpX::Evolve::step");
+        ABLASTR_PROFILE("WarpX::Evolve::step");
         const auto evolve_time_beg_step = static_cast<Real>(amrex::second());
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
@@ -192,12 +194,14 @@ WarpX::Evolve (int numsteps)
 
         // Update the timestep for solvers that support adaptive timestepping
         // (electrostatic and theta-implicit EM), provided const_dt is not specified.
-        if (m_dt_update_interval.contains(step+1)) {
-            if (verbose_step) {
-                amrex::Print() << Utils::TextMsg::Info("updating timestep");
-            }
+        if (m_dt_update_interval.contains(step+1) || (step == 0 && m_max_dt.has_value())) {
             SynchronizeVelocityWithPosition();
-            UpdateDtFromParticleSpeeds();
+            ApplyDtLimiters();
+            if (verbose_step) {
+                std::ostringstream oss;
+                oss << "updating timestep to DT = " << std::scientific << std::setprecision(6) << dt[0];
+                amrex::Print() << Utils::TextMsg::Info(oss.str());
+            }
         }
 
         // If position and velocity are synchronized, push velocity backward one half step
@@ -269,6 +273,11 @@ WarpX::Evolve (int numsteps)
         }
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
+
+        // Apply particle thermalizer (no-op until implemented)
+        if (m_particle_thermalizer.defined()) {
+            m_particle_thermalizer.applyThermalizer(*mypc);
+        }
 
         if (m_implicit_solver) {
             ExecutePythonCallback("beforecollisions");
@@ -385,7 +394,7 @@ void WarpX::OneStep (
     int a_step
 )
 {
-    WARPX_PROFILE("WarpX::OneStep()");
+    ABLASTR_PROFILE("WarpX::OneStep()");
 
     // implicit solver
     if (m_implicit_solver) {
@@ -397,30 +406,27 @@ void WarpX::OneStep (
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-            // with collisions placed in the middle of the position push and after the momentum push
-            if (m_collisions_split_position_push) {
-                // push particles (half position and full momentum)
+            // with collisions placed in the middle of the momentum push
+            if (m_collisions_split_momentum_push) {
+                // push particles (half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::FirstHalf,
-                    MomentumPushType::Full
+                    PositionPushType::None,
+                    MomentumPushType::FirstHalf
                 );
-
-                // communicate particle data
-                mypc->Redistribute();
 
                 // perform particle collisions
                 ExecutePythonCallback("beforecollisions");
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and half momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
-                    PositionPushType::SecondHalf,
-                    MomentumPushType::None
+                    PositionPushType::Full,
+                    MomentumPushType::SecondHalf
                 );
             }
             // with collisions placed before the position and momentum push, or without collisions
@@ -430,7 +436,7 @@ void WarpX::OneStep (
                 mypc->doCollisions(a_step, a_cur_time, a_dt);
                 ExecutePythonCallback("aftercollisions");
 
-                // push particles (half position)
+                // push particles (full position and full momentum)
                 PushParticlesandDeposit(
                     a_cur_time,
                     /*skip_deposition=*/true,
@@ -441,19 +447,24 @@ void WarpX::OneStep (
         }
         // electromagnetic solver
         else {
-            // perform particle collisions
-            ExecutePythonCallback("beforecollisions");
-            mypc->doCollisions(a_step, a_cur_time, a_dt);
-            ExecutePythonCallback("aftercollisions");
-
             // without mesh refinement
             if (finest_level == 0) {
                 // standard PIC loop
                 if (!m_JRhom) {
-                    OneStep_nosub(a_cur_time);
+                    OneStep_nosub(a_cur_time, a_dt, a_step);
                 }
                 // JRhom PIC loop
                 else {
+                    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_collisions_split_momentum_push == 0,
+                        "Collisions with split momentum push not yet implemented for JRhom PIC loop."
+                        "Set `collisions.split_momentum_push=0` to use JRhom with standard (pre-v-push collisions placement) collisions model."
+                    );
+                    // perform particle collisions
+                    ExecutePythonCallback("beforecollisions");
+                    mypc->doCollisions(a_step, a_cur_time, a_dt);
+                    ExecutePythonCallback("aftercollisions");
+
                     OneStep_JRhom(a_cur_time);
                 }
             }
@@ -461,7 +472,7 @@ void WarpX::OneStep (
             else {
                 // without subcycling
                 if (!m_do_subcycling) {
-                    OneStep_nosub(a_cur_time);
+                    OneStep_nosub(a_cur_time, a_dt, a_step);
                 }
                 // with subcycling
                 else {
@@ -469,6 +480,16 @@ void WarpX::OneStep (
                         finest_level == 1,
                         "Subcycling not implemented with more than 1 mesh refinement level"
                     );
+                    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_collisions_split_momentum_push == 0,
+                        "Collisions with split momentum push not yet implemented with subcycling."
+                        "Set `collisions.split_momentum_push=0` to use subcycling with standard (pre-v-push collisions placement) collisions model."
+                    );
+                    // perform particle collisions
+                    ExecutePythonCallback("beforecollisions");
+                    mypc->doCollisions(a_step, a_cur_time, a_dt);
+                    ExecutePythonCallback("aftercollisions");
+
                     OneStep_sub1(a_cur_time);
                 }
             }
@@ -482,19 +503,57 @@ void WarpX::OneStep (
  * for the field advance and particle pusher.
  */
 void
-WarpX::OneStep_nosub (Real cur_time)
+WarpX::OneStep_nosub (
+    amrex::Real a_cur_time,
+    amrex::Real a_dt,
+    int a_step
+)
 {
-    WARPX_PROFILE("WarpX::OneStep_nosub()");
+    ABLASTR_PROFILE("WarpX::OneStep_nosub()");
 
     // Push particle from x^{n} to x^{n+1}
     //               from p^{n-1/2} to p^{n+1/2}
     // Deposit current j^{n+1/2}
     // Deposit charge density rho^{n}
 
-    ExecutePythonCallback("particlescraper");
     ExecutePythonCallback("beforedeposition");
 
-    PushParticlesandDeposit(cur_time);
+    // with collisions placed in the middle of the momentum push
+    if (m_collisions_split_momentum_push) {
+        // push particles (half momentum)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_deposition=*/true,
+            PositionPushType::None,
+            MomentumPushType::FirstHalf
+        );
+        // perform particle collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+
+        // push particles (full position and half momentum)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_deposition=*/false,
+            PositionPushType::Full,
+            MomentumPushType::SecondHalf
+        );
+    }
+    else {
+        // perform particle collisions
+        ExecutePythonCallback("beforecollisions");
+        mypc->doCollisions(a_step, a_cur_time, a_dt);
+        ExecutePythonCallback("aftercollisions");
+
+        // push particles (full position and full momentum)
+        PushParticlesandDeposit(
+            a_cur_time,
+            /*skip_deposition=*/false,
+            PositionPushType::Full,
+            MomentumPushType::Full
+        );
+    }
 
     ExecutePythonCallback("afterdeposition");
 
@@ -521,7 +580,7 @@ WarpX::OneStep_nosub (Real cur_time)
             WarpX::Hybrid_QED_Push(dt);
             FillBoundaryE(guard_cells.ng_alloc_EB);
         }
-        PushPSATD(cur_time);
+        PushPSATD(a_cur_time);
 
         if (do_pml) {
             DampPML();
@@ -549,15 +608,15 @@ WarpX::OneStep_nosub (Real cur_time)
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
-        EvolveB(0.5_rt * dt[0], SubcyclingHalf::FirstHalf, cur_time); // We now have B^{n+1/2}
+        EvolveB(0.5_rt * dt[0], SubcyclingHalf::FirstHalf, a_cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
-            EvolveE(dt[0], cur_time); // We now have E^{n+1}
+            EvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
             // macroscopic medium
-            MacroscopicEvolveE(dt[0], cur_time); // We now have E^{n+1}
+            MacroscopicEvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else {
             WARPX_ABORT_WITH_MESSAGE("Medium for EM is unknown");
         }
@@ -565,7 +624,7 @@ WarpX::OneStep_nosub (Real cur_time)
 
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/1);
         EvolveG(0.5_rt * dt[0]);
-        EvolveB(0.5_rt * dt[0], SubcyclingHalf::SecondHalf, cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
+        EvolveB(0.5_rt * dt[0], SubcyclingHalf::SecondHalf, a_cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
             DampPML();
@@ -622,7 +681,8 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 *m_fields.get(FieldType::Efield_aux, Direction{2}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{0}, lev),
                 *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
-                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
+                *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev),
+                MomentumPushType::Full
             );
         }
         m_is_synchronized = false;
@@ -656,8 +716,10 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 {
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
+    ExecutePythonCallback("particlescraper");
+
     mypc->ApplyBoundaryConditions();
-    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc);
+    m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
     // Non-Maxwell solver: particles can move by an arbitrary number of cells
     if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
@@ -670,16 +732,16 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // Electromagnetic solver: due to CFL condition, particles can
         // only move by one or two cells per time step
         // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
-        if (max_level == 0) {
-            int num_redistribute_ghost = num_moved;
+        if (finest_level == 0) {
+            int max_cells_travelled = num_moved;
             if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
                 // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
-                num_redistribute_ghost += particle_max_grid_crossings + 1;
+                max_cells_travelled += particle_max_grid_crossings + 1;
             } else {
                 // Standard algorithm ; particles can move by up to the max number
-                num_redistribute_ghost += particle_max_grid_crossings;
+                max_cells_travelled += particle_max_grid_crossings;
             }
-            mypc->RedistributeLocal(num_redistribute_ghost);
+            mypc->RedistributeLocal(max_cells_travelled);
         }
         else {
             mypc->Redistribute();
@@ -691,7 +753,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         using warpx::fields::FieldType;
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
-            *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
+            *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+        // Remove particles that have been flagged to be scraped
         mypc->deleteInvalidParticles();
     }
 
@@ -1313,7 +1376,7 @@ WarpX::PushParticlesandDeposit (
         implicit_options
     );
 
-    if (!skip_deposition) {
+    if (!skip_deposition && !implicit_options) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
         ApplyInverseVolumeScalingToCurrentDensity(

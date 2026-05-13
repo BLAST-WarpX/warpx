@@ -11,6 +11,7 @@
 #include "HybridPICModel.H"
 
 #include <ablastr/utils/Communication.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
@@ -32,8 +33,17 @@ void HybridPICModel::ReadParameters ()
     const ParmParse pp_hybrid("hybrid_pic_model");
 
     // The B-field update is subcycled to improve stability - the number
-    // of sub steps can be specified by the user (defaults to 50).
+    // of sub steps can be specified by the user.
     utils::parser::queryWithParser(pp_hybrid, "substeps", m_substeps);
+    if (m_substeps % 2 != 0) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.substeps must be divisible by 2. "
+            "The value " + std::to_string(m_substeps) + " is not valid. "
+            "Automatically adjusting to " + std::to_string(m_substeps + 1) + ".",
+            ablastr::warn_manager::WarnPriority::medium);
+        m_substeps += 1;
+    }
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
 
@@ -61,6 +71,14 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("Jx_external_grid_function(x,y,z,t)", m_Jx_ext_grid_function);
     pp_hybrid.query("Jy_external_grid_function(x,y,z,t)", m_Jy_ext_grid_function);
     pp_hybrid.query("Jz_external_grid_function(x,y,z,t)", m_Jz_ext_grid_function);
+
+    // check if external currents are specified
+    if ((m_Jx_ext_grid_function == "0.0") &&
+        (m_Jy_ext_grid_function == "0.0") &&
+        (m_Jz_ext_grid_function == "0.0"))
+    {
+        m_has_external_current = false;
+    }
 
     // external fields
     pp_hybrid.query("add_external_fields", m_add_external_fields);
@@ -127,15 +145,17 @@ void HybridPICModel::AllocateLevelMFs (
 
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{0},
-        lev, amrex::convert(ba, jx_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{1},
-        lev, amrex::convert(ba, jy_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{2},
-        lev, amrex::convert(ba, jz_nodal_flag),
-        dm, ncomps, IntVect(1), 0.0_rt);
+    if (m_has_external_current) {
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_current_fp_external, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag),
+            dm, ncomps, IntVect(1), 0.0_rt);
+    }
 
     if (m_add_external_fields) {
         m_external_vector_potential->AllocateLevelMFs(
@@ -169,20 +189,22 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     const std::set<std::string> hyper_resistivity_symbols = m_hyper_resistivity_parser->symbols();
     m_hyper_resistivity_has_B_dependence += hyper_resistivity_symbols.count("B");
 
-    m_J_external_parser[0] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
-    m_J_external_parser[1] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jy_ext_grid_function,{"x","y","z","t"}));
-    m_J_external_parser[2] = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(m_Jz_ext_grid_function,{"x","y","z","t"}));
-    m_J_external[0] = m_J_external_parser[0]->compile<4>();
-    m_J_external[1] = m_J_external_parser[1]->compile<4>();
-    m_J_external[2] = m_J_external_parser[2]->compile<4>();
+    if (m_has_external_current) {
+        m_J_external_parser[0] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jx_ext_grid_function,{"x","y","z","t"}));
+        m_J_external_parser[1] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jy_ext_grid_function,{"x","y","z","t"}));
+        m_J_external_parser[2] = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_Jz_ext_grid_function,{"x","y","z","t"}));
+        m_J_external[0] = m_J_external_parser[0]->compile<4>();
+        m_J_external[1] = m_J_external_parser[1]->compile<4>();
+        m_J_external[2] = m_J_external_parser[2]->compile<4>();
 
-    // check if the external current parsers depend on time
-    for (int i=0; i<3; i++) {
-        const std::set<std::string> J_ext_symbols = m_J_external_parser[i]->symbols();
-        m_external_current_has_time_dependence += J_ext_symbols.count("t");
+        // check if the external current parsers depend on time
+        for (int i=0; i<3; i++) {
+            const std::set<std::string> J_ext_symbols = m_J_external_parser[i]->symbols();
+            m_external_current_has_time_dependence += J_ext_symbols.count("t");
+        }
     }
 
     auto& warpx = WarpX::GetInstance();
@@ -238,17 +260,19 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     Ez_IndexType[1]    = 1;
 #endif
 
-    // Initialize external current - note that this approach skips the check
-    // if the current is time dependent which is what needs to be done to
-    // write time independent fields on the first step.
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        warpx.ComputeExternalFieldOnGridUsingParser(
-            FieldType::hybrid_current_fp_external,
-            m_J_external[0],
-            m_J_external[1],
-            m_J_external[2],
-            lev, PatchType::fine,
-            warpx.GetEBUpdateEFlag());
+    if (m_has_external_current) {
+        // Initialize external current - note that this approach skips the check
+        // if the current is time dependent which is what needs to be done to
+        // write time independent fields on the first step.
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            warpx.ComputeExternalFieldOnGridUsingParser(
+                FieldType::hybrid_current_fp_external,
+                m_J_external[0],
+                m_J_external[1],
+                m_J_external[2],
+                lev, PatchType::fine,
+                warpx.GetEBUpdateEFlag());
+        }
     }
 
     if (m_add_external_fields) {
@@ -275,7 +299,7 @@ void HybridPICModel::GetCurrentExternal ()
 
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::MultiLevelVectorField const& Bfield,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E)
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E) const
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
@@ -287,9 +311,9 @@ void HybridPICModel::CalculatePlasmaCurrent (
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
-    const int lev)
+    const int lev) const
 {
-    WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
+    ABLASTR_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
@@ -303,14 +327,15 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // ApplyJfieldBoundary(lev, Jfield[0].get(), Jfield[1].get(), Jfield[2].get());
     for (int i=0; i<3; i++) { current_fp_plasma[i]->FillBoundary(warpx.Geom(lev).periodicity()); }
 
-    // Subtract external current from "Ampere" current calculated above. Note
-    // we need to include 1 ghost cell since later we will interpolate the
-    // plasma current to a nodal grid.
-    ablastr::fields::VectorField current_fp_external = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_external, lev);
-    for (int i=0; i<3; i++) {
-        current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
+    if (m_has_external_current) {
+        // Subtract external current from "Ampere" current calculated above. Note
+        // we need to include 1 ghost cell since later we will interpolate the
+        // plasma current to a nodal grid.
+        ablastr::fields::VectorField current_fp_external = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_external, lev);
+        for (int i=0; i<3; i++) {
+            current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
+        }
     }
-
 }
 
 void HybridPICModel::HybridPICSolveE (
@@ -341,7 +366,7 @@ void HybridPICModel::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, const bool solve_for_Faraday) const
 {
-    WARPX_PROFILE("WarpX::HybridPICSolveE()");
+    ABLASTR_PROFILE("WarpX::HybridPICSolveE()");
 
     HybridPICSolveE(
         Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
@@ -388,7 +413,7 @@ void HybridPICModel::CalculateElectronPressure() const
 
 void HybridPICModel::CalculateElectronPressure(const int lev) const
 {
-    WARPX_PROFILE("WarpX::CalculateElectronPressure()");
+    ABLASTR_PROFILE("WarpX::CalculateElectronPressure()");
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
@@ -482,7 +507,6 @@ void HybridPICModel::BfieldEvolveRK (
             Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 2,
             Bfield[lev][ii]->nGrowVect()
         );
-        K[ii].setVal(0.0);
     }
 
     // The Runge-Kutta scheme begins here.
@@ -509,16 +533,52 @@ void HybridPICModel::BfieldEvolveRK (
     );
 
     // The Bfield is now given by:
-    // B_new = B_old + 0.5 * dt * K0 + 0.5 * dt * [-curl x E(B_old + 0.5 * dt * K1)]
-    //       = B_old + 0.5 * dt * K0 + 0.5 * dt * K1
-    for (int ii = 0; ii < 3; ii++)
-    {
-        // Subtract 0.5 * dt * K0 from the Bfield for each direction, to get
-        // B_new = B_old + 0.5 * dt * K1.
-        MultiFab::Subtract(*Bfield[lev][ii], K[ii], 0, 0, 1, ng);
-        // Extract 0.5 * dt * K1 for each direction into index 1 of K.
-        MultiFab::LinComb(
-            K[ii], 1._rt, *Bfield[lev][ii], 0, -1._rt, B_old[ii], 0, 1, 1, ng
+    //   B_new = B_old + 0.5 * dt * K0 + 0.5 * dt * [-curl x E(B_old + 0.5 * dt * K1)]
+    //         = B_old + 0.5 * dt * K0 + 0.5 * dt * K1
+    //
+    // Subtract 0.5 * dt * K0 from the Bfield to get
+    //   B_new = B_old + 0.5 * dt * K1.
+    // Extract 0.5 * dt * K1 and write into index 1 of K.
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+
+        // Extract field data for this grid/tile
+        Array4<Real> const &Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const &By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const &Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const &Kx = K[0].array(mfi);
+        Array4<Real> const &Ky = K[1].array(mfi);
+        Array4<Real> const &Kz = K[2].array(mfi);
+        Array4<Real const> const &Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const &By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const &Bz_old = B_old[2].const_array(mfi);
+
+        // Extract tileboxes for which to loop
+        Box const& tjx  = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy  = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz  = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+
+        amrex::ParallelFor(tjx, tjy, tjz,
+            // x calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                Bx(i, j, k) -= Kx(i, j, k, 0);
+                Kx(i, j, k, 1) = Bx(i, j, k) - Bx_old(i, j, k);
+            },
+
+            // y calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                By(i, j, k) -= Ky(i, j, k, 0);
+                Ky(i, j, k, 1) = By(i, j, k) - By_old(i, j, k);
+            },
+
+            // z calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                Bz(i, j, k) -= Kz(i, j, k, 0);
+                Kz(i, j, k, 1) = Bz(i, j, k) - Bz_old(i, j, k);
+            }
         );
     }
 
@@ -545,26 +605,56 @@ void HybridPICModel::BfieldEvolveRK (
     );
 
     // The Bfield is now given by:
-    // B_new = B_old + dt * K2 + 0.5 * dt * [-curl x E(B_old + dt * K2)]
-    //       = B_old + dt * K2 + 0.5 * dt * K3
-    for (int ii = 0; ii < 3; ii++)
-    {
-        // Subtract B_old from the Bfield for each direction, to get
-        // B = dt * K2 + 0.5 * dt * K3.
-        MultiFab::Subtract(*Bfield[lev][ii], B_old[ii], 0, 0, 1, ng);
+    //   B_new = B_old + dt * K2 + 0.5 * dt * [-curl x E(B_old + dt * K2)]
+    //         = B_old + dt * K2 + 0.5 * dt * K3
+    // and
+    //   index 0 of K = 0.5 * dt * K0
+    //   index 1 of K = 0.5 * dt * K1
+    //
+    // We calculate:
+    //   K = 0.5 * dt * K0 + dt * K1 + dt * K2 + 0.5 * dt * K3
+    // then update B with the Runge-Kutta sum:
+    //   B = B_old + 1/3 * K
 
-        // Add dt * K2 + 0.5 * dt * K3 to index 0 of K (= 0.5 * dt * K0).
-        MultiFab::Add(K[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
-        // Add 2 * 0.5 * dt * K1 to index 0 of K.
-        MultiFab::LinComb(
-            K[ii], 1.0, K[ii], 0, 2.0, K[ii], 1, 0, 1, ng
-        );
+        // Extract field data for this grid/tile
+        Array4<Real> const &Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const &By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const &Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const &Kx = K[0].array(mfi);
+        Array4<Real> const &Ky = K[1].array(mfi);
+        Array4<Real> const &Kz = K[2].array(mfi);
+        Array4<Real const> const &Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const &By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const &Bz_old = B_old[2].const_array(mfi);
 
-        // Overwrite the Bfield with the Runge-Kutta sum:
-        // B_new = B_old + 1/3 * dt * (0.5 * K0 + K1 + K2 + 0.5 * K3).
-        MultiFab::LinComb(
-            *Bfield[lev][ii], 1.0, B_old[ii], 0, 1.0/3.0, K[ii], 0, 0, 1, ng
+        // Extract tileboxes for which to loop
+        Box const& tjx  = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy  = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz  = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+
+        amrex::ParallelFor(tjx, tjy, tjz,
+            // Bx calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                Kx(i, j, k, 0) += Bx(i, j, k) - Bx_old(i, j, k) + 2.0_rt * Kx(i, j, k, 1);
+                Bx(i, j, k) = Bx_old(i, j, k) + Kx(i, j, k, 0) / 3.0_rt;
+            },
+
+            // By calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                Ky(i, j, k, 0) += By(i, j, k) - By_old(i, j, k) + 2.0_rt * Ky(i, j, k, 1);
+                By(i, j, k) = By_old(i, j, k) + Ky(i, j, k, 0) / 3.0_rt;
+            },
+
+            // Bz calculation
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                Kz(i, j, k, 0) += Bz(i, j, k) - Bz_old(i, j, k) + 2.0_rt * Kz(i, j, k, 1);
+                Bz(i, j, k) = Bz_old(i, j, k) + Kz(i, j, k, 0) / 3.0_rt;
+            }
         );
     }
 }
@@ -587,7 +677,10 @@ void HybridPICModel::FieldPush (
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
-    warpx.FillBoundaryE(ng, nodal_sync);
+    // Call FillBoundary if a collocated grid is used
+    if (Bz_IndexType[0] == Ez_IndexType[0]) {
+        warpx.FillBoundaryE(ng, nodal_sync);
+    }
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);

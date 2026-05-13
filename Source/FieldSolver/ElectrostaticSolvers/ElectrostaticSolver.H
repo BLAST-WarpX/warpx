@@ -12,8 +12,8 @@
 #include "PoissonBoundaryHandler.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array.H>
 
 
@@ -25,7 +25,7 @@ class ElectrostaticSolver
 {
 public:
     ElectrostaticSolver() = default;
-    ElectrostaticSolver( int nlevs_max );
+    explicit ElectrostaticSolver( int nlevs_max );
 
     virtual ~ElectrostaticSolver();
 

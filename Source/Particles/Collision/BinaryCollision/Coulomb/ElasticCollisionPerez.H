@@ -13,7 +13,6 @@
 
 #include <AMReX_Random.H>
 
-
 /** Prepare information for and call UpdateMomentumPerezElastic().
  *
  * @tparam T_index type of index arguments
@@ -91,11 +90,6 @@ void ElasticCollisionPerez (
     // set max cross section based on mfp = atomic spacing
     const T_PR sigma_max = T_PR(1.0) / (maxn * rmin);
 
-#if (defined WARPX_DIM_RZ)
-    T_PR * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-    T_PR * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
-
     // call UpdateMomentumPerezElastic()
     {
       T_index i1 = I1s + coll_idx;
@@ -105,20 +99,6 @@ void ElasticCollisionPerez (
       // stride (smaller set size) until we do all collisions (larger set size)
       for (T_index k = coll_idx; k < max_N; k += min_N)
       {
-#if (defined WARPX_DIM_RZ)
-          /* In RZ geometry, macroparticles can collide with other macroparticles
-           * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-           * are actually not local in space. In this case, the underlying assumption is that
-           * particles within the same cylindrical cell represent a cylindrically-symmetry
-           * momentum distribution function. Therefore, here, we temporarily rotate the
-           * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-           * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-           * there is a corresponding assert statement at initialization.) */
-          T_PR const theta = theta2[I2[i2]]-theta1[I1[i1]];
-          T_PR const u1xbuf = u1x[I1[i1]];
-          u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-          u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
 
           // Compute the effective density n12 used to compute the normalized
           // transport mean free path (s12) in UpdateMomentumPerezElastic().
@@ -137,12 +117,6 @@ void ElasticCollisionPerez (
               u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
               n12, sigma_max, L, bmax, dt, engine );
-
-#if (defined WARPX_DIM_RZ)
-          T_PR const u1xbuf_new = u1x[I1[i1]];
-          u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-          u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
 
           if (max_N == NI1) {
             i1 += min_N;

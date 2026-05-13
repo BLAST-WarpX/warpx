@@ -5,8 +5,16 @@
 # WarpX executables are installed in /usr/bin/
 # WarpX Python bindings are installed in /opt/venv
 #
-# On Perlmutter, run WarpX like this:
-#   podman-hpc run --rm --gpu --cuda-mpi --nccl -v $PWD:/opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest warpx.2d /opt/pwd/inputs_base_2d
+# To push this to the NERSC registry, first tag the full name and version,
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman tag warpx-perlmutter:latest registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+# and then push
+#   podman login registry.nersc.gov
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest
+#   podman push registry.nersc.gov/m558/superfacility/warpx-perlmutter:25.11
+#
+# On Perlmutter, copy your inputs file to your present working directory (PWD) and run WarpX like this:
+#   podman-hpc run --rm --gpu --cuda-mpi --nccl -v $PWD:/opt/pwd --workdir /opt/pwd -it registry.nersc.gov/m558/superfacility/warpx-perlmutter:latest warpx.2d /opt/pwd/inputs_base_2d
 # Prefix this line with "srun ..." in job scripts, as usual:
 #   srun --cpu-bind=cores bash -c "
 #     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
@@ -116,6 +124,7 @@ RUN git clone                               \
       -S /tmp/c-blosc2                      \
       -B /tmp/c-blosc2-build                \
       -DCMAKE_INSTALL_PREFIX=/opt/warpx     \
+      -DBUILD_STATIC=OFF                    \
       -DBUILD_TESTS=OFF                     \
       -DBUILD_BENCHMARKS=OFF                \
       -DBUILD_EXAMPLES=OFF                  \
@@ -163,7 +172,7 @@ RUN git clone                  \
        -B /tmp/blaspp-build    \
        -Duse_openmp=OFF        \
        -Dgpu_backend=cuda      \
-       -DCMAKE_CXX_STANDARD=17 \
+       -DCMAKE_CXX_STANDARD=20 \
        -DCMAKE_INSTALL_PREFIX=/opt/warpx                         \
        -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libblas.so     \
        -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \
@@ -180,7 +189,7 @@ RUN git clone                     \
                                && \
     cmake -S /tmp/lapackpp        \
       -B /tmp/lapackpp-build      \
-      -DCMAKE_CXX_STANDARD=17     \
+      -DCMAKE_CXX_STANDARD=20     \
       -Dbuild_tests=OFF           \
       -DCMAKE_INSTALL_PREFIX=/opt/warpx \
       -DLAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so \
@@ -204,9 +213,11 @@ RUN python3 -m venv /opt/venv && \
         --upgrade        \
         build            \
         cmake            \
+        "nvidia-cuda-runtime-cu12==12.4.*" \
         cupy-cuda12x     \
         cython           \
         h5py             \
+        lasy             \
         matplotlib       \
         numpy            \
         openpmd-api      \
@@ -239,9 +250,10 @@ RUN git clone                       \
     cmake                           \
         -S /tmp/warpx-src           \
         -B /tmp/warpx-build         \
+        -DBUILD_SHARED_LIBS=ON      \
         -DCMAKE_INSTALL_PREFIX=/opt/warpx \
         -DWarpX_COMPUTE=CUDA        \
-        -DWarpX_DIMS="2;RZ"         \
+        -DWarpX_DIMS="1;2;RZ;3"     \
         -DWarpX_FFT=ON              \
         -DWarpX_PYTHON=ON           \
         -DWarpX_QED_TABLE_GEN=OFF   \
@@ -255,8 +267,11 @@ RUN git clone                       \
           -j${NJOBS}                \
                                  && \
     rm -rf /tmp/warpx*           && \
+    ln -s /opt/warpx/bin/warpx.1d* /opt/warpx/bin/warpx.1d  && \
     ln -s /opt/warpx/bin/warpx.2d* /opt/warpx/bin/warpx.2d  && \
-    ln -s /opt/warpx/bin/warpx.rz* /opt/warpx/bin/warpx.rz
+    ln -s /opt/warpx/bin/warpx.rz* /opt/warpx/bin/warpx.rz  && \
+    ln -s /opt/warpx/bin/warpx.3d* /opt/warpx/bin/warpx.3d  && \
+    rm -rf /opt/warpx/lib/*.a
 
 # Reduce to runtime
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS warpx
@@ -280,8 +295,6 @@ RUN apt-get update            && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy installed software from previous stage
-#   TODO: Check BLAS still works
-#   TODO: Check this does not copy CUDA devel packages
 COPY --from=warpx-dev /opt/warpx /opt/warpx
 COPY --from=warpx-dev /opt/venv /opt/venv
 
