@@ -494,7 +494,7 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 #if defined(WARPX_DIM_RSPHERE)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSHERE!");
+            "Using mass matrices is not setup for DIM = RSPHERE!");
 #endif
 #if defined(WARPX_DIM_3D)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
