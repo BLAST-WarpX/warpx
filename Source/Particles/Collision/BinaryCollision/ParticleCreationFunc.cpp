@@ -34,12 +34,14 @@ namespace {
                 "Failed to open fusion cross-section data file: " + cross_section_file);
         }
 
+        // Will be set from the first non-empty row; all subsequent rows must match.
         num_coefficients = 0;
         std::string line;
         int line_number = 0;
         while (std::getline(infile, line)) {
             ++line_number;
 
+            // Parse all whitespace-separated values on this line.
             std::istringstream line_stream(line);
             amrex::Vector<amrex::ParticleReal> values;
             amrex::ParticleReal value;
@@ -47,9 +49,10 @@ namespace {
                 values.push_back(value);
             }
             if (values.empty()) {
-                continue;
+                continue; // skip blank lines (no parseable floats)
             }
 
+            // Each row must have: one energy column + at least one coefficient column.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 values.size() > 1u,
                 "Fusion cross-section data must contain one energy column and at least one "
@@ -57,31 +60,37 @@ namespace {
 
             int const row_num_coefficients = static_cast<int>(values.size()) - 1;
             if (num_coefficients == 0) {
+                // Lock in the column count from the first data row.
                 num_coefficients = row_num_coefficients;
             } else {
+                // Subsequent rows must have the same number of coefficient columns.
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     row_num_coefficients == num_coefficients,
                     "Inconsistent number of columns in fusion cross-section data file " +
                     cross_section_file + " at line " + std::to_string(line_number));
             }
 
+            // Energy grid must be strictly increasing for interpolation.
             if (!energies.empty()) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     values[0] > energies.back(),
                     "Fusion cross-section energy values must be strictly increasing.");
             }
 
+            // Store the energy (column 0) and the coefficient(s) (columns 1..N).
             energies.push_back(values[0]);
             for (int i = 0; i < num_coefficients; ++i) {
                 coefficients.push_back(values[i + 1]);
             }
         }
 
+        // Distinguish a clean EOF from a low-level I/O error.
         if (infile.bad()) {
             WARPX_ABORT_WITH_MESSAGE(
                 "Failed to read fusion cross-section data from file: " + cross_section_file);
         }
 
+        // At least two energy points are required to perform linear interpolation.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             energies.size() > 1u,
             "Fusion cross-section data file must contain at least two energy rows for "
