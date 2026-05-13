@@ -141,29 +141,39 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
         pp_collision_name.query_enum_sloppy("scattering_angle_model", m_scattering_angle_model, "-_");
     }
 
+    // Optionally load an energy-dependent table of coefficients that
+    // describes the anisotropic angular distribution of fusion products.
     std::string fusion_angular_distribution_coefficients_file;
     if (pp_collision_name.query("fusion_angular_distribution_coefficients", fusion_angular_distribution_coefficients_file)) {
+        // Temporary host-side storage for the table data.
         amrex::Gpu::HostVector<amrex::ParticleReal> h_energies;
         amrex::Gpu::HostVector<amrex::ParticleReal> h_coefficients;
+        // Parse the file; sets m_fusion_angular_distribution_num_coefficients
+        // to the number of coefficients per energy point.
         readFusionCrossSectionFile(
             fusion_angular_distribution_coefficients_file, h_energies, h_coefficients,
             m_fusion_angular_distribution_num_coefficients);
 
+        // Record the number of energy points and size the device vectors.
         m_fusion_angular_distribution_num_energies = static_cast<int>(h_energies.size());
         m_fusion_angular_distribution_energies.resize(h_energies.size());
         m_fusion_angular_distribution_coefficients.resize(h_coefficients.size());
 #ifdef AMREX_USE_GPU
+        // Upload energy grid and coefficient table to device memory.
         amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_energies.begin(), h_energies.end(),
                          m_fusion_angular_distribution_energies.begin());
         amrex::Gpu::copy(amrex::Gpu::hostToDevice, h_coefficients.begin(), h_coefficients.end(),
                          m_fusion_angular_distribution_coefficients.begin());
 #else
+        // CPU path: DeviceVector uses host memory, so std::copy suffices.
         std::copy(h_energies.begin(), h_energies.end(), m_fusion_angular_distribution_energies.begin());
         std::copy(h_coefficients.begin(), h_coefficients.end(),
                   m_fusion_angular_distribution_coefficients.begin());
 #endif
     }
 
+    // If anisotropic scattering is requested, the coefficient table must have
+    // been loaded above; enforce this requirement before the simulation continues.
     if (m_collision_type == CollisionType::ProtonBoronToAlphasFusion
         || BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
     {
