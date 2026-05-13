@@ -2136,6 +2136,51 @@ WarpXParticleContainer::GetNumberDensity (int lev)
 }
 
 std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetPlasmaFrequency (int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
+        "The plasma frequency can not be calculated for a massless or neutral species.");
+
+    std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
+
+    amrex::BoxArray const & ba = number_density->boxArray();
+    amrex::DistributionMapping const & dm = number_density->DistributionMap();
+    int const ncomps = 1;
+    int const ng = 0;
+    auto plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+
+    auto const rmass = (amrex::Real)(m_mass);
+    auto const rcharge = (amrex::Real)(charge);
+    amrex::Real const Aconst = rcharge*rcharge/(rmass*PhysConst::epsilon_0);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*plasma_frequency, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::Array4<amrex::Real> const& omegap_array = plasma_frequency->array(mfi);
+
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                amrex::Real const N = num_array(i,j,k);
+
+                // plasma frequency squared
+                amrex::Real const ompegap_sq = Aconst*N;
+
+                omegap_array(i,j,k) = std::sqrt(ompegap_sq);
+
+            });
+    }
+
+    return plasma_frequency;
+}
+
+std::unique_ptr<amrex::MultiFab>
 WarpXParticleContainer::GetDebyeLength (int lev)
 {
 
@@ -2386,6 +2431,87 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
 
     if (!local) { ParallelAllReduce::Max(max_v, ParallelDescriptor::Communicator()); }
     return max_v;
+}
+
+void
+WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool forward)
+{
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    using namespace amrex::literals;
+
+    const int nLevels = finestLevel();
+    for (int lev = 0; lev <= nLevels; ++lev) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    {
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+
+            // momenta are stored as a struct of array, in `attribs`
+            auto& attribs = pti.GetAttribs();
+            amrex::ParticleReal * AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT theta_data = attribs[PIdx::theta].dataPtr();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+
+            // Loop over the particles, rotating their velocities by theta
+            amrex::ParallelFor(pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long i) {
+                    const amrex::ParticleReal theta_sign = forward ? -1._prt : +1._prt;
+                    const amrex::ParticleReal theta = theta_sign*theta_data[i];
+                    const amrex::ParticleReal uxsave = ux[i];
+                    const amrex::ParticleReal uysave = uy[i];
+                    ux[i] = uxsave*std::cos(theta) - uysave*std::sin(theta);
+                    uy[i] = uxsave*std::sin(theta) + uysave*std::cos(theta);
+                }
+            );
+
+#elif defined(WARPX_DIM_RSPHERE)
+
+            amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT phi_data = attribs[PIdx::phi].dataPtr();
+
+            if (forward) {
+
+                // Loop over the particles, rotating to theta = phi = 0
+                amrex::ParallelFor(pti.numParticles(),
+                    [=] AMREX_GPU_DEVICE (long i) {
+                        const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
+                        const amrex::ParticleReal uxsave = ux[i];
+                        const amrex::ParticleReal uysave = uy[i];
+                        const amrex::ParticleReal uzsave = uz[i];
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) + uysave*std::sin(theta)*std::cos(phi) + uzsave*std::sin(phi);
+                        uy[i] = -uxsave*std::sin(theta) + uysave*std::cos(theta);
+                        uz[i] = -uxsave*std::cos(theta)*std::sin(phi) - uysave*std::sin(theta)*std::sin(phi) + uzsave*std::cos(phi);
+                    }
+                );
+
+            } else {
+
+                // Loop over the particles, rotating from zero to theta and phi
+                amrex::ParallelFor(pti.numParticles(),
+                    [=] AMREX_GPU_DEVICE (long i) {
+                        const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
+                        const amrex::ParticleReal uxsave = ux[i];
+                        const amrex::ParticleReal uysave = uy[i];
+                        const amrex::ParticleReal uzsave = uz[i];
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) - uysave*std::sin(theta) - uzsave*std::cos(theta)*std::sin(phi);
+                        uy[i] = +uxsave*std::sin(theta)*std::cos(phi) + uysave*std::cos(theta) - uzsave*std::sin(theta)*std::sin(phi);
+                        uz[i] = +uxsave*std::sin(phi) + uzsave*std::cos(phi);
+                    }
+                );
+
+            }
+#endif
+        }
+    }
+    }
+#endif
 }
 
 void
