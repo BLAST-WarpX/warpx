@@ -266,7 +266,7 @@ Overall simulation parameters
         - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
           - ``newton.verbose`` (``bool``, default: true)
-          - ``newton.linear_solver`` (``string``, default: "gmres")
+          - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
