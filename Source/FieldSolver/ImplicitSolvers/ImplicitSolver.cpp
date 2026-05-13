@@ -358,6 +358,7 @@ void ImplicitSolver::ApplyMassMatrices (
             const amrex::IntVect ncomp_zy = m_ncomp_zy;
             const amrex::IntVect ncomp_zz = m_ncomp_zz;
 
+            if (!m_blank_electric_field[0]) {
             amrex::ParallelFor(
             outbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -425,6 +426,9 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_x(i,j,k,n) += baseline_arr_x(i,j,k,n); }
                 out_arr_x(i,j,k,n) += a_scale * (Sxx_d_in_x + Sxy_d_in_y + Sxz_d_in_z);
             });
+            }
+
+            if (!m_blank_electric_field[1]) {
             amrex::ParallelFor(
             outby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -492,6 +496,9 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_y(i,j,k,n) += baseline_arr_y(i,j,k,n); }
                 out_arr_y(i,j,k,n) += a_scale * (Syx_d_in_x + Syy_d_in_y + Syz_d_in_z);
             });
+            }
+
+            if (!m_blank_electric_field[2]) {
             amrex::ParallelFor(
             outbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -559,6 +566,8 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_z(i,j,k,n) += baseline_arr_z(i,j,k,n); }
                 out_arr_z(i,j,k,n) += a_scale * (Szx_d_in_x + Szy_d_in_y + Szz_d_in_z);
             });
+            }
+
         }
     }
 }
@@ -588,8 +597,21 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
         /* a_zero_out_first = */ a_J_from_MM_only);
 }
 
+void ImplicitSolver::parseBaseImplicitSolverParams ()
+{
+    const amrex::ParmParse pp("implicit_evolve");
 
-void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
+    amrex::Vector<int> tmp(3);
+    if (pp.queryarr("blank_electric_field", tmp)) {
+        for (int dir = 0; dir < 3; ++dir) {
+            m_blank_electric_field[dir] = (tmp[dir] != 0);
+        }
+    }
+
+    parseNonlinearSolverParams(pp);
+}
+
+void ImplicitSolver::parseNonlinearSolverParams (const amrex::ParmParse& pp)
 {
 
     pp.get("nonlinear_solver", m_nlsolver_type);
@@ -1306,6 +1328,9 @@ void ImplicitSolver::FinishMassMatrices ()
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
+    amrex::Print() << "Blank x-electric field:              " << (m_blank_electric_field[0] ? "true":"false") << "\n";
+    amrex::Print() << "Blank y-electric field:              " << (m_blank_electric_field[1] ? "true":"false") << "\n";
+    amrex::Print() << "Blank z-electric field:              " << (m_blank_electric_field[2] ? "true":"false") << "\n";
     amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
     amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
