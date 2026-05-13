@@ -64,8 +64,7 @@ namespace {
                             const amrex::ParticleReal& m1_out, const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_fusion,
                             ScatteringAngleModel const scattering_angle_model,
-                            ScatteringUtils::AnisotropicCoefficientTable const&
-                                anisotropic_coefficients,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;

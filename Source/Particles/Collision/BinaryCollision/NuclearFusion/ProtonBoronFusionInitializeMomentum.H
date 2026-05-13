@@ -67,8 +67,7 @@ namespace {
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
                             ScatteringAngleModel const scattering_angle_model,
-                            ScatteringUtils::AnisotropicCoefficientTable const&
-                                anisotropic_coefficients,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
