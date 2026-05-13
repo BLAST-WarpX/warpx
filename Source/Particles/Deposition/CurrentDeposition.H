@@ -51,10 +51,10 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                               [[maybe_unused]] const amrex::ParticleReal zp,
                               const amrex::ParticleReal wq,
                               const amrex::ParticleReal vx,
-                              const amrex::ParticleReal vy,
+                              [[maybe_unused]] const amrex::ParticleReal vy,
                               const amrex::ParticleReal vz,
                               amrex::Array4<amrex::Real> const& jx_arr,
-                              amrex::Array4<amrex::Real> const& jy_arr,
+                              [[maybe_unused]] amrex::Array4<amrex::Real> const& jy_arr,
                               amrex::Array4<amrex::Real> const& jz_arr,
                               amrex::IntVect const& jx_type,
                               amrex::IntVect const& jy_type,
@@ -81,7 +81,9 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
     const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
     const amrex::Real wqx = wq*invvol*(+vx*costheta + vy*sintheta);
+#if !defined(WARPX_EM_TEY)
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+#endif
     const amrex::Real wqz = wq*invvol*vz;
     #if defined(WARPX_DIM_RZ)
     const Complex xy0 = Complex{costheta, sintheta};
@@ -99,11 +101,15 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
     // convert from Cartesian to spherical
     const amrex::Real wqx = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
+#if !defined(WARPX_EM_TEY)
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+#endif
     const amrex::Real wqz = wq*invvol*(-vx*costheta*sinphi - vy*sintheta*sinphi + vz*cosphi);
 #else
     const amrex::Real wqx = wq*invvol*vx;
+#if !defined(WARPX_EM_TEY)
     const amrex::Real wqy = wq*invvol*vy;
+#endif
     const amrex::Real wqz = wq*invvol*vz;
 #endif
 
@@ -147,7 +153,9 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     }
 
     int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
+#if !defined(WARPX_EM_TEY)
     int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
+#endif
     int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
 #endif //!defined(WARPX_DIM_1D_Z)
 
@@ -195,16 +203,22 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
         l_cell = compute_shape_factor(sz_cell, zmid - 0.5);
     }
     amrex::Real sz_jx[depos_order + 1] = {0._rt};
+#if !defined(WARPX_EM_TEY)
     amrex::Real sz_jy[depos_order + 1] = {0._rt};
+#endif
     amrex::Real sz_jz[depos_order + 1] = {0._rt};
     for (int iz=0; iz<=depos_order; iz++)
     {
         sz_jx[iz] = ((jx_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+#if !defined(WARPX_EM_TEY)
         sz_jy[iz] = ((jy_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
+#endif
         sz_jz[iz] = ((jz_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
     }
     int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
+#if !defined(WARPX_EM_TEY)
     int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
+#endif
     int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
 #endif
 
@@ -214,9 +228,11 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
         amrex::Gpu::Atomic::AddNoRet(
             &jx_arr(lo.x+l_jx+iz, 0, 0, 0),
             sz_jx[iz]*wqx);
+#if !defined(WARPX_EM_TEY)
         amrex::Gpu::Atomic::AddNoRet(
             &jy_arr(lo.x+l_jy+iz, 0, 0, 0),
             sz_jy[iz]*wqy);
+#endif
         amrex::Gpu::Atomic::AddNoRet(
             &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
             sz_jz[iz]*wqz);
@@ -224,7 +240,9 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int ix=0; ix<=depos_order; ix++){
         amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, 0, 0, 0), sx_jx[ix]*wqx);
+#if !defined(WARPX_EM_TEY)
         amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, 0, 0, 0), sx_jy[ix]*wqy);
+#endif
         amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, 0, 0, 0), sx_jz[ix]*wqz);
     }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -233,9 +251,11 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
             amrex::Gpu::Atomic::AddNoRet(
                 &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
                 sx_jx[ix]*sz_jx[iz]*wqx);
+#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet(
                 &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
                 sx_jy[ix]*sz_jy[iz]*wqy);
+#endif
             amrex::Gpu::Atomic::AddNoRet(
                 &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
                 sx_jz[ix]*sz_jz[iz]*wqz);
@@ -245,8 +265,10 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                 // The factor 2 on the weighting comes from the normalization of the modes
                 amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 2*imode-1), 2._rt*sx_jx[ix]*sz_jx[iz]*wqx*xy.real());
                 amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 2*imode  ), 2._rt*sx_jx[ix]*sz_jx[iz]*wqx*xy.imag());
+#if !defined(WARPX_EM_TEY)
                 amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 2*imode-1), 2._rt*sx_jy[ix]*sz_jy[iz]*wqy*xy.real());
                 amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 2*imode  ), 2._rt*sx_jy[ix]*sz_jy[iz]*wqy*xy.imag());
+#endif
                 amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 2*imode-1), 2._rt*sx_jz[ix]*sz_jz[iz]*wqz*xy.real());
                 amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 2*imode  ), 2._rt*sx_jz[ix]*sz_jz[iz]*wqz*xy.imag());
                 xy = xy*xy0;
@@ -1508,7 +1530,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                                        [[maybe_unused]] amrex::ParticleReal const uzp_mid,
                                        [[maybe_unused]] amrex::ParticleReal const gaminv,
                                        amrex::Array4<amrex::Real>const & Jx_arr,
-                                       amrex::Array4<amrex::Real>const & Jy_arr,
+                                       [[maybe_unused]] amrex::Array4<amrex::Real>const & Jy_arr,
                                        amrex::Array4<amrex::Real>const & Jz_arr,
                                        amrex::Real const dt,
                                        amrex::XDim3 const & dinv,
@@ -1522,21 +1544,23 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 
     using namespace amrex::literals;
 
-#if (AMREX_SPACEDIM > 1)
+#if (AMREX_SPACEDIM > 1) && !defined(WARPX_EM_TEY)
     amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
     amrex::Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
     // computes current and old position in grid units
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
-    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
     amrex::Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
     amrex::Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
+#if !defined(WARPX_EM_TEY)
+    amrex::Real const xp_mid = (xp_new + xp_old)*0.5_rt;
+    amrex::Real const yp_mid = (yp_new + yp_old)*0.5_rt;
     amrex::Real const rp_mid = (rp_new + rp_old)/2._rt;
     amrex::Real const costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
     amrex::Real const sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
-#if defined(WARPX_DIM_RZ)
+#endif
+#if defined(WARPX_DIM_RZ) && !defined(WARPX_EM_TEY)
     Complex const xy_mid0 = Complex{costheta_mid, sintheta_mid};
 #endif
 
@@ -1544,7 +1568,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
+#endif
 #if defined(WARPX_DIM_RCYLINDER)
     amrex::Real const vz = uzp_mid*gaminv;
 #endif
@@ -1567,17 +1593,23 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     // convert from Cartesian to spherical
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
+#endif
     amrex::Real const vz = (-uxp_mid*costheta_mid*sinphi_mid - uyp_mid*sintheta_mid*sinphi_mid + uzp_mid*cosphi_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
     // Keep these double to avoid bug in single precision
     double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (xp_new - xp_old)/dt;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
+#endif
 #elif defined(WARPX_DIM_1D_Z)
     amrex::Real const vx = uxp_mid*gaminv;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const vy = uyp_mid*gaminv;
+#endif
 #elif defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
     double x_new = (xp_new - xyzmin.x)*dinv.x;
@@ -1627,7 +1659,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 
     // Define velocity kernals to deposit
     amrex::Real const wqx = wq*vx*invvol;
+#if !defined(WARPX_EM_TEY)
     amrex::Real const wqy = wq*vy*invvol;
+#endif
     amrex::Real const wqz = wq*vz*invvol;
 
     // 1) Determine the number of segments.
@@ -1933,7 +1967,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
             for (int k=0; k<=depos_order; k++) {
                 this_Jx = wqx*sx_cell[i]*(sz_old_node[k] + sz_new_node[k])/2.0_rt*seg_factor_x;
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, lo.y+k0_node+k, 0, 0), this_Jx);
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) && !defined(WARPX_EM_TEY)
                 Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     // The factor 2 comes from the normalization of the modes
@@ -1946,6 +1980,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
             }
         }
 
+#if !defined(WARPX_EM_TEY)
         // deposit out-of-plane Jy for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         amrex::Real this_Jy;
@@ -1956,7 +1991,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                               + sx_new_node[i]*sz_old_node[k]*one_sixth
                               + sx_new_node[i]*sz_new_node[k]*one_third )*seg_factor_y;
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, lo.y+k0_node+k, 0, 0), this_Jy);
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) && !defined(WARPX_EM_TEY)
                 Complex xy_mid = xy_mid0;
                 // Throughout the following loop, xy_ takes the value e^{i m theta_}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
@@ -1969,14 +2004,14 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
             }
         }
-
+#endif
         // deposit Jz for this segment
         amrex::Real this_Jz;
         for (int i=0; i<=depos_order; i++) {
             for (int k=0; k<=depos_order-1; k++) {
                 this_Jz = wqz*sz_cell[k]*(sx_old_node[i] + sx_new_node[i])/2.0_rt*seg_factor_z;
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+k0_cell+k, 0, 0), this_Jz);
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) && !defined(WARPX_EM_TEY)
                 Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
                 for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                     // The factor 2 comes from the normalization of the modes
@@ -2060,7 +2095,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         for (int k=0; k<=depos_order; k++) {
             const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+#endif
         }
 
         // deposit Jz for this segment
@@ -2138,7 +2175,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         // deposit out-of-plane Jy and Jz for this segment
         for (int i=0; i<=depos_order; i++) {
             const amrex::Real weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
+#if !defined(WARPX_EM_TEY)
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, 0, 0), wqy*weight);
+#endif
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, 0, 0), wqz*weight);
         }
 

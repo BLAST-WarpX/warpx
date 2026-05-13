@@ -172,7 +172,11 @@ protected:
     /**
      * \brief Flags to turn off evolving select components of the electric field
      */
+#if defined(WARPX_EM_TEY)
+    amrex::Array<bool,3> m_blank_electric_field{false,true,false};
+#else
     amrex::Array<bool,3> m_blank_electric_field{false,false,false};
+#endif
 
     /**
      * \brief Nonlinear solver type and object
@@ -257,7 +261,7 @@ protected:
 
     void parseBaseImplicitSolverParams ();
 
-    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
+    void parseNonlinearSolverParams (const amrex::ParmParse& pp);
 
     void SaveEoldMultifab ();
 
