@@ -2083,18 +2083,45 @@ void doGatherPicnicShapeN (
 
 #endif
 
-    // Gather magnetic field
+    // Gather magnetic field using direct gather with shape = 1.
     // This passes in the uncropped values of the half step position.
     // A future fix could pass in the average of the cropped values so
     // that the position would be within the domain.
     const int depos_order_perp = 1;
     const int depos_order_para = 1;
+    amrex::ParticleReal B1p = 0._prt;
+    amrex::ParticleReal B2p = 0._prt;
+    amrex::ParticleReal B3p = 0._prt;
     doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                                    rp_mid, 0._prt, 0._prt,
+#elif defined(WARPX_DIM_RZ)
+                                    rp_mid, 0._prt, zp_nph,
+#else
                                     xp_nph, yp_nph, zp_nph,
-                                    Bxp, Byp, Bzp,
+#endif
+                                    B1p, B2p, B3p,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, n_rz_azimuthal_modes);
+
+    // Because we pass rp_mid and 0. instead of xp_nph and yp_nph above for
+    // axisymmetric geometries, the returned fields on the particle are in mapped space.
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+    // Convert B1p = Brp and B2p = Bthp to Bxp and Byp
+    Bxp += costheta_mid*B1p - sintheta_mid*B2p;
+    Byp += costheta_mid*B2p + sintheta_mid*B1p;
+    Bzp += B3p;
+#elif defined(WARPX_DIM_RSPHERE)
+    // Convert B1p = Brp, B2p = Bthp, and B3p = Bphi to Bxp, Byp, and Bzp
+    Bxp += costheta_mid*cosphi_mid*B1p - sintheta_mid*B2p - costheta_mid*sinphi_mid*B3p;
+    Byp += sintheta_mid*cosphi_mid*B1p + costheta_mid*B2p - sintheta_mid*sinphi_mid*B3p;
+    Bzp += sinphi_mid*B1p + cosphi_mid*B3p;
+#else
+    Bxp += B1p;
+    Byp += B2p;
+    Bzp += B3p;
+#endif
 
 }
 
