@@ -257,7 +257,7 @@ Overall simulation parameters
 
           - ``picard.verbose`` (``bool``, default: true)
           - ``picard.require_convergence`` (``bool``, default: true)
-          - ``picard.maximum_iterations`` (``int``, default: 100)
+          - ``picard.max_iterations`` (``int``, default: 100)
           - ``picard.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``picard.absolute_tolerance`` (``float``, default: 0.0)
           - ``picard.diagnostic_file`` (``string``, default: None)
@@ -266,8 +266,9 @@ Overall simulation parameters
         - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
           - ``newton.verbose`` (``bool``, default: true)
+          - ``newton.linear_solver`` (``string``, default: "gmres")
           - ``newton.require_convergence`` (``bool``, default: true)
-          - ``newton.maximum_iterations`` (``int``, default: 100)
+          - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.diagnostic_file`` (``string``, default: None)
@@ -277,7 +278,7 @@ Overall simulation parameters
 
           - ``gmres.verbose_int`` (``int``, default: 2)
           - ``gmres.restart_length`` (``int``, default: 30)
-          - ``gmres.maximum_iterations`` (``int``, default: 1000)
+          - ``gmres.max_iterations`` (``int``, default: 1000)
           - ``gmres.relative_tolerance`` (``float``, default: 1.0e-4)
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
 
@@ -307,7 +308,7 @@ Overall simulation parameters
           If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
           In most cases, a width of 1 is sufficient for good GMRES performance.
 
-        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are two options:
+        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are three options:
 
           - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
 
@@ -335,6 +336,15 @@ Overall simulation parameters
             - ``pc_jacobi.max_iter`` (``int``, default: 10)
             - ``pc_jacobi.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (``float``, default: 1.0e-16)
+
+          - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
+
+            - ``pc_petsc.type`` (``string``, default: "asm")
+            - ``pc_petsc.asm_overlap`` (``int``, default: 0)
+            - ``pc_petsc.sub_type`` (``string``, default: "ilu")
+            - ``pc_petsc.ilu_factor_levels`` (``int``, default: 2)
+            - ``pc_petsc.hypre_type`` (``string``, default: "euclid")
+            - ``pc_petsc.euclid_factor_levels`` (``int``, default: 2)
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
