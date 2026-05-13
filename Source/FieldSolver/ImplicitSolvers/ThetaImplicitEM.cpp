@@ -52,8 +52,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
         m_theta>=0.5 && m_theta<=1.0,
         "theta parameter for theta implicit time solver must be between 0.5 and 1.0");
 
-    // Parse nonlinear solver parameters
-    parseNonlinearSolverParams( pp );
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -155,6 +154,15 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
 
+    // Apply blanking to electric field RHS vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) {
+                a_RHS.getArrayVec()[lev][dir]->setVal(0._rt);
+            }
+        }
+    }
+
 }
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
@@ -169,6 +177,14 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, start_time );
+
+    // Apply blanking to the electric field vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) { Efp[dir]->setVal(0._rt); }
+        }
+    }
 
 }
 

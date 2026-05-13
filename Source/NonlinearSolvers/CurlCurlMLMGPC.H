@@ -393,6 +393,12 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         } else {
             m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
         }
+
+        const bool blank_Ey = m_ops->GetBlankElectricField()[1];
+        if (blank_Ey) {
+            x_mfarrvec[n][1]->setVal(0.0);
+        }
+
     }
 }
 
