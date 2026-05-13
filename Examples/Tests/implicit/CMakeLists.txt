@@ -6,7 +6,7 @@ add_warpx_test(
     1  # dims
     2  # nprocs
     inputs_test_1d_theta_implicit_planar_pinch  # inputs
-    "analysis_planar_pinch.py diags/diag1000020"  # analysis
+    "analysis_pinch.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
@@ -67,8 +67,28 @@ if(AMReX_PETSC)
         2  # dims
         2  # nprocs
         inputs_test_2d_theta_implicit_planar_pinch  # inputs
-        "analysis_planar_pinch.py diags/diag1000020"  # analysis
+        "analysis_pinch.py diags/diag1000020"  # analysis
         "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_rcylinder_theta_implicit_dynamic_pinch  # name
+        RCYLINDER  # dims
+        2  # nprocs
+        inputs_test_rcylinder_theta_implicit_dynamic_pinch  # inputs
+        "analysis_pinch.py diags/diag1000020"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_rz_theta_implicit_dynamic_pinch  # name
+        RZ  # dims
+        2  # nprocs
+        inputs_test_rz_theta_implicit_dynamic_pinch  # inputs
+        "analysis_pinch.py diags/diag1000010"  # analysis
+        "analysis_default_regression.py --path diags/diag1000010"  # checksum
         OFF  # dependency
     )
 endif()
