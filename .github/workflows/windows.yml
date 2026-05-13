@@ -19,7 +19,7 @@ jobs:
 
   build_win_msvc:
     name: MSVC C++20 w/o MPI
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
@@ -43,7 +43,7 @@ jobs:
       run: |
         cmake -S . -B build               `
               -DCMAKE_BUILD_TYPE=Debug    `
-              -DCMAKE_CXX_STANDARD=17     `
+              -DCMAKE_CXX_STANDARD=20     `
               -DCMAKE_VERBOSE_MAKEFILE=ON `
               -DWarpX_COMPUTE=NOACC       `
               -DWarpX_OPENPMD=ON          `
@@ -101,6 +101,7 @@ jobs:
               -DCMAKE_C_COMPILER=clang-cl   ^
               -DCMAKE_CXX_COMPILER=clang-cl ^
               -DCMAKE_BUILD_TYPE=Debug      ^
+              -DCMAKE_CXX_STANDARD=20       ^
               -DCMAKE_VERBOSE_MAKEFILE=ON   ^
               -DWarpX_COMPUTE=OMP           ^
               -DWarpX_EB=OFF                ^
