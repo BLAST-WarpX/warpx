@@ -679,7 +679,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         xy = xy*xy0;
     }
 
-    // Convert Erp and Ethetap to Ex and Ey
+    // Convert Erp, Ethetap, Brp, Bthetap to Exp, Eyp, Bxp, Byp
     Exp += costheta*Erp - sintheta*Ethetap;
     Eyp += costheta*Ethetap + sintheta*Erp;
     Bxp += costheta*Brp - sintheta*Bthetap;
@@ -716,7 +716,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::Real const costheta = (rp > 0. ? xp/rp : 1.);
     amrex::Real const sintheta = (rp > 0. ? yp/rp : 0.);
 
-    // Convert Erp and Ethetap to Ex and Ey
+    // Convert Erp, Ethetap, Brp, Bthetap to Exp, Eyp, Bxp, Byp
     Exp += costheta*Erp - sintheta*Ethetap;
     Eyp += costheta*Ethetap + sintheta*Erp;
     Bxp += costheta*Brp - sintheta*Bthetap;
@@ -758,7 +758,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::Real const cosphi = (rp > 0. ? rpxy/rp : 1.);
     amrex::Real const sinphi = (rp > 0. ? zp/rp : 0.);
 
-    // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
+    // Convert Erp, Ethetap, Ephip, Brp, Bthetap, Bphip to Exp, Eyp, Ezp, Bxp, Byp, Bzp
     Exp += costheta*cosphi*Erp - sintheta*Ethetap - costheta*sinphi*Ephip;
     Eyp += sintheta*cosphi*Erp + costheta*Ethetap - sintheta*sinphi*Ephip;
     Ezp += sinphi*Erp + cosphi*Ephip;
@@ -1318,7 +1318,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
         Bzp += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
     }
 
-    // Convert Erp and Ethetap to Ex and Ey
+    // Convert Erp, Ethetap, Brp, Bthetap to Exp, Eyp, Bxp, Byp
     Exp += costheta_mid*Erp - sintheta_mid*Ethetap;
     Eyp += costheta_mid*Ethetap + sintheta_mid*Erp;
     Bxp += costheta_mid*Brp - sintheta_mid*Bthetap;
@@ -1358,7 +1358,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
         Bphip += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
     }
 
-    // Convert Erp, Ethetap, and Ephi to Ex, Ey, and Ez
+    // Convert Erp, Ethetap, Ephip, Brp, Bthetap, Bphip to Exp, Eyp, Ezp, Bxp, Byp, Bzp
     Exp += costheta_mid*cosphi_mid*Erp - sintheta_mid*Ethetap - costheta_mid*sinphi_mid*Ephip;
     Eyp += sintheta_mid*cosphi_mid*Erp + costheta_mid*Ethetap - sintheta_mid*sinphi_mid*Ephip;
     Ezp += sinphi_mid*Erp + cosphi_mid*Ephip;
@@ -2113,7 +2113,7 @@ void doGatherPicnicShapeN (
     Byp += costheta_mid*B2p + sintheta_mid*B1p;
     Bzp += B3p;
 #elif defined(WARPX_DIM_RSPHERE)
-    // Convert B1p = Brp, B2p = Bthp, and B3p = Bphi to Bxp, Byp, and Bzp
+    // Convert B1p = Brp, B2p = Bthp, and B3p = Bphip to Bxp, Byp, and Bzp
     Bxp += costheta_mid*cosphi_mid*B1p - sintheta_mid*B2p - costheta_mid*sinphi_mid*B3p;
     Byp += sintheta_mid*cosphi_mid*B1p + costheta_mid*B2p - sintheta_mid*sinphi_mid*B3p;
     Bzp += sinphi_mid*B1p + cosphi_mid*B3p;
