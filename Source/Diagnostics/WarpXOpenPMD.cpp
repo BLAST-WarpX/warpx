@@ -650,9 +650,9 @@ for (const auto & particle_diag : particle_diags) {
     // this remap, downstream indexing (e.g. `getParticlePositionComponentLabels`
     // and the position-reconstruction block in `SaveRealProperty`) would
     // pick up unrelated flags such as the weighting or z flags, which can
-    // both produce wrong output and cause a heap buffer overflow (the latter
-    // because the reconstruction buffer was sized by a flag that does not
-    // match the flag guarding the write).
+    // both produce wrong output and can cause out-of-bounds accesses in SoAs
+    // ((the latter because the reconstruction buffer was sized by a flag that
+    // does not match the flag guarding the write).
     amrex::Vector<int> real_flags(tmp.NumRealComps(), 0);
 #if defined(WARPX_DIM_RZ)
     real_flags[0] = particle_diag.m_plot_flags[PIdx::x];      // position_x ← r
