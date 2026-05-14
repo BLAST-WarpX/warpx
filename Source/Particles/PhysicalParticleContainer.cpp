@@ -216,7 +216,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("do_splitting", do_splitting);
     pp_species_name.query("split_type", split_type);
     pp_species_name.query("do_not_push", do_not_push);
-    if (m_charge == 0.) {
+    if (m_charge == 0._prt) {
         do_not_deposit = true;
         do_not_gather = true;
     } else {
