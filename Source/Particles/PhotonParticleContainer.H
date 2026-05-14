@@ -114,7 +114,16 @@ public:
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/) override {}
 
-    // DepositMassMatrices should do nothing for photons
+    /**
+     * \brief No-op override: photons are massless and carry no charge, so
+     * they do not contribute to the implicit-solver mass matrices
+     * (S_xx, S_xy, ..., S_zz) that weighted, charged particles deposit onto
+     * the grid.
+     *
+     * \param fields  MultiFab register holding the mass-matrix fields (unused)
+     * \param lev     refinement level (unused)
+     * \param dt      time step (unused)
+     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
                               int /*lev*/,
                               amrex::Real /*dt*/) override {}
