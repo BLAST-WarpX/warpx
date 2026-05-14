@@ -119,10 +119,6 @@ public:
      * they do not contribute to the implicit-solver mass matrices
      * (S_xx, S_xy, ..., S_zz) that weighted, charged particles deposit onto
      * the grid.
-     *
-     * \param fields  MultiFab register holding the mass-matrix fields (unused)
-     * \param lev     refinement level (unused)
-     * \param dt      time step (unused)
      */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
                               int /*lev*/,
