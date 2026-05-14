@@ -113,6 +113,7 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/) override {}
+
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_
