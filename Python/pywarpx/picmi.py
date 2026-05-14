@@ -2029,6 +2029,7 @@ class PETScSNESNonlinearSolver(NonlinearSolverBase):
     mass_matrices_pc_width: int, optional
         When use_mass_matrices_pc is True, the width of the preconditioner mass matrices
     """
+
     def __init__(
         self,
         verbose=None,
