@@ -205,8 +205,8 @@ void ThetaImplicitEM::Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
         // Compute the spatial average of Jz
         const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
         const bool local_sum = false;
-        amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
-        amrex::Real meanJz = sumJz_global*dx[0]/Lz;
+        const amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
+        const amrex::Real meanJz = sumJz_global*dx[0]/Lz;
 
         // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
         amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];

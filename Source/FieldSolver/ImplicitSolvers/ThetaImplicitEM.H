@@ -86,7 +86,7 @@ public:
 
 #if defined(WARPX_DIM_1D_Z)
     void Enforce1DESPeriodic (WarpXSolverVec&  a_RHS,
-                        const amrex::Real      a_theta_dt);
+                              amrex::Real      a_theta_dt);
 #endif
 
     // This parameter is used for the time-step fraction in the PC for implicit
