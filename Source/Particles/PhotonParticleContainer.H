@@ -113,6 +113,11 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/) override {}
+
+    // DepositMassMatrices should do nothing for photons
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
+                              int /*lev*/,
+                              amrex::Real /*dt*/) override {}
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_
