@@ -1465,7 +1465,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
             // to the cells above the axis.
             // If Jr is node centered, Jr[0] is located on the boundary.
             // If Jr is cell centered, Jr[0] is at 1/2 dr.
-            if (rmin == 0. && 1-ishift_r <= i && i < ngJ[0]-ishift_r) {
+            if (rmin == 0. && 1-ishift_r <= i && i <= ngJ[0]-ishift_r) {
                 Jr_arr(i,j,0,0) -= Jr_arr(-ishift_r-i,j,0,0);
             }
             // Apply the inverse volume scaling
@@ -1487,7 +1487,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
-                if (rmin == 0._rt && 1-ishift_r <= i && i < ngJ[0]-ishift_r) {
+                if (rmin == 0._rt && 1-ishift_r <= i && i <= ngJ[0]-ishift_r) {
                     Jr_arr(i,j,0,2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode-1));
                     Jr_arr(i,j,0,2*imode) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode));
                 }
@@ -1679,7 +1679,7 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
             // to the cells above the axis.
             // If Srr is node centered, Srr[0] is located on the boundary.
             // If Srr is cell centered, Srr[0] is at 1/2 dr.
-            if (rmin == 0. && 1-ishift_r <= i && i < ngS[0]-ishift_r) {
+            if (rmin == 0. && 1-ishift_r <= i && i <= ngS[0]-ishift_r) {
                 Srr_arr(i,j,0,icomp) += Srr_arr(-ishift_r-i,j,0,icomp);
             }
             // Apply the inverse volume scaling
