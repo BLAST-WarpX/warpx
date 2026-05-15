@@ -221,7 +221,9 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     if (m_charge == 0._prt) {
         do_not_deposit = true;
-        do_not_gather = true;
+        if (m_mass > 0._prt) {
+            do_not_gather = true;
+        }
     }
 
     pp_species_name.query("do_continuous_injection", do_continuous_injection);
