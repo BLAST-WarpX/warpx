@@ -1150,7 +1150,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
 
     amrex::Vector<amrex::Vector<ParticleReal>> attr;
     attr.push_back(wp);
-    const amrex::Vector<amrex::Vector<int>> attr_int;
+    const amrex::Vector<amrex::Vector<int>> attr_int{};
     pctmp_split.AddNParticles(lev,
                               np_split_to_add,
                               xp,
@@ -1446,6 +1446,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const auto do_sync = m_do_qed_quantum_sync;
     amrex::Real t_chi_max = 0.0;
     if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
 
     QuantumSynchrotronEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
@@ -1554,11 +1556,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
         [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
         [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
+        [[maybe_unused]] auto foo_qed_dt = qed_dt;
         if constexpr (qed_control == has_qed) {
             if (local_has_quantum_sync) {
                 evolve_opt(ux[ip], uy[ip], uz[ip],
                            Exp, Eyp, Ezp,Bxp, Byp, Bzp,
-                           dt, p_optical_depth_QSR[ip]);
+                           qed_dt, p_optical_depth_QSR[ip]);
             }
         }
 #else

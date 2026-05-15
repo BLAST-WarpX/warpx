@@ -422,6 +422,13 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
+MultiParticleContainer::TransformMomentumToCurvilinear (bool forward) {
+    for (const auto &pc : allcontainers) {
+        pc->TransformMomentumToCurvilinear(forward);
+    }
+}
+
+void
 MultiParticleContainer::AllocData ()
 {
     for (auto& pc : allcontainers) {

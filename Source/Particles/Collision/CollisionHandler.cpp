@@ -121,6 +121,20 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
  */
 void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
+     * in the same *cylindrical* cell, or in RSPHERE the same *spherical* shell.
+     * Because of this, the colliding macroparticles would not nessecarily be spatially
+     * near each other. This would violate the underlying assumptions that particles within the
+     * same cylindrical or spherical cell represent a cylindrically- or spherically-symmetric
+     * momentum distribution function and are spatially local. Therefore, we temporarily rotate
+     * the momentum of the macroparticles to the curvilinear frame, equivalent to the x-axis.
+     * (This is only valid if we use only the m=0 azimuthal mode in the simulation;
+     * there is a corresponding assert statement at initialization.) */
+    mypc->TransformMomentumToCurvilinear(/*forward*/true);
+#endif
+
 #ifdef WARPX_QED
     // For QED incoherent processes (e.g. Bethe-Heitler, Landau-Lifschitz), the process is mediated by virtual photons.
     // The virtual photons are newly generated here and participate in the collisions.
@@ -154,5 +168,10 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
             }
         }
     }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Undo the rotation above
+    mypc->TransformMomentumToCurvilinear(/*forward*/false);
+#endif
 
 }
