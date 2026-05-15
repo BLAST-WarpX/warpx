@@ -215,13 +215,13 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     // Initialize splitting
     pp_species_name.query("do_splitting", do_splitting);
     pp_species_name.query("split_type", split_type);
+    pp_species_name.query("do_not_deposit", do_not_deposit);
+    pp_species_name.query("do_not_gather", do_not_gather);
     pp_species_name.query("do_not_push", do_not_push);
+
     if (m_charge == 0._prt) {
         do_not_deposit = true;
         do_not_gather = true;
-    } else {
-        pp_species_name.query("do_not_deposit", do_not_deposit);
-        pp_species_name.query("do_not_gather", do_not_gather);
     }
 
     pp_species_name.query("do_continuous_injection", do_continuous_injection);
