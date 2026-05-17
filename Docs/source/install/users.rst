@@ -125,9 +125,23 @@ Please consider using :ref:`conda <install-methods-conda>` in the meantime.
 Using the Brew Package
 ----------------------
 
-.. note::
+A package for WarpX is available via the `Homebrew <https://brew.sh/>`_/`Linuxbrew <https://docs.brew.sh/Homebrew-on-Linux>`_ package manager.
 
-   Coming soon.
+.. code-block:: bash
+
+   brew update
+   brew tap openpmd/openpmd
+   brew install openpmd-api
+   brew tap ecp-warpx/blast
+   brew install warpx
+
+   python3 -m pip install --upgrade pip
+   python3 -m pip install --upgrade virtualenv
+   python3 -m venv py-venv
+   source py-venv/bin/activate
+   python3 -m pip install --upgrade pip
+   python3 -m pip install --upgrade build packaging setuptools wheel
+   python3 -m pip install --upgrade mpi4py
 
 
 .. _install-methods-cmake:
