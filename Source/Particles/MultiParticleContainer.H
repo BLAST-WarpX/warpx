@@ -397,7 +397,7 @@ public:
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator begin() {return allcontainers.begin();}
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator end() {return allcontainers.end();}
 
-    bool isPhotonSpecies (int ispecies) const
+    [[nodiscard]] bool isPhotonSpecies (int ispecies) const
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             ispecies >= 0 &&
