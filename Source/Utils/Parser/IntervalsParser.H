@@ -33,7 +33,7 @@ namespace utils::parser
         * the period). For example SliceParser(":1000:") is equivalent to SliceParser("0:1000:1").
         * @param[in] isBTD whether this is a back-transformed diagnostic
         */
-        SliceParser (const std::string& instr, bool isBTD=false);
+        explicit SliceParser (const std::string& instr, bool isBTD=false);
 
         /**
         * \brief A method that returns true if the input integer is contained in the slice. (e.g. if
@@ -42,7 +42,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        bool contains (const int n) const;
+        [[nodiscard]] bool contains (int n) const;
 
         /**
         * \brief A method that returns the smallest integer strictly greater than n such that
@@ -50,7 +50,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int nextContains (const int n) const;
+        [[nodiscard]] int nextContains (int n) const;
 
         /**
         * \brief A method that returns the greatest integer strictly smaller than n such that
@@ -58,31 +58,31 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int previousContains (const int n) const;
+        [[nodiscard]] int previousContains (int n) const;
 
         /**
         * \brief A method that returns the slice period.
         *
         */
-        int getPeriod () const;
+        [[nodiscard]] int getPeriod () const;
 
         /**
         * \brief A method that returns the slice start.
         *
         */
-        int getStart () const;
+        [[nodiscard]] int getStart () const;
 
         /**
         * \brief A method that returns the slice stop.
         *
         */
-        int getStop () const;
+        [[nodiscard]] int getStop () const;
 
         /**
         * @brief A method that returns the number of integers contained by the slice.
         *
         */
-        int numContained() const;
+        [[nodiscard]] int numContained() const;
 
     private:
         bool m_isBTD = false;
@@ -114,7 +114,7 @@ namespace utils::parser
         * "x,y,z,...". This will call the constructor of SliceParser using x, y and z as input
         * arguments.
         */
-        IntervalsParser (const std::vector<std::string>& instr_vec);
+        explicit IntervalsParser (const std::vector<std::string>& instr_vec);
 
         /**
         * \brief A method that returns true if the input integer is contained in any of the slices
@@ -122,7 +122,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        bool contains (const int n) const;
+        [[nodiscard]] bool contains (int n) const;
 
         /**
         * \brief A method that returns the smallest integer strictly greater than n such that
@@ -130,7 +130,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int nextContains (const int n) const;
+        [[nodiscard]] int nextContains (int n) const;
 
         /**
         * \brief A method that returns the greatest integer strictly smaller than n such that
@@ -138,7 +138,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int previousContains (const int n) const;
+        [[nodiscard]] int previousContains (int n) const;
 
         /**
         * \brief A method that returns the greatest integer smaller than or equal to n such that
@@ -146,7 +146,7 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int previousContainsInclusive (const int n) const;
+        [[nodiscard]] int previousContainsInclusive (int n) const;
 
         /**
         * \brief A method the local period (in timesteps) of the IntervalsParser at timestep n.
@@ -154,13 +154,13 @@ namespace utils::parser
         *
         * @param[in] n the input integer
         */
-        int localPeriod (const int n) const;
+        [[nodiscard]] int localPeriod (int n) const;
 
         /**
         * \brief A method that returns true if any of the slices contained by the IntervalsParser
         * has a strictly positive period.
         */
-        bool isActivated () const;
+        [[nodiscard]] bool isActivated () const;
 
     private:
         std::vector<SliceParser> m_slices;
@@ -188,31 +188,31 @@ namespace utils::parser
         * "x,y,z,...". This will call the constructor of SliceParser using x, y and z as input
         * arguments.
         */
-        BTDIntervalsParser (const std::vector<std::string>& instr_vec);
+        explicit BTDIntervalsParser (const std::vector<std::string>& instr_vec);
 
         /**
          * @brief Return the total number of unique labframe snapshots
          */
-        int NumSnapshots () const;
+        [[nodiscard]] int NumSnapshots () const;
 
         /**
          * @brief Return the iteration number stored at index i_buffer
          *
          * @param i_buffer buffer or iteration index, between 0 and NumSnapshots
          */
-        int GetBTDIteration(int i_buffer) const;
+        [[nodiscard]] int GetBTDIteration(int i_buffer) const;
 
         /**
          * @brief Return the final BTD iteration
          *
          */
-        int GetFinalIteration() const;
+        [[nodiscard]] int GetFinalIteration() const;
 
         /**
         * \brief A method that returns true if any of the slices contained by the IntervalsParser
         * has a strictly positive period.
         */
-        bool isActivated () const;
+        [[nodiscard]] bool isActivated () const;
 
     private:
         std::vector<int> m_btd_iterations;

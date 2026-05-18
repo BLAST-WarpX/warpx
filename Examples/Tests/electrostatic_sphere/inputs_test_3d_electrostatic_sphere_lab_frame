@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+diag2.electron.variables = x y z ux uy uz w phi
+warpx.do_electrostatic = labframe

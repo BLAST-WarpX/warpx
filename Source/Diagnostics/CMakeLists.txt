@@ -1,13 +1,12 @@
 foreach(D IN LISTS WarpX_DIMS)
     warpx_set_suffix_dims(SD ${D})
-    target_sources(WarpX_${SD}
+    target_sources(lib_${SD}
       PRIVATE
         Diagnostics.cpp
         FieldIO.cpp
         FullDiagnostics.cpp
         MultiDiagnostics.cpp
         ParticleIO.cpp
-        SliceDiagnostic.cpp
         WarpXIO.cpp
         WarpXOpenPMD.cpp
         BTDiagnostics.cpp

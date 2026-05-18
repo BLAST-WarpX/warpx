@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+# --- Input file for particle-boundary interaction testing in RZ.
+# --- This input is a simple case of reflection
+# --- of one electron on the surface of a sphere.
+
+import numpy as np
+import scipy.constants as scc
+
+from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
+
+##########################
+# numerics parameters
+##########################
+
+dt = 1.0e-11
+
+# --- Nb time steps
+
+max_steps = 23
+diagnostic_interval = 1
+
+# --- grid
+
+nr = 64
+nz = 64
+
+rmin = 0.0
+rmax = 2
+zmin = -2
+zmax = 2
+
+##########################
+# numerics components
+##########################
+
+grid = picmi.CylindricalGrid(
+    number_of_cells=[nr, nz],
+    n_azimuthal_modes=1,
+    lower_bound=[rmin, zmin],
+    upper_bound=[rmax, zmax],
+    lower_boundary_conditions=["none", "dirichlet"],
+    upper_boundary_conditions=["dirichlet", "dirichlet"],
+    lower_boundary_conditions_particles=["none", "reflecting"],
+    upper_boundary_conditions_particles=["absorbing", "reflecting"],
+)
+
+
+solver = picmi.ElectrostaticSolver(
+    grid=grid, method="Multigrid", warpx_absolute_tolerance=1e-7
+)
+
+embedded_boundary = picmi.EmbeddedBoundary(
+    implicit_function="-(x**2+y**2+z**2-radius**2)", radius=0.2
+)
+
+##########################
+# physics components
+##########################
+
+# one particle
+e_dist = picmi.ParticleListDistribution(
+    x=0.0, y=0.0, z=-0.25, ux=0.5e10, uy=0.0, uz=1.0e10, weight=1
+)
+
+electrons = picmi.Species(
+    particle_type="electron",
+    name="electrons",
+    initial_distribution=e_dist,
+    warpx_save_particles_at_eb=1,
+)
+
+##########################
+# diagnostics
+##########################
+
+field_diag = picmi.FieldDiagnostic(
+    name="diag1",
+    grid=grid,
+    period=diagnostic_interval,
+    data_list=["Er", "Ez", "phi", "rho", "rho_electrons"],
+    warpx_format="openpmd",
+)
+
+part_diag = picmi.ParticleDiagnostic(
+    name="diag1",
+    period=diagnostic_interval,
+    species=[electrons],
+    warpx_format="openpmd",
+)
+
+##########################
+# simulation setup
+##########################
+
+sim = picmi.Simulation(
+    solver=solver,
+    time_step_size=dt,
+    max_steps=max_steps,
+    warpx_embedded_boundary=embedded_boundary,
+    warpx_amrex_the_arena_is_managed=1,
+)
+
+sim.add_species(
+    electrons,
+    layout=picmi.GriddedLayout(n_macroparticle_per_cell=[10, 1, 1], grid=grid),
+)
+sim.add_diagnostic(part_diag)
+sim.add_diagnostic(field_diag)
+
+sim.initialize_inputs()
+sim.initialize_warpx()
+
+##########################
+# python particle data access
+##########################
+xp, _ = load_cupy()
+
+
+def concat(list_of_arrays):
+    if len(list_of_arrays) == 0:
+        # Return a 1d array of size 0
+        return xp.empty(0)
+    else:
+        return xp.concatenate(list_of_arrays)
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return arr
+
+
+def mirror_reflection():
+    buffer = particle_containers.ParticleBoundaryBufferWrapper()  # boundary buffer
+
+    # STEP 1: extract the different parameters of the boundary buffer (normal, time, position)
+    lev = 0  # level 0 (no mesh refinement here)
+    delta_t = concat(
+        buffer.get_particle_scraped_this_step(
+            "electrons", "eb", "deltaTimeScraped", lev
+        )
+    )
+    r = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "r", lev))
+    theta = concat(
+        buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
+    )
+
+    z = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev))
+    x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * xp.sin(theta)
+    ux = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ux", lev))
+    uy = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uy", lev))
+    uz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uz", lev))
+    w = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "w", lev))
+    nx = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nx", lev))
+    ny = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ny", lev))
+    nz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nz", lev))
+
+    # STEP 2: use these parameters to inject particle from the same position in the plasma
+    electrons = sim.particles.get("electrons")  # general particle container
+
+    ####this part is specific to the case of simple reflection.
+    un = ux * nx + uy * ny + uz * nz
+    ux_reflect = -2 * un * nx + ux  # for a "mirror reflection" u(sym)=-2(u.n)n+u
+    uy_reflect = -2 * un * ny + uy
+    uz_reflect = -2 * un * nz + uz
+
+    x = to_numpy(x)
+    y = to_numpy(y)
+    z = to_numpy(z)
+    w = to_numpy(w)
+    delta_t = to_numpy(delta_t)
+    ux_reflect = to_numpy(ux_reflect)
+    uy_reflect = to_numpy(uy_reflect)
+    uz_reflect = to_numpy(uz_reflect)
+
+    inv_c2 = 1.0 / (scc.c**2)
+    inv_gamma = 1.0 / np.sqrt(
+        1.0 + (ux_reflect**2 + uy_reflect**2 + uz_reflect**2) * inv_c2
+    )
+    dt_remaining = dt - delta_t
+
+    electrons.add_particles(
+        x=x + dt_remaining * ux_reflect * inv_gamma,
+        y=y + dt_remaining * uy_reflect * inv_gamma,
+        z=z + dt_remaining * uz_reflect * inv_gamma,
+        ux=ux_reflect,
+        uy=uy_reflect,
+        uz=uz_reflect,
+        w=w,
+    )  # adds the particle in the general particle container at the next step
+    #### Can be modified depending on the model of interaction.
+
+
+callbacks.installafterstep(
+    mirror_reflection
+)  # mirror_reflection is called at the next step
+# using the new particle container modified at the last step
+
+##########################
+# simulation run
+##########################
+
+sim.step(max_steps)  # the whole process is done "max_steps" times

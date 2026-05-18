@@ -26,61 +26,132 @@ If you are new to this system, **please see the following resources**:
   * ``$HOME`` : meant for scripts and tools, single user, never purged, backed up
 
 
-Installation
-------------
+.. _building-adastra-preparation:
 
-Use the following commands to download the WarpX source code and switch to the correct branch:
+Preparation
+-----------
 
-.. code-block:: bash
+The following instructions will install WarpX in the ``$WORKDIR`` directory.
+On Adastra the Home folder has relatively stringent space quota and inode quota shared
+among all the members of a given project. Therefore, installing WarpX in a different location
+is advisable.
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
-
-We use the following modules and environments on the system (``$HOME/adastra_warpx.profile``).
-
-.. literalinclude:: ../../../../Tools/machines/adastra-cines/adastra_warpx.profile.example
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/adastra-cines/adastra_warpx.profile.example``.
-
-We recommend to store the above lines in a file, such as ``$HOME/adastra_warpx.profile``, and load it into your shell after a login:
+Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   source $HOME/adastra_warpx.profile
+   # If you have multiple projects, activate the project that you want to use with:
+   #
+   # myproject -a YOUR_PROJECT_NAME
+   #
+   git clone https://github.com/BLAST-WarpX/warpx.git $WORKDIR/src/warpx
 
-And since Adastra does not yet provide a module for them, install c-blosc and ADIOS2:
-
-.. code-block:: bash
-
-   export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-   export CMAKE_PREFIX_PATH=${HOME}/sw/adastra/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
-
-   # c-blosc (I/O compression)
-   git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git src/c-blosc
-   rm -rf src/c-blosc-pm-build
-   cmake -S src/c-blosc -B src/c-blosc-pm-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${HOME}/sw/adastra/gpu/c-blosc-1.21.1
-   cmake --build src/c-blosc-pm-build --target install --parallel 16
-
-   # ADIOS2
-   git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git src/adios2
-   rm -rf src/adios2-pm-build
-   cmake -S src/adios2 -B src/adios2-pm-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${HOME}/sw/adastra/gpu/adios2-2.8.3
-   cmake --build src/adios2-pm-build --target install -j 16
-
-Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following commands to compile:
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/adastra_warpx.profile``.
+Create it now:
 
 .. code-block:: bash
 
-   cd $HOME/src/warpx
-   rm -rf build
+   cp $WORKDIR/src/warpx/Tools/machines/adastra-cines/adastra_warpx.profile.example $HOME/adastra_warpx.profile
 
-   cmake -S . -B build -DWarpX_DIMS="1;2;3" -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON
-   cmake --build build -j 32
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+   .. literalinclude:: ../../../../Tools/machines/adastra-cines/adastra_warpx.profile.example
+      :language: bash
 
-**That's it!**
-A 3D WarpX executable is now in ``build/bin/`` and :ref:`can be run <running-cpp-adastra>` with a :ref:`3D example inputs file <usage-examples>`.
-Most people execute the binary directly or copy it out to a location in ``$WORKDIR`` or ``$SCRATCHDIR``.
+Edit the 2nd line of this script, which sets the ``export proj=""`` variable using a text editor
+such as ``nano``, ``emacs``, or ``vim`` (all available by default on Adastra login nodes) and
+uncomment the 3rd line (which sets ``$proj`` as the active project).
+
+.. important::
+
+   Now, and as the first step on future logins to Adastra, activate these environment settings:
+
+   .. code-block:: bash
+
+      source $HOME/adastra_warpx.profile
+
+Finally, since Adastra does not yet provide software modules for some of our dependencies, install them once:
+
+.. code-block:: bash
+
+   bash $WORKDIR/src/warpx/Tools/machines/adastra-cines/install_dependencies.sh
+   source $WORKDIR/sw/adastra/gpu/venvs/warpx-adastra/bin/activate
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/adastra-cines/install_dependencies.sh
+      :language: bash
+
+
+.. _building-adastra-compilation:
+
+Compilation
+-----------
+
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
+
+.. code-block:: bash
+
+   cd $WORKDIR/src/warpx
+   rm -rf build_adastra
+
+   cmake -S . -B build_adastra -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3" -DWarpX_QED_TABLES_GEN_OMP=OFF
+   cmake --build build_adastra -j 16
+
+The WarpX application executables are now in ``$WORKDIR/src/warpx/build_adastra/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
+
+.. code-block:: bash
+
+   rm -rf build_adastra_py
+
+   cmake -S . -B build_adastra_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3" -DWarpX_QED_TABLES_GEN_OMP=OFF
+   cmake --build build_adastra_py -j 16 --target pip_install
+
+.. note::
+
+   Enabling openMP support for QED lookup tables generation in WarpX while compiling WarpX for GPUs on Adastra does not work. It is recommended to generate QED lookup tables locally (e.g., with the standalone tool) and then transfer them to Adastra. The usage of the standalone tool for QED lookup tables generation is documented in the usage/workflows section of the documentation.
+
+Now, you can :ref:`submit Adstra compute jobs <running-cpp-adastra>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
+Or, you can use the WarpX executables to submit Adastra jobs (:ref:`example inputs <usage-examples>`).
+For executables, you can reference their location in your :ref:`job script <running-cpp-adastra>` .
+
+
+.. _building-adastra-update:
+
+Update WarpX & Dependencies
+---------------------------
+
+If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+
+.. code-block:: bash
+
+   cd $WORKDIR/src/warpx
+
+   # read the output of this command - does it look ok?
+   git status
+
+   # get the latest WarpX source code
+   git fetch
+   git pull
+
+   # read the output of these commands - do they look ok?
+   git status
+   git log     # press q to exit
+
+And, if needed,
+
+- :ref:`update the adastra_warpx.profile file <building-adastra-preparation>`,
+- log out and into the system, activate the now updated environment profile as usual,
+- :ref:`execute the dependency install scripts <building-adastra-preparation>`.
+
+As a last step, clean the build directory ``rm -rf $WORKDIR/src/warpx/build_adastra`` and rebuild WarpX.
 
 
 .. _running-cpp-adastra:
@@ -97,7 +168,7 @@ In non-interactive runs:
 
 .. literalinclude:: ../../../../Tools/machines/adastra-cines/submit.sh
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/adastra-cines/submit.sh``.
+   :caption: You can copy this file from ``$HOME/src/warpx/Tools/machines/adastra-cines/submit.sh``.
 
 
 .. _post-processing-adastra:
@@ -144,3 +215,18 @@ Known System Issues
    Reported to AMD and fixed for the next release of ROCm.
 
    Stay with the ROCm 5.2 module to avoid.
+
+.. warning::
+
+   April 30th, 2025:
+   We observed several issues that can cause WarpX simulations to hang or crash on releases ``25.02`` and ``25.03``.
+
+   Releases ``<=25.01`` and ``>=25.04`` are currently working.
+
+.. warning::
+
+   August 2025:
+   We observed a heavy node memory increase over time when using module ``cray-mpich`` versions ``8.1.28`` and ``8.1.30``, which
+   causes simulations to slow down and eventually crash.
+
+   While no ``cray-mpich`` version ``>8.1.30`` is available on Adastra, stay with version ``8.1.26`` to avoid this issue.

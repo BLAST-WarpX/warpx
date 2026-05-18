@@ -8,15 +8,15 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 
 #include <string>
 
-BackgroundStopping::BackgroundStopping (std::string const collision_name)
+BackgroundStopping::BackgroundStopping (std::string const& collision_name)
     : CollisionBase(collision_name)
 {
     using namespace amrex::literals;
@@ -88,7 +88,7 @@ BackgroundStopping::BackgroundStopping (std::string const collision_name)
 void
 BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundStopping::doCollisions()");
+    ABLASTR_PROFILE("BackgroundStopping::doCollisions()");
     using namespace amrex::literals;
 
     auto& species = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -104,7 +104,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
     auto const flvl = species.finestLevel();
     for (int lev = 0; lev <= flvl; ++lev) {
 
-        auto cost = WarpX::getCosts(lev);
+        auto *cost = WarpX::getCosts(lev);
 
         // loop over particles box by box
 #ifdef _OPENMP
@@ -115,7 +115,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
             {
                 amrex::Gpu::synchronize();
             }
-            amrex::Real wt = amrex::second();
+            auto wt = static_cast<amrex::Real>(amrex::second());
 
             if (background_type == BackgroundStoppingType::ELECTRONS) {
                 doBackgroundStoppingOnElectronsWithinTile(pti, dt, cur_time, species_mass, species_charge);
@@ -126,7 +126,7 @@ BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiPar
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
             {
                 amrex::Gpu::synchronize();
-                wt = amrex::second() - wt;
+                wt = static_cast<amrex::Real>(amrex::second()) - wt;
                 amrex::HostDevice::Atomic::Add(&(*cost)[pti.index()], wt);
             }
         }
@@ -159,7 +159,7 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
     // May be needed to evaluate the density and/or temperature functions
-    auto const GetPosition = GetParticlePosition(pti);
+    auto const GetPosition = GetParticlePosition<PIdx>(pti);
 
     amrex::ParallelFor(np,
         [=] AMREX_GPU_HOST_DEVICE (long ip)
@@ -179,7 +179,7 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
             // give V(t+dt) = V(t)*exp(-alpha*dt)
 
             amrex::ParticleReal constexpr pi = MathConst::pi;
-            amrex::ParticleReal constexpr ep0 = PhysConst::ep0;
+            amrex::ParticleReal constexpr ep0 = PhysConst::epsilon_0;
             amrex::ParticleReal constexpr q_e = PhysConst::q_e;
             amrex::ParticleReal constexpr q_e2 = q_e*q_e;
             amrex::ParticleReal constexpr ep02 = ep0*ep0;
@@ -234,7 +234,7 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
     amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
     // May be needed to evaluate the density function
-    auto const GetPosition = GetParticlePosition(pti);
+    auto const GetPosition = GetParticlePosition<PIdx>(pti);
 
     amrex::ParallelFor(np,
         [=] AMREX_GPU_HOST_DEVICE (long ip)
@@ -256,7 +256,7 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
             amrex::ParticleReal constexpr pi = MathConst::pi;
             amrex::ParticleReal constexpr q_e = PhysConst::q_e;
             amrex::ParticleReal constexpr q_e2 = q_e*q_e;
-            amrex::ParticleReal constexpr ep0 = PhysConst::ep0;
+            amrex::ParticleReal constexpr ep0 = PhysConst::epsilon_0;
             amrex::ParticleReal constexpr ep02 = ep0*ep0;
 
             amrex::ParticleReal const qi2 = charge_state_i*charge_state_i*q_e2;

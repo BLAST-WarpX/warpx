@@ -1,11 +1,97 @@
-Checks: '-*,
-    cppcoreguidelines-avoid-goto,
-    misc-const-correctness,
-    modernize-avoid-bind,
-    modernize-use-nullptr,
-    performance-faster-string-find,
-    performance-for-range-copy,
-    readability-non-const-parameter
+Checks: '
+    -*,
+    bugprone-*,
+        -bugprone-easily-swappable-parameters,
+        -bugprone-implicit-widening-of-multiplication-result,
+        -bugprone-misplaced-widening-cast,
+        -bugprone-unchecked-optional-access,
+        -bugprone-unused-local-non-trivial-variable,
+    cert-*,
+        -cert-err58-cpp,
+    clang-analyzer-*,
+        -clang-analyzer-optin.performance.Padding,
+        -clang-analyzer-optin.mpi.MPI-Checker,
+        -clang-analyzer-osx.*,
+        -clang-analyzer-optin.osx.*,
+    clang-diagnostic-*,
+    cppcoreguidelines-*,
+        -cppcoreguidelines-avoid-c-arrays,
+        -cppcoreguidelines-avoid-magic-numbers,
+        -cppcoreguidelines-avoid-non-const-global-variables,
+        -cppcoreguidelines-init-variables,
+        -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-missing-std-forward,
+        -cppcoreguidelines-narrowing-conversions,
+        -cppcoreguidelines-non-private-member-variables-in-classes,
+        -cppcoreguidelines-owning-memory,
+        -cppcoreguidelines-pro-*,
+    google-build-explicit-make-pair,
+    google-build-namespaces,
+    google-explicit-constructor,
+    google-global-names-in-headers,
+    misc-*,
+        -misc-no-recursion,
+        -misc-non-private-member-variables-in-classes,
+        -misc-include-cleaner,
+    modernize-*,
+        -modernize-avoid-c-arrays,
+        -modernize-return-braced-init-list,
+        -modernize-use-trailing-return-type,
+        -modernize-use-constraints,
+        -modernize-use-designated-initializers,
+        -modernize-use-std-numbers,
+        -modernize-use-ranges,
+        -modernize-use-integer-sign-comparison,
+        -modernize-use-starts-ends-with,
+    mpi-*,
+    performance-*,
+        -performance-enum-size,
+    portability-*,
+    readability-*,
+        -readability-avoid-nested-conditional-operator,
+        -readability-convert-member-functions-to-static,
+        -readability-else-after-return,
+        -readability-function-cognitive-complexity,
+        -readability-identifier-length,
+        -readability-implicit-bool-conversion,
+        -readability-isolate-declaration,
+        -readability-magic-numbers,
+        -readability-named-parameter,
+        -readability-uppercase-literal-suffix,
+        -readability-redundant-casting,
+        -readability-container-contains,
+        -readability-redundant-inline-specifier,
+        -readability-redundant-member-init,
+        -readability-reference-to-constructed-temporary
     '
 
+CheckOptions:
+- key:          bugprone-narrowing-conversions.WarnOnIntegerToFloatingPointNarrowingConversion
+  value:        "false"
+- key:          misc-definitions-in-headers.HeaderFileExtensions
+  value:        "H,"
+- key:          modernize-pass-by-value.ValuesOnly
+  value:        "true"
+- key:          misc-use-anonymous-namespace.HeaderFileExtensions
+  value:        "H,"
+- key:          performance-move-const-arg.CheckTriviallyCopyableMove
+  value:        "false"
+
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
+
+# TODO Modernize this after switching to C++20:
+# -modernize-use-constraints
+# -modernize-use-designated-initializers
+# -modernize-use-std-numbers
+# -modernize-use-ranges
+# -modernize-use-integer-sign-comparison
+# -modernize-use-starts-ends-with
+# -readability-container-contains
+
+# TODO Consider enabling the following checks:
+# -bugprone-unused-local-non-trivial-variable
+# -performance-enum-size
+# -readability-container-contains
+# -readability-redundant-inline-specifier
+# -readability-redundant-member-init
+# -readability-reference-to-constructed-temporary

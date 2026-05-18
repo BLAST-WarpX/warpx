@@ -1,0 +1,92 @@
+my_constants.gamma_bunch=100.6
+my_constants.Bu = 0.5
+my_constants.lambda_u = 3e-2
+my_constants.k_u= 2*pi/lambda_u
+my_constants.K = q_e*Bu/(m_e*clight*k_u) # Undulator parameter
+
+warpx.gamma_boost = gamma_bunch/sqrt(1+K*K/2) # Lorentz factor of the ponderomotive frame
+warpx.boost_direction = z
+algo.maxwell_solver = yee
+algo.particle_shape = 2
+algo.particle_pusher = vay
+
+# geometry
+geometry.dims = 1
+geometry.prob_hi = 0
+geometry.prob_lo = -192e-6
+
+amr.max_grid_size = 1024
+amr.max_level = 0
+amr.n_cell = 1024
+
+# boundary
+boundary.field_hi = absorbing_silver_mueller
+boundary.field_lo = absorbing_silver_mueller
+boundary.particle_hi = absorbing
+boundary.particle_lo = absorbing
+
+# diagnostics
+diagnostics.diags_names = diag_labframe diag_boostedframe
+
+# Diagnostic that show quantities in the frame
+# of the simulation (boosted-frame)
+diag_boostedframe.diag_type = Full
+diag_boostedframe.format = openpmd
+diag_boostedframe.intervals = 100
+
+# Diagnostic that show quantities
+# reconstructed in the lab frame
+diag_labframe.diag_type = BackTransformed
+diag_labframe.num_snapshots_lab = 25
+diag_labframe.dz_snapshots_lab = 0.1
+diag_labframe.format = openpmd
+diag_labframe.buffer_size = 64
+
+# Run the simulation long enough for
+# all backtransformed diagnostic to be complete
+warpx.compute_max_step_from_btd = 1
+
+particles.species_names = electrons positrons
+particles.rigid_injected_species= electrons positrons
+
+electrons.charge = -q_e
+electrons.injection_style = nuniformpercell
+electrons.mass = m_e
+electrons.momentum_distribution_type = constant
+electrons.num_particles_per_cell_each_dim = 8
+electrons.profile = constant
+electrons.density = 2.7e19/2
+electrons.ux = 0.0
+electrons.uy = 0.0
+electrons.uz = gamma_bunch
+electrons.zmax = -25e-6
+electrons.zmin = -125e-6
+electrons.zinject_plane=0.0
+electrons.rigid_advance=0
+
+positrons.charge = q_e
+positrons.injection_style = nuniformpercell
+positrons.mass = m_e
+positrons.momentum_distribution_type = constant
+positrons.num_particles_per_cell_each_dim = 8
+positrons.profile = constant
+positrons.density = 2.7e19/2
+positrons.ux = 0.0
+positrons.uy = 0.0
+positrons.uz = gamma_bunch
+positrons.zmax = -25e-6
+positrons.zmin = -125e-6
+positrons.zinject_plane=0.0
+positrons.rigid_advance=0
+
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = sqrt(1-(1+K*K/2)/(gamma_bunch*gamma_bunch))
+
+# Undulator field
+particles.B_ext_particle_init_style = parse_B_ext_particle_function
+particles.Bx_external_particle_function(x,y,z,t) = 0
+particles.By_external_particle_function(x,y,z,t) = if( z>0, Bu*cos(k_u*z), 0 )
+particles.Bz_external_particle_function(x,y,z,t) =0.0
+
+warpx.cfl = 0.99

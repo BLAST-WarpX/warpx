@@ -1,0 +1,31 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# Test with electrons/positrons: use gaussian beam distribution
+# by providing the total charge (q_tot)
+
+my_constants.nmacropart = 2e5
+
+beam1.species_type = electron
+beam1.injection_style = gaussian_beam
+beam1.x_rms = sigmax
+beam1.y_rms = sigmay
+beam1.z_rms = sigmaz
+beam1.x_m = 0
+beam1.y_m = 0
+beam1.z_m = -muz
+beam1.npart = nmacropart
+beam1.q_tot = -beam_N*q_e
+beam1.z_cut = 4
+
+beam2.species_type = positron
+beam2.injection_style = gaussian_beam
+beam2.x_rms = sigmax
+beam2.y_rms = sigmay
+beam2.z_rms = sigmaz
+beam2.x_m = 0
+beam2.y_m = 0
+beam2.z_m = muz
+beam2.npart = nmacropart
+beam2.q_tot = beam_N*q_e
+beam2.z_cut = 4

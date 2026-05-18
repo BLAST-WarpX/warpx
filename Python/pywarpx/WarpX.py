@@ -6,8 +6,9 @@
 # License: BSD-3-Clause-LBNL
 
 import re
+import sys
 
-from . import Particles
+from ._libwarpx import libwarpx
 from .Algo import algo
 from .Amr import amr
 from .Amrex import amrex
@@ -18,12 +19,11 @@ from .Constants import my_constants
 from .Diagnostics import diagnostics, reduced_diagnostics
 from .EB2 import eb2
 from .Geometry import geometry
-from .HybridPICModel import hybridpicmodel
+from .HybridPICModel import external_vector_potential, hybridpicmodel
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
-from .PSATD import psatd
 from .Particles import particles, particles_list
-from ._libwarpx import libwarpx
+from .PSATD import psatd
 
 
 class WarpX(Bucket):
@@ -31,12 +31,17 @@ class WarpX(Bucket):
     A Python wrapper for the WarpX C++ class
     """
 
+    # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
+    # Simulation objects. In the future, LibWarpX objects may actually be owned
+    # by Simulation objects to permit multiple WarpX runs simultaneously.
+    extension = libwarpx
+
     def create_argv_list(self, **kw):
         argv = []
 
         for k, v in kw.items():
             if v is not None:
-                argv.append(f'{k} = {v}')
+                argv.append(f"{k} = {v}")
 
         argv += warpx.attrlist()
         argv += my_constants.attrlist()
@@ -44,24 +49,12 @@ class WarpX(Bucket):
         argv += amrex.attrlist()
         argv += geometry.attrlist()
         argv += hybridpicmodel.attrlist()
+        argv += external_vector_potential.attrlist()
         argv += boundary.attrlist()
         argv += algo.attrlist()
         argv += interpolation.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()
-
-        # --- Search through species_names and add any predefined particle objects in the list.
-        particles_list_names = [p.instancename for p in particles_list]
-        for pstring in particles.species_names:
-            if pstring in particles_list_names:
-                # --- The species is already included in particles_list
-                continue
-            elif hasattr(Particles, pstring):
-                # --- Add the predefined species to particles_list
-                particles_list.append(getattr(Particles, pstring))
-                particles_list_names.append(pstring)
-            else:
-                raise Exception('Species %s listed in species_names not defined'%pstring)
 
         argv += particles.attrlist()
         for particle in particles_list:
@@ -83,19 +76,111 @@ class WarpX(Bucket):
             for species_diagnostic in diagnostic._species_dict.values():
                 argv += species_diagnostic.attrlist()
 
-        reduced_diagnostics.reduced_diags_names = reduced_diagnostics._diagnostics_dict.keys()
+        reduced_diagnostics.reduced_diags_names = (
+            reduced_diagnostics._diagnostics_dict.keys()
+        )
         argv += reduced_diagnostics.attrlist()
         for diagnostic in reduced_diagnostics._diagnostics_dict.values():
             argv += diagnostic.attrlist()
 
+        for bucket in self._bucket_dict.values():
+            argv += bucket.attrlist()
+
         return argv
 
+    def get_bucket(self, bucket_name):
+        try:
+            return self._bucket_dict[bucket_name]
+        except KeyError:
+            bucket = Bucket(bucket_name)
+            self._bucket_dict[bucket_name] = bucket
+            return bucket
+
+    @staticmethod
+    def read_dims_from_file(filename, visited=None):
+        """Parse an AMReX input file (and its includes) and return the
+        geometry.dims value as a string or None if not found.
+        """
+        import os
+
+        if visited is None:
+            visited = set()
+        filename = os.path.abspath(filename)
+        if filename in visited:
+            return None
+        visited.add(filename)
+
+        # included files
+        file_pattern = re.compile(r'^\s*FILE\s*=\s*"?([^"\n\r]+)"?', re.I)
+        # geometry.dims can be 1/2/3/RZ/RCYLINDER/RSPHERE
+        dims_pattern = re.compile(
+            r'^\s*geometry\.dims\s*=\s*"?\s*(1|2|3|RZ|RCYLINDER|RSPHERE)\s*"?', re.I
+        )
+
+        dims_value = None
+        try:
+            with open(filename) as f:
+                for line in f:
+                    # Check for FILE = ... recursively
+                    m_file = file_pattern.search(line)
+                    if m_file:
+                        included_file = m_file.group(1).strip()
+                        val = WarpX.read_dims_from_file(included_file, visited)
+                        if val is not None:
+                            dims_value = val
+                        continue
+
+                    # Check for geometry.dims = ...
+                    m_dims = dims_pattern.search(line)
+                    if m_dims:
+                        dims_value = m_dims.group(1)
+
+        except (FileNotFoundError, OSError):
+            print(
+                f"Error: Could not open file '{filename}'. "
+                "Please check if it exists and is accessible."
+            )
+
+        return dims_value
+
+    def load_inputs_file(self, filename):
+        from .Geometry import geometry
+
+        geometry.dims = WarpX.read_dims_from_file(filename)
+        if geometry.dims is None:
+            raise RuntimeError(
+                f"Error: Could not find the geometry.dims in the input file '{filename}' or its included files."
+            )
+
+        libwarpx.initialize(sys.argv + [filename])
+
     def init(self, mpi_comm=None, **kw):
-        argv = ['warpx'] + self.create_argv_list(**kw)
+        # note: argv[0] needs to be an absolute path so it works with AMReX backtraces
+        # https://github.com/AMReX-Codes/amrex/issues/3435
+        argv = [sys.executable] + self.create_argv_list(**kw)
         libwarpx.initialize(argv, mpi_comm=mpi_comm)
 
+    @property
+    def fields(self):
+        return libwarpx.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        return libwarpx.warpx.multi_particle_container()
+
+    def step(self, nsteps=-1):
+        libwarpx.warpx.evolve(nsteps)
+
     def evolve(self, nsteps=-1):
-        libwarpx.evolve(nsteps)
+        """An alias of step, used in legacy code"""
+        import warnings
+
+        warnings.warn(
+            "warpx.evolve is now obsolete and should not be used. Please use warpx.step.",
+            UserWarning,
+            stacklevel=2,
+        )
+        self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
         libwarpx.finalize(finalize_mpi)
@@ -106,25 +191,25 @@ class WarpX(Bucket):
     def getProbHi(self, direction):
         return libwarpx.libwarpx_so.warpx_getProbHi(direction)
 
-    def write_inputs(self, filename='inputs', **kw):
+    def write_inputs(self, filename="inputs", **kw):
         argv = self.create_argv_list(**kw)
 
         # Sort the argv list to make it more human readable
         argv.sort()
 
-        with open(filename, 'w') as ff:
-
-            prefix_old = ''
+        with open(filename, "w") as ff:
+            prefix_old = ""
             for arg in argv:
                 # This prints the name of the input group (prefix) as a header
                 # before each group to make the input file more human readable
-                prefix_new = re.split(' |\.', arg)[0]
+                prefix_new = re.split(r" |\.", arg)[0]
                 if prefix_new != prefix_old:
-                    if prefix_old != '':
-                        ff.write('\n')
-                    ff.write(f'# {prefix_new}\n')
+                    if prefix_old != "":
+                        ff.write("\n")
+                    ff.write(f"# {prefix_new}\n")
                     prefix_old = prefix_new
 
-                ff.write(f'{arg}\n')
+                ff.write(f"{arg}\n")
 
-warpx = WarpX('warpx')
+
+warpx = WarpX("warpx", _bucket_dict={})

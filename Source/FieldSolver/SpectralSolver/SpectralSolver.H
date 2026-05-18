@@ -11,6 +11,10 @@
 
 #include "SpectralAlgorithms/SpectralBaseAlgorithm.H"
 #include "SpectralFieldData.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -21,7 +25,7 @@
 #include <array>
 #include <memory>
 
-#ifdef WARPX_USE_PSATD
+#ifdef WARPX_USE_FFT
 /**
  * \brief Top-level class for the electromagnetic spectral solver
  *
@@ -40,7 +44,6 @@ class SpectralSolver
          * for the discrete field update equations, and prepare the structures that store
          * the fields in spectral space.
          *
-         * \param[in] lev mesh refinement level
          * \param[in] realspace_ba BoxArray in real space
          * \param[in] dm DistributionMapping for the given BoxArray
          * \param[in] norder_x spectral order along x
@@ -60,33 +63,34 @@ class SpectralSolver
          * \param[in] fft_do_time_averaging whether the time averaging algorithm is used
          * \param[in] psatd_solution_type whether the PSATD equations are derived
          *                                from a first-order or second-order model
-         * \param[in] J_in_time integer that corresponds to the time dependency of J
+         * \param[in] time_dependency_J integer that corresponds to the time dependency of J
          *                      (constant, linear) for the PSATD algorithm
-         * \param[in] rho_in_time integer that corresponds to the time dependency of rho
+         * \param[in] time_dependency_rho integer that corresponds to the time dependency of rho
          *                        (linear, quadratic) for the PSATD algorithm
          * \param[in] dive_cleaning whether to use div(E) cleaning to account for errors in
          *                          Gauss law (new field F in the update equations)
          * \param[in] divb_cleaning whether to use div(B) cleaning to account for errors in
          *                          div(B) = 0 law (new field G in the update equations)
          */
-        SpectralSolver (const int lev,
-                        const amrex::BoxArray& realspace_ba,
+        SpectralSolver (const amrex::BoxArray& realspace_ba,
                         const amrex::DistributionMapping& dm,
-                        const int norder_x, const int norder_y,
-                        const int norder_z, const short grid_type,
+                        int norder_x,
+                        int norder_y,
+                        int norder_z,
+                        ablastr::utils::enums::GridType grid_type,
                         const amrex::Vector<amrex::Real>& v_galilean,
                         const amrex::Vector<amrex::Real>& v_comoving,
-                        const amrex::RealVect dx,
-                        const amrex::Real dt,
-                        const bool pml,
-                        const bool periodic_single_box,
-                        const bool update_with_rho,
-                        const bool fft_do_time_averaging,
-                        const int psatd_solution_type,
-                        const int J_in_time,
-                        const int rho_in_time,
-                        const bool dive_cleaning,
-                        const bool divb_cleaning);
+                        amrex::RealVect dx,
+                        amrex::Real dt,
+                        bool pml,
+                        bool periodic_single_box,
+                        bool update_with_rho,
+                        bool fft_do_time_averaging,
+                        PSATDSolutionType psatd_solution_type,
+                        TimeDependencyJ time_dependency_J,
+                        TimeDependencyRho time_dependency_rho,
+                        bool dive_cleaning,
+                        bool divb_cleaning);
 
         /**
          * \brief Transform the component i_comp of the MultiFab mf to Fourier space,
@@ -97,20 +101,20 @@ class SpectralSolver
          * \param[in] field_index index of the spectral field that stores the FFT result
          * \param[in] i_comp component of the MultiFab mf that is transformed to Fourier space
          */
-        void ForwardTransform (const int lev,
+        void ForwardTransform (int lev,
                                const amrex::MultiFab& mf,
-                               const int field_index,
-                               const int i_comp = 0);
+                               int field_index,
+                               int i_comp = 0);
 
         /**
          * \brief Transform spectral field specified by `field_index` back to
          * real space, and store it in the component `i_comp` of `mf`
          */
-        void BackwardTransform( const int lev,
+        void BackwardTransform( int lev,
                                 amrex::MultiFab& mf,
-                                const int field_index,
+                                int field_index,
                                 const amrex::IntVect& fill_guards,
-                                const int i_comp=0 );
+                                int i_comp=0 );
 
         /**
          * \brief Update the fields in spectral space, over one timestep
@@ -121,11 +125,10 @@ class SpectralSolver
           * \brief Public interface to call the member function ComputeSpectralDivE
           * of the base class SpectralBaseAlgorithm from objects of class SpectralSolver
           */
-        void ComputeSpectralDivE ( const int lev,
-                                   const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                   amrex::MultiFab& divE ) {
-            algorithm->ComputeSpectralDivE( lev, field_data, Efield, divE );
-        }
+        void ComputeSpectralDivE (
+            int lev,
+            ablastr::fields::VectorField const & Efield,
+            amrex::MultiFab& divE);
 
         /**
          * \brief Public interface to call the virtual function \c CurrentCorrection,
@@ -133,10 +136,7 @@ class SpectralSolver
          * by its derived classes (e.g. PsatdAlgorithm, PsatdAlgorithmComoving, etc.), from
          * objects of class SpectralSolver through the private unique pointer \c algorithm
          */
-        void CurrentCorrection ()
-        {
-            algorithm->CurrentCorrection(field_data);
-        }
+        void CurrentCorrection ();
 
         /**
          * \brief Public interface to call the virtual function \c VayDeposition,
@@ -144,10 +144,7 @@ class SpectralSolver
          * derived classes, from objects of class SpectralSolver through the private
          * unique pointer \c algorithm.
          */
-        void VayDeposition ()
-        {
-            algorithm->VayDeposition(field_data);
-        }
+        void VayDeposition ();
 
         /**
          * \brief Copy spectral data from component \c src_comp to component \c dest_comp
@@ -156,23 +153,14 @@ class SpectralSolver
          * \param[in] src_comp  component of the source FabArray from which the data are copied
          * \param[in] dest_comp component of the destination FabArray where the data are copied
          */
-        void CopySpectralDataComp (const int src_comp, const int dest_comp)
-        {
-            // The last two arguments represent the number of components and
-            // the number of ghost cells to perform this operation
-            Copy(field_data.fields, field_data.fields, src_comp, dest_comp, 1, 0);
-        }
+        void CopySpectralDataComp (int src_comp, int dest_comp);
 
         /**
          * \brief Set to zero the data on component \c icomp of \c field_data.fields
          *
          * \param[in] icomp component of the FabArray where the data are set to zero
          */
-        void ZeroOutDataComp (const int icomp)
-        {
-            // The last argument represents the number of components to perform this operation
-            field_data.fields.setVal(0., icomp, 1);
-        }
+        void ZeroOutDataComp (int icomp);
 
         /**
          * \brief Scale the data on component \c icomp of \c field_data.fields
@@ -181,13 +169,12 @@ class SpectralSolver
          * \param[in] icomp component of the FabArray where the data are scaled
          * \param[in] scale_factor scale factor to use for scaling
          */
-        void ScaleDataComp (const int icomp, const amrex::Real scale_factor)
-        {
-            // The last argument represents the number of components to perform this operation
-            field_data.fields.mult(scale_factor, icomp, 1);
-        }
+        void ScaleDataComp (int icomp, amrex::Real scale_factor);
 
         SpectralFieldIndex m_spectral_index;
+
+        // Solve time step size
+        amrex::Real m_dt;
 
     protected:
 
@@ -205,5 +192,5 @@ class SpectralSolver
         // to an instance of a sub-class defining a specific algorithm
         std::unique_ptr<SpectralBaseAlgorithm> algorithm;
 };
-#endif // WARPX_USE_PSATD
+#endif // WARPX_USE_FFT
 #endif // WARPX_SPECTRAL_SOLVER_H_

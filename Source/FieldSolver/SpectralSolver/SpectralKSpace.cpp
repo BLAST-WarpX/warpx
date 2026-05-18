@@ -7,9 +7,11 @@
  */
 #include "SpectralKSpace.H"
 
-#include "WarpX.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
+
+#include <ablastr/math/FiniteDifference.H>
+#include <ablastr/utils/Enums.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
@@ -68,14 +70,9 @@ SpectralKSpace::SpectralKSpace( const BoxArray& realspace_ba,
     spectralspace_ba.define( spectral_bl );
 
     // Allocate the components of the k vector: kx, ky (only in 3D), kz
-    bool only_positive_k;
     for (int i_dim=0; i_dim<AMREX_SPACEDIM; i_dim++) {
-        if (i_dim==0) {
-            // Real-to-complex FFTs: first axis contains only the positive k
-            only_positive_k = true;
-        } else {
-            only_positive_k = false;
-        }
+        // Real-to-complex FFTs: first axis contains only the positive k
+        const auto only_positive_k = (i_dim==0);
         k_vec[i_dim] = getKComponent(dm, realspace_ba, i_dim, only_positive_k);
     }
 }
@@ -142,24 +139,24 @@ SpectralKSpace::getKComponent( const DistributionMapping& dm,
  * specified by `i_dim`.
  *
  * (By default, we assume the FFT is done from/to a collocated grid in real space
- * It the FFT is performed from/to a cell-centered grid in real space,
+ * If the FFT is performed from/to a cell-centered grid in real space,
  * a correcting "shift" factor must be applied in spectral space.)
  */
 SpectralShiftFactor
 SpectralKSpace::getSpectralShiftFactor( const DistributionMapping& dm,
                                         const int i_dim,
-                                        const int shift_type ) const
+                                        const ShiftType shift_type ) const
 {
     // Initialize an empty DeviceVector in each box
     SpectralShiftFactor shift_factor( spectralspace_ba, dm );
-   // Loop over boxes and allocate the corresponding DeviceVector
+    // Loop over boxes and allocate the corresponding DeviceVector
     // for each box owned by the local MPI proc
     for ( MFIter mfi(spectralspace_ba, dm); mfi.isValid(); ++mfi ){
         const Gpu::DeviceVector<Real>& k = k_vec[i_dim][mfi];
         Gpu::DeviceVector<Complex>& shift = shift_factor[mfi];
 
         // Allocate shift coefficients
-        const int N = k.size();
+        const auto N = static_cast<int>(k.size());
         shift.resize(N);
         Real const* pk = k.data();
         Complex* pshift = shift.data();
@@ -193,10 +190,10 @@ SpectralKSpace::getSpectralShiftFactor( const DistributionMapping& dm,
  * \param grid_type type of grid (collocated or not)
  */
 KVectorComponent
-SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
+SpectralKSpace::getModifiedKComponent (const DistributionMapping& dm,
                                        const int i_dim,
                                        const int n_order,
-                                       const short grid_type ) const
+                                       ablastr::utils::enums::GridType grid_type) const
 {
     // Initialize an empty DeviceVector in each box
     KVectorComponent modified_k_comp(spectralspace_ba, dm);
@@ -207,7 +204,7 @@ SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
             Gpu::DeviceVector<Real>& modified_k = modified_k_comp[mfi];
 
             // Allocate modified_k to the same size as k
-            const int N = k.size();
+            const auto N = static_cast<int>(k.size());;
             modified_k.resize(N);
 
             // Fill the modified k vector
@@ -216,12 +213,13 @@ SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
     } else {
 
         // Compute real-space stencil coefficients
-        Vector<Real> h_stencil_coef = WarpX::getFornbergStencilCoefficients(n_order, grid_type);
+        Vector<Real> h_stencil_coef =
+            ablastr::math::getFornbergStencilCoefficients(n_order, grid_type);
         Gpu::DeviceVector<Real> d_stencil_coef(h_stencil_coef.size());
         Gpu::copyAsync(Gpu::hostToDevice, h_stencil_coef.begin(), h_stencil_coef.end(),
                        d_stencil_coef.begin());
         Gpu::synchronize();
-        const int nstencil = d_stencil_coef.size();
+        const auto nstencil = static_cast<int>(d_stencil_coef.size());
         Real const* p_stencil_coef = d_stencil_coef.data();
 
         // Loop over boxes and allocate the corresponding DeviceVector
@@ -232,7 +230,7 @@ SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
             Gpu::DeviceVector<Real>& modified_k = modified_k_comp[mfi];
 
             // Allocate modified_k to the same size as k
-            const int N = k.size();
+            const auto N = static_cast<int>(k.size());;
             modified_k.resize(N);
             Real const* p_k = k.data();
             Real * p_modified_k = modified_k.data();
@@ -242,12 +240,12 @@ SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
             {
                 p_modified_k[i] = 0;
                 for (int n=0; n<nstencil; n++){
-                    if (grid_type == GridType::Collocated){
+                    if (grid_type == ablastr::utils::enums::GridType::Collocated){
                         p_modified_k[i] += p_stencil_coef[n]*
                             std::sin( p_k[i]*(n+1)*delta_x )/( (n+1)*delta_x );
                     } else {
                         p_modified_k[i] += p_stencil_coef[n]* \
-                            std::sin( p_k[i]*(n+0.5)*delta_x )/( (n+0.5)*delta_x );
+                            std::sin( p_k[i]*(n+0.5_rt)*delta_x )/( (n+0.5_rt)*delta_x );
                     }
                 }
 
@@ -256,7 +254,7 @@ SpectralKSpace::getModifiedKComponent( const DistributionMapping& dm,
                 // (i.e. highest *real* k) is 0. However, the above calculation
                 // based on stencil coefficients does not give 0 to machine precision.
                 // Therefore, we need to enforce the fact that the modified k be 0 here.
-                if (grid_type == GridType::Collocated){
+                if (grid_type == ablastr::utils::enums::GridType::Collocated){
                     if (i_dim == 0){
                         // Because of the real-to-complex FFTs, the first axis (idim=0)
                         // contains only the positive k, and the Nyquist frequency is

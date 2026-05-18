@@ -24,9 +24,25 @@ struct FieldProbePIdx
 {
     enum
     {
-        Ex = 0, Ey, Ez,
+#if !defined (WARPX_DIM_1D_Z)
+        x,
+#endif
+#if defined (WARPX_DIM_3D)
+        y,
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) || !defined(WARPX_DIM_RSPHERE)
+        z,
+#endif
+        Ex, Ey, Ez,
         Bx, By, Bz,
         S, //!< the Poynting vector
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        theta,      ///< Cylindrical and spherical needs the angle
+
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        phi,      ///< 1D Sphere needs all three position components
+#endif
         nattribs
     };
 };
@@ -37,16 +53,26 @@ struct FieldProbePIdx
  * nattribs tells the particle container to allot 7 SOA values.
  */
 class FieldProbeParticleContainer
-    : public amrex::ParticleContainer<0, 0, FieldProbePIdx::nattribs>
+    : public amrex::ParticleContainerPureSoA<FieldProbePIdx::nattribs, 0>
 {
 public:
-    FieldProbeParticleContainer (amrex::AmrCore* amr_core);
-    virtual ~FieldProbeParticleContainer() {}
+    static constexpr int NStructReal = 0;
+    static constexpr int NStructInt = 0;
+    static constexpr int NReal = FieldProbePIdx::nattribs;
+    static constexpr int NInt = 0;
+
+    explicit FieldProbeParticleContainer (amrex::AmrCore* amr_core);
+    ~FieldProbeParticleContainer() override = default;
+
+    FieldProbeParticleContainer ( FieldProbeParticleContainer const &)             = delete;
+    FieldProbeParticleContainer& operator= ( FieldProbeParticleContainer const & ) = delete;
+    FieldProbeParticleContainer ( FieldProbeParticleContainer&& )                  = default;
+    FieldProbeParticleContainer& operator= ( FieldProbeParticleContainer&& )       = default;
 
     //! amrex iterator for our number of attributes
-    using iterator = amrex::ParIter<0, 0, FieldProbePIdx::nattribs, 0>;
+    using iterator = amrex::ParIterSoA<FieldProbePIdx::nattribs, 0>;
     //! amrex iterator for our number of attributes (read-only)
-    using const_iterator = amrex::ParConstIter<0, 0, FieldProbePIdx::nattribs, 0>;
+    using const_iterator = amrex::ParConstIterSoA<FieldProbePIdx::nattribs, 0>;
 
     //! similar to WarpXParticleContainer::AddNParticles but does not include u(x,y,z)
     void AddNParticles (int lev, amrex::Vector<amrex::ParticleReal> const & x, amrex::Vector<amrex::ParticleReal> const & y, amrex::Vector<amrex::ParticleReal> const & z);

@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_rz_load_external_field_grid
+
+# test input parameters
+amr.restart = "../test_rz_load_external_field_grid/diags/chk000150"

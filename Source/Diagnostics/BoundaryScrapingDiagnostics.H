@@ -8,14 +8,14 @@
 #define WARPX_BOUNDARYSCRAPINGDIAGNOSTICS_H_
 
 #include "Diagnostics.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/Parser/IntervalsParser.H"
 
 #include <string>
 
 /** collect the particles that are absorbed at the embedded boundary, throughout the simulation
  */
-class
-BoundaryScrapingDiagnostics final : public Diagnostics
+class BoundaryScrapingDiagnostics final : public Diagnostics
 {
 public:
 
@@ -23,8 +23,9 @@ public:
      *
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
+     * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
-    BoundaryScrapingDiagnostics (int i, std::string name);
+    BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
 private:
     /** Read relevant parameters for BoundaryScraping */
@@ -34,7 +35,7 @@ private:
     utils::parser::IntervalsParser m_intervals;
 
     /** \brief Flush data to file. */
-    void Flush (int i_buffer) override;
+    void Flush (int i_buffer, bool /* force_flush */) override;
     /** \brief Return whether to dump data to file at this time step.
      * (i.e. whether to call Flush)
      *
@@ -52,16 +53,18 @@ private:
      *
      * This is not used for BoundaryScrapingDiagnostics: no field to output
      */
-     void InitializeBufferData (int i_buffer, int lev, bool restart=false) override;
+    void InitializeBufferData (int i_buffer, int lev, bool restart=false) override;
     /** Initialize functors that point to the fields requested by the user.
      *
      * This is not used for BoundaryScrapingDiagnostics: no field to output
      */
     void InitializeFieldFunctors (int lev) override;
+
     /** Initialize the diagnostics by pointing to the `ParticleBoundaryBuffer`
      * that correspond to the species requested by the user.
+     * \param[in] mpc a constant reference to the multi-particle container.
      */
-    void InitializeParticleBuffer () override;
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
 
 };
 #endif // WARPX_BOUNDARYSCRAPINGDIAGNOSTICS_H_

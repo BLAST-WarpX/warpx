@@ -1,2 +1,4 @@
 CEXE_sources += Partition.cpp
+CEXE_sources += SortingUtils.cpp
+
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Sorting

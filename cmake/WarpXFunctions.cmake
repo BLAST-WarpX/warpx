@@ -1,11 +1,11 @@
-# Set C++17 for the whole build if not otherwise requested
+# Set C++20 for the whole build if not otherwise requested
 #
-# This is the easiest way to push up a C++17 requirement for AMReX, PICSAR and
+# This is the easiest way to push up a C++20 requirement for AMReX, PICSAR and
 # openPMD-api until they increase their requirement.
 #
-macro(set_cxx17_superbuild)
+macro(set_cxx20_superbuild)
     if(NOT DEFINED CMAKE_CXX_STANDARD)
-        set(CMAKE_CXX_STANDARD 17)
+        set(CMAKE_CXX_STANDARD 20)
     endif()
     if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
         set(CMAKE_CXX_EXTENSIONS OFF)
@@ -15,7 +15,7 @@ macro(set_cxx17_superbuild)
     endif()
 
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
-        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD 20)
     endif()
     if(NOT DEFINED CMAKE_CUDA_EXTENSIONS)
         set(CMAKE_CUDA_EXTENSIONS OFF)
@@ -63,6 +63,12 @@ macro(set_default_build_dirs)
                 CACHE PATH "Build directory for binaries")
         mark_as_advanced(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
     endif()
+    if(NOT CMAKE_PYTHON_OUTPUT_DIRECTORY)
+        set(CMAKE_PYTHON_OUTPUT_DIRECTORY
+            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/site-packages"
+            CACHE PATH "Build directory for python modules"
+        )
+    endif()
 endmacro()
 
 
@@ -93,6 +99,58 @@ macro(set_default_install_dirs)
 endmacro()
 
 
+# set names and paths of install directories
+# the defaults in CMake are sub-ideal for historic reasons, lets make them more
+# Unix-ish and portable.
+#
+macro(warpx_set_default_install_dirs)
+    if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+        include(GNUInstallDirs)
+        if(NOT CMAKE_INSTALL_CMAKEDIR)
+            set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake"
+                    CACHE PATH "CMake config package location for installed targets")
+            if(WIN32)
+                set(CMAKE_INSTALL_LIBDIR Lib
+                        CACHE PATH "Object code libraries")
+                set_property(CACHE CMAKE_INSTALL_CMAKEDIR PROPERTY VALUE "cmake")
+            endif()
+            mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
+        endif()
+    endif()
+
+    if(WIN32)
+        set(WarpX_INSTALL_CMAKEDIR "${CMAKE_INSTALL_CMAKEDIR}")
+    else()
+        set(WarpX_INSTALL_CMAKEDIR "${CMAKE_INSTALL_CMAKEDIR}/WarpX")
+    endif()
+endmacro()
+
+
+# set names and paths for Python modules
+# this needs to be slightly delayed until we found Python and know its
+# major and minor version number
+#
+macro(warpx_set_default_install_dirs_python)
+    if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+        # Python install and build output dirs
+        if(NOT CMAKE_INSTALL_PYTHONDIR)
+            if(WIN32)
+                set(CMAKE_INSTALL_PYTHONDIR_DEFAULT
+                        "${CMAKE_INSTALL_LIBDIR}/site-packages"
+                        )
+            else()
+                set(CMAKE_INSTALL_PYTHONDIR_DEFAULT
+                        "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
+                        )
+            endif()
+            set(CMAKE_INSTALL_PYTHONDIR "${CMAKE_INSTALL_PYTHONDIR_DEFAULT}"
+                    CACHE STRING "Location for installed python package"
+                    )
+        endif()
+    endif()
+endmacro()
+
+
 # change the default CMAKE_BUILD_TYPE
 # the default in CMake is Debug for historic reasons
 #
@@ -113,43 +171,44 @@ macro(set_default_build_type default_build_type)
     endif()
 endmacro()
 
-# Set CXX
-# Note: this is a bit legacy and one should use CMake TOOLCHAINS instead.
+# Set compile warnings
 #
-macro(set_cxx_warnings)
+function(warpx_set_compile_warnings tgt)
     # On Windows, Clang -Wall aliases -Weverything; default is /W3
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT WIN32)
-        # list(APPEND CMAKE_CXX_FLAGS "-fsanitize=address") # address, memory, undefined
-        # set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-        # set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
-        # set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=address")
-
-        # note: might still need a
+        # To find memory issues at runtime:
+        # - Add "-fsanitize=address" to the compile options
+        # - set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+        # - set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+        # - set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=address")
+        # You might still need
         #   export LD_PRELOAD=libclang_rt.asan.so
-        # or on Debian 9 with Clang 6.0
+        # or, on Debian 9 with Clang 6.0,
         #   export LD_PRELOAD=/usr/lib/llvm-6.0/lib/clang/6.0.0/lib/linux/libclang_rt.asan-x86_64.so:
         #                     /usr/lib/llvm-6.0/lib/clang/6.0.0/lib/linux/libclang_rt.ubsan_minimal-x86_64.so
-        # at runtime when used with symbol-hidden code (e.g. pybind11 module)
-
-        #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weverything")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code")
+        # at runtime when used with symbol-hidden code (e.g., pybind11 module).
+        target_compile_options(${tgt} PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code)
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+        target_compile_options(${tgt} PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Woverloaded-virtual -Wextra-semi -Wunreachable-code)
     elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wshadow -Woverloaded-virtual -Wunreachable-code")
+        target_compile_options(${tgt} PRIVATE -Wall -Wextra -Wshadow -Woverloaded-virtual -Wunreachable-code -Wno-array-bounds)
+        if(NOT WarpX_COMPUTE STREQUAL CUDA)
+            # In older NVCC, -Wpedantic causes "warning: style of line directive is a GCC extension"
+            target_compile_options(${tgt} PRIVATE -Wpedantic)
+        endif()
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-        # Warning C4503: "decorated name length exceeded, name was truncated"
-        # Symbols longer than 4096 chars are truncated (and hashed instead)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd4503")
-        # Yes, you should build against the same C++ runtime and with same
-        # configuration (Debug/Release). MSVC does inconvenient choices for their
-        # developers, so be it. (Our Windows-users use conda-forge builds, which
-        # are consistent.)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd4251")
+        # Warning C4503: "decorated name length exceeded, name was truncated".
+        # Symbols longer than 4096 chars are truncated (and hashed instead).
+        # You should build against the same C++ runtime and with the same configuration (Debug/Release).
+        # MSVC does inconvenient choices for their developers, so be it.
+        # Our Windows-users use conda-forge builds, which are consistent.
+        target_compile_options(${tgt} PRIVATE /wd4503 /wd4251)
     endif ()
-endmacro()
+endfunction()
 
 # Enables interprocedural optimization for a list of targets
 #
-function(enable_IPO all_targets_list)
+function(warpx_enable_IPO all_targets_list)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT is_IPO_available)
     if(is_IPO_available)
@@ -163,12 +222,16 @@ endfunction()
 
 # Set the suffix for targets and binaries depending on dimension
 #
-# User specify 1;2;RZ;D in WarpX_DIMS.
-# We append to CMake targets and binaries the suffix "Nd" for 1,2,3 and "rz" for RZ.
+# User specify 1;2;3;RZ;RCYLINDER;RSPHERE in WarpX_DIMS.
+# We append to CMake targets and binaries the suffix "Nd" for 1,2,3 or otherwise the lowercase dimension string
 #
 macro(warpx_set_suffix_dims suffix dim)
     if("${dim}" STREQUAL "RZ")
         set(${suffix} rz)
+    elseif("${dim}" STREQUAL "RCYLINDER")
+        set(${suffix} rcylinder)
+    elseif("${dim}" STREQUAL "RSPHERE")
+        set(${suffix} rsphere)
     else()
         set(${suffix} ${dim}d)
     endif()
@@ -203,12 +266,18 @@ function(set_warpx_binary_name D)
     set(warpx_bin_names)
     if(WarpX_APP)
         list(APPEND warpx_bin_names app_${SD})
+        set_target_properties(app_${SD} PROPERTIES OUTPUT_NAME "warpx")
     endif()
     if(WarpX_LIB)
-        list(APPEND warpx_bin_names shared_${SD})
+        list(APPEND warpx_bin_names lib_${SD})
+        # On WIN32, the OUTPUT_NAME must not collide between lib and app!
+        if(WIN32)
+            set_target_properties(lib_${SD} PROPERTIES OUTPUT_NAME "libwarpx")
+        else()
+            set_target_properties(lib_${SD} PROPERTIES OUTPUT_NAME "warpx")
+        endif()
     endif()
     foreach(tgt IN LISTS warpx_bin_names)
-        set_target_properties(${tgt} PROPERTIES OUTPUT_NAME "warpx")
         set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".${SD}")
 
         if(WarpX_MPI)
@@ -235,12 +304,16 @@ function(set_warpx_binary_name D)
             set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".ASCENT")
         endif()
 
+        if(WarpX_CATALYST)
+            set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".CATALYST")
+        endif()
+
         if(WarpX_OPENPMD)
             set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".OPMD")
         endif()
 
-        if(WarpX_PSATD)
-            set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".PSATD")
+        if(WarpX_FFT)
+            set_property(TARGET ${tgt} APPEND_STRING PROPERTY OUTPUT_NAME ".FFT")
         endif()
 
         if(WarpX_EB)
@@ -274,10 +347,10 @@ function(set_warpx_binary_name D)
         endif()
         if(WarpX_LIB)
             # alias to the latest build; this is the one expected by Python bindings
-            add_custom_command(TARGET shared_${SD} POST_BUILD
+            add_custom_command(TARGET lib_${SD} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E create_symlink
-                    $<TARGET_FILE_NAME:shared_${SD}>
-                    $<TARGET_FILE_DIR:shared_${SD}>/libwarpx.${SD}$<TARGET_FILE_SUFFIX:shared_${SD}>
+                    $<TARGET_FILE_NAME:lib_${SD}>
+                    $<TARGET_FILE_DIR:lib_${SD}>/libwarpx.${SD}$<TARGET_FILE_SUFFIX:lib_${SD}>
             )
         endif()
     endforeach()
@@ -353,6 +426,9 @@ function(warpx_print_summary)
     message("        lib: ${CMAKE_INSTALL_LIBDIR}")
     message("    include: ${CMAKE_INSTALL_INCLUDEDIR}")
     message("      cmake: ${WarpX_INSTALL_CMAKEDIR}")
+    if(WarpX_PYTHON)
+        message("     python: ${CMAKE_INSTALL_PYTHONDIR}")
+    endif()
     message("")
     set(BLD_TYPE_UNKNOWN "")
     if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR AND
@@ -363,31 +439,43 @@ function(warpx_print_summary)
     set(LIB_TYPE "")
     if(WarpX_LIB)
         if(BUILD_SHARED_LIBS)
-            set(LIB_TYPE " (shared)")
+            set(LIB_TYPE " (shared")
         else()
-            set(LIB_TYPE " (static)")
+            set(LIB_TYPE " (static")
         endif()
+        if(WarpX_UNITY_BUILD)
+            set(LIB_TYPE "${LIB_TYPE}, unity build")
+        endif()
+        set(LIB_TYPE "${LIB_TYPE})")
     endif()
     #message("  Testing: ${BUILD_TESTING}")
     message("  Build options:")
     message("    APP: ${WarpX_APP}")
     message("    ASCENT: ${WarpX_ASCENT}")
+    message("    CATALYST: ${WarpX_CATALYST}")
     message("    COMPUTE: ${WarpX_COMPUTE}")
+    message("    FASTMATH: ${WarpX_FASTMATH}")
+    message("    SIMD: ${WarpX_SIMD}")
     message("    DIMS: ${WarpX_DIMS}")
     message("    Embedded Boundary: ${WarpX_EB}")
-    message("    GPU clock timers: ${WarpX_GPUCLOCK}")
+    message("    PETSc: ${WarpX_PETSC}")
     message("    IPO/LTO: ${WarpX_IPO}")
     message("    LIB: ${WarpX_LIB}${LIB_TYPE}")
     message("    MPI: ${WarpX_MPI}")
     if(MPI)
         message("    MPI (thread multiple): ${WarpX_MPI_THREAD_MULTIPLE}")
     endif()
-    message("    PSATD: ${WarpX_PSATD}")
-    message("    PRECISION: ${WarpX_PRECISION}")
     message("    PARTICLE PRECISION: ${WarpX_PARTICLE_PRECISION}")
+    message("    PRECISION: ${WarpX_PRECISION}")
+    message("    FFT Solvers: ${WarpX_FFT}")
+    message("    PYTHON: ${WarpX_PYTHON}")
+    if(WarpX_PYTHON)
+        message("    PYTHON IPO: ${WarpX_PYTHON_IPO}")
+    endif()
     message("    OPENPMD: ${WarpX_OPENPMD}")
     message("    QED: ${WarpX_QED}")
     message("    QED table generation: ${WarpX_QED_TABLE_GEN}")
+    message("    QED tools: ${WarpX_QED_TOOLS}")
     message("    SENSEI: ${WarpX_SENSEI}")
     message("")
 endfunction()

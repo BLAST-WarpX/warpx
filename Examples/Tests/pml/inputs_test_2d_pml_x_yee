@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.maxwell_solver = yee

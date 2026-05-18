@@ -1,54 +1,80 @@
 name: 🧹 clang-tidy
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangtidy
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   run_clang_tidy:
-    name: clang-tidy
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        dim: [1, 2, RZ, 3]
+    name: clang-tidy-${{ matrix.dim }}D
+    runs-on: ubuntu-24.04
+    timeout-minutes: 250
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     - name: install dependencies
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
-        .github/workflows/dependencies/clang14.sh
-    - name: build WarpX using clang-tidy
+        .github/workflows/dependencies/clang.sh 18
+    - name: set up cache
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: build WarpX & run clang-tidy
+      if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=300M
+        export CCACHE_EXTRAFILES=${{ github.workspace }}/.clang-tidy
+        export CCACHE_LOGFILE=${{ github.workspace }}/ccache.log.txt
+        ccache -z
+        export CXX=$(which clang++-18)
+        export CC=$(which clang-18)
 
+        ##### FOR DEBUG ONLY: CLEAR CACHE ######################
+        # clearing the cache forces running clang-tidy on all
+        # the files. This can be useful for debugging purposes,
+        # but it should be commented out in production.
+        # ccache -C --verbose
+        ########################################################
 
-        export CXX=$(which clang++)
-        export CC=$(which clang)
-
-        # The following wrapper ensures that only source files
-        # in WarpX/Source/* are actually processed by clang-tidy
-        #_______________________________
-        cat > clang_tidy_wrapper << EOF
-        #!/bin/bash
-        REGEX="[a-z_A-Z0-9\/]*WarpX\/Source[a-z_A-Z0-9\/]+.cpp"
-        if [[ \$4 =~ \$REGEX ]];then
-          clang-tidy \$@
-        fi
-        EOF
-        chmod +x clang_tidy_wrapper
-        #_____________________________________
-
-        cmake -S . -B build_clang_tidy \
-          -DCMAKE_CXX_CLANG_TIDY="$PWD/clang_tidy_wrapper;--system-headers=0;--config-file=$PWD/.clang-tidy" \
-          -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_DIMS="1;2;3;RZ"      \
-          -DWarpX_MPI=ON               \
-          -DWarpX_COMPUTE=OMP          \
-          -DWarpX_PSATD=ON             \
-          -DWarpX_QED=ON               \
-          -DWarpX_QED_TABLE_GEN=ON     \
-          -DWarpX_OPENPMD=ON           \
-          -DWarpX_PRECISION=SINGLE
-
-        cmake --build build_clang_tidy -j 2 2> build_clang_tidy/clang-tidy.log
-
-        cat build_clang_tidy/clang-tidy.log
-        if [[ $(wc -m <build_clang_tidy/clang-tidy.log) -gt 1 ]]; then exit 1; fi
+        cmake -S . -B build_clang_tidy      \
+          -DCMAKE_VERBOSE_MAKEFILE=ON       \
+          -DWarpX_DIMS="${{ matrix.dim }}"  \
+          -DWarpX_MPI=ON                    \
+          -DWarpX_COMPUTE=OMP               \
+          -DWarpX_FFT=ON                    \
+          -DWarpX_QED=ON                    \
+          -DWarpX_QED_TABLE_GEN=ON          \
+          -DWarpX_OPENPMD=ON                \
+          -DWarpX_PRECISION=SINGLE          \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --build build_clang_tidy -j 4
+        ${{github.workspace}}/.github/workflows/source/makeMakefileForClangTidy.py --input ${{github.workspace}}/ccache.log.txt
+        make -j4 --keep-going -f clang-tidy-ccache-misses.mak \
+            CLANG_TIDY=clang-tidy-18 \
+            CLANG_TIDY_ARGS="--config-file=${{github.workspace}}/.clang-tidy --warnings-as-errors=*"
+        ccache -s
+        du -hs ~/.cache/ccache

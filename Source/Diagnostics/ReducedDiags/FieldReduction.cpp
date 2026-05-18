@@ -22,15 +22,15 @@
 #include <regex>
 
 // constructor
-FieldReduction::FieldReduction (std::string rd_name)
+FieldReduction::FieldReduction (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     using namespace amrex::literals;
 
-    // RZ coordinate is not working
-#if (defined WARPX_DIM_RZ)
+    // Non-Cartesian coordinates not working
+#if (defined WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
-        "FieldReduction reduced diagnostics does not work for RZ coordinate.");
+        "FieldReduction reduced diagnostics not implemented for cylindrical and spherical coordinates.");
 #endif
 
     // read number of levels
@@ -44,23 +44,23 @@ FieldReduction::FieldReduction (std::string rd_name)
     // resize data array
     m_data.resize(noutputs, 0.0_rt);
 
+    BackwardCompatibility();
+
     const amrex::ParmParse pp_rd_name(rd_name);
 
     // read reduced function with parser
-    std::string parser_string = "";
-    utils::parser::Store_parserString(pp_rd_name,"reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz)",
+    std::string parser_string;
+    utils::parser::Store_parserString(pp_rd_name,"reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz,jx,jy,jz)",
                        parser_string);
     m_parser = std::make_unique<amrex::Parser>(
-        utils::parser::makeParser(parser_string,{"x","y","z","Ex","Ey","Ez","Bx","By","Bz"}));
+        utils::parser::makeParser(parser_string,{"x","y","z","Ex","Ey","Ez","Bx","By","Bz","jx","jy","jz"}));
 
     // Replace all newlines and possible following whitespaces with a single whitespace. This
     // should avoid weird formatting when the string is written in the header of the output file.
     parser_string = std::regex_replace(parser_string, std::regex("\n\\s*"), " ");
 
     // read reduction type
-    std::string reduction_type_string;
-    pp_rd_name.get("reduction_type", reduction_type_string);
-    m_reduction_type = GetAlgorithmInteger (pp_rd_name, "reduction_type");
+    pp_rd_name.get_enum_sloppy("reduction_type", m_reduction_type, "-_");
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
@@ -75,15 +75,27 @@ FieldReduction::FieldReduction (std::string rd_name)
             ofs << m_sep;
             ofs << "[" << c++ << "]time(s)";
             ofs << m_sep;
-            ofs << "[" << c++ << "]" + reduction_type_string + " of " + parser_string + " (SI units)";
+            ofs << "[" << c++ << "]" + amrex::getEnumNameString(m_reduction_type) + " of " + parser_string + " (SI units)";
 
-            ofs << std::endl;
+            ofs << "\n";
             // close file
             ofs.close();
         }
     }
 }
 // end constructor
+
+void FieldReduction::BackwardCompatibility ()
+{
+    const amrex::ParmParse pp_rd_name(m_rd_name);
+    std::vector<std::string> backward_strings;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_rd_name.queryarr("reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz)", backward_strings),
+        "<reduced_diag_name>.reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz) is no longer a valid option. "
+        "Please use the renamed option <reduced_diag_name>.reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz,jx,jy,jz) instead."
+    );
+}
+
 
 // function that does an arbitrary reduction of the electromagnetic fields
 void FieldReduction::ComputeDiags (int step)

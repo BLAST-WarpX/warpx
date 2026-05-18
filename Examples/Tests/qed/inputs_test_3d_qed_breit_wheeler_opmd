@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d_breit_wheeler
+
+# test input parameters
+diag1.format = openpmd
+diag1.openpmd_backend = h5

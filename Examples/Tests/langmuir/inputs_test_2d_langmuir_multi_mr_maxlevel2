@@ -1,0 +1,16 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# mesh-refinement
+amr.max_level = 2
+amr.ref_ratio = 2
+warpx.fine_tag_lo = -10.e-6 -10.e-6
+warpx.fine_tag_hi =  10.e-6  10.e-6
+
+# Algorithms
+algo.maxwell_solver = ckc
+warpx.use_filter = 1
+
+# test input parameters
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz

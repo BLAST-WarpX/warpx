@@ -1,0 +1,70 @@
+max_step = 8
+amr.n_cell = 16 16
+amr.blocking_factor = 8
+amr.max_grid_size = 8
+geometry.dims = 2
+geometry.prob_lo     = 0.  0.
+geometry.prob_hi     = 16. 16.
+amr.max_level = 0
+
+# Boundary condition
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+particles.species_names = resampled_part1 resampled_part2
+
+# First particle species. The particles are distributed throughout the simulation box and all have
+# the same weight.
+resampled_part1.species_type = electron
+resampled_part1.injection_style = NRandomPerCell
+resampled_part1.num_particles_per_cell = 400
+resampled_part1.profile = constant
+resampled_part1.density = 1.
+resampled_part1.momentum_distribution_type = at_rest
+resampled_part1.do_not_deposit = 1
+resampled_part1.do_not_gather = 1
+resampled_part1.do_not_push = 1
+resampled_part1.do_resampling = 1
+resampled_part1.resampling_algorithm = leveling_thinning
+resampled_part1.resampling_algorithm_target_ratio = 1.3
+# This should trigger resampling at timestep 5 only in this case
+resampled_part1.resampling_trigger_intervals = 5
+# This should trigger resampling at first timestep
+resampled_part1.resampling_trigger_max_avg_ppc = 395
+
+# Second particle species. The particles are only present in one cell and have a Gaussian weight
+# distribution.
+resampled_part2.species_type = electron
+resampled_part2.injection_style = NRandomPerCell
+resampled_part2.num_particles_per_cell = 100000
+resampled_part2.zmin = 0.001
+resampled_part2.zmax = 0.999
+resampled_part2.xmin = 0.001
+resampled_part2.xmax = 0.999
+resampled_part2.profile = parse_density_function
+# Trick to get a Gaussian weight distribution is to do a Box-Muller transform using the position
+# within the cell as the two random variables. Here, we have a distribution with standard deviation
+# sigma = 1/sqrt(2) and mean 4*sigma.
+resampled_part2.density_function(x,y,z) = 2.*sqrt(2.)+sqrt(-log(x))*cos(2*pi*z)
+resampled_part2.momentum_distribution_type = at_rest
+resampled_part2.do_not_deposit = 1
+resampled_part2.do_not_gather = 1
+resampled_part2.do_not_push = 1
+resampled_part2.do_resampling = 1
+resampled_part2.resampling_algorithm = leveling_thinning
+resampled_part2.resampling_algorithm_target_ratio = 1.3
+# This should prevent actual resampling at timestep 7
+resampled_part2.resampling_min_ppc = 80000
+# This should trigger resampling at timestep 6 and 7 in this case. The rest is here to test the
+# intervals parser syntax.
+resampled_part2.resampling_trigger_intervals = 100 :120:3, 6:6:6 , 7
+# This should not trigger resampling: this species only has ~391 ppc on average.
+resampled_part2.resampling_trigger_max_avg_ppc = 395
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 8
+diag1.diag_type = Full

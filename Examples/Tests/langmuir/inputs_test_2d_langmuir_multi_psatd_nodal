@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.current_deposition = direct
+algo.maxwell_solver = psatd
+diag1.fields_to_plot = Ex Ey Ez jx jy jz part_per_cell
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz
+psatd.current_correction = 0
+warpx.abort_on_warning_threshold = medium
+warpx.cfl = 0.7071067811865475
+warpx.grid_type = collocated

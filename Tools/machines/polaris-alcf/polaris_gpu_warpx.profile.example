@@ -1,0 +1,63 @@
+# Set the project name
+export proj=""  # change me!
+
+# swap to GNU programming environment (with gcc 13.2)
+module load PrgEnv-gnu
+
+# swap to the Milan cray package
+module load craype-x86-milan
+
+# extra modules
+module use /soft/modulefiles
+module load spack-pe-gnu
+
+# add cuda
+module load cuda/12.6
+module load cudatoolkit-standalone/12.6
+module load craype-accel-nvidia80
+
+# required dependencies
+module load cmake
+
+# optional: for QED support with detailed tables
+module load boost
+
+# optional: for openPMD and PSATD+RZ support
+module load cray-hdf5-parallel
+module load cray-libsci/25.03.0
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/adios2-2.10.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=/home/${USER}/sw/polaris/gpu/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+
+export LD_LIBRARY_PATH=/home/${USER}/sw/polaris/gpu/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/${USER}/sw/polaris/gpu/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/${USER}/sw/polaris/gpu/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/${USER}/sw/polaris/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+
+export PATH=/home/${USER}/sw/polaris/gpu/adios2-2.10.2/bin:${PATH}
+
+# optional: for Python bindings or libEnsemble
+module load cray-python/3.11.7
+
+if [ -d "/home/${USER}/sw/polaris/gpu/venvs/warpx" ]
+then
+  source /home/${USER}/sw/polaris/gpu/venvs/warpx/bin/activate
+fi
+
+# necessary to use CUDA-Aware MPI and run a job
+export CRAY_ACCEL_TARGET=nvidia80
+
+# optimize CUDA compilation for A100
+export AMREX_CUDA_ARCH=8.0
+
+# optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
+# note: the cc/CC/ftn wrappers below add those
+export CXXFLAGS="-march=znver3"
+export CFLAGS="-march=znver3"
+
+# compiler environment hints
+export CC=$(which gcc-12)
+export CXX=$(which g++-12)
+export CUDACXX=$(which nvcc)
+export CUDAHOSTCXX=${CXX}

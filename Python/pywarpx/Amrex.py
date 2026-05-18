@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-amrex = Bucket('amrex')
+amrex = Bucket("amrex")

@@ -1,0 +1,14 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.maxwell_solver = psatd
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho divE
+psatd.current_correction = 0
+psatd.update_with_rho = 1
+psatd.v_galilean = 0. 0. 0.99
+warpx.abort_on_warning_threshold = medium
+warpx.cfl = 0.7071067811865475
+warpx.do_pml_divb_cleaning = 1
+warpx.do_pml_dive_cleaning = 1
+warpx.grid_type = collocated

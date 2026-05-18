@@ -1,0 +1,22 @@
+{
+  "lev=0": {
+    "Bx": 29.8448958859583,
+    "By": 29.8448958859583,
+    "Bz": 197.55124310523018,
+    "Ex": 0.0,
+    "Ey": 0.0,
+    "Ez": 0.0,
+    "jx": 0.0,
+    "jy": 0.0,
+    "jz": 0.0
+  },
+  "proton": {
+    "particle_momentum_x": 1.2118959018435722e-23,
+    "particle_momentum_y": 7.822512514550813e-23,
+    "particle_momentum_z": 2.2761898475893665e-23,
+    "particle_position_x": 0.122380722759106,
+    "particle_position_y": 0.009653949671674482,
+    "particle_position_z": 4.317544766532689,
+    "particle_weight": 1.0
+  }
+}

@@ -1,0 +1,3 @@
+FILE = inputs_test_3d_open_bc_poisson_solver
+
+warpx.use_2d_slices_fft_solver = 1

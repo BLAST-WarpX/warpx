@@ -60,14 +60,14 @@ struct CartesianYeeAlgorithm {
      */
     static amrex::IntVect GetMaxGuardCell () {
         // The yee solver requires one guard cell in each dimension
-        return (amrex::IntVect(AMREX_D_DECL(1,1,1)));
+        return amrex::IntVect{AMREX_D_DECL(1,1,1)};
     }
 
     /**
      * Perform derivative along x on a cell-centered grid, from a nodal field `F`*/
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDx (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -101,10 +101,29 @@ struct CartesianYeeAlgorithm {
     }
 
     /**
+     * Perform second derivative along x on a cell-centered grid, from a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dxx (
+        T_Field const& F,
+        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if (defined WARPX_DIM_1D_Z)
+        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+        return 0._rt; // 1D Cartesian: derivative along x is 0
+#else
+        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
+        return inv_dx2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
+#endif
+    }
+
+    /**
      * Perform derivative along y on a cell-centered grid, from a nodal field `F`*/
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDy (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_y, int const n_coefs_y,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -148,10 +167,29 @@ struct CartesianYeeAlgorithm {
     }
 
     /**
+     * Perform derivative along y on a nodal grid, from a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dyy (
+        T_Field const& F,
+        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        Real const inv_dy2 = coefs_y[0]*coefs_y[0];
+        return inv_dy2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
+#elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
+        amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+#endif
+    }
+
+    /**
      * Perform derivative along z on a cell-centered grid, from a nodal field `F`*/
    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -183,6 +221,26 @@ struct CartesianYeeAlgorithm {
         return inv_dz*( F(i,j,k,ncomp) - F(i,j-1,k,ncomp) );
 #elif (defined WARPX_DIM_1D_Z)
         return inv_dz*( F(i,j,k,ncomp) - F(i-1,j,k,ncomp) );
+#endif
+    }
+
+    /**
+     * Perform second derivative along z on a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dzz (
+        T_Field const& F,
+        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+        Real const inv_dz2 = coefs_z[0]*coefs_z[0];
+#if defined WARPX_DIM_3D
+        return inv_dz2*( F(i,j,k-1,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j,k+1,ncomp) );
+#elif (defined WARPX_DIM_XZ)
+        return inv_dz2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
+#elif (defined WARPX_DIM_1D_Z)
+        return inv_dz2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
 #endif
     }
 

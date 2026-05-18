@@ -63,6 +63,9 @@ public:
     //! Check whether a given action has been requested, and reset the associated flag
     static bool TestAndResetActionRequestFlag (int action_to_test);
 
+    // Don't allow clients to incorrectly try to construct and use an instance of this type
+    SignalHandling () = delete;
+
 private:
     //! Is any signal handling action configured in signal_conf_requests ?
     static bool m_any_signal_action_active;
@@ -81,9 +84,6 @@ private:
     //! Boolean flags transmitted between CheckSignals() and
     //! HandleSignals() to indicate actions requested by signals
     static bool signal_actions_requested[SIGNAL_REQUESTS_SIZE];
-
-     // Don't allow clients to incorrectly try to construct and use an instance of this type
-    SignalHandling () = delete;
 };
 
 } // namespace ablastr::utils

@@ -1,0 +1,90 @@
+#################################
+########## CONSTANTS ############
+#################################
+
+my_constants.nA = 1.e25       # m^-3
+my_constants.NpA = 400        # m^-3
+my_constants.UA = 6.55e5      # m/s
+my_constants.TA = 500.        # eV
+#
+my_constants.nB = 1.e26       # m^-3
+my_constants.NpB = 400        # m^-3
+my_constants.UB = 0.          # m/s
+my_constants.TB = 500.        # eV
+#
+my_constants.q_c12 = 6.*q_e
+my_constants.m_c12 = 12.*m_u - 6.*m_e
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 600
+amr.n_cell = 180
+amr.max_level = 0
+amr.blocking_factor = 4
+geometry.dims = 1
+geometry.prob_lo = 0.
+geometry.prob_hi = 0.01
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 0.05e-12
+warpx.use_filter = 0
+
+# Do not evolve the E and B fields
+algo.maxwell_solver = none
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = ions
+
+ions.charge = q_c12
+ions.mass = m_c12
+ions.do_not_deposit = 1
+
+ions.injection_sources = groupA groupB
+
+ions.groupA.injection_style = "NUniformPerCell"
+ions.groupA.num_particles_per_cell_each_dim = NpA
+ions.groupA.profile = constant
+ions.groupA.density = nA  # number per m^3
+ions.groupA.momentum_distribution_type = "gaussian"
+ions.groupA.uz_m = UA/clight
+ions.groupA.ux_th = sqrt(TA*q_e/m_c12)/clight
+ions.groupA.uy_th = sqrt(TA*q_e/m_c12)/clight
+ions.groupA.uz_th = sqrt(TA*q_e/m_c12)/clight
+
+ions.groupB.injection_style = "NUniformPerCell"
+ions.groupB.num_particles_per_cell_each_dim = NpB
+ions.groupB.profile = constant
+ions.groupB.density = nB  # number per m^3
+ions.groupB.momentum_distribution_type = "gaussian"
+ions.groupB.uz_m = UB/clight
+ions.groupB.ux_th = sqrt(TB*q_e/m_c12)/clight
+ions.groupB.uy_th = sqrt(TB*q_e/m_c12)/clight
+ions.groupB.uz_th = sqrt(TB*q_e/m_c12)/clight
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = collision1
+collision1.species = ions ions
+collision1.CoulombLog = 10.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 600
+diag1.diag_type = Full

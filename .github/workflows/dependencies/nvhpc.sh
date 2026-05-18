@@ -12,8 +12,8 @@ set -eu -o pipefail
 #   failed files the given number of times.
 echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
 
-sudo apt-get -qqq update
-sudo apt-get install -y \
+sudo apt -qqq update
+sudo apt install -y     \
     build-essential     \
     ca-certificates     \
     cmake               \
@@ -25,16 +25,30 @@ sudo apt-get install -y \
     pkg-config          \
     wget
 
-echo 'deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | \
-  sudo tee /etc/apt/sources.list.d/nvhpc.list
-sudo apt-get update -y
-sudo apt-get install -y --no-install-recommends nvhpc-21-11
+# ccache
+$(dirname "$0")/ccache.sh
+
+# parse version number from command line argument
+VERSION_DOTTED=${1:-25.1}
+VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
+
+# install nvhpc
+curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+sudo apt update -y
+sudo apt install -y --no-install-recommends nvhpc-${VERSION_DASHED}
+
+# clean up space
+sudo rm -rf /var/lib/apt/lists/*
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/examples
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/profilers
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/math_libs/12.6/targets/x86_64-linux/lib/lib*_static*.a
 
 # things should reside in /opt/nvidia/hpc_sdk now
 
 # activation via:
 #   source /etc/profile.d/modules.sh
-#   module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/21.11
+#   module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/${VERSION_DOTTED}
 
 # cmake-easyinstall
 #
@@ -42,12 +56,3 @@ sudo curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.c
 sudo chmod a+x /usr/local/bin/cmake-easyinstall
 export CEI_SUDO="sudo"
 export CEI_TMP="/tmp/cei"
-
-# ccache 4.2+
-#
-CXXFLAGS="" cmake-easyinstall --prefix=/usr/local \
-    git+https://github.com/ccache/ccache.git@v4.6 \
-    -DCMAKE_BUILD_TYPE=Release        \
-    -DENABLE_DOCUMENTATION=OFF        \
-    -DENABLE_TESTING=OFF              \
-    -DWARNINGS_AS_ERRORS=OFF

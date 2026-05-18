@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_rz
+
+# test input parameters
+diag1.dump_rz_modes = 0
+diag1.electrons.variables = x y z w ux uy uz
+diag1.ions.variables = x y z w ux uy uz

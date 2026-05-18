@@ -17,28 +17,43 @@
 # A100 80GB (256 nodes)
 #S BATCH -C gpu&hbm80g
 #SBATCH --exclusive
+#SBATCH --cpus-per-task=32
+# ideally single:1, but NERSC cgroups issue
 #SBATCH --gpu-bind=none
+#SBATCH --ntasks-per-node=4
 #SBATCH --gpus-per-node=4
 #SBATCH -o WarpX.o%j
 #SBATCH -e WarpX.e%j
 
-# executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs_small
+# python interpreter & script here
+EXE=python3
+INPUTS=run_script.py
+# or executable & inputs file
+#EXE=./warpx
+#INPUTS=inputs
+
+# environment setup
+if [[ -z "${MY_PROFILE}" ]]; then
+    echo "WARNING: FORGOT TO"
+    echo "   source $HOME/perlmutter_gpu_warpx.profile"
+    echo "before submission. Doing that now."
+
+    source $HOME/perlmutter_gpu_warpx.profile
+fi
 
 # pin to closest NIC to GPU
 export MPICH_OFI_NIC_POLICY=GPU
 
 # threads for OpenMP and threaded compressors per MPI rank
-export SRUN_CPUS_PER_TASK=32
+#   note: 16 avoids hyperthreading (32 virtual cores, 16 physical)
+export OMP_NUM_THREADS=16
 
-# depends on https://github.com/ECP-WarpX/WarpX/issues/2009
-#GPU_AWARE_MPI="amrex.the_arena_is_managed=0 amrex.use_gpu_aware_mpi=1"
-GPU_AWARE_MPI=""
+# GPU-aware MPI optimizations
+export AMREX_DEFAULT_INIT="amrex.use_gpu_aware_mpi=1"
 
 # CUDA visible devices are ordered inverse to local task IDs
 #   Reference: nvidia-smi topo -m
 srun --cpu-bind=cores bash -c "
     export CUDA_VISIBLE_DEVICES=\$((3-SLURM_LOCALID));
-    ${EXE} ${INPUTS} ${GPU_AWARE_MPI}" \
+    ${EXE} ${INPUTS}" \
   > output.txt

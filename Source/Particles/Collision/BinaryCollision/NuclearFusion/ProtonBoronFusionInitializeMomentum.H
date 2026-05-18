@@ -5,12 +5,13 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
-#define PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#ifndef WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#define WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductFusionUtil.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -22,20 +23,22 @@
 
 namespace {
     // Define shortcuts for frequently-used type names
-    using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
-    using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
-    using index_type = ParticleBins::index_type;
+    using SoaData_type = typename WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
+    using ParticleType = typename WarpXParticleContainer::ParticleType;
+    using ParticleTileType = typename WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = typename ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
+    using index_type = typename ParticleBins::index_type;
 
     /**
      * \brief This function initializes the momentum of the alpha particles produced from
      * proton-boron fusion. The momentum is initialized by assuming that the fusion of a proton
      * with a boron nucleus into 3 alphas takes place in two steps. In the first step, the proton
-     * and the boron fuse into a beryllium nucleus and an alpha particle. In the second step, the
-     * beryllium decays into two alpha particles. The first step produces 8.59009 MeV of kinetic
-     * energy while the second step produces 91.8984 keV of kinetic energy. This two-step process
+     * and the boron fuse into an excited beryllium nucleus and an alpha particle. In the second step, the
+     * excited beryllium decays into two alpha particles. The first step produces ~5.56 MeV of kinetic
+     * energy while the second step produces ~3.12 MeV of kinetic energy. This two-step process
      * is considered to be the dominant process of proton+boron fusion into alphas (see
-     * Becker et al., Zeitschrift für Physik A Atomic Nuclei, 327(3), 341-355 (1987)).
+     * D.R. Tilley et al. / Nuclear Physics A 745 (2004) 155–362).
      * For each step, we assume in this function that the particles are emitted isotropically in
      * the corresponding center of mass frame (center of mass frame of proton + boron for the
      * creation of first alpha+beryllium and rest frame of beryllium for the creation of second and
@@ -52,6 +55,7 @@ namespace {
      * @param[in] idx_alpha_start index of first produced alpha macroparticle
      * @param[in] m1 mass of first colliding species
      * @param[in] m2 mass of second colliding species
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -61,6 +65,7 @@ namespace {
                             const index_type& idx_1, const index_type& idx_2,
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
+                            ScatteringAngleModel const scattering_angle_model,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
@@ -71,46 +76,52 @@ namespace {
 
         constexpr amrex::ParticleReal mev_to_joule = PhysConst::q_e*1.e6_prt;
         // Energy produced in the fusion reaction proton + boron11 -> Beryllium8 + alpha
-        // cf. Janis book of proton-induced cross-sections (2019)
-        constexpr amrex::ParticleReal E_fusion = 8.59009_prt*mev_to_joule;
+        // cf. https://doi.org/10.1016/j.radphyschem.2022.110727
+        // Dominant reaction channel is p + B11 -> alpha_1 + 8Be* -> alpha_1 + alpha_11 + alpha_12 + 8.68 MeV
+        // cf. Kelley et al., (2017) http://dx.doi.org/10.1016/j.nuclphysa.2017.07.015
+        constexpr amrex::ParticleReal E_fusion = 5.55610759_prt*mev_to_joule;
         // Energy produced when Beryllium8 decays into two alphas
-        // cf. JEFF-3.3 radioactive decay data library (2017)
-        constexpr amrex::ParticleReal E_decay = 0.0918984_prt*mev_to_joule;
+        // cf. Kelley et al., (2017) http://dx.doi.org/10.1016/j.nuclphysa.2017.07.015
+        constexpr amrex::ParticleReal E_decay = 3.12600414_prt*mev_to_joule;
 
         // The constexprs ma_sq and mBe_sq underflow in single precision because we use SI units,
         // which can cause compilation to fail or generate a warning, so we're explicitly setting
         // them as double. Note that nuclear fusion module does not currently work with single
         // precision anyways.
-        constexpr double m_alpha = PhysConst::m_u * 4.002602_prt;
-        constexpr double m_beryllium = PhysConst::m_p * 7.94748_prt;
+        // Alpha (He4) mass: subtract 2 electron masses to get nuclear mass
+        constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt - 2.0_prt * PhysConst::m_e;
+        // mass of the Be8 excited state (3.03 MeV above ground state): subtract 4 electron masses to get nuclear mass
+        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt) - 4.0_prt * PhysConst::m_e;
         constexpr double mBe_sq = m_beryllium*m_beryllium;
-        constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
 
         // Compute the resulting momenta of the alpha and beryllium particles
         // produced in the fusion reaction
         amrex::ParticleReal ux_alpha1 = 0.0, uy_alpha1 = 0.0, uz_alpha1 = 0.0;
         amrex::ParticleReal ux_Be = 0.0, uy_Be = 0.0, uz_Be = 0.0;
-        TwoProductFusionComputeProductMomenta (
+        TwoProductComputeProductMomenta (
             soa_1.m_rdata[PIdx::ux][idx_1],
             soa_1.m_rdata[PIdx::uy][idx_1],
             soa_1.m_rdata[PIdx::uz][idx_1], m1,
             soa_2.m_rdata[PIdx::ux][idx_2],
             soa_2.m_rdata[PIdx::uy][idx_2],
             soa_2.m_rdata[PIdx::uz][idx_2], m2,
-            ux_alpha1, uy_alpha1, uz_alpha1, m_alpha,
-            ux_Be, uy_Be, uz_Be, m_beryllium,
-            E_fusion, engine);
+            ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
+            ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
+            E_fusion,
+            scattering_angle_model,
+            engine);
 
         // Compute momentum of beryllium in lab frame
-        const amrex::ParticleReal px_Be = m_beryllium * ux_Be;
-        const amrex::ParticleReal py_Be = m_beryllium * uy_Be;
-        const amrex::ParticleReal pz_Be = m_beryllium * uz_Be;
+        const amrex::ParticleReal px_Be = static_cast<amrex::ParticleReal>(m_beryllium) * ux_Be;
+        const amrex::ParticleReal py_Be = static_cast<amrex::ParticleReal>(m_beryllium) * uy_Be;
+        const amrex::ParticleReal pz_Be = static_cast<amrex::ParticleReal>(m_beryllium) * uz_Be;
 
         // Compute momentum norm of second and third alphas in Beryllium rest frame
         // Factor 0.5 is here because each alpha only gets half of the decay energy
-        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c_sq));
+        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c2));
         constexpr amrex::ParticleReal gamma_Bestar_sq_minus_one = gamma_Bestar*gamma_Bestar - 1._prt;
-        const amrex::ParticleReal p_Bestar = m_alpha*PhysConst::c*std::sqrt(gamma_Bestar_sq_minus_one);
+        const amrex::ParticleReal p_Bestar = static_cast<amrex::ParticleReal>(m_alpha)*PhysConst::c*std::sqrt(gamma_Bestar_sq_minus_one);
 
         // Compute momentum of second alpha in Beryllium rest frame, assuming isotropic distribution
         amrex::ParticleReal px_Bestar, py_Bestar, pz_Bestar;
@@ -120,8 +131,8 @@ namespace {
         amrex::ParticleReal px_alpha2, py_alpha2, pz_alpha2;
         // Preliminary calculation: compute Beryllium velocity v_Be
         const amrex::ParticleReal p_Be_sq   = px_Be*px_Be + py_Be*py_Be + pz_Be*pz_Be;
-        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (mBe_sq*c_sq));
-        const amrex::ParticleReal mg_Be     = m_beryllium*g_Be;
+        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (static_cast<amrex::ParticleReal>(mBe_sq)*c2));
+        const amrex::ParticleReal mg_Be     = static_cast<amrex::ParticleReal>(m_beryllium)*g_Be;
         const amrex::ParticleReal v_Bex     = px_Be / mg_Be;
         const amrex::ParticleReal v_Bey     = py_Be / mg_Be;
         const amrex::ParticleReal v_Bez     = pz_Be / mg_Be;
@@ -133,7 +144,7 @@ namespace {
         {
             const amrex::ParticleReal vcDps = v_Bex*px_Bestar + v_Bey*py_Bestar + v_Bez*pz_Bestar;
             const amrex::ParticleReal factor0 = (g_Be-1._prt)/v_Be_sq;
-            const amrex::ParticleReal factor = factor0*vcDps + m_alpha*gamma_Bestar*g_Be;
+            const amrex::ParticleReal factor = factor0*vcDps + static_cast<amrex::ParticleReal>(m_alpha)*gamma_Bestar*g_Be;
             px_alpha2 = px_Bestar + v_Bex * factor;
             py_alpha2 = py_Bestar + v_Bey * factor;
             pz_alpha2 = pz_Bestar + v_Bez * factor;
@@ -159,20 +170,20 @@ namespace {
         soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 1] = ux_alpha1;
         soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 1] = uy_alpha1;
         soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 1] = uz_alpha1;
-        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 2] = px_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 2] = py_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 2] = pz_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 3] = px_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 3] = py_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 3] = pz_alpha2/m_alpha;
-        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 4] = px_alpha3/m_alpha;
-        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 4] = py_alpha3/m_alpha;
-        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 4] = pz_alpha3/m_alpha;
-        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 5] = px_alpha3/m_alpha;
-        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 5] = py_alpha3/m_alpha;
-        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 5] = pz_alpha3/m_alpha;
+        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 2] = px_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 2] = py_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 2] = pz_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 3] = px_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 3] = py_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 3] = pz_alpha2/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 4] = px_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 4] = py_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 4] = pz_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::ux][idx_alpha_start + 5] = px_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uy][idx_alpha_start + 5] = py_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
+        soa_alpha.m_rdata[PIdx::uz][idx_alpha_start + 5] = pz_alpha3/static_cast<amrex::ParticleReal>(m_alpha);
     }
 
 }
 
-#endif // PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
+#endif // WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H

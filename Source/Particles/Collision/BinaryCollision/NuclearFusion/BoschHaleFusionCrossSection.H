@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef BOSCH_HALE_FUSION_CROSS_SECTION_H
-#define BOSCH_HALE_FUSION_CROSS_SECTION_H
+#ifndef WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H
+#define WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Utils/WarpXConst.H"
@@ -46,7 +46,7 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     // The formula for `B_G` below assumes that both reactants have Z=1
     // When one of the reactants is helium (Z=2), this formula is corrected further below.
     amrex::ParticleReal B_G = MathConst::pi * PhysConst::alpha
-         * std::sqrt( 2._prt*m_reduced*PhysConst::c*PhysConst::c * joule_to_keV );
+         * std::sqrt( 2._prt*m_reduced*PhysConst::c2 * joule_to_keV );
     if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
         // Take into account the fact that Z=2 for one of the reactant (helium) in this case
         B_G *= 2;
@@ -110,4 +110,4 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     return millibarn_to_sqm * astrophysical_factor/E_keV * std::exp(-B_G/std::sqrt(E_keV));
 }
 
-#endif // BOSCH_HALE_FUSION_CROSS_SECTION_H
+#endif // WARPX_BOSCH_HALE_FUSION_CROSS_SECTION_H

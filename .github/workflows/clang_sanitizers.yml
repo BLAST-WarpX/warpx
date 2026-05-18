@@ -1,0 +1,163 @@
+name: 🧴 clang sanitizers
+
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
+  cancel-in-progress: true
+
+jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
+  build_UB_sanitizer:
+    name: Clang UB sanitizer
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    env:
+      CC: clang
+      CXX: clang++
+      # On CI for this test, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        .github/workflows/dependencies/clang.sh 17
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: build WarpX
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
+        export CXX=$(which clang++-17)
+        export CC=$(which clang-17)
+        export CXXFLAGS="-fsanitize=undefined,address,pointer-compare -fno-sanitize-recover=all"
+
+        cmake -S . -B build                 \
+          -GNinja                           \
+          -DCMAKE_VERBOSE_MAKEFILE=ON       \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DWarpX_DIMS="RZ;1;2;3"           \
+          -DWarpX_FFT=ON                    \
+          -DWarpX_QED=ON                    \
+          -DWarpX_QED_TABLE_GEN=ON          \
+          -DWarpX_OPENPMD=ON
+        cmake --build build -j 4
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
+    - name: run with UB sanitizer
+      run: |
+
+        export OMP_NUM_THREADS=2
+
+        #MPI implementations often leak memory
+        export "ASAN_OPTIONS=detect_leaks=0"
+
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
+
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+
+        ctest --test-dir build/Examples/Physics_applications/ -R ".*\.run" --output-on-failure
+
+  build_thread_sanitizer:
+    name: Clang thread sanitizer
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    env:
+      CC: clang
+      CXX: clang++
+      # On CI for this test, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        .github/workflows/dependencies/clang.sh 17
+    - name: CCache Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
+        restore-keys: |
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
+    - name: build WarpX
+      run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
+        export CXX=$(which clang++-17)
+        export CC=$(which clang-17)
+        export CXXFLAGS="-fsanitize=thread"
+
+        cmake -S . -B build                 \
+          -GNinja                           \
+          -DCMAKE_VERBOSE_MAKEFILE=ON       \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DWarpX_DIMS="RZ;1;2;3"           \
+          -DWarpX_FFT=ON                    \
+          -DWarpX_QED=ON                    \
+          -DWarpX_QED_TABLE_GEN=ON          \
+          -DWarpX_OPENPMD=ON                \
+          -DWarpX_PRECISION=DOUBLE          \
+          -DWarpX_PARTICLE_PRECISION=DOUBLE
+        cmake --build build -j 4
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
+    - name: run with thread sanitizer
+      run: |
+        # Disabling the gds/shmem component by using gds/hash instead
+        # is required to avoid issues with shared memory.
+        export PMIX_MCA_gds=hash
+
+        # Archer is a data race detector for OpenMP programs.
+        # It is required to avoid false positives with OpenMP and it is
+        # included in llvm. However with many Linux it is necessary
+        # to define this environment variable to make sure that the
+        # Archer library is actually used.
+        # When the Archer library is used and ARCHER_OPTIONS="verbose=1",
+        # the following message should be displayed:
+        # Archer detected OpenMP application with TSan, supplying OpenMP synchronization semantics
+        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-17/lib/libarcher.so
+        export ARCHER_OPTIONS="verbose=1"
+
+        # This option is required to avoid false positive reports from the OpenMP runtime
+        export TSAN_OPTIONS='ignore_noninstrumented_modules=1'
+
+        export OMP_NUM_THREADS=2
+
+        mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
+
+        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
+        cd Examples/Tests/embedded_circle
+
+        ulimit -c unlimited
+
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0

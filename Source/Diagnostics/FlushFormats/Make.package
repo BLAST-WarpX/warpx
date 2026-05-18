@@ -1,5 +1,7 @@
 CEXE_sources += FlushFormatPlotfile.cpp
 CEXE_sources += FlushFormatCheckpoint.cpp
+CEXE_sources += FlushFormatInSitu.cpp
+CEXE_sources += FlushFormatCatalyst.cpp
 CEXE_sources += FlushFormatAscent.cpp
 CEXE_sources += FlushFormatSensei.cpp
 ifeq ($(USE_OPENPMD), TRUE)

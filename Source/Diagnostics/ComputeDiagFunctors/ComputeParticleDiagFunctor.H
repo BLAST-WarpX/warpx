@@ -8,23 +8,27 @@
 #define WARPX_COMPUTEPARTICLEDIAGFUNCTOR_H_
 
 #include "Particles/WarpXParticleContainer.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
 #include <AMReX.H>
 #include <AMReX_AmrParticles.H>
 
 /**
  * \brief Functor to compute a diagnostic and store the result in existing ParticleContainer.
  */
-class
-ComputeParticleDiagFunctor
+class ComputeParticleDiagFunctor
 {
 public:
 
-    ComputeParticleDiagFunctor( ) {}
+    ComputeParticleDiagFunctor( ) = default;
     /** Virtual Destructor to handle clean destruction of derived classes */
     virtual ~ComputeParticleDiagFunctor() = default;
 
-    /** \brief Prepare data required to back-transform particle attribtutes for
+    /** Default assignment and copy operations*/
+    ComputeParticleDiagFunctor(const ComputeParticleDiagFunctor&) = default;
+    ComputeParticleDiagFunctor& operator=(const ComputeParticleDiagFunctor&) = default;
+    ComputeParticleDiagFunctor(ComputeParticleDiagFunctor&&) = default;
+    ComputeParticleDiagFunctor& operator=(ComputeParticleDiagFunctor&&) = default;
+
+    /** \brief Prepare data required to back-transform particle attributes for
      *         lab-frame snapshot, with index i_buffer.
      *         Note that this function has parameters that are specific to
      *         back-transformed diagnostics, that are unused for regular diagnostics.
@@ -54,7 +58,7 @@ public:
      *  \param[out] totalParticlesInBuffer total number of particles in the container
      *  \param[in] i_buffer snapshot index for which the particle buffer is processed
      */
-    virtual void operator () (PinnedMemoryParticleContainer& pc_dst, int &totalParticlesInBuffer, int i_buffer = 0) const = 0;
+    virtual void operator () (WarpXParticleContainer::Base& pc_dst, int &totalParticlesInBuffer, int i_buffer = 0) const = 0;
     virtual void InitData () {}
 };
 

@@ -16,23 +16,25 @@
 
 #include <algorithm>
 
-utils::parser::SliceParser::SliceParser (const std::string& instr, const bool isBTD)
+utils::parser::SliceParser::SliceParser (const std::string& instr, const bool isBTD):
+    m_isBTD{isBTD}
 {
-    m_isBTD = isBTD;
+    const amrex::ParmParse pp;
+
     // split string and trim whitespaces
     auto insplit = ablastr::utils::text::split_string<std::vector<std::string>>(
         instr, m_separator, true);
 
     if(insplit.size() == 1){ // no colon in input string. The input is the period.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_isBTD, "must specify interval stop for BTD");
-        m_period = parseStringtoInt(insplit[0], "interval period");}
+        m_period = int(std::round(pp.eval<double>(insplit[0])));}
     else if(insplit.size() == 2) // 1 colon in input string. The input is start:stop
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_isBTD || !insplit[1].empty(), "must specify interval stop for BTD");
         if (!insplit[0].empty()){
-            m_start = parseStringtoInt(insplit[0], "interval start");}
+            m_start = int(std::round(pp.eval<double>(insplit[0])));}
         if (!insplit[1].empty()){
-            m_stop = parseStringtoInt(insplit[1], "interval stop");}
+            m_stop = int(std::round(pp.eval<double>(insplit[1])));}
     }
     else // 2 colons in input string. The input is start:stop:period
     {
@@ -41,11 +43,11 @@ utils::parser::SliceParser::SliceParser (const std::string& instr, const bool is
             insplit.size() == 3,
             instr + "' is not a valid syntax for a slice.");
         if (!insplit[0].empty()){
-            m_start = parseStringtoInt(insplit[0], "interval start");}
+            m_start = int(std::round(pp.eval<double>(insplit[0])));}
         if (!insplit[1].empty()){
-            m_stop = parseStringtoInt(insplit[1], "interval stop");}
+            m_stop = int(std::round(pp.eval<double>(insplit[1])));}
         if (!insplit[2].empty()){
-            m_period = parseStringtoInt(insplit[2], "interval period");}
+            m_period = int(std::round(pp.eval<double>(insplit[2])));}
     }
 }
 
@@ -92,7 +94,7 @@ utils::parser::IntervalsParser::IntervalsParser (
     const std::vector<std::string>& instr_vec)
 {
     std::string inconcatenated;
-    for (const auto& instr_element : instr_vec) inconcatenated +=instr_element;
+    for (const auto& instr_element : instr_vec) { inconcatenated +=instr_element; }
 
     auto insplit = ablastr::utils::text::split_string<std::vector<std::string>>(
         inconcatenated, m_separator);
@@ -102,7 +104,7 @@ utils::parser::IntervalsParser::IntervalsParser (
         const SliceParser temp_slice(inslc);
         m_slices.push_back(temp_slice);
         if ((temp_slice.getPeriod() > 0) &&
-               (temp_slice.getStop() >= temp_slice.getStart())) m_activated = true;
+               (temp_slice.getStop() >= temp_slice.getStart())) { m_activated = true; }
     }
 }
 
@@ -155,7 +157,7 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
     const std::vector<std::string>& instr_vec)
 {
     std::string inconcatenated;
-    for (const auto& instr_element : instr_vec) inconcatenated +=instr_element;
+    for (const auto& instr_element : instr_vec) { inconcatenated +=instr_element; }
 
     auto const insplit = ablastr::utils::text::split_string<std::vector<std::string>>(
         inconcatenated, std::string(1,m_separator));
@@ -164,14 +166,14 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
     // in order of increasing Slice start value
     for(const auto& inslc : insplit)
     {
-        const bool isBTD = true;
+        constexpr bool isBTD = true;
         const SliceParser temp_slice(inslc, isBTD);
-        if (m_slices.size() > 0)
+        if (!m_slices.empty())
         {
             // find the last index i_slice where
             // the start value of m_slices[i_slice] is greater than temp_slices' start_value
             int i_slice = 0;
-            while (temp_slice.getStart() > m_slices[i_slice].getStart() && i_slice < static_cast<int>(m_slices.size()))
+            while (i_slice < static_cast<int>(m_slices.size()) && temp_slice.getStart() > m_slices[i_slice].getStart())
             {
                 i_slice++;
             }
@@ -193,20 +195,20 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
         const int start = temp_slice.getStart();
         const int period = temp_slice.getPeriod();
         int btd_iter_ind;
-        // for Slice temp_slice in m_slices,
-        // determine the index in m_btd_iterations where temp_slice's starting value goes
-        //
         // Implementation note:
-        // assuming the user mostly lists slices in ascending order,
         // start at the end of m_btd_iterations and search backward
-        if (m_btd_iterations.size() == 0)
+        // with the thinking that the user mostly lists slices in ascending order
+        //
+        // for Slice temp_slice in m_slices,
+        // determine the largest index in m_btd_iterations smaller than start
+        if (m_btd_iterations.empty())
         {
             btd_iter_ind = 0;
         }
         else
         {
-            btd_iter_ind = m_btd_iterations.size() - 1;
-            while (start < m_btd_iterations[btd_iter_ind] and btd_iter_ind>0)
+            btd_iter_ind = static_cast<int>(m_btd_iterations.size() - 1);
+            while (start < m_btd_iterations.at(btd_iter_ind) and btd_iter_ind>0)
             {
                 btd_iter_ind--;
             }
@@ -214,33 +216,49 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
         // insert each iteration contained in temp_slice into m_btd_iterations
         // adding them in increasing sorted order and not adding any iterations
         // already contained in m_btd_iterations
-        for (int ii = start; ii <= temp_slice.getStop(); ii += period)
+        for (int slice_iter = start; slice_iter <= temp_slice.getStop(); slice_iter += period)
         {
-            if (m_btd_iterations.size() > 0)
+            // number of iterations currently in this slice
+            auto const num_btd_iterations = static_cast<int>(m_btd_iterations.size());
+
+            if (num_btd_iterations > 0)
             {
-                // find where iteration ii should go in m_btd_iterations
-                while (ii > m_btd_iterations[btd_iter_ind] && btd_iter_ind < static_cast<int>(m_btd_iterations.size()))
+                // increment btd_iter_ind for each existing iteration,
+                // if slice_iter is larger than an existing one
+                while (btd_iter_ind < num_btd_iterations &&
+                       slice_iter > m_btd_iterations.at(btd_iter_ind))
                 {
                     btd_iter_ind++;
                 }
-                if (ii != m_btd_iterations[btd_iter_ind])
+                // this is the place to insert slice_iter if it is not in m_btd_iterations
+                // if slice_iter > all entries in m_btd_iterations, append slice_iter
+                if (btd_iter_ind == num_btd_iterations)
                 {
-                    m_btd_iterations.insert(m_btd_iterations.begin() + btd_iter_ind, ii);
+                    m_btd_iterations.insert(m_btd_iterations.begin() + btd_iter_ind, slice_iter);
+                } else
+                {
+                    if (slice_iter != m_btd_iterations.at(btd_iter_ind))
+                    {
+                        m_btd_iterations.insert(m_btd_iterations.begin() + btd_iter_ind, slice_iter);
+                    }
                 }
             } else
             {
-                m_btd_iterations.push_back(ii);
+                m_btd_iterations.push_back(slice_iter);
             }
         }
-        if ((temp_slice.getPeriod() > 0) &&
-               (temp_slice.getStop() >= start)) m_activated = true;
+        if (temp_slice.getPeriod() > 0 &&
+            temp_slice.getStop() >= start)
+        {
+            m_activated = true;
+        }
     }
 }
 
 
 int utils::parser::BTDIntervalsParser::NumSnapshots () const
 {
-    return m_btd_iterations.size();
+    return static_cast<int>(m_btd_iterations.size());
 }
 
 

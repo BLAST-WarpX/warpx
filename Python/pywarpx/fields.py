@@ -1,10 +1,10 @@
-# Copyright 2017-2019 David Grote
+# Copyright 2017-2023 David Grote
 #
 # This file is part of WarpX.
 #
 # License: BSD-3-Clause-LBNL
 
-"""Provides wrappers around field and current density on multiFABs
+"""Provides wrappers around MultiFabs
 
 Available routines:
 
@@ -12,922 +12,581 @@ ExWrapper, EyWrapper, EzWrapper
 BxWrapper, ByWrapper, BzWrapper
 JxWrapper, JyWrapper, JzWrapper
 
-"""
-import numpy as np
+ExFPWrapper, EyFPWrapper, EzFPWrapper
+BxFPWrapper, ByFPWrapper, BzFPWrapper
+JxFPWrapper, JyFPWrapper, JzFPWrapper
 
-try:
-    from mpi4py import MPI as mpi
-    comm_world = mpi.COMM_WORLD
-    npes = comm_world.Get_size()
-except ImportError:
-    npes = 1
+RhoFPWrapper, PhiFPWrapper
+FFPWrapper, GFPWrapper
+AxFPWrapper, AyFPWrapper, AzFPWrapper
+
+ExCPWrapper, EyCPWrapper, EzCPWrapper
+BxCPWrapper, ByCPWrapper, BzCPWrapper
+JxCPWrapper, JyCPWrapper, JzCPWrapper
+
+RhoCPWrapper
+FCPWrapper, GCPWrapper
+
+EdgeLengthsxWrapper, EdgeLengthsyWrapper, EdgeLengthszWrapper
+FaceAreasxWrapper, FaceAreasyWrapper, FaceAreaszWrapper
+
+ExFPPMLWrapper, EyFPPMLWrapper, EzFPPMLWrapper
+BxFPPMLWrapper, ByFPPMLWrapper, BzFPPMLWrapper
+JxFPPMLWrapper, JyFPPMLWrapper, JzFPPMLWrapper
+JxFPPlasmaWrapper, JyFPPlasmaWrapper, JzFPPlasmaWrapper
+FFPPMLWrapper, GFPPMLWrapper
+
+ExCPPMLWrapper, EyCPPMLWrapper, EzCPPMLWrapper
+BxCPPMLWrapper, ByCPPMLWrapper, BzCPPMLWrapper
+JxCPPMLWrapper, JyCPPMLWrapper, JzCPPMLWrapper
+FCPPMLWrapper, GCPPMLWrapper
+"""
 
 from ._libwarpx import libwarpx
 
 
-class _MultiFABWrapper(object):
-    """Wrapper around field arrays at level 0
-    This provides a convenient way to query and set fields that are broken up into FABs.
+class MultiFabWrapper(object):
+    """Wrapper around MultiFabs
+    This provides a convenient way to query and set data in the MultiFabs.
     The indexing is based on global indices.
-     - direction: component to access, one of the values (0, 1, 2) or None
-     - get_lovects: routine that returns the list of lo vectors
-     - get_fabs: routine that returns the list of FABs
-     - get_nodal_flag: routine that returns the list of nodal flag
-     - level: refinement level
+
+    Parameters
+    ----------
+     mf_name: string, optional
+         The name of the MultiFab to be accessed, as specified in the MultiFab registry.
+         The Multifab will be accessed anew from WarpX everytime it is called if this
+         argument is given instead of directly providing the Multifab. Either this
+         or the mf must be specified.
+
+     mf: MultiFab, optional
+         The Multifab that is wrapped. Either this or mf_name must be specified.
+
+     idir: int, optional
+         For MultiFab that is an element of a vector, the direction number, 0, 1, or 2.
+
+     level: int
+         The refinement level
+
+     create_new: boolean, optional
+         If True, a new MultiFab with the name mf_name, idir, and level will be
+         created and added to the registry. The following input parameters
+         are used to set the properties of the MultiFab.
+
+     ba: BoxArray, optional
+         The BoxArray for the new MultiFab, defaults to warpx.boxArray(level).
+
+     dm: DistributionMapping, optional
+         The DistributionMapping for the new MultiFab, defaults to warpx.DistributionMap(level)
+
+     ncomp: int, optional
+         The number of components for the new MultiFab, defaults to 1.
+
+     ngrow: IntVect or int, optional
+         The number of guard cells for the new MultiFab, defaults to 0.
+
+     initial_value: float, optional
+         The initial value for the new MultiFab, defaults to 0.
+
+     remake: boolean, optional
+         Whether the new MultiFab is to be remade, for example during a load balance.
+         Defaults to True.
+
+     redistribute_on_remake: boolean, optional
+         Whether the data in the new MultiFab is redistributed when it is remade.
+         Defaults to True.
     """
-    def __init__(self, direction, get_lovects, get_fabs, get_nodal_flag, level, include_ghosts=False):
-        self.direction = direction
-        self.get_lovects = get_lovects
-        self.get_fabs = get_fabs
-        self.get_nodal_flag = get_nodal_flag
+
+    def __init__(
+        self,
+        mf=None,
+        mf_name=None,
+        idir=None,
+        level=0,
+        create_new=False,
+        ba=None,
+        dm=None,
+        ncomp=1,
+        ngrow=0,
+        initial_value=0.0,
+        remake=True,
+        redistribute_on_remake=True,
+    ):
+        import warnings
+
+        warnings.warn(
+            """The fields wrapper is now obsolete and should not be used. The
+            recommended way of obtaining the MultiFabs is directly from the register.
+            This is done using the 'sim.fields.get' routine where 'sim' is a PICMI
+            Simulation instance or the 'warpx' instance of pywarpx.WarpX.""",
+            UserWarning,
+            stacklevel=2,
+        )
+
+        self._mf = mf
+        self.mf_name = mf_name
+        self.idir = idir
         self.level = level
-        self.include_ghosts = include_ghosts
+        self.create_new = create_new
+        self.ba = ba
+        self.dm = dm
+        self.ncomp = ncomp
+        self.ngrow = ngrow
+        self.initial_value = initial_value
+        self.remake = remake
+        self.redistribute_on_remake = redistribute_on_remake
 
         self.dim = libwarpx.dim
 
-        # overlaps is one along the axes where the grid boundaries overlap the neighboring grid,
-        # which is the case with node centering.
-        # This presumably will never change during a calculation.
-        self.overlaps = self.get_nodal_flag()
-
-    def _getlovects(self):
-        if self.direction is None:
-            lovects, ngrow = self.get_lovects(self.level, self.include_ghosts)
-        else:
-            lovects, ngrow = self.get_lovects(self.level, self.direction, self.include_ghosts)
-        return lovects, ngrow
-
-    def _gethivects(self):
-        lovects, ngrow = self._getlovects()
-        fields = self._getfields()
-
-        hivects = np.zeros_like(lovects)
-        for i in range(len(fields)):
-            hivects[:,i] = lovects[:,i] + np.array(fields[i].shape[:self.dim]) - self.overlaps
-
-        return hivects, ngrow
-
-    def _getfields(self):
-        if self.direction is None:
-            return self.get_fabs(self.level, self.include_ghosts)
-        else:
-            return self.get_fabs(self.level, self.direction, self.include_ghosts)
+        if self.create_new:
+            self.create_new_MultiFab()
 
     def __len__(self):
-        lovects, ngrow = self._getlovects()
-        return len(lovects)
+        "Returns the number of blocks"
+        return self.mf.size
 
-    def mesh(self, direction):
-        """Returns the mesh along the specified direction with the appropriate centering.
-        - direction: In 3d, one of 'x', 'y', or 'z'.
-                     In 2d, Cartesian, one of 'x', or 'z'.
-                     In RZ, one of 'r', or 'z'
-                     In Z, 'z'.
-        """
-
-        try:
-            if libwarpx.geometry_dim == '3d':
-                idir = ['x', 'y', 'z'].index(direction)
-                celldir = idir
-            elif libwarpx.geometry_dim == '2d':
-                idir = ['x', 'z'].index(direction)
-                celldir = 2*idir
-            elif libwarpx.geometry_dim == 'rz':
-                idir = ['r', 'z'].index(direction)
-                celldir = 2*idir
-            elif libwarpx.geometry_dim == '1d':
-                idir = ['z'].index(direction)
-                celldir = idir
-        except ValueError:
-            raise Exception('Inappropriate direction given')
-
-        # --- Get the total number of cells along the direction
-        hivects, ngrow = self._gethivects()
-        nn = hivects[idir,:].max() - ngrow[idir] + self.overlaps[idir]
-        if npes > 1:
-            nn = comm_world.allreduce(nn, op=mpi.MAX)
-
-        # --- Cell size in the direction
-        dd = libwarpx.getCellSize(celldir, self.level)
-
-        # --- Get the nodal flag along direction
-        nodal_flag = self.get_nodal_flag()[idir]
-
-        # --- The centering shift
-        if nodal_flag == 1:
-            # node centered
-            shift = 0.
-        else:
-            # cell centered
-            shift = 0.5*dd
-
-        return np.arange(nn)*dd + shift
-
-    def _find_start_stop(self, ii, imin, imax, d):
-        """Given the input index, calculate the start and stop range of the indices.
-        - ii: input index, either a slice object or an integer
-        - imin: the global lowest lovect value in the specified direction
-        - imax: the global highest hivect value in the specified direction
-        - d: the direction, an integer, 0, 1, or 2
-        If ii is a slice, the start and stop values are used directly,
-        unless they are None, then the lower or upper bound is used.
-        An assertion checks if the indices are within the bounds.
-        """
-        if isinstance(ii, slice):
-            if ii.start is None:
-                iistart = imin
-            else:
-                iistart = ii.start
-            if ii.stop is None:
-                iistop = imax + self.overlaps[d]
-            else:
-                iistop = ii.stop
-        else:
-            iistart = ii
-            iistop = ii + 1
-        assert imin <= iistart <= imax + self.overlaps[d], Exception(f'Dimension {d} lower index is out of bounds')
-        assert imin <= iistop <= imax + self.overlaps[d], Exception(f'Dimension {d} upper index is out of bounds')
-        return iistart, iistop
-
-    def _get_indices(self, index):
-        if self.dim == 1:
-            return None, None, index[0]
-        elif self.dim == 2:
-            return index[0], None, index[1]
-        elif self.dim == 3:
-            return index[0], index[1], index[2]
-
-    def _get_min_indices(self, lovects):
-        if self.dim == 1:
-            return 0, 0, lovects[0,:].min()
-        elif self.dim == 2:
-            return lovects[0,:].min(), 0, lovects[1,:].min()
-        elif self.dim == 3:
-            return lovects[0,:].min(), lovects[1,:].min(), lovects[2,:].min()
-
-    def _get_max_indices(self, hivects):
-        if self.dim == 1:
-            return 0, 0, hivects[0,:].max()
-        elif self.dim == 2:
-            return hivects[0,:].max(), 0, hivects[1,:].max()
-        elif self.dim == 3:
-            return hivects[0,:].max(), hivects[1,:].max(), hivects[2,:].max()
-
-    def _get_vslice(self, lovects, fields_shape, ixstart, ixstop, iystart,
-                    iystop, izstart, izstop, ic):
-        # --- The ix1, 2 etc are relative to global indexing
-        if self.dim == 1:
-            ix1, ix2 = 0, 1
-            iy1, iy2 = 0, 1
-            iz1 = max(izstart, lovects[0])
-            iz2 = min(izstop, lovects[0] + fields_shape[0])
-        elif self.dim == 2:
-            ix1 = max(ixstart, lovects[0])
-            ix2 = min(ixstop, lovects[0] + fields_shape[0])
-            iy1, iy2 = 0, 1
-            iz1 = max(izstart, lovects[1])
-            iz2 = min(izstop, lovects[1] + fields_shape[1])
-        elif self.dim == 3:
-            ix1 = max(ixstart, lovects[0])
-            ix2 = min(ixstop, lovects[0] + fields_shape[0])
-            iy1 = max(iystart, lovects[1])
-            iy2 = min(iystop, lovects[1] + fields_shape[1])
-            iz1 = max(izstart, lovects[2])
-            iz2 = min(izstop, lovects[2] + fields_shape[2])
-
-        if ix1 < ix2 and iy1 < iy2 and iz1 < iz2:
-
-            if self.dim == 1:
-                sss = (slice(iz1 - lovects[0], iz2 - lovects[0]))
-                vslice = (slice(iz1 - izstart, iz2 - izstart))
-
-            elif self.dim == 2:
-                sss = (slice(ix1 - lovects[0], ix2 - lovects[0]),
-                       slice(iz1 - lovects[1], iz2 - lovects[1]))
-                vslice = (slice(ix1 - ixstart, ix2 - ixstart),
-                          slice(iz1 - izstart, iz2 - izstart))
-
-            elif self.dim == 3:
-                sss = (slice(ix1 - lovects[0], ix2 - lovects[0]),
-                       slice(iy1 - lovects[1], iy2 - lovects[1]),
-                       slice(iz1 - lovects[2], iz2 - lovects[2]))
-                vslice = (slice(ix1 - ixstart, ix2 - ixstart),
-                          slice(iy1 - iystart, iy2 - iystart),
-                          slice(iz1 - izstart, iz2 - izstart))
-
-            if ic is not None:
-                sss = tuple(list(sss) + [ic])
-
-            return sss, vslice
-        else:
-            return None, None
+    def __iter__(self):
+        "The iteration is over the MultiFab"
+        return self.mf.__iter__()
 
     def __getitem__(self, index):
-        """Returns slices of a decomposed array, The shape of
-        the object returned depends on the number of ix, iy and iz specified, which
-        can be from none to all three. Note that the values of ix, iy and iz are
-        relative to the fortran indexing, meaning that 0 is the lower boundary
-        of the whole domain.
+        """Returns slice of the MultiFab using global indexing, as a numpy array.
+        This uses numpy array indexing, with the indexing relative to the global array.
+        The slice ranges can cross multiple blocks and the result will be gathered into a single
+        array.
+
+        In an MPI context, this is a global operation. An "allgather" is performed so that the full
+        result is returned on all processors.
+
+        Note that the index is in fortran ordering and that 0 is the lower boundary of the whole domain.
+
+        The default range of the indices includes only the valid cells. The ":" index will include all of
+        the valid cels and no ghost cells. The ghost cells can be accessed using imaginary numbers, with
+        negative imaginary numbers for the lower ghost cells, and positive for the upper ghost cells.
+        The index "[-1j]" for example refers to the first lower ghost cell, and "[1j]" to the first upper
+        ghost cell. To access all cells, ghosts and valid cells, use an empty tuple for the index, i.e. "[()]".
+
+        Parameters
+        ----------
+        index : the index using numpy style indexing
+            Index of the slice to return.
         """
-        if index == Ellipsis:
-            index = tuple(self.dim*[slice(None)])
-
-        if len(index) < self.dim:
-            # --- Add extra dims to index if needed
-            index = list(index)
-            for i in range(len(index), self.dim):
-                index.append(slice(None))
-            index = tuple(index)
-
-        lovects, ngrow = self._getlovects()
-        hivects, ngrow = self._gethivects()
-        fields = self._getfields()
-
-        ix, iy, iz = self._get_indices(index)
-
-        if len(fields[0].shape) > self.dim:
-            ncomps = fields[0].shape[-1]
-        else:
-            ncomps = 1
-
-        if len(index) > self.dim:
-            if ncomps > 1:
-                ic = index[self.dim]
-            else:
-                raise Exception('Too many indices given')
-        else:
-            ic = None
-
-        ixmin, iymin, izmin = self._get_min_indices(lovects)
-        ixmax, iymax, izmax = self._get_max_indices(hivects)
-
-        if npes > 1:
-            izmin = comm_world.allreduce(izmin, op=mpi.MIN)
-            izmax = comm_world.allreduce(izmax, op=mpi.MAX)
-            if self.dim > 1:
-                ixmin = comm_world.allreduce(ixmin, op=mpi.MIN)
-                ixmax = comm_world.allreduce(ixmax, op=mpi.MAX)
-            if self.dim == 3:
-                iymin = comm_world.allreduce(iymin, op=mpi.MIN)
-                iymax = comm_world.allreduce(iymax, op=mpi.MAX)
-
-        # --- Setup the size of the array to be returned.
-        if self.dim == 1:
-            ixstart, ixstop = None, None
-            iystart, iystop = None, None
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 0)
-
-            sss = [max(0, izstop - izstart)]
-
-        elif self.dim == 2:
-            ixstart, ixstop = self._find_start_stop(ix, ixmin, ixmax, 0)
-            iystart, iystop = None, None
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 1)
-
-            sss = (max(0, ixstop - ixstart),
-                   max(0, izstop - izstart))
-
-        elif self.dim == 3:
-            ixstart, ixstop = self._find_start_stop(ix, ixmin, ixmax, 0)
-            iystart, iystop = self._find_start_stop(iy, iymin, iymax, 1)
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 2)
-
-            sss = (max(0, ixstop - ixstart),
-                   max(0, iystop - iystart),
-                   max(0, izstop - izstart))
-
-        # --- Space is added for multiple components if needed.
-        if ncomps > 1 and ic is None:
-            sss = tuple(list(sss) + [ncomps])
-        # --- Create the array to be returned.
-        resultglobal = np.zeros(sss, dtype=libwarpx._numpy_real_dtype)
-
-        datalist = []
-        for i in range(len(fields)):
-            sss, vslice = self._get_vslice(
-                lovects[:,i], fields[i].shape, ixstart, ixstop, iystart,
-                iystop, izstart, izstop, ic
-            )
-            if vslice is not None:
-                datalist.append((vslice, fields[i][sss]))
-
-        if npes == 1:
-            all_datalist = [datalist]
-        else:
-            all_datalist = comm_world.allgather(datalist)
-
-        for datalist in all_datalist:
-            for vslice, ff in datalist:
-                resultglobal[vslice] = ff
-
-        # --- Now remove any of the reduced dimensions.
-        if self.dim == 1:
-            sss = [slice(None)]
-            if not isinstance(iz, slice):
-                sss[0] = 0
-        elif self.dim == 2:
-            sss = [slice(None), slice(None)]
-            if not isinstance(ix, slice):
-                sss[0] = 0
-            if not isinstance(iz, slice):
-                sss[1] = 0
-        elif self.dim == 3:
-            sss = [slice(None), slice(None), slice(None)]
-            if not isinstance(ix, slice):
-                sss[0] = 0
-            if not isinstance(iy, slice):
-                sss[1] = 0
-            if not isinstance(iz, slice):
-                sss[2] = 0
-
-        return resultglobal[tuple(sss)]
+        return self.mf.__getitem__(index)
 
     def __setitem__(self, index, value):
-        """Sets slices of a decomposed array. The shape of
-        the input object depends on the number of arguments specified, which can
-        be from none to all three.
-        - value: input array (must be supplied)
+        """Sets the slice of the MultiFab using global indexing.
+        This uses numpy array indexing, with the indexing relative to the global array.
+        The slice ranges can cross multiple blocks and the value will be distributed accordingly.
+        Note that this will apply the value to both valid and ghost cells.
+
+        In an MPI context, this is a local operation. On each processor, the blocks within the slice
+        range will be set to the value.
+
+        Note that the index is in fortran ordering and that 0 is the lower boundary of the whole domain.
+
+        The default range of the indices includes only the valid cells. The ":" index will include all of
+        the valid cels and no ghost cells. The ghost cells can be accessed using imaginary numbers, with
+        negative imaginary numbers for the lower ghost cells, and positive for the upper ghost cells.
+        The index "[-1j]" for example refers to the first lower ghost cell, and "[1j]" to the first upper
+        ghost cell. To access all cells, ghosts and valid cells, use an empty tuple for the index, i.e. "[()]".
+
+        Parameters
+        ----------
+        index : the index using numpy style indexing
+            Index of the slice to return.
+        value : scalar or array
+            Input value to assign to the specified slice of the MultiFab
         """
-        if index == Ellipsis:
-            index = tuple(self.dim*[slice(None)])
+        self.mf.__setitem__(index, value)
 
-        if len(index) < self.dim:
-            # --- Add extra dims to index if needed
-            index = list(index)
-            for i in range(len(index), self.dim):
-                index.append(slice(None))
-            index = tuple(index)
+    def __getattr__(self, name):
+        # For attributes not explicitly defined here, return the
+        # attribute of the underlying MultiFab
+        return getattr(self.mf, name)
 
-        lovects, ngrow = self._getlovects()
-        hivects, ngrow = self._gethivects()
-        fields = self._getfields()
-
-        ix, iy, iz = self._get_indices(index)
-
-        if len(fields[0].shape) > self.dim:
-            ncomps = fields[0].shape[-1]
+    @property
+    def mf(self):
+        if self._mf is not None:
+            return self._mf
         else:
-            ncomps = 1
-
-        if len(index) > self.dim:
-            if ncomps > 1:
-                ic = index[self.dim]
+            # Always fetch this anew in case the C++ MultiFab is recreated
+            warpx = libwarpx.libwarpx_so.get_instance()
+            fields = warpx.multifab_register()
+            if self.idir is not None:
+                direction = libwarpx.libwarpx_so.Direction(self.idir)
+                return fields.get(self.mf_name, dir=direction, level=self.level)
             else:
-                raise Exception('Too many indices given')
-        else:
-            ic = None
+                return fields.get(self.mf_name, level=self.level)
 
-        ixmin, iymin, izmin = self._get_min_indices(lovects)
-        ixmax, iymax, izmax = self._get_max_indices(hivects)
+    def create_new_MultiFab(self):
+        warpx = libwarpx.libwarpx_so.get_instance()
+        fields = warpx.multifab_register()
 
-        if npes > 1:
-            izmin = comm_world.allreduce(izmin, op=mpi.MIN)
-            izmax = comm_world.allreduce(izmax, op=mpi.MAX)
-            if self.dim > 1:
-                ixmin = comm_world.allreduce(ixmin, op=mpi.MIN)
-                ixmax = comm_world.allreduce(ixmax, op=mpi.MAX)
-            if self.dim == 3:
-                iymin = comm_world.allreduce(iymin, op=mpi.MIN)
-                iymax = comm_world.allreduce(iymax, op=mpi.MAX)
-
-        # --- Add extra dimensions so that the input has the same number of
-        # --- dimensions as array.
-        if self.dim == 1:
-            ixstart, ixstop = None, None
-            iystart, iystop = None, None
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 0)
-
-        elif self.dim == 2:
-            ixstart, ixstop = self._find_start_stop(ix, ixmin, ixmax, 0)
-            iystart, iystop = None, None
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 1)
-
-        elif self.dim == 3:
-            ixstart, ixstop = self._find_start_stop(ix, ixmin, ixmax, 0)
-            iystart, iystop = self._find_start_stop(iy, iymin, iymax, 1)
-            izstart, izstop = self._find_start_stop(iz, izmin, izmax, 2)
-
-        if isinstance(value, np.ndarray):
-            value3d = np.array(value, copy=False)
-            sss = list(value3d.shape)
-            if self.dim == 1:
-                if not isinstance(iz, slice): sss[0:0] = [1]
-            elif self.dim == 2:
-                if not isinstance(ix, slice): sss[0:0] = [1]
-                if not isinstance(iz, slice): sss[1:1] = [1]
-            elif self.dim == 3:
-                if not isinstance(ix, slice): sss[0:0] = [1]
-                if not isinstance(iy, slice): sss[1:1] = [1]
-                if not isinstance(iz, slice): sss[2:2] = [1]
-            value3d.shape = sss
-
-        for i in range(len(fields)):
-            sss, vslice = self._get_vslice(
-                lovects[:,i], fields[i].shape, ixstart, ixstop, iystart,
-                iystop, izstart, izstop, ic
+        if self.idir is not None:
+            fields.alloc_init(
+                self.mf_name,
+                libwarpx.libwarpx_so.Direction(self.idir),
+                self.level,
+                (self.ba or warpx.boxArray(self.level)),
+                (self.dm or warpx.DistributionMap(self.level)),
+                self.ncomp,
+                libwarpx.amr.IntVect(self.ngrow),
+                self.initial_value,
+                self.remake,
+                self.redistribute_on_remake,
             )
-            if vslice is not None:
-                if isinstance(value, np.ndarray):
-                    fields[i][sss] = value3d[vslice]
-                else:
-                    fields[i][sss] = value
-
-
-def ExWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_electric_field_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field,
-                            get_nodal_flag=libwarpx.get_Ex_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EyWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_electric_field_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field,
-                            get_nodal_flag=libwarpx.get_Ey_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EzWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_electric_field_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field,
-                            get_nodal_flag=libwarpx.get_Ez_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BxWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field,
-                            get_nodal_flag=libwarpx.get_Bx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ByWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field,
-                            get_nodal_flag=libwarpx.get_By_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BzWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field,
-                            get_nodal_flag=libwarpx.get_Bz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ExCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp,
-                            get_nodal_flag=libwarpx.get_Ex_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EyCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp,
-                            get_nodal_flag=libwarpx.get_Ey_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EzCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp,
-                            get_nodal_flag=libwarpx.get_Ez_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BxCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp,
-                            get_nodal_flag=libwarpx.get_Bx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ByCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp,
-                            get_nodal_flag=libwarpx.get_By_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BzCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp,
-                            get_nodal_flag=libwarpx.get_Bz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_cp,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_cp,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_cp,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def RhoCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_charge_density_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_charge_density_cp,
-                            get_nodal_flag=libwarpx.get_Rho_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_F_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_F_cp,
-                            get_nodal_flag=libwarpx.get_F_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def GCPWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_G_cp_lovects,
-                            get_fabs=libwarpx.get_mesh_G_cp,
-                            get_nodal_flag=libwarpx.get_G_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ExFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp,
-                            get_nodal_flag=libwarpx.get_Ex_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EyFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp,
-                            get_nodal_flag=libwarpx.get_Ey_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EzFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp,
-                            get_nodal_flag=libwarpx.get_Ez_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BxFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp,
-                            get_nodal_flag=libwarpx.get_Bx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ByFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp,
-                            get_nodal_flag=libwarpx.get_By_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BzFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp,
-                            get_nodal_flag=libwarpx.get_Bz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def RhoFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_charge_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_charge_density_fp,
-                            get_nodal_flag=libwarpx.get_Rho_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def PhiFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_phi_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_phi_fp,
-                            get_nodal_flag=libwarpx.get_Phi_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def AxFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_vector_potential_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_vector_potential_fp,
-                            get_nodal_flag=libwarpx.get_Ax_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def AyFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_vector_potential_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_vector_potential_fp,
-                            get_nodal_flag=libwarpx.get_Ay_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def AzFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_vector_potential_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_vector_potential_fp,
-                            get_nodal_flag=libwarpx.get_Az_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_F_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_F_fp,
-                            get_nodal_flag=libwarpx.get_F_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def GFPWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_G_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_G_fp,
-                            get_nodal_flag=libwarpx.get_G_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EdgeLengthsxWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_edge_lengths_lovects,
-                            get_fabs=libwarpx.get_mesh_edge_lengths,
-                            get_nodal_flag=libwarpx.get_edge_lengths_x_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EdgeLengthsyWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_edge_lengths_lovects,
-                            get_fabs=libwarpx.get_mesh_edge_lengths,
-                            get_nodal_flag=libwarpx.get_edge_lengths_y_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EdgeLengthszWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_edge_lengths_lovects,
-                            get_fabs=libwarpx.get_mesh_edge_lengths,
-                            get_nodal_flag=libwarpx.get_edge_lengths_z_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FaceAreasxWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_face_areas_lovects,
-                            get_fabs=libwarpx.get_mesh_face_areas,
-                            get_nodal_flag=libwarpx.get_face_areas_x_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FaceAreasyWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_face_areas_lovects,
-                            get_fabs=libwarpx.get_mesh_face_areas,
-                            get_nodal_flag=libwarpx.get_face_areas_y_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FaceAreaszWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_face_areas_lovects,
-                            get_fabs=libwarpx.get_mesh_face_areas,
-                            get_nodal_flag=libwarpx.get_face_areas_z_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ExCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_Ex_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EyCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_Ey_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EzCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_electric_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_Ez_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BxCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_Bx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ByCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_By_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BzCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_cp_pml,
-                            get_nodal_flag=libwarpx.get_Bz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_cp_pml,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_cp_pml,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_cp_pml,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_F_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_F_cp_pml,
-                            get_nodal_flag=libwarpx.get_F_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def GCPPMLWrapper(level=1, include_ghosts=False):
-    assert level>0, Exception('Coarse patch only available on levels > 0')
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_G_cp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_G_cp_pml,
-                            get_nodal_flag=libwarpx.get_G_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ExFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_Ex_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EyFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_Ey_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def EzFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_electric_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_electric_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_Ez_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BxFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_Bx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def ByFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_By_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def BzFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_magnetic_field_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_magnetic_field_fp_pml,
-                            get_nodal_flag=libwarpx.get_Bz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_pml,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_pml,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_pml,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JxFPAmpereWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=0,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_ampere,
-                            get_nodal_flag=libwarpx.get_Jx_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JyFPAmpereWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=1,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_ampere,
-                            get_nodal_flag=libwarpx.get_Jy_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def JzFPAmpereWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=2,
-                            get_lovects=libwarpx.get_mesh_current_density_fp_lovects,
-                            get_fabs=libwarpx.get_mesh_current_density_fp_ampere,
-                            get_nodal_flag=libwarpx.get_Jz_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def FFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_F_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_F_fp_pml,
-                            get_nodal_flag=libwarpx.get_F_pml_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
-
-def GFPPMLWrapper(level=0, include_ghosts=False):
-    return _MultiFABWrapper(direction=None,
-                            get_lovects=libwarpx.get_mesh_G_fp_lovects_pml,
-                            get_fabs=libwarpx.get_mesh_G_fp_pml,
-                            get_nodal_flag=libwarpx.get_G_pml_nodal_flag,
-                            level=level, include_ghosts=include_ghosts)
+        else:
+            fields.alloc_init(
+                self.mf_name,
+                self.level,
+                (self.ba or warpx.boxArray(self.level)),
+                (self.dm or warpx.DistributionMap(self.level)),
+                self.ncomp,
+                libwarpx.amr.IntVect(self.ngrow),
+                self.initial_value,
+                self.remake,
+                self.redistribute_on_remake,
+            )
+
+
+def CustomNamedxWrapper(mf_name, level=0):
+    return MultiFabWrapper(mf_name=mf_name, idir=0, level=level)
+
+
+def CustomNamedyWrapper(mf_name, level=0):
+    return MultiFabWrapper(mf_name=mf_name, idir=1, level=level)
+
+
+def CustomNamedzWrapper(mf_name, level=0):
+    return MultiFabWrapper(mf_name=mf_name, idir=2, level=level)
+
+
+def ExWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_aux", idir=0, level=level)
+
+
+def EyWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_aux", idir=1, level=level)
+
+
+def EzWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_aux", idir=2, level=level)
+
+
+def BxWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_aux", idir=0, level=level)
+
+
+def ByWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_aux", idir=1, level=level)
+
+
+def BzWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_aux", idir=2, level=level)
+
+
+def JxWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=0, level=level)
+
+
+def JyWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=1, level=level)
+
+
+def JzWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=2, level=level)
+
+
+def ExFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp", idir=0, level=level)
+
+
+def EyFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp", idir=1, level=level)
+
+
+def EzFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp", idir=2, level=level)
+
+
+def BxFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp", idir=0, level=level)
+
+
+def ByFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp", idir=1, level=level)
+
+
+def BzFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp", idir=2, level=level)
+
+
+def ExFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp_external", idir=0, level=level)
+
+
+def EyFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp_external", idir=1, level=level)
+
+
+def EzFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_fp_external", idir=2, level=level)
+
+
+def BxFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp_external", idir=0, level=level)
+
+
+def ByFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp_external", idir=1, level=level)
+
+
+def BzFPExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_fp_external", idir=2, level=level)
+
+
+def AxHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_A_fp_external", idir=0, level=level)
+
+
+def AyHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_A_fp_external", idir=1, level=level)
+
+
+def AzHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_A_fp_external", idir=2, level=level)
+
+
+def ExHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_E_fp_external", idir=0, level=level)
+
+
+def EyHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_E_fp_external", idir=1, level=level)
+
+
+def EzHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_E_fp_external", idir=2, level=level)
+
+
+def BxHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_B_fp_external", idir=0, level=level)
+
+
+def ByHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_B_fp_external", idir=1, level=level)
+
+
+def BzHybridExternalWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_B_fp_external", idir=2, level=level)
+
+
+def JxFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=0, level=level)
+
+
+def JyFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=1, level=level)
+
+
+def JzFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_fp", idir=2, level=level)
+
+
+def RhoFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="rho_fp", level=level)
+
+
+def PhiFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="phi_fp", level=level)
+
+
+def FFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="F_fp", level=level)
+
+
+def GFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="G_fp", level=level)
+
+
+def AxFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="vector_potential_fp_nodal", idir=0, level=level)
+
+
+def AyFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="vector_potential_fp_nodal", idir=1, level=level)
+
+
+def AzFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="vector_potential_fp_nodal", idir=2, level=level)
+
+
+def ExCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_cp", idir=0, level=level)
+
+
+def EyCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_cp", idir=1, level=level)
+
+
+def EzCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Efield_cp", idir=2, level=level)
+
+
+def BxCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_cp", idir=0, level=level)
+
+
+def ByCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_cp", idir=1, level=level)
+
+
+def BzCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="Bfield_cp", idir=2, level=level)
+
+
+def JxCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_cp", idir=0, level=level)
+
+
+def JyCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_cp", idir=1, level=level)
+
+
+def JzCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="current_cp", idir=2, level=level)
+
+
+def RhoCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="rho_cp", level=level)
+
+
+def FCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="F_cp", level=level)
+
+
+def GCPWrapper(level=0):
+    return MultiFabWrapper(mf_name="G_cp", level=level)
+
+
+def EdgeLengthsxWrapper(level=0):
+    return MultiFabWrapper(mf_name="edge_lengths", idir=0, level=level)
+
+
+def EdgeLengthsyWrapper(level=0):
+    return MultiFabWrapper(mf_name="edge_lengths", idir=1, level=level)
+
+
+def EdgeLengthszWrapper(level=0):
+    return MultiFabWrapper(mf_name="edge_lengths", idir=2, level=level)
+
+
+def FaceAreasxWrapper(level=0):
+    return MultiFabWrapper(mf_name="face_areas", idir=0, level=level)
+
+
+def FaceAreasyWrapper(level=0):
+    return MultiFabWrapper(mf_name="face_areas", idir=1, level=level)
+
+
+def FaceAreaszWrapper(level=0):
+    return MultiFabWrapper(mf_name="face_areas", idir=2, level=level)
+
+
+def JxFPPlasmaWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_current_fp_plasma", idir=0, level=level)
+
+
+def JyFPPlasmaWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_current_fp_plasma", idir=1, level=level)
+
+
+def JzFPPlasmaWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_current_fp_plasma", idir=2, level=level)
+
+
+def ExFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_fp", idir=0, level=level)
+
+
+def EyFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_fp", idir=1, level=level)
+
+
+def EzFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_fp", idir=2, level=level)
+
+
+def BxFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_fp", idir=0, level=level)
+
+
+def ByFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_fp", idir=1, level=level)
+
+
+def BzFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_fp", idir=2, level=level)
+
+
+def JxFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_fp", idir=0, level=level)
+
+
+def JyFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_fp", idir=1, level=level)
+
+
+def JzFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_fp", idir=2, level=level)
+
+
+def FFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_F_fp", level=level)
+
+
+def GFPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_G_fp", level=level)
+
+
+def ExCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_cp", idir=0, level=level)
+
+
+def EyCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_cp", idir=1, level=level)
+
+
+def EzCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_E_cp", idir=2, level=level)
+
+
+def BxCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_cp", idir=0, level=level)
+
+
+def ByCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_cp", idir=1, level=level)
+
+
+def BzCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_B_cp", idir=2, level=level)
+
+
+def JxCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_cp", idir=0, level=level)
+
+
+def JyCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_cp", idir=1, level=level)
+
+
+def JzCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_j_cp", idir=2, level=level)
+
+
+def FCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_F_cp", level=level)
+
+
+def GCPPMLWrapper(level=0):
+    return MultiFabWrapper(mf_name="pml_G_cp", level=level)

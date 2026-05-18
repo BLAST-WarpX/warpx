@@ -6,8 +6,9 @@
 
 from .Bucket import Bucket
 
-collisions = Bucket('collisions')
+collisions = Bucket("collisions")
 collisions_list = []
+
 
 def newcollision(name):
     result = Bucket(name)

@@ -14,16 +14,65 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
-#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L, Huebl A.
+#. Wang J X, Han L Q, Zhao X Y, Ablimit A, Gong Z, Wen H and Yu J Q.
+   **Muon injection and acceleration via ultraintense electron beam-driven plasma wakefield**.
+   Phys. Rev. Accel. Beams **29**, 021302, 2026.
+   `DOI:10.1103/wq5g-mtjq <https://doi.org/10.1103/wq5g-mtjq>`__
+
+#. Gardner C and Dollar F.
+   **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
+   New Journal of Physics **27**, 124301, 2025.
+   `DOI:10.1088/1367-2630/ae23f1 <https://doi.org/10.1088/1367-2630/ae23f1>`__
+
+#. Lei B., Zhang H., Bonţoiu C., Bonatto A., Resta-López J., Xia G., Qiao B. and Welsch C.
+   **100 TeV/m-level particle accelerators driven by high-density electron beams in micro structured carbon nanotube forest channel**.
+   New Journal of Physics **27**, 2025.
+   `DOI:10.1088/1367-2630/adf87d <https://doi.org/10.1088/1367-2630/adf87d>`__
+
+#. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
+   **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
+   Optics Express **33**, 10, 2025.
+   `DOI:10.1364/OE.557855 <https://doi.org/10.1364/OE.557855>`__
+
+#. Ma M, Zeng M, Wang J, Lu G, Yan W, Chen L, and Li D.
+   **Particle-in-cell simulation of laser wakefield accelerators with oblique lasers in quasicylindrical geometry**.
+   Phys. Rev. Accel. Beams **28**, 021301, 2025
+   `DOI:10.1103/PhysRevAccelBeams.28.021301 <https://doi.org/10.1103/PhysRevAccelBeams.28.021301>`__
+
+#. Shrock JE, Rockafellow E, Miao B, Le M, Hollinger RC, Wang S, Gonsalves AJ, Picksley A, Rocca JJ, and Milchberg HM.
+   **Guided Mode Evolution and Ionization Injection in Meter-Scale Multi-GeV Laser Wakefield Accelerators**.
+   Phys. Rev. Lett. **133**, 045002, 2024
+   `DOI:10.1103/PhysRevLett.133.045002 <https://link.aps.org/doi/10.1103/PhysRevLett.133.045002>`__
+
+#. Ross AJ, Chappell J, van de Wetering JJ, Cowley J, Archer E, Bourgeois N, Corner L, Emerson DR, Feder L, Gu XJ, Jakobsson O, Jones H, Picksley A, Reid L, Wang W, Walczak R, Hooker SM.
+   **Resonant excitation of plasma waves in a plasma channel**.
+   Phys. Rev. Research **6**, L022001, 2024
+   `DOI:10.1103/PhysRevResearch.6.L022001 <https://doi.org/10.1103/PhysRevResearch.6.L022001>`__
+
+#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
+   **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
+   Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.
+   `DOI:10.1145/3659914.3659937 <https://doi.org/10.1145/3659914.3659937>`__
+
+#. Peng H, Huang TW, Jiang K, Li R, Wu CN, Yu MY, Riconda C, Weber S, Zhou CT, Ruan SC.
+   **Coherent Subcycle Optical Shock from a Superluminal Plasma Wake**.
+   Phys. Rev. Lett. **131**, 145003, 2023
+   `DOI:10.1103/PhysRevLett.131.145003 <https://doi.org/10.1103/PhysRevLett.131.145003>`__
+
+#. Mewes SM, Boyle GJ, Ferran Pousa A, Shalloo RJ, Osterhoff J, Arran C, Corner L, Walczak R, Hooker SM, Thévenet M.
+   **Demonstration of tunability of HOFI waveguides via start-to-end simulations**.
+   Phys. Rev. Research **5**, 033112, 2023
+   `DOI:10.1103/PhysRevResearch.5.033112 <https://doi.org/10.1103/PhysRevResearch.5.033112>`__
+
+#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L and Huebl A.
    **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
-   14th International Particle Accelerator Conference (IPAC'23), WEPA101, *in print*, 2023.
-   `preprint <https://www.ipac23.org/preproc/pdf/WEPA101.pdf>`__,
-   `DOI:10.18429/JACoW-IPAC-23-WEPA101 <https://doi.org/10.18429/JACoW-IPAC-23-WEPA101>`__
+   14th International Particle Accelerator Conference (IPAC'23), WEPA101, 2023.
+   `DOI:10.18429/JACoW-IPAC2023-WEPA101 <https://doi.org/10.18429/JACoW-IPAC2023-WEPA101>`__
 
 #. Wang J, Zeng M, Li D, Wang X, Gao J.
    **High quality beam produced by tightly focused laser driven wakefield accelerators**.
-   arXiv pre-print, 2023.
-   `DOI:10.48550/arXiv.2304.10730 <https://doi.org/10.48550/arXiv.2304.10730>`__
+   Phys. Rev. Accel. Beams, **26**, 091303, 2023.
+   `DOI:10.1103/PhysRevAccelBeams.26.091303 <https://doi.org/10.1103/PhysRevAccelBeams.26.091303>`__
 
 #. Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
    **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
@@ -61,6 +110,26 @@ Laser-Plasma Interaction
 
 Scientific works in laser-ion acceleration and laser-matter interaction.
 
+#. Lei B, Zhang H, Seipt D, Bonatto A, Qiao B, Resta-López J, Xia G, and Welsch C.
+   **Coherent Synchrotron Radiation by Excitation of Surface Plasmon Polariton on Near-Critical Solid Microtube Surface**.
+   Phys. Rev. Lett. **135**, 205001, 2025.
+   `DOI:10.1103/cnym-16hc <https://doi.org/10.1103/cnym-16hc>`__
+
+#. Garten M, Bulanov S S, Hakimi S, Obst-Huebl L, Mitchell C E, Schroeder C B, Esarey E, Geddes C G R, Vay J-L, Huebl A.
+   **Laser-plasma ion beam booster based on hollow-channel magnetic vortex acceleration**.
+   Physical Review Research **6**, 033148, 2024.
+   `DOI:10.1103/PhysRevResearch.6.033148 <https://doi.org/10.1103/PhysRevResearch.6.033148>`__
+
+#. Zaïm N, Sainte-Marie A, Fedeli L, Bartoli P, Huebl A, Leblanc A, Vay J-L, Vincenti H.
+   **Light-matter interaction near the Schwinger limit using tightly focused doppler-boosted lasers**.
+   Physical Review Letters **132**, 175002, 2024.
+   `DOI:10.1103/PhysRevLett.132.175002 <https://doi.org/10.1103/PhysRevLett.132.175002>`__
+
+#. Knight B, Gautam C, Stoner C, Egner B, Smith J, Orban C, Manfredi J, Frische K, Dexter M, Chowdhury E, Patnaik A (2023).
+   **Detailed Characterization of a kHz-rate Laser-Driven Fusion at a Thin Liquid Sheet with a Neutron Detection Suite**.
+   High Power Laser Science and Engineering, 1-13, 2023.
+   `DOI:10.1017/hpl.2023.84 <https://doi.org/10.1017/hpl.2023.84>`__
+
 #. Fedeli L, Huebl A, Boillod-Cerneux F, Clark T, Gott K, Hillairet C, Jaure S, Leblanc A, Lehe R, Myers A, Piechurski C, Sato M, Zaim N, Zhang W, Vay J-L, Vincenti H.
    **Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers**.
    *SC22: International Conference for High Performance Computing, Networking, Storage and Analysis (SC)*. ISSN:2167-4337, pp. 25-36, Dallas, TX, US, 2022.
@@ -76,17 +145,33 @@ Scientific works in laser-ion acceleration and laser-matter interaction.
    Phys. Rev. Accel. Beams **25**, 093402, 2022.
    `DOI:10.1103/PhysRevAccelBeams.25.093402 <https://doi.org/10.1103/PhysRevAccelBeams.25.093402>`__
 
+#. Fedeli L, Sainte-Marie A, Zaïm N, Thévenet M, Vay J-L, Myers A, Quéré F, Vincenti H.
+   **Probing strong-field QED with Doppler-boosted PetaWatt-class lasers**.
+   Physical Review Letters **127**, 114801, 2021.
+   `DOI:10.1103/PhysRevLett.127.114801 <https://doi.org/10.1103/PhysRevLett.127.114801>`__
+
 
 Particle Accelerator & Beam Physics
 ***********************************
 
 Scientific works in particle and beam modeling.
 
+#. Sandberg R T, Lehe R, Mitchell C E, Garten M, Myers A, Qiang J, Vay J-L and Huebl A.
+   **Synthesizing Particle-in-Cell Simulations Through Learning and GPU Computing for Hybrid Particle Accelerator Beamlines**.
+   Proc. of Platform for Advanced Scientific Computing (PASC'24), *PASC24 Best Paper Award*, 2024.
+   `DOI:10.1145/3659914.3659937 <https://doi.org/10.1145/3659914.3659937>`__
+
+#. Nguyen B, Formenti A, Lehe R, Vay J-L, Gessner S, and Fedeli L.
+   **Comparison of WarpX and GUINEA-PIG for electron positron collisions**.
+   15th International Particle Accelerator Conference (IPAC'24), WEPC84, 2024.
+   `preprint <https://arxiv.org/abs/2405.09583>`__,
+   `DOI:10.18429/JACoW-IPAC2024-WEPC84 <https://doi.org/10.18429/JACoW-IPAC2024-WEPC84>`__
+
 #. Sandberg R T, Lehe R, Mitchell C E, Garten M, Qiang J, Vay J-L, Huebl A.
    **Hybrid Beamline Element ML-Training for Surrogates in the ImpactX Beam-Dynamics Code**.
-   14th International Particle Accelerator Conference (IPAC'23), WEPA101, *in print*, 2023.
+   14th International Particle Accelerator Conference (IPAC'23), WEPA101, 2023.
    `preprint <https://www.ipac23.org/preproc/pdf/WEPA101.pdf>`__,
-   `DOI:10.18429/JACoW-IPAC-23-WEPA101 <https://doi.org/10.18429/JACoW-IPAC-23-WEPA101>`__
+   `DOI:10.18429/JACoW-IPAC2023-WEPA101 <https://doi.org/10.18429/JACoW-IPAC2023-WEPA101>`__
 
 #. Tan W H, Piot P, Myers A, Zhang W, Rheaume T, Jambunathan R, Huebl A, Lehe R, Vay J-L.
    **Simulation studies of drive-beam instability in a dielectric wakefield accelerator**.
@@ -94,15 +179,40 @@ Scientific works in particle and beam modeling.
    `DOI:10.18429/JACoW-IPAC2022-MOPOMS012 <https://doi.org/10.18429/JACoW-IPAC2022-MOPOMS012>`__
 
 
-High Energy Astrophysical Plasma Physics
-****************************************
+Astrophysical Plasma Physics
+****************************
 
 Scientific works in astrophysical plasma modeling.
 
+#. Zhang Z P, Zhao Z H, Jin X X, Zhu X W, Wang Y S, Zhu X Y, Qiao B.
+   **Multispecies Ion Acceleration in the Interaction of Multiple Reconnection Current Sheets**.
+   The Astrophysical Journal, **997** 196, 2026.
+   `10.3847/1538-4357/ae2320 <https://doi.org/10.3847/1538-4357/ae2320>`__
+
+#. Wu Y, Shi C, Tao X, Zhao J
+   **Kinetic-hybrid Simulations of Counterpropagating Ion Cyclotron Waves and Proton Scattering in the Near-Sun Solar Wind**.
+   The Astrophysical Journal **983** 107, 2025.
+   `10.3847/1538-4357/adbc6a <https://doi.org/10.3847/1538-4357/adbc6a>`__
+
+#. Sam A, Kumar P, Fletcher AC, Crabtree C, Lee N, Elschot S.
+   **Nonlinear evolution, propagation, electron-trapping, and damping effects of ion-acoustic solitons using fully kinetic PIC simulations**.
+   Phys. Plasmas **32** 022103, 2025
+   `DOI:10.1063/5.0249525 <https://doi.org/10.1063/5.0249525>`__
+
+#. Jambunathan R, Jones H, Corrales L, Klion H, Roward ME, Myers A, Zhang W, Vay J-L.
+   **Application of mesh refinement to relativistic magnetic reconnection**.
+   Physics of Plasmas ***32*** 1, 2025
+   `DOI:10.1063/5.0233583 <https://doi.org/10.1063/5.0233583>`__
+
+#. Ghosh S, Bhat P.
+   **Magnetic Reconnection: An Alternative Explanation of Radio Emission in Galaxy Clusters**.
+   The Astrophysical Journal Letters **979** 1, 2025.
+   `DOI:10.3847/2041-8213/ad9f2d <https://doi.org/10.3847/2041-8213/ad9f2d>`__
+
 #. Klion H, Jambunathan R, Rowan ME, Yang E, Willcox D, Vay J-L, Lehe R, Myers A, Huebl A, Zhang W.
    **Particle-in-Cell simulations of relativistic magnetic reconnection with advanced Maxwell solver algorithms**.
-   arXiv pre-print, 2023.
-   `DOI:10.48550/arXiv.2304.10566 <https://doi.org/10.48550/arXiv.2304.10566>`__
+   The Astrophysical Journal **952** 8, 2023.
+   `DOI:10.3847/1538-4357/acd75b <https://doi.org/10.3847/1538-4357/acd75b>`__
 
 
 Microelectronics
@@ -114,6 +224,7 @@ Microelectronics
    **Characterization of Transmission Lines in Microelectronic Circuits Using the ARTEMIS Solver**.
    IEEE Journal on Multiscale and Multiphysics Computational Techniques, vol. 8, pp. 31-39, 2023.
    `DOI:10.1109/JMMCT.2022.3228281 <https://doi.org/10.1109/JMMCT.2022.3228281>`__
+
 #. Kumar P, Nonaka A, Jambunathan R, Pahwa G and Salahuddin S, Yao Z.
    **FerroX: A GPU-accelerated, 3D Phase-Field Simulation Framework for Modeling Ferroelectric Devices**.
    arXiv preprint, 2022.
@@ -131,3 +242,82 @@ High-Performance Computing and Numerics
 Scientific works in High-Performance Computing, applied mathematics and numerics.
 
 Please see :ref:`this section <acknowledge_warpx_all_refs>`.
+
+Related works using WarpX:
+
+#. Yan Y., Du F., Tang J., Yu D and Zhao Y.,
+   **Numerical study on wave attenuation via 1D fully kinetic electromagnetic particle-in-cell simulations**.
+   Plasma Sources Sci. Technol. **33** 115013, 2024
+   `DOI:10.1088/1361-6595/ad8c7c <https://doi.org/10.1088/1361-6595/ad8c7c>`__
+
+
+Nuclear Fusion and Plasma Confinement
+*************************************
+
+#. Groenewald R. E., Gupta S., Veksler A., Tobin M., Galeotti L., Onofri M., Ceccherini F., Barnes D. C., Belova E. and Dettrick S. A.
+   **Fast ion stabilization of tilt in large radius FRCs**.
+   Physics of Plasmas **32**, 072503, 2025.
+   `DOI:10.1063/5.0277175 <https://doi.org/10.1063/5.0277175>`__
+
+#. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
+   **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
+   Physics of Plasmas **32**, 032514, 2025.
+   `DOI:10.1063/5.0227040 <https://doi.org/10.1063/5.0227040>`__
+
+#. Tyushev M., Papahn Zadeh M., Chopra N. S., Raitses Y., Romadanov I., Likhanskii A., Fubiani G., Garrigues L., Groenewald R. and Smolyakov A.
+   **Mode transitions and spoke structures in  E×B Penning discharge**.
+   Physics of Plasmas **32**, 013511, 2025.
+   `DOI:10.1063/5.0238577 <https://doi.org/10.1063/5.0238577>`__
+
+#. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
+   **Axial Confinement in the Novatron Mirror Machine**.
+   Nuclear Fusion, **65**, Number 6, 2025.
+   `DOI:10.1088/1741-4326/add173 <https://doi.org/10.1088/1741-4326/add173>`__
+
+#. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
+   **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
+   AIP Advances **14**, 085025, 2024.
+   `DOI:10.1063/5.0201470 <https://doi.org/10.1063/5.0201470>`__
+
+#. Nicks B. S., Putvinski S. and Tajima T.
+   **Stabilization of the Alfvén-ion cyclotron instability through short plasmas: Fully kinetic simulations in a high-beta regime**.
+   Physics of Plasmas **30**, 102108, 2023.
+   `DOI:10.1063/5.0163889 <https://doi.org/10.1063/5.0163889>`__
+
+#. Groenewald R. E., Veksler A., Ceccherini F., Necas A., Nicks B. S., Barnes D. C., Tajima T. and Dettrick S. A.
+   **Accelerated kinetic model for global macro stability studies of high-beta fusion reactors**.
+   Physics of Plasmas **30**, 122508, 2023.
+   `DOI:10.1063/5.0178288 <https://doi.org/10.1063/5.0178288>`__
+
+Plasma Thrusters and Spacecraft Physics
+***************************************
+
+#. Zhou Z., Luo X., Zhao Y., Yu D.
+   **Impact of azimuthal magnetic field inhomogeneity on Hall thruster high-frequency azimuthal instability via 2D radial–azimuthal PIC simulations**.
+   Plasma Sources Sci. Technol. **34**, 105006, 2025.
+   `DOI:10.1088/1361-6595/ae0af5 <https://doi.org/10.1088/1361-6595/ae0af5>`__
+
+#. Xie L., Zhou Z., Luo X., Zhao Y.
+   **The influence of adding Monte Carlo collisions on convergence in 3D PIC simulations of Hall thruster azimuthal instability**.
+   Phys. Scr. **100**, 075616, 2025.
+   `DOI:10.1088/1402-4896/ade636 <https://doi.org/10.1088/1402-4896/ade636>`__
+
+#. Sam A., Elschot S.,
+   **Self-consistent charging of complex objects in flowing plasma: Implementation and analysis in WarpX**.
+   Computer Physics Communications, **314**, 109680, 2025.
+   `DOI:10.1016/j.cpc.2025.109680 <https://doi.org/10.1016/j.cpc.2025.109680>`__
+
+#. Marks T. A. and Gorodetsky A. A.,
+   **GPU-accelerated kinetic Hall thruster simulations in WarpX**.
+   Journal of Electric Propulsion (2025) 4:34.
+   `DOI:10.1007/s44205-025-00133-1 <https://doi.org/10.1007/s44205-025-00133-1>`__
+
+#. Xie L., Luo X., Zhou Z. and Zhao Y.,
+   **Effect of plasma initialization on 3D PIC simulation of Hall thruster azimuthal instability**.
+   Physica Scripta, **99**, 095602, 2024.
+   `DOI:10.1088/1402-4896/ad69e5 <https://doi.org/10.1088/1402-4896/ad69e5>`__
+
+#. Marks T. A. and Gorodetsky A. A.,
+   **Hall thruster simulations in WarpX**.
+   38th International Electric Propulsion Conference, Toulouse, France, 2024.
+   `DOI:10.7302/234915 <https://doi.org/10.7302/23491>`__

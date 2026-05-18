@@ -1,0 +1,79 @@
+# Input file for MCC testing. This runs an eighth of a voltage input period
+# of the first benchmark case of Turner et al. (2013).
+
+my_constants.Ngas = 9.64e+20 # m^-3
+my_constants.Tgas = 300 # K
+my_constants.Nplasma = 2.56e14 # m^-3
+my_constants.freq = 13.56e6 # Hz
+my_constants.Mion = 6.67e-27 # kg
+
+max_step = 50
+warpx.verbose = 0
+warpx.const_dt = 1.0/(400*freq)
+warpx.do_electrostatic = labframe
+warpx.self_fields_required_precision = 1e-06
+warpx.use_filter = 0
+warpx.abort_on_warning_threshold = high
+
+amr.n_cell = 128 8
+amr.max_grid_size = 128
+amr.max_level = 0
+
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 0.067 0.0041875
+
+boundary.field_lo = pec periodic
+boundary.field_hi = pec periodic
+boundary.potential_hi_x = 450.0*sin(2*pi*freq*t)
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+particles.species_names = electrons he_ions
+electrons.species_type = electron
+electrons.injection_style = nuniformpercell
+electrons.initialize_self_fields = 0
+electrons.num_particles_per_cell_each_dim = 32 16
+electrons.profile = constant
+electrons.density = Nplasma
+electrons.momentum_distribution_type = maxwell_boltzmann
+electrons.theta = (kb*30000/(m_e*clight^2))
+
+he_ions.species_type = helium
+he_ions.charge = q_e
+he_ions.injection_style = nuniformpercell
+he_ions.initialize_self_fields = 0
+he_ions.num_particles_per_cell_each_dim = 32 16
+he_ions.profile = constant
+he_ions.density = Nplasma
+he_ions.momentum_distribution_type = maxwell_boltzmann
+he_ions.theta = (kb*Tgas/(Mion*clight^2))
+
+collisions.collision_names = coll_elec coll_ion
+coll_ion.type = background_mcc
+coll_ion.species = he_ions
+coll_ion.background_density = Ngas
+coll_ion.background_temperature = Tgas
+coll_ion.scattering_processes = elastic back
+coll_ion.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ion_scattering.dat
+coll_ion.back_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ion_back_scatter.dat
+
+coll_elec.type = background_mcc
+coll_elec.species = electrons
+coll_elec.background_density = Ngas
+coll_elec.background_temperature = Tgas
+coll_elec.scattering_processes = elastic excitation1 excitation2 ionization
+coll_elec.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/He/electron_scattering.dat
+coll_elec.excitation1_energy = 19.82
+coll_elec.excitation1_cross_section = ../../../../warpx-data/MCC_cross_sections/He/excitation_1.dat
+coll_elec.excitation2_energy = 20.61
+coll_elec.excitation2_cross_section = ../../../../warpx-data/MCC_cross_sections/He/excitation_2.dat
+coll_elec.ionization_energy = 24.55
+coll_elec.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ionization.dat
+coll_elec.ionization_species = he_ions
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = 50
+diag1.fields_to_plot = rho_electrons rho_he_ions

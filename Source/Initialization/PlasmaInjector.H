@@ -6,10 +6,11 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PLASMA_INJECTOR_H_
-#define PLASMA_INJECTOR_H_
+#ifndef WARPX_PLASMA_INJECTOR_H_
+#define WARPX_PLASMA_INJECTOR_H_
 
 #include "InjectorDensity.H"
+#include "InjectorFlux.H"
 #include "InjectorMomentum.H"
 #include "TemperatureProperties.H"
 #include "VelocityProperties.H"
@@ -20,13 +21,11 @@
 #include <AMReX_Dim3.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
+#include <AMReX_ParmParse.H>
 
 #include <AMReX_BaseFwd.H>
 
-#ifdef WARPX_USE_OPENPMD
-#   include <openPMD/openPMD.hpp>
-#endif
-
+#include <any>
 #include <limits>
 #include <memory>
 #include <string>
@@ -41,17 +40,27 @@ class PlasmaInjector
 
 public:
 
+    /** Default constructor*/
     PlasmaInjector () = default;
 
-    PlasmaInjector (int ispecies, const std::string& name);
+    PlasmaInjector (int ispecies, const std::string& name, const amrex::Geometry& geom,
+                    const std::string& src_name="");
+
+    // Default move and copy operations
+    PlasmaInjector(const PlasmaInjector&) = delete;
+    PlasmaInjector& operator=(const PlasmaInjector&) = delete;
+    PlasmaInjector(PlasmaInjector&&) = default;
+    PlasmaInjector& operator=(PlasmaInjector&&) = default;
 
     ~PlasmaInjector ();
 
     // bool: whether the point (x, y, z) is inside the plasma region
-    bool insideBounds (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept;
+    [[nodiscard]] bool insideBounds (
+        amrex::Real x, amrex::Real y, amrex::Real z) const noexcept;
 
     // bool: whether the region defined by lo and hi overlaps with the plasma region
-    bool overlapsWith (const amrex::XDim3& lo, const amrex::XDim3& hi) const noexcept;
+    [[nodiscard]] bool overlapsWith (
+        const amrex::XDim3& lo, const amrex::XDim3& hi) const noexcept;
 
     int num_particles_per_cell;
     amrex::Real num_particles_per_cell_real;
@@ -59,16 +68,18 @@ public:
     amrex::Vector<int> num_particles_per_cell_each_dim;
 
     // gamma * beta
-    amrex::XDim3 getMomentum (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept;
+    [[nodiscard]] amrex::XDim3 getMomentum (
+        amrex::Real x, amrex::Real y, amrex::Real z) const noexcept;
 
-    amrex::Real getCharge () {return charge;}
-    amrex::Real getMass () {return mass;}
-    PhysicalSpecies getPhysicalSpecies() const {return physical_species;}
+    bool queryCharge (amrex::ParticleReal& a_charge) const;
+    bool queryMass (amrex::ParticleReal& a_mass) const;
 
     // bool: whether the initial injection of particles should be done
-    // This routine is called during initialization of the plasma. When injecting
-    // a surface flux, no injection is done doing initialization so return false.
-    bool doInjection () const noexcept { return h_inj_pos != nullptr && !surface_flux;}
+    // This routine is called during initialization of the plasma.
+    [[nodiscard]] bool doInjection () const noexcept { return h_inj_pos != nullptr;}
+
+    // bool: whether the flux injection of particles should be done.
+    [[nodiscard]] bool doFluxInjection () const noexcept { return h_flux_pos != nullptr;}
 
     bool add_single_particle = false;
     amrex::Vector<amrex::ParticleReal> single_particle_pos;
@@ -95,18 +106,24 @@ public:
     amrex::Real y_cut = std::numeric_limits<amrex::Real>::max();
     amrex::Real z_cut = std::numeric_limits<amrex::Real>::max();
     amrex::Real q_tot = 0.0;
+    amrex::Real N_tot = 0.0;
     long npart;
     int do_symmetrize = 0;
     int symmetrization_order = 4;
+    bool do_focusing = false;
+    amrex::Real focal_distance;
+    bool do_rotation = false;
+    bool do_rotation_momenta = false;
+    amrex::Real rotation_angle;
+    amrex::Vector<amrex::Real> rotation_axis;
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
 #ifdef WARPX_USE_OPENPMD
     //! openPMD::Series to load from in external_file injection
-    std::unique_ptr<openPMD::Series> m_openpmd_input_series;
+    std::any m_openpmd_input_series;
 #endif
 
-    bool surface_flux = false; // inject from a surface
     amrex::Real surface_flux_pos; // surface location
     amrex::Real flux_tmin = -1.; // Time after which we start injecting particles
     amrex::Real flux_tmax = -1.; // Time after which we stop injecting particles
@@ -116,12 +133,12 @@ public:
     int flux_normal_axis;
     int flux_direction; // -1 for left, +1 for right
 
-    bool radially_weighted = true;
+    // With radial geometry, the number of particles per cell will be proportional to r**radial_numpercell_power
+    amrex::Real radial_numpercell_power;
 
-    std::string str_density_function;
-    std::string str_momentum_function_ux;
-    std::string str_momentum_function_uy;
-    std::string str_momentum_function_uz;
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
+
+    std::string str_flux_function;
 
     amrex::Real xmin, xmax;
     amrex::Real ymin, ymax;
@@ -129,41 +146,79 @@ public:
     amrex::Real density_min = std::numeric_limits<amrex::Real>::epsilon();
     amrex::Real density_max = std::numeric_limits<amrex::Real>::max();
 
-    InjectorPosition* getInjectorPosition ();
-    InjectorDensity*  getInjectorDensity ();
-    InjectorMomentum* getInjectorMomentum ();
+    [[nodiscard]] InjectorPosition* getInjectorPosition () const;
+    [[nodiscard]] InjectorPosition* getInjectorFluxPosition () const;
+    [[nodiscard]] InjectorDensity*  getInjectorDensity (int li) const;
+
+    [[nodiscard]] InjectorFlux*  getInjectorFlux () const;
+    [[nodiscard]] InjectorMomentum* getInjectorMomentumDevice () const;
+    [[nodiscard]] InjectorMomentum* getInjectorMomentumHost () const;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    [[nodiscard]] bool distributedInjectorDensity () const { return inj_rho_distributed; }
 
 protected:
 
-    amrex::Real mass, charge;
+    bool mass_from_source = false;
+    bool charge_from_source = false;
+    amrex::ParticleReal mass, charge;
 
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
-    amrex::Real density;
+    amrex::Real flux;
 
     int species_id;
     std::string species_name;
+    std::string source_name;
+
+    amrex::Geometry m_geom;
 
     std::unique_ptr<InjectorPosition> h_inj_pos;
     InjectorPosition* d_inj_pos = nullptr;
 
+    std::unique_ptr<InjectorPosition> h_flux_pos;
+    InjectorPosition* d_flux_pos = nullptr;
+
     std::unique_ptr<InjectorDensity,InjectorDensityDeleter> h_inj_rho;
     InjectorDensity* d_inj_rho = nullptr;
+    bool inj_rho_distributed = false;
+    bool inj_rho_prepared = false;
     std::unique_ptr<amrex::Parser> density_parser;
+
+    std::unique_ptr<InjectorFlux,InjectorFluxDeleter> h_inj_flux;
+    InjectorFlux* d_inj_flux = nullptr;
+    std::unique_ptr<amrex::Parser> flux_parser;
 
     std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter> h_inj_mom;
     InjectorMomentum* d_inj_mom = nullptr;
     std::unique_ptr<amrex::Parser> ux_parser;
     std::unique_ptr<amrex::Parser> uy_parser;
     std::unique_ptr<amrex::Parser> uz_parser;
+    std::unique_ptr<amrex::Parser> ux_th_parser;
+    std::unique_ptr<amrex::Parser> uy_th_parser;
+    std::unique_ptr<amrex::Parser> uz_th_parser;
 
     // Keep a pointer to TemperatureProperties to ensure the lifetime of the
     // contained Parser
     std::unique_ptr<TemperatureProperties> h_mom_temp;
     std::unique_ptr<VelocityProperties> h_mom_vel;
 
-    void parseDensity (const amrex::ParmParse& pp);
-    void parseMomentum (const amrex::ParmParse& pp);
+    void setupSingleParticle (amrex::ParmParse const& pp_species);
+    void setupMultipleParticles (amrex::ParmParse const& pp_species);
+    void setupGaussianBeam (amrex::ParmParse const& pp_species);
+    void setupNRandomPerCell (amrex::ParmParse const& pp_species);
+    void setupNFluxPerCell (amrex::ParmParse const& pp_species);
+    void setupNuniformPerCell (amrex::ParmParse const& pp_species);
+    void setupExternalFile (amrex::ParmParse const& pp_species);
+
+    void parseFlux (amrex::ParmParse const& pp_species);
 };
 
-#endif
+#endif //WARPX_PLASMA_INJECTOR_H_

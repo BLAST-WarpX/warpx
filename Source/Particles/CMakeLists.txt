@@ -1,6 +1,6 @@
 foreach(D IN LISTS WarpX_DIMS)
     warpx_set_suffix_dims(SD ${D})
-    target_sources(WarpX_${SD}
+    target_sources(lib_${SD}
       PRIVATE
         MultiParticleContainer.cpp
         ParticleBoundaries.cpp
@@ -11,15 +11,17 @@ foreach(D IN LISTS WarpX_DIMS)
         LaserParticleContainer.cpp
         ParticleBoundaryBuffer.cpp
         SpeciesPhysicalProperties.cpp
+        ExternalParticleFields.cpp
     )
 endforeach()
 
 #add_subdirectory(Algorithms)
 add_subdirectory(Collision)
-#add_subdirectory(Deposition)
+add_subdirectory(Deposition)
 add_subdirectory(ElementaryProcess)
 add_subdirectory(Gather)
 add_subdirectory(ParticleCreation)
-#add_subdirectory(Pusher)
+add_subdirectory(ParticleThermalizer)
+add_subdirectory(Pusher)
 add_subdirectory(Resampling)
 add_subdirectory(Sorting)

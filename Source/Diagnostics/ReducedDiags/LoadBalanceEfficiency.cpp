@@ -20,7 +20,7 @@
 using namespace amrex;
 
 // constructor
-LoadBalanceEfficiency::LoadBalanceEfficiency (std::string rd_name)
+LoadBalanceEfficiency::LoadBalanceEfficiency (const std::string& rd_name)
     : ReducedDiags{rd_name}
 {
     // read number of levels
@@ -50,7 +50,7 @@ LoadBalanceEfficiency::LoadBalanceEfficiency (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]lev" + std::to_string(lev);
             }
-            ofs << std::endl;
+            ofs << "\n";
 
             // close file
             ofs.close();

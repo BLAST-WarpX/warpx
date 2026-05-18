@@ -2,15 +2,25 @@
 #define WARPX_FULLDIAGNOSTICS_H_
 
 #include "Diagnostics.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/Parser/IntervalsParser.H"
+
+#include <AMReX_REAL.H>
 
 #include <string>
 
-class
-FullDiagnostics final : public Diagnostics
+class FullDiagnostics final : public Diagnostics
 {
 public:
-    FullDiagnostics (int i, std::string name);
+    FullDiagnostics (int i, const std::string& name, DiagTypes diag_type);
+    /** Type of time averaging for diagnostics (fields only)
+     * None corresponds to instantaneous diags
+     * Static corresponds to a fixed starting step for averaging,
+     *     will average until the end, and dump out intermediate average results
+     * Dynamic corresponds to a moving period for averaging where the start step
+     *     is as many steps before the output interval as the averaging period is long.
+     */
+    enum struct TimeAverageType {None, Static, Dynamic};
 private:
     /** Read user-requested parameters for full diagnostics */
     void ReadParameters ();
@@ -22,10 +32,24 @@ private:
     bool m_plot_raw_fields_guards = false;
     /** Whether to dump the RZ modes */
     bool m_dump_rz_modes = false;
-    /** Flush m_mf_output and particles to file for the i^th buffer */
-    void Flush (int i_buffer) override;
+    /** Whether the field solver deposits current density, if not it will be done
+     * before writing the diagnostic.
+     */
+    bool m_solver_deposits_current = true;
+    /** Whether the diagnostics are averaging data over time or not */
+    TimeAverageType m_time_average_mode = TimeAverageType::None;
+    /** Period to average fields over: in steps */
+    int m_average_period_steps = -1;
+    /** Period to average fields over: in seconds */
+    amrex::Real m_average_period_time = -1.0;
+    /** Time step to start averaging */
+    int m_average_start_step = -1;
+    /** Flush m_mf_output or m_sum_mf_output and particles to file for the i^th buffer */
+    void Flush (int i_buffer, bool /* force_flush */) override;
     /** Flush raw data */
     void FlushRaw ();
+    /** Initialize Data required to compute TimeAveraged diagnostics */
+    void DerivedInitData () override;
     /** whether to compute and pack cell-centered data in m_mf_output
      * \param[in] step current time step
      * \param[in] force_flush if true, return true for any step since output must be
@@ -51,6 +75,7 @@ private:
       *
       * \param[in] i_buffer index of a back-transformed snapshot
       * \param[in] lev level on which source multifabs are defined
+      * \param[in] restart whether this is called upon restarting a previous simulation
       */
     void InitializeBufferData ( int i_buffer, int lev, bool restart=false ) override;
     /** Initialize functors that store pointers to the RZ fields requested by the user.
@@ -66,7 +91,9 @@ private:
       * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
       */
     void InitializeFieldFunctors (int lev) override;
-    void InitializeParticleBuffer () override;
+
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
+
     /** Prepare field data to be used for diagnostics */
     void PrepareFieldDataForOutput () override;
     /** Prepare particle data to be used for diagnostics. */

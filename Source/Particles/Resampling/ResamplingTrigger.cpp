@@ -14,7 +14,7 @@
 
 #include <vector>
 
-ResamplingTrigger::ResamplingTrigger (const std::string species_name)
+ResamplingTrigger::ResamplingTrigger (const std::string& species_name)
 {
     const amrex::ParmParse pp_species_name(species_name);
 

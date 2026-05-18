@@ -40,9 +40,9 @@ public:
      *  (cost, processor, level, i_low, j_low, k_low, gpu_ID [if GPU run], num_cells, num_macro_particles
      * note: the hostname per box is stored separately (in m_data_string) */
 #ifdef AMREX_USE_GPU
-    const int m_nDataFields = 9;
+    static const int m_nDataFields = 9;
 #else
-    const int m_nDataFields = 8;
+    static const int m_nDataFields = 8;
 #endif
 
     /** used to keep track of max number of boxes over all timesteps; this allows
@@ -54,7 +54,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    LoadBalanceCosts(std::string rd_name);
+    explicit LoadBalanceCosts(const std::string& rd_name);
 
     /**
      * This function updates the costs, given the current distribution mapping,
@@ -62,7 +62,7 @@ public:
      *
      * @param[in] step current time step
      */
-    virtual void ComputeDiags(int step) override final;
+    void ComputeDiags(int step) final;
 
     /**
      * write to file function for costs;  this differs from the base class
@@ -71,7 +71,7 @@ public:
      *
      * @param[in] step current time step
      */
-    virtual void WriteToFile(int step) const override final;
+    void WriteToFile(int step) const final;
 
 };
 

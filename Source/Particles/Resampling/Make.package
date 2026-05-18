@@ -1,5 +1,6 @@
 CEXE_sources += Resampling.cpp
 CEXE_sources += ResamplingTrigger.cpp
 CEXE_sources += LevelingThinning.cpp
+CEXE_sources += VelocityCoincidenceThinning.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Resampling/
