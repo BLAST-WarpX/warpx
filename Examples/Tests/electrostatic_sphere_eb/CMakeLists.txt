@@ -51,6 +51,18 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
+        test_3d_electrostatic_sphere_eb_mr  # name
+        3  # dims
+        2  # nprocs
+        inputs_test_3d_electrostatic_sphere_eb_mr  # inputs
+        "analysis_3d_mr.py diags/diag1/"  # analysis
+        "analysis_default_regression.py --path diags/diag1/"  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
         test_rz_electrostatic_sphere_eb_mr  # name
         RZ  # dims
         2  # nprocs
