@@ -1071,28 +1071,13 @@ WarpX::OneStep_sub1 (Real cur_time)
     const int fine_lev = 1;
     const int coarse_lev = 0;
     const amrex::IntVect& crse_to_fine_ref_ratio = this->refRatio(coarse_lev);
-    bool ref_ratio_is_uniform_two = true;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if (crse_to_fine_ref_ratio[idim] != 2) {
-            ref_ratio_is_uniform_two = false;
-            break;
-        }
-    }
+    const bool ref_ratio_is_uniform_two = (crse_to_fine_ref_ratio == amrex::IntVect(2));
     if (finest_level != 1 || !ref_ratio_is_uniform_two) {
         std::ostringstream msg;
         msg << "MR with subcycling algorithm requires exactly two levels of MR "
-            << "and refinement ratio of2 in all directions. "
+            << "and a refinement ratio of 2 in all directions. "
             << "Found: finest_level = " << finest_level
-            << ", refRatio(" << coarse_lev << ") = (";
-
-        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            msg << crse_to_fine_ref_ratio[idim];
-            if (idim < AMREX_SPACEDIM - 1) {
-                msg << ", ";
-            }
-        }
-        msg << ")";
-
+            << ", refRatio(" << coarse_lev << ") = " << crse_to_fine_ref_ratio;
         WARPX_ABORT_WITH_MESSAGE(msg.str());
     }
 
