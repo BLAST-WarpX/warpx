@@ -121,6 +121,22 @@ public:
     );
 
     /**
+    * \brief This evolves photon particles by one PIC time step.
+    * This is used by the implicit solvers so that photons are only advanced once at
+    * the end of the step to avoid multiple advances per step for iterative solvers.
+    */
+    void EvolvePhotonsOnly (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev,
+        amrex::Real t,
+        amrex::Real dt,
+        SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+        bool skip_deposition=true,
+        PositionPushType position_push_type=PositionPushType::Full,
+        MomentumPushType momentum_push_type=MomentumPushType::Full
+    );
+
+    /**
      * \brief Deposit mass matrices.
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
@@ -380,6 +396,17 @@ public:
 
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator begin() {return allcontainers.begin();}
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator end() {return allcontainers.end();}
+
+    bool isPhotonSpecies (int ispecies) const
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            ispecies >= 0 &&
+            ispecies < static_cast<int>(species_types.size()),
+            "Invalid species index in isPhotonSpecies()"
+        );
+
+        return species_types[ispecies] == PCTypes::Photon;
+    }
 
 protected:
 

@@ -263,5 +263,5 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                       t, dt, subcycling_half, skip_deposition,
                                       position_push_type,
                                       momentum_push_type,
-                                      nullptr);
+                                      /*implicit_options=*/nullptr);
 }

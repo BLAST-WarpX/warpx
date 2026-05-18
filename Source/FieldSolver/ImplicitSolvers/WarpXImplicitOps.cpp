@@ -207,7 +207,7 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 }
 
 void
-WarpX::FinishImplicitParticleUpdate ()
+WarpX::FinishImplicitParticleUpdate (amrex::Real time)
 {
     using namespace amrex::literals;
 
@@ -216,9 +216,15 @@ WarpX::FinishImplicitParticleUpdate ()
     // step we need to transform the particle postion and momentum from
     // time n+1/2 to time n+1. This is done here.
 
-    for (auto const& pc : *mypc) {
+    for (int lev = 0; lev <= finest_level; ++lev) {
 
-        for (int lev = 0; lev <= finest_level; ++lev) {
+        mypc->EvolvePhotonsOnly(m_fields, lev,
+                                time, dt[lev]);
+
+        for (auto const& pc : *mypc) {
+
+            if (mypc->isPhotonSpecies(pc->getSpeciesId())) { continue; }
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
 #endif
@@ -274,6 +280,7 @@ WarpX::FinishImplicitParticleUpdate ()
                 });
 
             }
+
             }
 
         }
