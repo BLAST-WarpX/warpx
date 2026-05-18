@@ -143,12 +143,16 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
     }
 
     amrex::Real sx_jx[depos_order + 1] = {0._rt};
+#if !defined(WARPX_EM_TEY)
     amrex::Real sx_jy[depos_order + 1] = {0._rt};
+#endif
     amrex::Real sx_jz[depos_order + 1] = {0._rt};
     for (int ix=0; ix<=depos_order; ix++)
     {
         sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+#if !defined(WARPX_EM_TEY)
         sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+#endif
         sx_jz[ix] = ((jz_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
     }
 
