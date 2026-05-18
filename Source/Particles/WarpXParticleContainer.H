@@ -559,7 +559,7 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    amrex::ParticleReal getCharge () const {return charge;}
+    amrex::ParticleReal getCharge () const {return m_charge;}
 
     amrex::ParticleReal getMass () const {return m_mass;}
 
@@ -633,7 +633,7 @@ public:
 protected:
     int species_id;
 
-    amrex::ParticleReal charge;
+    amrex::ParticleReal m_charge;
     amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
