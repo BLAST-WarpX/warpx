@@ -421,7 +421,7 @@ WarpX::InitFromCheckpoint ()
     mypc->Restart(restart_chkfile);
 
     if (m_implicit_solver) {
-        m_implicit_solver->Define(this, restart_chkfile.empty());
+        m_implicit_solver->Define(this, /*from_restart=*/true);
         m_implicit_solver->CreateParticleAttributes();
     }
 
