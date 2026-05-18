@@ -97,7 +97,7 @@ WarpX::InitEB ()
          // number (e.g., maxLevel()+20) for multigrid solvers.  Because the coarse
          // level has only 1/8 of the cells on the fine level, the memory usage should
          // not be an issue.
-        amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20, 4, false);
     } else {
         amrex::ParmParse pp_eb2("eb2");
         if (!pp_eb2.contains("geom_type")) {
