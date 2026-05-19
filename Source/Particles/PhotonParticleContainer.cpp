@@ -253,10 +253,12 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                  PositionPushType position_push_type,
                                  MomentumPushType momentum_push_type,
-                                 ImplicitOptions const * /*implicit_options*/)
+                                 ImplicitOptions const * implicit_options)
 {
     // This does gather, push and deposit.
-    // Push and deposit have been re-written for photons
+    // Push and deposit have been re-written for photons.
+    // Don't Evolve photons when called from implicit solver.
+    if (implicit_options) { return; }
     PhysicalParticleContainer::Evolve(fields,
                                       lev,
                                       current_fp_string,

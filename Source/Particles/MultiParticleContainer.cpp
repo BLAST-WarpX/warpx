@@ -522,7 +522,6 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         }
     }
     for (auto& pc : allcontainers) {
-        if (implicit_options && species_types[pc->getSpeciesId()] == PCTypes::Photon) { continue; }
         pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
     }
 }
