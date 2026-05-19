@@ -447,7 +447,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
 
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::FindMaxTilesize",
@@ -1016,7 +1016,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
-    const amrex::ParticleReal qs = this->charge;
+    const amrex::ParticleReal qs = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     // Get tile box where current is deposited.
@@ -1149,6 +1149,13 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     const amrex::IndexType By_type = By->box().ixType();
     const amrex::IndexType Bz_type = Bz->box().ixType();
 
+    const auto getExternalEB = GetExternalEBField(pti, offset);
+
+    // Get uniform external B-field
+    const amrex::ParticleReal Bx_ext = m_B_external_particle[0];
+    const amrex::ParticleReal By_ext = m_B_external_particle[1];
+    const amrex::ParticleReal Bz_ext = m_B_external_particle[2];
+
     auto& uxp_n = pti.GetAttribs("ux_n");
     auto& uyp_n = pti.GetAttribs("uy_n");
     auto& uzp_n = pti.GetAttribs("uz_n");
@@ -1159,6 +1166,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
     // Not doing shared memory deposition, call normal kernels
     if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+
 #if !defined(WARPX_DIM_1D_Z)
         auto& xp_n = pti.GetAttribs("x_n");
         const ParticleReal* xp_n_data = xp_n.dataPtr() + offset;
@@ -1188,6 +1196,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 1 && !full_mass_matrices) {
@@ -1200,6 +1209,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
@@ -1212,6 +1222,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
@@ -1224,6 +1235,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
@@ -1236,6 +1248,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
@@ -1248,6 +1261,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
@@ -1260,6 +1274,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
@@ -1272,6 +1287,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
         }
@@ -1292,6 +1308,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if  (WarpX::nox == 1 && !full_mass_matrices) {
@@ -1303,6 +1320,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && full_mass_matrices) {
@@ -1314,6 +1332,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 2 && !full_mass_matrices) {
@@ -1325,6 +1344,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && full_mass_matrices) {
@@ -1336,6 +1356,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 3 && !full_mass_matrices) {
@@ -1347,6 +1368,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && full_mass_matrices) {
@@ -1358,6 +1380,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         } else if (WarpX::nox == 4 && !full_mass_matrices) {
@@ -1369,6 +1392,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
                     Sxx_type, Syy_type, Szz_type,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, lo, qs, mass);
         }
@@ -1531,7 +1555,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                   "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for charge deposition");
         amrex::ignore_unused(range); // In case the assertion isn't compiled
 
-        const Real q = this->charge;
+        const Real q = this->m_charge;
 
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort);
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd);
@@ -1756,7 +1780,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noz);
 
         ablastr::particles::deposit_charge<WarpXParticleContainer>(
-                pti, wp, this->charge, ion_lev,
+                pti, wp, this->m_charge, ion_lev,
                 rho, local_rho[thread_num],
                 WarpX::noz, dinv, xyzmin, WarpX::n_rz_azimuthal_modes,
                 ng_rho, depos_lev, ref_ratio,
@@ -2112,10 +2136,55 @@ WarpXParticleContainer::GetNumberDensity (int lev)
 }
 
 std::unique_ptr<amrex::MultiFab>
+WarpXParticleContainer::GetPlasmaFrequency (int lev)
+{
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*m_charge != 0.,
+        "The plasma frequency can not be calculated for a massless or neutral species.");
+
+    std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
+
+    amrex::BoxArray const & ba = number_density->boxArray();
+    amrex::DistributionMapping const & dm = number_density->DistributionMap();
+    int const ncomps = 1;
+    int const ng = 0;
+    auto plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
+
+    auto const rmass = (amrex::Real)(m_mass);
+    auto const rcharge = (amrex::Real)(m_charge);
+    amrex::Real const Aconst = rcharge*rcharge/(rmass*PhysConst::epsilon_0);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*plasma_frequency, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& num_array = number_density->array(mfi);
+        amrex::Array4<amrex::Real> const& omegap_array = plasma_frequency->array(mfi);
+
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                amrex::Real const N = num_array(i,j,k);
+
+                // plasma frequency squared
+                amrex::Real const ompegap_sq = Aconst*N;
+
+                omegap_array(i,j,k) = std::sqrt(ompegap_sq);
+
+            });
+    }
+
+    return plasma_frequency;
+}
+
+std::unique_ptr<amrex::MultiFab>
 WarpXParticleContainer::GetDebyeLength (int lev)
 {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*m_charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
     std::unique_ptr<amrex::MultiFab> temperature = GetAverageNGPTemperature(lev);
@@ -2128,7 +2197,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
     auto const rmass = static_cast<amrex::Real>(m_mass);
-    auto const rcharge = static_cast<amrex::Real>(charge);
+    auto const rcharge = static_cast<amrex::Real>(m_charge);
     amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
 #ifdef AMREX_USE_OMP
@@ -2235,7 +2304,7 @@ amrex::ParticleReal WarpXParticleContainer::sumParticleWeight (bool local) const
 
 amrex::ParticleReal WarpXParticleContainer::sumParticleCharge (bool local) const {
 
-    return this->sumParticleWeight(local) * this->charge;
+    return this->sumParticleWeight(local) * this->m_charge;
 }
 
 std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool local) {
@@ -2330,31 +2399,119 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 
+    amrex::Long np_total = 0;
+
     const int nLevels = finestLevel();
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#pragma omp parallel reduction(+:np_total) if (amrex::Gpu::notInLaunchRegion())
 #endif
     for (int lev = 0; lev <= nLevels; ++lev) {
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
+            const amrex::Long np = pti.numParticles();
+            if (np == 0) { continue; }
+
+            np_total += np;
+
             auto *const ux = pti.GetAttribs(PIdx::ux).data();
             auto *const uy = pti.GetAttribs(PIdx::uy).data();
             auto *const uz = pti.GetAttribs(PIdx::uz).data();
 
-            reduce_op.eval(pti.numParticles(), reduce_data,
+            reduce_op.eval(np, reduce_data,
                 [=] AMREX_GPU_DEVICE (int ip)
                 { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_c2; });
         }
     }
 
-    const amrex::ParticleReal max_usq = amrex::get<0>(reduce_data.value());
+    const amrex::ParticleReal max_usq = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
 
     const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + max_usq);
     amrex::ParticleReal max_v = gaminv * std::sqrt(max_usq) * PhysConst::c;
 
     if (!local) { ParallelAllReduce::Max(max_v, ParallelDescriptor::Communicator()); }
     return max_v;
+}
+
+void
+WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool forward)
+{
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    using namespace amrex::literals;
+
+    const int nLevels = finestLevel();
+    for (int lev = 0; lev <= nLevels; ++lev) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    {
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+
+            // momenta are stored as a struct of array, in `attribs`
+            auto& attribs = pti.GetAttribs();
+            amrex::ParticleReal * AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT theta_data = attribs[PIdx::theta].dataPtr();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+
+            // Loop over the particles, rotating their velocities by theta
+            amrex::ParallelFor(pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long i) {
+                    const amrex::ParticleReal theta_sign = forward ? -1._prt : +1._prt;
+                    const amrex::ParticleReal theta = theta_sign*theta_data[i];
+                    const amrex::ParticleReal uxsave = ux[i];
+                    const amrex::ParticleReal uysave = uy[i];
+                    ux[i] = uxsave*std::cos(theta) - uysave*std::sin(theta);
+                    uy[i] = uxsave*std::sin(theta) + uysave*std::cos(theta);
+                }
+            );
+
+#elif defined(WARPX_DIM_RSPHERE)
+
+            amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT phi_data = attribs[PIdx::phi].dataPtr();
+
+            if (forward) {
+
+                // Loop over the particles, rotating to theta = phi = 0
+                amrex::ParallelFor(pti.numParticles(),
+                    [=] AMREX_GPU_DEVICE (long i) {
+                        const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
+                        const amrex::ParticleReal uxsave = ux[i];
+                        const amrex::ParticleReal uysave = uy[i];
+                        const amrex::ParticleReal uzsave = uz[i];
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) + uysave*std::sin(theta)*std::cos(phi) + uzsave*std::sin(phi);
+                        uy[i] = -uxsave*std::sin(theta) + uysave*std::cos(theta);
+                        uz[i] = -uxsave*std::cos(theta)*std::sin(phi) - uysave*std::sin(theta)*std::sin(phi) + uzsave*std::cos(phi);
+                    }
+                );
+
+            } else {
+
+                // Loop over the particles, rotating from zero to theta and phi
+                amrex::ParallelFor(pti.numParticles(),
+                    [=] AMREX_GPU_DEVICE (long i) {
+                        const amrex::ParticleReal theta = theta_data[i];
+                        const amrex::ParticleReal phi = phi_data[i];
+                        const amrex::ParticleReal uxsave = ux[i];
+                        const amrex::ParticleReal uysave = uy[i];
+                        const amrex::ParticleReal uzsave = uz[i];
+                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) - uysave*std::sin(theta) - uzsave*std::cos(theta)*std::sin(phi);
+                        uy[i] = +uxsave*std::sin(theta)*std::cos(phi) + uysave*std::cos(theta) - uzsave*std::sin(theta)*std::sin(phi);
+                        uz[i] = +uxsave*std::sin(phi) + uzsave*std::cos(phi);
+                    }
+                );
+
+            }
+#endif
+        }
+    }
+    }
+#endif
 }
 
 void

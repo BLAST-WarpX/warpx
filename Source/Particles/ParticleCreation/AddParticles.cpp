@@ -403,7 +403,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
         // compute the weight from N_tot if the user specified npart_real = N_tot
         // compute the weight from q_tot if the user specified q_tot
         // note that npart is the number of macroparticles
-        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*charge));
+        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*m_charge));
         for (long i = 0; i < npart; ++i) {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
             const amrex::Real weight = weight_3d;
@@ -1164,11 +1164,13 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 // Update the weight based on the specified power.
                 // The coefficient ensures that the correct density distribution is obtained.
                 const amrex::Real coeff = 2._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                 weight *= coeff*std::pow(xb/rmax, 1._rt - radial_numpercell_power);
 #elif defined(WARPX_DIM_RSPHERE)
                 const amrex::Real coeff = 4._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power )*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power )*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                 weight *= coeff*std::pow(xb/rmax, 2._rt - radial_numpercell_power);
 #endif
                 pa[PIdx::w ][ip] = weight;
@@ -1689,7 +1691,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Update the weight based on the specified power.
                     // The coefficient ensures that the correct density distribution is obtained.
                     const amrex::Real coeff = 2._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax - std::pow(rmax, -radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                     t_weight *= coeff*std::pow(radial_position/rmax, 1._rt - radial_numpercell_power);
                 }
 
@@ -1706,7 +1709,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     // Update the weight based on the specified power.
                     // The coefficient ensures that the correct density distribution is obtained.
                     const amrex::Real coeff = 4._rt*MathConst::pi/(1._rt + radial_numpercell_power)
-                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power));
+                        *(rmax*rmax - std::pow(rmax, 1._rt - radial_numpercell_power)*std::pow(rmin, 1._rt + radial_numpercell_power))*
+                        (rmax/(rmax - rmin));
                     t_weight *= coeff*std::pow(radial_position/rmax, 2._rt - radial_numpercell_power);
                 }
                 const amrex::Real weight = t_weight;

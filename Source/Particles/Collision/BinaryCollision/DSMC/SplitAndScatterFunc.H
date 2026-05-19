@@ -17,6 +17,8 @@
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <array>
+
 /**
  * \brief This class defines an operator to create product particles from DSMC
  * collisions and sets the particle properties (position, momentum, weight).
@@ -140,9 +142,10 @@ public:
         index_type* AMREX_RESTRICT no_product_offsets_data = no_product_offsets.data();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return ((mask[i] > 0) &
-                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                return ((mask[i] > 0) &&
+                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &&
+                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) &&
+                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -167,7 +170,8 @@ public:
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
-                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION)) |
+                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -236,7 +240,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
+            if ((mask[i] > 0) && (mask[i] != int(ScatteringProcessType::IONIZATION)) && (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) && (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
@@ -259,25 +263,6 @@ public:
                 auto& ux1 = soa_products_data[1].m_rdata[PIdx::ux][slot1_idx];
                 auto& uy1 = soa_products_data[1].m_rdata[PIdx::uy][slot1_idx];
                 auto& uz1 = soa_products_data[1].m_rdata[PIdx::uz][slot1_idx];
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
-                * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                * are actually not local in space. In this case, the underlying assumption is that
-                * particles within the same cylindrical cell represent a cylindrically-symmetry
-                * momentum distribution function. Therefore, here, we temporarily rotate the
-                * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                * there is a corresponding assert statement at initialization.)
-                */
-                amrex::ParticleReal const theta = (
-                    soa_products_data[1].m_rdata[PIdx::theta][slot1_idx]
-                    - soa_products_data[0].m_rdata[PIdx::theta][slot0_idx]
-                );
-                amrex::ParticleReal const ux0buf = ux0;
-                ux0 = ux0buf*std::cos(theta) - uy0*std::sin(theta);
-                uy0 = ux0buf*std::sin(theta) + uy0*std::cos(theta);
-#endif
 
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
@@ -327,16 +312,11 @@ public:
                 uy1 += uCOM_y;
                 uz1 += uCOM_z;
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* Undo the earlier velocity rotation. */
-                amrex::ParticleReal const ux0buf_new = ux0;
-                ux0 = ux0buf_new*std::cos(-theta) - uy0*std::sin(-theta);
-                uy0 = ux0buf_new*std::sin(-theta) + uy0*std::cos(-theta);
-#endif
             }
 
             // Next perform all product-producing collisions
-            else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
+            else if ((mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION)) ||
+                     (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)))
             {
                 // create a copy of the first product species at the location of the first reactant species
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
@@ -353,6 +333,31 @@ public:
                                 static_cast<int>(slot3_idx), engine);
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
+
+                // For charge exchange, swap positions at which the products are created
+                // to ensure local charge conservation. For instance in the reaction
+                // `A+ + B -> A + B+`, B+ will be created at the position of A+, instead of that of B.
+                if (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) {
+                    // The SoA components that define the positions depend on the geometry.
+#if defined(WARPX_DIM_1D_Z)
+                    constexpr std::array<int, 1> position_indices = {PIdx::z};
+#elif defined(WARPX_DIM_XZ)
+                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::z};
+#elif defined(WARPX_DIM_RZ)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::z, PIdx::theta};
+#elif defined(WARPX_DIM_RCYLINDER)
+                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::theta};
+#elif defined(WARPX_DIM_RSPHERE)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::theta, PIdx::phi};
+#elif defined(WARPX_DIM_3D)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
+#endif
+                    // Loop over the components that define the positions and swap the positions of the products.
+                    for (int const idim : position_indices) {
+                        soa_products_data[2].m_rdata[idim][slot2_idx] = soa_1.m_rdata[idim][src1_idx];
+                        soa_products_data[3].m_rdata[idim][slot3_idx] = soa_0.m_rdata[idim][src0_idx];
+                    }
+                }
 
                 // Update the momenta of the products
                 TwoProductComputeProductMomenta(

@@ -68,7 +68,10 @@ neutrals.charge = 0.0
 neutrals.mass = Mneu
 neutrals.do_not_push = 1
 neutrals.do_not_deposit = 1
-
+neutrals.injection_style = "NUniformPerCell"
+neutrals.num_particles_per_cell_each_dim = Nppc_x Nppc_x Nppc_x
+neutrals.profile = constant
+neutrals.density = n0
 neutrals.momentum_distribution_type = "maxwellian"
 neutrals.maxwellian_u_std_distribution_type= "parser"
 neutrals.ux_std_function(x,y,z) = "0.0"

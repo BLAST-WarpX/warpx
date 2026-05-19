@@ -83,7 +83,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     : WarpXParticleContainer(amr_core, ispecies),
       m_laser_name{name}
 {
-    charge = 1.0;
+    m_charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
@@ -786,7 +786,8 @@ LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
                                MomentumPushType /*momentum_push_type*/)
 {
-    // I don't think we need to do anything.
+    // Laser particles are not advanced using a particle pusher.
+    // Therefore, PushP does nothing in this implementation.
 }
 
 /* \brief compute particles position in laser plane coordinate.

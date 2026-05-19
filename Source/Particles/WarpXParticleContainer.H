@@ -400,6 +400,7 @@ public:
     void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
+    std::unique_ptr<amrex::MultiFab> GetPlasmaFrequency (int lev);
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositMassMatrices (WarpXParIter& pti,
@@ -460,6 +461,18 @@ public:
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
     amrex::ParticleReal maxParticleVelocity(bool local = false);
+
+    /**
+     * \brief Map the momentum of the particles to and from the curvilinear frame.
+     *        This is equivalent to mapping to the X-axis, i.e. theta = 0
+     *        cylinderical and theta = phi = 0 for spherical. This mapping is used
+     *        for binary collisions to put the colliding particles in a spatially local
+     *        frame.
+     *
+     * \param[in] forward When true, maps to the frame, when false maps from the frame
+     *            to the original location
+     */
+    void TransformMomentumToCurvilinear (bool forward);
 
     /**
      * \brief Adds n particles to the simulation
@@ -546,7 +559,7 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    amrex::ParticleReal getCharge () const {return charge;}
+    amrex::ParticleReal getCharge () const {return m_charge;}
 
     amrex::ParticleReal getMass () const {return m_mass;}
 
@@ -620,7 +633,7 @@ public:
 protected:
     int species_id;
 
-    amrex::ParticleReal charge;
+    amrex::ParticleReal m_charge;
     amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
