@@ -36,8 +36,7 @@ namespace ablastr::constant
         constexpr auto degree2rad_v = pi_v<T> / static_cast<T>(180);
 
         //! convert degree to radian
-        template<typename T>
-        constexpr auto degree2rad = degree2rad<amrex::Real>;
+        constexpr auto degree2rad = degree2rad_v<amrex::Real>;
 
     } // namespace math
 
