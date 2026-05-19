@@ -7,6 +7,8 @@
 #ifndef Implicit_Solver_H_
 #define Implicit_Solver_H_
 
+#include "ImplicitSolver_fwd.H"
+
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
@@ -46,7 +48,7 @@ public:
      * \brief Read user-provided parameters that control the implicit solver.
      * Allocate internal arrays for intermediate field values needed by the solver.
      */
-    virtual void Define ( WarpX*  a_WarpX ) = 0;
+    virtual void Define (WarpX* a_WarpX, bool from_restart) = 0;
 
     [[nodiscard]] bool IsDefined () const { return m_is_defined; }
 
@@ -54,7 +56,7 @@ public:
 
     void CreateParticleAttributes () const;
 
-    bool DoParticleSuborbits () { return m_particle_suborbits; }
+    bool DoParticleSuborbits () const { return m_particle_suborbits; }
 
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
@@ -84,6 +86,11 @@ public:
                               amrex::Real      a_time,
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
+
+    /**
+     * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
+     */
+    void PreLinearSolve ();
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -127,7 +134,7 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
-    void ComputeJfromMassMatrices (const bool  a_J_from_MM_only);
+    void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
     /**
      * \brief Finish filling the mass matrices after deposit
@@ -244,6 +251,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void SaveEoldMultifab ();
+
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
@@ -254,9 +263,9 @@ protected:
     /**
      * \brief Perform operations needed before computing the Right Hand Side
      */
-    void PreRHSOp ( const amrex::Real  a_cur_time,
-                    const int          a_nl_iter,
-                    const bool         a_from_jacobian );
+    void PreRHSOp ( amrex::Real  a_cur_time,
+                    int          a_nl_iter,
+                    bool         a_from_jacobian );
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions
@@ -266,7 +275,7 @@ protected:
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
      */
-    void SetMassMatricesForPC ( const amrex::Real a_theta_dt );
+    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
@@ -281,7 +290,7 @@ protected:
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType
      */
-    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, const int bdry_side ) const;
+    [[nodiscard]] amrex::Array<amrex::LinOpBCType,AMREX_SPACEDIM> convertFieldBCToLinOpBC ( const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>&, int bdry_side ) const;
 
 };
 

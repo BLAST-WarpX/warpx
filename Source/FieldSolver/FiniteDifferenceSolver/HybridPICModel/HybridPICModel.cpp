@@ -299,7 +299,7 @@ void HybridPICModel::GetCurrentExternal ()
 
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::MultiLevelVectorField const& Bfield,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E)
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E) const
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
@@ -311,9 +311,9 @@ void HybridPICModel::CalculatePlasmaCurrent (
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
-    const int lev)
+    const int lev) const
 {
-    WARPX_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
+    ABLASTR_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
@@ -360,7 +360,7 @@ void HybridPICModel::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
     const int lev, const bool solve_for_Faraday) const
 {
-    WARPX_PROFILE("WarpX::HybridPICSolveE()");
+    ABLASTR_PROFILE("WarpX::HybridPICSolveE()");
 
     HybridPICSolveE(
         Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
@@ -407,7 +407,7 @@ void HybridPICModel::CalculateElectronPressure() const
 
 void HybridPICModel::CalculateElectronPressure(const int lev) const
 {
-    WARPX_PROFILE("WarpX::CalculateElectronPressure()");
+    ABLASTR_PROFILE("WarpX::CalculateElectronPressure()");
 
     auto& warpx = WarpX::GetInstance();
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
@@ -634,20 +634,20 @@ void HybridPICModel::BfieldEvolveRK (
         amrex::ParallelFor(tjx, tjy, tjz,
             // Bx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                Kx(i, j, k, 0) += Bx(i, j, k) - Bx_old(i, j, k) + 2.0 * Kx(i, j, k, 1);
-                Bx(i, j, k) = Bx_old(i, j, k) + Kx(i, j, k, 0) / 3.0;
+                Kx(i, j, k, 0) += Bx(i, j, k) - Bx_old(i, j, k) + 2.0_rt * Kx(i, j, k, 1);
+                Bx(i, j, k) = Bx_old(i, j, k) + Kx(i, j, k, 0) / 3.0_rt;
             },
 
             // By calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                Ky(i, j, k, 0) += By(i, j, k) - By_old(i, j, k) + 2.0 * Ky(i, j, k, 1);
-                By(i, j, k) = By_old(i, j, k) + Ky(i, j, k, 0) / 3.0;
+                Ky(i, j, k, 0) += By(i, j, k) - By_old(i, j, k) + 2.0_rt * Ky(i, j, k, 1);
+                By(i, j, k) = By_old(i, j, k) + Ky(i, j, k, 0) / 3.0_rt;
             },
 
             // Bz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                Kz(i, j, k, 0) += Bz(i, j, k) - Bz_old(i, j, k) + 2.0 * Kz(i, j, k, 1);
-                Bz(i, j, k) = Bz_old(i, j, k) + Kz(i, j, k, 0) / 3.0;
+                Kz(i, j, k, 0) += Bz(i, j, k) - Bz_old(i, j, k) + 2.0_rt * Kz(i, j, k, 1);
+                Bz(i, j, k) = Bz_old(i, j, k) + Kz(i, j, k, 0) / 3.0_rt;
             }
         );
     }

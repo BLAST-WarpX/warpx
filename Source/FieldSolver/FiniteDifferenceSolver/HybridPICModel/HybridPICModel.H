@@ -21,9 +21,9 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -89,12 +89,12 @@ public:
     void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E
-    );
+    ) const;
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev
-    );
+    ) const;
 
     /**
      * \brief
