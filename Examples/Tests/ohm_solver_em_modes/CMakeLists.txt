@@ -12,7 +12,7 @@ add_warpx_test(
 )
 
 add_warpx_test(
-    test_1d_ohm_solver_em_modes_picmi_rkf45  # name
+    test_1d_ohm_solver_em_modes_rkf45_picmi  # name
     1  # dims
     2  # nprocs
     "inputs_test_1d_ohm_solver_em_modes_picmi.py --test --dim 1 --bdir z --use_rkf45"  # inputs
