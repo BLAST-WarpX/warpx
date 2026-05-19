@@ -150,6 +150,21 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, 0.0_rt);
 
+    // Per-species ion current density - one MultiFab per charged species,
+    // accumulated into current_fp during deposition. Allows the per-species
+    // velocity moment to be reconstructed on the grid for downstream coupling
+    // (e.g. resistive-drag collision operator).
+    auto const & mypc = WarpX::GetInstance().GetPartContainer();
+    for (auto const & spec : mypc.GetSpeciesNames()) {
+        if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
+        fields.alloc_init("current_fp_" + spec, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("current_fp_" + spec, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("current_fp_" + spec, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    }
+
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid
     if (m_has_external_current) {

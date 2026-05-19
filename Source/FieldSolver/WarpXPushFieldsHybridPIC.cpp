@@ -228,8 +228,36 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Perform charge deposition in component 0 of rho_fp at current time.
     mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-    // Perform current deposition at t_{n-1/2}.
-    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
+
+    // Per-species current deposition at t_{n-1/2}: each charged species
+    // deposits into its own MultiFab and the totals are accumulated into
+    // current_fp. The per-species fields are kept on the grid for downstream
+    // coupling (e.g. resistive-drag collision operator).
+    auto current_fp = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+    for (auto const & J_lev : current_fp) {
+        for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
+    }
+    for (auto const & spec : mypc->GetSpeciesNames()) {
+        auto & pc = mypc->GetParticleContainerFromName(spec);
+        if (pc.getCharge() == 0._prt) { continue; }
+        auto J_spec = m_fields.get_mr_levels_alldirs("current_fp_" + spec, finest_level);
+        for (auto const & J_lev : J_spec) {
+            for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
+        }
+        pc.DepositCurrent(J_spec, dt[0], -0.5_rt * dt[0]);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int idim = 0; idim < 3; ++idim) {
+                MultiFab::Add(*current_fp[lev][idim], *J_spec[lev][idim],
+                              0, 0, 1, current_fp[lev][idim]->nGrowVect());
+            }
+        }
+    }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyInverseVolumeScalingToCurrentDensity(
+            current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
+    }
+#endif
 
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
     // Perform Temperature Deposition at time t_{n}
