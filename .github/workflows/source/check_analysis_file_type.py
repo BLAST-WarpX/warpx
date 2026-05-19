@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+"""Check that every analysis_default_regression.py under Examples/Tests and
+Examples/Physics_applications is a symlink pointing to the shared canonical
+file at Examples/analysis_default_regression.py."""
 
 import sys
 from pathlib import Path
