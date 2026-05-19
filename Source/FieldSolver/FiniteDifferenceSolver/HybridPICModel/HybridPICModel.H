@@ -180,6 +180,14 @@ public:
     void CalculateElectronPressure (int lev) const;
 
     /**
+     * \brief Compute the electron fluid velocity V_e on the grid from the
+     * deposited ion current and the plasma current: V_e = (J_i - J_plasma)/rho,
+     * with rho floored at m_n_floor * q_e. Used by the resistive-drag operator.
+     */
+    void CalculateElectronFluidVelocity () const;
+    void CalculateElectronFluidVelocity (int lev) const;
+
+    /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
      * specified electron equation of state.

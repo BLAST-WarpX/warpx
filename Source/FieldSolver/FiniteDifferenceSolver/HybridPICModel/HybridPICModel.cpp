@@ -10,6 +10,7 @@
 
 #include "HybridPICModel.H"
 
+#include <ablastr/coarsen/sample.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -164,6 +165,15 @@ void HybridPICModel::AllocateLevelMFs (
         fields.alloc_init("current_fp_" + spec, Direction{2},
             lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
+
+    // Electron fluid velocity V_e on the grid, V_e = (J_i - J_plasma)/rho.
+    // Face-staggered like J for direct gather by the resistive-drag operator.
+    fields.alloc_init("Ve_fp", Direction{0},
+        lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    fields.alloc_init("Ve_fp", Direction{1},
+        lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    fields.alloc_init("Ve_fp", Direction{2},
+        lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
 
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid
@@ -447,6 +457,75 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         WarpX::do_single_precision_comms,
         warpx.Geom(lev).periodicity(),
         true);
+}
+
+void HybridPICModel::CalculateElectronFluidVelocity () const
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        CalculateElectronFluidVelocity(lev);
+    }
+}
+
+void HybridPICModel::CalculateElectronFluidVelocity (const int lev) const
+{
+    ABLASTR_PROFILE("WarpX::CalculateElectronFluidVelocity()");
+    using namespace ablastr::coarsen::sample;
+
+    auto & warpx = WarpX::GetInstance();
+    ablastr::fields::VectorField Ve = warpx.m_fields.get_alldirs("Ve_fp", lev);
+    ablastr::fields::VectorField Ji = warpx.m_fields.get_alldirs(FieldType::current_fp, lev);
+    ablastr::fields::VectorField J  = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    amrex::MultiFab const & rho_field = *warpx.m_fields.get(FieldType::rho_fp, lev);
+
+    auto const Jx_stag = Jx_IndexType;
+    auto const Jy_stag = Jy_IndexType;
+    auto const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    auto const rho_floor = m_n_floor * PhysConst::q_e;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Ve[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Vex = Ve[0]->array(mfi);
+        Array4<Real> const& Vey = Ve[1]->array(mfi);
+        Array4<Real> const& Vez = Ve[2]->array(mfi);
+        Array4<Real const> const& Jix = Ji[0]->const_array(mfi);
+        Array4<Real const> const& Jiy = Ji[1]->const_array(mfi);
+        Array4<Real const> const& Jiz = Ji[2]->const_array(mfi);
+        Array4<Real const> const& Jx  = J[0]->const_array(mfi);
+        Array4<Real const> const& Jy  = J[1]->const_array(mfi);
+        Array4<Real const> const& Jz  = J[2]->const_array(mfi);
+        Array4<Real const> const& rho = rho_field.const_array(mfi);
+
+        Box const& tx = mfi.tilebox(Ve[0]->ixType().toIntVect());
+        Box const& ty = mfi.tilebox(Ve[1]->ixType().toIntVect());
+        Box const& tz = mfi.tilebox(Ve[2]->ixType().toIntVect());
+
+        amrex::ParallelFor(tx, ty, tz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val = std::max(Interp(rho, nodal, Jx_stag, coarsen, i, j, k, 0), rho_floor);
+                Vex(i, j, k) = (Jix(i, j, k) - Jx(i, j, k)) / rho_val;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val = std::max(Interp(rho, nodal, Jy_stag, coarsen, i, j, k, 0), rho_floor);
+                Vey(i, j, k) = (Jiy(i, j, k) - Jy(i, j, k)) / rho_val;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val = std::max(Interp(rho, nodal, Jz_stag, coarsen, i, j, k, 0), rho_floor);
+                Vez(i, j, k) = (Jiz(i, j, k) - Jz(i, j, k)) / rho_val;
+            }
+        );
+    }
+
+    for (int idim = 0; idim < 3; ++idim) {
+        ablastr::utils::communication::FillBoundary(
+            *Ve[idim], WarpX::do_single_precision_comms,
+            warpx.Geom(lev).periodicity(), true);
+    }
 }
 
 void HybridPICModel::FillElectronPressureMF (

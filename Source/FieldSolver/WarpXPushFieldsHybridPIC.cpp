@@ -175,6 +175,9 @@ void WarpX::HybridPICEvolveFields ()
         m_eb_update_E, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
+    // Update Ve_fp at t=n+1 for the next step's particle-level drag operator.
+    m_hybrid_pic_model->CalculateElectronFluidVelocity();
+
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
         // If using split fields, add the external field at the new time
