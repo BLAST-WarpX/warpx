@@ -207,7 +207,7 @@ If your project uses a specific algorithm or component, please consider citing t
 - Hedlof R, Barnes D, Groenewald R, Necas A, Smith T, Lau C, Brandt S, Zhang W, Eckert Z, Hooper R.
   **Verification of an energy-conserving semi-implicit electrostatic particle-in-cell scheme for modeling high-density plasma at scale**.
   Physics of Plasmas 33, 053902, 2026.
-  `DOI:10.1063/5.0315721 < https://doi.org/10.1063/5.0315721>`__
+  `DOI:10.1063/5.0315721 <https://doi.org/10.1063/5.0315721>`__
 
 - Lehe R, Haseeb M, Angus J, Grote D, Groenewald R, Formenti A, Huebl A, Deslippe J, Vay JL.
   **An Efficient GPU Parallelization Strategy for Binary Collisions in Particle-In-Cell Plasma Simulations**.
