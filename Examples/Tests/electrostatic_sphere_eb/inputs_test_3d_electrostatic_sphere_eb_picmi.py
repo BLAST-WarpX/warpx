@@ -61,9 +61,8 @@ solver = picmi.ElectrostaticSolver(
 )
 
 embedded_boundary = picmi.EmbeddedBoundary(
-    implicit_function="-(x**2+y**2+z**2-radius**2)",
-    potential=V_embedded_boundary,
-    radius=0.1,
+    implicit_function="(0.1**2-x**2-y**2-z**2)*(0.5**2-x**2-y**2-z**2)",
+    potential="if(x**2+y**2+z**2 < 0.3**2, 1., 0.)",
 )
 
 ##########################
@@ -84,13 +83,16 @@ field_diag = picmi.FieldDiagnostic(
 )
 
 reduced_diag = picmi.ReducedDiagnostic(
-    diag_type="ChargeOnEB", name="eb_charge", period=1
+    diag_type="ChargeOnEB",
+    name="eb_charge",
+    weighting_function="(x**2+y**2+z**2 < 0.3**2)",
+    period=1,
 )
 
 reduced_diag_one_eighth = picmi.ReducedDiagnostic(
     diag_type="ChargeOnEB",
     name="eb_charge_one_eighth",
-    weighting_function="(x>0)*(y>0)*(z>0)",
+    weighting_function="(x**2+y**2+z**2 < 0.3**2)*(x>0)*(y<0)*(z>0)",
     period=1,
 )
 

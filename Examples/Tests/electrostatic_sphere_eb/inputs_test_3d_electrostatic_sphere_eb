@@ -17,8 +17,9 @@ geometry.prob_hi     =  0.5  0.5  0.5
 warpx.const_dt = 1e-6
 
 warpx.do_electrostatic = labframe
-warpx.eb_implicit_function = "-(x**2+y**2+z**2-0.1**2)"
-warpx.eb_potential(x,y,z,t) = "1."
+# Two concentric spherical EBs: inner sphere r=0.1 at phi=1, outer sphere r=0.5 at phi=0
+warpx.eb_implicit_function = "(0.1**2-x**2-y**2-z**2)*(0.5**2-x**2-y**2-z**2)"
+warpx.eb_potential(x,y,z,t) = "if(x**2+y**2+z**2 < 0.3**2, 1., 0.)"
 warpx.self_fields_required_precision = 1.e-7
 warpx.abort_on_warning_threshold = medium
 
@@ -34,7 +35,9 @@ diag1.openpmd_backend = h5
 warpx.reduced_diags_names = eb_charge eb_charge_one_eighth
 eb_charge.type = ChargeOnEB
 eb_charge.intervals = 1
+# Select only the inner sphere (r<0.3 is between the inner and outer spheres)
+eb_charge.weighting_function(x,y,z) = (x**2+y**2+z**2 < 0.3**2)
 eb_charge_one_eighth.type = ChargeOnEB
 eb_charge_one_eighth.intervals = 1
-# Select only one eighth of the sphere
-eb_charge_one_eighth.weighting_function(x,y,z) = (x>0)*(y<0)*(z>0)
+# Select only one eighth of the inner sphere
+eb_charge_one_eighth.weighting_function(x,y,z) = (x**2+y**2+z**2 < 0.3**2)*(x>0)*(y<0)*(z>0)
