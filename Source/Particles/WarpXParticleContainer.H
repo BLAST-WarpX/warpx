@@ -240,8 +240,8 @@ public:
     /**
      * \brief Virtual function to finish the implicit particle update at the end of a time step.
      * For photon particles this advances the photon position and deposits current.
-     * For physical particles this extrapolates the position and momentum from time n+1/2 to n+1.
-     * The default no-op implementation is appropriate for laser particles.
+     * The default implementation extrapolates position and momentum from time n+1/2 to n+1,
+     * which is appropriate for physical and laser particles.
      */
     virtual void FinishImplicitParticleUpdate (
         ablastr::fields::MultiFabRegister& fields,
@@ -250,11 +250,7 @@ public:
         SubcyclingHalf subcycling_half = SubcyclingHalf::None,
         bool skip_deposition = true,
         PositionPushType position_push_type = PositionPushType::Full,
-        MomentumPushType momentum_push_type = MomentumPushType::Full)
-    {
-        amrex::ignore_unused(fields, lev, t, dt, subcycling_half, skip_deposition,
-                             position_push_type, momentum_push_type);
-    }
+        MomentumPushType momentum_push_type = MomentumPushType::Full);
 
     /**
      * \brief virtual function to deposit mass matrices for charged particles

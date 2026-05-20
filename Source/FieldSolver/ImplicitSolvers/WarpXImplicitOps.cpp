@@ -213,8 +213,8 @@ WarpX::FinishImplicitParticleUpdate (amrex::Real time)
     // momentum to advance the system in time. Thus, at the end of the
     // step we need to transform the particle position and momentum from
     // time n+1/2 to time n+1. This is done here via virtual dispatch:
-    // photon particles call Evolve; physical particles extrapolate position
-    // and momentum; laser particles are a no-op.
+    // photon particles call Evolve; all other particles extrapolate position
+    // and momentum.
 
     for (int lev = 0; lev <= finest_level; ++lev) {
         for (auto const& pc : *mypc) {
