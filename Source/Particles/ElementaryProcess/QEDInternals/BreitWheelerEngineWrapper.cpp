@@ -35,20 +35,20 @@ namespace pxr_sr = picsar::multi_physics::utils::serialization;
 
 // Factory class =============================
 
-BreitWheelerEvolveOpticalDepth
-BreitWheelerEngine::build_evolve_functor () const
-{
-    AMREX_ALWAYS_ASSERT(m_lookup_tables_initialized);
-
-    return {m_dndt_table.get_view(), m_bw_minimum_chi_phot};
-}
-
 BreitWheelerGeneratePairs
 BreitWheelerEngine::build_pair_functor () const
 {
     AMREX_ALWAYS_ASSERT(m_lookup_tables_initialized);
 
     return BreitWheelerGeneratePairs{m_pair_prod_table.get_view()};
+}
+
+BW_dndt_table_view
+BreitWheelerEngine::get_dndt_table_view () const
+{
+    AMREX_ALWAYS_ASSERT(m_lookup_tables_initialized);
+
+    return m_dndt_table.get_view();
 }
 
 bool BreitWheelerEngine::are_lookup_tables_initialized () const

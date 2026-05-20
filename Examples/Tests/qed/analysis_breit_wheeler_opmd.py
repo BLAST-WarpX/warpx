@@ -25,11 +25,11 @@ def main():
     series = io.Series(prefix + "/openpmd_%T.h5", io.Access.read_only)
     data_set_end = series.iterations[2]
 
-    # get simulation time
-    sim_time = data_set_end.time
-    # no particles can be created on the first timestep so we have 2 timesteps in the test case,
-    # with only the second one resulting in particle creation
-    dt = sim_time / 2.0
+    # The Breit-Wheeler pair-production probability is sampled stochastically
+    # at each timestep, so the expected number of pairs after the test's
+    # `max_step` timesteps follows `1 - exp(-dN/dt * sim_time)`. We therefore
+    # use the total simulation time as the effective dt in the analysis.
+    dt = data_set_end.time
 
     # get particle data
     particle_data = {}
@@ -47,11 +47,7 @@ def main():
             io.Mesh_Record_Component.SCALAR
         ][:]
 
-        if is_photon:
-            opt = data_set_end.particles[spec_name]["opticalDepthBW"][
-                io.Mesh_Record_Component.SCALAR
-            ][:]
-        else:
+        if not is_photon:
             opt = data_set_end.particles[spec_name]["opticalDepthQSR"][
                 io.Mesh_Record_Component.SCALAR
             ][:]
@@ -62,7 +58,8 @@ def main():
         data["py"] = py
         data["pz"] = pz
         data["w"] = w
-        data["opt"] = opt
+        if not is_photon:
+            data["opt"] = opt
 
         particle_data[spec_name] = data
 

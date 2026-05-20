@@ -399,8 +399,6 @@ public:
 
     PhotonEmissionFilterFunc getPhotonEmissionFilterFunc ();
 
-    PairGenerationFilterFunc getPairGenerationFilterFunc ();
-
     /**
      * Tells if this PhysicalParticleContainer has
      * virtual photons enabled

@@ -10,7 +10,6 @@
 
 #include <WarpX.H>
 #ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
 
@@ -52,7 +51,6 @@ static std::map<std::string, InitializationPolicy> initialization_policies = {
 #endif
 
 #ifdef WARPX_QED
-    {"opticalDepthBW",   InitializationPolicy::Zero},
     {"opticalDepthQSR",   InitializationPolicy::RandomExp}
 #endif
 
@@ -180,21 +178,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 }
             }
 
-            // Current runtime comp is Breit-Wheeler optical depth
-            auto const it_bw = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthBW");
-            if (it_bw != particle_comps.end() &&
-                std::distance(particle_comps.begin(), it_bw) == j)
-            {
-                if (!do_qed_comps) { continue; }
-                if (run_on_gpu) {
-                    amrex::ParallelFor(stop - start,
-                                       [=] AMREX_GPU_DEVICE (int i) noexcept {
-                                           attr_ptr[i + start] = amrex::ParticleReal(0);
-                                       });
-                } else {
-                    for (int ip = start; ip < stop; ++ip) { attr_ptr[ip] = amrex::ParticleReal(0); }
-                }
-            }
 #endif
 
             for (int ia = 0; ia < n_user_real_attribs; ++ia)

@@ -8,7 +8,6 @@
 #ifndef WARPX_BREIT_WHEELER_ENGINE_WRAPPER_FWD_H
 #define WARPX_BREIT_WHEELER_ENGINE_WRAPPER_FWD_H
 
-class BreitWheelerEvolveOpticalDepth;
 class BreitWheelerGeneratePairs;
 
 class BreitWheelerEngine;

@@ -200,10 +200,10 @@ diagnostics.diags_names = diag1
 diag1.intervals = 2
 diag1.diag_type = Full
 diag1.fields_to_plot = Ex
-diag1.p1.variables = x y z ux uy uz w opticalDepthBW
-diag1.p2.variables = x y z ux uy uz w opticalDepthBW
-diag1.p3.variables = x y z ux uy uz w opticalDepthBW
-diag1.p4.variables = x y z ux uy uz w opticalDepthBW
+diag1.p1.variables = x y z ux uy uz w
+diag1.p2.variables = x y z ux uy uz w
+diag1.p3.variables = x y z ux uy uz w
+diag1.p4.variables = x y z ux uy uz w
 
 diag1.ele1.variables = x y z ux uy uz w opticalDepthQSR
 diag1.ele2.variables = x y z ux uy uz w opticalDepthQSR

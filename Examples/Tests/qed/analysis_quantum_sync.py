@@ -175,11 +175,12 @@ def get_spec(ytdata, specname, is_photon):
 
     w = ytdata[specname, "particle_weighting"].v
 
+    # Photons no longer carry a Breit-Wheeler optical depth: the BW probability
+    # is sampled stochastically each timestep.
     if is_photon:
-        opt = ytdata[specname, "particle_opticalDepthBW"].v
-    else:
-        opt = ytdata[specname, "particle_opticalDepthQSR"].v
+        return {"px": px, "py": py, "pz": pz, "w": w}
 
+    opt = ytdata[specname, "particle_opticalDepthQSR"].v
     return {"px": px, "py": py, "pz": pz, "w": w, "opt": opt}
 
 
@@ -210,14 +211,15 @@ def check_momenta(phot_data, p_phot, p0):
     print("  [OK] photons move along the initial particle direction")
 
 
-def check_opt_depths(part_data, phot_data):
-    data = (part_data, phot_data)
-    for dd in data:
-        # Remove the negative optical depths that will be
-        # reset at the beginning of the next timestep
-        loc, scale = st.expon.fit(dd["opt"][dd["opt"] > 0])
-        assert np.abs(loc - 0) < tol_red
-        assert np.abs(scale - 1) < tol_red
+def check_opt_depths(part_data):
+    # Photons no longer carry a Breit-Wheeler optical depth: their pair-production
+    # probability is sampled stochastically each timestep. Only the (charged)
+    # source species still carry a Quantum-Synchrotron optical depth.
+    # Remove the negative optical depths that will be reset at the beginning
+    # of the next timestep.
+    loc, scale = st.expon.fit(part_data["opt"][part_data["opt"] > 0])
+    assert np.abs(loc - 0) < tol_red
+    assert np.abs(scale - 1) < tol_red
     print("  [OK] optical depth distributions are still exponential")
 
 
@@ -335,7 +337,7 @@ def check():
 
         check_energy_distrib(gamma_phot, chi_part, gamma_part, n_phot, NNS[idx], idx)
 
-        check_opt_depths(part_data_final, phot_data)
+        check_opt_depths(part_data_final)
 
         print("*************\n")
 

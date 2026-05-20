@@ -266,9 +266,6 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     pp_species_name.query("do_qed_breit_wheeler", m_do_qed_breit_wheeler);
-    if (m_do_qed_breit_wheeler) {
-        AddRealComp("opticalDepthBW");
-    }
 
     if(m_do_qed_quantum_sync){
         pp_species_name.get("qed_quantum_sync_phot_product_species",
@@ -1806,13 +1803,6 @@ PhysicalParticleContainer::getPhotonEmissionFilterFunc ()
 {
     ABLASTR_PROFILE("PhysicalParticleContainer::getPhotonEmissionFunc()");
     return PhotonEmissionFilterFunc{GetRealCompIndex("opticalDepthQSR") - NArrayReal};
-}
-
-PairGenerationFilterFunc
-PhysicalParticleContainer::getPairGenerationFilterFunc ()
-{
-    ABLASTR_PROFILE("PhysicalParticleContainer::getPairGenerationFunc()");
-    return PairGenerationFilterFunc{GetRealCompIndex("opticalDepthBW") - NArrayReal};
 }
 
 #endif
