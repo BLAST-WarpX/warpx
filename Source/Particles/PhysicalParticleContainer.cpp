@@ -2198,4 +2198,3 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         local_temperature_arrays->ConvertVarianceToTemperatureAndFilter(T_vf, Tnorm, WarpX::use_filter);
     }
 }
-
