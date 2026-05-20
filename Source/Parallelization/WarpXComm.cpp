@@ -1145,7 +1145,7 @@ void WarpX::FillBoundaryG (int lev, PatchType patch_type, IntVect ng, std::optio
 void
 WarpX::FillBoundaryAux (IntVect ng)
 {
-    for (int lev = 0; lev <= finest_level-1; ++lev)
+    for (int lev = 0; lev <= finest_level; ++lev)
     {
         FillBoundaryAux(lev, ng);
     }
