@@ -1141,7 +1141,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 }
 
                 if(qed_helper.has_breit_wheeler){
-                    qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
+                    qed_helper.p_optical_depth_BW[ip] = amrex::ParticleReal(0);
                 }
 #endif
                 // Initialize user-defined integers with user-defined parser
@@ -1649,7 +1649,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 }
 
                 if(qed_helper.has_breit_wheeler){
-                    qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
+                    qed_helper.p_optical_depth_BW[ip] = amrex::ParticleReal(0);
                 }
 #endif
 

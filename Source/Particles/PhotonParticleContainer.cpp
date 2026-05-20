@@ -191,12 +191,12 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     // local copy for device lambda capture
     amrex::ParticleReal const mass = m_mass;
 
-    amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
-                                CompileTimeOptions<no_qed  ,has_qed>>{},
-                       {exteb_runtime_flag, qed_runtime_flag},
-                       np_to_push,
-                       [=] AMREX_GPU_DEVICE (long i, auto exteb_control,
-                                             auto qed_control) {
+    amrex::AnyCTO(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
+                           CompileTimeOptions<no_qed  ,has_qed>>{},
+                  {exteb_runtime_flag, qed_runtime_flag},
+                  [&](auto cto_func) { amrex::ParallelForRNG(np_to_push, cto_func); },
+                  [=] AMREX_GPU_DEVICE (long i, amrex::RandomEngine const& engine,
+                                        auto exteb_control, auto qed_control) {
             if (do_copy) { copyAttribs(i); }
             ParticleReal x, y, z;
             GetPosition(i, x, y, z);
@@ -232,10 +232,10 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             [[maybe_unused]] auto qed_dt_tmp = qed_dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                           qed_dt, p_optical_depth_BW[i]);
+                           qed_dt, p_optical_depth_BW[i], engine);
             }
 #else
-            amrex::ignore_unused(qed_control);
+            amrex::ignore_unused(qed_control, engine);
 #endif
 
             if (position_push_type == PositionPushType::Full) {

@@ -313,7 +313,7 @@ struct QEDHelper
     QEDHelper (SoAType& a_soa, std::size_t old_size,
                bool a_has_quantum_sync, bool a_has_breit_wheeler,
                const std::shared_ptr<QuantumSynchrotronEngine>& a_shr_p_qs_engine,
-               const std::shared_ptr<BreitWheelerEngine>& a_shr_p_bw_engine)
+               const std::shared_ptr<BreitWheelerEngine>& /*a_shr_p_bw_engine*/)
         : has_quantum_sync(a_has_quantum_sync), has_breit_wheeler(a_has_breit_wheeler)
     {
         if(has_quantum_sync){
@@ -322,8 +322,6 @@ struct QEDHelper
             p_optical_depth_QSR = a_soa.GetRealData("opticalDepthQSR").data() + old_size;
         }
         if(has_breit_wheeler){
-            breit_wheeler_get_opt =
-                a_shr_p_bw_engine->build_optical_depth_functor();
             p_optical_depth_BW = a_soa.GetRealData("opticalDepthBW").data() + old_size;
         }
     }
@@ -335,7 +333,6 @@ struct QEDHelper
     bool has_breit_wheeler;
 
     QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt;
-    BreitWheelerGetOpticalDepth breit_wheeler_get_opt;
 };
 #endif
 
