@@ -744,9 +744,6 @@ void HybridPICModel::BfieldEvolveRKF45 (
         if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
 
         // ---- Stage 1: B = B_old, FieldPush, K[comp0] = h*k1 ----
-        for (int ii = 0; ii < 3; ii++) {
-            MultiFab::Copy(*Bfield[lev][ii], B_old[ii], 0, 0, 1, ng);
-        }
         FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
                   dt_sub, subcycling_half, ng, nodal_sync);
         for (int ii = 0; ii < 3; ii++) {
