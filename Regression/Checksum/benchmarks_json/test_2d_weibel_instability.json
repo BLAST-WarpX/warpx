@@ -1,35 +1,35 @@
 {
-  "lev=0": {
-    "Bx": 17081.54938838751,
-    "By": 5069.038844805531,
-    "Bz": 22578.43314244605,
-    "Ex": 131472065112.8389,
-    "Ey": 15499749379.452814,
-    "Ez": 96875560125.93277,
-    "divE": 2.2952221115722234e+17,
-    "jx": 3158749804748072.0,
-    "jy": 2.9152023272824344e+16,
-    "jz": 3357047810158430.5,
-    "rho": 26250061971.455997,
-    "rho_electrons_1": 13125030985.727999,
-    "rho_electrons_2": 13125030985.728
-  },
   "electrons_1": {
-    "particle_position_x": 1.1287046881983565,
+    "particle_momentum_x": 8.10238289988496e-21,
+    "particle_momentum_y": 7.159688417853738e-19,
+    "particle_momentum_z": 8.095911049279298e-21,
+    "particle_position_x": 2.260987744209889,
     "particle_position_y": 0.0,
-    "particle_position_z": 6.037150392480717,
-    "particle_momentum_x": 7.251681052107335e-20,
-    "particle_momentum_y": 3.0680290278027596e-19,
-    "particle_momentum_z": 6.240000791581243e-20,
+    "particle_position_z": 12.058332979166044,
     "particle_weight": 3.1740000000000004e+16
   },
   "electrons_2": {
-    "particle_position_x": 1.1322806070411857,
+    "particle_momentum_x": 8.139992326593604e-21,
+    "particle_momentum_y": 7.159515315191291e-19,
+    "particle_momentum_z": 8.087981468570089e-21,
+    "particle_position_x": 2.2609983549910337,
     "particle_position_y": 0.0,
-    "particle_position_z": 6.023129663467087,
-    "particle_momentum_x": 7.261744719292597e-20,
-    "particle_momentum_y": 3.067979459199902e-19,
-    "particle_momentum_z": 6.243126010301083e-20,
+    "particle_position_z": 12.058823049482097,
     "particle_weight": 3.1740000000000004e+16
+  },
+  "lev=0": {
+    "Bx": 167.18141935632687,
+    "By": 65.22858195397562,
+    "Bz": 295.950817796734,
+    "Ex": 39668128695.895294,
+    "Ey": 14092411520.900654,
+    "Ez": 27044207622.74174,
+    "divE": 1.220238340709355e+17,
+    "jx": 69475878266194.4,
+    "jy": 662181223185970.0,
+    "jz": 79000265492877.81,
+    "rho": 52500123942.91199,
+    "rho_electrons_1": 26250061971.455997,
+    "rho_electrons_2": 26250061971.455994
   }
 }

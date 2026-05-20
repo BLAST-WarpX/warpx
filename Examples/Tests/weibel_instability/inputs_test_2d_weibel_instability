@@ -1,11 +1,11 @@
 algo.particle_shape = 2
 
-amr.blocking_factor_x = 32  # 64
-amr.blocking_factor_y = 128  # 512
-amr.max_grid_size_x = 32  # 64
-amr.max_grid_size_y = 128  # 512
+amr.blocking_factor_x = 64
+amr.blocking_factor_y = 64
+amr.max_grid_size_x = 64
+amr.max_grid_size_y = 64
 amr.max_level = 0
-amr.n_cell = 64 128  # 192 512
+amr.n_cell = 128 128
 
 boundary.field_hi = periodic periodic
 boundary.field_lo = periodic periodic
@@ -16,7 +16,7 @@ diag1.diag_type = Full
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_electrons_1 rho_electrons_2 jx jy jz divE rho
 diag1.file_min_digits = 8
 diag1.format = openpmd
-diag1.intervals = 100
+diag1.intervals = 10
 diag1.openpmd_backend = h5
 
 diagnostics.diags_names = diag1
@@ -54,11 +54,9 @@ geometry.dims = 2
 geometry.prob_hi =  17.25e-6 92.0e-6
 geometry.prob_lo = -17.25e-6  0.0e-6
 
-max_step = 3000  # 1000000
+max_step = 900
 
 particles.species_names = electrons_1 electrons_2
-
-stop_time = 4.5e-12  # 1.0e-11
 
 warpx.cfl = 0.9999
 warpx.random_seed = 1
