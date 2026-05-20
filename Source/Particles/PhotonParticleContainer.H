@@ -72,6 +72,18 @@ public:
                         PositionPushType position_push_type=PositionPushType::Full,
                         MomentumPushType momentum_push_type=MomentumPushType::Full) override;
 
+    /**
+     * \brief Advances photon position and deposits current at the end of an implicit time step.
+     */
+    void FinishImplicitParticleUpdate (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev,
+        amrex::Real t, amrex::Real dt,
+        SubcyclingHalf subcycling_half = SubcyclingHalf::None,
+        bool skip_deposition = true,
+        PositionPushType position_push_type = PositionPushType::Full,
+        MomentumPushType momentum_push_type = MomentumPushType::Full) override;
+
     // Do nothing
     void PushP (int /*lev*/,
                         amrex::Real /*dt*/,
