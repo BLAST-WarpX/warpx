@@ -428,6 +428,10 @@ WarpX::MoveWindow (const int step, bool move_j)
     int num_shift_crse = num_shift;
 
     // Shift the mesh fields
+    // (only for electromagnetic solvers, for which the history of the
+    // fields matter ; for other solvers, the fields are recomputed from
+    // at each iteration)
+    if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
     for (int lev = 0; lev <= finest_level; ++lev) {
 
         if (lev > 0) {
@@ -608,6 +612,7 @@ WarpX::MoveWindow (const int step, bool move_j)
                 ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{2}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
             }
         }
+    }
     }
 
     // Loop over species (particles and lasers)
