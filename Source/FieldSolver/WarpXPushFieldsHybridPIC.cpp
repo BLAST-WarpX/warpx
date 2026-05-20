@@ -34,8 +34,9 @@ void WarpX::HybridPICEvolveFields ()
         finest_level == 0,
         "Ohm's law E-solve only works with a single level.");
 
-    // Get requested number of substeps to use
+    // Get substep parameters
     const int sub_steps = m_hybrid_pic_model->m_substeps;
+    const bool use_rkf45 = m_hybrid_pic_model->m_use_rkf45;
 
     // Get flag to include external fields.
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
@@ -98,18 +99,30 @@ void WarpX::HybridPICEvolveFields ()
     // Push the B field from t=n to t=n+1/2 using the current and density
     // at t=n, while updating the E field along with B using the electron
     // momentum equation
-    const int sub_steps_per_half = sub_steps / 2;
-    for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
-    {
-        m_hybrid_pic_model->BfieldEvolveRK(
+    if (use_rkf45) {
+        m_hybrid_pic_model->BfieldEvolveRKF45(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
             m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
             current_fp_temp, rho_fp_temp,
             m_eb_update_E,
-            dt[0]/sub_steps,
+            0.5_rt*dt[0],
             SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
+    } else {
+        const int sub_steps_per_half = sub_steps / 2;
+        for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
+        {
+            m_hybrid_pic_model->BfieldEvolveRK(
+                m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+                m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+                current_fp_temp, rho_fp_temp,
+                m_eb_update_E,
+                dt[0]/sub_steps,
+                SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
+                WarpX::sync_nodal_points
+            );
+        }
     }
 
     // Average rho^{n} and rho^{n+1} to get rho^{n+1/2} in rho_fp_temp
@@ -132,18 +145,32 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
-    for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
-    {
-        m_hybrid_pic_model->BfieldEvolveRK(
+    if (use_rkf45) {
+        m_hybrid_pic_model->BfieldEvolveRKF45(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
             m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
             m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
             rho_fp_temp,
             m_eb_update_E,
-            dt[0]/sub_steps,
+            0.5_rt*dt[0],
             SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
             WarpX::sync_nodal_points
         );
+    } else {
+        const int sub_steps_per_half = sub_steps / 2;
+        for (int sub_step = 0; sub_step < sub_steps_per_half; sub_step++)
+        {
+            m_hybrid_pic_model->BfieldEvolveRK(
+                m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+                m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+                m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+                rho_fp_temp,
+                m_eb_update_E,
+                dt[0]/sub_steps,
+                SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
+                WarpX::sync_nodal_points
+            );
+        }
     }
 
     // Extrapolate the ion current density to t=n+1 using
