@@ -61,7 +61,7 @@ def linear_fit(x, y):
 
 
 def save_field_animation(
-    iterations, t, get_field_frame, abs_max, colorbar_label, title_prefix, filename
+    iterations, t, get_field_frame, vmin, vmax, colorbar_label, title_prefix, filename
 ):
     """Create and save an animated GIF for a 2-D field quantity.
 
@@ -70,22 +70,21 @@ def save_field_animation(
     iterations : array of int
     t : array of float
     get_field_frame : callable(iteration) -> (data, info)
-    abs_max : float — symmetric color-scale limit; falls back to 1.0 when zero
+    vmin, vmax : float — color-scale limits
     colorbar_label : str
     title_prefix : str — prepended to "iteration N - time T s"
     filename : str — output GIF path
     """
     fig, ax = plt.subplots()
     data, info = get_field_frame(iterations[0])
-    clim = abs_max if abs_max > 0.0 else 1.0
     im = ax.imshow(
         data,
         origin="lower",
         extent=info.imshow_extent,
         aspect="auto",
         interpolation="nearest",
-        vmin=-clim,
-        vmax=clim,
+        vmin=vmin,
+        vmax=vmax,
         cmap="RdBu_r",
     )
     cb = fig.colorbar(im, ax=ax)
@@ -189,21 +188,24 @@ B_x_2 = np.empty_like(t)
 B_y_2 = np.empty_like(t)
 B_z_2 = np.empty_like(t)
 B_z_abs_max = 0.0  # track the peak |B_z| for the animation color scale
-rho_abs_max = 0.0  # track the peak |rho_electrons_1| for the animation color scale
+rho_spatial_mean = (
+    None  # mean of rho_electrons_1 in first frame (proxy for bulk density)
+)
+rho_dev_max = 0.0  # max spatial deviation from that mean, across all frames
 
 for i, iteration in enumerate(iterations):
     B_x, _ = ts.get_field(field="B", coord="x", iteration=iteration, plot=False)
     B_y, _ = ts.get_field(field="B", coord="y", iteration=iteration, plot=False)
     B_z, _ = ts.get_field(field="B", coord="z", iteration=iteration, plot=False)
-    rho_frame, _ = ts.get_field(
-        field="rho_electrons_1", iteration=iteration, plot=False
-    )
+    rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iteration, plot=False)
 
     B_x_2[i] = np.sum(np.square(B_x))
     B_y_2[i] = np.sum(np.square(B_y))
     B_z_2[i] = np.sum(np.square(B_z))
     B_z_abs_max = max(B_z_abs_max, float(np.max(np.abs(B_z))))
-    rho_abs_max = max(rho_abs_max, float(np.max(np.abs(rho_frame))))
+    if rho_spatial_mean is None:
+        rho_spatial_mean = float(np.mean(rho_1))
+    rho_dev_max = max(rho_dev_max, float(np.max(np.abs(rho_1 - rho_spatial_mean))))
 
 assert np.all(np.isfinite(B_x_2))
 assert np.all(np.isfinite(B_y_2))
@@ -386,7 +388,8 @@ save_field_animation(
     get_field_frame=lambda it: ts.get_field(
         field="B", coord="z", iteration=it, plot=False
     ),
-    abs_max=B_z_abs_max,
+    vmin=-B_z_abs_max,
+    vmax=B_z_abs_max,
     colorbar_label=r"$B_z$ (T)",
     title_prefix="B_z",
     filename="weibel_Bz.gif",
@@ -397,8 +400,9 @@ save_field_animation(
     get_field_frame=lambda it: ts.get_field(
         field="rho_electrons_1", iteration=it, plot=False
     ),
-    abs_max=rho_abs_max,
-    colorbar_label=r"$\rho_{\mathrm{e1}}$ (C/m$^3$)",
+    vmin=rho_spatial_mean - rho_dev_max,
+    vmax=rho_spatial_mean + rho_dev_max,
+    colorbar_label=r"$\rho_{\mathrm{e1}} - \langle\rho_{\mathrm{e1}}\rangle$ (C/m$^3$)",
     title_prefix="rho_electrons_1",
     filename="weibel_rho_electrons_1.gif",
 )
