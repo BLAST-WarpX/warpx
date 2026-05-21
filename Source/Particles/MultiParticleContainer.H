@@ -408,7 +408,7 @@ protected:
 #endif
 
     // Particle container types
-    enum struct PCTypes {Physical, RigidInjected, Photon, Laser};
+    enum struct PCTypes {Physical, RigidInjected, Photon};
 
     std::vector<std::string> species_names;
 

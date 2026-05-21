@@ -350,9 +350,6 @@ MultiParticleContainer::ReadParameters ()
         const ParmParse pp_lasers("lasers");
         pp_lasers.queryarr("names", lasers_names);
         auto const nlasers = lasers_names.size();
-        for (std::size_t i = 0; i < nlasers; i++) {
-            species_types.push_back(PCTypes::Laser);
-        }
 
         // Get lasers to deposit on main grid
         m_laser_deposit_on_main_grid.resize(nlasers, false);
