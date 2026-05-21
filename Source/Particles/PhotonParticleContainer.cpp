@@ -276,6 +276,11 @@ PhotonParticleContainer::FinishImplicitParticleUpdate (
     ablastr::fields::MultiFabRegister& fields,
     int lev, amrex::Real t, amrex::Real dt)
 {
+    // We perform a single full explicit push over [t-dt, t] here.
+    // Deposition is skipped because photons carry no charge and
+    // therefore contribute no current. We pass implicit_options=nullptr
+    // so that the early-return guard in PhotonParticleContainer::Evolve()
+    // does not fire: we do want the push this time.
     Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt,
            SubcyclingHalf::None, /*skip_deposition=*/true,
            PositionPushType::Full, MomentumPushType::Full, /*implicit_options=*/nullptr);
