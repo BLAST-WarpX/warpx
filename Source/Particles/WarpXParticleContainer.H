@@ -238,6 +238,16 @@ public:
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     /**
+     * \brief Virtual function to finish the implicit particle update at the end of a time step.
+     * The default implementation extrapolates position and momentum from time n+1/2 to n+1,
+     * which is appropriate for physical and laser particles. For photon particles this advances
+     * their position by the full time step.
+     */
+    virtual void FinishImplicitParticleUpdate (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev, amrex::Real t, amrex::Real dt);
+
+    /**
      * \brief virtual function to deposit mass matrices for charged particles
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,

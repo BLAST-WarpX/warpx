@@ -267,3 +267,13 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                       momentum_push_type,
                                       /*implicit_options=*/nullptr);
 }
+
+void
+PhotonParticleContainer::FinishImplicitParticleUpdate (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev, amrex::Real t, amrex::Real dt)
+{
+    Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt,
+           SubcyclingHalf::None, /*skip_deposition=*/true,
+           PositionPushType::Full, MomentumPushType::Full, /*implicit_options=*/nullptr);
+}
