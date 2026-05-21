@@ -3699,7 +3699,7 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this selects the B-field sub-step integrator.
     When ``false`` (default), a fixed-step classical RK4 method is used with exactly
     :pp:param:`hybrid_pic_model.substeps` total sub-steps per timestep.
-    When ``true``, the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) method :cite:t:`Fehlberg1969`
+    When ``true``, the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) method :cite:t:`param-Fehlberg1969`
     is used, controlling the local truncation error to stay within
     :pp:param:`hybrid_pic_model.substep_rtol` and :pp:param:`hybrid_pic_model.substep_atol`.
 
