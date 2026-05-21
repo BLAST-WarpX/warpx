@@ -73,7 +73,7 @@ public:
                         MomentumPushType momentum_push_type=MomentumPushType::Full) override;
 
     /**
-     * \brief Advances photon position and deposits current at the end of an implicit time step.
+     * \brief Advances photon position at the end of an implicit time step.
      */
     void FinishImplicitParticleUpdate (
         ablastr::fields::MultiFabRegister& fields,
