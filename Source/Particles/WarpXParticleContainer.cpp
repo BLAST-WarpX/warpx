@@ -2740,6 +2740,7 @@ WarpXParticleContainer::FinishImplicitParticleUpdate (
             amrex::ParticleReal xp, yp, zp;
             getPosition(ip, xp, yp, zp);
 
+            // Extrapolate position: x^{n+1} = 2 x^{n+1/2} - x^n
 #if !defined(WARPX_DIM_1D_Z)
             xp = 2._rt*xp - x_n[ip];
 #endif
