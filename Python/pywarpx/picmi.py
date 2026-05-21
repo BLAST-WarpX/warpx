@@ -2134,8 +2134,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         ``dt / substeps``). Must be divisible by 2; if not, the value is
         automatically rounded up to the next even number.
         When ``use_rkf45=True``, this is instead used only as the initial
-        substep count estimate for the adaptive solver; a value of 1–4 is
-        recommended.
+        substep count estimate for the adaptive solver.
 
     use_rkf45: bool, default=False
         If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
