@@ -257,7 +257,10 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 {
     // This does gather, push and deposit.
     // Push and deposit have been re-written for photons.
-    // Don't Evolve photons when called from implicit solver.
+    // Photons do not participate in the implicit solver. When called
+    // from the implicit solver during the iteration, we skip the push entirely;
+    // photons are instead advanced once at the end of the step via
+    // FinishImplicitParticleUpdate below.
     if (implicit_options) { return; }
     PhysicalParticleContainer::Evolve(fields,
                                       lev,
