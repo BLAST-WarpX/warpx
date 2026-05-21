@@ -3656,8 +3656,6 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma resistivity in :math:`\Omega m`.
-    Can be a constant value or an expression depending on ``rho`` (charge density), ``J`` (current density magnitude),
-    and ``t`` (simulation time).
 
 .. pp:param:: hybrid_pic_model.plasma_hyper_resistivity(rho,B)
     :type: ``float`` or ``str``
@@ -3689,7 +3687,7 @@ Maxwell solver: kinetic-fluid hybrid
     the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken
     per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
     automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this is
-    instead used only as the initial substep count estimate for the adaptive solver; a value of 1–4 is recommended.
+    instead used only as the initial substep count estimate for the adaptive solver.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``bool``
