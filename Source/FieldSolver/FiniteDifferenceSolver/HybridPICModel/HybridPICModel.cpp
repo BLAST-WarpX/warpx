@@ -734,7 +734,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
         );
     }
 
-    amrex::Real dt_sub = dt_half / m_substeps;
+    amrex::Real dt_sub = 2._rt * dt_half / m_substeps;
     amrex::Real t = 0._rt;
     int n_attempts = 0;
     int n_accepted = 0;
