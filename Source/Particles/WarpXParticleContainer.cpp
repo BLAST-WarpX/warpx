@@ -2750,6 +2750,7 @@ WarpXParticleContainer::FinishImplicitParticleUpdate (
             zp = 2._rt*zp - z_n[ip];
 #endif
 
+            // Extrapolate momentum: u^{n+1} = 2 u^{n+1/2} - u^n
             ux[ip] = 2._rt*ux[ip] - ux_n[ip];
             uy[ip] = 2._rt*uy[ip] - uy_n[ip];
             uz[ip] = 2._rt*uz[ip] - uz_n[ip];
