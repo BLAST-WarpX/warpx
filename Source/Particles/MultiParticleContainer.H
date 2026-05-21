@@ -397,17 +397,6 @@ public:
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator begin() {return allcontainers.begin();}
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>>::iterator end() {return allcontainers.end();}
 
-    [[nodiscard]] bool isPhotonSpecies (int ispecies) const
-    {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ispecies >= 0 &&
-            ispecies < static_cast<int>(species_types.size()),
-            "Invalid species index in isPhotonSpecies()"
-        );
-
-        return species_types[ispecies] == PCTypes::Photon;
-    }
-
 protected:
 
 #ifdef WARPX_QED

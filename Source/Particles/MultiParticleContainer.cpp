@@ -527,22 +527,6 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 }
 
 void
-MultiParticleContainer::EvolvePhotonsOnly (ablastr::fields::MultiFabRegister& fields,
-                                int lev,
-                                Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
-                                PositionPushType position_push_type,
-                                MomentumPushType momentum_push_type)
-{
-    for (auto& pc : allcontainers) {
-        if (species_types[pc->getSpeciesId()] == PCTypes::Photon) {
-            pc->Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt, subcycling_half, skip_deposition,
-                       position_push_type, momentum_push_type,/*implicit_options=*/nullptr);
-        }
-    }
-}
-
-
-void
 MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                                              int lev, amrex::Real dt)
 {
