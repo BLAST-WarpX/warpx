@@ -37,15 +37,21 @@ sim.add_diagnostic(chk)
 
 def test_checkpoint_flags():
     """Test checkpoint flag functionality"""
-    import amrex
-    
     print("\n" + "="*60)
     print("Testing PR1: Checkpoint Flag Functionality")
     print("="*60)
-    
+
+    # Test 0: has() / has_vector() on non-existent fields
+    print("\nTest 0: has() / has_vector() on non-existent fields")
+    assert not sim.fields.has("nonexistent_field", level=0), \
+        "has() should return False for non-existent scalar field"
+    assert not sim.fields.has_vector("nonexistent_vector", level=0), \
+        "has_vector() should return False for non-existent vector field"
+    print("  [OK] has() and has_vector() return False for non-existent fields")
+
     # Get Ex field as reference
     Ex = sim.fields.get("Efield_fp", dir='x', level=0)
-    
+
     # Test 1: Allocate a scalar field and mark for checkpoint
     print("\nTest 1: Scalar field checkpoint flag")
     test_scalar = sim.fields.alloc_init(
@@ -60,10 +66,15 @@ def test_checkpoint_flags():
         redistribute_on_remake=True
     )
 
+    # Verify has() returns True now that the field is allocated
+    assert sim.fields.has("test_scalar", level=0), \
+        "has() should return True after alloc_init"
+    print("  [OK] has('test_scalar') returns True")
+
     # Mark for checkpoint
     sim.fields.set_checkpoint("test_scalar", level=0, checkpoint=True)
     print("  [OK] Scalar field 'test_scalar' marked for checkpoint")
-    
+
     # Test 2: Allocate vector field components and mark for checkpoint
     print("\nTest 2: Vector field checkpoint flags")
     for idir in range(3):
@@ -82,7 +93,14 @@ def test_checkpoint_flags():
         )
         sim.fields.set_checkpoint("test_vector", dir=dirstr, level=0, checkpoint=True)
         print(f"  [OK] Vector component 'test_vector_{dirstr}' marked for checkpoint")
-    
+
+    # Verify has() with direction and has_vector()
+    assert sim.fields.has("test_vector", dir='x', level=0), \
+        "has('test_vector', dir='x') should be True"
+    assert sim.fields.has_vector("test_vector", level=0), \
+        "has_vector('test_vector') should be True after all 3 components are allocated"
+    print("  [OK] has() with direction and has_vector() return True")
+
     # Test 3: Query checkpoint fields
     print("\nTest 3: Query checkpoint fields")
     checkpoint_fields = sim.fields.get_checkpoint_fields(level=0)

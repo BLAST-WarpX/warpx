@@ -1,3 +1,14 @@
+# add_field_to_diagnostic: verify custom fields appear in openPMD output
+add_warpx_test(
+        test_3d_add_field_to_diagnostic_picmi  # name
+        3  # dims
+        1  # nprocs
+        inputs_test_add_field_to_diagnostic_picmi.py  # inputs
+        OFF  # analysis (test validates itself with assertions)
+        OFF  # checksum (API test)
+        OFF  # dependency
+)
+
 # MultiFabRegister checkpoint flag API
 add_warpx_test(
         test_3d_checkpoint_flag_picmi  # name

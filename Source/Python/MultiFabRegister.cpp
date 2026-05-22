@@ -161,6 +161,16 @@ void init_MultiFabRegister (py::module & m)
              py::arg("level")
         )
 
+        .def("has_vector",
+             py::overload_cast<
+                 std::string,
+                 int
+             >(&MultiFabRegister::has_vector<std::string>, py::const_),
+             py::arg("name"),
+             py::arg("level"),
+             "Return True if all components of a vector field exist at the given level"
+        )
+
         .def("_get",
              py::overload_cast<
                  std::string,

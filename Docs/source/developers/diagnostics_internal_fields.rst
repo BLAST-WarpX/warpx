@@ -62,18 +62,18 @@ This can be done either from Python callbacks or by modifying C++ code.
 
 .. code-block:: python
 
-   @callbacks.callfrombeforediagnostics
+   @callbacks.callfromafterstep
    def compute_diagnostic_fields():
-       """Runs before diagnostic output - compute derived quantities"""
-       
+       """Runs every step - compute derived quantities to store for next output"""
+
        # Get input fields
        Bx = sim.fields.get("Bfield_fp", dir='x', level=0)
        Jx = sim.fields.get("current_fp", dir='x', level=0)
        rho = sim.fields.get("rho_fp", level=0)
-       
+
        # Get diagnostic field to write to
        hall_term = sim.fields.get("hall_term", dir='x', level=0)
-       
+
        # Compute and store (simplified example)
        # Note: This uses global indexing for simplicity
        hall_term[...] = (Jx[...] * Bx[...]) / rho[...]
@@ -87,6 +87,31 @@ the diagnostic field exists. See the complete example below.
 
 The field will automatically be included in diagnostic output since it was
 added with ``add_field_to_diagnostic()``.
+
+.. note::
+
+   **Alternative: PICMI ``data_list`` pass-through**
+
+   If you prefer to declare all desired output fields up front, you can
+   include your custom field name directly in the ``data_list`` of a
+   :py:class:`~pywarpx.picmi.FieldDiagnostic`:
+
+   .. code-block:: python
+
+      diag = picmi.FieldDiagnostic(
+          name="diag1",
+          grid=grid,
+          period=10,
+          data_list=["Ex", "Ey", "Ez", "Bx", "By", "Bz", "custom_scalar", "custom_vector"],
+          warpx_format="openpmd",
+      )
+
+   Names that are not recognised WarpX built-in fields are passed through to
+   the C++ diagnostic layer.  The field **must exist** in the
+   ``MultiFabRegister`` at the time the diagnostic is flushed (typically
+   allocated in an ``afterInitEsolve`` or ``afterInitatRestart`` callback).
+   This approach is equivalent to calling ``add_field_to_diagnostic()`` and
+   produces identical output.
 
 Complete Example: Hall Term in Ohm's Law
 -----------------------------------------
@@ -140,7 +165,7 @@ Recompute the Hall term in a Python callback:
        sim.extension.warpx.add_field_to_diagnostic("diag1", "hall_term", lev=0)
        print("Hall term diagnostics enabled")
    
-   @callbacks.callfrombeforediagnostics
+   @callbacks.callfromafterstep
    def compute_hall_term():
        """Compute Hall term: (J - Ji) x B / (ne)"""
        from scipy.constants import elementary_charge as q_e
@@ -319,7 +344,7 @@ Additional Examples
 
 .. code-block:: python
 
-   @callbacks.callfrombeforediagnostics
+   @callbacks.callfromafterstep
    def compute_all_diagnostics():
        """Compute multiple derived fields at once"""
        
@@ -342,8 +367,11 @@ Best Practices
 
 2. **Performance:** Only compute diagnostics when needed:
 
-   - Use ``callfrombeforediagnostics`` callback (not ``callfromafterstep``)
-   - This ensures computation only happens when diagnostics are actually written
+   - Use ``callfromafterstep`` to update diagnostic fields each step so they
+     are ready when the diagnostic system writes them (the diagnostic period
+     filter is applied by the flush mechanism, not by your callback)
+   - For expensive recomputations you can check the step number against the
+     diagnostic period manually inside your callback
 
 3. **Memory:** Diagnostic fields consume memory - only allocate what you need
 

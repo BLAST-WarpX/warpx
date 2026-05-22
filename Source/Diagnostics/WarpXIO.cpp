@@ -462,7 +462,7 @@ WarpX::RestoreCustomFieldsFromCheckpoint ()
 {
     using ablastr::fields::Direction;
 
-    WARPX_PROFILE("WarpX::RestoreCustomFieldsFromCheckpoint()");
+    ABLASTR_PROFILE("WarpX::RestoreCustomFieldsFromCheckpoint()");
 
     if (m_custom_fields_to_restore.empty()) {
         return;  // No custom fields to restore
