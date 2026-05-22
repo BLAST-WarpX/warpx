@@ -355,7 +355,9 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions",
+                           # testing that output of auxiliary fields works
+                           "hybrid_electron_pressure_fp"],
                 write_dir="diags",
                 warpx_format="plotfile",
             )
@@ -364,7 +366,9 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions",
+                           # testing that output of auxiliary fields works
+                           "hybrid_electron_pressure_fp"],
                 write_dir="diags",
                 warpx_format="openpmd",
                 warpx_file_prefix="field_diags",
