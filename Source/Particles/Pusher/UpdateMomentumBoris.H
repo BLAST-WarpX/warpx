@@ -38,10 +38,20 @@ void UpdateMomentumBoris(
     const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + (ux*ux + uy*uy + uz*uz)*inv_c2);
     // Magnetic rotation
     // - Compute temporary variables
-    const amrex::Real bconst = (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) ? 0.5_rt*econst : econst;
-    const amrex::ParticleReal tx = bconst*inv_gamma*Bx;
-    const amrex::ParticleReal ty = bconst*inv_gamma*By;
-    const amrex::ParticleReal tz = bconst*inv_gamma*Bz;
+    amrex::ParticleReal tx = econst*inv_gamma*Bx;
+    amrex::ParticleReal ty = econst*inv_gamma*By;
+    amrex::ParticleReal tz = econst*inv_gamma*Bz;
+    // For half pushes, rescale t so that two half rotations compose exactly into the
+    // full Boris rotation. The Boris formula rotates by an angle alpha with
+    // tan(alpha/2) = |t|; for two half rotations to compose to alpha_full we need
+    // |t_half| = tan(alpha_full/4) = (sqrt(1 + |t_full|^2) - 1) / |t_full|.
+    if (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
+        const amrex::ParticleReal tsq = tx*tx + ty*ty + tz*tz;
+        const amrex::ParticleReal factor = (tsq > 0._prt) ? (std::sqrt(1._prt + tsq) - 1._prt) / tsq : 0.5_prt;
+        tx *= factor;
+        ty *= factor;
+        tz *= factor;
+    }
     const amrex::ParticleReal tsqi = 2._prt/(1._prt + tx*tx + ty*ty + tz*tz);
     const amrex::ParticleReal sx = tx*tsqi;
     const amrex::ParticleReal sy = ty*tsqi;
