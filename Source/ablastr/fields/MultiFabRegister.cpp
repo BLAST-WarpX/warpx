@@ -578,7 +578,7 @@ namespace ablastr::fields
         auto it = m_mf_register.find(internal_name);
         if (it == m_mf_register.end()) {
             throw std::runtime_error(
-                "MultiFabRegister::set_checkpoint: field '" + name + 
+                "MultiFabRegister::set_checkpoint: field '" + name +
                 "' not found at level " + std::to_string(level)
             );
         }
@@ -599,7 +599,7 @@ namespace ablastr::fields
         auto it = m_mf_register.find(internal_name);
         if (it == m_mf_register.end()) {
             throw std::runtime_error(
-                "MultiFabRegister::set_checkpoint: field '" + name + 
+                "MultiFabRegister::set_checkpoint: field '" + name +
                 "' with direction " + std::to_string(static_cast<int>(dir)) +
                 " not found at level " + std::to_string(level)
             );
@@ -622,13 +622,13 @@ namespace ablastr::fields
                 // Extract the base field name from the internal name
                 // Internal name format: "name[dir=x][level=0]" or "name[level=0]"
                 std::string field_name = internal_name;
-                
+
                 // Remove direction suffix (if present)
                 size_t dir_pos = field_name.find("[dir=");
                 if (dir_pos != std::string::npos) {
                     field_name = field_name.substr(0, dir_pos);
                 }
-                
+
                 // Remove level suffix
                 size_t level_pos = field_name.find("[level=");
                 if (level_pos != std::string::npos) {

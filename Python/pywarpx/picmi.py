@@ -4194,7 +4194,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     # - WarpX-internal / auxiliary fields (e.g., hybrid_electron_pressure_fp)
                     # - User-registered Python fields
                     # - Future field types without needing Python updates
-                    # 
+                    #
                     # C++ diagnostics will validate and provide detailed error messages
                     # if the field doesn't exist in the MultiFabRegister.
                     fields_to_plot.add(dataname)

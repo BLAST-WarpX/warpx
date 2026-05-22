@@ -291,11 +291,11 @@ void init_WarpX (py::module& m)
             [](WarpX& wx, const std::string& diag_name, const std::string& field_name, int lev) {
                 auto& multi_diags = wx.GetMultiDiags();
                 int ndiags = multi_diags.GetTotalDiags();
-                
+
                 // Find the diagnostic by name
                 for (int idiag = 0; idiag < ndiags; ++idiag) {
                     auto& diag = multi_diags.GetDiag(idiag);
-                    
+
                     // Check if this diagnostic matches the requested name
                     if (diag.GetDiagName() == diag_name) {
                         // Check if it's a FullDiagnostics (only FullDiagnostics supports AddFieldToOutput)
@@ -305,7 +305,7 @@ void init_WarpX (py::module& m)
                             return;
                         } else {
                             WARPX_ABORT_WITH_MESSAGE(
-                                "add_field_to_diagnostic: Diagnostic '" + diag_name + 
+                                "add_field_to_diagnostic: Diagnostic '" + diag_name +
                                 "' is not a FullDiagnostics (only field/field diagnostics support adding fields)");
                         }
                     }

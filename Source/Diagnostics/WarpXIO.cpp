@@ -288,22 +288,22 @@ WarpX::InitFromCheckpoint ()
             int num_custom_fields;
             is >> num_custom_fields;
             ablastr::utils::text::goto_next_line(is);
-            
+
             for (int i = 0; i < num_custom_fields; ++i) {
                 std::string field_name;
                 std::getline(is, field_name);
-                
+
                 int has_direction;
                 is >> has_direction;
                 ablastr::utils::text::goto_next_line(is);
-                
+
                 std::optional<Direction> maybe_dir = std::nullopt;
                 if (has_direction == 1) {
                     std::string dir_str;
                     std::getline(is, dir_str);
                     maybe_dir = Direction{dir_str};
                 }
-                
+
                 custom_fields_by_level[lev].push_back({field_name, maybe_dir});
             }
         }

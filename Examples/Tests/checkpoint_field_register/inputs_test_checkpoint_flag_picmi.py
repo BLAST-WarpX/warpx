@@ -106,29 +106,29 @@ def test_checkpoint_flags():
     print("\nTest 3: Query checkpoint fields")
     checkpoint_fields = sim.fields.get_checkpoint_fields(level=0)
     print(f"  Found {len(checkpoint_fields)} fields marked for checkpoint at level 0:")
-    
+
     for field_name, dir_opt in checkpoint_fields:
         if dir_opt is None:
             print(f"    - {field_name} (scalar)")
         else:
             print(f"    - {field_name} (vector, dir={str(dir_opt)})")
-    
+
     # Verify our test fields are in the list
     # Scalar field: name only
     field_names = [name for name, _ in checkpoint_fields]
     assert "test_scalar" in field_names, "test_scalar not in checkpoint list!"
-    
+
     # Vector field: check base name with each direction
     vector_entries = [(name, dir_opt) for name, dir_opt in checkpoint_fields if name == "test_vector"]
     assert len(vector_entries) == 3, f"Expected 3 test_vector components, found {len(vector_entries)}"
-    
+
     directions_found = [str(dir_opt) for _, dir_opt in vector_entries if dir_opt is not None]
     assert "x" in directions_found, "test_vector direction x not found!"
     assert "y" in directions_found, "test_vector direction y not found!"
     assert "z" in directions_found, "test_vector direction z not found!"
-    
+
     print("\n  [OK] All test fields found in checkpoint list")
-    
+
     # Test 4: Create an alias and verify it's not in checkpoint list
     print("\nTest 4: Verify aliases are excluded from checkpoints")
     sim.fields.alias_init(
@@ -137,15 +137,15 @@ def test_checkpoint_flags():
         level=0,
         #initial_value=0.
     )
-    
+
     # Get checkpoint fields again
     checkpoint_fields_after = sim.fields.get_checkpoint_fields(level=0)
     field_names_after = [name for name, _ in checkpoint_fields_after]
-    
+
     # Alias should NOT be in the list (even though owner is)
     assert "test_scalar_alias" not in field_names_after, "Alias should not be in checkpoint list!"
     assert "test_scalar" in field_names_after, "Owner should still be in checkpoint list!"
-    
+
     print("  [OK] Alias correctly excluded from checkpoint list")
 
 

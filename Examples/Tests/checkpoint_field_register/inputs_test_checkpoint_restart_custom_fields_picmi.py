@@ -55,10 +55,10 @@ def setup_custom_fields():
     print("\n" + "="*60)
     print("Setting up custom fields")
     print("="*60)
-    
+
     # Get Ex field as reference
     Ex = sim.fields.get("Efield_fp", dir='x', level=0)
-    
+
     # Create a scalar field
     sim.fields.alloc_init(
         name="custom_scalar",
@@ -72,7 +72,7 @@ def setup_custom_fields():
         redistribute_on_remake=True
     )
     print("  [OK] Allocated custom_scalar field")
-    
+
     # Create a vector field
     for idir, dirstr in enumerate(['x', 'y', 'z']):
         sim.fields.alloc_init(
@@ -88,15 +88,15 @@ def setup_custom_fields():
             redistribute_on_remake=True
         )
         print(f"  [OK] Allocated custom_vector_{dirstr} field")
-    
+
     # Mark fields for checkpointing
     sim.fields.set_checkpoint("custom_scalar", level=0, checkpoint=True)
     print("  [OK] Marked custom_scalar for checkpoint")
-    
+
     for dirstr in ['x', 'y', 'z']:
         sim.fields.set_checkpoint("custom_vector", dir=dirstr, level=0, checkpoint=True)
     print("  [OK] Marked custom_vector for checkpoint")
-    
+
     # Note: On restart, fields are automatically restored in PostRestart()
     # after user callbacks have allocated them
     if sim.amr_restart:
@@ -105,22 +105,22 @@ def setup_custom_fields():
 def verify_restored_fields():
     """Verify restored field values after restart (runs at first step)"""
     step = sim.extension.warpx.getistep(lev=0)
-    
+
     if sim.amr_restart and step == 6:
         print("\n" + "="*60)
         print("Verifying automatically restored field values")
         print("="*60)
-        
+
         # Get the restored fields
         test_scalar = sim.fields.get("custom_scalar", level=0)
-        
+
         # Check scalar
         scalar_data = test_scalar[...]
         scalar_mean = scalar_data.mean()
         print(f"  custom_scalar mean value: {scalar_mean}")
         assert abs(scalar_mean - 42.0) < 1e-10, f"Scalar field not restored correctly! Expected 42.0, got {scalar_mean}"
         print("  [OK] Scalar field values correct")
-        
+
         # Check vector components
         for idir, dirstr in enumerate(['x', 'y', 'z']):
             vec_field = sim.fields.get("custom_vector", dir=dirstr, level=0)
@@ -130,7 +130,7 @@ def verify_restored_fields():
             print(f"  custom_vector_{dirstr} mean value: {vec_mean}")
             assert abs(vec_mean - expected) < 1e-10, f"Vector {dirstr} not restored correctly! Expected {expected}, got {vec_mean}"
         print("  [OK] Vector field values correct")
-        
+
         print("\n" + "="*60)
         print("RESTART TEST PASSED!")
         print("="*60 + "\n")
@@ -145,12 +145,12 @@ def verify_checkpoint_written():
         print("\n" + "="*60)
         print("Verifying checkpoint file contents")
         print("="*60)
-        
+
         # Check that checkpoint directory exists (in diags/ subdirectory)
         chk_dir = "diags/checkpoint_restart_test000005"
         assert os.path.exists(chk_dir), f"Checkpoint directory {chk_dir} not found!"
         print(f"  [OK] Checkpoint directory exists: {chk_dir}")
-        
+
         # Check that custom field files exist
         for field_name in ["custom_scalar", "custom_vector[dir=x]", "custom_vector[dir=y]", "custom_vector[dir=z]"]:
             # AMReX MultiFab files have a _H header file
@@ -159,7 +159,7 @@ def verify_checkpoint_written():
                 print(f"  [OK] Found custom field file: {field_name}")
             else:
                 print(f"  WARNING: Custom field file not found: {field_name}")
-        
+
         print("="*60 + "\n")
 
 # IMPORTANT: Custom fields must be allocated in BOTH callbacks:

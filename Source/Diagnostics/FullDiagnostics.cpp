@@ -540,7 +540,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             // FALLBACK: Check if field exists in MultiFabRegister (RZ geometry path)
             // This allows output of persistent internal auxiliary fields or user-registered fields from Python
             bool found_in_register = false;
-            
+
             // Try as scalar field
             if (warpx.m_fields.has(m_varnames_fields[comp], lev)) {
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
@@ -576,7 +576,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                     }
                 }
             }
-            
+
             if (!found_in_register) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "Error: " + m_varnames_fields[comp] + " is not a known field output type in RZ geometry "
@@ -960,7 +960,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             // FALLBACK: Check if field exists in MultiFabRegister
             // This allows output of persistent internal auxiliary fields or user-registered fields from Python
             bool found_in_register = false;
-            
+
             // Try as scalar field
             if (warpx.m_fields.has(m_varnames[comp], lev)) {
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
@@ -990,7 +990,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                     }
                 }
             }
-            
+
             if (!found_in_register) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "Error on component " + m_varnames[comp] + ": "
@@ -1051,14 +1051,14 @@ FullDiagnostics::AddFieldToOutput (const std::string& field_name, int lev)
 
     if (!found_in_register) {
         WARPX_ABORT_WITH_MESSAGE(
-            "AddFieldToOutput: Field '" + field_name + "' not found in MultiFab register at level " 
+            "AddFieldToOutput: Field '" + field_name + "' not found in MultiFab register at level "
             + std::to_string(lev));
     }
 
     // Resize m_mf_output to accommodate new fields
     int new_ncomp = static_cast<int>(m_varnames.size());
     int old_ncomp = m_mf_output[0][lev].nComp();
-    
+
     if (new_ncomp > old_ncomp) {
         for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
             // Create new MultiFab with increased component count
@@ -1066,16 +1066,16 @@ FullDiagnostics::AddFieldToOutput (const std::string& field_name, int lev)
             amrex::MultiFab new_mf(m_mf_output[i_buffer][lev].boxArray(),
                                    m_mf_output[i_buffer][lev].DistributionMap(),
                                    new_ncomp, ngrow);
-            
+
             // Copy existing data from old MultiFab (if any)
             if (old_ncomp > 0) {
                 amrex::MultiFab::Copy(new_mf, m_mf_output[i_buffer][lev],
                                       0, 0, old_ncomp, 0);
             }
-            
+
             // Replace old MultiFab with new one
             m_mf_output[i_buffer][lev] = std::move(new_mf);
-            
+
             // Also resize m_sum_mf_output if time-averaged diagnostics
             if (m_diag_type == DiagTypes::TimeAveraged) {
                 amrex::MultiFab new_sum_mf(m_sum_mf_output[i_buffer][lev].boxArray(),
