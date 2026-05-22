@@ -10,6 +10,7 @@ This test verifies:
 """
 
 from pywarpx import picmi
+from pywarpx.callbacks import installafterInitEsolve, installafterstep
 
 # Simulation setup
 nx, ny, nz = 16, 16, 16
@@ -167,7 +168,6 @@ def test_remove_field_from_checkpoint():
         print("="*60 + "\n")
 
 
-from pywarpx.callbacks import installafterInitEsolve, installafterstep
 installafterInitEsolve(test_checkpoint_flags)
 installafterstep(test_remove_field_from_checkpoint)
 

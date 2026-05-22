@@ -14,6 +14,7 @@ import numpy as np
 import openpmd_api as io
 
 from pywarpx import picmi
+from pywarpx.callbacks import installafterInitEsolve
 
 # Minimal simulation setup
 nx, ny, nz = 8, 8, 8
@@ -101,7 +102,6 @@ def setup_custom_fields():
     print("  [OK] Fields registered with diagnostic 'field_output_test'")
 
 
-from pywarpx.callbacks import installafterInitEsolve
 installafterInitEsolve(setup_custom_fields)
 
 # -------------------------------------------------------------------------

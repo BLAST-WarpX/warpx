@@ -9,8 +9,9 @@ This script demonstrates how to compute individual terms from Ohm's law:
 And add them to diagnostic output using the new dynamic field registration.
 """
 
-from pywarpx import picmi, callbacks
 import numpy as np
+
+from pywarpx import callbacks, picmi
 
 # ============================================================================
 # Simulation setup (simplified - adjust for your actual simulation)
@@ -50,10 +51,6 @@ def compute_ohm_law_terms():
     level = 0
     
     # Get existing fields
-    Ex = sim.fields.get("Efield_fp", dir='x', level=level)
-    Ey = sim.fields.get("Efield_fp", dir='y', level=level)
-    Ez = sim.fields.get("Efield_fp", dir='z', level=level)
-    
     Bx = sim.fields.get("Bfield_fp", dir='x', level=level)
     By = sim.fields.get("Bfield_fp", dir='y', level=level)
     Bz = sim.fields.get("Bfield_fp", dir='z', level=level)

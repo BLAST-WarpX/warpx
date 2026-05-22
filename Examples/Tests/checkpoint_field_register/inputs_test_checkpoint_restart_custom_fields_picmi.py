@@ -8,10 +8,15 @@ This test verifies:
 3. Both scalar and vector fields work correctly
 """
 
-import os
-import numpy as np
 import argparse
+import os
+
 from pywarpx import picmi
+from pywarpx.callbacks import (
+    installafterInitatRestart,
+    installafterInitEsolve,
+    installafterstep,
+)
 
 # Parse command line arguments
 parser = argparse.ArgumentParser()
@@ -47,8 +52,6 @@ sim.add_diagnostic(chk)
 
 def setup_custom_fields():
     """Allocate and initialize custom fields (both new run and restart)"""
-    import amrex
-    
     print("\n" + "="*60)
     print("Setting up custom fields")
     print("="*60)
@@ -158,8 +161,6 @@ def verify_checkpoint_written():
                 print(f"  WARNING: Custom field file not found: {field_name}")
         
         print("="*60 + "\n")
-
-from pywarpx.callbacks import installafterInitEsolve, installafterInitatRestart, installafterstep
 
 # IMPORTANT: Custom fields must be allocated in BOTH callbacks:
 # - afterInitEsolve: runs on fresh start (after initial E-field solve)
