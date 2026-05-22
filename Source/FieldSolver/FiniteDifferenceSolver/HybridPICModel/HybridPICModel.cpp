@@ -1053,8 +1053,8 @@ void HybridPICModel::BfieldEvolveRKF45 (
         amrex::Real err_norm = 0._rt;
         amrex::Real B4_norm  = 0._rt;
         for (int ii = 0; ii < 3; ii++) {
-            err_norm = std::max(err_norm, err_scratch[ii].norm0(0, 0, true));
-            B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0(0, 0, true));
+            err_norm = std::max(err_norm, err_scratch[ii].norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
+            B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
         }
         amrex::ParallelDescriptor::ReduceRealMax({err_norm, B4_norm});
         const amrex::Real err_scalar = err_norm / (m_substep_atol + m_substep_rtol * B4_norm);
