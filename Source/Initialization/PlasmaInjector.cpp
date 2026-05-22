@@ -306,7 +306,8 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
         ablastr::warn_manager::WMRecordWarning("Species",
             "For accurate use of WarpX cylindrical geometry the number \n"
             "of particles should be at least two times n_rz_azimuthal_modes \n"
-            "(Please visit PR#765 for more information.)\n");
+            "(Please visit PR#765 for more information.)\n",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
     // Construct InjectorPosition with InjectorPositionRandom.
