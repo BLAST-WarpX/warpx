@@ -567,6 +567,82 @@ namespace ablastr::fields
     }
 
     void
+    MultiFabRegister::internal_set_checkpoint (
+        std::string const & name,
+        int level,
+        bool checkpoint
+    )
+    {
+        std::string const internal_name = mf_name(name, level);
+
+        auto it = m_mf_register.find(internal_name);
+        if (it == m_mf_register.end()) {
+            throw std::runtime_error(
+                "MultiFabRegister::set_checkpoint: field '" + name + 
+                "' not found at level " + std::to_string(level)
+            );
+        }
+
+        it->second.m_checkpoint = checkpoint;
+    }
+
+    void
+    MultiFabRegister::internal_set_checkpoint (
+        std::string const & name,
+        Direction dir,
+        int level,
+        bool checkpoint
+    )
+    {
+        std::string const internal_name = mf_name(name, dir, level);
+
+        auto it = m_mf_register.find(internal_name);
+        if (it == m_mf_register.end()) {
+            throw std::runtime_error(
+                "MultiFabRegister::set_checkpoint: field '" + name + 
+                "' with direction " + std::to_string(static_cast<int>(dir)) +
+                " not found at level " + std::to_string(level)
+            );
+        }
+
+        it->second.m_checkpoint = checkpoint;
+    }
+
+    std::vector<std::pair<std::string, std::optional<Direction>>>
+    MultiFabRegister::get_checkpoint_fields (int level) const
+    {
+        std::vector<std::pair<std::string, std::optional<Direction>>> result;
+
+        for (auto const & [internal_name, owner] : m_mf_register)
+        {
+            // Only include fields at the requested level that are marked for checkpoint
+            // and are not aliases (we only checkpoint the owner)
+            if (owner.m_level == level && owner.m_checkpoint && !owner.is_alias())
+            {
+                // Extract the base field name from the internal name
+                // Internal name format: "name[dir=x][level=0]" or "name[level=0]"
+                std::string field_name = internal_name;
+                
+                // Remove direction suffix (if present)
+                size_t dir_pos = field_name.find("[dir=");
+                if (dir_pos != std::string::npos) {
+                    field_name = field_name.substr(0, dir_pos);
+                }
+                
+                // Remove level suffix
+                size_t level_pos = field_name.find("[level=");
+                if (level_pos != std::string::npos) {
+                    field_name = field_name.substr(0, level_pos);
+                }
+
+                result.push_back({field_name, owner.m_dir});
+            }
+        }
+
+        return result;
+    }
+
+    void
     MultiFabRegister::internal_erase (
         std::string const & name,
         int level
