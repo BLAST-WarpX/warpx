@@ -41,11 +41,14 @@ void UpdateMomentumBoris(
     amrex::ParticleReal tx = econst*inv_gamma*Bx;
     amrex::ParticleReal ty = econst*inv_gamma*By;
     amrex::ParticleReal tz = econst*inv_gamma*Bz;
-    // For half pushes, rescale t so that two half rotations compose exactly into the
-    // full Boris rotation. The Boris formula rotates by an angle alpha with
-    // tan(alpha/2) = |t|; for two half rotations to compose to alpha_full we need
-    // |t_half| = tan(alpha_full/4) = (sqrt(1 + |t_full|^2) - 1) / |t_full|.
     if (momentum_push_type == MomentumPushType::FirstHalf || momentum_push_type == MomentumPushType::SecondHalf) {
+        // For a full push, the Boris algorithm rotates the momentum about the vector t,
+        // by an angle alpha that satisfies tan(alpha/2) = |t| = qB /(2 gamma m).
+        // (See Birdsall and Langdon, "Plasma Physics via Computer Simulation", section 4-3, eq. 10)
+        // For half pushes, the combination of the first and second half push should result in a rotation by the same alpha.
+        // Therefore, each half push should used a modified t than results in a rotation by only alpha/2.
+        // Using the identity tan(alpha/2) = 2 tan(alpha/4) / (1 - tan(alpha/4)^2), one can see that t should be
+        // rescaled so that |t_half|/|t_full| = tan(alpha/4)/tan(alpha/2) = (sqrt(1 + |t_full|^2) - 1) / |t_full|^2.
         const amrex::ParticleReal tsq = tx*tx + ty*ty + tz*tz;
         const amrex::ParticleReal factor = (tsq > 0._prt) ? (std::sqrt(1._prt + tsq) - 1._prt) / tsq : 0.5_prt;
         tx *= factor;
