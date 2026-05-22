@@ -307,7 +307,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, level);
 
-        return m_mf_register.contais(internal_name);
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -319,7 +319,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, dir, level);
 
-        return m_mf_register.contais(internal_name);
+        return m_mf_register.contains(internal_name);
     }
 
     bool
