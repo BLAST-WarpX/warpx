@@ -121,6 +121,8 @@ public:
     [[nodiscard]] bool DoDumpLastTimestep () const {return  m_dump_last_timestep;}
     /** Returns the number of snapshots used in BTD. For Full-Diagnostics, the value is 1*/
     [[nodiscard]] int getnumbuffers() const {return m_num_buffers;}
+    /** Returns the diagnostic name */
+    [[nodiscard]] std::string GetDiagName() const {return m_diag_name;}
     /** Time in lab-frame associated with the ith snapshot
      * \param[in] i_buffer index of the buffer
      */

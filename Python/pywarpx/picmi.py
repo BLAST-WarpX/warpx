@@ -4126,6 +4126,8 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
             A_fields_list = ["Ax", "Ay", "Az"]
             T_fields_list = ["Tx_", "Ty_", "Tz_"]
         if self.data_list is not None:
+            # TODO: remove allowed list and just pass all, then handle validation on C++ side
+            #       OR print warnings for non-standard fields?
             for dataname in self.data_list:
                 if dataname == "E":
                     for field_name in E_fields_list:
@@ -4186,6 +4188,16 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     self.plot_crsepatch = 1
                 elif dataname == "none":
                     fields_to_plot = set(("none",))
+                else:
+                    # Pass through unrecognized field names to C++ for validation.
+                    # This enables:
+                    # - WarpX-internal / auxiliary fields (e.g., hybrid_electron_pressure_fp)
+                    # - User-registered Python fields
+                    # - Future field types without needing Python updates
+                    # 
+                    # C++ diagnostics will validate and provide detailed error messages
+                    # if the field doesn't exist in the MultiFabRegister.
+                    fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
             # --- is the same on all processors.

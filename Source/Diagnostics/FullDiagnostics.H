@@ -13,6 +13,12 @@ class FullDiagnostics final : public Diagnostics
 {
 public:
     FullDiagnostics (int i, const std::string& name, DiagTypes diag_type);
+
+    /** Dynamically add a field from MultiFabRegister to diagnostic output
+     * \param[in] field_name name of the field in MultiFabRegister
+     * \param[in] lev refinement level
+     */
+    void AddFieldToOutput (const std::string& field_name, int lev);
     /** Type of time averaging for diagnostics (fields only)
      * None corresponds to instantaneous diags
      * Static corresponds to a fixed starting step for averaging,
