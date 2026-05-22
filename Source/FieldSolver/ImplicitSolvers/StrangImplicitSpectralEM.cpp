@@ -91,11 +91,12 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
     UpdateWarpXFields(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    amrex::Real const new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance E and B fields from time n+1/2 to time n+1
-    amrex::Real const new_time = start_time + m_dt;
     FinishFieldUpdate(new_time);
 
     // Advance the fields to time n+1 source free

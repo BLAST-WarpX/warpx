@@ -125,12 +125,13 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    const amrex::Real new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance Eg and Bg from time n+theta to time n+1
-    const amrex::Real end_time = start_time + m_dt;
-    FinishFieldUpdate(end_time);
+    FinishFieldUpdate(new_time);
 
 }
 
