@@ -54,7 +54,7 @@ def test_checkpoint_flags():
 
     # Test 1: Allocate a scalar field and mark for checkpoint
     print("\nTest 1: Scalar field checkpoint flag")
-    test_scalar = sim.fields.alloc_init(
+    sim.fields.alloc_init(
         name="test_scalar",
         level=0,
         ba=Ex.box_array(),
@@ -79,7 +79,7 @@ def test_checkpoint_flags():
     print("\nTest 2: Vector field checkpoint flags")
     for idir in range(3):
         dirstr = ['x', 'y', 'z'][idir]
-        test_vec = sim.fields.alloc_init(
+        sim.fields.alloc_init(
             name="test_vector",
             dir=dirstr,
             level=0,
@@ -130,7 +130,7 @@ def test_checkpoint_flags():
     
     # Test 4: Create an alias and verify it's not in checkpoint list
     print("\nTest 4: Verify aliases are excluded from checkpoints")
-    alias_field = sim.fields.alias_init(
+    sim.fields.alias_init(
         new_name="test_scalar_alias",
         alias_name="test_scalar",
         level=0,

@@ -57,7 +57,7 @@ def setup_custom_fields():
     Ex = sim.fields.get("Efield_fp", dir='x', level=0)
     
     # Create a scalar field
-    test_scalar = sim.fields.alloc_init(
+    sim.fields.alloc_init(
         name="custom_scalar",
         level=0,
         ba=Ex.box_array(),
@@ -72,7 +72,7 @@ def setup_custom_fields():
     
     # Create a vector field
     for idir, dirstr in enumerate(['x', 'y', 'z']):
-        test_vec = sim.fields.alloc_init(
+        sim.fields.alloc_init(
             name="custom_vector",
             dir=dirstr,
             level=0,

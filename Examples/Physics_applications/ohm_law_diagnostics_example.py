@@ -185,7 +185,7 @@ def setup_ohm_law_fields():
     
     # Allocate Hall term components
     for dir_str in ['x', 'y', 'z']:
-        hall = sim.fields.alloc_init(
+        sim.fields.alloc_init(
             name="hall_term",
             dir=dir_str,
             level=level,
@@ -198,7 +198,7 @@ def setup_ohm_law_fields():
             redistribute_on_remake=True
         )
         
-        pressure = sim.fields.alloc_init(
+        sim.fields.alloc_init(
             name="pressure_term",
             dir=dir_str,
             level=level,
