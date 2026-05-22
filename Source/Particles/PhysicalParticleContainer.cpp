@@ -149,7 +149,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     for (auto const& plasma_injector : plasma_injectors) {
         // For now, use the last value for charge and mass that is found.
         // A check could be added for consistency of multiple values, but it'll probably never be needed
-        charge_from_source |= plasma_injector->queryCharge(charge);
+        charge_from_source |= plasma_injector->queryCharge(m_charge);
         mass_from_source |= plasma_injector->queryMass(m_mass);
     }
 
@@ -160,12 +160,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
             physical_species_s + " does not exist!");
         physical_species = physical_species_from_string.value();
-        charge = species::get_charge( physical_species );
+        m_charge = species::get_charge( physical_species );
         m_mass = species::get_mass( physical_species );
     }
 
     // parse charge and mass (overriding values above)
-    const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", charge);
+    const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", m_charge);
     const bool mass_is_specified = utils::parser::queryWithParser(pp_species_name, "mass", m_mass);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE (
@@ -217,6 +217,13 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("do_not_deposit", do_not_deposit);
     pp_species_name.query("do_not_gather", do_not_gather);
     pp_species_name.query("do_not_push", do_not_push);
+
+    if (m_charge == 0._prt) {
+        do_not_deposit = true;
+        if (m_mass > 0._prt) {
+            do_not_gather = true;
+        }
+    }
 
     pp_species_name.query("do_continuous_injection", do_continuous_injection);
     pp_species_name.query("initialize_self_fields", initialize_self_fields);
@@ -1243,7 +1250,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             }
 
             // Loop over the particles and update their momentum
-            const amrex::ParticleReal q = this->charge;
+            const amrex::ParticleReal q = this->m_charge;
             const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -1437,7 +1444,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 
     // local copies for device lambda capture
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -1575,12 +1582,12 @@ PhysicalParticleContainer::InitIonizationModule ()
 {
     if (!do_field_ionization) { return; }
     const ParmParse pp_species_name(species_name);
-    if (charge != PhysConst::q_e){
+    if (m_charge != PhysConst::q_e){
         ablastr::warn_manager::WMRecordWarning("Species",
             "charge != q_e for ionizable species '" +
             species_name + "':" +
             "overriding user value and setting charge = q_e.");
-        charge = PhysConst::q_e;
+        m_charge = PhysConst::q_e;
     }
     utils::parser::queryWithParser(pp_species_name, "do_adk_correction", do_adk_correction);
 

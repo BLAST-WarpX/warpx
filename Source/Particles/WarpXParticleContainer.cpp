@@ -447,7 +447,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
 
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Sorting", blp_sort);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::FindMaxTilesize",
@@ -1016,7 +1016,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
-    const amrex::ParticleReal qs = this->charge;
+    const amrex::ParticleReal qs = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     // Get tile box where current is deposited.
@@ -1555,7 +1555,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                   "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for charge deposition");
         amrex::ignore_unused(range); // In case the assertion isn't compiled
 
-        const Real q = this->charge;
+        const Real q = this->m_charge;
 
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Sorting", blp_sort);
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::ChargeDeposition", blp_ppc_chd);
@@ -1780,7 +1780,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noz);
 
         ablastr::particles::deposit_charge<WarpXParticleContainer>(
-                pti, wp, this->charge, ion_lev,
+                pti, wp, this->m_charge, ion_lev,
                 rho, local_rho[thread_num],
                 WarpX::noz, dinv, xyzmin, WarpX::n_rz_azimuthal_modes,
                 ng_rho, depos_lev, ref_ratio,
@@ -2109,7 +2109,7 @@ std::unique_ptr<amrex::MultiFab>
 WarpXParticleContainer::GetDebyeLength (int lev)
 {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*m_charge != 0.,
         "The Debye length can not be calculated for a massless or neutral species.");
 
     WarpX & warpx = WarpX::GetInstance();
@@ -2127,7 +2127,7 @@ WarpXParticleContainer::GetDebyeLength (int lev)
     auto debye_length = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
     auto const rmass = static_cast<amrex::Real>(m_mass);
-    auto const rcharge = static_cast<amrex::Real>(charge);
+    auto const rcharge = static_cast<amrex::Real>(m_charge);
     amrex::Real const Aconst = PhysConst::epsilon_0/(rcharge*rcharge);
 
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
@@ -2208,7 +2208,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
 {
     using ablastr::fields::Direction;
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*m_charge != 0.,
         "The nuei can not be calculated for a massless or neutral species.");
 
     // This assumes that all of these quantities have already been calculated
@@ -2227,7 +2227,7 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
     amrex::MultiFab const & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
 
     auto const rimass = static_cast<amrex::Real>(m_mass);
-    auto const Zi = static_cast<amrex::Real>(charge)/PhysConst::q_e;
+    auto const Zi = static_cast<amrex::Real>(m_charge)/PhysConst::q_e;
 
     auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
 
@@ -2411,7 +2411,7 @@ std::unique_ptr<amrex::MultiFab>
 WarpXParticleContainer::GetPlasmaFrequency (int lev)
 {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*charge != 0.,
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass*m_charge != 0.,
         "The plasma frequency can not be calculated for a massless or neutral species.");
 
     std::unique_ptr<amrex::MultiFab> number_density = GetNumberDensity(lev);
@@ -2423,7 +2423,7 @@ WarpXParticleContainer::GetPlasmaFrequency (int lev)
     auto plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dm, ncomps, ng);
 
     auto const rmass = (amrex::Real)(m_mass);
-    auto const rcharge = (amrex::Real)(charge);
+    auto const rcharge = (amrex::Real)(m_charge);
     amrex::Real const Aconst = rcharge*rcharge/(rmass*PhysConst::epsilon_0);
 
 #ifdef AMREX_USE_OMP
@@ -2520,7 +2520,7 @@ amrex::ParticleReal WarpXParticleContainer::sumParticleWeight (bool local) const
 
 amrex::ParticleReal WarpXParticleContainer::sumParticleCharge (bool local) const {
 
-    return this->sumParticleWeight(local) * this->charge;
+    return this->sumParticleWeight(local) * this->m_charge;
 }
 
 std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool local) {
