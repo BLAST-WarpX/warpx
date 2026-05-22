@@ -280,6 +280,36 @@ WarpX::InitFromCheckpoint ()
                 multi_diags->GetDiag(idiag).InitData(*mypc);
             }
         }
+
+        // Read custom field metadata for checkpoint/restart
+        // Store metadata for later use after fields are allocated by user
+        std::vector<std::vector<std::pair<std::string, std::optional<Direction>>>> custom_fields_by_level(nlevs);
+        for (int lev = 0; lev < nlevs; ++lev) {
+            int num_custom_fields;
+            is >> num_custom_fields;
+            ablastr::utils::text::goto_next_line(is);
+            
+            for (int i = 0; i < num_custom_fields; ++i) {
+                std::string field_name;
+                std::getline(is, field_name);
+                
+                int has_direction;
+                is >> has_direction;
+                ablastr::utils::text::goto_next_line(is);
+                
+                std::optional<Direction> maybe_dir = std::nullopt;
+                if (has_direction == 1) {
+                    std::string dir_str;
+                    std::getline(is, dir_str);
+                    maybe_dir = Direction{dir_str};
+                }
+                
+                custom_fields_by_level[lev].push_back({field_name, maybe_dir});
+            }
+        }
+
+        // Store custom field metadata for use after user allocates fields
+        m_custom_fields_to_restore = std::move(custom_fields_by_level);
     }
 
     const int nlevs = finestLevel()+1;
@@ -425,4 +455,49 @@ WarpX::InitFromCheckpoint ()
         m_implicit_solver->CreateParticleAttributes();
     }
 
+}
+
+void
+WarpX::RestoreCustomFieldsFromCheckpoint ()
+{
+    using ablastr::fields::Direction;
+
+    WARPX_PROFILE("WarpX::RestoreCustomFieldsFromCheckpoint()");
+
+    if (m_custom_fields_to_restore.empty()) {
+        return;  // No custom fields to restore
+    }
+
+    // Read custom field data from checkpoint files
+    // This should be called after user has allocated fields via alloc_init in callback
+    for (int lev = 0; lev < static_cast<int>(m_custom_fields_to_restore.size()); ++lev) {
+        for (auto const & [field_name, maybe_dir] : m_custom_fields_to_restore[lev]) {
+            // Check if field exists (user should have allocated it)
+            bool field_exists = false;
+            if (maybe_dir.has_value()) {
+                field_exists = m_fields.has(field_name, *maybe_dir, lev);
+            } else {
+                field_exists = m_fields.has(field_name, lev);
+            }
+
+            if (!field_exists) {
+                amrex::Print() << Utils::TextMsg::Warn(
+                    "Custom field '" + field_name + "' at level " + std::to_string(lev) +
+                    " found in checkpoint but was not allocated. Skipping restore.");
+                continue;
+            }
+
+            // Read the field data
+            if (maybe_dir.has_value()) {
+                Direction dir = *maybe_dir;
+                std::string dir_str = static_cast<std::string>(dir);
+                std::string checkpoint_name = field_name + "[dir=" + dir_str + "]";
+                VisMF::Read(*m_fields.get(field_name, dir, lev),
+                            amrex::MultiFabFileFullPrefix(lev, restart_chkfile, "Level_", checkpoint_name));
+            } else {
+                VisMF::Read(*m_fields.get(field_name, lev),
+                            amrex::MultiFabFileFullPrefix(lev, restart_chkfile, "Level_", field_name));
+            }
+        }
+    }
 }

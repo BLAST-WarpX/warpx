@@ -347,6 +347,22 @@ FlushFormatPlotfile::WriteWarpXHeader(
                 }
             }
         }
+
+        // Write custom field metadata for checkpoint/restart
+        // For each level, write the number of custom fields and their names/directions
+        for (int lev = 0; lev < nlevels; ++lev) {
+            auto checkpoint_fields = warpx.m_fields.get_checkpoint_fields(lev);
+            HeaderFile << checkpoint_fields.size() << "\n";
+            for (auto const & [field_name, maybe_dir] : checkpoint_fields) {
+                HeaderFile << field_name << "\n";
+                if (maybe_dir.has_value()) {
+                    HeaderFile << "1\n";  // has direction
+                    HeaderFile << static_cast<std::string>(*maybe_dir) << "\n";
+                } else {
+                    HeaderFile << "0\n";  // no direction (scalar)
+                }
+            }
+        }
     }
 }
 
