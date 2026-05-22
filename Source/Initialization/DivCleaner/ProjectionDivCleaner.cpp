@@ -145,6 +145,14 @@ ProjectionDivCleaner::ReadParameters ()
 void
 ProjectionDivCleaner::solve ()
 {
+    // Skip divergence cleanup at quartz boundaries
+    for (int idim=0; idim<AMREX_SPACEDIM; idim++){
+        if (WarpX::field_boundary_lo[idim] == FieldBoundaryType::Quartz ||
+            WarpX::field_boundary_hi[idim] == FieldBoundaryType::Quartz) {
+            amrex::Print() << "Skipping divergence cleaning for Quartz boundary.\n";
+            return;
+        }
+    }
     // Get WarpX object
     auto & warpx = WarpX::GetInstance();
 

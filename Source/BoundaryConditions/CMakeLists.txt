@@ -8,6 +8,7 @@ foreach(D IN LISTS WarpX_DIMS)
         WarpXEvolvePML.cpp
         WarpXFieldBoundaries.cpp
         WarpX_PEC.cpp
+        Quartz.cpp
     )
 
     if(D STREQUAL "RZ")
