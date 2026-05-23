@@ -10,7 +10,6 @@
 
 #include <WarpX.H>
 #ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
 
@@ -52,7 +51,6 @@ static std::map<std::string, InitializationPolicy> initialization_policies = {
 #endif
 
 #ifdef WARPX_QED
-    {"opticalDepthBW",   InitializationPolicy::RandomExp},
     {"opticalDepthQSR",   InitializationPolicy::RandomExp}
 #endif
 
@@ -128,7 +126,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         const std::vector<amrex::Parser*>& user_real_attrib_parser = pc.getUserRealAttribParser();
         const std::vector<amrex::Parser*>& user_int_attrib_parser  = pc.getUserIntAttribParser();
 #ifdef WARPX_QED
-        BreitWheelerEngine*       p_bw_engine = pc.get_breit_wheeler_engine_ptr();
         QuantumSynchrotronEngine* p_qs_engine = pc.get_quantum_sync_engine_ptr();
 #endif
         const int ionization_initial_level = pc.getIonizationInitialLevel();
@@ -181,32 +178,6 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 }
             }
 
-            // Current runtime comp is Breit-Wheeler optical depth
-            auto const it_bw = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthBW");
-            if (it_bw != particle_comps.end() &&
-                std::distance(particle_comps.begin(), it_bw) == j)
-            {
-                if (!do_qed_comps) { continue; }
-                const BreitWheelerGetOpticalDepth breit_wheeler_get_opt =
-                                                p_bw_engine->build_optical_depth_functor();;
-                // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if (run_on_gpu) {
-                        amrex::ParallelForRNG(stop - start,
-                                              [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
-                                                  const int ip = i + start;
-                                                  attr_ptr[ip] = breit_wheeler_get_opt(engine);
-                                              });
-                // Otherwise (e.g. particle tile allocated in pinned memory), run on CPU
-                } else {
-                    for (int ip = start; ip < stop; ++ip) {
-#ifdef AMREX_USE_GPU
-                        attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{nullptr});
-#else
-                        attr_ptr[ip] = breit_wheeler_get_opt(amrex::RandomEngine{});
-#endif
-                    }
-                }
-            }
 #endif
 
             for (int ia = 0; ia < n_user_real_attribs; ++ia)

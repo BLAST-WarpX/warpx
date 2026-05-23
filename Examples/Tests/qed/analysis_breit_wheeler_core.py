@@ -26,8 +26,8 @@ from scipy.constants import c, e, fine_structure, hbar, m_e
 # - The generated particles are emitted in the right direction
 # - Total energy is conserved in each event
 # - The energy distribution of the generated particles is in agreement with theory
-# - The optical depths of the product species are correctly initialized (QED effects are
-#   enabled for product species too).
+# - The optical depths of the product species (used by Quantum Synchrotron emission)
+#   are correctly initialized (QED effects are enabled for product species too).
 #
 # More details on the theoretical formulas used in this script can be found in
 # the Jupyter notebook picsar/src/multi_physics/QED_tests/validation/validation.ipynb
@@ -210,15 +210,15 @@ def check_energy(energy_phot, energy_ele, energy_pos):
     print("  [OK] energy is conserved in each event")
 
 
-def check_opt_depths(phot_data, ele_data, pos_data):
-    data = (phot_data, ele_data, pos_data)
-    for dd in data:
-        # Remove the negative optical depths that correspond to photons that will decay into pairs
-        # at the beginning of the next timestep
-        loc, scale = st.expon.fit(dd["opt"][dd["opt"] > 0])
+def check_opt_depths(ele_data, pos_data):
+    # Photons no longer carry an optical depth: the Breit-Wheeler probability is
+    # sampled stochastically each timestep. Only the (charged) product species
+    # still carry a Quantum-Synchrotron optical depth.
+    for dd in (ele_data, pos_data):
+        loc, scale = st.expon.fit(dd["opt"])
         assert np.abs(loc - 0) < tol_red
         assert np.abs(scale - 1) < tol_red
-    print("  [OK] optical depth distributions are still exponential")
+    print("  [OK] product-species optical depth distributions are exponential")
 
 
 def check_energy_distrib(
@@ -318,6 +318,6 @@ def check(dt, particle_data):
             energy_ele, energy_pos, gamma_phot, chi_phot, n_lost, NNS[idx], idx
         )
 
-        check_opt_depths(phot_data, ele_data, pos_data)
+        check_opt_depths(ele_data, pos_data)
 
         print("*************\n")

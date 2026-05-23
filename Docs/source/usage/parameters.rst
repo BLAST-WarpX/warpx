@@ -5382,11 +5382,12 @@ Alternatively, one can use the low-resolution builtin tables or generate them on
 
     * ``generate``: a new table is generated on the fly at the beginning of the simulation. This option requires Boost math library
       (version >= 1.66) and the extra compilation flag ``-DWarpX_QED_TABLE_GEN=ON``.
-      All the following parameters must be specified (table 1 is used to evolve the optical depth
-      of the photons, while table 2 is used for pair generation):
+      All the following parameters must be specified (table 1 stores the ``dN/dt`` rate
+      used to sample the per-timestep Breit-Wheeler pair-production probability, while
+      table 2 is used for pair generation):
 
         * ``qed_bw.tab_dndt_chi_min`` (``float``): minimum chi parameter for lookup table 1 (
-          used for the evolution of the optical depth of the photons)
+          used to compute the per-timestep Breit-Wheeler pair-production probability)
 
         * ``qed_bw.tab_dndt_chi_max`` (``float``): maximum chi parameter for lookup table 1
 

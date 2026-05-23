@@ -11,7 +11,6 @@
 #include "Initialization/PlasmaInjector.H"
 
 #ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
 
@@ -311,31 +310,22 @@ struct QEDHelper
 {
     template <typename SoAType>
     QEDHelper (SoAType& a_soa, std::size_t old_size,
-               bool a_has_quantum_sync, bool a_has_breit_wheeler,
-               const std::shared_ptr<QuantumSynchrotronEngine>& a_shr_p_qs_engine,
-               const std::shared_ptr<BreitWheelerEngine>& a_shr_p_bw_engine)
-        : has_quantum_sync(a_has_quantum_sync), has_breit_wheeler(a_has_breit_wheeler)
+               bool a_has_quantum_sync,
+               const std::shared_ptr<QuantumSynchrotronEngine>& a_shr_p_qs_engine)
+        : has_quantum_sync(a_has_quantum_sync)
     {
         if(has_quantum_sync){
             quantum_sync_get_opt =
                 a_shr_p_qs_engine->build_optical_depth_functor();
             p_optical_depth_QSR = a_soa.GetRealData("opticalDepthQSR").data() + old_size;
         }
-        if(has_breit_wheeler){
-            breit_wheeler_get_opt =
-                a_shr_p_bw_engine->build_optical_depth_functor();
-            p_optical_depth_BW = a_soa.GetRealData("opticalDepthBW").data() + old_size;
-        }
     }
 
     amrex::ParticleReal* p_optical_depth_QSR = nullptr;
-    amrex::ParticleReal* p_optical_depth_BW  = nullptr;
 
     bool has_quantum_sync;
-    bool has_breit_wheeler;
 
     QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt;
-    BreitWheelerGetOpticalDepth breit_wheeler_get_opt;
 };
 #endif
 

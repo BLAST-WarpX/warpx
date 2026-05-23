@@ -165,8 +165,6 @@ namespace
      * \param pi ionization level data
      * \param has_quantum_sync whether species has quantum synchrotron
      * \param p_optical_depth_QSR quantum synchrotron optical depth data
-     * \param has_breit_wheeler whether species has Breit-Wheeler
-     * \param p_optical_depth_BW Breit-Wheeler optical depth data
      */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void ZeroInitializeAndSetNegativeID (
@@ -184,7 +182,6 @@ namespace
         if (do_field_ionization) {pi[ip] = 0;}
 #ifdef WARPX_QED
         if (qed_helper.has_quantum_sync) {qed_helper.p_optical_depth_QSR[ip] = 0._rt;}
-        if (qed_helper.has_breit_wheeler) {qed_helper.p_optical_depth_BW[ip] = 0._rt;}
 #endif
 
         idcpu[ip] = amrex::ParticleIdCpus::Invalid;
@@ -946,8 +943,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
 #ifdef WARPX_QED
         const QEDHelper qed_helper(soa, old_size,
-                                   has_quantum_sync(), has_breit_wheeler(),
-                                   m_shr_p_qs_engine, m_shr_p_bw_engine);
+                                   has_quantum_sync(),
+                                   m_shr_p_qs_engine);
 #endif
 
         const bool loc_do_field_ionization = do_field_ionization;
@@ -1138,10 +1135,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 #ifdef WARPX_QED
                 if(qed_helper.has_quantum_sync){
                     qed_helper.p_optical_depth_QSR[ip] = qed_helper.quantum_sync_get_opt(engine);
-                }
-
-                if(qed_helper.has_breit_wheeler){
-                    qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
                 }
 #endif
                 // Initialize user-defined integers with user-defined parser
@@ -1429,8 +1422,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
 #ifdef WARPX_QED
         const QEDHelper qed_helper(soa, old_size,
-                                   has_quantum_sync(), has_breit_wheeler(),
-                                   m_shr_p_qs_engine, m_shr_p_bw_engine);
+                                   has_quantum_sync(),
+                                   m_shr_p_qs_engine);
 #endif
 
         const bool loc_do_field_ionization = do_field_ionization;
@@ -1646,10 +1639,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 #ifdef WARPX_QED
                 if(qed_helper.has_quantum_sync){
                     qed_helper.p_optical_depth_QSR[ip] = qed_helper.quantum_sync_get_opt(engine);
-                }
-
-                if(qed_helper.has_breit_wheeler){
-                    qed_helper.p_optical_depth_BW[ip] = qed_helper.breit_wheeler_get_opt(engine);
                 }
 #endif
 

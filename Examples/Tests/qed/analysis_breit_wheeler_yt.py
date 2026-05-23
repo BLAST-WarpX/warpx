@@ -25,11 +25,11 @@ def main():
     filename_end = sys.argv[1]
     data_set_end = yt.load(filename_end)
 
-    # get simulation time
-    sim_time = data_set_end.current_time.to_value()
-    # no particles can be created on the first timestep so we have 2 timesteps in the test case,
-    # with only the second one resulting in particle creation
-    dt = sim_time / 2.0
+    # The Breit-Wheeler pair-production probability is sampled stochastically
+    # at each timestep, so the expected number of pairs after the test's
+    # `max_step` timesteps follows `1 - exp(-dN/dt * sim_time)`. We therefore
+    # use the total simulation time as the effective dt in the analysis.
+    dt = data_set_end.current_time.to_value()
 
     # get particle data
     all_data_end = data_set_end.all_data()
@@ -45,9 +45,7 @@ def main():
         data["pz"] = all_data_end[spec_name, "particle_momentum_z"].v
         data["w"] = all_data_end[spec_name, "particle_weighting"].v
 
-        if is_photon:
-            data["opt"] = all_data_end[spec_name, "particle_opticalDepthBW"].v
-        else:
+        if not is_photon:
             data["opt"] = all_data_end[spec_name, "particle_opticalDepthQSR"].v
 
         particle_data[spec_name] = data

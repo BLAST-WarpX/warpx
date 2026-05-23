@@ -142,8 +142,6 @@ Attribute name        ``int``/``real``  Description                         Wher
                                                                                        physics is used.
 ``opticalDepthQSR``   ``real``          QED: optical depth of the Quantum-  SoA   RT   Added when PICSAR QED
                                         Synchrotron process                            physics is used.
-``opticalDepthBW``    ``real``          QED: optical depth of the Breit-    SoA   RT   Added when PICSAR QED
-                                        Wheeler process                                physics is used.
 ``x/y/z_n``           ``real``          For implicit solver, the position   SoA   RT   Added when implicit solver
                                         at the start of the time step.                 is used. Not included in diagnostic output.
 ``ux/uy/uz_n``        ``real``          For implicit solver, the momentum   SoA   RT   Added when implicit solver

@@ -26,7 +26,7 @@ namespace QedUtils{
     * @param[in] bx,by,bz components of magnetic field (SI units)
     * @return chi parameter
     */
-    AMREX_GPU_DEVICE
+    AMREX_GPU_HOST_DEVICE
     AMREX_FORCE_INLINE
     amrex::Real chi_photon(
         const amrex::ParticleReal px, const amrex::ParticleReal py,

@@ -71,124 +71,6 @@ struct PicsarBreitWheelerCtrl
 // They can be included in GPU kernels.
 
 /**
- * Functor to initialize the optical depth of photons for the
- * Breit-Wheeler process
- */
-class BreitWheelerGetOpticalDepth
-{
-public:
-    /**
-     * Constructor does nothing because optical depth initialization
-     * does not require control parameters or lookup tables.
-     */
-    BreitWheelerGetOpticalDepth () = default;
-
-    /**
-     * () operator is just a thin wrapper around a very simple function to
-     * generate the optical depth. It can be used on GPU.
-     */
-    AMREX_GPU_HOST_DEVICE
-    AMREX_FORCE_INLINE
-    amrex::ParticleReal operator() (amrex::RandomEngine const& engine) const noexcept
-    {
-        namespace pxr_bw = picsar::multi_physics::phys::breit_wheeler;
-
-        //A random number in [0,1) should be provided as an argument.
-        return pxr_bw::get_optical_depth(amrex::Random(engine));
-    }
-};
-//____________________________________________
-
-/**
- * Functor to evolve the optical depth of photons due to the
- * Breit-Wheeler process
- */
-class BreitWheelerEvolveOpticalDepth
-{
-public:
-
-    /**
-     * Default constructor: it leaves the functor in a non-initialized state.
-     */
-    BreitWheelerEvolveOpticalDepth () = default;
-
-
-    /**
-     * Constructor to be used to initialize the functor.
-     *
-     * @param[in] table_view a view of a BW_dndt_table lookup table
-     * @param[in] bw_minimum_chi_phot the minimum quantum parameter to evolve the optical depth
-     */
-    BreitWheelerEvolveOpticalDepth (
-        const BW_dndt_table_view table_view,
-        const amrex::ParticleReal bw_minimum_chi_phot):
-        m_table_view{table_view}, m_bw_minimum_chi_phot{bw_minimum_chi_phot}{}
-
-    /**
-     * Evolves the optical depth. It can be used on GPU.
-     * If the  quantum parameter parameter of the photon is
-     * < bw_minimum_chi_phot, the method returns immediately.
-     * The method returns also if the energy of the photon is insufficient
-     * to generate a pair.
-     *
-     * @param[in] ux,uy,uz gamma*v components of the photon.
-     * @param[in] ex,ey,ez electric field components (SI units)
-     * @param[in] bx,by,bz magnetic field components (SI units)
-     * @param[in] dt timestep (SI units)
-     * @param[in,out] opt_depth optical depth of the photon.
-     * @return a flag which is 1 if chi_phot was out of table
-     */
-    AMREX_GPU_DEVICE
-    AMREX_FORCE_INLINE
-    int operator()(
-        const amrex::ParticleReal ux, const amrex::ParticleReal uy,
-        const amrex::ParticleReal uz, const amrex::ParticleReal ex,
-        const amrex::ParticleReal ey, const amrex::ParticleReal ez,
-        const amrex::ParticleReal bx, const amrex::ParticleReal by,
-        const amrex::ParticleReal bz, const amrex::Real dt,
-        amrex::ParticleReal& opt_depth) const noexcept
-    {
-        namespace pxr_m = picsar::multi_physics::math;
-        namespace pxr_p = picsar::multi_physics::phys;
-        namespace pxr_bw = picsar::multi_physics::phys::breit_wheeler;
-
-        constexpr amrex::ParticleReal m_e = PhysConst::m_e;
-        const auto u_norm = std::sqrt(ux*ux + uy*uy + uz*uz);
-        const auto energy = u_norm*m_e*PhysConst::c;
-
-        const auto px = m_e*ux;
-        const auto py = m_e*uy;
-        const auto pz = m_e*uz;
-
-        const auto chi_phot = QedUtils::chi_photon(
-            px, py, pz, ex, ey, ez, bx, by, bz);
-
-        //Optical depth is not evolved for photons having less energy than what is
-        //required to generate a pair or a quantum parameter smaller than
-        //m_bw_minimum_chi_phot
-        const auto gamma_photon = pxr_p::compute_gamma_photon<
-                amrex::ParticleReal, pxr_p::unit_system::SI>(
-                    px, py, pz);
-        if (gamma_photon < pxr_m::two<amrex::ParticleReal> ||
-            chi_phot < m_bw_minimum_chi_phot) {
-            return 0;
-        }
-
-        const auto is_out = pxr_bw::evolve_optical_depth<
-            amrex::ParticleReal,
-            BW_dndt_table_view,
-            pxr_p::unit_system::SI>(
-                energy, chi_phot, dt, opt_depth, m_table_view);
-
-        return is_out;
-    }
-
-private:
-    BW_dndt_table_view m_table_view;
-    amrex::ParticleReal m_bw_minimum_chi_phot;
-};
-
-/**
  * Functor to generate a pair via the
  * Breit-Wheeler process
  */
@@ -299,19 +181,15 @@ public:
     BreitWheelerEngine () = default;
 
     /**
-     * Builds the functor to initialize the optical depth
-     */
-    [[nodiscard]] BreitWheelerGetOpticalDepth build_optical_depth_functor () const;
-
-    /**
-     * Builds the functor to evolve the optical depth
-     */
-    [[nodiscard]] BreitWheelerEvolveOpticalDepth build_evolve_functor () const;
-
-    /**
      * Builds the functor to generate the pairs
      */
     [[nodiscard]] BreitWheelerGeneratePairs build_pair_functor () const;
+
+    /**
+     * Returns a view of the dN/dt lookup table. Used by the pair-generation
+     * filter functor to compute the per-timestep Breit-Wheeler probability.
+     */
+    [[nodiscard]] BW_dndt_table_view get_dndt_table_view () const;
 
     /**
      * Checks if the optical tables are properly initialized
@@ -330,7 +208,8 @@ public:
      * Init lookup tables from raw binary data.
      *
      * @param[in] raw_data a vector of char
-     * @param[in] bw_minimum_chi_phot minimum chi parameter to evolve the optical depth of a photon
+     * @param[in] bw_minimum_chi_phot minimum chi parameter below which the Breit-Wheeler
+     *            process is ignored for a photon
      * @return true if it succeeds, false if it cannot parse raw_data
      */
     bool init_lookup_tables_from_raw_data (
@@ -340,7 +219,8 @@ public:
     /**
      * Init lookup tables using built-in (low resolution) tables
      *
-     * @param[in] bw_minimum_chi_phot minimum chi parameter to evolve the optical depth of a photon
+     * @param[in] bw_minimum_chi_phot minimum chi parameter below which the Breit-Wheeler
+     *            process is ignored for a photon
      */
     void init_builtin_tables(amrex::ParticleReal bw_minimum_chi_phot);
 
@@ -348,7 +228,8 @@ public:
      * Computes the lookup tables. It does nothing unless WarpX is compiled with QED_TABLE_GEN=TRUE
      *
      * @param[in] ctrl control params to generate the tables
-     * @param[in] bw_minimum_chi_phot minimum chi parameter to evolve the optical depth of a photon
+     * @param[in] bw_minimum_chi_phot minimum chi parameter below which the Breit-Wheeler
+     *            process is ignored for a photon
      */
     void compute_lookup_tables (PicsarBreitWheelerCtrl ctrl,
         amrex::ParticleReal bw_minimum_chi_phot);
@@ -365,8 +246,7 @@ public:
 private:
     bool m_lookup_tables_initialized = false;
 
-    //Variables to store the minimum chi parameters to enable
-    //Quantum Synchrotron process
+    //Minimum chi parameter below which the Breit-Wheeler process is ignored
     amrex::ParticleReal m_bw_minimum_chi_phot;
 
     BW_dndt_table m_dndt_table;

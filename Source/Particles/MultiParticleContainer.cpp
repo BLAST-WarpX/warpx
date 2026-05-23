@@ -1753,11 +1753,13 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
         const SmartCopyFactory copy_factory_pos(*pc_source, *pc_product_pos);
         auto *phys_pc_ptr = static_cast<PhysicalParticleContainer*>(pc_source.get());
 
-        const auto Filter  = phys_pc_ptr->getPairGenerationFilterFunc();
         const auto CopyEle = copy_factory_ele.getSmartCopy();
         const auto CopyPos = copy_factory_pos.getSmartCopy();
 
         const auto pair_gen_functor = m_shr_p_bw_engine->build_pair_functor();
+        const auto bw_dndt_table_view = m_shr_p_bw_engine->get_dndt_table_view();
+        const auto bw_minimum_chi_phot = m_shr_p_bw_engine->get_minimum_chi_phot();
+        const auto dt = WarpX::GetInstance().getdt(lev);
 
         pc_source ->defineAllParticleTiles();
         pc_product_pos->defineAllParticleTiles();
@@ -1775,6 +1777,15 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
                 amrex::Gpu::synchronize();
             }
             auto wt = static_cast<amrex::Real>(amrex::second());
+
+            auto Filter = PairGenerationFilterFunc(bw_dndt_table_view,
+                                                   bw_minimum_chi_phot,
+                                                   dt,
+                                                   pti, lev, Ex.nGrowVect(),
+                                                   Ex[pti], Ey[pti], Ez[pti],
+                                                   Bx[pti], By[pti], Bz[pti],
+                                                   phys_pc_ptr->m_E_external_particle,
+                                                   phys_pc_ptr->m_B_external_particle);
 
             auto Transform = PairGenerationTransformFunc(pair_gen_functor,
                                                          pti, lev, Ex.nGrowVect(),

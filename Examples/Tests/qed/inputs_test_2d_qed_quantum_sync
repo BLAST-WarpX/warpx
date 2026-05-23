@@ -183,7 +183,7 @@ diag1.p2.variables = x z ux uy uz w opticalDepthQSR
 diag1.p3.variables = x z ux uy uz w opticalDepthQSR
 diag1.p4.variables = x z ux uy uz w opticalDepthQSR
 
-diag1.qsp_1.variables = x z ux uy uz w opticalDepthBW
-diag1.qsp_2.variables = x z ux uy uz w opticalDepthBW
-diag1.qsp_3.variables = x z ux uy uz w opticalDepthBW
-diag1.qsp_4.variables = x z ux uy uz w opticalDepthBW
+diag1.qsp_1.variables = x z ux uy uz w
+diag1.qsp_2.variables = x z ux uy uz w
+diag1.qsp_3.variables = x z ux uy uz w
+diag1.qsp_4.variables = x z ux uy uz w

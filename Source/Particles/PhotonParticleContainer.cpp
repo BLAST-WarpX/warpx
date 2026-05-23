@@ -7,9 +7,6 @@
  */
 #include "PhotonParticleContainer.H"
 
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#endif
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/PhysicalParticleContainer.H"
@@ -123,18 +120,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
 
-#ifdef WARPX_QED
-    BreitWheelerEvolveOpticalDepth evolve_opt;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_BW = nullptr;
-    const amrex::Real qed_dt =
-        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
-    const bool local_has_breit_wheeler = has_breit_wheeler();
-    if (local_has_breit_wheeler) {
-        evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
-        p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
-    }
-#endif
-
     const int do_copy = (m_do_back_transformed_particles && (subcycling_half!=SubcyclingHalf::SecondHalf) );
     CopyParticleAttribs copyAttribs;
     if (do_copy) {
@@ -179,24 +164,16 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const auto t_do_not_gather = do_not_gather;
 
     enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
-    const int qed_runtime_flag = (local_has_breit_wheeler) ? has_qed : no_qed;
-#else
-    const int qed_runtime_flag = no_qed;
-#endif
 
     // local copy for device lambda capture
     amrex::ParticleReal const mass = m_mass;
 
-    amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
-                                CompileTimeOptions<no_qed  ,has_qed>>{},
-                       {exteb_runtime_flag, qed_runtime_flag},
+    amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
+                       {exteb_runtime_flag},
                        np_to_push,
-                       [=] AMREX_GPU_DEVICE (long i, auto exteb_control,
-                                             auto qed_control) {
+                       [=] AMREX_GPU_DEVICE (long i, auto exteb_control) {
             if (do_copy) { copyAttribs(i); }
             ParticleReal x, y, z;
             GetPosition(i, x, y, z);
@@ -221,22 +198,6 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             if constexpr (exteb_control == has_exteb) {
                 getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
-
-#ifdef WARPX_QED
-            [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
-            [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
-            [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
-            [[maybe_unused]] auto *uy_tmp = uy;
-            [[maybe_unused]] auto *uz_tmp = uz;
-            [[maybe_unused]] auto dt_tmp = dt;
-            [[maybe_unused]] auto qed_dt_tmp = qed_dt;
-            if constexpr (qed_control == has_qed) {
-                evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                           qed_dt, p_optical_depth_BW[i]);
-            }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
 
             if (position_push_type == PositionPushType::Full) {
                 UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
