@@ -33,6 +33,7 @@ Checks: '
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
         -misc-include-cleaner,
+        -misc-use-internal-linkage,
     modernize-*,
         -modernize-avoid-c-arrays,
         -modernize-return-braced-init-list,
@@ -57,6 +58,7 @@ Checks: '
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
+        -readability-math-missing-parentheses,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix,
         -readability-redundant-casting,
@@ -92,8 +94,10 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 
 # TODO Consider enabling the following checks:
 # -bugprone-unused-local-non-trivial-variable
+# -misc-use-internal-linkage
 # -performance-enum-size
 # -readability-container-contains
+# -readability-math-missing-parentheses
 # -readability-redundant-inline-specifier
 # -readability-redundant-member-init
 # -readability-reference-to-constructed-temporary
