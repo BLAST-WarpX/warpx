@@ -117,7 +117,7 @@ computeEffectivePotentialPhi (
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
-    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt,
+    [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
     [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
 ) {
