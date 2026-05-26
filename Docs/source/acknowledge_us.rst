@@ -75,7 +75,6 @@ If your project leads to a scientific publication, please consider citing all Wa
                       Ge, Lixin and
                       Giacomel, Lorenzo and
                       Gott, Kevin and
-                      Giacomel, Lorenzo and
                       Groenewald, Roelof E. and
                       Grote, David and
                       Gu, Junmin and
@@ -94,7 +93,6 @@ If your project leads to a scientific publication, please consider citing all Wa
                       Pech, Juliette and
                       Rheaume, Elisa and
                       Richardson, Glenn and
-                      Rheaume, Elisa and
                       Rowan, Michael E. and
                       Sandberg, Ryan Thor and
                       Scherpelz, Peter and
@@ -152,7 +150,6 @@ Since WarpX is an actively evolving project, a specific version might be used in
                       Ge, Lixin and
                       Giacomel, Lorenzo and
                       Gott, Kevin and
-                      Giacomel, Lorenzo and
                       Groenewald, Roelof E. and
                       Grote, David and
                       Gu, Junmin and
@@ -171,7 +168,6 @@ Since WarpX is an actively evolving project, a specific version might be used in
                       Pech, Juliette and
                       Rheaume, Elisa and
                       Richardson, Glenn and
-                      Rheaume, Elisa and
                       Rowan, Michael E. and
                       Sandberg, Ryan Thor and
                       Scherpelz, Peter and
