@@ -42,7 +42,6 @@ Checks: '
         -modernize-use-std-numbers,
         -modernize-use-ranges,
         -modernize-use-integer-sign-comparison,
-        -modernize-use-starts-ends-with,
     mpi-*,
     performance-*,
         -performance-enum-size,
@@ -85,7 +84,6 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -modernize-use-std-numbers
 # -modernize-use-ranges
 # -modernize-use-integer-sign-comparison
-# -modernize-use-starts-ends-with
 # -readability-container-contains
 
 # TODO Consider enabling the following checks:
