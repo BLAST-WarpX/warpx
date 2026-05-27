@@ -1975,12 +1975,12 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     amrex::MultiFab & particle_number = *warpx.m_fields.get(N_field_name, lev);
     particle_number.setVal(0., 0, particle_number.nComp(), particle_number.nGrowVect());
 
-    amrex::MultiFab & ux = *warpx.m_fields.get(u_field_name, Direction{0}, lev);
-    amrex::MultiFab & uy = *warpx.m_fields.get(u_field_name, Direction{1}, lev);
-    amrex::MultiFab & uz = *warpx.m_fields.get(u_field_name, Direction{2}, lev);
-    ux.setVal(0., 0, ux.nComp(), ux.nGrowVect());
-    uy.setVal(0., 0, uy.nComp(), uy.nGrowVect());
-    uz.setVal(0., 0, uz.nComp(), uz.nGrowVect());
+    amrex::MultiFab & ux_mf = *warpx.m_fields.get(u_field_name, Direction{0}, lev);
+    amrex::MultiFab & uy_mf = *warpx.m_fields.get(u_field_name, Direction{1}, lev);
+    amrex::MultiFab & uz_mf = *warpx.m_fields.get(u_field_name, Direction{2}, lev);
+    ux_mf.setVal(0., 0, ux_mf.nComp(), ux_mf.nGrowVect());
+    uy_mf.setVal(0., 0, uy_mf.nComp(), uy_mf.nGrowVect());
+    uz_mf.setVal(0., 0, uz_mf.nComp(), uz_mf.nGrowVect());
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1996,9 +1996,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
 
         amrex::Array4<amrex::Real> const& N_array = particle_number.array(pti);
-        amrex::Array4<amrex::Real> const& ux_array = ux.array(pti);
-        amrex::Array4<amrex::Real> const& uy_array = uy.array(pti);
-        amrex::Array4<amrex::Real> const& uz_array = uz.array(pti);
+        amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
+        amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
+        amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
 
         amrex::ParallelFor(np,
             [=] AMREX_GPU_DEVICE (long ip) {
@@ -2026,9 +2026,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
     {
         const amrex::Box& box = mfi.tilebox();
         amrex::Array4<amrex::Real> const& N_array = particle_number.array(mfi);
-        amrex::Array4<amrex::Real> const& ux_array = ux.array(mfi);
-        amrex::Array4<amrex::Real> const& uy_array = uy.array(mfi);
-        amrex::Array4<amrex::Real> const& uz_array = uz.array(mfi);
+        amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(mfi);
+        amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(mfi);
+        amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(mfi);
         amrex::ParallelFor(box,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (N_array(i,j,k) > 0) {
@@ -2054,9 +2054,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
 
-        amrex::Array4<amrex::Real> const& ux_array = ux.array(pti);
-        amrex::Array4<amrex::Real> const& uy_array = uy.array(pti);
-        amrex::Array4<amrex::Real> const& uz_array = uz.array(pti);
+        amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
+        amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
+        amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(pti);
 
         amrex::ParallelFor(np,
