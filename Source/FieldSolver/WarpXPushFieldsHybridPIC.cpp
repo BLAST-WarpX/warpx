@@ -175,8 +175,10 @@ void WarpX::HybridPICEvolveFields ()
         m_eb_update_E, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
-    // Update Ve_fp at t=n+1 for the next step's particle-level drag operator.
+    // Update Ve_fp and per-species Vs_fp at t=n+1 for the next step's
+    // particle-level drag operator.
     m_hybrid_pic_model->CalculateElectronFluidVelocity();
+    m_hybrid_pic_model->CalculateIonFluidVelocity();
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
@@ -254,6 +256,12 @@ void WarpX::HybridPICDepositRhoAndJ ()
                               0, 0, 1, current_fp[lev][idim]->nGrowVect());
             }
         }
+        // Per-species charge density (used to recover the species bulk
+        // velocity Vs = Js/rhos in CalculateIonFluidVelocity).
+        pc.DepositCharge(m_fields.get_mr_levels("rho_fp_" + spec, finest_level),
+                         /*local*/false, /*reset*/true,
+                         /*apply_boundary_and_scale_volume*/false,
+                         /*interpolate_across_levels*/false);
     }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     for (int lev = 0; lev <= finest_level; ++lev) {

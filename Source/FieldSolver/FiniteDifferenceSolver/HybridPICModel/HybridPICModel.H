@@ -188,6 +188,16 @@ public:
     void CalculateElectronFluidVelocity (int lev) const;
 
     /**
+     * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
+     * grid for every charged species. Output is stored in Vs_fp_<species>
+     * (face-staggered like J). Used by the resistive-drag operator to
+     * apply a per-cell uniform shift (V_s - V_e)(1 - exp(-nu dt)) to every
+     * particle, leaving the thermal moment intact.
+     */
+    void CalculateIonFluidVelocity () const;
+    void CalculateIonFluidVelocity (int lev) const;
+
+    /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
      * specified electron equation of state.

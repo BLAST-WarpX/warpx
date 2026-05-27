@@ -151,10 +151,11 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, 0.0_rt);
 
-    // Per-species ion current density - one MultiFab per charged species,
-    // accumulated into current_fp during deposition. Allows the per-species
-    // velocity moment to be reconstructed on the grid for downstream coupling
-    // (e.g. resistive-drag collision operator).
+    // Per-species ion fields - one set per charged species. current_fp_<s>
+    // and rho_fp_<s> are deposited from particles and accumulated into the
+    // global current_fp / rho_fp; Vs_fp_<s> is the bulk velocity J_s/rho_s,
+    // used by the resistive-drag operator to shift each species' particles
+    // toward V_e without collapsing the thermal moment.
     auto const & mypc = WarpX::GetInstance().GetPartContainer();
     for (auto const & spec : mypc.GetSpeciesNames()) {
         if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
@@ -163,6 +164,14 @@ void HybridPICModel::AllocateLevelMFs (
         fields.alloc_init("current_fp_" + spec, Direction{1},
             lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         fields.alloc_init("current_fp_" + spec, Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("rho_fp_" + spec,
+            lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+        fields.alloc_init("Vs_fp_" + spec, Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("Vs_fp_" + spec, Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("Vs_fp_" + spec, Direction{2},
             lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
@@ -521,10 +530,104 @@ void HybridPICModel::CalculateElectronFluidVelocity (const int lev) const
         );
     }
 
+    // FillBoundary first so the filter sees valid ghost values, then apply
+    // the same binomial filter used on J (suppresses grid-scale noise that
+    // would otherwise be injected into particles by the gather inside the
+    // drag operator). Final FillBoundary refreshes ghosts after filtering.
     for (int idim = 0; idim < 3; ++idim) {
         ablastr::utils::communication::FillBoundary(
             *Ve[idim], WarpX::do_single_precision_comms,
             warpx.Geom(lev).periodicity(), true);
+    }
+    if (WarpX::use_filter) {
+        warpx.ApplyFilterMF(
+            warpx.m_fields.get_mr_levels_alldirs("Ve_fp", warpx.finestLevel()), lev);
+        for (int idim = 0; idim < 3; ++idim) {
+            ablastr::utils::communication::FillBoundary(
+                *Ve[idim], WarpX::do_single_precision_comms,
+                warpx.Geom(lev).periodicity(), true);
+        }
+    }
+}
+
+void HybridPICModel::CalculateIonFluidVelocity () const
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        CalculateIonFluidVelocity(lev);
+    }
+}
+
+void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
+{
+    ABLASTR_PROFILE("WarpX::CalculateIonFluidVelocity()");
+    using namespace ablastr::coarsen::sample;
+
+    auto & warpx = WarpX::GetInstance();
+    auto const & mypc = warpx.GetPartContainer();
+
+    auto const Jx_stag = Jx_IndexType;
+    auto const Jy_stag = Jy_IndexType;
+    auto const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    auto const rho_floor = m_n_floor * PhysConst::q_e;
+
+    for (auto const & spec : mypc.GetSpeciesNames()) {
+        if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
+        ablastr::fields::VectorField Vs = warpx.m_fields.get_alldirs("Vs_fp_" + spec, lev);
+        ablastr::fields::VectorField Js = warpx.m_fields.get_alldirs("current_fp_" + spec, lev);
+        amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( MFIter mfi(*Vs[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+            Array4<Real> const& Vsx = Vs[0]->array(mfi);
+            Array4<Real> const& Vsy = Vs[1]->array(mfi);
+            Array4<Real> const& Vsz = Vs[2]->array(mfi);
+            Array4<Real const> const& Jsx = Js[0]->const_array(mfi);
+            Array4<Real const> const& Jsy = Js[1]->const_array(mfi);
+            Array4<Real const> const& Jsz = Js[2]->const_array(mfi);
+            Array4<Real const> const& rho = rho_s.const_array(mfi);
+
+            Box const& tx = mfi.tilebox(Vs[0]->ixType().toIntVect());
+            Box const& ty = mfi.tilebox(Vs[1]->ixType().toIntVect());
+            Box const& tz = mfi.tilebox(Vs[2]->ixType().toIntVect());
+
+            amrex::ParallelFor(tx, ty, tz,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val = std::max(Interp(rho, nodal, Jx_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsx(i, j, k) = Jsx(i, j, k) / rho_val;
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val = std::max(Interp(rho, nodal, Jy_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsy(i, j, k) = Jsy(i, j, k) / rho_val;
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val = std::max(Interp(rho, nodal, Jz_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsz(i, j, k) = Jsz(i, j, k) / rho_val;
+                }
+            );
+        }
+
+        for (int idim = 0; idim < 3; ++idim) {
+            ablastr::utils::communication::FillBoundary(
+                *Vs[idim], WarpX::do_single_precision_comms,
+                warpx.Geom(lev).periodicity(), true);
+        }
+        // Same J-style binomial filter as in CalculateElectronFluidVelocity.
+        if (WarpX::use_filter) {
+            warpx.ApplyFilterMF(
+                warpx.m_fields.get_mr_levels_alldirs("Vs_fp_" + spec, warpx.finestLevel()),
+                lev);
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *Vs[idim], WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(), true);
+            }
+        }
     }
 }
 
