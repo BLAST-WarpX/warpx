@@ -403,10 +403,6 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        int num_sweeps = 16; // amrex default is 2
-        mlmg.setPreSmooth(num_sweeps);
-        mlmg.setPostSmooth(num_sweeps);
-        mlmg.setFinalSmooth(4*num_sweeps); // amrex default is 8. Thus the 4*.
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
 
