@@ -54,8 +54,11 @@ if last_fn[-1] == "/":
 last_it = last_fn[-6:]  # i.e., 000150
 prefix = last_fn[:-6]  # i.e., diags/diag1
 
-# Collect all output files in fn_list (names match pattern prefix + arbitrary number)
-fn_list = glob.glob(prefix + "*[0-9]")
+# Collect all output files in fn_list (names match pattern prefix + step number between 0 and 150)
+# This avoids reading any old plotfiles that are there if the test is run multiple times, which
+# which cause this test to fail.
+fn_list = glob.glob(prefix + "000[01][0-9][0-9]")
+fn_list.sort()
 
 error = 0.0
 nt = 0
