@@ -3650,7 +3650,7 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the exponent used to calculate
     the electron pressure (see :ref:`here <theory-hybrid-model-elec-temp>`).
 
-.. pp:param:: hybrid_pic_model.plasma_resistivity(rho,J)
+.. pp:param:: hybrid_pic_model.plasma_resistivity(rho,J,t)
     :type: ``float`` or ``str``
     :default: ``0``
     :optional:
@@ -3683,7 +3683,63 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``10``
     :optional:
 
-    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the number of sub-steps to take during the B-field update.
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the total number of sub-steps used to advance
+    the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken
+    per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
+    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this is
+    instead used only as the initial substep count estimate for the adaptive solver.
+
+.. pp:param:: hybrid_pic_model.use_rkf45
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this selects the B-field sub-step integrator.
+    When ``false`` (default), a fixed-step classical RK4 method is used with exactly
+    :pp:param:`hybrid_pic_model.substeps` total sub-steps per timestep.
+    When ``true``, the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) method :cite:t:`param-Fehlberg1969`
+    is used, controlling the local truncation error to stay within
+    :pp:param:`hybrid_pic_model.substep_rtol` and :pp:param:`hybrid_pic_model.substep_atol`.
+
+.. pp:param:: hybrid_pic_model.substep_rtol
+    :type: ``float``
+    :default: ``1e-4``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the relative tolerance for the RKF45
+    adaptive step-size control.
+
+.. pp:param:: hybrid_pic_model.substep_atol
+    :type: ``float``
+    :default: ``1e-8``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the absolute tolerance for the RKF45
+    adaptive step-size control.
+
+.. pp:param:: hybrid_pic_model.substep_safety
+    :type: ``float``
+    :default: ``0.9``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the safety factor applied to the
+    step-size adjustment formula.
+
+.. pp:param:: hybrid_pic_model.substep_max_growth
+    :type: ``float``
+    :default: ``5.0``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum factor by which the
+    substep size may grow after an accepted step.
+
+.. pp:param:: hybrid_pic_model.max_substep_attempts
+    :type: ``int``
+    :default: ``250``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum number of substep attempts
+    (accepted and rejected combined) per half-step before the simulation aborts.
 
 .. pp:param:: hybrid_pic_model.holmstrom_vacuum_region
     :type: ``bool``
