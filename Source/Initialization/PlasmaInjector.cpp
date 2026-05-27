@@ -304,9 +304,11 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 #if WARPX_DIM_RZ
     if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell < 2*WarpX::n_rz_azimuthal_modes)) {
         ablastr::warn_manager::WMRecordWarning("Species",
-            "For accurate use of WarpX cylindrical geometry the number \n"
-            "of particles should be at least two times n_rz_azimuthal_modes \n"
-            "(Please visit PR#765 for more information.)\n",
+            "Too few particles per cell for cylindrical geometry: got "
+            + std::to_string(num_particles_per_cell) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
             ablastr::warn_manager::WarnPriority::high);
     }
 #endif
