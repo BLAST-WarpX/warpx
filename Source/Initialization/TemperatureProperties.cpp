@@ -41,12 +41,9 @@ namespace
             "uy_std_function(x,y,z)",
             "uz_std_function(x,y,z)"
         };
-        for (const char* k : keys) {
-            if (specified(pp, group, k)) {
-                return true;
-            }
-        }
-        return false;
+        return std::ranges::any_of(keys, [&](const char* k) {
+            return specified(pp, group, k);
+        });
     }
 }
 
@@ -55,8 +52,11 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
 {
 }
 
-/** Read ``momentum_distribution_type``: ``maxwell_juttner`` uses ``theta``, ``maxwellian`` uses ``u_std``
- *  or ``maxwellian_T_eV_*`` (constant ``T_eV`` needs ``species_mass`` [kg]). */
+/** Construct TemperatureProperties from the passed particle source parameters.
+ *  Parse the momentum distribution type and initialize the corresponding
+ *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
+ *  or temperature `T_eV` for `maxwellian` distribution, and `theta` otherwise.
+ */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                                              amrex::Real species_mass)
     : m_species_mass(species_mass)

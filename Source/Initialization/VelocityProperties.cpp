@@ -12,7 +12,12 @@
 #include "Utils/TextMsg.H"
 
 #include <cmath>
-
+/**
+* Construct VelocityProperties from the passed particle source parameters.
+* Parse the momentum distribution type and initialize the corresponding
+* velocity parameters: `ux_mean`, `uy_mean`, and `uz_mean` for
+* `maxwellian` distributions, or `bulk_vel_dir` and `beta` otherwise.
+*/
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
 
