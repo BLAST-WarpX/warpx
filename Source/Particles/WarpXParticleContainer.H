@@ -238,6 +238,24 @@ public:
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
     /**
+     * \brief Finish the implicit particle update at the end of a time step.
+     *
+     * The default implementation extrapolates position and momentum from
+     * time n+1/2 to n+1, which is appropriate for physical and laser particles.
+     *
+     * Photon particles override this to instead perform a full explicit
+     * push over the step (without deposition).
+     *
+     * \param fields  field register
+     * \param lev     AMR level
+     * \param t       time at end of the step (n+1)
+     * \param dt      step size on this level
+     */
+    virtual void FinishImplicitParticleUpdate (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev, amrex::Real t, amrex::Real dt);
+
+    /**
      * \brief virtual function to deposit mass matrices for charged particles
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
@@ -292,6 +310,20 @@ public:
      *                          the time of the deposition.
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
+                         amrex::Real dt, amrex::Real relative_time);
+
+    /**
+     * \brief Deposit current density, sum guard values, and apply boundary conditions.
+     *
+     * \param[in] mf_name Name of vector field in which current density should be deposited
+     * \param[in] lev Mesh refinement level for deposition
+     * \param[in] dt Time step for particle level
+     * \param[in] relative_time Time at which to deposit J, relative to the time of the
+     *                          current positions of the particles. When different than 0,
+     *                          the particle position will be temporarily modified to match
+     *                          the time of the deposition.
+     */
+    void DepositCurrent (const std::string& mf_name, int lev,
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
@@ -380,12 +412,13 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, const int lev);
+    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
     std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
 
-    void DepositNumberDensity (amrex::MultiFab* number_density, const int lev);
+    void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
+    std::unique_ptr<amrex::MultiFab> GetPlasmaFrequency (int lev);
     std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositMassMatrices (WarpXParIter& pti,
@@ -446,6 +479,18 @@ public:
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
     amrex::ParticleReal maxParticleVelocity(bool local = false);
+
+    /**
+     * \brief Map the momentum of the particles to and from the curvilinear frame.
+     *        This is equivalent to mapping to the X-axis, i.e. theta = 0
+     *        cylinderical and theta = phi = 0 for spherical. This mapping is used
+     *        for binary collisions to put the colliding particles in a spatially local
+     *        frame.
+     *
+     * \param[in] forward When true, maps to the frame, when false maps from the frame
+     *            to the original location
+     */
+    void TransformMomentumToCurvilinear (bool forward);
 
     /**
      * \brief Adds n particles to the simulation
@@ -532,7 +577,7 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    amrex::ParticleReal getCharge () const {return charge;}
+    amrex::ParticleReal getCharge () const {return m_charge;}
 
     amrex::ParticleReal getMass () const {return m_mass;}
 
@@ -606,7 +651,7 @@ public:
 protected:
     int species_id;
 
-    amrex::ParticleReal charge;
+    amrex::ParticleReal m_charge;
     amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 

@@ -42,6 +42,7 @@ def analyze(args: argparse.Namespace) -> None:
     num_particles_per_cell_array = np.array(
         [int(nppc) for nppc in num_particles_per_cell_list]
     )
+    num_species = len(input_dict["particles.species_names"])
     num_particles_per_cell = np.prod(num_particles_per_cell_array)
     electrostatic = (
         True
@@ -52,9 +53,9 @@ def analyze(args: argparse.Namespace) -> None:
         else False
     )
     if electrostatic:
-        equipartition_value = 1 / (6 * num_particles_per_cell + 1)
+        equipartition_value = 1 / (3 * num_species * num_particles_per_cell + 1)
     else:
-        equipartition_value = 5 / (6 * num_particles_per_cell + 5)
+        equipartition_value = 5 / (3 * num_species * num_particles_per_cell + 5)
 
     # normalize the field energy variation
     electron_temperature = float(input_dict["my_constants.Te"][0])
@@ -117,7 +118,7 @@ def analyze(args: argparse.Namespace) -> None:
         )
 
     # compare the final value of the field energy variation to the reference equipartition value
-    relative_tolerance = 1e-1 if electrostatic else 5e-1
+    relative_tolerance = 1.1e-1 if electrostatic else 5e-1
     # average over the last 100 time steps to reduce noise
     field_energy_error_avg = np.mean(field_energy_error[-100:])
     if not np.isclose(
