@@ -26,7 +26,7 @@ namespace
             return true;
         }
         if (!group.empty()) {
-            return pp.contains((group + '.' + name).c_str());
+            return pp.contains(group + '.' + name);
         }
         return false;
     }
@@ -59,9 +59,8 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
  *  or ``maxwellian_T_eV_*`` (constant ``T_eV`` needs ``species_mass`` [kg]). */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                                              amrex::Real species_mass)
+    : m_species_mass(species_mass)
 {
-    m_species_mass = species_mass;
-
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 

@@ -79,7 +79,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
 
-            amrex::Real velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
+            amrex::Real const velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
                                                   m_uy_mean*m_uy_mean +
                                                   m_uz_mean*m_uz_mean);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
