@@ -37,7 +37,7 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    VelocityCoincidenceThinning (const std::string& species_name);
+    explicit VelocityCoincidenceThinning (const std::string& species_name);
 
     enum struct VelocityGridType {
         Spherical = 0,
