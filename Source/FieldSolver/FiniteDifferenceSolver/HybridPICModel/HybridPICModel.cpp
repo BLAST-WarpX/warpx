@@ -1082,7 +1082,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
 
     // Set the number of substeps such that dt_sub on the next step will be similar
     // to what was found to work in this step
-    m_substeps = n_accepted;
+    m_substeps = 2*n_accepted;
 
     if (WarpX::GetInstance().Verbose()) {
         amrex::Print() << "RKF45 "
