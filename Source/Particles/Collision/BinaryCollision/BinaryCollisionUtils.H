@@ -128,45 +128,73 @@ namespace BinaryCollisionUtils{
         const double m1_sq = m1_dbl*m1_dbl;
         const double m2_sq = m2_dbl*m2_dbl;
 
-        // Square norm of the total (sum between the two particles) momenta in the lab frame
-        const double p_total_sq = powi<2>(p1x_dbl + p2x_dbl) + powi<2>(p1y_dbl + p2y_dbl) + powi<2>(p1z_dbl + p2z_dbl);
+        const double p1_sq = p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl;
+        const double p2_sq = p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl;
+        const double p1_dot_p2 = p1x_dbl*p2x_dbl + p1y_dbl*p2y_dbl + p1z_dbl*p2z_dbl;
 
-        // Total energy in the lab frame
+        // Total energy of each particle in the lab frame.
         // Note the use of `double` for energy since this calculation is prone to error with single precision.
-        const double E1_lab = std::sqrt( m1_sq * c2 + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * c;
-        const double E2_lab = std::sqrt( m2_sq * c2 + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * c;
-        const double E_lab = E1_lab + E2_lab;
-        // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
-        // of the four-momentum norm
-        const double E_star_sq = E_lab*E_lab - c2*p_total_sq;
+        const double E1_lab = std::sqrt( m1_sq * c2 + p1_sq ) * c;
+        const double E2_lab = std::sqrt( m2_sq * c2 + p2_sq ) * c;
 
-        // Kinetic energy in the center of mass frame
+        // Compute the kinetic energy in the COM frame, and the squared momentum of each
+        // particle in the COM frame, in a way that avoids catastrophic cancellation
+        // for low-energy collisions.
+        //
+        // Starting from the Lorentz-invariant
+        //     E_star^2 = E_lab^2 - c^2 p_total^2
+        //              = (E1 + E2)^2 - c^2 (p1 + p2)^2
+        // and expanding using E_i^2 = m_i^2 c^4 + c^2 p_i^2, one gets
+        //     E_star^2 = m1^2 c^4 + m2^2 c^4 + 2 ( E1 E2 - c^2 p1.p2 )
+        // and therefore
+        //     E_star^2 - (m1 + m2)^2 c^4 = 2 ( E1 E2 - m1 m2 c^4 - c^2 p1.p2 ).            (*)
+        //
+        // The reverse Cauchy-Schwarz inequality for future-pointing timelike four-vectors
+        // guarantees E1 E2 - c^2 p1.p2 >= m1 m2 c^4 (with equality iff the two particles
+        // have the same four-velocity), so the RHS of (*) is non-negative.
+        //
+        // To preserve this non-negativity numerically, we compute (E1 E2 - m1 m2 c^4)
+        // as a sum of inherently non-negative products by using the identity
+        //     E1 E2 - m1 m2 c^4 = m2 c^2 KE1 + m1 c^2 KE2 + KE1 KE2
+        // where KE_i = E_i - m_i c^2 is computed without cancellation as
+        //     KE_i = p_i^2 c^2 / (E_i + m_i c^2).
+        const double KE1_lab = p1_sq * c2 / (E1_lab + m1_dbl * c2);
+        const double KE2_lab = p2_sq * c2 / (E2_lab + m2_dbl * c2);
+        const double E1E2_minus_m1m2c4 = m2_dbl * c2 * KE1_lab
+                                       + m1_dbl * c2 * KE2_lab
+                                       + KE1_lab * KE2_lab;
+
+        // s_minus_threshold = E_star^2 - (m1 + m2)^2 c^4 >= 0 (in J^2 units)
+        const double s_minus_threshold = 2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2);
+        const double m_sum_c2 = (m1_dbl + m2_dbl) * c2;
+        const double E_star_sq = m_sum_c2 * m_sum_c2 + s_minus_threshold;
         const double E_star = std::sqrt(E_star_sq);
 
-        // Cast back to chosen precision for output
-        E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c2);
+        // Kinetic energy in the COM frame, computed as
+        //     E_star - (m1 + m2) c^2 = (E_star^2 - (m1 + m2)^2 c^4) / (E_star + (m1 + m2) c^2)
+        // to avoid catastrophic cancellation between E_star and (m1 + m2) c^2.
+        // For two massless particles, E_kin_COM = E_star exactly, and the denominator
+        // above can be zero (degenerate collinear case), so just use E_star directly.
+        if (m_sum_c2 == 0.0) {
+            E_kin_COM = static_cast<amrex::ParticleReal>(E_star);
+        } else {
+            E_kin_COM = static_cast<amrex::ParticleReal>(
+                s_minus_threshold / (E_star + m_sum_c2)
+            );
+        }
 
-        // Find the norm of the momentum of each particles in the center of mass frame
-        // This is done by solving the following system (in the COM frame)
-        // E_1^2 = p^2 c^2 + m_1^2 c^4  (for the first particle)
-        // E_2^2 = p^2 c^2 + m_2^2 c^4  (for the second particle ; same p since we are in the COM frame)
-        // to find the expression of the p as a function of E = E_1 + E_2.
-        // Here is an abbreviation derivation:
-        // - By summing the above equations
-        // E^2 = E_1^2 + E_2^2 + 2 E_1 E_2 = 2 p^2 c^2 + (m_1^2 + m_2^2) c^4 + 2 E_1 E_2
-        // - Rearranging and squaring
-        // ( E^2 - 2 p^2 c^2 - (m_1^2 + m_2^2) c^4 )^2 = 4 E_1^2 E_2^2 = 4 (p^2 c^2 + m_1^2 c^4) (p^2 c^2 + m_2^2 c^4)
-        // - By rearranging, we get:
-        // p^2 = E^2/4c^2 - (m_1^2 + m_2^2)c^2/2 + (m_1^2-m_2^2)^2 c^6/4E^2
+        // Find the norm of the momentum of each particle in the COM frame, using the
+        // factored Kallen form of the relativistic two-body momentum:
+        //     p_star^2 = (s - (m1 + m2)^2 c^2) (s - (m1 - m2)^2 c^2) / (4 s)
+        // with s = E_star^2 / c^2. The two factors in the numerator differ by 4 m1 m2 c^2,
+        // so we obtain both from `s_minus_threshold` without further cancellation.
         double p_star_sq;
         if (m1_dbl + m2_dbl == 0) {
             p_star_sq = powi<2>( 0.5 * E_star * inv_c );
         } else {
-            // The expression below is specifically written in a form that avoids returning
-            // small negative numbers due to machine precision errors, for low-energy particles
-            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c2);
-            p_star_sq = m1_dbl*m2_dbl*c2 * ( powi<2>(E_ratio) - 1.0 )
-                + powi<2>(m1_dbl - m2_dbl)*c2/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
+            p_star_sq = s_minus_threshold
+                      * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2)
+                      / (4.0 * E_star_sq * c2);
         }
 
         // Energy of each particle in the center of mass frame
