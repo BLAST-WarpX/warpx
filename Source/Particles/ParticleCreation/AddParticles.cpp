@@ -1437,7 +1437,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         const int loc_ionization_initial_level = ionization_initial_level;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
+#if defined(AMREX_USE_EB)
         bool const random_theta = m_random_theta;
+#endif
 #endif
 
         // local copy for device lambda capture
