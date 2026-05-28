@@ -8,6 +8,7 @@ Checks: '
         -bugprone-unused-local-non-trivial-variable,
     cert-*,
         -cert-err58-cpp,
+        -cert-int09-c,
     clang-analyzer-*,
         -clang-analyzer-optin.performance.Padding,
         -clang-analyzer-optin.mpi.MPI-Checker,
@@ -33,6 +34,7 @@ Checks: '
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
         -misc-include-cleaner,
+        -misc-use-internal-linkage,
     modernize-*,
         -modernize-avoid-c-arrays,
         -modernize-return-braced-init-list,
@@ -43,6 +45,7 @@ Checks: '
         -modernize-use-ranges,
         -modernize-use-integer-sign-comparison,
         -modernize-use-starts-ends-with,
+        -modernize-use-std-format,
     mpi-*,
     performance-*,
         -performance-enum-size,
@@ -51,11 +54,13 @@ Checks: '
         -readability-avoid-nested-conditional-operator,
         -readability-convert-member-functions-to-static,
         -readability-else-after-return,
+        -readability-enum-initial-value,
         -readability-function-cognitive-complexity,
         -readability-identifier-length,
         -readability-implicit-bool-conversion,
         -readability-isolate-declaration,
         -readability-magic-numbers,
+        -readability-math-missing-parentheses,
         -readability-named-parameter,
         -readability-uppercase-literal-suffix,
         -readability-redundant-casting,
@@ -85,11 +90,15 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -modernize-use-ranges
 # -modernize-use-integer-sign-comparison
 # -modernize-use-starts-ends-with
+# -modernize-use-std-format
 
 # TODO Consider enabling the following checks:
 # -bugprone-unused-local-non-trivial-variable
+# -misc-use-internal-linkage
 # -performance-enum-size
 # -readability-container-contains
+# -readability-enum-initial-value
+# -readability-math-missing-parentheses
 # -readability-redundant-inline-specifier
 # -readability-redundant-member-init
 # -readability-reference-to-constructed-temporary

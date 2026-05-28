@@ -734,7 +734,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
         );
     }
 
-    amrex::Real dt_sub = dt_half / m_substeps;
+    amrex::Real dt_sub = 2._rt * dt_half / m_substeps;
     amrex::Real t = 0._rt;
     int n_attempts = 0;
     int n_accepted = 0;
@@ -1049,13 +1049,14 @@ void HybridPICModel::BfieldEvolveRKF45 (
         }
 
         // ---- Error norm and adaptive step control ----
-        // norm0() with local=false (default) performs the MPI AllReduce internally
+        // Compute local maxima first, then one combined AllReduce for both norms.
         amrex::Real err_norm = 0._rt;
         amrex::Real B4_norm  = 0._rt;
         for (int ii = 0; ii < 3; ii++) {
-            err_norm = std::max(err_norm, err_scratch[ii].norm0());
-            B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0());
+            err_norm = std::max(err_norm, err_scratch[ii].norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
+            B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
         }
+        amrex::ParallelDescriptor::ReduceRealMax({err_norm, B4_norm});
         const amrex::Real err_scalar = err_norm / (m_substep_atol + m_substep_rtol * B4_norm);
         const amrex::Real factor = m_substep_safety * std::pow(err_scalar + 1.e-10_rt, -0.2_rt);
 
@@ -1079,6 +1080,10 @@ void HybridPICModel::BfieldEvolveRKF45 (
             "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
         );
     }
+
+    // Set the number of substeps such that dt_sub on the next step will be similar
+    // to what was found to work in this step
+    m_substeps = 2*n_accepted;
 
     if (WarpX::GetInstance().Verbose()) {
         amrex::Print() << "RKF45 "

@@ -2127,17 +2127,22 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
-    substeps: int, default=100
-        Number of substeps for the B-field update. When ``use_rkf45=True``
-        this is used only as the initial substep count estimate for the
-        adaptive solver. When ``use_rkf45=False`` (default) it is the fixed
-        number of substeps per half-step.
+    substeps: int, default=10
+        Total number of substeps used to advance the B-field over one full
+        timestep (split evenly between the two half-steps, so ``substeps/2``
+        RK4 steps are taken per half-step, each of duration
+        ``dt / substeps``). Must be divisible by 2; if not, the value is
+        automatically rounded up to the next even number.
+        When ``use_rkf45=True``, this is instead used only as the initial
+        substep count estimate for the adaptive solver.
 
     use_rkf45: bool, default=False
-        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) integrator for
-        the B-field substep advance, with step-size control governed by
-        ``substep_rtol`` and ``substep_atol``. If False, use the fixed-step
-        classical RK4 integrator with ``substeps`` substeps per half-step.
+        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
+        integrator (Fehlberg 1969, NASA Technical Report R-315,
+        https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
+        advance, with step-size control governed by ``substep_rtol`` and
+        ``substep_atol``. If False, use the fixed-step classical RK4
+        integrator with ``substeps`` total substeps per timestep.
 
     substep_rtol: float, default=1e-4
         Relative tolerance for the RKF45 adaptive step-size control.
