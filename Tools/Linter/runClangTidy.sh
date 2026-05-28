@@ -55,13 +55,13 @@ ${CTIDY} --version
 echo
 echo "This can be overridden by setting the environment"
 echo "variables CLANG, CLANGXX, and CLANGTIDY e.g.: "
-echo "$ export CLANG=clang-18"
-echo "$ export CLANGXX=clang++-18"
-echo "$ export CLANGTIDY=clang-tidy-18"
+echo "$ export CLANG=clang-19"
+echo "$ export CLANGXX=clang++-19"
+echo "$ export CLANGTIDY=clang-tidy-19"
 echo "$ ./Tools/Linter/runClangTidy.sh"
 echo
 echo "******************************************************"
-echo "* Warning: clang v18 is currently used in CI tests.  *"
+echo "* Warning: clang v19 is currently used in CI tests.  *"
 echo "* It is therefore recommended to use this version.   *"
 echo "* Otherwise, a newer version may find issues not     *"
 echo "* currently covered by CI tests while older versions *"

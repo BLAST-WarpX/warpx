@@ -89,7 +89,7 @@ public:
      * @param[in] mypc Container of species involved
      *
      */
-    BinaryCollision (std::string collision_name, MultiParticleContainer const * const mypc)
+    BinaryCollision (const std::string& collision_name, MultiParticleContainer const * const mypc)
         : CollisionBase(collision_name)
     {
         using namespace amrex::literals;
