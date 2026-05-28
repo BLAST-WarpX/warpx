@@ -1437,6 +1437,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         const int loc_ionization_initial_level = ionization_initial_level;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
+        bool const random_theta = m_random_theta;
 #endif
 
         // local copy for device lambda capture
@@ -1490,6 +1491,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + pt[0])*dx[0];
                     pos.y = 0.0_rt;
                     pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    // Use cell-centered uniform bins when theta is not randomized.
+                    r.y = random_theta ?
+                        amrex::Random(engine) :
+                        (static_cast<amrex::Real>(i_part) + 0.5_rt) / pcounts[index];
 #endif
                 } else
 #endif
