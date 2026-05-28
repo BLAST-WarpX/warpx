@@ -157,38 +157,9 @@ void UpdateMomentumPerezElastic (
         // Get random numbers
         T_PR r = amrex::Random(engine);
 
-        // Compute scattering angle
-        T_PR cosXs;
-        T_PR sinXs;
-        if ( s12 <= T_PR(0.1) )
-        {
-            while ( true )
-            {
-                cosXs = T_PR(1.0) + s12 * std::log(r);
-                // Avoid the bug when r is too small such that cosXs < -1
-                if ( cosXs >= T_PR(-1.0) ) { break; }
-                r = amrex::Random(engine);
-            }
-        }
-        else if ( s12 > T_PR(0.1) && s12 <= T_PR(3.0) )
-        {
-            T_PR const Ainv = static_cast<T_PR>(
-                0.0056958 + 0.9560202*s12 - 0.508139*s12*s12 +
-                0.47913906*s12*s12*s12 - 0.12788975*s12*s12*s12*s12 + 0.02389567*s12*s12*s12*s12*s12);
-            cosXs = Ainv * std::log( std::exp(T_PR(-1.0)/Ainv) +
-                    T_PR(2.0) * r * std::sinh(T_PR(1.0)/Ainv) );
-        }
-        else if ( s12 > T_PR(3.0) && s12 <= T_PR(6.0) )
-        {
-            T_PR const A = T_PR(3.0) * std::exp(-s12);
-            cosXs = T_PR(1.0)/A * std::log( std::exp(-A) +
-                    T_PR(2.0) * r * std::sinh(A) );
-        }
-        else
-        {
-            cosXs = T_PR(2.0) * r - T_PR(1.0);
-        }
-        sinXs = std::sqrt(T_PR(1.0) - cosXs*cosXs);
+        // Compute scattering angle using Delta function distribution
+        T_PR const cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
+        T_PR const sinXs = std::sqrt(T_PR(1.0) - cosXs*cosXs);
 
         // Get random azimuthal angle
         T_PR const phis = amrex::Random(engine) * T_PR(2.0) * MathConst::pi;
