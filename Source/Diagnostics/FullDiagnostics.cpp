@@ -973,7 +973,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                     std::string base_name = m_varnames[comp];
                     // Check if field name ends with direction suffix (x/y/z or r/t/p)
                     if (base_name.size() > 1) {
-                        char last_char = base_name.back();
+                        char const last_char = base_name.back();
                         if (last_char == field_names[idir][0]) {  // matches direction character
                             base_name.pop_back();
                             // Check for underscore separator (e.g., my_field_x)
@@ -1035,10 +1035,12 @@ FullDiagnostics::AddFieldToOutput (const std::string& field_name, int lev)
     // Try as vector field - add all three components
     else if (warpx.m_fields.has_vector(field_name, lev)) {
         for (int idir = 0; idir < 3; idir++) {
-            Direction dir{idir};
+            Direction const dir{idir};
             // Use Direction's string conversion to get proper component name (x/y/z or r/t/p)
-            std::string dir_str = static_cast<std::string>(dir);
-            std::string comp_name = field_name + "_" + dir_str;
+            std::string const dir_str = static_cast<std::string>(dir);
+            std::string comp_name = field_name;
+            comp_name += "_";
+            comp_name += dir_str;
             m_varnames.push_back(comp_name);
 
             // Create functor for this component
@@ -1056,8 +1058,8 @@ FullDiagnostics::AddFieldToOutput (const std::string& field_name, int lev)
     }
 
     // Resize m_mf_output to accommodate new fields
-    int new_ncomp = static_cast<int>(m_varnames.size());
-    int old_ncomp = m_mf_output[0][lev].nComp();
+    int const new_ncomp = static_cast<int>(m_varnames.size());
+    int const old_ncomp = m_mf_output[0][lev].nComp();
 
     if (new_ncomp > old_ncomp) {
         for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {

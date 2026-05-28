@@ -27,14 +27,26 @@ sim = picmi.Simulation(
 diag = picmi.FieldDiagnostic(
     name="diag1",
     period=10,
-    data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez",
-               "Jx", "Jy", "Jz", "rho", "electron_pressure"],
+    data_list=[
+        "Bx",
+        "By",
+        "Bz",
+        "Ex",
+        "Ey",
+        "Ez",
+        "Jx",
+        "Jy",
+        "Jz",
+        "rho",
+        "electron_pressure",
+    ],
 )
 sim.add_diagnostic(diag)
 
 # ============================================================================
 # Helper function to compute Ohm's law terms
 # ============================================================================
+
 
 def compute_ohm_law_terms():
     """
@@ -51,19 +63,19 @@ def compute_ohm_law_terms():
     level = 0
 
     # Get existing fields
-    Bx = sim.fields.get("Bfield_fp", dir='x', level=level)
-    By = sim.fields.get("Bfield_fp", dir='y', level=level)
-    Bz = sim.fields.get("Bfield_fp", dir='z', level=level)
+    Bx = sim.fields.get("Bfield_fp", dir="x", level=level)
+    By = sim.fields.get("Bfield_fp", dir="y", level=level)
+    Bz = sim.fields.get("Bfield_fp", dir="z", level=level)
 
     # Total current (from Ampere's law: J = curl B / mu0 - J_ext)
-    Jx = sim.fields.get("hybrid_current_fp_plasma", dir='x', level=level)
-    Jy = sim.fields.get("hybrid_current_fp_plasma", dir='y', level=level)
-    Jz = sim.fields.get("hybrid_current_fp_plasma", dir='z', level=level)
+    Jx = sim.fields.get("hybrid_current_fp_plasma", dir="x", level=level)
+    Jy = sim.fields.get("hybrid_current_fp_plasma", dir="y", level=level)
+    Jz = sim.fields.get("hybrid_current_fp_plasma", dir="z", level=level)
 
     # Ion current (deposited from ion particles)
-    Jix = sim.fields.get("current_fp", dir='x', level=level)
-    Jiy = sim.fields.get("current_fp", dir='y', level=level)
-    Jiz = sim.fields.get("current_fp", dir='z', level=level)
+    Jix = sim.fields.get("current_fp", dir="x", level=level)
+    Jiy = sim.fields.get("current_fp", dir="y", level=level)
+    Jiz = sim.fields.get("current_fp", dir="z", level=level)
 
     # Charge density and electron pressure
     rho = sim.fields.get("rho_fp", level=level)
@@ -71,13 +83,13 @@ def compute_ohm_law_terms():
 
     # Get or create custom fields for Ohm's law terms
     # Note: These should have been allocated in afterInitEsolve callback
-    hall_x = sim.fields.get("hall_term", dir='x', level=level)
-    hall_y = sim.fields.get("hall_term", dir='y', level=level)
-    hall_z = sim.fields.get("hall_term", dir='z', level=level)
+    hall_x = sim.fields.get("hall_term", dir="x", level=level)
+    hall_y = sim.fields.get("hall_term", dir="y", level=level)
+    hall_z = sim.fields.get("hall_term", dir="z", level=level)
 
-    pressure_x = sim.fields.get("pressure_term", dir='x', level=level)
-    pressure_y = sim.fields.get("pressure_term", dir='y', level=level)
-    pressure_z = sim.fields.get("pressure_term", dir='z', level=level)
+    pressure_x = sim.fields.get("pressure_term", dir="x", level=level)
+    pressure_y = sim.fields.get("pressure_term", dir="y", level=level)
+    pressure_z = sim.fields.get("pressure_term", dir="z", level=level)
 
     # ========================================================================
     # Compute Hall term: (J - Ji) x B / (ne)
@@ -169,6 +181,7 @@ def compute_ohm_law_terms():
 # Callback setup
 # ============================================================================
 
+
 @callbacks.installafterInitEsolve
 def setup_ohm_law_fields():
     """
@@ -178,10 +191,10 @@ def setup_ohm_law_fields():
     level = 0
 
     # Use E-field as template for staggering and grid properties
-    Ex = sim.fields.get("Efield_fp", dir='x', level=level)
+    Ex = sim.fields.get("Efield_fp", dir="x", level=level)
 
     # Allocate Hall term components
-    for dir_str in ['x', 'y', 'z']:
+    for dir_str in ["x", "y", "z"]:
         sim.fields.alloc_init(
             name="hall_term",
             dir=dir_str,
@@ -192,7 +205,7 @@ def setup_ohm_law_fields():
             ngrow=Ex.n_grow_vect,
             initial_value=0.0,
             redistribute=True,
-            redistribute_on_remake=True
+            redistribute_on_remake=True,
         )
 
         sim.fields.alloc_init(
@@ -205,7 +218,7 @@ def setup_ohm_law_fields():
             ngrow=Ex.n_grow_vect,
             initial_value=0.0,
             redistribute=True,
-            redistribute_on_remake=True
+            redistribute_on_remake=True,
         )
 
     # Add these fields to diagnostic output

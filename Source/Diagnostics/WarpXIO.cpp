@@ -304,7 +304,7 @@ WarpX::InitFromCheckpoint ()
                     maybe_dir = Direction{dir_str};
                 }
 
-                custom_fields_by_level[lev].push_back({field_name, maybe_dir});
+                custom_fields_by_level[lev].emplace_back(field_name, maybe_dir);
             }
         }
 
@@ -489,9 +489,12 @@ WarpX::RestoreCustomFieldsFromCheckpoint ()
 
             // Read the field data
             if (maybe_dir.has_value()) {
-                Direction dir = *maybe_dir;
-                std::string dir_str = static_cast<std::string>(dir);
-                std::string checkpoint_name = field_name + "[dir=" + dir_str + "]";
+                Direction const dir = *maybe_dir;
+                std::string const dir_str = static_cast<std::string>(dir);
+                std::string checkpoint_name = field_name;
+                checkpoint_name += "[dir=";
+                checkpoint_name += dir_str;
+                checkpoint_name += "]";
                 VisMF::Read(*m_fields.get(field_name, dir, lev),
                             amrex::MultiFabFileFullPrefix(lev, restart_chkfile, "Level_", checkpoint_name));
             } else {

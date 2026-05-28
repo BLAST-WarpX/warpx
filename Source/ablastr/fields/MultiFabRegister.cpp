@@ -624,18 +624,18 @@ namespace ablastr::fields
                 std::string field_name = internal_name;
 
                 // Remove direction suffix (if present)
-                size_t dir_pos = field_name.find("[dir=");
+                size_t const dir_pos = field_name.find("[dir=");
                 if (dir_pos != std::string::npos) {
                     field_name = field_name.substr(0, dir_pos);
                 }
 
                 // Remove level suffix
-                size_t level_pos = field_name.find("[level=");
+                size_t const level_pos = field_name.find("[level=");
                 if (level_pos != std::string::npos) {
                     field_name = field_name.substr(0, level_pos);
                 }
 
-                result.push_back({field_name, owner.m_dir});
+                result.emplace_back(field_name, owner.m_dir);
             }
         }
 

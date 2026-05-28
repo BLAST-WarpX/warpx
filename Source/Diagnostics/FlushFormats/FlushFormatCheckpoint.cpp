@@ -178,7 +178,10 @@ FlushFormatCheckpoint::WriteToFile (
                 // Vector field component
                 const Direction dir = *maybe_dir;
                 const std::string dir_str = static_cast<std::string>(dir);
-                const std::string checkpoint_name = field_name + "[dir=" + dir_str + "]";
+                std::string checkpoint_name = field_name;
+                checkpoint_name += "[dir=";
+                checkpoint_name += dir_str;
+                checkpoint_name += "]";
                 VisMF::Write(*warpx.m_fields.get(field_name, dir, lev),
                              amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, checkpoint_name));
             } else {
