@@ -44,6 +44,13 @@ namespace ablastr::coarsen::average
              cr[i] = crse_ratio[i];
         }
 
+        amrex::GpuArray<int,3> idx_min_src, np_src;
+        amrex::GpuArray<bool,3> use_half_weight;
+        amrex::Real crx_cry_crz_inv;
+
+        CalculateCoarseningData(
+            idx_min_src, np_src, use_half_weight, crx_cry_crz_inv, sf, sc, cr);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -53,11 +60,11 @@ namespace ablastr::coarsen::average
             amrex::Box const & bx = mfi.growntilebox(ngrow);
             amrex::Array4<amrex::Real> const &arr_dst = mf_dst.array(mfi);
             amrex::Array4<amrex::Real const> const &arr_src = mf_src.const_array(mfi);
-            ParallelFor(bx, ncomp,
-                        [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-                            arr_dst(i, j, k, n) = Interp(
-                                arr_src, sf, sc, cr, i, j, k, n);
-                        });
+            amrex::ParallelFor(bx, ncomp,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                    arr_dst(i, j, k, n) = InterpWithCoarseningData(
+                        arr_src, idx_min_src, np_src, use_half_weight, crx_cry_crz_inv, cr, i, j, k, n);
+                });
         }
     }
 
