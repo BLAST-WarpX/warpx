@@ -7,7 +7,7 @@ USE_PARTICLES = TRUE
 USE_RPATH     = TRUE
 USE_GPU_RDC   = FALSE
 BL_NO_FORT    = TRUE
-CXXSTD        = c++17
+CXXSTD        = c++20
 
 # required for AMReX async I/O
 MPI_THREAD_MULTIPLE = TRUE
@@ -151,7 +151,7 @@ endif
 
 ifeq ($(USE_OPENPMD), TRUE)
   # try pkg-config query
-  ifeq (0, $(shell pkg-config "openPMD >= 0.16.1"; echo $$?))
+  ifeq (0, $(shell pkg-config "openPMD >= 0.17.0"; echo $$?))
     CXXFLAGS += $(shell pkg-config --cflags openPMD)
     LIBRARY_LOCATIONS += $(shell pkg-config --variable=libdir openPMD)
     libraries += $(shell pkg-config --libs-only-l openPMD)

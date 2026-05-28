@@ -21,9 +21,9 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -67,7 +67,7 @@ public:
         const amrex::IntVect& Bz_nodal_flag
     ) const;
 
-    void InitData ();
+    void InitData (const ablastr::fields::MultiFabRegister& fields);
 
     /**
      * \brief
@@ -89,12 +89,12 @@ public:
     void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E
-    );
+    ) const;
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev
-    );
+    ) const;
 
     /**
      * \brief
@@ -130,7 +130,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, DtType a_dt_type,
+        amrex::Real dt, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolveRK (
@@ -139,7 +139,25 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, int lev, DtType dt_type,
+        amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    void BfieldEvolveRKF45 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        amrex::Real dt_half, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    void BfieldEvolveRKF45 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void FieldPush (
@@ -148,7 +166,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, DtType dt_type,
+        amrex::Real dt, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     /**
@@ -172,8 +190,22 @@ public:
         amrex::MultiFab const& rho_field ) const;
 
     // Declare variables to hold hybrid-PIC model parameters
-    /** Number of substeps to take when evolving B */
+    /** Number of substeps to take when evolving B (also used as initial substep
+     *  count guess when RKF45 adaptive stepping is active) */
     int m_substeps = 10;
+
+    /** Relative tolerance for RKF45 adaptive substep error control */
+    amrex::Real m_substep_rtol = 1.e-4;
+    /** Absolute tolerance for RKF45 adaptive substep error control */
+    amrex::Real m_substep_atol = 1.e-8;
+    /** Safety factor for RKF45 step-size adjustment */
+    amrex::Real m_substep_safety = 0.9;
+    /** Maximum step-size growth factor per accepted step */
+    amrex::Real m_substep_max_growth = 5.0;
+    /** Maximum number of substep attempts (accepted + rejected) before abort */
+    int m_max_substep_attempts = 250;
+    /** If true, use the adaptive RKF45 integrator; if false, use fixed-step RK4 */
+    bool m_use_rkf45 = false;
 
     bool m_holmstrom_vacuum_region = false;
 
@@ -190,11 +222,15 @@ public:
     /** Plasma resistivity */
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
-    amrex::ParserExecutor<2> m_eta;
+    amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
 
     /** Plasma hyper-resisitivity */
-    amrex::Real m_eta_h = 0.0;
+    std::string m_eta_h_expression = "0.0";
+    std::unique_ptr<amrex::Parser> m_hyper_resistivity_parser;
+    amrex::ParserExecutor<2> m_eta_h;
+    bool m_include_hyper_resistivity_term = false;
+    bool m_hyper_resistivity_has_B_dependence = false;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
@@ -202,6 +238,7 @@ public:
     std::string m_Jz_ext_grid_function = "0.0";
     std::array< std::unique_ptr<amrex::Parser>, 3> m_J_external_parser;
     std::array< amrex::ParserExecutor<4>, 3> m_J_external;
+    bool m_has_external_current = true;
     bool m_external_current_has_time_dependence = false;
 
     /** External E/B fields */

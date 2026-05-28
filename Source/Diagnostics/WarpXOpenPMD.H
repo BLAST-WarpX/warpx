@@ -40,10 +40,10 @@
 class WarpXParticleCounter
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
-  WarpXParticleCounter (ParticleContainer* pc);
+  explicit WarpXParticleCounter (ParticleContainer* pc);
   [[nodiscard]] unsigned long GetTotalNumParticles () const {return m_Total;}
 
   std::vector<unsigned long long> m_ParticleOffsetAtRank;
@@ -76,13 +76,13 @@ private:
 class WarpXOpenPMDPlot
 {
 public:
-  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PinnedArenaAllocator>;
-  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PinnedArenaAllocator>;
+  using ParticleContainer = typename WarpXParticleContainer::ContainerLike<amrex::PolymorphicArenaAllocator>;
+  using ParticleIter = typename amrex::ParConstIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>;
 
   /** Initialize openPMD I/O routines
    *
    * @param ie  iteration encoding from openPMD: "group, file, variable"
-   * @param filetype file backend, e.g. "bp" or "h5"
+   * @param filetype file backend, e.g. "bp5", "bp4", or "h5"
    * @param operator_type openPMD-api backend operator (compressor) for ADIOS2
    * @param operator_parameters openPMD-api backend operator parameters for ADIOS2
    * @param engine_type ADIOS engine for output
@@ -149,9 +149,24 @@ public:
               bool isBTD = false,
               const amrex::Geometry& full_BTD_snapshot=amrex::Geometry() ) const;
 
-  /** Return OpenPMD File type ("bp" or "h5" or "json")*/
+  /** Return OpenPMD File type ("bp5", "bp4", "h5" or "json")*/
   std::string OpenPMDFileType () { return m_OpenPMDFileType; }
 
+  /** Ensure BTD buffers are written to disk
+   *
+   * This function can be called to intermediately ensure ADIOS buffered "steps"
+   * are written to disk, and the valid metadata if checkpointing is required.
+   *
+   * This is needed to read partial data while a simulation is running or
+   * to support restarting (the BTD diagnostics) in WarpX, so it
+   * can continue to append to a partially written labframe station
+   * after restart.
+   *
+   * The frequency is controlled by
+   * FlushFormatOpenPMD::m_NumAggBTDBufferToFlush (default to 5).
+   * It can be adjusted in the input file: diag_name.buffer_flush_limit_btd
+   */
+  void FlushBTDToDisk ();
 private:
   void Init (openPMD::Access access, bool isBTD);
 
@@ -176,6 +191,23 @@ private:
     }
   }
 
+  /** Flushing out data of the current openPMD iteration
+   *
+   * @param[in] isBTD if the current diagnostic is BTD
+   *
+   * if isBTD=false, apply the default flush behaviour
+   *                 in ADIOS, the action will be PerformDataWrite
+   * if isBTD=true,  in ADIOS, the action will be PerformPut
+   *                 because no action is taken for the span tasks.
+   *                 This way we can aggregate buffers before
+   *                 calling FlushBTDToDisk() to write out.
+   *
+   * iteration.seriesFlush() is used instead of series.flush()
+   *  because the latter flushes only if data is dirty
+   *  this causes trouble when the underlying writing function is collective (like PDW)
+   *
+   */
+  void seriesFlush (bool isBTD) const;
 
   /** This function does initial setup for the fields when interation is newly created
    *  @param[in] meshes   The meshes in a series
@@ -293,7 +325,6 @@ private:
    * @param[in] int_comp_names The int attribute names, from WarpX
    * @param[in] charge         Charge of the particles (note: fix for ions)
    * @param[in] mass           Mass of the particles
-   * @param[inout] ParticleFlushOffset previously flushed number of particles in BTD
    * @param[in] isBTD is this a backtransformed diagnostics (BTD) write?
    * @param[in] isLastBTDFlush is this the last time we will flush this BTD station?
    */
@@ -337,7 +368,7 @@ private:
   int m_MPISize = 1;
 
   openPMD::IterationEncoding m_Encoding = openPMD::IterationEncoding::fileBased;
-  std::string m_OpenPMDFileType = "bp"; //! MPI-parallel openPMD backend: bp or h5
+  std::string m_OpenPMDFileType = "bp5"; //! MPI-parallel openPMD backend: bp5, bp4 or h5
   std::string m_OpenPMDoptions = "{}"; //! JSON option string for openPMD::Series constructor
   int m_CurrentStep  = -1;
 

@@ -8,9 +8,10 @@
 #ifndef WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 #define WARPX_PROTON_BORON_FUSION_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductFusionUtil.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -54,6 +55,7 @@ namespace {
      * @param[in] idx_alpha_start index of first produced alpha macroparticle
      * @param[in] m1 mass of first colliding species
      * @param[in] m2 mass of second colliding species
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -63,6 +65,7 @@ namespace {
                             const index_type& idx_1, const index_type& idx_2,
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
+                            ScatteringAngleModel const scattering_angle_model,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
@@ -85,17 +88,18 @@ namespace {
         // which can cause compilation to fail or generate a warning, so we're explicitly setting
         // them as double. Note that nuclear fusion module does not currently work with single
         // precision anyways.
-        constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt;
-        // mass of the Be8 excited state (3.03 MeV above ground state)
-        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt);
+        // Alpha (He4) mass: subtract 2 electron masses to get nuclear mass
+        constexpr double m_alpha = PhysConst::m_u * 4.00260325413_prt - 2.0_prt * PhysConst::m_e;
+        // mass of the Be8 excited state (3.03 MeV above ground state): subtract 4 electron masses to get nuclear mass
+        constexpr double m_beryllium = PhysConst::m_u*(8.0053095729_prt+0.00325283863_prt) - 4.0_prt * PhysConst::m_e;
         constexpr double mBe_sq = m_beryllium*m_beryllium;
-        constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
 
         // Compute the resulting momenta of the alpha and beryllium particles
         // produced in the fusion reaction
         amrex::ParticleReal ux_alpha1 = 0.0, uy_alpha1 = 0.0, uz_alpha1 = 0.0;
         amrex::ParticleReal ux_Be = 0.0, uy_Be = 0.0, uz_Be = 0.0;
-        TwoProductFusionComputeProductMomenta (
+        TwoProductComputeProductMomenta (
             soa_1.m_rdata[PIdx::ux][idx_1],
             soa_1.m_rdata[PIdx::uy][idx_1],
             soa_1.m_rdata[PIdx::uz][idx_1], m1,
@@ -104,7 +108,9 @@ namespace {
             soa_2.m_rdata[PIdx::uz][idx_2], m2,
             ux_alpha1, uy_alpha1, uz_alpha1, static_cast<amrex::ParticleReal>(m_alpha),
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
-            E_fusion, engine);
+            E_fusion,
+            scattering_angle_model,
+            engine);
 
         // Compute momentum of beryllium in lab frame
         const amrex::ParticleReal px_Be = static_cast<amrex::ParticleReal>(m_beryllium) * ux_Be;
@@ -113,7 +119,7 @@ namespace {
 
         // Compute momentum norm of second and third alphas in Beryllium rest frame
         // Factor 0.5 is here because each alpha only gets half of the decay energy
-        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c_sq));
+        constexpr amrex::ParticleReal gamma_Bestar = (1._prt + 0.5_prt*E_decay/(m_alpha*c2));
         constexpr amrex::ParticleReal gamma_Bestar_sq_minus_one = gamma_Bestar*gamma_Bestar - 1._prt;
         const amrex::ParticleReal p_Bestar = static_cast<amrex::ParticleReal>(m_alpha)*PhysConst::c*std::sqrt(gamma_Bestar_sq_minus_one);
 
@@ -125,7 +131,7 @@ namespace {
         amrex::ParticleReal px_alpha2, py_alpha2, pz_alpha2;
         // Preliminary calculation: compute Beryllium velocity v_Be
         const amrex::ParticleReal p_Be_sq   = px_Be*px_Be + py_Be*py_Be + pz_Be*pz_Be;
-        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (static_cast<amrex::ParticleReal>(mBe_sq)*c_sq));
+        const amrex::ParticleReal g_Be      = std::sqrt(1._prt + p_Be_sq / (static_cast<amrex::ParticleReal>(mBe_sq)*c2));
         const amrex::ParticleReal mg_Be     = static_cast<amrex::ParticleReal>(m_beryllium)*g_Be;
         const amrex::ParticleReal v_Bex     = px_Be / mg_Be;
         const amrex::ParticleReal v_Bey     = py_Be / mg_Be;

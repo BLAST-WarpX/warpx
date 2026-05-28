@@ -15,7 +15,7 @@ import numpy as np
 import openpmd_api as io
 from mpi4py import MPI as mpi
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 constants = picmi.constants
 
@@ -28,8 +28,8 @@ class PlasmaCylinderCompression(object):
     # B0 is chosen with all other quantities scaled by it
     n0 = 1e20
     T_i = 10  # eV
-    T_e = 0
-    p0 = n0 * constants.q_e * T_i
+    T_e = 10
+    p0 = n0 * constants.q_e * (T_i + T_e)
 
     B0 = np.sqrt(2 * constants.mu0 * p0)  # External magnetic field strength (T)
 
@@ -58,7 +58,7 @@ class PlasmaCylinderCompression(object):
     NPPC = 100
 
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 60
 
     def Bz(self, r):
         return np.sqrt(
@@ -67,7 +67,7 @@ class PlasmaCylinderCompression(object):
             * constants.mu0
             * self.n0
             * constants.q_e
-            * self.T_i
+            * (self.T_i + self.T_e)
             / (1.0 + np.exp((r - self.R_p) / self.delta_p))
         )
 
@@ -93,8 +93,8 @@ class PlasmaCylinderCompression(object):
             Ar_data = np.zeros_like(RM)
             Az_data = np.zeros_like(RM)
 
-            # Zero padded outside of domain
-            At_data = 0.5 * RM * self.dB
+            # Only include half of the compression field here
+            At_data = 0.25 * RM * self.dB
 
             # Write vector potential to file to exercise field loading via
             series = io.Series("Afield.h5", io.Access.create)
@@ -213,9 +213,9 @@ class PlasmaCylinderCompression(object):
         self.rho_i = self.vi_th / self.w_ci
 
     def load_fields(self):
-        Br = fields.BxFPExternalWrapper(include_ghosts=False)
-        Bt = fields.ByFPExternalWrapper(include_ghosts=False)
-        Bz = fields.BzFPExternalWrapper(include_ghosts=False)
+        Br = simulation.fields.get("Bfield_fp_external", dir="r", level=0)
+        Bt = simulation.fields.get("Bfield_fp_external", dir="theta", level=0)
+        Bz = simulation.fields.get("Bfield_fp_external", dir="z", level=0)
 
         Br[:, :] = 0.0
         Bt[:, :] = 0.0
@@ -255,28 +255,31 @@ class PlasmaCylinderCompression(object):
         #######################################################################
         # External Field definition. Sigmoid starting around 2.5 us
         A_ext = {
-            "uniform": {
+            "uniform_file": {
                 "read_from_file": True,
                 "path": "Afield.h5",
                 "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
-            }
+            },
+            "uniform_analytical": {
+                "Ax_external_function": f"-0.25*y*{self.dB}",
+                "Ay_external_function": f"0.25*x*{self.dB}",
+                "Az_external_function": "0",
+                "A_time_external_function": "1/(1+exp(5*(1-(t-t0_ramp)*sqrt(2)/tau_ramp)))",
+            },
         }
 
         self.solver = picmi.HybridPICSolver(
             grid=self.grid,
-            gamma=1.0,
+            gamma=5.0 / 3.0,
             Te=self.T_e,
             n0=self.n0,
             n_floor=0.05 * self.n0,
-            plasma_resistivity="if(rho<=rho_floor,eta_v,eta_p)",
-            plasma_hyper_resistivity=1e-8,
+            plasma_resistivity=1e-4 * constants.mu0 * self.R_c * self.vA,
+            plasma_hyper_resistivity=1e-9,
             substeps=self.substeps,
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
-            rho_floor=0.05 * self.n0 * constants.q_e,
-            eta_p=1e-8,
-            eta_v=1e-3,
         )
         simulation.solver = self.solver
 
@@ -302,11 +305,12 @@ class PlasmaCylinderCompression(object):
             name="ions",
             charge="q_e",
             mass=self.M,
+            warpx_do_temperature_deposition=True,
             initial_distribution=picmi.AnalyticDistribution(
                 density_expression="n0_p/(1+exp((sqrt(x*x+y*y)-R_p)/delta_p))",
                 momentum_expressions=momentum_expr,
                 warpx_momentum_spread_expressions=[f"{str(self.vi_th)}"] * 3,
-                warpx_density_min=0.01 * self.n0,
+                warpx_density_min=0.05 * self.n0,
                 R_p=self.R_p,
                 delta_p=self.delta_p,
                 n0_p=self.n0,
@@ -335,14 +339,25 @@ class PlasmaCylinderCompression(object):
                 warpx_format="plotfile",
             )
             simulation.add_diagnostic(particle_diag)
-        field_diag = picmi.FieldDiagnostic(
-            name="diag1",
-            grid=self.grid,
-            period=self.diag_steps,
-            data_list=["B", "E", "rho"],
-            write_dir="diags",
-            warpx_format="plotfile",
-        )
+            field_diag = picmi.FieldDiagnostic(
+                name="diag1",
+                grid=self.grid,
+                period=self.diag_steps,
+                data_list=["B", "E", "rho", "Tr_ions", "Tt_ions", "Tz_ions"],
+                write_dir="diags",
+                warpx_format="plotfile",
+            )
+        else:
+            field_diag = picmi.FieldDiagnostic(
+                name="diag1",
+                grid=self.grid,
+                period=self.diag_steps,
+                data_list=["B", "E", "rho", "Tr_ions", "Tt_ions", "Tz_ions"],
+                write_dir="diags",
+                warpx_format="openpmd",
+                warpx_file_prefix="field_diags",
+                warpx_openpmd_backend="h5",
+            )
         simulation.add_diagnostic(field_diag)
 
         #######################################################################

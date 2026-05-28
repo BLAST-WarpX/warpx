@@ -28,7 +28,9 @@ sudo apt-key add rocm.gpg.key
 
 source /etc/os-release # set UBUNTU_CODENAME: focal or jammy or ...
 
-echo "deb [arch=amd64] https://repo.radeon.com/rocm/apt/${1-latest} ${UBUNTU_CODENAME} main" \
+VERSION=${1-6.3.2}
+
+echo "deb [arch=amd64] https://repo.radeon.com/rocm/apt/${VERSION} ${UBUNTU_CODENAME} main" \
   | sudo tee /etc/apt/sources.list.d/rocm.list
 echo 'export PATH=/opt/rocm/llvm/bin:/opt/rocm/bin:/opt/rocm/profiler/bin:/opt/rocm/opencl/bin:$PATH' \
   | sudo tee -a /etc/profile.d/rocm.sh
@@ -50,12 +52,16 @@ sudo apt-get install -y --no-install-recommends \
     libzstd-dev     \
     ninja-build     \
     openmpi-bin     \
-    rocm-dev        \
-    rocfft-dev      \
-    rocprim-dev     \
-    rocsparse-dev   \
-    rocrand-dev     \
-    hiprand-dev
+    rocm-dev${VERSION}        \
+    roctracer-dev${VERSION}   \
+    rocprofiler-dev${VERSION} \
+    rocrand-dev${VERSION}     \
+    rocfft-dev${VERSION}      \
+    rocprim-dev${VERSION}     \
+    rocsparse-dev${VERSION}
+
+# hiprand-dev is a new package that does not exist in old versions
+sudo apt-get install -y --no-install-recommends hiprand-dev${VERSION} || true
 
 # ccache
 $(dirname "$0")/ccache.sh
@@ -68,11 +74,6 @@ which clang
 which clang++
 export CXX=$(which clang++)
 export CC=$(which clang)
-
-# "mpic++ --showme" forgets open-pal in Ubuntu 20.04 + OpenMPI 4.0.3
-#   https://bugs.launchpad.net/ubuntu/+source/openmpi/+bug/1941786
-#   https://github.com/open-mpi/ompi/issues/9317
-export LDFLAGS="-lopen-pal"
 
 # cmake-easyinstall
 #

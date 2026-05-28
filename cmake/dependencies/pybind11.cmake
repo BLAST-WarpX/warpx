@@ -37,7 +37,7 @@ function(find_pybind11)
             mark_as_advanced(FETCHCONTENT_UPDATES_DISCONNECTED_FETCHEDpybind11)
         endif()
     else()
-        find_package(pybind11 2.13.0 CONFIG REQUIRED)
+        find_package(pybind11 ${pybind11_version_min} CONFIG REQUIRED)
         message(STATUS "pybind11: Found version '${pybind11_VERSION}'")
     endif()
 endfunction()
@@ -52,7 +52,16 @@ option(WarpX_pybind11_internal "Download & build pybind11" ON)
 set(WarpX_pybind11_repo "https://github.com/pybind/pybind11.git"
     CACHE STRING
     "Repository URI to pull and build pybind11 from if(WarpX_pybind11_internal)")
-set(WarpX_pybind11_branch "v2.13.6"
+
+# Parse pybind11 version and commit information
+file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON pybind11_version_min GET "${dependencies_data}" version_pybind11_min)
+string(JSON pybind11_commit GET "${dependencies_data}" commit_pybind11)
+
+# Strip "v" prefix from version for find_package
+string(REGEX REPLACE "^v" "" pybind11_version_min "${pybind11_version_min}")
+
+set(WarpX_pybind11_branch ${pybind11_commit}
     CACHE STRING
     "Repository branch for WarpX_pybind11_repo if(WarpX_pybind11_internal)")
 

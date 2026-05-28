@@ -9,6 +9,7 @@
 
 #include "ExternalVectorPotential.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -26,6 +27,8 @@ void
 ExternalVectorPotential::ReadParameters ()
 {
     const ParmParse pp_ext_A("external_vector_potential");
+
+    pp_ext_A.query("do_diva_cleaning", m_do_clean_divA);
 
     pp_ext_A.queryarr("fields", m_field_names);
 
@@ -46,7 +49,7 @@ ExternalVectorPotential::ReadParameters ()
     m_A_external.resize(m_nFields);
 
     m_A_ext_time_function.resize(m_nFields);
-    for (std::string & field_time : m_A_ext_time_function) {field_time = "1.0"; }
+    for (std::string & field_time : m_A_ext_time_function) { field_time = "1.0"; }
 
     m_A_external_time_parser.resize(m_nFields);
     m_A_time_scale.resize(m_nFields);
@@ -62,17 +65,17 @@ ExternalVectorPotential::ReadParameters ()
         m_read_A_from_file[i] = read_from_file;
 
         if (m_read_A_from_file[i]) {
-            pp_ext_A.query((m_field_names[i]+".path").c_str(), m_external_file_path[i]);
+            pp_ext_A.query(m_field_names[i]+".path", m_external_file_path[i]);
         } else {
-            pp_ext_A.query((m_field_names[i]+".Ax_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Ax_external_grid_function(x,y,z)",
                 m_Ax_ext_grid_function[i]);
-            pp_ext_A.query((m_field_names[i]+".Ay_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Ay_external_grid_function(x,y,z)",
                 m_Ay_ext_grid_function[i]);
-            pp_ext_A.query((m_field_names[i]+".Az_external_grid_function(x,y,z)").c_str(),
+            pp_ext_A.query(m_field_names[i]+".Az_external_grid_function(x,y,z)",
                 m_Az_ext_grid_function[i]);
         }
 
-        pp_ext_A.query((m_field_names[i]+".A_time_external_function(t)").c_str(),
+        pp_ext_A.query(m_field_names[i]+".A_time_external_function(t)",
             m_A_ext_time_function[i]);
     }
 }
@@ -140,8 +143,6 @@ ExternalVectorPotential::InitData ()
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-    int A_time_dep_count = 0;
-
     for (int i = 0; i < m_nFields; ++i) {
 
         const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
@@ -200,15 +201,20 @@ ExternalVectorPotential::InitData ()
                     lev, PatchType::fine,
                     warpx.GetEBUpdateEFlag(),
                     false);
-
-                for (int idir = 0; idir < 3; ++idir) {
-                    warpx.m_fields.get(Aext_field, Direction{idir}, lev)->
-                        FillBoundary(warpx.Geom(lev).periodicity());
-                }
             }
+            // NOTE: Fill Boundary is not done here since non-periodic A fields can lead to periodic E/B fields
+            // This requires valid definitions of the vector potential in the ghost cells.
         }
 
         amrex::Gpu::streamSynchronize();
+
+        if (m_do_clean_divA) {
+            warpx::initialization::ProjectionDivCleaner dc(Aext_field, true);
+            dc.setSourceFromField();
+            dc.solve();
+            dc.correctField();
+            amrex::Print() << Utils::TextMsg::Info( "Finished Projection A-Field divergence cleaner.");
+        }
 
         CalculateExternalCurlA(m_field_names[i]);
 
@@ -216,17 +222,6 @@ ExternalVectorPotential::InitData ()
         m_A_external_time_parser[i] = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(m_A_ext_time_function[i],{"t",}));
         m_A_time_scale[i] = m_A_external_time_parser[i]->compile<1>();
-
-        const std::set<std::string> A_time_ext_symbols = m_A_external_time_parser[i]->symbols();
-        A_time_dep_count += static_cast<int>(A_time_ext_symbols.count("t"));
-    }
-
-    if (A_time_dep_count > 0) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC ExternalVectorPotential",
-            "Coulomb Gauge is Expected, please be sure to have a divergence free A. Divergence cleaning of A to be implemented soon.",
-            ablastr::warn_manager::WarnPriority::low
-        );
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));
@@ -272,7 +267,7 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
 
 AMREX_FORCE_INLINE
 void
-ExternalVectorPotential::PopulateExternalFieldFromVectorPotential (
+ExternalVectorPotential::AddExternalFieldFromVectorPotential (
     ablastr::fields::VectorField const& dstField,
     amrex::Real scale_factor,
     ablastr::fields::VectorField const& srcField,
@@ -313,21 +308,21 @@ ExternalVectorPotential::PopulateExternalFieldFromVectorPotential (
                 // Skip field update in the embedded boundaries
                 if (update_Fx_arr && update_Fx_arr(i, j, k) == 0) { return; }
 
-                Fx(i,j,k) = scale_factor * Sx(i,j,k);
+                Fx(i,j,k) += scale_factor * Sx(i,j,k);
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip field update in the embedded boundaries
                 if (update_Fy_arr && update_Fy_arr(i, j, k) == 0) { return; }
 
-                Fy(i,j,k) = scale_factor * Sy(i,j,k);
+                Fy(i,j,k) += scale_factor * Sy(i,j,k);
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip field update in the embedded boundaries
                 if (update_Fz_arr && update_Fz_arr(i, j, k) == 0) { return; }
 
-                Fz(i,j,k) = scale_factor * Sz(i,j,k);
+                Fz(i,j,k) += scale_factor * Sz(i,j,k);
             }
         );
     }
@@ -339,12 +334,20 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
 
-
     ablastr::fields::MultiLevelVectorField B_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_B_fp_external, warpx.finestLevel());
     ablastr::fields::MultiLevelVectorField E_ext =
         warpx.m_fields.get_mr_levels_alldirs(FieldType::hybrid_E_fp_external, warpx.finestLevel());
 
+    // Zero E and B external fields prior to accumulating external fields
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        for (int idir = 0; idir < 3; ++idir) {
+            B_ext[lev][Direction{idir}]->setVal(0.0_rt);
+            E_ext[lev][Direction{idir}]->setVal(0.0_rt);
+        }
+    }
+
+    // Iterate over external fields and add together with individual time functions.
     for (int i = 0; i < m_nFields; ++i) {
         const std::string Aext_field = m_field_names[i] + std::string{"_Aext"};
         const std::string curlAext_field = m_field_names[i] + std::string{"_curlAext"};
@@ -363,8 +366,8 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
             warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
 
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            PopulateExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
-            PopulateExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
+            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
+            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
 
             for (int idir = 0; idir < 3; ++idir) {
                 E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());

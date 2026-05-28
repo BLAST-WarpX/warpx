@@ -34,14 +34,14 @@ If you install ``pre-commit`` locally, the style and correctness checks will run
 If you do not install ``pre-commit`` locally, these checks will run automatically as part of our CI workflows and a commit containing style and correctness changes might be added automatically to your branch after you have pushed your own commit.
 In that case, you will need to pull that automated commit before pushing further commits.
 
-The configuration options for ``pre-commit`` are set in the `pre-commit-config.yaml <https://github.com/ECP-WarpX/WarpX/blob/development/.pre-commit-config.yaml>`__ file.
+The configuration options for ``pre-commit`` are set in the `pre-commit-config.yaml <https://github.com/BLAST-WarpX/warpx/blob/development/.pre-commit-config.yaml>`__ file.
 
 How to configure the automated tests
 ------------------------------------
 
 Our regression tests are run with `CTest <https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html#>`__, an executable that comes with CMake.
 
-The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-cmake>` or :ref:`Developers <building-cmake>` sections.
+The test suite is ready to run once you have configured and built WarpX with CMake, following the instructions that you find in our :ref:`Users <install-methods-cmake>` or :ref:`Developers <install-build-cmake>` sections.
 
 A test that requires a build option that was not configured and built will be skipped automatically. For example, if you configure and build WarpX in 1D only, any test of dimensionality other than 1D, which would require WarpX to be configured and built in the corresponding dimensionality, will be skipped automatically.
 
@@ -50,7 +50,7 @@ How to run automated tests locally
 
 Once your code changes are ready, there are ways to check that they do not break the rest of the code.
 WarpX has automated tests running every time a commit is pushed to an open pull request.
-The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+The input files and scripts used by the automated tests can be found in the `Examples <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory, either under `Physics_applications <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests>`__.
 
 For easier debugging, it can be convenient to run the tests on your local computer by executing CTest as illustrated in the examples below (where we assume that WarpX was configured and built in the directory ``build``):
 
@@ -130,7 +130,7 @@ An automated test typically consists of the following components:
 
 * checksum file.
 
-As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/ECP-WarpX/WarpX/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests>`__.
+As mentioned above, the input files and scripts used by the automated tests can be found in the `Examples <https://github.com/BLAST-WarpX/warpx/tree/development/Examples>`__ directory, under either `Physics_applications <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications>`__ or `Tests <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests>`__.
 
 Each test directory must contain a file named ``CMakeLists.txt`` where all tests associated with the input files and scripts in that directory must be listed.
 
@@ -145,7 +145,7 @@ A new test can be added by calling the function ``add_warpx_test`` in ``CMakeLis
      function(add_warpx_test
          name        # unique test name:
                      # test_1d_example, test_2d_example_picmi, etc.
-         dims        # dimensionality: 1, 2, 3, RZ
+         dims        # dimensionality: 1, 2, 3, RZ, RCYLINDER, RSPHERE
          nprocs      # number of processes: 1, 2
          inputs      # inputs file or PICMI script:
                      # inputs_test_1d_example, inputs_test_2d_example_picmi.py, "inputs_test_2d_example_picmi.py arg1 arg2", etc.
@@ -168,9 +168,9 @@ Here's how to add an automated test:
 
 #. Add the test to the ``CMakeLists.txt`` file (add such file if you are adding the test in a new test directory) using the function ``add_warpx_test`` mentioned above.
 
-#. If the test directory is new, add the directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/ECP-WarpX/WarpX/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the test directory is located.
+#. If the test directory is new, add the directory with the command ``add_subdirectory`` in `Physics_applications/CMakeLists.txt <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Physics_applications/CMakeLists.txt>`__ or `Tests/CMakeLists.txt <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests/CMakeLists.txt>`__, depending on where the test directory is located.
 
-#. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/ECP-WarpX/WarpX/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
+#. If the test directory is new, make a symbolic link to the default regression analysis script ``analysis_default_regression.py`` from `Examples/analysis_default_regression.py <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/analysis_default_regression.py>`__, by running ``ln -s ../../analysis_default_regression.py analysis_default_regression.py`` from the test directory.
 
 #. Run the test locally with ``ctest``, after setting the environment variable ``CHECKSUM_RESET=ON``, in order to generate automatically the checksum file.
 
@@ -178,7 +178,7 @@ Once you have added the test, run the test locally again, after resetting ``CHEC
 
 The ``analysis`` and ``checksum`` commands passed as arguments to ``add_warpx_test`` can be set to ``OFF`` if the intention is to skip the respective analysis for a given test.
 
-If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/ECP-WarpX/WarpX/blob/development/Regression/requirements.txt>`__.
+If you need a new Python package dependency for testing, please add it in `Regression/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/Regression/requirements.txt>`__.
 
 Sometimes two or more tests share a large number of input parameters.
 The shared input parameters can be collected in a "base" input file that can be passed as a runtime parameter in the actual test input files through the parameter ``FILE``.
@@ -195,39 +195,31 @@ Here is the help message of the default regression analysis script, including us
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
 
-How to reset checksums locally
-------------------------------
+How to reset checksums
+----------------------
 
-It is possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
+Your code changes may sometimes change the results that WarpX produces.
+This is automatically detected by the automated tests (which run every time a commit is pushed to the head branch of an open PR) through comparison of the WarpX results with the reference values stored in the checksum files.
+
+**If** the differences are expected, you can reset the checksum files automatically using the output
+of the automated tests. To do so, go to the directory
+`Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script
+`update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ with the ``--pr-number`` option:
+
+.. code:: bash
+
+     python update_benchmarks_from_azure_output.py --pr-number 1234
+
+This requires the `GitHub CLI <https://cli.github.com/>`__ (``gh``) to be installed and authenticated.
+The script will automatically find the failing Azure Pipelines jobs for the pull request, download their logs, and update all checksum benchmark files that did not pass the checksum analysis.
+
+Alternatively, it is also possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
 
   .. code-block:: bash
 
-       CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
+     CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
 
-Alternatively, it is also possible to reset multiple checksum files using the output of our Azure pipelines, which can be useful for code changes that result in resetting a large numbers of checksum files.
-Here's how to do so:
-
-#. On the GitHub page of the pull request, find (one of) the pipeline(s) failing due to checksum regressions and click on "Details" (highlighted in blue).
-
-   .. figure:: https://gist.github.com/user-attachments/assets/09db91b9-5711-4250-8b36-c52a6049e38e
-
-#. In the new page that opens up, click on "View more details on Azure pipelines" (highlighted in blue).
-
-   .. figure:: https://gist.github.com/user-attachments/assets/ab0c9a24-5518-4da7-890f-d79fa1c8de4c
-
-#. In the new page that opens up, select the group of tests for which you want to reset the checksum files (e.g., ``cartesian_3d``) and click on "View raw log".
-
-   .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
-
-#. Save the raw log as a text file on your computer.
-
-#. Go to the directory `Tools/DevUtils <https://github.com/ECP-WarpX/WarpX/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/ECP-WarpX/WarpX/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
-
-   .. code:: bash
-
-        python update_benchmarks_from_azure_output.py path/to/raw_log.txt
-
-   This will update the checksum files for all the tests in the raw log that did not pass the checksum analysis.
+Note that it is possible that the checksum values generated locally on your computer architecture may differ from the ones generated remotely by the autometed tests on the architecture provided by the CI runners.
 
 .. _developers-testing-naming:
 

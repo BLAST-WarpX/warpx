@@ -10,7 +10,7 @@
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/WarpXParticleContainer.H"
+#include "Particles/WarpXParticleContainer_fwd.H"
 
 #include <AMReX_REAL.H>
 #include <AMReX_GpuContainers.H>
@@ -31,10 +31,12 @@ struct LatticeElementFinder
      *
      * @param[in] lev the refinement level
      * @param[in] gamma_boost the Lorentz factor of the boosted frame
+     * @param[in] time the current time on all refinement levels
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      */
     void InitElementFinder (int lev, amrex::Real gamma_boost,
+                            const amrex::Vector<amrex::Real>& time,
                             amrex::MFIter const& a_mfi,
                             AcceleratorLattice const& accelerator_lattice);
 
@@ -51,9 +53,11 @@ struct LatticeElementFinder
      * @param[in] lev the refinement level
      * @param[in] a_mfi specifies the grid where the finder is defined
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] time the current time on all refinement levels
      */
     void UpdateIndices (int lev, amrex::MFIter const& a_mfi,
-                        AcceleratorLattice const& accelerator_lattice);
+                        AcceleratorLattice const& accelerator_lattice,
+                        const amrex::Vector<amrex::Real>& time);
 
     /* Define the location and size of the index lookup table */
     /* Use the type Real to be consistent with the way the main grid is defined */
@@ -73,9 +77,11 @@ struct LatticeElementFinder
      * @param[in] a_pti specifies the grid where the finder is defined
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     [[nodiscard]] LatticeElementFinderDevice GetFinderDeviceInstance (
-        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice) const;
+        WarpXParIter const& a_pti, int a_offset, AcceleratorLattice const& accelerator_lattice,
+        const amrex::Vector<amrex::Real>&  dts) const;
 
     /* The index lookup tables for each lattice element type */
     amrex::Gpu::DeviceVector<int> d_quad_indices;
@@ -108,13 +114,19 @@ struct LatticeElementFinderDevice
      * @param[in] a_offset particle index offset needed to access particle info
      * @param[in] accelerator_lattice a reference to the accelerator lattice at the refinement level
      * @param[in] h_finder The host level instance of the element finder that this is associated with
+     * @param[in] dts vector containing the timestep sizes at all refinement levels
      */
     void
     InitLatticeElementFinderDevice (WarpXParIter const& a_pti, int a_offset,
                                     AcceleratorLattice const& accelerator_lattice,
-                                    LatticeElementFinder const & h_finder);
+                                    LatticeElementFinder const & h_finder,
+                                    const amrex::Vector<amrex::Real>& dts);
+
+    /* Whether the class has been initialized */
+    bool m_initialized = false;
 
     /* Size and location of the index lookup table */
+    int m_nz;
     amrex::Real m_zmin;
     amrex::Real m_dz;
     amrex::Real m_dt;
@@ -162,7 +174,11 @@ struct LatticeElementFinderDevice
         // (which is in the boosted frame)
         const int iz = static_cast<int>((z - m_zmin)/m_dz);
 
-        constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+        // This check shouldn't be needed since the particle should always
+        // be within the grid, but it is added for safety.
+        if (iz < 0 || iz >= m_nz) { return; }
+
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         amrex::ParticleReal const gamma = std::sqrt(1._prt + (m_ux[i]*m_ux[i] + m_uy[i]*m_uy[i] + m_uz[i]*m_uz[i])*inv_c2);
         amrex::ParticleReal const vzp = m_uz[i]/gamma;
 

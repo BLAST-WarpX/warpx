@@ -89,9 +89,15 @@ positrons.momentum_function_uy(x,y,z) = "-epsilon * k/kp * cos(k*x) * sin(k*y) *
 positrons.momentum_function_uz(x,y,z) = "-epsilon * k/kp * cos(k*x) * cos(k*y) * sin(k*z)"
 
 # Diagnostics
-diagnostics.diags_names = diag1
+warpx.synchronize_velocity_for_diagnostics = 1
+diagnostics.diags_names = diag1 openpmd
 diag1.intervals = max_step
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz part_per_cell rho
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz part_per_cell rho divE
 diag1.electrons.variables = x y z w ux
 diag1.positrons.variables = x y z uz
+
+openpmd.intervals = 40
+openpmd.diag_type = Full
+openpmd.format = openpmd
+openpmd.electrons.additional_variables = Ex Ey Ez

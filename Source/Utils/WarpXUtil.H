@@ -31,16 +31,7 @@
 void ReadBoostedFrameParameters(amrex::Real& gamma_boost, amrex::Real& beta_boost,
                                 amrex::Vector<int>& boost_direction);
 
-void ReadMovingWindowParameters(
-    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
-    int& moving_window_dir, amrex::Real& moving_window_v);
-
 void ConvertLabParamsToBoost();
-
-/**
- * Reads the user-defined field and particle boundary condition parameters
- */
-void ReadBCParams ();
 
 /** Check the warpx.dims matches the binary name & set up RZ gridding
  *
@@ -57,8 +48,8 @@ void CheckGriddingForRZSpectral ();
  *
  * \param[in] mf Pointer to the MultiFab
  * \param[in] lev The mesh refinement level
- * \param[in] zmin The minimum z of the range to be mullified
- * \param[in] zmin The maximum z of the range to be mullified
+ * \param[in] zmin The minimum z of the range to be nullified
+ * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMFinstance (
     amrex::MultiFab *mf,
@@ -70,10 +61,10 @@ void NullifyMFinstance (
 /** Function that sets the value of MultiFab MF to zero.
  *
  * \param[in] multifab_map Multifab registry
- * \param[in] nf_name Name of Multifab to modify
+ * \param[in] mf_name Name of Multifab to modify
  * \param[in] lev The mesh refinement level
- * \param[in] zmin The minimum z of the range to be mullified
- * \param[in] zmin The maximum z of the range to be mullified
+ * \param[in] zmin The minimum z of the range to be nullified
+ * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMF (
     ablastr::fields::MultiFabRegister& multifab_map,
@@ -86,11 +77,11 @@ void NullifyMF (
 /** Function that sets the value of MultiFab MF to zero.
  *
  * \param[in] multifab_map Multifab registry
- * \param[in] nf_name Name of Multifab to modify
+ * \param[in] mf_name Name of Multifab to modify
  * \param[in] dir Direction, for Multifabs that are components of vectors
  * \param[in] lev The mesh refinement level
- * \param[in] zmin The minimum z of the range to be mullified
- * \param[in] zmin The maximum z of the range to be mullified
+ * \param[in] zmin The minimum z of the range to be nullified
+ * \param[in] zmax The maximum z of the range to be nullified
  */
 void NullifyMF (
     ablastr::fields::MultiFabRegister& multifab_map,
@@ -100,17 +91,6 @@ void NullifyMF (
     amrex::Real zmin,
     amrex::Real zmax
 );
-
-namespace WarpXUtilIO{
-/**
- * A helper function to write binary data on disk.
- * @param[in] filename where to write
- * @param[in] data Vector containing binary data to write on disk
- * return true if it succeeds, false otherwise
- */
-bool WriteBinaryDataOnFile(const std::string& filename, const amrex::Vector<char>& data);
-
-}
 
 namespace WarpXUtilLoadBalance
 {

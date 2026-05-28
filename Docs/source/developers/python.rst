@@ -11,10 +11,10 @@ The two layers are described below.
 Input parameters
 ----------------
 
-In a C++ input file, each of the parameters has a prefix, for example ``geometry`` in ``geometry.prob_lo``.
+In a C++ input file, each of the parameters has a prefix, for example ``geometry`` in :pp:param:`geometry.prob_lo`.
 For each of these prefixes, an instance of a Python class is created and the parameters saved as attributes.
 This construction is used since the lines in the input file look very much like a Python assignment statement,
-assigning attributes of class instances, for example ``geometry.dims = 3``.
+assigning attributes of class instances, for example :pp:param:`geometry.dims = 3`.
 
 Many of the prefix instances are predefined, for instance ``geometry`` is created in the file ``Python/pywarpx/Geometry.py``.
 In that case, ``geometry`` is an instance of the class ``Bucket`` (specified in ``Python/pywarpx/Bucket.py``),
@@ -24,7 +24,7 @@ Most of the instances are instances of the ``Bucket`` class.
 There are exceptions, such as ``constants`` and ``diagnostics`` where extra processing is needed.
 
 There can also be instances created as needed.
-For example, for the particle species, an instance is created for each species listed in ``particles.species_names``.
+For example, for the particle species, an instance is created for each species listed in :pp:param:`particles.species_names`.
 This gives a place to hold the parameters for the species, e.g., ``electrons.mass``.
 
 The instances are then used to generate the input parameters.
@@ -42,7 +42,7 @@ This is as if all of the input parameters had been specified on the command line
 If Python is only used as a prepocessor to generate the input file, the list are the strings that are written out to create the
 input file.
 
-There are two input parameters that do not have prefixes, ``max_step`` and ``stop_time``.
+There are two input parameters that do not have prefixes, :pp:param:`max_step` and :pp:param:`stop_time`.
 These are handled via keyword arguments in the ``WarpX.create_argv_list`` method.
 
 Conversion from PICMI
@@ -79,76 +79,5 @@ The initialization happens when either the ``write_input_file`` method is called
 After ``initialize_inputs`` is finished, the attributes of the prefix instances have been filled in, and the process described
 above happens, where the prefix instances are looped over to generate the list of input parameter strings (that is either written
 out to a file or passed in as ``argv``).
-The two parameters that do not have a prefix, ``max_step`` and ``stop_time``, are passed into the ``warpx`` method as keyword
+The two parameters that do not have a prefix, :pp:param:`max_step` and :pp:param:`stop_time`, are passed into the ``warpx`` method as keyword
 arguments.
-
-Python runtime interface
-========================
-
-The Python interface provides low and high level access to much of the data in WarpX.
-With the low level access, a user has direct access to the underlying memory contained
-in the MultiFabs and in the particle arrays.
-The high level provides a more user friendly interface.
-
-High level interface
---------------------
-
-There are two python modules that provide convenient access to the fields and the particles.
-
-Fields
-~~~~~~
-
-The ``fields`` module provides wrapper around most of the MultiFabs that are defined in the WarpX class.
-For a list of all of the available wrappers, see the file ``Python/pywarpx/fields.py``.
-For each MultiFab, there is a function that will return a wrapper around the data.
-For instance, the function ``ExWrapper`` returns a wrapper around the ``x`` component of the MultiFab vector ``Efield_aux``.
-
-.. code-block:: python
-
-   from pywarpx import fields
-   Ex = fields.ExWrapper()
-
-By default, this wraps the MultiFab for level 0. The ``level`` argument can be specified for other levels.
-By default, the wrapper only includes the valid cells. To include the ghost cells, set the argument ``include_ghosts=True``.
-
-The wrapper provides access to the data via global indexing.
-Using standard array indexing (with exceptions) with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-With multiple processors, the result is broadcast to all processors.
-This example will return the ``Bz`` field at all points along ``x`` at the specified ``y`` and ``z`` indices.
-
-.. code-block:: python
-
-   from pywarpx import fields
-   Bz = fields.BzWrapper()
-   Bz_along_x = Bz[:,5,6]
-
-The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
-specified ``x``. The data will be scattered appropriately to the underlying FABs.
-
-.. code-block:: python
-
-   from pywarpx import fields
-   Jy = fields.JyFPWrapper()
-   Jy[5,6:20,8:30] = 7.
-
-The code does error checking to ensure that the specified indices are within the bounds of the global domain.
-Note that negative indices are handled differently than with numpy arrays because of the possibility of having ghost cells.
-With ghost cells, the lower ghost cells are accessed using negative indices (since ``0`` is the index of the lower bound of the
-valid cells). Without ghost cells, a negative index will always raise an out of bounds error since there are no ghost cells.
-
-Under the covers, the wrapper object has a list of numpy arrays that have pointers to the underlying data, one array for each FAB.
-When data is being fetched, it loops over that list to gather the data.
-The result is then gathered among all processors.
-Note that the result is not writeable, in the sense that changing it won’t change the underlying data since it is a copy.
-When the data is set, using the global indexing, a similar process is done where the processors loop over their FABs and set the data at the appropriate indices.
-
-The wrappers are always up to date since whenever an access is done (either a get or a set), the list of numpy arrays for the FABs is regenerated.
-In this case, efficiency is sacrificed for consistency.
-
-If it is needed, the list of numpy arrays associated with the FABs can be obtained using the wrapper method ``_getfields``.
-Additionally, there are the methods ``_getlovects`` and ``_gethivects`` that get the list of the bounds of each of the arrays.
-
-Particles
-~~~~~~~~~
-
-This is still in development.

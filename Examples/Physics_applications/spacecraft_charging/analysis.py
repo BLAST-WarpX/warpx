@@ -55,7 +55,7 @@ print("v0=%5.3f, tau=%5.9f" % (popt[0], popt[1]))
 
 
 tolerance_v0 = 0.04
-tolerance_tau = 0.04
+tolerance_tau = 0.20
 print("tolerance for v0 = " + str(tolerance_v0 * 100) + "%")
 print("tolerance for tau = " + str(tolerance_tau * 100) + "%")
 

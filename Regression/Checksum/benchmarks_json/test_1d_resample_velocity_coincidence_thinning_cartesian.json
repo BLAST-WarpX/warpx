@@ -6,14 +6,14 @@
     "Ex": 0.0,
     "Ey": 0.0,
     "Ez": 0.0,
-    "jx": 434240.88525516074,
-    "jy": 315768.9402331213,
-    "jz": 642846.5589763735
+    "jx": 434240.8852551609,
+    "jy": 315768.9402331208,
+    "jz": 642846.558976395
   },
   "hydrogen": {
-    "particle_momentum_x": 6.919253235905925e-20,
-    "particle_momentum_y": 7.069867215063566e-20,
-    "particle_momentum_z": 7.606884436016626e-20,
+    "particle_momentum_x": 6.919253245255027e-20,
+    "particle_momentum_y": 7.069867224616174e-20,
+    "particle_momentum_z": 7.606884446294835e-20,
     "particle_position_x": 25.60006676227001,
     "particle_weight": 1.0000000000000001e+18
   }

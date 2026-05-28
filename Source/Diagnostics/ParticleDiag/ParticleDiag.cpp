@@ -4,7 +4,6 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -17,7 +16,7 @@ using namespace amrex;
 
 ParticleDiag::ParticleDiag (
     const std::string& diag_name, const std::string& name,
-    WarpXParticleContainer* pc, PinnedMemoryParticleContainer* pinned_pc):
+    WarpXParticleContainer* pc, WarpXParticleContainer::Base* pinned_pc):
     m_diag_name(diag_name), m_name(name), m_pc(pc), m_pinned_pc(pinned_pc)
 {
     //variable to set m_plot_flags size
@@ -37,16 +36,28 @@ ParticleDiag::ParticleDiag (
         bool contains_positions = false;
         if (variables[0] != "none"){
             for (auto& var : variables){
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 // we reconstruct to Cartesian x,y,z for RZ particle output
+                if (var == "x") { var = "r"; }
                 if (var == "y") { var = "theta"; }
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                // we reconstruct to Cartesian x,y,z for RSPHERE particle output
+                if (var == "z") { var = "phi"; }
 #endif
                 if (var == "phi") {
                     // User requests phi on particle. This is *not* part of the variables that
                     // the particle container carries, and is only added to particles during output.
                     // Therefore, this case needs to be treated specifically.
                     m_plot_phi = true;
-                } else {
+                }
+                else if (var == "Ex") { m_plot_Ex = true; }
+                else if (var == "Ey") { m_plot_Ey = true; }
+                else if (var == "Ez") { m_plot_Ez = true; }
+                else if (var == "Bx") { m_plot_Bx = true; }
+                else if (var == "By") { m_plot_By = true; }
+                else if (var == "Bz") { m_plot_Bz = true; }
+                else {
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc->HasRealComp(var),
                         "variables argument '" + var
                         +"' is not an existing attribute for this species");
@@ -68,11 +79,31 @@ ParticleDiag::ParticleDiag (
         }
     }
 
-#ifdef WARPX_DIM_RZ
+    amrex::Vector<std::string> additional_variables;
+    pp_diag_name_species_name.queryarr("additional_variables", additional_variables);
+    for (auto& var : additional_variables) {
+        if (var == "phi") { m_plot_phi = true; }
+        else if (var == "Ex") { m_plot_Ex = true; }
+        else if (var == "Ey") { m_plot_Ey = true; }
+        else if (var == "Ez") { m_plot_Ez = true; }
+        else if (var == "Bx") { m_plot_Bx = true; }
+        else if (var == "By") { m_plot_By = true; }
+        else if (var == "Bz") { m_plot_Bz = true; }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+                "additional_variables argument '" + var + "' is not a valid variable");
+        }
+    }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Always write out theta, whether or not it's requested,
     // to be consistent with always writing out r and z.
     // TODO: openPMD does a reconstruction to Cartesian, so we can now skip force-writing this
     m_plot_flags[pc->GetRealCompIndex("theta")] = 1;
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+    // Always write out the angle phi, whether or not it's requested,
+    m_plot_flags[pc->GetRealCompIndex("phi")] = 1;
 #endif
 
     // build filter functors

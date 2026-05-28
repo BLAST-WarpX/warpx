@@ -120,7 +120,7 @@ run of the desired simulation.
 .. figure:: https://data.kitware.com/api/v1/item/5c06b4b18d777f2179d4784c/download
 
    Rendering of 10 3D iso-surfaces of j using VisIt libsim. The upper left
-   quadrant has been clipped away to reveal innner structure.
+   quadrant has been clipped away to reveal inner structure.
 
 The same run and visualization was repeated using ParaView Catalyst, shown in
 :numref:`lpa_pv`, by providing the following XML configuration.
@@ -250,7 +250,7 @@ First, log into cori and clone the git repo's.
    cd $SCRATCH
    mkdir warpx
    cd warpx/
-   git clone https://github.com/ECP-WarpX/WarpX.git WarpX-libsim
+   git clone https://github.com/BLAST-WarpX/warpx.git WarpX-libsim
    git clone https://github.com/AMReX-Codes/amrex
    git clone https://github.com/ECP-WarpX/picsar.git
    cd WarpX-libsim
@@ -301,7 +301,7 @@ First, log into cori and clone the git repo's.
    cd $SCRATCH
    mkdir warpx
    cd warpx/
-   git clone https://github.com/ECP-WarpX/WarpX.git WarpX-catalyst
+   git clone https://github.com/BLAST-WarpX/warpx.git WarpX-catalyst
    git clone --branch development https://github.com/AMReX-Codes/amrex
    git clone https://github.com/ECP-WarpX/picsar.git
    cd WarpX-catalyst

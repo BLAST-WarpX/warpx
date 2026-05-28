@@ -54,7 +54,7 @@ public:
     StrangImplicitSpectralEM(StrangImplicitSpectralEM&&) = delete;
     StrangImplicitSpectralEM& operator=(StrangImplicitSpectralEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX* a_WarpX, bool a_from_restart) override;
 
     void PrintParameters () const override;
 
@@ -64,9 +64,14 @@ public:
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
-                      amrex::Real      half_time,
+                      amrex::Real      start_time,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
+
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] amrex::Real  GetThetaForPC () const override { return 0.; }
 
 private:
 

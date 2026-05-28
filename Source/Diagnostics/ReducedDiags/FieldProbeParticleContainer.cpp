@@ -7,54 +7,21 @@
 
 #include "FieldProbeParticleContainer.H"
 
-#include "Particles/Deposition/ChargeDeposition.H"
-#include "Particles/Deposition/CurrentDeposition.H"
-#include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/Pusher/UpdatePosition.H"
-#include "Particles/ParticleBoundaries_K.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
-#include <AMReX.H>
 #include <AMReX_AmrCore.H>
 #include <AMReX_AmrParGDB.H>
 #include <AMReX_BLassert.H>
-#include <AMReX_Box.H>
-#include <AMReX_BoxArray.H>
-#include <AMReX_Config.H>
-#include <AMReX_Dim3.H>
-#include <AMReX_Extension.H>
-#include <AMReX_FabArray.H>
-#include <AMReX_Geometry.H>
 #include <AMReX_GpuAllocators.H>
-#include <AMReX_GpuAtomic.H>
-#include <AMReX_GpuControl.H>
-#include <AMReX_GpuDevice.H>
-#include <AMReX_GpuLaunch.H>
-#include <AMReX_GpuQualifiers.H>
-#include <AMReX_IndexType.H>
-#include <AMReX_IntVect.H>
-#include <AMReX_LayoutData.H>
-#include <AMReX_MFIter.H>
-#include <AMReX_MultiFab.H>
-#include <AMReX_PODVector.H>
-#include <AMReX_ParGDB.H>
 #include <AMReX_ParallelDescriptor.H>
-#include <AMReX_ParallelReduce.H>
-#include <AMReX_ParmParse.H>
 #include <AMReX_Particle.H>
-#include <AMReX_ParticleContainerBase.H>
+#include <AMReX_ParticleContainer.H>
 #include <AMReX_ParticleTile.H>
 #include <AMReX_ParticleTransformation.H>
-#include <AMReX_ParticleUtil.H>
-#include <AMReX_Utility.H>
+#include <AMReX_StructOfArrays.H>
 
+#include <string>
 
-#include <algorithm>
-#include <cmath>
 
 using namespace amrex;
 
@@ -93,10 +60,12 @@ FieldProbeParticleContainer::AddNParticles (int lev,
      * is then coppied to the permament tile which is stored on the particle
      * (particle_tile).
      */
-    using PinnedTile = typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType;
+    using PinnedTile = typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType;
 
     PinnedTile pinned_tile;
-    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps());
+    auto soa_rdata_names = GetRealSoANames();
+    auto soa_idata_names = GetIntSoANames();
+    pinned_tile.define(NumRuntimeRealComps(), NumRuntimeIntComps(), &soa_rdata_names, &soa_idata_names, amrex::The_Pinned_Arena());
 
     for (int i = 0; i < np; i++)
     {
@@ -108,8 +77,11 @@ FieldProbeParticleContainer::AddNParticles (int lev,
     DefineAndReturnParticleTile(0, 0, 0);
 
     // for RZ write theta value
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     pinned_tile.push_back_real(FieldProbePIdx::theta, np, 0.0);
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+    pinned_tile.push_back_real(FieldProbePIdx::phi, np, 0.0);
 #endif
 #if !defined (WARPX_DIM_1D_Z)
     pinned_tile.push_back_real(FieldProbePIdx::x, x);
@@ -117,7 +89,9 @@ FieldProbeParticleContainer::AddNParticles (int lev,
 #if defined (WARPX_DIM_3D)
     pinned_tile.push_back_real(FieldProbePIdx::y, y);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     pinned_tile.push_back_real(FieldProbePIdx::z, z);
+#endif
     pinned_tile.push_back_real(FieldProbePIdx::Ex, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Ey, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Ez, np, 0.0);

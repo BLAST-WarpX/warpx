@@ -4,16 +4,15 @@
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "Particles/Filter/FilterFunctors.H"
-#include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleIO.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_Box.H>
@@ -49,12 +48,19 @@
 #include <utility>
 #include <vector>
 
+#ifndef WARPX_UNITY_ID
+#define WARPX_UNITY_ID
+#endif
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
 namespace
 {
+namespace WARPX_UNITY_ID
+{
     const std::string default_level_prefix {"Level_"};
+}
 }
 
 void
@@ -72,7 +78,7 @@ FlushFormatPlotfile::WriteToFile (
     const amrex::Geometry& /*full_BTD_snapshot*/,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatPlotfile::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatPlotfile::WriteToFile()");
     auto & warpx = WarpX::GetInstance();
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
@@ -352,51 +358,69 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
 {
     for (const auto& part_diag : particle_diags) {
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
-        PinnedMemoryParticleContainer* pinned_pc = part_diag.getPinnedParticleContainer();
+        WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
-            pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-            pc->make_alike<amrex::PinnedArenaAllocator>();
+            pinned_pc->make_alike<>() :
+            pc->make_alike<>();
+        tmp.SetArena(amrex::The_Pinned_Arena());
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
         Vector<int> int_flags;
         Vector<int> real_flags;
 
-        // note: positions skipped here, since we reconstruct a plotfile SoA from them
+        // This gets the names correct relative to what WarpX uses, but note that AMReX ignores
+        // these names and always writes the particles out with "x" as the first coordinate,
+        // "y" as the second, and "z" as the third independent of what geometry is being used.
+        // All that matters here is getting the correct number of positions.
+#if !defined (WARPX_DIM_1D_Z)
+        real_names.push_back("position_x");
+#endif
+#if defined (WARPX_DIM_3D)
+        real_names.push_back("position_y");
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+        real_names.push_back("position_z");
+#endif
+
         real_names.push_back("weight");
         real_names.push_back("momentum_x");
         real_names.push_back("momentum_y");
         real_names.push_back("momentum_z");
 
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         real_names.push_back("theta");
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        real_names.push_back("phi");
 #endif
 
         // get the names of the extra real comps
-        real_names.resize(tmp.NumRealComps() - AMREX_SPACEDIM);
+        real_names.resize(tmp.NumRealComps());
+        real_flags = part_diag.m_plot_flags;
+        real_flags.resize(tmp.NumRealComps());
 
-        // note, skip the required compnent names here
+        // note, skip the required component names here
         auto rnames = tmp.GetRealSoANames();
         for (std::size_t index = PIdx::nattribs; index < rnames.size(); ++index) {
-            real_names[index - AMREX_SPACEDIM] = rnames[index];
+            real_names[index] = rnames[index];
+            real_flags[index] = tmp.h_redistribute_real_comp[index];
         }
-
-        // plot any "extra" fields by default
-        real_flags = part_diag.m_plot_flags;
-        real_flags.resize(tmp.NumRealComps(), 1);
 
         //   note: skip the mandatory AMREX_SPACEDIM positions for pure SoA
+        real_names.erase(real_names.begin(), real_names.begin() + AMREX_SPACEDIM);
         real_flags.erase(real_flags.begin(), real_flags.begin() + AMREX_SPACEDIM);
 
-        // and the names
+        // and the int comps
         int_names.resize(tmp.NumIntComps());
+        int_flags.resize(tmp.NumIntComps());
+        //   note: inames and h_redistribute_int_comp are not the same size
         auto inames = tmp.GetIntSoANames();
+        std::size_t const i0_redist = tmp.h_redistribute_int_comp.size() - inames.size();
         for (std::size_t index = 0; index < inames.size(); ++index) {
             int_names[index] = inames[index];
+            int_flags[index] = tmp.h_redistribute_int_comp[i0_redist + index];
         }
-
-        // plot by default
-        int_flags.resize(tmp.NumIntComps(), 1);
 
         const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
         RandomFilter const random_filter(part_diag.m_do_random_filter,
@@ -425,9 +449,20 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
             }, true);
             particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
         } else {
-            tmp.copyParticles(*pinned_pc, true);
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
+            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
+            using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
+            tmp.copyParticles(*pinned_pc,
+                              [random_filter,uniform_filter,parser_filter,geometry_filter]
+                              AMREX_GPU_HOST_DEVICE
+                              (const SrcData& src, int ip, const amrex::RandomEngine& engine)
+            {
+                const SuperParticleType& p = src.getSuperParticle(ip);
+                return random_filter(p, engine) * uniform_filter(p, engine)
+                    * parser_filter(p, engine) * geometry_filter(p, engine);
+            }, true);
+            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
         }
+
         // real_names contains a list of all particle attributes.
         // real_flags & int_flags are 1 or 0, whether quantity is dumped or not.
         tmp.WritePlotFile(
@@ -562,6 +597,7 @@ FlushFormatPlotfile::WriteAllRawFields(
     const bool plot_raw_fields_guards) const
 {
     using ablastr::fields::Direction;
+    using WARPX_UNITY_ID::default_level_prefix;
 
     if (!plot_raw_fields) { return; }
     auto & warpx = WarpX::GetInstance();
@@ -599,6 +635,15 @@ FlushFormatPlotfile::WriteAllRawFields(
                     default_level_prefix, "By_fp", lev, plot_raw_fields_guards );
         WriteRawMF( *warpx.m_fields.get(FieldType::Bfield_fp, Direction{2}, lev), dm, raw_pltname,
                     default_level_prefix, "Bz_fp", lev, plot_raw_fields_guards );
+        if (warpx.m_fields.has_vector(FieldType::E_old, lev))
+        {
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{0}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ex_old", lev, plot_raw_fields_guards );
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{1}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ey_old", lev, plot_raw_fields_guards );
+            WriteRawMF( *warpx.m_fields.get(FieldType::E_old, Direction{2}, lev), dm, raw_pltname,
+                        default_level_prefix, "Ez_old", lev, plot_raw_fields_guards );
+        }
         if (warpx.m_fields.has(FieldType::F_fp, lev))
         {
             WriteRawMF( *warpx.m_fields.get(FieldType::F_fp, lev), dm, raw_pltname,

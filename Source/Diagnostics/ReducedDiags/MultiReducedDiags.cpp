@@ -28,8 +28,8 @@
 #include "RhoMaximum.H"
 #include "Timestep.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
@@ -117,7 +117,7 @@ void MultiReducedDiags::LoadBalance () {
 // call functions to compute diags
 void MultiReducedDiags::ComputeDiags (int step)
 {
-    WARPX_PROFILE("MultiReducedDiags::ComputeDiags()");
+    ABLASTR_PROFILE("MultiReducedDiags::ComputeDiags()");
 
     // loop over all reduced diags
     for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
@@ -131,7 +131,7 @@ void MultiReducedDiags::ComputeDiags (int step)
 // call functions to compute diags at the mid step time level
 void MultiReducedDiags::ComputeDiagsMidStep (int step)
 {
-    WARPX_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
+    ABLASTR_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
 
     // loop over all reduced diags
     for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
@@ -160,6 +160,18 @@ void MultiReducedDiags::WriteToFile (int step)
     // end loop over all reduced diags
 }
 // end void MultiReducedDiags::WriteToFile
+
+// Check if any diagnostics will be done
+bool MultiReducedDiags::DoDiags(int step)
+{
+    bool result = false;
+    for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
+    {
+        result = result || m_multi_rd[i_rd] -> DoDiags(step);
+    }
+    return result;
+}
+// end bool MultiReducedDiags::DoDiags
 
 void MultiReducedDiags::WriteCheckpointData (std::string const & dir)
 {

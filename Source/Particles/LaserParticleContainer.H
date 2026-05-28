@@ -9,10 +9,10 @@
 #ifndef WARPX_LaserParticleContainer_H_
 #define WARPX_LaserParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Laser/LaserProfiles.H"
 #include "WarpXParticleContainer.H"
+
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_Extension.H>
 #include <AMReX_Random.H>
@@ -56,7 +56,7 @@ public:
      * \brief Method to initialize runtime attributes. Does nothing for LaserParticleContainer.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& /*pinned_tile*/,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& /*pinned_tile*/,
         int /*n_external_attr_real*/,
         int /*n_external_attr_int*/) final {}
 
@@ -67,8 +67,11 @@ public:
     void Evolve (ablastr::fields::MultiFabRegister& fields,
                  int lev,
                  const std::string& current_fp_string,
-                 amrex::Real t, amrex::Real dt, DtType a_dt_type=DtType::Full,
-                 bool skip_deposition=false, PushType push_type=PushType::Explicit) final;
+                 amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
+                 bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) final;
 
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,
@@ -76,7 +79,8 @@ public:
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
-                        const amrex::MultiFab& ) final;
+                        const amrex::MultiFab& ,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) final;
 
     void PostRestart () final;
 

@@ -39,6 +39,12 @@ function(find_pyamrex)
     if(WarpX_pyamrex_internal OR WarpX_pyamrex_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
+        # save compile time
+        set(pyAMReX_CODES "WarpX" CACHE INTERNAL "Fine-tune the pre-compiled particle containers for downstream codes")
+
+        # skip pyAMReX's own tests (e.g., pytest.AMReX) in the WarpX superbuild
+        set(pyAMReX_BUILD_TESTING OFF CACHE BOOL "Run the pyAMReX tests" FORCE)
+
         if(WarpX_pyamrex_src)
             add_subdirectory(${WarpX_pyamrex_src} _deps/localpyamrex-build/)
         else()
@@ -59,7 +65,7 @@ function(find_pyamrex)
         endif()
     elseif(NOT WarpX_pyamrex_internal)
         # TODO: MPI control
-        find_package(pyAMReX 25.02 CONFIG REQUIRED)
+        find_package(pyAMReX ${pyamrex_version} CONFIG REQUIRED COMPONENTS CODES_WarpX)
         message(STATUS "pyAMReX: Found version '${pyAMReX_VERSION}'")
     endif()
 endfunction()
@@ -74,7 +80,13 @@ option(WarpX_pyamrex_internal "Download & build pyAMReX" ON)
 set(WarpX_pyamrex_repo "https://github.com/AMReX-Codes/pyamrex.git"
     CACHE STRING
     "Repository URI to pull and build pyamrex from if(WarpX_pyamrex_internal)")
-set(WarpX_pyamrex_branch "3088ea12a1a6287246bf027c4235f10e92472450"
+
+# Parse pyAMReX version and commit information
+file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON pyamrex_version GET "${dependencies_data}" version_pyamrex)
+string(JSON pyamrex_commit GET "${dependencies_data}" commit_pyamrex)
+
+set(WarpX_pyamrex_branch ${pyamrex_commit}
     CACHE STRING
     "Repository branch for WarpX_pyamrex_repo if(WarpX_pyamrex_internal)")
 

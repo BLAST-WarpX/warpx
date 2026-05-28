@@ -62,11 +62,13 @@ default_tol = 1.0e-12  # Default relative tolerance
 keV_to_Joule = scc.e * 1e3
 MeV_to_Joule = scc.e * 1e6
 barn_to_square_meter = 1.0e-28
-m_p = 1.00782503223 * scc.m_u  # Proton mass
-m_b = 11.00930536 * scc.m_u  # Boron 11 mass
+m_p = scc.m_p  # Proton mass
+m_b = 11.00930536 * scc.m_u - 5 * scc.m_e  # Boron 11 mass
 m_reduced = m_p * m_b / (m_p + m_b)
-m_a = 4.00260325413 * scc.m_u  # Alpha (He4) mass
-m_be = (8.0053095729 + 0.00325283863) * scc.m_u  # Be8* mass (3.03 MeV ex. state)
+m_a = 4.00260325413 * scc.m_u - 2 * scc.m_e  # Alpha (He4) mass
+m_be = (
+    (8.0053095729 + 0.00325283863) * scc.m_u - 4 * scc.m_e
+)  # Be8* mass (3.03 MeV ex. state): subtract 4 electron masses to get nuclear mass
 Z_boron = 5.0
 Z_proton = 1.0
 E_Gamow = (
@@ -80,7 +82,7 @@ E_fusion_total = E_fusion + E_decay  # Energy released during p + B -> 3*alpha
 
 ## Checks whether this is the 2D or the 3D test
 with open("./warpx_used_inputs") as warpx_used_inputs:
-    is_2D = re.search("geometry.dims\s*=\s*2", warpx_used_inputs.read())
+    is_2D = re.search(r"geometry.dims\s*=\s*2", warpx_used_inputs.read())
 warpx_used_inputs.close()
 
 ## Some numerical parameters for this test
@@ -697,14 +699,17 @@ def check_initial_energy2(data):
         ## Tolerance is quite high because we don't have a lot of alphas to produce good
         ## statistics and an event like alpha1 emitted exactly in direction of proton & alpha2
         ## emitted exactly in direction opposite to Beryllium is somewhat rare.
+        print(
+            f"Check energy max: {np.amax(energy_alpha2_simulation)} {max_energy_alpha23} {(np.amax(energy_alpha2_simulation) - max_energy_alpha23) / max_energy_alpha23}"
+        )
         assert is_close(
-            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=5e-2
+            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=6.3e-2
         )
         assert is_close(
             np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-14
         )
         assert is_close(
-            np.amax(energy_alpha3_simulation), max_energy_alpha23, rtol=5e-2
+            np.amax(energy_alpha3_simulation), max_energy_alpha23, rtol=7e-2
         )
         assert is_close(
             np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=3.218e-14

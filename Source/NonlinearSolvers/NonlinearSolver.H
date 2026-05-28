@@ -1,6 +1,8 @@
 #ifndef WARPX_NONLINEAR_SOLVER_H_
 #define WARPX_NONLINEAR_SOLVER_H_
 
+#include "PreconditionerLibrary.H"
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_REAL.H>
 
@@ -59,7 +61,8 @@ public:
     virtual void Solve ( Vec&,
                    const Vec&,
                          amrex::Real,
-                         amrex::Real ) const = 0;
+                         amrex::Real,
+                         int) const = 0;
 
     /**
      * \brief Print parameters used by the nonlinear solver.
@@ -72,15 +75,23 @@ public:
     virtual void GetSolverParams (amrex::Real&, amrex::Real&, int&) = 0;
 
     /**
+     * \brief Return preconditioner type.
+     */
+    virtual PreconditionerType GetPreconditionerType () const { return PreconditionerType::none; }
+
+    /**
      * \brief Allow caller to dynamically change the verbosity flag. For
      * example, one may want to only print solver information every 100 steps.
      */
-    void Verbose ( bool  a_verbose ) { m_verbose = a_verbose; }
+    virtual void Verbose ( bool  a_verbose ) { m_verbose = a_verbose; }
 
 protected:
 
     bool m_is_defined = false;
     mutable bool m_verbose = true;
+    std::string m_diagnostic_file;
+    int m_diagnostic_interval = 1;
+    bool m_usePC = false;
 
 };
 

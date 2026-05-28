@@ -1,10 +1,10 @@
 #include "FlushFormatOpenPMD.H"
 
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Diagnostics/OpenPMDHelpFunction.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -46,6 +46,13 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         encoding = openPMD::IterationEncoding::fileBased;
     }
 
+    // BP5 does not support groupBased (metadata explosion)
+    if ((openpmd_backend == "bp5" || openpmd_backend == "bp") &&
+        (encoding == openPMD::IterationEncoding::groupBased))
+    {
+        throw std::runtime_error("BeamMonitor: groupBased encoding not supported for BP5.");
+    }
+
     std::string diag_type_str;
     pp_diag_name.get("diag_type", diag_type_str);
     if (diag_type_str == "BackTransformed")
@@ -57,6 +64,8 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
             ablastr::warn_manager::WMRecordWarning("Diagnostics", warnMsg);
             encoding = openPMD::IterationEncoding::groupBased;
         }
+
+        pp_diag_name.query("buffer_flush_limit_btd", m_NumAggBTDBufferToFlush);
     }
 
     //
@@ -83,7 +92,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefix_len = prefix.size() + 1;
     for (std::string k : entr) {
         std::string v;
-        pp.get(k.c_str(), v);
+        pp.get(k, v);
         k.erase(0, prefix_len);
         operator_parameters.insert({k, v});
     }
@@ -99,7 +108,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefixlen = engine_prefix.size() + 1;
     for (std::string k : eng_entr) {
         std::string v;
-        ppe.get(k.c_str(), v);
+        ppe.get(k, v);
         k.erase(0, prefixlen);
         engine_parameters.insert({k, v});
     }
@@ -129,7 +138,7 @@ FlushFormatOpenPMD::WriteToFile (
     const amrex::Geometry& full_BTD_snapshot,
     bool isLastBTDFlush) const
 {
-    WARPX_PROFILE("FlushFormatOpenPMD::WriteToFile()");
+    ABLASTR_PROFILE("FlushFormatOpenPMD::WriteToFile()");
     const std::string& filename = amrex::Concatenate(prefix, iteration[0], file_min_digits);
     if (verbose > 0) {
         if (!isBTD)
@@ -168,6 +177,10 @@ FlushFormatOpenPMD::WriteToFile (
     // particles: all (reside only on locally finest level)
     m_OpenPMDPlotWriter->WriteOpenPMDParticles(
         particle_diags, static_cast<amrex::Real>(time), use_pinned_pc, isBTD, isLastBTDFlush);
+
+    if (isBTD  && (bufferID % m_NumAggBTDBufferToFlush == 0) ) {
+        m_OpenPMDPlotWriter->FlushBTDToDisk();
+    }
 
     // signal that no further updates will be written to this iteration
     m_OpenPMDPlotWriter->CloseStep(isBTD, isLastBTDFlush);

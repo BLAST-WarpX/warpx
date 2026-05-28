@@ -32,6 +32,7 @@
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param mask pointer to the mask: 1 means copy, 0 means don't copy
@@ -85,20 +86,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
         }
     });
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst,
-                                       0, 0,
-                                       pc.getUserRealAttribs(), pc.getUserIntAttribs(),
-                                       pc.GetRealSoANames(), pc.GetIntSoANames(),
-                                       pc.getUserRealAttribParser(),
-                                       pc.getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the CopyFunc functor
-                                       pc.get_breit_wheeler_engine_ptr(),
-                                       pc.get_quantum_sync_engine_ptr(),
-#endif
-                                       pc.getIonizationInitialLevel(),
-                                       old_np, new_np);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst, pc, old_np, new_np);
 
     Gpu::synchronize();
     return num_added;
@@ -124,6 +112,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param dst_index the location at which to starting writing the result to dst
@@ -188,6 +177,8 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile
@@ -255,34 +246,9 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
         }
     });
 
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1,
-                                       0, 0,
-                                       pc1.getUserRealAttribs(), pc1.getUserIntAttribs(),
-                                       pc1.GetRealSoANames(), pc1.GetIntSoANames(),
-                                       pc1.getUserRealAttribParser(),
-                                       pc1.getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the CopyFunc functor
-                                       pc1.get_breit_wheeler_engine_ptr(),
-                                       pc1.get_quantum_sync_engine_ptr(),
-#endif
-                                       pc1.getIonizationInitialLevel(),
-                                       old_np1, new_np1);
-    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2,
-                                       0, 0,
-                                       pc2.getUserRealAttribs(), pc2.getUserIntAttribs(),
-                                       pc2.GetRealSoANames(), pc2.GetIntSoANames(),
-                                       pc2.getUserRealAttribParser(),
-                                       pc2.getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the CopyFunc functor
-                                       pc2.get_breit_wheeler_engine_ptr(),
-                                       pc2.get_quantum_sync_engine_ptr(),
-#endif
-                                       pc2.getIonizationInitialLevel(),
-                                       old_np2, new_np2);
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1, pc1, old_np1, new_np1);
+
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2, pc2, old_np2, new_np2);
 
     Gpu::synchronize();
     return num_added;
@@ -310,6 +276,8 @@ Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTi
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile

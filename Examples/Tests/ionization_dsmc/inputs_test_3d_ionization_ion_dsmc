@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_base_3d
+
+ioniz.ionization_cross_section = ../../../../warpx-data/MCC_cross_sections/H/ion_impact_ionization.dat
+ioniz.species = ions neutrals

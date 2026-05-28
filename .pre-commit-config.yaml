@@ -15,10 +15,13 @@
 # Do not check/format anything from third parties
 exclude: '^share/openPMD/thirdParty'
 
+ci:
+  autoupdate_schedule: monthly
+
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
     - id: trailing-whitespace
       args: [--markdown-linebreak-ext=md]
@@ -49,7 +52,7 @@ repos:
 
 # Changes tabs to spaces
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.5
+  rev: v1.5.6
   hooks:
   - id: remove-tabs
     exclude: 'Make.WarpX|Make.package|Makefile|GNUmake'
@@ -64,15 +67,19 @@ repos:
 #    files: (\.cmake|CMakeLists.txt)(.in)?$
 
 # C++ formatting
-# clang-format
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v22.1.4
+  hooks:
+  - id: clang-format
+    files: '^Source/main.cpp'
 
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.9.6
+  rev: v0.15.12
   hooks:
     # Run the linter
-    - id: ruff
+    - id: ruff-check
       args: [--fix, --exit-non-zero-on-fix]
     # Run the formatter
     - id: ruff-format
@@ -89,7 +96,7 @@ repos:
 
 # Checks the manifest for missing files (native support)
 - repo: https://github.com/mgedmin/check-manifest
-  rev: "0.50"
+  rev: "0.51"
   hooks:
   - id: check-manifest
     # This is a slow hook, so only run this if --hook-stage manual is passed

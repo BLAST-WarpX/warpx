@@ -52,7 +52,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (const std::string& rd_name);
+    explicit ReducedDiags (const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism
@@ -96,6 +96,9 @@ public:
      * @param[in] step current time step
      */
     virtual void WriteToFile (int step) const;
+
+    /** Check if diag should be done */
+    [[nodiscard]] bool DoDiags(int step) const { return m_intervals.contains(step+1); }
 
     /**
      * \brief Write out checkpoint related data

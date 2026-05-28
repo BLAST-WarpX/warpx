@@ -26,7 +26,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    FieldEnergy(const std::string& rd_name);
+    explicit FieldEnergy(const std::string& rd_name);
 
     /**
      * This function computes the field energy (EF):
@@ -44,7 +44,7 @@ public:
      *        account the fraction of the cell volume within the domain.
      *
      * \param field The MultiFab to be integrated
-     * \param lev   The refinement level
+     * \param lev The refinement level
      * \return The integral
      */
     amrex::Real ComputeNorm2(const amrex::MultiFab& field, int lev);
