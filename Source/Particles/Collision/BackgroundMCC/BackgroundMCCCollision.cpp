@@ -96,7 +96,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
+        pp_collision_name.query(kw_cross_section, cross_section_file);
 
         amrex::ParticleReal energy = 0.0;
         // if the scattering process is excitation or ionization get the
@@ -206,10 +206,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
               * std::sqrt(2.0_prt / m_mass1 * PhysConst::q_e)
               * sigma_E * std::sqrt(E)
               );
-        if (nu > nu_max) {
-            nu_max = nu;
-        }
-
+        nu_max = std::max(nu_max, nu);
         E+=E_step;
     }
     return nu_max;

@@ -52,6 +52,17 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Default radial_numpercell_power is uniform number of particles per cell
+    radial_numpercell_power{0._rt},
+#endif
+    // Unlimited boundaries
+    xmin{std::numeric_limits<amrex::Real>::lowest()},
+    xmax{std::numeric_limits<amrex::Real>::max()},
+    ymin{std::numeric_limits<amrex::Real>::lowest()},
+    ymax{std::numeric_limits<amrex::Real>::max()},
+    zmin{std::numeric_limits<amrex::Real>::lowest()},
+    zmax{std::numeric_limits<amrex::Real>::max()},
     species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
@@ -67,21 +78,10 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::ParmParse pp_species(species_name);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Default radial_numpercell_power is uniform number of particles per cell
-    radial_numpercell_power = 0._rt;
     utils::parser::queryWithParser(pp_species, source_name, "radial_numpercell_power", radial_numpercell_power);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radial_numpercell_power > -1.,
         "The radial_numpercell_power must be greater than -1");
 #endif
-
-    // Unlimited boundaries
-    xmin = std::numeric_limits<amrex::Real>::lowest();
-    ymin = std::numeric_limits<amrex::Real>::lowest();
-    zmin = std::numeric_limits<amrex::Real>::lowest();
-
-    xmax = std::numeric_limits<amrex::Real>::max();
-    ymax = std::numeric_limits<amrex::Real>::max();
-    zmax = std::numeric_limits<amrex::Real>::max();
 
     // NOTE: When periodic boundaries are used, default injection range is set to mother grid dimensions.
     if( geom.isPeriodic(0) ) {
@@ -302,12 +302,14 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 {
     utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
 #if WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles should be at least two times n_rz_azimuthal_modes "
-        "(Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell for cylindrical geometry: got "
+            + std::to_string(num_particles_per_cell) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
     // Construct InjectorPosition with InjectorPositionRandom.
@@ -333,12 +335,14 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 {
     utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
 #ifdef WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell_real>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles should be at least two times n_rz_azimuthal_modes "
-        "(Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell_real < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell for cylindrical geometry: got "
+            + std::to_string(num_particles_per_cell_real) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
 
@@ -448,12 +452,15 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
     }
 
 #if WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell_each_dim[1]>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles in the theta direction should be at least two times "
-        "n_rz_azimuthal_modes (Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell_each_dim[1] < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell in the theta direction for cylindrical "
+            "geometry: got "
+            + std::to_string(num_particles_per_cell_each_dim[1]) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
     // Construct InjectorPosition from InjectorPositionRegular.

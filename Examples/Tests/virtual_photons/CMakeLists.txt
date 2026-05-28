@@ -2,6 +2,16 @@
 #
 
 add_warpx_test(
+    test_3d_beamsize_effect  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_beamsize_effect  # inputs
+    analysis_beamsize_effect.py  # analysis
+    "analysis_default_regression.py --path diags/diag1"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_virtual_photons  # name
     3  # dims
     1  # nprocs
