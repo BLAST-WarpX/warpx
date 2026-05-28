@@ -556,7 +556,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 for (int idir = 0; idir < 3; idir++) {
                     std::string base_name = m_varnames_fields[comp];
                     if (base_name.size() > 1) {
-                        char last_char = base_name.back();
+                        char const last_char = base_name.back();
                         if (last_char == field_names[idir][0]) {
                             base_name.pop_back();
                             if (!base_name.empty() && base_name.back() == '_') {
