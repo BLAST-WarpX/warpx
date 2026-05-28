@@ -163,10 +163,10 @@ void EffectivePotentialES::ComputeSigma (
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
 
-        // Add rho for this species to the total charge density MF, but only
-        // over the guard region that exists in both MultiFabs to avoid
-        // triggering the AMReX guard-size assertion when the deposition
-        // MultiFab still uses the pre-filter guard width.
+        // Add rho for this species to the total charge density MultiFab,
+        // but only over the guard region that exists in both MultiFabs
+        // to avoid triggering the AMReX guard-size assertion when the
+        // deposition MultiFab still uses the pre-filter guard width.
         auto add_ng = rho_fp[lev]->nGrowVect();
         add_ng.min(rho->nGrowVect());
         amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, add_ng);
