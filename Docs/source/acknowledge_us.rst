@@ -26,7 +26,7 @@ Please add the following acknowledgement sentence to your publications, it helps
 
    .. tab-item:: Plain text
 
-      This research used the open-source `particle-in-cell code WarpX <https://blast-warpx.github.io>`__. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies. We acknowledge all WarpX contributors.
+      This research used the open-source `particle-in-cell code WarpX <https://blast-warpx.github.io>`__. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, TAE Technologies, and Realta Fusion. We acknowledge all WarpX contributors.
 
    .. tab-item:: LaTeX
 
@@ -34,7 +34,7 @@ Please add the following acknowledgement sentence to your publications, it helps
 
         \usepackage{hyperref}
         This research used the open-source \href{https://blast-warpx.github.io}{particle-in-cell code WarpX}.
-        Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies.
+        Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, TAE Technologies, and Realta Fusion.
         We acknowledge all WarpX contributors.
 
 .. _acknowledge_warpx_ref:
