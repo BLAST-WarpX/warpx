@@ -22,7 +22,7 @@ PolicyVec getPolicies (std::vector<std::string> const & names_vec) noexcept
     h_policies.resize(names.size());
     for (const auto& kv : names)
     {
-        h_policies[kv.second] = initialization_policies[kv.first];
+        h_policies[kv.second] = ::initialization_policies[kv.first];
     }
 
     // host-to-device copy
