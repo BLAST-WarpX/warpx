@@ -24,6 +24,7 @@
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Filter/BilinearFilter.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
@@ -34,12 +35,12 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 #include "Python/callbacks.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/parallelization/MPIInitHelpers.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/UsedInputsFile.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -110,6 +111,7 @@ namespace
                        injection_style.begin(),
                        ::tolower);
 
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (injection_style == "singleparticle") {
             nppc = 1;
         } else if (injection_style == "multipleparticles") {
@@ -421,19 +423,24 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             auto w = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
                               [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
             {
-                Real x = 0, y = 0, z = 0;
 #if defined(WARPX_DIM_1D_Z)
-                z = problo[0] + (i+Real(0.5))*dx[0];
+                const auto x = 0.0_rt;
+                const auto y = 0.0_rt;
+                const auto z = problo[0] + (i+Real(0.5))*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
-                x = problo[0] + (i+Real(0.5))*dx[0];
-                z = problo[1] + (j+Real(0.5))*dx[1];
+                const auto x = problo[0] + (i+Real(0.5))*dx[0];
+                const auto y = 0.0_rt;
+                const auto z = problo[1] + (j+Real(0.5))*dx[1];
 #else
-                AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
-                             y = problo[1] + (j+Real(0.5))*dx[1];,
-                             z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_TERM(const auto x = problo[0] + (i+Real(0.5))*dx[0];,
+                             const auto y = problo[1] + (j+Real(0.5))*dx[1];,
+                             const auto z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_PICK(const auto y = 0.0_rt; const auto z = 0.0_rt;,
+                             const auto z = 0.0_rt;,
+                             /*x,y,z already defined*/);
 #endif
-                Real v = density_exe(x,y,z);
-                Real r = (v >= density_min) ? nppc : Real(0);
+                const Real v = density_exe(x,y,z);
+                const Real r = (v >= density_min) ? nppc : Real(0);
                 rhoma[b](i,j,k) += r;
                 return r;
             });
@@ -467,11 +474,11 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                         // threshold, we split this Box in its longest
                         // direction.
                         int dir;
-                        int len = bx.longside(dir); // longest side of the box
+                        const int len = bx.longside(dir); // longest side of the box
                         if (len <= split_high_density_boxes_min_box_size) { // Box is already very small.
                             new_boxes.push_back(bx);
                         } else {
-                            int chop_pnt = bx.smallEnd(dir) + len/2;
+                            const int chop_pnt = bx.smallEnd(dir) + len/2;
                             auto bx2 = bx.chop(dir, chop_pnt);
                             // bx is now chopped into bx and bx2.
                             test_boxes.push_back(bx);
@@ -489,7 +496,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             if (new_boxes.size() > ba0.size()) {
                 // If the size is the same as before, we don't need to build
                 // a new BoxArray.
-                ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+                ba0 = BoxArray(new_boxes.data(), static_cast<int>(new_boxes.size()));
             }
         }
     }
@@ -640,61 +647,63 @@ WarpX::PrintMainPICparameters ()
     else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC){
       amrex::Print() << "Maxwell Solver:       | Hybrid-PIC (Ohm's law) \n";
     }
-  #ifdef WARPX_USE_FFT
-    // Print PSATD solver's configuration
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
-      amrex::Print() << "Maxwell Solver:       | PSATD \n";
-      }
-    if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-      amrex::Print() << "                      | - Galilean \n" <<
-      "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
-                              m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
-      }
-    if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
-      amrex::Print() << "                      | - comoving \n" <<
-      "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
-                              m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
-      }
-    if (WarpX::update_with_rho) {
-      amrex::Print() << "                      | - update with rho is ON \n";
-      }
-    if (current_correction) {
-      amrex::Print() << "                      | - current correction is ON \n";
-        }
-    if (WarpX::do_dive_cleaning) {
-      amrex::Print() << "                      | - div(E) cleaning is ON \n";
-      }
-    if (WarpX::do_divb_cleaning) {
-      amrex::Print() << "                      | - div(B) cleaning is ON \n";
-      }
-    if (m_JRhom == 1){
-      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
-      amrex::Print() << "                      |   - m_JRhom_subintervals = "
-                                        << WarpX::m_JRhom_subintervals << "\n";
-      if (time_dependency_J == TimeDependencyJ::Linear){
-        amrex::Print() << "                      |   - time_dependency_J = linear \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Constant){
-        amrex::Print() << "                      |   - time_dependency_J = constant \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
-      }
-      if (time_dependency_rho == TimeDependencyRho::Linear){
-        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Constant){
-        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
-      }
-    }
-    if (fft_do_time_averaging){
-      amrex::Print()<<"                      | - time-averaged is ON \n";
-    }
-  #endif // WARPX_USE_FFT
+    #ifdef WARPX_USE_FFT
+        // All FFT/PSATD-related prints only when PSATD is selected at runtime
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
+            amrex::Print() << "Maxwell Solver:       | PSATD \n";
 
+            if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
+                amrex::Print() << "                      | - Galilean \n" <<
+                "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
+                                                                m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
+            }
+            if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
+                amrex::Print() << "                      | - comoving \n" <<
+                "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
+                                                                m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
+            }
+            if (WarpX::update_with_rho) {
+                amrex::Print() << "                      | - update with rho is ON \n";
+            }
+            if (current_correction) {
+                amrex::Print() << "                      | - current correction is ON \n";
+            }
+            if (m_JRhom == 1){
+                amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+                amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                                                                    << WarpX::m_JRhom_subintervals << "\n";
+                if (time_dependency_J == TimeDependencyJ::Linear){
+                    amrex::Print() << "                      |   - time_dependency_J = linear \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Constant){
+                    amrex::Print() << "                      |   - time_dependency_J = constant \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Quadratic){
+                    amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
+                }
+            }
+
+            if (time_dependency_rho == TimeDependencyRho::Linear){
+                amrex::Print() << "                      |   - time_dependency_rho = linear \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Constant){
+                amrex::Print() << "                      |   - time_dependency_rho = constant \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Quadratic){
+                amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
+            }
+
+            if (fft_do_time_averaging){
+                amrex::Print()<<"                      | - time-averaged is ON \n";
+            }
+        }
+    #endif // WARPX_USE_FFT
+  if (WarpX::do_dive_cleaning) {
+    amrex::Print() << "                      | - div(E) cleaning is ON \n";
+        }
+  if (WarpX::do_divb_cleaning) {
+    amrex::Print() << "                      | - div(B) cleaning is ON \n";
+        }
   if (grid_type == GridType::Collocated){
     amrex::Print() << "                      | - collocated grid \n";
   }
@@ -785,7 +794,7 @@ WarpX::PrintMainPICparameters ()
 void
 WarpX::InitData ()
 {
-    WARPX_PROFILE("WarpX::InitData()");
+    ABLASTR_PROFILE("WarpX::InitData()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -877,14 +886,27 @@ WarpX::InitData ()
 
     if (restart_chkfile.empty())
     {
-        // Loop through species and calculate their space-charge field
-        bool const reset_fields = false; // Do not erase previous user-specified values on the grid
         ExecutePythonCallback("beforeInitEsolve");
-        ComputeSpaceChargeField(reset_fields);
-        ExecutePythonCallback("afterInitEsolve");
-        if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
-            ComputeMagnetostaticField();
+        // Loop through species and calculate their space-charge field
+        // Field solve step for electrostatic solvers, or when
+        // any species has initialize_self_fields = true, or when boundary potential is specified
+        bool has_initialize_self_fields = false;
+        for (auto const& species : *mypc) {
+            has_initialize_self_fields |= species->initialize_self_fields;
         }
+        const bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
+             has_initialize_self_fields ||
+             has_boundary_potential)
+            && WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
+        {
+            bool const reset_fields = false; // Do not erase previous user-specified values on the grid
+            ComputeSpaceChargeField(reset_fields);
+            if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
+                ComputeMagnetostaticField();
+            }
+        }
+        ExecutePythonCallback("afterInitEsolve");
         // Add external fields to the fine patch fields. This makes it so that the
         // net fields are the sum of the field solutions and any external fields.
         for (int lev = 0; lev <= max_level; ++lev) {
@@ -978,7 +1000,7 @@ WarpX::InitFromScratch ()
 
     if (m_implicit_solver) {
 
-        m_implicit_solver->Define(this);
+        m_implicit_solver->Define(this,/*from_restart=*/false);
         m_implicit_solver->CreateParticleAttributes();
     }
 
@@ -1599,12 +1621,12 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E[lev],
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
                 // Mark on which grid points B should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_B[lev],
                     m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact );
+                    eb_fact, Geom(lev).periodicity() );
             }
 
         }
@@ -1688,59 +1710,75 @@ WarpX::LoadExternalFields (int const lev)
         // Call Python callback which might write values to external field multifabs
         ExecutePythonCallback("loadExternalFields");
     }
-    // External particle fields
 
+    // External particle B fields
     if (mypc->m_B_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
-            "B", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
-            "B", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
-            "B", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
+        if (!metaB.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaB.size()); ++ic) {
+                const std::string& path = metaB[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{0}, lev),
+                    "B", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{1}, lev),
+                    "B", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::B_external_particle_field, Direction{2}, lev),
+                    "B", dimnames[2], ic);
+            }
+        }
     }
+
+    //  External particle E fields
     if (mypc->m_E_ext_particle_s == "read_from_file") {
-        std::string external_fields_path;
-        const amrex::ParmParse pp_particles("particles");
-        pp_particles.get("read_fields_from_path", external_fields_path );
 #if defined(WARPX_DIM_RZ)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(n_rz_azimuthal_modes == 1,
                                          "External field reading is not implemented for more than one RZ mode (see #3829)");
 #endif
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
-            "E", dimnames[0]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
-            "E", dimnames[1]);
-        ReadExternalFieldFromFile(external_fields_path,
-            m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
-            "E", dimnames[2]);
+
+        // Get meta data of field maps to get correct path per field map
+        const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
+        if (!metaE.empty()) {
+            // Read multiple maps: each field map goes to component ic
+            for (int ic = 0; ic < static_cast<int>(metaE.size()); ++ic) {
+                const std::string& path = metaE[ic].path;
+
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{0}, lev),
+                    "E", dimnames[0], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{1}, lev),
+                    "E", dimnames[1], ic);
+                ReadExternalFieldFromFile(path,
+                    m_fields.get(FieldType::E_external_particle_field, Direction{2}, lev),
+                    "E", dimnames[2], ic);
+            }
+        }
     }
 }
 
 void
 WarpX::ReadExternalFieldFromFile (
        const std::string& read_fields_from_path, amrex::MultiFab* mf,
-       const std::string& F_name, const std::string& F_component)
+       const std::string& F_name, const std::string& F_component, int dest_comp)
 {
 #if !defined(WARPX_USE_OPENPMD)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile requires OpenPMD support to be enabled");
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
-    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component);
+    amrex::ignore_unused(read_fields_from_path, mf, F_name, F_component, dest_comp);
     WARPX_ABORT_WITH_MESSAGE("ReadExternalFieldFromFile is not supported for 1D RCYLINDER and RSPHERE");
 
 #else
@@ -1757,8 +1795,12 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component);
-    ExternalFieldView const& external_field_view = external_field_reader.getView();
+    const Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    const bool distributed = true;
+    ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
+                                              problo, dx, pbox, distributed);
+    external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
+                                  mf->nGrowVect());
 
     // Loop over boxes
 #if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
@@ -1768,6 +1810,9 @@ WarpX::ReadExternalFieldFromFile (
     {
         const amrex::Box tb = mfi.tilebox(nodal_flag, mf->nGrowVect());
         auto const& mffab = mf->array(mfi);
+
+        // This is thread safe because getView return by value.
+        auto const& external_field_view = external_field_reader.getView(mfi.LocalIndex());
 
         // Start ParallelFor
         amrex::ParallelFor (tb,
@@ -1787,11 +1832,11 @@ WarpX::ReadExternalFieldFromFile (
                 // Physical coordinates of the grid point
                 // 0,1,2 denote x,y,z in 3D xyz.
                 // 0,1 denote r,z in 2D rz.
-                amrex::RealVect pos
-                    (AMREX_D_DECL(problo[0] + ii*dx[0],
+                const auto pos = amrex::RealVect{
+                    AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
-                                  problo[2] + k *dx[2]));
-                mffab(i,j,k) = external_field_view(pos);
+                                  problo[2] + k *dx[2])};
+                mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 
         ); // End ParallelFor

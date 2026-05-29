@@ -4,25 +4,25 @@ Dimensionality
 ==============
 
 This section describes the handling of dimensionality in WarpX.
+The velocity space is always three-dimensional: regardless of the dimensionality of the configuration space (position space), particles always carry three velocity (or momentum) components.
 
 Build Options
 -------------
 
-===============  =========================================
-Dimensions       CMake Option
-===============  =========================================
-**3D3V**         ``WarpX_DIMS=3`` (default)
-**2D3V**         ``WarpX_DIMS=2``
-**1D3V**         ``WarpX_DIMS=1``
-**RZ3V**         ``WarpX_DIMS=RZ``
-**RCYLINDER3V**  ``WarpX_DIMS=RCYLINDER``
-**RSPHERE3V**    ``WarpX_DIMS=RSPHERE``
-**all**          ``WarpX_DIMS=1;2;RZ;RCYLINDER;RSPHERE;3``
-===============  =========================================
+==============  ==========================
+Dimensions      CMake Option
+==============  ==========================
+**3D**          ``WarpX_DIMS=3`` (default)
+**2D**          ``WarpX_DIMS=2``
+**1D**          ``WarpX_DIMS=1``
+**RZ**          ``WarpX_DIMS=RZ``
+**RCYLINDER**   ``WarpX_DIMS=RCYLINDER``
+**RSPHERE**     ``WarpX_DIMS=RSPHERE``
+==============  ==========================
 
-Note that one can :ref:`build multiple WarpX dimensions at once <building-cmake-options>` via ``-DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"``.
+Note that one can :ref:`build multiple WarpX dimensions at once <install-build-options>` via ``-DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"``.
 
-See :ref:`building from source <install-developers>` for further details.
+See :ref:`building from source <install-build-cmake>` for further details.
 
 Defines
 -------
@@ -30,7 +30,7 @@ Defines
 Depending on the build variant of WarpX, the following preprocessor macros will be set:
 
 =========================  ===========  ===========  ===========  ===========  ===========  ===========
-Macro                      3D3V         2D3V         1D3V         RZ3V         RCYLINDER3V  RSPHERE3V
+Macro                      3D           2D           1D           RZ           RCYLINDER    RSPHERE
 =========================  ===========  ===========  ===========  ===========  ===========  ===========
 ``AMREX_SPACEDIM``         ``3``        ``2``        ``1``        ``2``        ``1``        ``1``
 ``WARPX_DIM_3D``           **defined**  *undefined*  *undefined*  *undefined*  *undefined*  *undefined*
@@ -45,7 +45,7 @@ Macro                      3D3V         2D3V         1D3V         RZ3V         R
 At the same time, the following conventions will apply:
 
 ====================  ===========  ===========  ===========  ===========  ===============  ==============
-**Convention**        **3D3V**     **2D3V**     **1D3V**     **RZ3V**     **RCYLINDER3V**  **RSPHERE3V**
+**Convention**        **3D**       **2D**       **1D**       **RZ**       **RCYLINDER**    **RSPHERE**
 --------------------  -----------  -----------  -----------  -----------  ---------------  --------------
 *Fields*
 ------------------------------------------------------------------------  ---------------  --------------
@@ -64,5 +64,5 @@ Please see the following sections for particle SoA details.
 Conventions
 -----------
 
-In 2D3V, we assume that the position of a particle in ``y`` is equal to ``0``.
-In 1D3V, we assume that the position of a particle in ``x`` and ``y`` is equal to ``0``.
+In 2D, we assume that the position of a particle in ``y`` is equal to ``0``.
+In 1D, we assume that the position of a particle in ``x`` and ``y`` is equal to ``0``.

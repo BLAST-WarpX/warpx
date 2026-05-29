@@ -16,13 +16,19 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, picmi
+from pywarpx import callbacks, libwarpx, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
 
 comm = mpi.COMM_WORLD
 
 simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0)
+
+
+def get_xp():
+    xp, _ = load_cupy()
+    return xp
 
 
 class ForceFreeSheetReconnection(object):
@@ -55,7 +61,7 @@ class ForceFreeSheetReconnection(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 6e-3  # normalized resistivity
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 40
 
     def __init__(self, test, verbose):
         self.test = test
@@ -306,12 +312,19 @@ class ForceFreeSheetReconnection(object):
         if not (step == 1 or step % self.diag_steps == 0):
             return
 
-        rho = fields.RhoFPWrapper()[...]
-        Jiy = fields.JyFPWrapper()[...] / self.J0
-        Jy = fields.JyFPPlasmaWrapper()[...] / self.J0
-        Bx = fields.BxFPWrapper()[...] / self.B0
-        By = fields.ByFPWrapper()[...] / self.B0
-        Bz = fields.BzFPWrapper()[...] / self.B0
+        get_xp()
+
+        rho = simulation.fields.get("rho_fp", level=0)[...] / self.J0
+
+        Jiy = simulation.fields.get("current_fp", dir="y", level=0)[...] / self.J0
+        Jy = (
+            simulation.fields.get("hybrid_current_fp_plasma", dir="y", level=0)[...]
+            / self.J0
+        )
+
+        Bx = simulation.fields.get("Bfield_fp", dir="x", level=0)[...] / self.B0
+        By = simulation.fields.get("Bfield_fp", dir="y", level=0)[...] / self.B0
+        Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)[...] / self.B0
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

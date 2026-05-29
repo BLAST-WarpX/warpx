@@ -43,7 +43,7 @@ void UpdateMomentumPerezElastic (
     T_R const dt, amrex::RandomEngine const& engine )
 {
 
-    T_PR constexpr inv_c2 = T_PR(1.0) / ( PhysConst::c * PhysConst::c );
+    auto constexpr inv_c2 = PhysConst::inv_c2_v<T_PR>;
 
     // Compute Lorentz factor gamma
     T_PR const gb1sq = (u1x*u1x + u1y*u1y + u1z*u1z)*inv_c2;
@@ -117,7 +117,7 @@ void UpdateMomentumPerezElastic (
         // See the SMILEI documentation: https://smileipic.github.io/Smilei/Understand/collisions.html
         // and https://github.com/BLAST-WarpX/warpx/files/3799803/main.pdf from GitHub #429
         T_PR const b0 = amrex::Math::abs(q1*q2) /
-                        (T_PR(2.0)*MathConst::pi*PhysConst::ep0*muRst*vrelst*vrelst_invar);
+                        (T_PR(2.0)*MathConst::pi*PhysConst::epsilon_0*muRst*vrelst*vrelst_invar);
 
 
         // Compute the Coulomb log lnLmd first

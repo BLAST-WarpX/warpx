@@ -150,7 +150,7 @@ namespace {
         // Add constants only if it's not defined already.
         amrex::Real tmp = PhysConst::c;
         pp_constants.queryAdd("clight", tmp);
-        tmp =       PhysConst::ep0;
+        tmp =       PhysConst::epsilon_0;
         pp_constants.queryAdd("epsilon0", tmp);
         tmp =       PhysConst::mu0;
         pp_constants.queryAdd("mu0", tmp);
@@ -164,6 +164,8 @@ namespace {
         pp_constants.queryAdd("m_u", tmp);
         tmp =       PhysConst::kb;
         pp_constants.queryAdd("kb", tmp);
+        tmp =       PhysConst::hbar;
+        pp_constants.queryAdd("hbar", tmp);
         tmp =       MathConst::pi;
         pp_constants.queryAdd("pi", tmp);
     }

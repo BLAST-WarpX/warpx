@@ -7,7 +7,7 @@ WarpX is an advanced **Particle-In-Cell** code.
 
 It supports many features including:
 
-    - Multiple types of field solvers (incl. for `Maxwell's equations <https://warpx.readthedocs.io/en/latest/theory/pic.html#field-solve>`__, Poisson's equation, and `Maxwell-Ampere coupled with Ohm's law <https://warpx.readthedocs.io/en/latest/theory/kinetic_fluid_hybrid_model.html>`__)
+    - Multiple types of field solvers (incl. for :ref:`Maxwell's equations <theory-em-pic>`, Poisson's equation, and :ref:`Ampere's law coupled with Ohm's law <theory-kinetic-fluid-hybrid-model>`)
     - Various grid geometries (1D/2D/3D Cartesian, cylindrical, spherical)
     - Multi-physics packages (incl. ionization, atomic, fusion and collisional physics, as well as quantum electrodynamics)
     - Advanced numerical methods (incl. explicit and implicit time advance, mesh refinement, boosted-frame simulations, embedded boundaries, pseudo-spectral solvers)
@@ -20,7 +20,7 @@ In addition, WarpX is a *highly-parallel and highly-optimized code*:
     - Can run on multi-core CPUs as well as NVIDIA, AMD or Intel GPUs
     - Scales to the world's largest supercomputers and includes load balancing capabilities. WarpX was awarded the `2022 ACM Gordon Bell Prize <https://www.exascaleproject.org/ecp-supported-collaborative-teams-win-the-2022-acm-gordon-bell-prize-and-special-prize/>`__.
     - Multi-platform code that can run on Linux, macOS and Windows.
-    - Can be run and extended via its Python interface, e.g., to couple to other codes or AI/ML frameworks.
+    - Can be run and :ref:`extended via its Python interface <usage-python-extend>`, e.g., to couple to other codes or AI/ML frameworks.
 
 .. _contact:
 
@@ -80,8 +80,8 @@ Usage
 
    usage/how_to_run
    usage/examples
-   usage/python
    usage/parameters
+   usage/python
    usage/workflows
    usage/faq
 
@@ -102,14 +102,10 @@ Data Analysis
    :hidden:
 
    dataanalysis/formats
+   dataanalysis/openpmd
    dataanalysis/yt
-   dataanalysis/openpmdviewer
-   dataanalysis/openpmdapi
-   dataanalysis/paraview
-   dataanalysis/visit
-   dataanalysis/visualpic
-   dataanalysis/picviewer
-   dataanalysis/reduced_diags
+   dataanalysis/3dvisualizations
+   dataanalysis/insitu
    dataanalysis/workflows
 
 Theory
@@ -118,15 +114,9 @@ Theory
    :caption: THEORY
    :maxdepth: 1
    :hidden:
+   :titlesonly:
 
    theory/intro
-   theory/pic
-   theory/amr
-   theory/boundary_conditions
-   theory/boosted_frame
-   theory/multiphysics_extensions
-   theory/kinetic_fluid_hybrid_model
-   theory/cold_fluid_model
 
 Development
 -----------

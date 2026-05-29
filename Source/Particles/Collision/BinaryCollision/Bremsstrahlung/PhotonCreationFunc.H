@@ -161,7 +161,7 @@ public:
         {
             if (p_mask[i])
             {
-                constexpr auto c2 = PhysConst::c * PhysConst::c;
+                constexpr auto c2 = PhysConst::c2;
 
                 int const i1 = static_cast<int>(p_pair_indices_1[i]);
                 int const i2 = static_cast<int>(p_pair_indices_2[i]);
@@ -272,19 +272,7 @@ public:
             const auto start_index = int(products_np[i]);
             const auto stop_index  = int(products_np[i] + num_added_vec[i]);
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
-                                       0, 0,
-                                       pc_products[i]->getUserRealAttribs(), pc_products[i]->getUserIntAttribs(),
-                                       pc_products[i]->GetRealSoANames(), pc_products[i]->GetIntSoANames(),
-                                       pc_products[i]->getUserRealAttribParser(),
-                                       pc_products[i]->getUserIntAttribParser(),
-#ifdef WARPX_QED
-                                       false, // do not initialize QED quantities, since they were initialized
-                                              // when calling the SmartCopy functors
-                                       pc_products[i]->get_breit_wheeler_engine_ptr(),
-                                       pc_products[i]->get_quantum_sync_engine_ptr(),
-#endif
-                                       pc_products[i]->getIonizationInitialLevel(),
-                                       start_index, stop_index);
+                                                 *pc_products[i], start_index, stop_index);
         }
 
         amrex::Gpu::synchronize();

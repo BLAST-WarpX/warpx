@@ -100,6 +100,7 @@ struct GetParticlePosition
      * \param a_offset offset to apply to the particle indices
      */
     template <typename ptiType>
+    explicit
     GetParticlePosition (const ptiType& a_pti, long a_offset = 0) noexcept
     {
         const auto& soa = a_pti.GetStructOfArrays();
@@ -107,7 +108,7 @@ struct GetParticlePosition
 #if defined(WARPX_DIM_RZ)
         m_x = soa.GetRealData(PIdx::r).dataPtr() + a_offset;
         m_z = soa.GetRealData(PIdx::z).dataPtr() + a_offset;
-#elifdefined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
         m_x = soa.GetRealData(PIdx::x).dataPtr() + a_offset;
         m_z = soa.GetRealData(PIdx::z).dataPtr() + a_offset;
 #elif defined(WARPX_DIM_3D)
@@ -234,6 +235,7 @@ struct SetParticlePosition
 #endif
 
     template <typename ptiType>
+    explicit
     SetParticlePosition (const ptiType& a_pti, long a_offset = 0) noexcept
     {
         auto& soa = a_pti.GetStructOfArrays();

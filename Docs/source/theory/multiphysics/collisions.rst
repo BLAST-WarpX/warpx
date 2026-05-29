@@ -52,6 +52,27 @@ for all scattering processes are evaluated at the energy as calculated above.
 
 Once a particle is selected for a specific collision process, that process determines how the particle is scattered as outlined below.
 
+.. _multiphysics-collisions-pulseddecay:
+
+Pulsed Decay
+------------
+
+This collision module can be used to have a parent species decay into two product
+species with a user-defined decay rate. Mathematically, it solves the following
+rate equations on a cell-by-cell basis:
+
+    .. math::
+
+       \begin{aligned}
+        \frac{dn_1}{dt} &= -\nu(t)n_1, \\
+        \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
+       \end{aligned}
+
+where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
+and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+
+This can be used, for example, to represent ionization of a parent species by an externally applied laser pulse.
+
 .. _multiphysics-collisions-dsmc:
 
 Direct Simulation Monte Carlo (DSMC)
@@ -160,8 +181,10 @@ See for example :cite:t:`b-Lim2007` for a derivation. The result is that given a
 The impact of incorporating relativistic effects in the MCC routine can be seen in the plots below where high energy collisions are considered with both a classical and relativistic implementation of MCC. It is observed that the classical version of MCC reproduces the classical limit of the above equation but especially for ions, this result differs substantially from the fully relativistic result.
 
 .. figure:: https://user-images.githubusercontent.com/40245517/170900079-74e505a5-2790-44f5-ac84-5847eda954e6.png
-   :alt: Classical v relativistic MCC
+   :alt: Comparison of classical and relativistic MCC collision results
    :width: 96%
+
+   Classical v. relativistic MCC.
 
 .. bibliography::
     :keyprefix: b-

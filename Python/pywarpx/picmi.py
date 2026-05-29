@@ -197,34 +197,23 @@ class Species(picmistandard.PICMI_Species):
     """
 
     def init(self, kw):
-        if self.particle_type == "electron":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "positron":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_e"
-        elif self.particle_type == "proton":
-            if self.charge is None:
-                self.charge = "q_e"
-            if self.mass is None:
-                self.mass = "m_p"
-        elif self.particle_type == "anti-proton":
-            if self.charge is None:
-                self.charge = "-q_e"
-            if self.mass is None:
-                self.mass = "m_p"
+        self.species_type = None
+        if self.particle_type in [
+            "unspecified",
+            "electron",
+            "positron",
+            "muon",
+            "antimuon",
+            "photon",
+            "neutron",
+            "proton",
+            "antiproton",
+            "alpha",
+        ]:
+            self.species_type = self.particle_type
         else:
             if self.charge is None and self.charge_state is not None:
-                if self.charge_state == +1.0:
-                    self.charge = "q_e"
-                elif self.charge_state == -1.0:
-                    self.charge = "-q_e"
-                else:
-                    self.charge = self.charge_state * constants.q_e
+                self.charge = f"{self.charge_state}*q_e"
             if self.particle_type is not None:
                 # Match a string of the format '#nXx', with the '#n' optional isotope number.
                 m = re.match(r"(?P<iso>#[\d+])*(?P<sym>[A-Za-z]+)", self.particle_type)
@@ -347,6 +336,7 @@ class Species(picmistandard.PICMI_Species):
 
         self.species = pywarpx.Bucket.Bucket(
             self.name,
+            species_type=self.species_type,
             mass=self.mass,
             charge=self.charge,
             injection_style=None,
@@ -489,17 +479,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         # --- Only PseudoRandomLayout is supported
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
-        # --- Calculate the total charge. Note that charge might be a string instead of a number.
-        charge = species.charge
-        if charge == "q_e" or charge == "+q_e":
-            charge = constants.q_e
-        elif charge == "-q_e":
-            charge = -constants.q_e
-        species.add_new_group_attr(
-            source_name, "q_tot", self.n_physical_particles * charge
-        )
+        # --- Total number of real particles
+        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "q_tot", density_scale)
+            species.add_new_group_attr(source_name, "npart_real", density_scale)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
@@ -513,14 +496,21 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 
         # --- Note that WarpX takes gamma*beta as input
         if np.any(np.not_equal(self.velocity_divergence, 0.0)):
+            u_over_x = self.velocity_divergence[0] / constants.c
+            u_over_y = self.velocity_divergence[1] / constants.c
+            u_over_z = self.velocity_divergence[2] / constants.c
             species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "radial_expansion"
+                source_name, "momentum_distribution_type", "parse_momentum_function"
             )
             species.add_new_group_attr(
-                source_name, "u_over_r", self.velocity_divergence[0] / constants.c
+                source_name, "momentum_function_ux(x,y,z)", f"{u_over_x}*x"
             )
-            # species.add_new_group_attr(source_name, 'u_over_y', self.velocity_divergence[1]/constants.c)
-            # species.add_new_group_attr(source_name, 'u_over_z', self.velocity_divergence[2]/constants.c)
+            species.add_new_group_attr(
+                source_name, "momentum_function_uy(x,y,z)", f"{u_over_y}*y"
+            )
+            species.add_new_group_attr(
+                source_name, "momentum_function_uz(x,y,z)", f"{u_over_z}*z"
+            )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussian"
@@ -1648,6 +1638,418 @@ class ExplicitEvolveScheme(picmistandard.base._ClassWithInit):
         pywarpx.algo.evolve_scheme = "explicit"
 
 
+class LinearSolverBase(picmistandard.base._ClassWithInit):
+    pass
+
+
+class GMRESLinearSolver(LinearSolverBase):
+    """
+    Sets up the iterative GMRES linear solver for the implicit Newton nonlinear solver
+
+    Parameters
+    ----------
+    verbose_int: integer, default=2
+        Level of verbosity of output
+
+    restart_length: integer, default=30
+       How often to restart the GMRES iterations
+
+    max_iterations: integer, default=1000
+        Maximum number of iterations
+
+    relative_tolerance: float, default=1.e-4
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, default=0.
+        Absoluate tolerence of the convergence
+    """
+
+    def __init__(
+        self,
+        verbose_int=None,
+        restart_length=None,
+        absolute_tolerance=None,
+        relative_tolerance=None,
+        max_iterations=None,
+    ):
+        self.verbose_int = verbose_int
+        self.restart_length = restart_length
+        self.absolute_tolerance = absolute_tolerance
+        self.relative_tolerance = relative_tolerance
+        self.max_iterations = max_iterations
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver):
+        nonlinear_solver.liner_solver = "amrex_gmres"
+        amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
+        amrex_gmres.verbose_int = self.verbose_int
+        amrex_gmres.restart_length = self.restart_length
+        amrex_gmres.absolute_tolerance = self.absolute_tolerance
+        amrex_gmres.relative_tolerance = self.relative_tolerance
+        amrex_gmres.max_iterations = self.max_iterations
+
+
+class PETScKSPLinearSolver(LinearSolverBase):
+    """
+    Sets up the petsc_ksp linear solver for the implicit Newton nonlinear solver
+
+    Parameters
+    ----------
+    """
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver):
+        nonlinear_solver.liner_solver = "petsc_ksp"
+
+
+class PreconditionerBase(picmistandard.base._ClassWithInit):
+    pass
+
+
+class CurlCurlMLMGPreconditioner(PreconditionerBase):
+    """
+    Sets up the curl-curl multigrid preconditioner used during the nonlinear solver
+
+    Parameters
+    ----------
+    verbose: bool, optional
+        Whether there is verbose output from the solver
+
+    bottom_verbose: bool, optional
+        Whether there is verbose output from the bottom solver
+
+    agglomeration: bool, optional
+
+    consolidation: bool, optional
+
+    max_iter: int, optional
+        Maximum number of iterations
+
+    max_coarsening_level: int, optional
+        Maximum coarsening level
+
+    relative_tolerance: float, optional
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, optional
+        Absoluate tolerence of the convergence
+    """
+
+    def __init__(
+        self,
+        verbose,
+        bottom_verbose,
+        agglomeration,
+        consolidation,
+        max_iter,
+        max_coarsening_level,
+        relative_tolerance,
+        absolute_tolerance,
+    ):
+        self.verbose = verbose
+        self.bottom_verbose = bottom_verbose
+        self.agglomeration = agglomeration
+        self.consolidation = consolidation
+        self.max_iter = max_iter
+        self.max_coarsening_level = max_coarsening_level
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+
+    def preconditioner_type_initialize_inputs(self):
+        pc_curl_curl_mlmg = pywarpx.warpx.get_bucket("pc_curl_curl_mlmg")
+        pc_curl_curl_mlmg.verbose = self.verbose
+        pc_curl_curl_mlmg.bottom_verbose = self.bottom_verbose
+        pc_curl_curl_mlmg.agglomeration = self.agglomeration
+        pc_curl_curl_mlmg.consolidation = self.consolidation
+        pc_curl_curl_mlmg.max_iter = self.max_iter
+        pc_curl_curl_mlmg.max_coarsening_level = self.max_coarsening_level
+        pc_curl_curl_mlmg.relative_tolerance = self.relative_tolerance
+        pc_curl_curl_mlmg.absolute_tolerance = self.absolute_tolerance
+
+
+class JacobiPreconditioner(PreconditionerBase):
+    """
+    Sets up the point Jacobi preconditioner used during the nonlinear solver
+
+    Parameters
+    ----------
+    verbose: bool, optional
+        Whether there is verbose output from the solver
+
+    max_iter: int, optional
+        Maximum number of iterations
+
+    relative_tolerance: float, optional
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, optional
+        Absoluate tolerence of the convergence
+    """
+
+    def __init__(
+        self,
+        verbose,
+        max_iter,
+        relative_tolerance,
+        absolute_tolerance,
+    ):
+        self.verbose = verbose
+        self.max_iter = max_iter
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+
+    def preconditioner_type_initialize_inputs(self):
+        pc_jacobi = pywarpx.warpx.get_bucket("pc_jacobi")
+        pc_jacobi.verbose = self.verbose
+        pc_jacobi.max_iter = self.max_iter
+        pc_jacobi.relative_tolerance = self.relative_tolerance
+        pc_jacobi.absolute_tolerance = self.absolute_tolerance
+
+
+class PETScPreconditioner(PreconditionerBase):
+    """
+    Sets up the PETSc preconditioner used during the nonlinear solver
+
+    Parameters
+    ----------
+    type: string, optional
+        PETSc solver type, one of "lu", "asm", or "hypre"
+
+    asm_overlap: int, optional
+        Parameter for type is "asm"
+
+    sub_type: string, optional
+        When type is "asm", one of "ilu" or "lu", defailt "ilu"
+
+    ilu_factor_levels: int, optional
+        When type is "asm", and sub_type is "ilu"
+
+    hypre_type: string, optional
+        When type is "hypre", default "euclid"
+
+    euclid_factor_levels: string, optional
+        When type is "hypre" and hypre_type is "euclid"
+    """
+
+    def __init__(
+        self,
+        type,
+        asm_overlap,
+        sub_type,
+        ilu_factor_levels,
+        hypre_type,
+        euclid_factor_levels,
+    ):
+        self.type = type
+        self.asm_overlap = asm_overlap
+        self.sub_type = sub_type
+        self.ilu_factor_levels = ilu_factor_levels
+        self.hypre_type = hypre_type
+        self.euclid_factor_levels = euclid_factor_levels
+
+    def preconditioner_type_initialize_inputs(self):
+        pc_petsc = pywarpx.warpx.get_bucket("pc_petsc")
+        pc_petsc.type = self.type
+        pc_petsc.asm_overlap = self.asm_overlap
+        pc_petsc.sub_type = self.sub_type
+        pc_petsc.ilu_factor_levels = self.ilu_factor_levels
+        pc_petsc.hypre_type = self.hypre_type
+        pc_petsc.euclid_factor_levels = self.euclid_factor_levels
+
+
+class NonlinearSolverBase(picmistandard.base._ClassWithInit):
+    pass
+
+
+class NewtonNonlinearSolver(NonlinearSolverBase):
+    """
+    Sets up the iterative Newton nonlinear solver for the implicit evolve scheme
+
+    Parameters
+    ----------
+    verbose: bool, default=True
+        Whether there is verbose output from the solver
+
+    linear_solver: linear solver instance, optional
+        Specifies input arguments to the linear solver
+
+    require_convergence: bool, default True
+        Whether convergence is required. If True and convergence is not obtained, the code will exit.
+
+    max_iterations: integer, default=100
+        Maximum number of iterations
+
+    relative_tolerance: float, default=1.e-6
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, default=0.
+        Absoluate tolerence of the convergence
+
+    diagnostic_file: string, optional
+        File name where solver diagnostics are written
+
+    diagnostic_interval: string, optional
+        The intervals for writing out solver diagnostics to the diagnostic file
+
+    max_particle_iterations: integer, optional
+        The maximum number of particle iterations
+
+    particle_tolerance: float, optional
+        The tolerance of parrticle quantities for convergence
+
+    particle_suborbits: bool, optional
+        Whether to use particle suborbits during the solve
+
+    print_unconverged_particle_detail: bool, optional
+        Whether to print the details of unconverged particles during suborbits
+
+    use_mass_matrices_jacobian: bool, optional
+        Whether to use mass-matrices during the linear stage of PS-JFNK
+
+    skip_particle_picard_init: bool, optional
+        When use_mass_matrices_jacobian is True, whether to skip the particle picard iteration on the initial Newton step
+
+    use_mass_matrices_pc: bool, optional
+        Whether to capture the plasma response in the preconditioner
+
+    mass_matrices_pc_width: int, optional
+        When use_mass_matrices_pc is True, the width of the preconditioner mass matrices
+
+    pc_type: preconditioner instance, optional
+        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner
+    """
+
+    def __init__(
+        self,
+        verbose=None,
+        linear_solver=None,
+        require_convergence=None,
+        max_iterations=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
+        diagnostic_file=None,
+        diagnostic_interval=None,
+        max_particle_iterations=None,
+        particle_tolerance=None,
+        particle_suborbits=None,
+        print_unconverged_particle_detail=None,
+        use_mass_matrices_jacobian=None,
+        skip_particle_picard_init=None,
+        use_mass_matrices_pc=None,
+        mass_matrices_pc_width=None,
+        pc_type=None,
+    ):
+        self.verbose = verbose
+        self.linear_solver = linear_solver
+        self.max_iterations = max_iterations
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+        self.require_convergence = require_convergence
+        self.diagnostic_file = diagnostic_file
+        self.diagnostic_interval = diagnostic_interval
+        self.max_particle_iterations = max_particle_iterations
+        self.particle_tolerance = particle_tolerance
+        self.particle_suborbits = particle_suborbits
+        self.print_unconverged_particle_detail = print_unconverged_particle_detail
+        self.use_mass_matrices_jacobian = use_mass_matrices_jacobian
+        self.skip_particle_picard_init = skip_particle_picard_init
+        self.use_mass_matrices_pc = use_mass_matrices_pc
+        self.mass_matrices_pc_width = mass_matrices_pc_width
+        self.pc_type = pc_type
+
+        if linear_solver is not None:
+            assert isinstance(linear_solver, LinearSolverBase)
+        if pc_type is not None:
+            assert isinstance(pc_type, PreconditionerBase)
+
+    def nonlinear_solver_initialize_inputs(self):
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.nonlinear_solver = "newton"
+        implicit_evolve.max_particle_iterations = self.max_particle_iterations
+        implicit_evolve.particle_tolerance = self.particle_tolerance
+        implicit_evolve.particle_suborbits = self.particle_suborbits
+        implicit_evolve.print_unconverged_particle_detail = (
+            self.print_unconverged_particle_detail
+        )
+        implicit_evolve.use_mass_matrices_jacobian = self.use_mass_matrices_jacobian
+        implicit_evolve.skip_particle_picard_init = self.skip_particle_picard_init
+        implicit_evolve.use_mass_matrices_pc = self.use_mass_matrices_pc
+        implicit_evolve.mass_matrices_pc_width = self.mass_matrices_pc_width
+
+        newton = pywarpx.warpx.get_bucket("newton")
+        newton.verbose = self.verbose
+        newton.absolute_tolerance = self.absolute_tolerance
+        newton.relative_tolerance = self.relative_tolerance
+        newton.max_iterations = self.max_iterations
+        newton.require_convergence = self.require_convergence
+        newton.diagnostic_file = self.diagnostic_file
+        newton.diagnostic_interval = self.diagnostic_interval
+
+        if self.linear_solver is not None:
+            self.linear_solver.linear_solver_initialize_inputs(newton)
+
+        if self.pc_type is not None:
+            self.pc_type.preconditioner_type_initialize_inputs()
+
+
+class PicardNonlinearSolver(NonlinearSolverBase):
+    """
+    Sets up the iterative Picard nonlinear solver for the implicit evolve scheme
+
+    Parameters
+    ----------
+    verbose: bool, default=True
+        Whether there is verbose output from the solver
+
+    require_convergence: bool, default True
+        Whether convergence is required. If True and convergence is not obtained, the code will exit.
+
+    max_iterations: integer, default=100
+        Maximum number of iterations
+
+    relative_tolerance: float, default=1.e-6
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, default=0.
+        Absoluate tolerence of the convergence
+
+    diagnostic_file: string, optional
+        File name where solver diagnostics are written
+
+    diagnostic_interval: string, optional
+        The intervals for writing out solver diagnostics to the diagnostic file
+    """
+
+    def __init__(
+        self,
+        verbose=None,
+        require_convergence=None,
+        max_iterations=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
+        diagnostic_file=None,
+        diagnostic_interval=None,
+    ):
+        self.verbose = verbose
+        self.require_convergence = require_convergence
+        self.max_iterations = max_iterations
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+        self.diagnostic_file = diagnostic_file
+        self.diagnostic_interval = diagnostic_interval
+
+    def nonlinear_solver_initialize_inputs(self):
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.nonlinear_solver = "picard"
+
+        picard = pywarpx.warpx.get_bucket("picard")
+        picard.verbose = self.verbose
+        picard.require_convergence = self.require_convergence
+        picard.max_iterations = self.max_iterations
+        picard.relative_tolerance = self.relative_tolerance
+        picard.absolute_tolerance = self.absolute_tolerance
+        picard.diagnostic_file = self.diagnostic_file
+        picard.diagnostic_interval = self.diagnostic_interval
+
+
 class ThetaImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
     """
     Sets up the "theta implicit" electromagnetic evolve scheme
@@ -1664,6 +2066,8 @@ class ThetaImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
     def __init__(self, nonlinear_solver, theta=None):
         self.nonlinear_solver = nonlinear_solver
         self.theta = theta
+
+        assert isinstance(nonlinear_solver, NonlinearSolverBase)
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "theta_implicit_em"
@@ -1686,171 +2090,12 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
     def __init__(self, nonlinear_solver):
         self.nonlinear_solver = nonlinear_solver
 
+        assert isinstance(nonlinear_solver, NonlinearSolverBase)
+
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_em"
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
-
-
-class PicardNonlinearSolver(picmistandard.base._ClassWithInit):
-    """
-    Sets up the iterative Picard nonlinear solver for the implicit evolve scheme
-
-    Parameters
-    ----------
-    verbose: bool, default=True
-        Whether there is verbose output from the solver
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    relative_tolerance: float, default=1.e-6
-        Relative tolerance of the convergence
-
-    max_iterations: integer, default=100
-        Maximum number of iterations
-
-    require_convergence: bool, default True
-        Whether convergence is required. If True and convergence is not obtained, the code will exit.
-    """
-
-    def __init__(
-        self,
-        verbose=None,
-        absolute_tolerance=None,
-        relative_tolerance=None,
-        max_iterations=None,
-        require_convergence=None,
-    ):
-        self.verbose = verbose
-        self.absolute_tolerance = absolute_tolerance
-        self.relative_tolerance = relative_tolerance
-        self.max_iterations = max_iterations
-        self.require_convergence = require_convergence
-
-    def nonlinear_solver_initialize_inputs(self):
-        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
-        implicit_evolve.nonlinear_solver = "picard"
-
-        picard = pywarpx.warpx.get_bucket("picard")
-        picard.verbose = self.verbose
-        picard.absolute_tolerance = self.absolute_tolerance
-        picard.relative_tolerance = self.relative_tolerance
-        picard.max_iterations = self.max_iterations
-        picard.require_convergence = self.require_convergence
-
-
-class NewtonNonlinearSolver(picmistandard.base._ClassWithInit):
-    """
-    Sets up the iterative Newton nonlinear solver for the implicit evolve scheme
-
-    Parameters
-    ----------
-    verbose: bool, default=True
-        Whether there is verbose output from the solver
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    relative_tolerance: float, default=1.e-6
-        Relative tolerance of the convergence
-
-    max_iterations: integer, default=100
-        Maximum number of iterations
-
-    require_convergence: bool, default True
-        Whether convergence is required. If True and convergence is not obtained, the code will exit.
-
-    linear_solver: linear solver instance, optional
-        Specifies input arguments to the linear solver
-
-    max_particle_iterations: integer, optional
-        The maximum number of particle iterations
-
-    particle_tolerance: float, optional
-        The tolerance of parrticle quantities for convergence
-
-    """
-
-    def __init__(
-        self,
-        verbose=None,
-        absolute_tolerance=None,
-        relative_tolerance=None,
-        max_iterations=None,
-        require_convergence=None,
-        linear_solver=None,
-        max_particle_iterations=None,
-        particle_tolerance=None,
-    ):
-        self.verbose = verbose
-        self.absolute_tolerance = absolute_tolerance
-        self.relative_tolerance = relative_tolerance
-        self.max_iterations = max_iterations
-        self.require_convergence = require_convergence
-        self.linear_solver = linear_solver
-        self.max_particle_iterations = max_particle_iterations
-        self.particle_tolerance = particle_tolerance
-
-    def nonlinear_solver_initialize_inputs(self):
-        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
-        implicit_evolve.nonlinear_solver = "newton"
-        implicit_evolve.max_particle_iterations = self.max_particle_iterations
-        implicit_evolve.particle_tolerance = self.particle_tolerance
-
-        newton = pywarpx.warpx.get_bucket("newton")
-        newton.verbose = self.verbose
-        newton.absolute_tolerance = self.absolute_tolerance
-        newton.relative_tolerance = self.relative_tolerance
-        newton.max_iterations = self.max_iterations
-        newton.require_convergence = self.require_convergence
-
-        self.linear_solver.linear_solver_initialize_inputs()
-
-
-class GMRESLinearSolver(picmistandard.base._ClassWithInit):
-    """
-    Sets up the iterative GMRES linear solver for the implicit Newton nonlinear solver
-
-    Parameters
-    ----------
-    verbose_int: integer, default=2
-        Level of verbosity of output
-
-    restart_length: integer, default=30
-       How often to restart the GMRES iterations
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    relative_tolerance: float, default=1.e-4
-        Relative tolerance of the convergence
-
-    max_iterations: integer, default=1000
-        Maximum number of iterations
-    """
-
-    def __init__(
-        self,
-        verbose_int=None,
-        restart_length=None,
-        absolute_tolerance=None,
-        relative_tolerance=None,
-        max_iterations=None,
-    ):
-        self.verbose_int = verbose_int
-        self.restart_length = restart_length
-        self.absolute_tolerance = absolute_tolerance
-        self.relative_tolerance = relative_tolerance
-        self.max_iterations = max_iterations
-
-    def linear_solver_initialize_inputs(self):
-        gmres = pywarpx.warpx.get_bucket("gmres")
-        gmres.verbose_int = self.verbose_int
-        gmres.restart_length = self.restart_length
-        gmres.absolute_tolerance = self.absolute_tolerance
-        gmres.relative_tolerance = self.relative_tolerance
-        gmres.max_iterations = self.max_iterations
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
@@ -1873,13 +2118,52 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Minimum density used in Ohm's law calculation.
 
     plasma_resistivity: float or str
-        Value or expression to use for the plasma resistivity.
+        Value or expression to use for the plasma resistivity in Ohm*m.
+        Can be a constant value or an expression depending on ``rho`` (charge density),
+        ``J`` (current density magnitude), and ``t`` (simulation time).
 
     plasma_hyper_resistivity: float or str
-        Value or expression to use for the plasma hyper-resistivity.
+        Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
+        Can be a constant value or an expression depending on ``rho`` (charge density)
+        and ``B`` (magnetic field magnitude).
 
-    substeps: int, default=100
-        Number of substeps to take when updating the B-field.
+    substeps: int, default=10
+        Total number of substeps used to advance the B-field over one full
+        timestep (split evenly between the two half-steps, so ``substeps/2``
+        RK4 steps are taken per half-step, each of duration
+        ``dt / substeps``). Must be divisible by 2; if not, the value is
+        automatically rounded up to the next even number.
+        When ``use_rkf45=True``, this is instead used only as the initial
+        substep count estimate for the adaptive solver.
+
+    use_rkf45: bool, default=False
+        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
+        integrator (Fehlberg 1969, NASA Technical Report R-315,
+        https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
+        advance, with step-size control governed by ``substep_rtol`` and
+        ``substep_atol``. If False, use the fixed-step classical RK4
+        integrator with ``substeps`` total substeps per timestep.
+
+    substep_rtol: float, default=1e-4
+        Relative tolerance for the RKF45 adaptive step-size control.
+        Only used when ``use_rkf45=True``.
+
+    substep_atol: float, default=1e-8
+        Absolute tolerance for the RKF45 adaptive step-size control.
+        Only used when ``use_rkf45=True``.
+
+    substep_safety: float, default=0.9
+        Safety factor applied to the step-size adjustment formula.
+        Only used when ``use_rkf45=True``.
+
+    substep_max_growth: float, default=5.0
+        Maximum factor by which the substep size may grow after an accepted
+        step. Only used when ``use_rkf45=True``.
+
+    max_substep_attempts: int, default=250
+        Maximum number of substep attempts (accepted + rejected combined) per
+        half-step before the simulation aborts. Only used when
+        ``use_rkf45=True``.
 
     holmstrom_vacuum_region: bool, default=False
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
@@ -1890,32 +2174,37 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     A_external: dict
         Function of space and time specifying external (non-plasma) vector potential fields.
-        It is expected that a nested dicitonary will be passed
-        into picmi for each field that has different timings
-        e.g.
-        A_external = {
-            '<field_name1>': {
-                'Ax_external_function': <implicit function with (x,y,z) dependence>,
-                'Ay_external_function': <implicit function with (x,y,z) dependence>,
-                'Az_external_function': <implicit function with (x,y,z) dependence>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
-
-        or if fields are to be loaded from an OpenPMD file
-        A_external = {
-            '<field_name1>': {
-                'load_from_file': True,
-                'path': <path to OpenPMD file>,
-                'A_time_external_function': <implicit function with (t) dependence>
-            },
-            '<field_name2>: {...}'
-        }
+        It is expected that a nested dictionary will be passed in for each separate vector potential that may have
+        different spatial configuration or time dependence. Each field entry should contain either implicit functions
+        with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function',
+        'Az_external_function', plus 'A_time_external_function' with (t) dependence, or
+        alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with
+        'A_time_external_function'.
 
     do_external_diva_cleaning: bool (default=True)
         This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
         external A with periodic field boundary conditions.
+
+    Notes
+    -----
+    **Required Parameters:**
+
+    - ``Te`` must be specified when using the hybrid solver.
+    - ``n0`` should be specified if ``gamma != 1``.
+
+    **Best Practices:**
+
+    - *Grid type:* Setting ``warpx_grid_type='collocated'`` is recommended.
+    - *Particle shape:* Linear particles (``algo.particle_shape = 1``) are recommended.
+
+    **Constraints and Limitations:**
+
+    - *Mesh refinement:* Only one level is supported (no AMR). The solver will abort if more than one level is used.
+    - *RZ geometry:* Only the m=0 azimuthal mode is supported in RZ geometry.
+    - *External vector potential:* If ``A_external`` is provided, it must be non-empty.
+    - *Time-dependent A fields:* When using expressions for external vector potentials, time variation must be specified via ``A_time_external_function``, not directly in the ``A[x,y,z]_external_function`` expressions.
+
+    For complete parameter documentation, see the `Input Parameters section <https://warpx.readthedocs.io/en/latest/usage/parameters.html#maxwell-solver-kinetic-fluid-hybrid>`_.
     """
 
     def __init__(
@@ -1928,6 +2217,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
         substeps=None,
+        use_rkf45=None,
+        substep_rtol=None,
+        substep_atol=None,
+        substep_safety=None,
+        substep_max_growth=None,
+        max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         Jx_external_function=None,
         Jy_external_function=None,
@@ -1947,6 +2242,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
 
         self.substeps = substeps
+        self.use_rkf45 = use_rkf45
+        self.substep_rtol = substep_rtol
+        self.substep_atol = substep_atol
+        self.substep_safety = substep_safety
+        self.substep_max_growth = substep_max_growth
+        self.max_substep_attempts = max_substep_attempts
 
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
@@ -1981,7 +2282,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.gamma = self.gamma
         pywarpx.hybridpicmodel.n_floor = self.n_floor
         pywarpx.hybridpicmodel.__setattr__(
-            "plasma_resistivity(rho,J)",
+            "plasma_resistivity(rho,J,t)",
             pywarpx.my_constants.mangle_expression(
                 self.plasma_resistivity, self.mangle_dict
             ),
@@ -1993,6 +2294,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             ),
         )
         pywarpx.hybridpicmodel.substeps = self.substeps
+        pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
+        pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
+        pywarpx.hybridpicmodel.substep_atol = self.substep_atol
+        pywarpx.hybridpicmodel.substep_safety = self.substep_safety
+        pywarpx.hybridpicmodel.substep_max_growth = self.substep_max_growth
+        pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
@@ -2062,19 +2369,40 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
 
+    The standard PICMI parameters `required_precision` and `maximum_iterations` control the
+    MLMG Poisson solver convergence for the labframe electrostatic solvers. When `warpx_magnetostatic=True`,
+    these parameters are used as defaults for the magnetostatic solver but can be overridden
+    with the explicit `warpx_magnetostatic_*` parameters.
+
     Parameters
     ----------
     warpx_relativistic: bool, default=False
         Whether to use the relativistic solver or lab frame solver
 
     warpx_absolute_tolerance: float, default=0.
-        Absolute tolerance on the lab frame solver
+        Absolute tolerance on the labframe electrostatic solver
 
     warpx_self_fields_verbosity: integer, default=2
-        Level of verbosity for the lab frame solver
+        Level of verbosity for the labframe electrostatic solver
 
     warpx_magnetostatic: bool, default=False
-        Whether to use the magnetostatic solver
+        Whether to also solve for self-consistent magnetic fields from currents.
+
+    warpx_magnetostatic_required_precision: float, optional
+        Relative precision for the magnetostatic solver. If not specified,
+        defaults to the value of `required_precision`.
+
+    warpx_magnetostatic_absolute_tolerance: float, optional
+        Absolute tolerance for the magnetostatic solver. If not specified,
+        defaults to the value of `warpx_absolute_tolerance`.
+
+    warpx_magnetostatic_max_iters: integer, optional
+        Maximum iterations for the magnetostatic solver. If not specified,
+        defaults to the value of `maximum_iterations`.
+
+    warpx_magnetostatic_verbosity: integer, optional
+        Verbosity level for the magnetostatic solver. If not specified,
+        defaults to the value of `warpx_self_fields_verbosity`.
 
     warpx_effective_potential: bool, default=False
         Whether to use the effective potential Poisson solver (EP-PIC)
@@ -2082,6 +2410,15 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_effective_potential_factor: float, default=4
         If the effective potential Poisson solver is used, this sets the value
         of C_EP (the method is marginally stable at C_EP = 1)
+
+    warpx_effective_potential_time_filter_param: float, default=0.1
+        Time filtering parameter used to filter sigma in the effective
+        potential scheme. sigma is updated using:
+        sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
+
+    warpx_effective_potential_density_floor: float, default=0
+        If given, this value will be used as the minimum density during the
+        local calculation of sigma.
 
     warpx_dt_update_interval: integer, optional (default = -1)
         How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
@@ -2099,9 +2436,24 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        # Explicit magnetostatic solver parameters (override self_fields_* defaults)
+        self.magnetostatic_required_precision = kw.pop(
+            "warpx_magnetostatic_required_precision", None
+        )
+        self.magnetostatic_absolute_tolerance = kw.pop(
+            "warpx_magnetostatic_absolute_tolerance", None
+        )
+        self.magnetostatic_max_iters = kw.pop("warpx_magnetostatic_max_iters", None)
+        self.magnetostatic_verbosity = kw.pop("warpx_magnetostatic_verbosity", None)
         self.effective_potential = kw.pop("warpx_effective_potential", False)
         self.effective_potential_factor = kw.pop(
             "warpx_effective_potential_factor", None
+        )
+        self.effective_potential_time_filter_param = kw.pop(
+            "warpx_effective_potential_time_filter_param", None
+        )
+        self.effective_potential_density_floor = kw.pop(
+            "warpx_effective_potential_density_floor", None
         )
         self.cfl = kw.pop("warpx_cfl", None)
         self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
@@ -2128,12 +2480,27 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
                 pywarpx.warpx.effective_potential_factor = (
                     self.effective_potential_factor
                 )
+                pywarpx.warpx.effective_potential_time_filter_param = (
+                    self.effective_potential_time_filter_param
+                )
+                pywarpx.warpx.effective_potential_density_floor = (
+                    self.effective_potential_density_floor
+                )
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"
             pywarpx.warpx.self_fields_required_precision = self.required_precision
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
+            # Explicit magnetostatic solver parameters (if provided)
+            pywarpx.warpx.magnetostatic_solver_required_precision = (
+                self.magnetostatic_required_precision
+            )
+            pywarpx.warpx.magnetostatic_solver_absolute_tolerance = (
+                self.magnetostatic_absolute_tolerance
+            )
+            pywarpx.warpx.magnetostatic_solver_max_iters = self.magnetostatic_max_iters
+            pywarpx.warpx.magnetostatic_solver_verbosity = self.magnetostatic_verbosity
             pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
             pywarpx.boundary.potential_lo_y = self.grid.potential_ymin
             pywarpx.boundary.potential_lo_z = self.grid.potential_zmin
@@ -2402,12 +2769,40 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     """
-    Load external E/B fields from file (openPMD/plotfile) and optionally
-    apply a time-dependent scalar multiplier parsed on the C++ side.
+    Load external electromagnetic fields (E and/or B) from an openPMD file and
+    optionally apply a time-dependent scaling.
+
+    Multiple external field maps are supported by adding several
+    ``LoadAppliedField`` objects to the simulation via repeated calls to
+    ``Simulation.add_applied_field(...)``. Each instance contributes one
+    independently scaled field map; the resulting fields are summed by WarpX.
+
+    Example (multiple applied fields)::
+
+        applied_field1 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(omega*t)",
+        )
+
+        applied_field2 = picmi.LoadAppliedField(
+            read_fields_from_path="diags/Bfield_map",
+            load_E=False,
+            load_B=True,
+            warpx_B_time_function="cos(2*omega*t)",
+        )
+
+        sim.add_applied_field(applied_field1)
+        sim.add_applied_field(applied_field2)
+
+    Internally, each object registers a uniquely named external field entry
+    (``particles.<name>.*``), ensuring that multiple applied fields compose
+    without overwriting each other.
 
     Parameters
     ----------
-    read_fields_from_path : str
+    read_fields_from_path : str, optional
         Path to diagnostics containing the external field data to load.
 
     load_E : bool, default=True
@@ -2417,17 +2812,18 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         If True, load the external B field from file.
 
     warpx_E_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded E field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded electric field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_B_time_function : str, optional
-        AMReX parser expression in variable `t` (seconds) that scales the
-        file-loaded B field uniformly in space and per level, e.g.
-        ``"cos(2*pi*2e6*t + pi/2)"``. If not provided, defaults to ``"1.0"`` in C++.
+        AMReX parser expression in variable ``t`` (seconds) scaling the
+        file-loaded magnetic field uniformly in space and per level.
+        Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        Run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based B-field divergence cleaner after loading.
+        (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
         Absolute tolerance for the divergence cleaner solve.
@@ -2435,6 +2831,33 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     warpx_projection_div_cleaner_rtol : float, optional
         Relative tolerance for the divergence cleaner solve.
     """
+
+    _auto_field_counter = 0
+
+    def _next_auto_name(self):
+        LoadAppliedField._auto_field_counter += 1
+        return f"ext_field{LoadAppliedField._auto_field_counter}"
+
+    def _as_list(self, x):
+        if x is None:
+            return []
+        if isinstance(x, (list, tuple)):
+            return list(x)
+        if isinstance(x, str):
+            return [s for s in x.split() if s]
+        return [x]
+
+    def _append_names(self, list_key, new_names):
+        existing = None
+        try:
+            existing = getattr(pywarpx.particles, list_key)
+        except Exception:
+            existing = None
+        existing = self._as_list(existing)
+        for n in new_names:
+            if n not in existing:
+                existing.append(n)
+        pywarpx.particles.__setattr__(list_key, existing)
 
     def __init__(self, **kw):
         self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
@@ -2444,23 +2867,57 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
         self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
 
+        # Collect user constants for mangle_expression (but keep kw intact)
+        # Exclude base-class params so they don't end up in my_constants.
+        base_keys = {"read_fields_from_path", "load_E", "load_B"}
+        self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
+
+        # Base class requires read_fields_from_path -> enforce it
+        if "read_fields_from_path" not in kw:
+            raise ValueError("LoadAppliedField requires 'read_fields_from_path'.")
+
         super().__init__(**kw)
 
-    def applied_field_initialize_inputs(self):
-        # file path for external fields
-        pywarpx.particles.read_fields_from_path = self.read_fields_from_path
+        # hard-disable unwanted loaders set by the base ctor
+        if not self.load_E:
+            pywarpx.particles.E_ext_particle_init_style = "none"
+        if not self.load_B:
+            pywarpx.particles.B_ext_particle_init_style = "none"
 
-        # enable file-loading styles
+    def applied_field_initialize_inputs(self):
+        mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        if not (self.load_E or self.load_B):
+            pywarpx.particles.E_ext_particle_init_style = "none"
+            pywarpx.particles.B_ext_particle_init_style = "none"
+            return
+
+        # Always register this object as a named external field so that multiple
+        # LoadAppliedField objects compose (no overwrite of global keys).
+        if not hasattr(self, "read_fields_from_path") or not self.read_fields_from_path:
+            raise ValueError("[PICMI] read_fields_from_path must be provided.")
+
+        # construct particles.<fname>.read_fields_from_path as needed for WarpX input
+        fname = self._next_auto_name()
+        pywarpx.particles.__setattr__(
+            f"{fname}.read_fields_from_path", self.read_fields_from_path
+        )
+
         if self.load_E:
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
-            # pass time dependence via parser
-            if self.warpx_E_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_E_dependency(t)", self.warpx_E_time_function
-                )
+            self._append_names("E_ext_particle_fields", [fname])
+
+            dep_raw = self.warpx_E_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_E_dependency(t)", dep)
+        else:
+            pywarpx.particles.E_ext_particle_init_style = "none"
 
         if self.load_B:
             pywarpx.particles.B_ext_particle_init_style = "read_from_file"
+            self._append_names("B_ext_particle_fields", [fname])
+
+            # div cleaner knobs are global-ish: last set value wins
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "atol", self.div_cleaner_atol
@@ -2468,11 +2925,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             pywarpx.warpx.add_new_group_attr(
                 "projection_div_cleaner", "rtol", self.div_cleaner_rtol
             )
-            # pass time dependence via parser
-            if self.warpx_B_time_function:
-                pywarpx.particles.__setattr__(
-                    "read_fields_B_dependency(t)", self.warpx_B_time_function
-                )
+
+            dep_raw = self.warpx_B_time_function or "1.0"
+            dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
+            pywarpx.particles.__setattr__(f"{fname}.read_fields_B_dependency(t)", dep)
+        else:
+            pywarpx.particles.B_ext_particle_init_style = "none"
 
 
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
@@ -2601,15 +3059,37 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         Value of the Coulomb log to use in the collision cross section.
         If not supplied, it is calculated from the local conditions.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(self, name, species, CoulombLog=None, ndt=None, **kw):
+    def __init__(
+        self,
+        name,
+        species,
+        CoulombLog=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
         self.name = name
         self.species = species
         self.CoulombLog = CoulombLog
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2618,7 +3098,8 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.type = "pairwisecoulomb"
         collision.species = [species.name for species in self.species]
         collision.CoulombLog = self.CoulombLog
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
 
 class MCCCollisions(picmistandard.base._ClassWithInit):
@@ -2652,8 +3133,15 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         The maximum background density. When the background_density is an expression, this must also
         be specified.
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
@@ -2665,7 +3153,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         scattering_processes,
         background_mass=None,
         max_background_density=None,
-        ndt=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
         **kw,
     ):
         self.name = name
@@ -2675,7 +3164,14 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.background_mass = background_mass
         self.scattering_processes = scattering_processes
         self.max_background_density = max_background_density
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2697,7 +3193,8 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
             collision.background_temperature = self.background_temperature
         collision.background_mass = self.background_mass
         collision.max_background_density = self.max_background_density
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -2728,18 +3225,39 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         The species produced by collision processes (currently both
         ionization and charge-exchange require defining the product species).
 
-    ndt: integer, optional
-        The collisions will be applied every "ndt" steps. Must be 1 or larger.
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
     """
 
     def __init__(
-        self, name, species, scattering_processes, product_species=None, ndt=None, **kw
+        self,
+        name,
+        species,
+        scattering_processes,
+        product_species=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
     ):
         self.name = name
         self.species = species
         self.scattering_processes = scattering_processes
         self.product_species = product_species
-        self.ndt = ndt
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        if "ndt" in kw:
+            raise ValueError(
+                "`ndt` is no longer a valid option for collisions."
+                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
+            )
 
         self.handle_init(kw)
 
@@ -2751,7 +3269,8 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
             collision.product_species = [
                 species.name for species in self.product_species
             ]
-        collision.ndt = self.ndt
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -3042,6 +3561,11 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_amrex_use_gpu_aware_mpi: bool, optional
         Whether to use GPU-aware MPI communications
 
+    warpx_do_device_synchronize: bool, optional
+        Whether to synchronize GPU threads at ends of profiling regions.
+        Note that if this is set to False, the TinyProfiler table can be
+        misleading.
+
     warpx_zmax_plasma_to_compute_max_step: float, optional
         Sets the simulation run time based on the maximum z value
 
@@ -3053,14 +3577,13 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_collisions: collision instance, optional
         The collision instance specifying the particle collisions
 
-    warpx_collisions_split_position_push: bool, default=1
-        If true, collisions are performed in the middle of the position push,
+    warpx_collisions_split_momentum_push: bool, default=1
+        If true, collisions are performed in the middle of the momentum push,
         which is split into two substeps.
         This improves energy conservation, as demonstrated in
         (Vay et al., Phys. Rev. E 111, 2025).
         This is only implemented for the explicit evolve scheme
         and is not available for the implicit evolve schemes.
-        It is also not available with embedded boundaries.
 
     warpx_embedded_boundary: embedded boundary instance, optional
 
@@ -3167,6 +3690,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         )
         self.amrex_the_arena_init_size = kw.pop("warpx_amrex_the_arena_init_size", None)
         self.amrex_use_gpu_aware_mpi = kw.pop("warpx_amrex_use_gpu_aware_mpi", None)
+        self.do_device_synchronize = kw.pop("warpx_do_device_synchronize", None)
         self.zmax_plasma_to_compute_max_step = kw.pop(
             "warpx_zmax_plasma_to_compute_max_step", None
         )
@@ -3180,8 +3704,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
 
         self.collisions = kw.pop("warpx_collisions", None)
-        self.collisions_split_position_push = kw.pop(
-            "warpx_collisions_split_position_push", None
+        self.collisions_split_momentum_push = kw.pop(
+            "warpx_collisions_split_momentum_push", None
         )
 
         self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
@@ -3346,7 +3870,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             for collision in self.collisions:
                 pywarpx.collisions.collision_names.append(collision.name)
                 collision.collision_initialize_inputs()
-            pywarpx.collisions.split_position_push = self.collisions_split_position_push
+            pywarpx.collisions.split_momentum_push = self.collisions_split_momentum_push
 
         if self.embedded_boundary is not None:
             self.embedded_boundary.embedded_boundary_initialize_inputs(self.solver)
@@ -3375,6 +3899,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.amrex_use_gpu_aware_mpi is not None:
             pywarpx.amrex.use_gpu_aware_mpi = self.amrex_use_gpu_aware_mpi
 
+        if self.do_device_synchronize is not None:
+            pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
+
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:
             return
@@ -3396,12 +3923,28 @@ class Simulation(picmistandard.PICMI_Simulation):
                 nsteps = self.max_steps
             else:
                 nsteps = -1
-        pywarpx.warpx.evolve(nsteps)
+        pywarpx.warpx.step(nsteps)
 
     def finalize(self):
         if self.warpx_initialized:
             self.warpx_initialized = False
             pywarpx.warpx.finalize()
+
+    @property
+    def fields(self):
+        """
+        This is a convenience property that returns the MultiFab registry, allowing
+        easy fetching of the MultiFabs.
+        """
+        return self.extension.warpx.multifab_register()
+
+    @property
+    def particles(self):
+        """
+        This is a convenience property that returns the MultiParticleContainer, allowing
+        easy fetching of the WarpXParticleContainer instances.
+        """
+        return self.extension.warpx.multi_particle_container()
 
 
 # ----------------------------
@@ -4092,8 +4635,8 @@ class LabFrameFieldDiagnostic(
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
+                elif dataname == "rho":
+                    # Add rho diagnostic
                     fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order

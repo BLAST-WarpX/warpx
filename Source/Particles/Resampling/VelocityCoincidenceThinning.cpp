@@ -112,7 +112,7 @@ void VelocityCoincidenceThinning::operator() (
     amrex::Gpu::DeviceVector<int> sorted_indices(n_parts_in_tile);
     auto* sorted_indices_data = sorted_indices.data();
 
-    constexpr auto c2 = PhysConst::c * PhysConst::c;
+    constexpr auto c2 = PhysConst::c2;
 
     auto velocityBinCalculator = VelocityBinCalculator();
     velocityBinCalculator.velocity_grid_type = m_velocity_grid_type;

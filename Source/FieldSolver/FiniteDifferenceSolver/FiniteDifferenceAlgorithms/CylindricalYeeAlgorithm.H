@@ -199,6 +199,26 @@ struct CylindricalYeeAlgorithm {
     }
 
     /**
+     * Perform second derivative along r on a field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Drr (
+        T_Field const& F,
+        amrex::Real const * const coefs_r, int const /*n_coefs_r*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+
+#ifdef WARPX_DIM_RZ
+        Real const inv_dr2 = coefs_r[0]*coefs_r[0];
+        return inv_dr2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
+#elif defined(WARPX_DIM_RCYLINDER)
+        amrex::ignore_unused(F, coefs_r, i, j, k, ncomp);
+        return 0._rt;
+#endif
+    }
+
+    /**
      * Perform second derivative along z on a cell-centered field `F`*/
     template< typename T_Field>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

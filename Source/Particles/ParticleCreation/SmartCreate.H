@@ -52,8 +52,12 @@ struct SmartCreate
         prt.m_rdata[PIdx::x][i_prt] = x;
         prt.m_rdata[PIdx::y][i_prt] = y;
         prt.m_rdata[PIdx::z][i_prt] = z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_XZ)
         prt.m_rdata[PIdx::x][i_prt] = x;
+        prt.m_rdata[PIdx::z][i_prt] = z;
+        amrex::ignore_unused(y);
+#elif defined(WARPX_DIM_RZ)
+        prt.m_rdata[PIdx::r][i_prt] = x;
         prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(y);
 #elif defined(WARPX_DIM_1D_Z)
@@ -99,6 +103,7 @@ class SmartCreateFactory
 
 public:
     template <class PartTileData>
+    explicit
     SmartCreateFactory (const PartTileData& part) noexcept:
         m_policy_real{getPolicies(part.GetRealSoANames())},
         m_policy_int{getPolicies(part.GetIntSoANames())},

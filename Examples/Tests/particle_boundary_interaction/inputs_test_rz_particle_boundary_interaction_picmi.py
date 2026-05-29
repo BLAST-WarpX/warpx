@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# @Eya Dammak supervised by @Remi Lehe, 2024
 # --- Input file for particle-boundary interaction testing in RZ.
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
+
 import numpy as np
+import scipy.constants as scc
 
 from pywarpx import callbacks, particle_containers, picmi
+from pywarpx.LoadThirdParty import load_cupy
 
 ##########################
 # numerics parameters
@@ -112,14 +114,22 @@ sim.initialize_warpx()
 ##########################
 # python particle data access
 ##########################
+xp, _ = load_cupy()
 
 
 def concat(list_of_arrays):
     if len(list_of_arrays) == 0:
         # Return a 1d array of size 0
-        return np.empty(0)
+        return xp.empty(0)
     else:
-        return np.concatenate(list_of_arrays)
+        return xp.concatenate(list_of_arrays)
+
+
+def to_numpy(arr):
+    if hasattr(arr, "get"):
+        return arr.get()
+    else:
+        return arr
 
 
 def mirror_reflection():
@@ -136,9 +146,10 @@ def mirror_reflection():
     theta = concat(
         buffer.get_particle_scraped_this_step("electrons", "eb", "theta", lev)
     )
+
     z = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev))
-    x = r * np.cos(theta)  # from RZ coordinates to 3D coordinates
-    y = r * np.sin(theta)
+    x = r * xp.cos(theta)  # from RZ coordinates to 3D coordinates
+    y = r * xp.sin(theta)
     ux = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "ux", lev))
     uy = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uy", lev))
     uz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "uz", lev))
@@ -148,19 +159,33 @@ def mirror_reflection():
     nz = concat(buffer.get_particle_scraped_this_step("electrons", "eb", "nz", lev))
 
     # STEP 2: use these parameters to inject particle from the same position in the plasma
-    elect_pc = particle_containers.ParticleContainerWrapper(
-        "electrons"
-    )  # general particle container
+    electrons = sim.particles.get("electrons")  # general particle container
 
     ####this part is specific to the case of simple reflection.
     un = ux * nx + uy * ny + uz * nz
     ux_reflect = -2 * un * nx + ux  # for a "mirror reflection" u(sym)=-2(u.n)n+u
     uy_reflect = -2 * un * ny + uy
     uz_reflect = -2 * un * nz + uz
-    elect_pc.add_particles(
-        x=x + (dt - delta_t) * ux_reflect,
-        y=y + (dt - delta_t) * uy_reflect,
-        z=z + (dt - delta_t) * uz_reflect,
+
+    x = to_numpy(x)
+    y = to_numpy(y)
+    z = to_numpy(z)
+    w = to_numpy(w)
+    delta_t = to_numpy(delta_t)
+    ux_reflect = to_numpy(ux_reflect)
+    uy_reflect = to_numpy(uy_reflect)
+    uz_reflect = to_numpy(uz_reflect)
+
+    inv_c2 = 1.0 / (scc.c**2)
+    inv_gamma = 1.0 / np.sqrt(
+        1.0 + (ux_reflect**2 + uy_reflect**2 + uz_reflect**2) * inv_c2
+    )
+    dt_remaining = dt - delta_t
+
+    electrons.add_particles(
+        x=x + dt_remaining * ux_reflect * inv_gamma,
+        y=y + dt_remaining * uy_reflect * inv_gamma,
+        z=z + dt_remaining * uz_reflect * inv_gamma,
         ux=ux_reflect,
         uy=uy_reflect,
         uz=uz_reflect,
