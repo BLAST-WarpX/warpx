@@ -456,38 +456,143 @@ public:
                 uy3 -= uCOM_y;
                 uz3 -= uCOM_z;
 
-                // calculate kinetic energy of the collision
-                const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
-                const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
-                // subtract the energy cost for ionization (converted from eV to J)
-                const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
+                // The kinematics of the ionization event (i.e. how the energy and momentum are
+                // distributed among the products) depend on the nature of the incident particle
+                // (first reactant species, slot 0, with mass m0).
+                if (m0 > 2.0_prt * PhysConst::m_e)
+                {
+                    // Ion impact ionization (the incident particle is heavier than an electron).
+                    // We use the collinear model: in the center-of-mass frame, the two products
+                    // (the ion and the electron) are assumed to have equal velocity, and their
+                    // velocity vector is aligned with that of the incident (non-target) particle.
 
-                // Momentum and energy division after the ionization event is done as follows:
-                // we assume that, in the center of mass frame, the two products (the ion and the electron)
-                // have equal velocity and that their velocity vector is aligned with that of the target particle
+                    // calculate kinetic energy of the collision
+                    const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+                    const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
+                    // subtract the energy cost for ionization (converted from eV to J)
+                    const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
 
-                // With these assumptions, conservation of momentum in the center of mass frame allows to express the momenta
-                // of the products, as a function of the outcoming momentum of the non-target particle:
-                // p_slot2 = - p_non_target_out * mass_slot2 / m1
-                // p_slot3 = - p_non_target_out * mass_slot3 / m1
-                // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
+                    // Momentum and energy division after the ionization event is done as follows:
+                    // we assume that, in the center of mass frame, the two products (the ion and the electron)
+                    // have equal velocity and that their velocity vector is aligned with that of the target particle
 
-                // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
-                const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / m1 ) );
+                    // With these assumptions, conservation of momentum in the center of mass frame allows to express the momenta
+                    // of the products, as a function of the outcoming momentum of the non-target particle:
+                    // p_slot2 = - p_non_target_out * mass_slot2 / m1
+                    // p_slot3 = - p_non_target_out * mass_slot3 / m1
+                    // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
 
-                // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
-                const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
-                ux0 *= reduce_factor;
-                uy0 *= reduce_factor;
-                uz0 *= reduce_factor;
-                // Obtain the other velocity vectors by conservation of momentum
-                const amrex::ParticleReal mass_ratio = m0 / m1;
-                ux2 = -mass_ratio * ux0;
-                uy2 = -mass_ratio * uy0;
-                uz2 = -mass_ratio * uz0;
-                ux3 = -mass_ratio * ux0;
-                uy3 = -mass_ratio * uy0;
-                uz3 = -mass_ratio * uz0;
+                    // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
+                    const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / m1 ) );
+
+                    // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
+                    const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
+                    ux0 *= reduce_factor;
+                    uy0 *= reduce_factor;
+                    uz0 *= reduce_factor;
+                    // Obtain the other velocity vectors by conservation of momentum
+                    const amrex::ParticleReal mass_ratio = m0 / m1;
+                    ux2 = -mass_ratio * ux0;
+                    uy2 = -mass_ratio * uy0;
+                    uz2 = -mass_ratio * uz0;
+                    ux3 = -mass_ratio * ux0;
+                    uy3 = -mass_ratio * uy0;
+                    uz3 = -mass_ratio * uz0;
+                }
+                else
+                {
+                    // Electron impact ionization (the incident particle is an electron).
+                    // We use the original model, in which the momenta of the three products are
+                    // distributed by sampling a random point on an ellipse (see below).
+
+                    // calculate kinetic energy of the collision (in eV)
+                    const amrex::ParticleReal E1 = (
+                        0.5_prt * m0 * (ux0*ux0 + uy0*uy0 + uz0*uz0) / PhysConst::q_e
+                    );
+                    const amrex::ParticleReal E2 = (
+                        0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3) / PhysConst::q_e
+                    );
+                    const amrex::ParticleReal E_coll = E1 + E2;
+
+                    // subtract the energy cost for ionization
+                    const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
+
+                    // Momentum and energy division after the ionization event
+                    // is done as follows:
+                    // Three numbers are generated that satisfy the triangle
+                    // inequality. These numbers will be scaled to give the
+                    // momentum for each particle (satisfying the triangle
+                    // inequality ensures that the momentum vectors can be
+                    // arranged such that the net linear momentum is zero).
+                    // Product 2 is definitely an ion, so we first choose its
+                    // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
+                    // R is a random number between 0 and 1.
+                    // The other two numbers (n_0 & n_1) are then found
+                    // by choosing a random point on the ellipse characterized
+                    // by the semi-major and semi-minor axes
+                    //    a = (1 - n_0) / 2.0
+                    //    b = 0.5 * sqrt(1 - 2 * n_0)
+                    // The numbers are found by randomly sampling an x value
+                    // between -a and a, and finding the corresponding y value
+                    // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
+                    // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
+                    // n_1 = 1 - n_2 - n_0.
+                    // Next, we need to find the number C, such that if
+                    // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
+                    // where E_i = p_i^2 / (2 M_i), i.e.,
+                    // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
+                    // After C is determined the momentum vectors are arranged
+                    // such that the net linear momentum is zero.
+
+                    const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
+
+                    // find ellipse semi-major and minor axis
+                    const double a = 0.5 * (1.0 - n_2);
+                    const double b = 0.5 * std::sqrt(1.0 - 2.0 * n_2);
+
+                    // sample random x value and calculate y
+                    const double x = (2.0 * amrex::Random(engine) - 1.0) * a;
+                    const double y2 = b*b - b*b/(a*a) * x*x;
+                    const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25*n_2*n_2);
+                    const double n_1 = 1.0 - n_0 - n_2;
+
+                    // calculate the value of C
+                    const double C = std::sqrt(E_out / (
+                        n_0*n_0 / (2.0 * m0) + n_1*n_1 / (2.0 * mass_slot2) + n_2*n_2 / (2.0 * mass_slot3)
+                    ));
+
+                    // Now that appropriate momenta are set for each outgoing species
+                    // the directions for the velocity vectors must be chosen such
+                    // that the net linear momentum in the current frame is 0.
+                    // This is achieved by arranging the momentum vectors in
+                    // a triangle and finding the required angles between the vectors.
+                    const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0 * n_0 * n_1);
+                    const double sin_alpha = std::sqrt(1.0 - cos_alpha*cos_alpha);
+                    const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0 * n_0 * n_2);
+                    const double sin_gamma = std::sqrt(1.0 - cos_gamma*cos_gamma);
+
+                    // choose random theta and phi values (orientation of the triangle)
+                    const double Theta = amrex::Random(engine) * 2.0 * MathConst::pi;
+                    const double phi = amrex::Random(engine) * MathConst::pi;
+
+                    const double cos_theta = std::cos(Theta);
+                    const double sin_theta = std::sin(Theta);
+                    const double cos_phi = std::cos(phi);
+                    const double sin_phi = std::sin(phi);
+
+                    // calculate the velocity components for each particle
+                    ux0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * cos_phi);
+                    uy0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * sin_phi);
+                    uz0 = static_cast<amrex::ParticleReal>(-C * n_0 / m0 * sin_theta);
+
+                    ux2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi));
+                    uy2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi));
+                    uz2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (cos_alpha * sin_theta));
+
+                    ux3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi));
+                    uy3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi));
+                    uz3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (cos_gamma * sin_theta));
+                }
 
                 // transform back to labframe
                 ux0 += uCOM_x;
