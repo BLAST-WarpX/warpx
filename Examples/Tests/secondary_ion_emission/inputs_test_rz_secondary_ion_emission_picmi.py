@@ -148,7 +148,7 @@ xp, _ = load_cupy()
 # Use a separate, reproducible random seed on each MPI rank, so that the
 # secondary electrons emitted on different ranks are not drawn from the
 # same random sequence.
-np.random.seed(10025015 + COMM_WORLD.Get_rank())
+np.random.seed(COMM_WORLD.Get_rank() + 3)
 
 
 def concat(list_of_arrays):
