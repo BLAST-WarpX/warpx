@@ -585,7 +585,6 @@ def check_initial_energy1(data, E_com):
         assert is_close(
             np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=1.0e-2
         )
-
         assert is_close(
             np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=5e-14
         )

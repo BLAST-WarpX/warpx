@@ -205,7 +205,7 @@ private:
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
-// drift velocity u_mean, from the Maxwellian distribution.
+// bulk drift momentum u_mean, from the Maxwellian distribution.
 struct InjectorMomentumMaxwellian
 {
     // Constructor whose inputs are:
@@ -224,17 +224,9 @@ struct InjectorMomentumMaxwellian
         using namespace amrex::literals;
         const amrex::XDim3 u_std = temperature(x,y,z);
         const amrex::XDim3 u_mean = velocity(x,y,z);
-
-        // Calculate local velocity and abort if |u_mean|>=1
-        amrex::Real const u_mean_mag = std::sqrt(
-            u_mean.x*u_mean.x +
-            u_mean.y*u_mean.y +
-            u_mean.z*u_mean.z
-        );
-        if (u_mean_mag >= 1._rt) {
-            amrex::Abort("Magnitude of mean normalized momentum |u_mean| >= 1.");
+        if (u_std.x < 0.0_rt || u_std.y < 0.0_rt || u_std.z < 0.0_rt) {
+            amrex::Abort("The standard deviation of normalized momentum must be non-negative.");
         }
-
         const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
         const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
         const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);

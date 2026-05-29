@@ -2195,7 +2195,6 @@ WarpX::BackwardCompatibility ()
                 );
             }
         }
-
         ssspecies << "'" << speciesiter << ".multiple_particles_vel_<x,y,z>'";
         ssspecies << " are not supported anymore. ";
         ssspecies << "Please use the renamed variables ";

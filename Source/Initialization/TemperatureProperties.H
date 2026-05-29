@@ -43,7 +43,8 @@ struct TemperatureProperties
     TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name);
 
     /**
-     * \brief Same as above, but species_mass [kg] is required for maxwellian ``T_eV`` spread.
+     * \brief Read runtime parameters to populate constant or spatially-varying temperature
+     * information, but species_mass [kg] is required for maxwellian ``T_eV`` spread.
      */
     TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                            amrex::Real species_mass);

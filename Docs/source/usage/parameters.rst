@@ -1708,10 +1708,9 @@ Particle initialization
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
-    * ``maxwellian``: Maxwellian momentum distribution where the mean (bulk drift) and the
-      standard deviation (thermal spread) of each normalized-momentum component are required
-      and can be specified as constants, or functions of position.
-      Each component is sampled independently from a Gaussian distribution.
+    * ``maxwellian``:A Maxwellian momentum distribution. The mean normalized momentum (bulk drift) and the standard deviation (thermal spread) of each
+      momentum component can be specified independently. They can be given either as constants or as functions of position.
+      Each normalized-momentum component is sampled independently from a Gaussian distribution.
 
       It requires the following arguments:
 
@@ -1729,14 +1728,6 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
-        * If ``read_from_file``, the spatial bulk drift is read from openPMD file
-          (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
-          The following are required: ``<species_name>.read_ux_mean_from_path``,
-          ``<species_name>.read_uy_mean_from_path``,
-          ``<species_name>.read_uz_mean_from_path`` (each an openPMD file path).
-          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to
-          load openPMD data in parallel, in the same way density is loaded from a file via
-          ``read_density_distributed``.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1756,16 +1747,6 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
-        * If ``read_from_file``, the spatial thermal spread per axis is read from openPMD
-          (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
-          Required: ``<species_name>.read_ux_std_from_path``,
-          ``<species_name>.read_uy_std_from_path``,
-          ``<species_name>.read_uz_std_from_path``.
-          Optional: ``<species_name>.ux_std_openpmd_mesh``,
-          ``<species_name>.uy_std_openpmd_mesh``,
-          ``<species_name>.uz_std_openpmd_mesh`` (default mesh record names ``ux_std``,
-          ``uy_std``, ``uz_std``), and ``<species_name>.read_u_std_distributed`` (`0` or `1`,
-          default `1`) for parallel loading, analogous to ``read_u_mean_distributed``.
 
       * ``<species_name>.maxwellian_T_eV_distribution_type`` (`string`) is an alternative (mutually exclusive) to
         ``maxwellian_u_std_distribution_type``. This sets isotropic thermal
@@ -1784,10 +1765,8 @@ Particle initialization
       :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
       Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
       The Sobol method used to generate the distribution will not terminate for :math:`\theta \lesssim 0.1`, and the code will abort if it encounters a temperature below that threshold.
-      The Maxwellian (``maxwellian``) distribution is recommended when the component-wise temperature
-      parameters (i.e., :math:`\theta_x = u_{x,\mathrm{std}}^2`,
-      :math:`\theta_y = u_{y,\mathrm{std}}^2`, :math:`\theta_z = u_{z,\mathrm{std}}^2`)
-      satisfy :math:`0.01 < \theta_i < 0.1`.
+      The Maxwellian (``maxwellian``) distribution is recommended when the temperature
+      parameter :math:`\theta` satisfies :math:`0.01 < \theta_i < 0.1`.
       Errors due to relativistic effects can be expected to approximately between 1% and 10%.
       The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
       The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).

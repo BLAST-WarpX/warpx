@@ -51,7 +51,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
     : TemperatureProperties(pp, source_name, std::numeric_limits<amrex::Real>::quiet_NaN())
 {
 }
-
 /** Construct TemperatureProperties from the passed particle source parameters.
  *  Parse the momentum distribution type and initialize the corresponding
  *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
