@@ -158,9 +158,9 @@ gaussian_parser.ux_mean_function(x,y,z) = "0.1*z"
 gaussian_parser.uy_mean_function(x,y,z) = "0.12*z"
 gaussian_parser.uz_mean_function(x,y,z) = "0.14*z"
 gaussian_parser.maxwellian_u_std_distribution_type= "parser"
-gaussian_parser.ux_std_function(x,y,z) = "0.2*z"
-gaussian_parser.uy_std_function(x,y,z) = "0.21*z"
-gaussian_parser.uz_std_function(x,y,z) = "0.22*z"
+gaussian_parser.ux_std_function(x,y,z) = "0.2*abs(z)"
+gaussian_parser.uy_std_function(x,y,z) = "0.21*abs(z)"
+gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 
 #################################
 ########## DIAGNOSTIC ###########
