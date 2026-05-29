@@ -16,16 +16,20 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 data = {}
 
-filenames = ["PhaseSpaceElectrons_zux", "PhaseSpaceElectrons_zuy", "PhaseSpaceElectrons"]
-keys      = ["zux","zuy","zuz"]
-yticks    = [(-2,-1, 1, 2),(-2,-1,1,2),(-20,0,20,40)]
+filenames = [
+    "PhaseSpaceElectrons_zux",
+    "PhaseSpaceElectrons_zuy",
+    "PhaseSpaceElectrons",
+]
+keys = ["zux", "zuy", "zuz"]
+yticks = [(-2, -1, 1, 2), (-2, -1, 1, 2), (-20, 0, 20, 40)]
 
-for filename, key in zip(filenames, keys) :
-    print (filename, key)
-    ts = OpenPMDTimeSeries("diags/reducedfiles/"+filename)
+for filename, key in zip(filenames, keys):
+    print(filename, key)
+    ts = OpenPMDTimeSeries("diags/reducedfiles/" + filename)
     data[key], info = ts.get_field(field="data", iteration=8000, plot=True)
 
-fig, ax = plt.subplots(3,1)
+fig, ax = plt.subplots(3, 1)
 
 for i, key in enumerate(keys):
     ax[i].pcolormesh(np.log10(data[key]))
