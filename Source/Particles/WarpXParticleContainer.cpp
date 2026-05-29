@@ -2038,8 +2038,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (amrex::MultiFab* temperature
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if (sum_array(i,j,k,0) > 0) {
                     // Use the unbiased weighted sample variance,
-                    // dividing by the sum(w) - ave(w)
-                    const amrex::Real invsum = 1._rt/(sum_array(i,j,k,0) - sum_array(i,j,k,4));
+                    // dividing by sum(w) - ave(w)
+                    const amrex::Real denom = sum_array(i,j,k,0) - sum_array(i,j,k,4);
+                    const amrex::Real invsum = denom > 0._rt ? 1._rt/denom : 0._rt;
                     temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
                 }
             });
