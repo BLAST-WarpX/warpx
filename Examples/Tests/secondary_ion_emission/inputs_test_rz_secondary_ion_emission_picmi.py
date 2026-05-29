@@ -276,8 +276,6 @@ def secondary_emission():
     # Add the secondary electrons to the simulation. This call must be executed
     # exactly once per timestep on every MPI rank (even when the rank emits no
     # electron), because add_particles triggers a collective redistribution.
-    # Guarding it with `if n != 0` made different ranks call it a different
-    # number of times, which caused the deadlock reported in #5916.
     # unique_particles=True: each rank adds only the electrons it generated.
     electrons.add_particles(
         x=xe + (dt - delta_te) * uxe,
