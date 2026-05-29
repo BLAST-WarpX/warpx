@@ -16,8 +16,6 @@
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array.H>
 
-#include <optional>
-
 
 /**
  * \brief Base class for Electrostatic Solver
