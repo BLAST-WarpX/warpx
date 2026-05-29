@@ -19,9 +19,11 @@ jobs:
         with:
           filters: |
             non_docs:
+              - '!.zenodo.json'
               - '!Docs/**'
-              - '!**.md'
+              - '!Tools/machines/**'
               - '!**.rst'
+              - '!**.md'
           predicate-quantifier: 'every'
       - id: set-output
         run: |

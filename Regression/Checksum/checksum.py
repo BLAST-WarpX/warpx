@@ -21,6 +21,34 @@ yt.funcs.mylog.setLevel(50)
 class Checksum:
     """Class for checksum comparison of one test."""
 
+    @staticmethod
+    def _add_openpmd_rz_mode_checksums(data_lev, ts, field, coord, iteration, key):
+        """Add one checksum per RZ mode real/imag component."""
+
+        avail_modes = ts.fields_metadata[field]["avail_circ_modes"]
+        modes = [int(mode) for mode in avail_modes if mode != "all"]
+        for mode in modes:
+            # In RZ, openPMD stores one real component for mode 0,
+            # then real/imag component pairs for higher azimuthal modes.
+            # openPMD-viewer exposes these through get_field(m=..., theta=...):
+            # F_m(theta) = real_m*cos(m*theta) + imag_m*sin(m*theta).
+            if mode == 0:
+                # Mode 0 has no imaginary component.
+                mode_components = [(0.0, "real")]
+            else:
+                # theta=0 selects the real component; theta=pi/(2*m) selects
+                # the imaginary component because cos(pi/2)=0 and sin(pi/2)=1.
+                mode_components = [(0.0, "real"), (0.5 * np.pi / mode, "imag")]
+            for theta, part in mode_components:
+                Q, _ = ts.get_field(
+                    field=field,
+                    coord=coord,
+                    iteration=iteration,
+                    m=mode,
+                    theta=theta,
+                )
+                data_lev[f"{key}_{mode}_{part}"] = np.sum(np.abs(Q))
+
     def __init__(
         self,
         test_name,
@@ -140,13 +168,13 @@ class Checksum:
             # Load time series
             ts = OpenPMDTimeSeries(self.output_file)
             data = {}
-            # Compute number of MR levels
-            # TODO This calculation of nlevels assumes that the last element
-            #      of level_fields is by default on the highest MR level.
-            level_fields = [field for field in ts.avail_fields if "lvl" in field]
-            nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
             # Compute checksum for field quantities
             if do_fields:
+                # Compute number of MR levels
+                # TODO This calculation of nlevels assumes that the last element
+                #      of level_fields is by default on the highest MR level.
+                level_fields = [field for field in ts.avail_fields if "lvl" in field]
+                nlevels = 0 if level_fields == [] else int(level_fields[-1][-1])
                 for lev in range(nlevels + 1):
                     # Create list of fields specific to level lev
                     grid_fields = []
@@ -160,25 +188,45 @@ class Checksum:
                         ]
                     data_lev = {}
                     for field in grid_fields:
-                        vector_components = ts.fields_metadata[field][
-                            "avail_components"
-                        ]
+                        metadata = ts.fields_metadata[field]
+                        vector_components = metadata["avail_components"]
                         if vector_components != []:
                             for coord in vector_components:
-                                Q, info = ts.get_field(
-                                    field=field,
-                                    iteration=ts.iterations[-1],
-                                    coord=coord,
-                                )
-                                # key stores strings composed of field name and vector components
-                                # (e.g., field='B' or field='B_lvl1' + coord='y' results in key='By')
+                                # key stores strings composed of field name and vector
+                                # components (e.g., field='B' or field='B_lvl1' +
+                                # coord='y' results in key='By')
                                 key = field.replace(f"_lvl{lev}", "") + coord
-                                data_lev[key] = np.sum(np.abs(Q))
+                                if metadata["geometry"] == "thetaMode":
+                                    self._add_openpmd_rz_mode_checksums(
+                                        data_lev,
+                                        ts,
+                                        field,
+                                        coord,
+                                        ts.iterations[-1],
+                                        key,
+                                    )
+                                else:
+                                    Q, _ = ts.get_field(
+                                        field=field,
+                                        iteration=ts.iterations[-1],
+                                        coord=coord,
+                                    )
+                                    data_lev[key] = np.sum(np.abs(Q))
                         else:  # scalar field
-                            Q, info = ts.get_field(
-                                field=field, iteration=ts.iterations[-1]
-                            )
-                            data_lev[field] = np.sum(np.abs(Q))
+                            if metadata["geometry"] == "thetaMode":
+                                self._add_openpmd_rz_mode_checksums(
+                                    data_lev,
+                                    ts,
+                                    field,
+                                    None,
+                                    ts.iterations[-1],
+                                    field,
+                                )
+                            else:
+                                Q, _ = ts.get_field(
+                                    field=field, iteration=ts.iterations[-1]
+                                )
+                                data_lev[field] = np.sum(np.abs(Q))
                     data[f"lev={lev}"] = data_lev
             # Compute checksum for particle quantities
             if do_particles:
@@ -265,6 +313,7 @@ class Checksum:
 
         # Dictionaries have same values?
         checksums_differ = False
+        max_rel_err = 0.0
         for key1 in ref_benchmark.data.keys():
             for key2 in ref_benchmark.data[key1].keys():
                 passed = np.isclose(
@@ -294,6 +343,8 @@ class Checksum:
                     if np.abs(x) != 0.0:
                         rel_err = abs_err / np.abs(x)
                         print("Relative error: {:.2e}".format(rel_err))
+                        max_rel_err = max(max_rel_err, rel_err)
+        print("\nMaximum relative error: {:.2e}".format(max_rel_err))
         if checksums_differ:
             print(f"\nNew checksums file {self.test_name}.json:")
             print(json.dumps(self.data, indent=2))

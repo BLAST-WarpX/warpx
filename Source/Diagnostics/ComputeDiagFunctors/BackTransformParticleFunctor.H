@@ -24,6 +24,7 @@ struct SelectParticles
     /**
      * \brief Constructor of SelectParticles functor.
      *
+     * @param[in] pc                 WarpX particle container
      * @param[in] a_pti              WarpX particle iterator
      * @param[in] current_z_boost    current z-position of the slice in boosted frame
      * @param[in] old_z_boost        previous z-position of the slice in boosted frame
@@ -78,6 +79,7 @@ struct LorentzTransformParticles
     /**
      * \brief Constructor of the LorentzTransformParticles functor.
      *
+     * @param[in] pc                 WarpX particle container
      * @param[in] a_pti              WarpX particle iterator
      * @param[in] t_boost            time in boosted frame
      * @param[in] dt                 timestep in boosted-frame
@@ -206,7 +208,7 @@ class BackTransformParticleFunctor final : public ComputeParticleDiagFunctor
 public:
     BackTransformParticleFunctor(WarpXParticleContainer *pc_src, std::string species_name, int num_buffers);
     /** Computes the Lorentz transform of source particles to obtain lab-frame data in pc_dst*/
-    void operator () (PinnedMemoryParticleContainer& pc_dst, int &TotalParticleCounter, int i_buffer) const override;
+    void operator () (WarpXParticleContainer::Base& pc_dst, int &TotalParticleCounter, int i_buffer) const override;
     void InitData() override;
     /** \brief Prepare data required to back-transform particle attributes for lab-frame snapshot, i_buffer
      *

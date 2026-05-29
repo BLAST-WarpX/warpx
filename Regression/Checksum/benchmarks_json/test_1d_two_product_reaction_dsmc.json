@@ -1,0 +1,41 @@
+{
+  "lev=0": {
+    "rho": 0.04471238203113101
+  },
+  "H": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 2191.075345900273,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 7.32179142498638e-19,
+    "particle_weight": 443133476524733.9
+  },
+  "H2": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 5119.315988293887,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_weight": 1.9999998461035678e+22
+  },
+  "H2plus": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 5156.397782418421,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 5.93203022388544e-19,
+    "particle_weight": 1488554890952068.8
+  },
+  "Hplus": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 798.5798255995561,
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 5.964608739562287e-19,
+    "particle_weight": 290844996668640.5
+  }
+}

@@ -1,4 +1,4 @@
-/* Copyright 2024 The WarpX Community
+/* Copyright 2024-2025 The WarpX Community
  *
  * This file is part of WarpX.
  *
@@ -19,7 +19,7 @@ class EffectivePotentialES final : public ElectrostaticSolver
 {
 public:
 
-    EffectivePotentialES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
+    explicit EffectivePotentialES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             (nlevs_max == 1),
@@ -35,7 +35,15 @@ public:
         MultiFluidContainer* mfl,
         int max_level) override;
 
-    void ComputeSigma ( amrex::MultiFab& sigma ) const;
+    void ComputeSigma (
+        ablastr::fields::MultiLevelScalarField const& rho_fp
+    );
+
+    void computePhi (
+        ablastr::fields::MultiLevelScalarField const& rho,
+        ablastr::fields::MultiLevelScalarField const& phi,
+        ablastr::fields::MultiLevelVectorField const& efield
+    );
 
     /**
      * Compute the potential `phi` by solving the semi-implicit Poisson equation using the Effective Potential method
@@ -47,7 +55,6 @@ public:
      * \param[in] rho The total charge density
      * \param[out] phi The potential to be computed by this function
      * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
-     * \param[in] sigma Represents the modified dielectric
      * \param[in] required_precision The relative convergence threshold for the MLMG solver
      * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
      * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
@@ -56,19 +63,14 @@ public:
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
-        ablastr::fields::MultiLevelVectorField const& efield
-    ) const;
-    void computePhi (
-        ablastr::fields::MultiLevelScalarField const& rho,
-        ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield,
-        amrex::MultiFab const& sigma,
         amrex::Real required_precision,
         amrex::Real absolute_tolerance,
         int max_iters,
         int verbosity
     ) const;
 
+    bool m_overwrite_sigma;
 };
 
 #endif // WARPX_EFFECTIVEPOTENTIALES_H_

@@ -105,7 +105,7 @@ On Great Lakes, you can run either on GPU nodes with `fast V100 GPUs (recommende
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 

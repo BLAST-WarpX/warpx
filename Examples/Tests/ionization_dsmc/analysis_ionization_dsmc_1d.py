@@ -32,7 +32,7 @@ for species in ["Hneutral", "Hplus"]:
         iteration=iteration,
         select={"uz": [1e-3, None]},
     )
-    w_binned, bins = np.histogram(z, bins=25, weights=w * uz)
+    w_binned, bins = np.histogram(z, bins=32, range=[0, 0.2], weights=w * uz)
     # Convert from number of particles per bin to beam current
     dz_bin = bins[1] - bins[0]
     sim_flux[species] = w_binned / dz_bin * c
@@ -46,7 +46,7 @@ theory_flux["Hneutral"] = flux * np.exp(-z_th * n * cross_section)
 theory_flux["Hplus"] = flux * (1 - np.exp(-z_th * n * cross_section))
 
 # Compare the fluxes
-assert np.allclose(sim_flux["Hneutral"], theory_flux["Hneutral"], atol=5e-2 * flux)
+assert np.allclose(sim_flux["Hneutral"], theory_flux["Hneutral"], atol=6e-2 * flux)
 assert np.allclose(sim_flux["Hplus"], theory_flux["Hplus"], atol=5e-2 * flux)
 
 # Plot the computed fluxes

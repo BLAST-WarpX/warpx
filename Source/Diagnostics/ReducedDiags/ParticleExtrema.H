@@ -25,7 +25,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleExtrema(const std::string& rd_name);
+    explicit ParticleExtrema(const std::string& rd_name);
 
     /// name of species
     std::string m_species_name;

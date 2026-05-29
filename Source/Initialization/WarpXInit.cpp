@@ -8,6 +8,8 @@
 #include "WarpXInit.H"
 
 #include "Initialization/WarpXAMReXInit.H"
+#include "Utils/Parser/ParserUtils.H"
+#include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 
 #include <AMReX.H>
@@ -17,6 +19,11 @@
 #include <ablastr/parallelization/MPIInitHelpers.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
+#ifdef AMREX_USE_PETSC
+#include <petscsys.h>
+#endif
+
+
 #include <optional>
 #include <string>
 
@@ -25,10 +32,19 @@ void warpx::initialization::initialize_external_libraries(int argc, char* argv[]
     ablastr::parallelization::mpi_init(argc, argv);
     warpx::initialization::amrex_init(argc, argv);
     ablastr::math::anyfft::setup();
+#ifdef AMREX_USE_PETSC
+    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
+    PetscInitialize(&argc, &argv, nullptr, "WarpX with PETSc");
+    amrex::Print() << "Initialized PETSc.\n";
+#endif
 }
 
 void warpx::initialization::finalize_external_libraries ()
 {
+#ifdef AMREX_USE_PETSC
+    PetscFinalize();
+    amrex::Print() << "Finalized PETSc.\n";
+#endif
     ablastr::math::anyfft::cleanup();
     amrex::Finalize();
     ablastr::parallelization::mpi_finalize();
@@ -95,4 +111,43 @@ void warpx::initialization::check_dims()
         dims_error.append(dims_compiled).append("' to inputs file.");
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(dims == dims_compiled, dims_error);
+}
+
+void warpx::initialization::read_moving_window_parameters(
+    int& do_moving_window, int& start_moving_window_step, int& end_moving_window_step,
+    [[maybe_unused]] int& moving_window_dir, amrex::Real& moving_window_v)
+{
+    const amrex::ParmParse pp_warpx("warpx");
+    pp_warpx.query("do_moving_window", do_moving_window);
+    if (do_moving_window) {
+        utils::parser::queryWithParser(
+            pp_warpx, "start_moving_window_step", start_moving_window_step);
+        utils::parser::queryWithParser(
+            pp_warpx, "end_moving_window_step", end_moving_window_step);
+        std::string s;
+        pp_warpx.get("moving_window_dir", s);
+
+        if (s == "z" || s == "Z") {
+#ifdef WARPX_ZINDEX
+            moving_window_dir = WARPX_ZINDEX;
+#endif
+        }
+#if defined(WARPX_DIM_3D)
+        else if (s == "y" || s == "Y") {
+            moving_window_dir = 1;
+        }
+#endif
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+        else if (s == "x" || s == "X") {
+            moving_window_dir = 0;
+        }
+#endif
+        else {
+            WARPX_ABORT_WITH_MESSAGE("Unknown moving_window_dir: "+s);
+        }
+
+        utils::parser::getWithParser(
+            pp_warpx, "moving_window_v", moving_window_v);
+        moving_window_v *= PhysConst::c;
+    }
 }

@@ -34,7 +34,6 @@
 #include <ostream>
 #include <vector>
 
-
 // forward declaration
 class WarpX;
 
@@ -305,14 +304,17 @@ public:
     }
 
     // copy to/from Real-type arrays
-    void copyFrom (const amrex::Real* const);
-    void copyTo   (amrex::Real* const) const;
+    void copyFrom (const amrex::Real*);
+    void copyTo   (amrex::Real*) const;
 
     // return WarpX pointer
-    inline auto getWarpX () const { return m_WarpX; }
+    [[nodiscard]] auto getWarpX () const { return m_WarpX; }
 
     // return the number of AMR levels
-    inline auto numAMRLevels () const { return m_num_amr_levels; }
+    [[nodiscard]] auto numAMRLevels () const { return m_num_amr_levels; }
+
+    // return DOFs object pointer
+    [[nodiscard]] inline const auto& getDOFsObject () const { return m_dofs; }
 
 private:
 

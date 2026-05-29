@@ -14,6 +14,21 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Wang J X, Han L Q, Zhao X Y, Ablimit A, Gong Z, Wen H and Yu J Q.
+   **Muon injection and acceleration via ultraintense electron beam-driven plasma wakefield**.
+   Phys. Rev. Accel. Beams **29**, 021302, 2026.
+   `DOI:10.1103/wq5g-mtjq <https://doi.org/10.1103/wq5g-mtjq>`__
+
+#. Gardner C and Dollar F.
+   **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
+   New Journal of Physics **27**, 124301, 2025.
+   `DOI:10.1088/1367-2630/ae23f1 <https://doi.org/10.1088/1367-2630/ae23f1>`__
+
+#. Lei B., Zhang H., Bonţoiu C., Bonatto A., Resta-López J., Xia G., Qiao B. and Welsch C.
+   **100 TeV/m-level particle accelerators driven by high-density electron beams in micro structured carbon nanotube forest channel**.
+   New Journal of Physics **27**, 2025.
+   `DOI:10.1088/1367-2630/adf87d <https://doi.org/10.1088/1367-2630/adf87d>`__
+
 #. Chu M., Luan S., Yang H., Feng K., Tian Y., Yang X., and Wang W.
    **Controlled Betatron radiation from high-charge electron beams in multiple plasma channels**.
    Optics Express **33**, 10, 2025.
@@ -95,6 +110,11 @@ Laser-Plasma Interaction
 
 Scientific works in laser-ion acceleration and laser-matter interaction.
 
+#. Lei B, Zhang H, Seipt D, Bonatto A, Qiao B, Resta-López J, Xia G, and Welsch C.
+   **Coherent Synchrotron Radiation by Excitation of Surface Plasmon Polariton on Near-Critical Solid Microtube Surface**.
+   Phys. Rev. Lett. **135**, 205001, 2025.
+   `DOI:10.1103/cnym-16hc <https://doi.org/10.1103/cnym-16hc>`__
+
 #. Garten M, Bulanov S S, Hakimi S, Obst-Huebl L, Mitchell C E, Schroeder C B, Esarey E, Geddes C G R, Vay J-L, Huebl A.
    **Laser-plasma ion beam booster based on hollow-channel magnetic vortex acceleration**.
    Physical Review Research **6**, 033148, 2024.
@@ -164,6 +184,11 @@ Astrophysical Plasma Physics
 
 Scientific works in astrophysical plasma modeling.
 
+#. Zhang Z P, Zhao Z H, Jin X X, Zhu X W, Wang Y S, Zhu X Y, Qiao B.
+   **Multispecies Ion Acceleration in the Interaction of Multiple Reconnection Current Sheets**.
+   The Astrophysical Journal, **997** 196, 2026.
+   `10.3847/1538-4357/ae2320 <https://doi.org/10.3847/1538-4357/ae2320>`__
+
 #. Wu Y, Shi C, Tao X, Zhao J
    **Kinetic-hybrid Simulations of Counterpropagating Ion Cyclotron Waves and Proton Scattering in the Near-Sun Solar Wind**.
    The Astrophysical Journal **983** 107, 2025.
@@ -229,6 +254,11 @@ Related works using WarpX:
 Nuclear Fusion and Plasma Confinement
 *************************************
 
+#. Groenewald R. E., Gupta S., Veksler A., Tobin M., Galeotti L., Onofri M., Ceccherini F., Barnes D. C., Belova E. and Dettrick S. A.
+   **Fast ion stabilization of tilt in large radius FRCs**.
+   Physics of Plasmas **32**, 072503, 2025.
+   `DOI:10.1063/5.0277175 <https://doi.org/10.1063/5.0277175>`__
+
 #. Tyushev M., Smolyakov A., Sabo A., Groenewald R., Necas A., and Yushmanov P.
    **Drift-kinetic PIC simulations of plasma flow and energy transport in the magnetic mirror configuration**.
    Physics of Plasmas **32**, 032514, 2025.
@@ -241,8 +271,8 @@ Nuclear Fusion and Plasma Confinement
 
 #. Scheffel J. and Jäderberg J. and Bendtz K. and Holmberg R. and Lindvall K.,
    **Axial Confinement in the Novatron Mirror Machine**.
-   arXiv 2410.20134
-   `DOI:10.48550/arXiv.2410.20134 <https://doi.org/10.48550/arXiv.2410.20134>`__
+   Nuclear Fusion, **65**, Number 6, 2025.
+   `DOI:10.1088/1741-4326/add173 <https://doi.org/10.1088/1741-4326/add173>`__
 
 #. Affolter M., Thompson R., Hepner S., Hayes E. C., Podolsky V., Borghei M., Carlsson J., Gargone A., Merthe D., McKee E., Langtry R.,
    **The Orbitron: A crossed-field device for co-confinement of high energy ions and electrons**.
@@ -261,6 +291,16 @@ Nuclear Fusion and Plasma Confinement
 
 Plasma Thrusters and Spacecraft Physics
 ***************************************
+
+#. Zhou Z., Luo X., Zhao Y., Yu D.
+   **Impact of azimuthal magnetic field inhomogeneity on Hall thruster high-frequency azimuthal instability via 2D radial–azimuthal PIC simulations**.
+   Plasma Sources Sci. Technol. **34**, 105006, 2025.
+   `DOI:10.1088/1361-6595/ae0af5 <https://doi.org/10.1088/1361-6595/ae0af5>`__
+
+#. Xie L., Zhou Z., Luo X., Zhao Y.
+   **The influence of adding Monte Carlo collisions on convergence in 3D PIC simulations of Hall thruster azimuthal instability**.
+   Phys. Scr. **100**, 075616, 2025.
+   `DOI:10.1088/1402-4896/ade636 <https://doi.org/10.1088/1402-4896/ade636>`__
 
 #. Sam A., Elschot S.,
    **Self-consistent charging of complex objects in flowing plasma: Implementation and analysis in WarpX**.

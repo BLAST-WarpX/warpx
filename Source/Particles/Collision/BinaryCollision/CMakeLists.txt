@@ -4,7 +4,9 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         BinaryCollisionUtils.cpp
         ParticleCreationFunc.cpp
+        VirtualPhotonCreation.cpp
     )
 endforeach()
 
 add_subdirectory(DSMC)
+add_subdirectory(Bremsstrahlung)

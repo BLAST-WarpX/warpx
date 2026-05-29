@@ -5,6 +5,7 @@ on:
     branches:
       - "development"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-clangsanitizers
@@ -30,7 +31,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang.sh 17
+        .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -45,8 +46,8 @@ jobs:
         export CCACHE_MAXSIZE=100M
         ccache -z
 
-        export CXX=$(which clang++-17)
-        export CC=$(which clang-17)
+        export CXX=$(which clang++-19)
+        export CC=$(which clang-19)
         export CXXFLAGS="-fsanitize=undefined,address,pointer-compare -fno-sanitize-recover=all"
 
         cmake -S . -B build                 \
@@ -57,9 +58,7 @@ jobs:
           -DWarpX_FFT=ON                    \
           -DWarpX_QED=ON                    \
           -DWarpX_QED_TABLE_GEN=ON          \
-          -DWarpX_OPENPMD=ON                \
-          -DWarpX_PRECISION=SINGLE          \
-          -DWarpX_PARTICLE_PRECISION=SINGLE
+          -DWarpX_OPENPMD=ON
         cmake --build build -j 4
 
         ccache -s
@@ -73,11 +72,12 @@ jobs:
         #MPI implementations often leak memory
         export "ASAN_OPTIONS=detect_leaks=0"
 
-        mpirun -n 2 ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Tests/implicit/inputs_test_2d_theta_implicit_jfnk_vandb
+        # Print stacktrace for easier debugging
+        export UBSAN_OPTIONS=print_stacktrace=1
+
+        git clone https://github.com/ECP-WarpX/warpx-data ../warpx-data
+
+        ctest --test-dir build/Examples/Physics_applications/ -R ".*\.run" --output-on-failure
 
   build_thread_sanitizer:
     name: Clang thread sanitizer
@@ -93,7 +93,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/clang.sh 17
+        .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
       uses: actions/cache@v4
       with:
@@ -108,8 +108,8 @@ jobs:
         export CCACHE_MAXSIZE=100M
         ccache -z
 
-        export CXX=$(which clang++-17)
-        export CC=$(which clang-17)
+        export CXX=$(which clang++-19)
+        export CC=$(which clang-19)
         export CXXFLAGS="-fsanitize=thread"
 
         cmake -S . -B build                 \
@@ -142,7 +142,7 @@ jobs:
         # When the Archer library is used and ARCHER_OPTIONS="verbose=1",
         # the following message should be displayed:
         # Archer detected OpenMP application with TSan, supplying OpenMP synchronization semantics
-        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-17/lib/libarcher.so
+        export OMP_TOOL_LIBRARIES=/usr/lib/llvm-19/lib/libarcher.so
         export ARCHER_OPTIONS="verbose=1"
 
         # This option is required to avoid false positive reports from the OpenMP runtime

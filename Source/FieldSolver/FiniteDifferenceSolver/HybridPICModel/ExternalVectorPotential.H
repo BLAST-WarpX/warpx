@@ -18,9 +18,9 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -59,6 +59,9 @@ protected:
 
     std::vector<bool> m_read_A_from_file;
     std::vector<std::string> m_external_file_path;
+
+    // Clean div A
+    bool m_do_clean_divA = true;
 
 public:
 

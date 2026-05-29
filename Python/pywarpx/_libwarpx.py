@@ -74,17 +74,16 @@ class LibWarpX:
         # --- Use geometry to determine whether to import the 1D, 2D, 3D or RZ version.
         # --- The geometry must be setup before the lib warpx shared object can be loaded.
         try:
-            _prob_lo = geometry.prob_lo
-            _dims = geometry.dims
+            _dims = str(geometry.dims)
         except AttributeError:
             raise Exception(
-                "The shared object could not be loaded. The geometry must be setup before the WarpX pybind11 module can be accessesd. The geometry determines which version of the shared object to load."
+                "The shared object could not be loaded. The geometry must be setup before the WarpX pybind11 module can be accessed. The geometry determines which version of the shared object to load."
             )
 
         if _dims == "RZ":
             self.geometry_dim = "rz"
         elif _dims == "1" or _dims == "2" or _dims == "3":
-            self.geometry_dim = "%dd" % len(_prob_lo)
+            self.geometry_dim = "%dd" % int(_dims)
         else:
             raise Exception("Undefined geometry %d" % _dims)
 
@@ -129,6 +128,23 @@ class LibWarpX:
             )
 
         self.__version__ = self.libwarpx_so.__version__
+
+        # Extend pybind11 types in libwarpx_so (and pyAMReX) with pure Python
+        from .extensions.MultiFab import register_warpx_MultiFab_extension
+        from .extensions.MultiFabRegister import (
+            register_warpx_MultiFabRegister_extension,
+        )
+        from .extensions.MultiParticleContainer import (
+            register_warpx_MultiParticleContainer_extension,
+        )
+        from .extensions.WarpXParticleContainer import (
+            register_warpx_WarpXParticleContainer_extension,
+        )
+
+        register_warpx_MultiFab_extension(self.amr)
+        register_warpx_MultiFabRegister_extension(self.libwarpx_so)
+        register_warpx_MultiParticleContainer_extension(self.libwarpx_so)
+        register_warpx_WarpXParticleContainer_extension(self.libwarpx_so)
 
     def amrex_init(self, argv, mpi_comm=None):
         if mpi_comm is None:  # or MPI is None:

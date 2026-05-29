@@ -72,6 +72,11 @@ public:
         m_linear_function->curTimeStep( a_dt );
     }
 
+    PreconditionerType GetPreconditionerType () const override
+    {
+        return m_linear_function->pcType();
+    }
+
     void PrintParams () const override
     {
         amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";
@@ -124,6 +129,11 @@ private:
     int m_maxits = 100;
 
     /**
+     * \brief Total nonlinear iterations for the diagnostic file
+     */
+    mutable int m_total_iters = 0;
+
+    /**
      * \brief Relative tolerance for linear solver.
      */
     amrex::Real m_linsol_rtol = 1.0e-4;
@@ -137,6 +147,11 @@ private:
      * \brief Maximum iterations for linear solver.
      */
     int m_linsol_maxits = 1000;
+
+    /**
+     * \brief Total linear iterations for the diagnostic file
+     */
+    mutable int m_total_linsol_iters = 0;
 
     /**
      * \brief Verbosity flag for linear solver.
@@ -203,6 +218,7 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
     m_linear_function->define(m_F, m_ops, m_pc_type);
+    this->m_usePC = m_linear_function->usePreconditioner();
 
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
         m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
@@ -242,11 +258,15 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]iters";
         diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]total_iters";
+        diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_abs";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]norm_rel";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]gmres_iters";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]gmres_total_iters";
         diagnostic_file << " ";
         diagnostic_file << "[" << c++ << "]gmres_last_res";
         diagnostic_file << "\n";
@@ -333,7 +353,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
                            << std::scientific << std::setprecision(5) << norm_rel << " (rel.)" << "\n";
         }
 
-        if (norm_abs < m_rtol) {
+        if (norm_abs < m_atol) {
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied absolute tolerance " << m_atol << "\n";
@@ -359,6 +379,12 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
             WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
         }
 
+        // Prepare for the linear solve
+        m_ops->PreLinearSolve();
+        m_linear_function->setBaseSolution(a_U);
+        m_linear_function->setBaseRHS(m_R);
+        m_linear_function->updatePreCondMat(a_U);
+
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();
         m_linear_solver->solve( m_dU, m_F, m_linsol_rtol, m_linsol_atol );
@@ -377,6 +403,10 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
     }
+
+    // Update total iteration count
+    m_total_iters += iter;
+    m_total_linsol_iters += linear_solver_iters;
 
     if (m_rtol > 0. && iter == m_maxits) {
        std::stringstream convergenceMsg;
@@ -398,17 +428,21 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
         diagnostic_file << a_step+1;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << a_time + a_dt;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << iter;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_iters;
+        diagnostic_file << " ";
         diagnostic_file << norm_abs;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << norm_rel;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
         diagnostic_file << linear_solver_iters;
-        diagnostic_file << " ";;
+        diagnostic_file << " ";
+        diagnostic_file << m_total_linsol_iters;
+        diagnostic_file << " ";
         diagnostic_file << m_linear_solver->getResidualNorm();
         diagnostic_file << "\n";
         diagnostic_file.close();
@@ -425,13 +459,6 @@ void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
 {
     BL_PROFILE("NewtonSolver::EvalResidual()");
     m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
-
-    // set base U and R(U) for matrix-free Jacobian action calculation
-    m_linear_function->setBaseSolution(a_U);
-    m_linear_function->setBaseRHS(m_R);
-
-    // update preconditioner
-    m_linear_function->updatePreCondMat(a_U);
 
     // Compute residual: F(U) = U - b - R(U)
     a_F.Copy(a_U);

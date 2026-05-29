@@ -12,12 +12,12 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
-#include "Utils/RelativeCellPosition.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/utils/RelativeCellPosition.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -407,22 +407,16 @@ WarpXOpenPMDPlot::~WarpXOpenPMDPlot ()
   }
 }
 
-void WarpXOpenPMDPlot::flushCurrent (bool isBTD) const
+void WarpXOpenPMDPlot::seriesFlush (bool isBTD) const
 {
-     WARPX_PROFILE("WarpXOpenPMDPlot::flushCurrent");
-
-     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool flattenSteps = isBTD && (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
-
-     openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
-     if (flattenSteps) {
-         // delayed until all fields and particles are registered for flush
-         // and dumped once via flattenSteps
-         currIteration.seriesFlush(  "adios2.engine.preferred_flush_target = \"buffer\"" );
-     }
-     else {
-         currIteration.seriesFlush();
-     }
+    openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+    if (isBTD) {
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD");
+        currIteration.seriesFlush("adios2.engine.preferred_flush_target = \"buffer\"");
+    } else {
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()");
+        currIteration.seriesFlush();
+    }
 }
 
 std::string
@@ -455,23 +449,13 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
     m_dirPrefix = dirPrefix;
     m_file_min_digits = file_min_digits;
 
-    if( ! isBTD ) {
-        if (m_CurrentStep >= ts) {
-            // note m_Series is reset in Init(), so using m_Series->iterations.contains(ts) is only able to check the
-            // last written step in m_Series's life time, but not other earlier written steps by other m_Series
-            ablastr::warn_manager::WMRecordWarning("Diagnostics",
-                    " Warning from openPMD writer: Already written iteration:"
-                    + std::to_string(ts)
-                );
-        }
-    }
-
     m_CurrentStep = ts;
     Init(openPMD::Access::CREATE, isBTD);
 }
 
 void WarpXOpenPMDPlot::CloseStep (bool isBTD, bool isLastBTDFlush)
 {
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::CloseStep()");
     // default close is true
     bool callClose = true;
     // close BTD file only when isLastBTDFlush is true
@@ -552,20 +536,21 @@ WarpXOpenPMDPlot::WriteOpenPMDParticles (const amrex::Vector<ParticleDiag>& part
                   const bool isLastBTDFlush
 )
 {
-WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
+ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
 for (const auto & particle_diag : particle_diags) {
     WarpXParticleContainer* pc = particle_diag.getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
+    WarpXParticleContainer::Base* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
         }
     }
 
-    PinnedMemoryParticleContainer tmp = (isBTD || use_pinned_pc) ?
-        pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-        pc->make_alike<amrex::PinnedArenaAllocator>();
+    WarpXParticleContainer::Base tmp = (isBTD || use_pinned_pc) ?
+        pinned_pc->make_alike<>() :
+        pc->make_alike<>();
+    tmp.SetArena(amrex::The_Pinned_Arena());
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
     RandomFilter const random_filter(particle_diag.m_do_random_filter,
@@ -611,6 +596,12 @@ for (const auto & particle_diag : particle_diags) {
     // Gather the electrostatic potential (phi) on the macroparticles
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
+    }
+    if (particle_diag.m_plot_Ex || particle_diag.m_plot_Ey || particle_diag.m_plot_Ez ||
+        particle_diag.m_plot_Bx || particle_diag.m_plot_By || particle_diag.m_plot_Bz) {
+        storeFieldOnParticles(tmp, !use_pinned_pc,
+                              particle_diag.m_plot_Ex, particle_diag.m_plot_Ey, particle_diag.m_plot_Ez,
+                              particle_diag.m_plot_Bx, particle_diag.m_plot_By, particle_diag.m_plot_Bz);
     }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
@@ -675,18 +666,31 @@ for (const auto & particle_diag : particle_diags) {
         pc->getCharge(), pc->getMass(),
         isBTD, isLastBTDFlush);
     }
+}
 
+void
+WarpXOpenPMDPlot::FlushBTDToDisk()
+{
+    constexpr bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
-    const bool flattenSteps = isBTD && (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
+    const bool flattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
     if (flattenSteps)
     {
-       // forcing new step so data from each btd batch in
-       // preferred_flush_target="buffer" can be flushed out
-       openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
-       currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "new_step")");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
+        // Here for checkpointing purpose, we ask ADIOS to create to a new step, which
+        // triggers writting both data and metadata.
+        openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+        currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "new_step")");
     }
+    else
+      {
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ForceFlush()::Disk()");
+        openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
+        currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "disk")");
+      }
 }
+
 
 void
 WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
@@ -702,7 +706,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                     const bool isLastBTDFlush
 )
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::DumpToFile()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::DumpToFile()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD: series must be initialized");
 
     AMREX_ALWAYS_ASSERT(write_real_comp.size() == pc->NumRealComps());
@@ -761,7 +765,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
         SetConstParticleRecordsEDPIC(currSpecies, positionComponents, NewParticleVectorSize, charge, mass);
     }
 
-    flushCurrent(isBTD);
+    this->seriesFlush(isBTD);
 
     // dump individual particles
     bool contributed_particles = false;  // did the local MPI rank contribute particles?
@@ -802,7 +806,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
     //   BP4 (ADIOS 2.8): last MPI rank's `Put` meta-data wins
     //   BP5 (ADIOS 2.8): everyone has to write an empty block
     if (is_resizing_flush && !contributed_particles && isBTD && m_Series->backend() == "ADIOS2") {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()");
         for( auto & [record_name, record] : currSpecies ) {
             for( auto & [comp_name, comp] : record ) {
                 if (comp.constant()) { continue; }
@@ -813,6 +817,11 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                         [[fallthrough]];
                     case openPMD::Datatype::DOUBLE : {
                         auto empty_data = std::make_shared<amrex::ParticleReal>();
+                        comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
+                        break;
+                    }
+                    case openPMD::Datatype::INT : {
+                        auto empty_data = std::make_shared<int>();
                         comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
                         break;
                     }
@@ -842,7 +851,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
         }
     }
 
-    flushCurrent(isBTD);
+    this->seriesFlush(isBTD);
 }
 
 void
@@ -1312,7 +1321,7 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     mesh_comp.resetDataset(dataset);
 
     ::detail::setOpenPMDUnit( mesh, field_name );
-    auto relative_cell_pos = utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
+    auto relative_cell_pos = ablastr::utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
     std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
 }
@@ -1407,7 +1416,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                       const amrex::Geometry& full_BTD_snapshot ) const
 {
     //This is AMReX's tiny profiler. Possibly will apply it later
-    WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD series must be initialized");
 
@@ -1420,6 +1429,8 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
 
     // collective open
     series_iteration.open();
+
+    const bool hasADIOS =  (m_Series->backend() == "ADIOS2");
 
     auto meshes = series_iteration.meshes;
     if (first_write_to_iteration) {
@@ -1518,26 +1529,58 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 //   GPU pointers to the I/O library
 #ifdef AMREX_USE_GPU
                 if (fab.arena()->isManaged() || fab.arena()->isDevice()) {
-                    amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
-                    std::shared_ptr<amrex::Real> data_pinned(foo.release());
-                    amrex::Gpu::dtoh_memcpy_async(data_pinned.get(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
-                    // intentionally delayed until before we .flush(): amrex::Gpu::streamSynchronize();
-                    mesh_comp.storeChunk(data_pinned, chunk_offset, chunk_size);
-                } else
+                    if (hasADIOS)
+                    {
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
+                        auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
+                             chunk_offset, chunk_size,
+                             [&local_box](size_t /* size */) {
+                                  amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
+                                  std::shared_ptr<amrex::Real> data_pinned(foo.release());
+                                  return data_pinned;
+                              });
+                        auto span = dynamicMemoryView.currentBuffer();
+                        amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                    } else
+                    {
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H()");
+                        amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
+                        std::shared_ptr<amrex::Real> data_pinned(foo.release());
+                        amrex::Gpu::dtoh_memcpy_async(data_pinned.get(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                        // intentionally delayed until before we .flush(): amrex::Gpu::streamSynchronize();
+                        mesh_comp.storeChunk(data_pinned, chunk_offset, chunk_size);
+                    }
+                }  else
 #endif
-                {
-                    amrex::Real const *local_data = fab.dataPtr(icomp);
-                    mesh_comp.storeChunkRaw(
-                        local_data, chunk_offset, chunk_size);
-                }
-            }
-        } // icomp store loop
+                { // CPU
+                  if (hasADIOS)
+                    {
+                      ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
+                      auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
+                           chunk_offset, chunk_size,
+                           [&local_box](size_t /* size */) {
+                              amrex::BaseFab<amrex::Real> foo(local_box, 1);
+                              std::shared_ptr<amrex::Real> data_pinned(foo.release());
+                              return data_pinned;
+                            });
 
+                      auto span = dynamicMemoryView.currentBuffer();
+                      std::memcpy(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
+                    }
+                  else
+                    {
+                       ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
+                       amrex::Real const *local_data = fab.dataPtr(icomp);
+                       mesh_comp.storeChunkRaw( local_data, chunk_offset, chunk_size);
+                    }
+                } // CPU
+           }
+        } // icomp store loop
 #ifdef AMREX_USE_GPU
         amrex::Gpu::streamSynchronize();
 #endif
         // Flush data to disk after looping over all components
-        flushCurrent(isBTD);
+        this->seriesFlush(isBTD);
     } // levels loop (i)
 }
 #endif // WARPX_USE_OPENPMD
@@ -1551,7 +1594,7 @@ WarpXParticleCounter::WarpXParticleCounter (ParticleContainer* pc):
     m_MPIRank{amrex::ParallelDescriptor::MyProc()},
     m_MPISize{amrex::ParallelDescriptor::NProcs()}
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::ParticleCounter()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::ParticleCounter()");
     m_ParticleCounterByLevel.resize(pc->finestLevel()+1);
     m_ParticleOffsetAtRank.resize(pc->finestLevel()+1);
     m_ParticleSizeAtRank.resize(pc->finestLevel()+1);

@@ -37,7 +37,7 @@ public:
 
     AMReXGMRES () = default;
 
-    virtual ~AMReXGMRES () = default;
+    ~AMReXGMRES () override = default;
 
     // Prohibit Move and Copy operations
     AMReXGMRES(const AMReXGMRES&) = delete;
@@ -49,7 +49,7 @@ public:
     //! keep the Ops object alive for GMRES to be functional. This function
     //! must be called before solve() can be called.
     AMREX_FORCE_INLINE
-    void define (Ops& linop)
+    void define (Ops& linop) override
     {
         m_solver = std::make_unique<amrex::GMRES<Vec,Ops>>();
         m_solver->define(linop);
@@ -62,41 +62,41 @@ public:
      * \param a_rhs     RHS, i.e., b in A x = b.
      * \param a_tol_rel relative tolerance.
      * \param a_tol_abs absolute tolerance.
-     * \patam a_its     optional argument specifying the maximum number of iterations.
+     * \param a_its     optional argument specifying the maximum number of iterations.
      */
     AMREX_FORCE_INLINE
     void solve (Vec& a_sol,
                 Vec const& a_rhs,
                 RT a_tol_rel,
                 RT a_tol_abs,
-                int a_its=-1)
+                int a_its=-1) override
     {
         m_solver->solve(a_sol, a_rhs, a_tol_rel, a_tol_abs, a_its);
     }
 
     //! Sets verbosity.
     AMREX_FORCE_INLINE
-    void setVerbose (int v) { m_solver->setVerbose(v); }
+    void setVerbose (int v) override { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
     AMREX_FORCE_INLINE
-    void setRestartLength (int rl) { m_solver->setRestartLength(rl); }
+    void setRestartLength (int rl) override { m_solver->setRestartLength(rl); }
 
     //! Sets the max number of iterations
     AMREX_FORCE_INLINE
-    void setMaxIters (int niters) { m_solver->setMaxIters(niters); }
+    void setMaxIters (int niters) override { m_solver->setMaxIters(niters); }
 
     //! Gets the number of iterations.
     AMREX_FORCE_INLINE
-    int getNumIters () const { return m_solver->getNumIters(); }
+    int getNumIters () const override { return m_solver->getNumIters(); }
 
     //! Gets the solver status.
     AMREX_FORCE_INLINE
-    int getStatus () const { return m_solver->getStatus(); }
+    int getStatus () const override { return m_solver->getStatus(); }
 
     //! Gets the 2-norm of the residual.
     AMREX_FORCE_INLINE
-    RT getResidualNorm () const { return m_solver->getResidualNorm(); }
+    RT getResidualNorm () const override { return m_solver->getResidualNorm(); }
 
 private:
     std::unique_ptr<amrex::GMRES<Vec,Ops>> m_solver = nullptr;
