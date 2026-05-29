@@ -471,6 +471,14 @@ Overall simulation parameters
     verbose output. When using ``labframe-electromagnetostatic``, this value
     is also used as the default for ``magnetostatic_solver_verbosity``.
 
+.. pp:param:: warpx.self_fields_num_sweeps
+    :type: ``integer``
+
+    Number of pre- and post-smoothing sweeps for the MLMG Poisson solver used in
+    electrostatic self-field calculations. If set, the final smoothing uses four
+    times this value (same ratio as the AMReX defaults of 2 and 8). If omitted,
+    AMReX defaults are used (pre/post: 2, final: 8). Must be greater than zero.
+
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
     :default: value of ``self_fields_required_precision``
