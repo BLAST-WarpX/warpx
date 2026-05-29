@@ -23,7 +23,7 @@ yticks    = [(-2,-1, 1, 2),(-2,-1,1,2),(-20,0,20,40)]
 for filename, key in zip(filenames, keys) :
     print (filename, key)
     ts = OpenPMDTimeSeries("diags/reducedfiles/"+filename)
-    data[key], info = ts.get_field(field="data", iteration=8000, plot=True)
+    data[key], _ = ts.get_field(field="data", iteration=8000, plot=True)
 
 fig, ax = plt.subplots(3,1)
 
