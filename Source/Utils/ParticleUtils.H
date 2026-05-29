@@ -237,7 +237,10 @@ namespace ParticleUtils {
      * \result true if the point with within the boundary, otherwise false
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool containsInclusive (amrex::RealBox const& tilebox, amrex::Real x, amrex::Real y, amrex::Real z) {
+    bool containsInclusive (amrex::RealBox const& tilebox,
+                            [[maybe_unused]]amrex::Real x,
+                            [[maybe_unused]]amrex::Real y,
+                            [[maybe_unused]]amrex::Real z) {
         using namespace amrex::literals;
         const auto *const xlo = tilebox.lo();
         const auto *const xhi = tilebox.hi();
@@ -248,15 +251,10 @@ namespace ParticleUtils {
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         const amrex::Real px = x;
         const amrex::Real py = z;
-        const amrex::Real pz = 0._rt;
 #elif defined(WARPX_DIM_1D_Z)
         const amrex::Real px = z;
-        const amrex::Real py = 0._rt;
-        const amrex::Real pz = 0._rt;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const amrex::Real px = x;
-        const amrex::Real py = 0._rt;
-        const amrex::Real pz = 0._rt;
 #endif
         return  AMREX_D_TERM((xlo[0] <= px) && (px <= xhi[0]),
                           && (xlo[1] <= py) && (py <= xhi[1]),
