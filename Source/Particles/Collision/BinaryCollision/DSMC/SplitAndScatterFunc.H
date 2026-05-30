@@ -478,12 +478,12 @@ public:
 
                     // With these assumptions, conservation of momentum in the center of mass frame allows to express the momenta
                     // of the products, as a function of the outcoming momentum of the non-target particle:
-                    // p_slot2 = - p_non_target_out * mass_slot2 / m1
-                    // p_slot3 = - p_non_target_out * mass_slot3 / m1
+                    // p2 = - p_non_target_out * mass_slot2 / m1
+                    // p3 = - p_non_target_out * mass_slot3 / m1
                     // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
 
                     // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
-                    const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / m1 ) );
+                    const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / (mass_slot2 + mass_slot3) ) );
 
                     // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
                     const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
@@ -491,7 +491,7 @@ public:
                     uy0 *= reduce_factor;
                     uz0 *= reduce_factor;
                     // Obtain the other velocity vectors by conservation of momentum
-                    const amrex::ParticleReal mass_ratio = m0 / m1;
+                    const amrex::ParticleReal mass_ratio = m0 / (mass_slot2 + mass_slot3);
                     ux2 = -mass_ratio * ux0;
                     uy2 = -mass_ratio * uy0;
                     uz2 = -mass_ratio * uz0;
@@ -502,23 +502,7 @@ public:
                 else
                 {
                     // Electron impact ionization (the incident particle is an electron).
-                    // We use the original model, in which the momenta of the three products are
-                    // distributed by sampling a random point on an ellipse (see below).
-
-                    // calculate kinetic energy of the collision (in eV)
-                    const amrex::ParticleReal E1 = (
-                        0.5_prt * m0 * (ux0*ux0 + uy0*uy0 + uz0*uz0) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E2 = (
-                        0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E_coll = E1 + E2;
-
-                    // subtract the energy cost for ionization
-                    const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
-
-                    // Momentum and energy division after the ionization event
-                    // is done as follows:
+                    // Distribution of momentum and energy is done as follows:
                     // Three numbers are generated that satisfy the triangle
                     // inequality. These numbers will be scaled to give the
                     // momentum for each particle (satisfying the triangle
@@ -543,6 +527,18 @@ public:
                     // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
                     // After C is determined the momentum vectors are arranged
                     // such that the net linear momentum is zero.
+
+                    // calculate kinetic energy of the collision (in eV)
+                    const amrex::ParticleReal E1 = (
+                        0.5_prt * m0 * (ux0*ux0 + uy0*uy0 + uz0*uz0) / PhysConst::q_e
+                    );
+                    const amrex::ParticleReal E2 = (
+                        0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3) / PhysConst::q_e
+                    );
+                    const amrex::ParticleReal E_coll = E1 + E2;
+
+                    // subtract the energy cost for ionization
+                    const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
 
                     const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
 
