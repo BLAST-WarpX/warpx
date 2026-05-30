@@ -403,7 +403,7 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
         // compute the weight from N_tot if the user specified npart_real = N_tot
         // compute the weight from q_tot if the user specified q_tot
         // note that npart is the number of macroparticles
-        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*charge));
+        const amrex::Real weight_3d = (N_tot > 0._rt) ? (N_tot / npart) : (q_tot / (npart*m_charge));
         for (long i = 0; i < npart; ++i) {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
             const amrex::Real weight = weight_3d;
@@ -1490,6 +1490,10 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + pt[0])*dx[0];
                     pos.y = 0.0_rt;
                     pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    // r.y needs to be set here since it is used below to calculate theta
+                    r.y = amrex::Random(engine);
 #endif
                 } else
 #endif

@@ -422,6 +422,13 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
+MultiParticleContainer::TransformMomentumToCurvilinear (bool forward) {
+    for (const auto &pc : allcontainers) {
+        pc->TransformMomentumToCurvilinear(forward);
+    }
+}
+
+void
 MultiParticleContainer::AllocData ()
 {
     for (auto& pc : allcontainers) {
@@ -1848,7 +1855,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
-                  pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
+                  pc_source->GetRealCompIndex("opticalDepthQSR") - WarpXParticleContainer::NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
                   pti, lev, Ex.nGrowVect(),
                   Ex[pti], Ey[pti], Ez[pti],

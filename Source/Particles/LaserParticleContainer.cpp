@@ -83,7 +83,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     : WarpXParticleContainer(amr_core, ispecies),
       m_laser_name{name}
 {
-    charge = 1.0;
+    m_charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
@@ -742,12 +742,12 @@ LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
     const auto eps = static_cast<Real>(dx[0]*small_coeff);
 #endif
 #if defined(WARPX_DIM_3D)
-    Sx = std::min(std::min(dx[0]/(std::abs(m_u_X[0])+eps),
-                           dx[1]/(std::abs(m_u_X[1])+eps)),
-                           dx[2]/(std::abs(m_u_X[2])+eps));
-    Sy = std::min(std::min(dx[0]/(std::abs(m_u_Y[0])+eps),
-                           dx[1]/(std::abs(m_u_Y[1])+eps)),
-                           dx[2]/(std::abs(m_u_Y[2])+eps));
+    Sx = std::min({dx[0]/(std::abs(m_u_X[0])+eps),
+                   dx[1]/(std::abs(m_u_X[1])+eps),
+                   dx[2]/(std::abs(m_u_X[2])+eps)});
+    Sy = std::min({dx[0]/(std::abs(m_u_Y[0])+eps),
+                   dx[1]/(std::abs(m_u_Y[1])+eps),
+                   dx[2]/(std::abs(m_u_Y[2])+eps)});
 #elif defined(WARPX_DIM_RZ)
     Sx = dx[0];
     Sy = 1.0;
@@ -786,7 +786,8 @@ LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
                                MomentumPushType /*momentum_push_type*/)
 {
-    // I don't think we need to do anything.
+    // Laser particles are not advanced using a particle pusher.
+    // Therefore, PushP does nothing in this implementation.
 }
 
 /* \brief compute particles position in laser plane coordinate.
