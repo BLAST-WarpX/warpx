@@ -123,6 +123,7 @@ namespace SpeciesUtils {
         std::unique_ptr<amrex::Parser>& uz_parser,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
+        amrex::Geometry const& geom,
         int flux_normal_axis, int flux_direction)
     {
         using namespace amrex::literals;
@@ -205,13 +206,13 @@ namespace SpeciesUtils {
         } else if (mom_dist_s == "maxwellian") {
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperatureVector getTempVec(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperature getTemp(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocity getVel(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));

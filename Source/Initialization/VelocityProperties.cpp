@@ -18,9 +18,11 @@
 * velocity parameters: `ux_mean`, `uy_mean`, and `uz_mean` for
 * `maxwellian` distributions, or `bulk_vel_dir` and `beta` for `maxwell_juttner`.
 */
-VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
-{
 
+VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                        amrex::Geometry const& geom)
+    : m_geom(geom)
+{
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
     if (mom_dist_s == "maxwell_juttner") {
@@ -108,6 +110,32 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
                 std::make_unique<amrex::Parser>(
                     utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
             m_type = VelParserFunctionVector;
+
+        } else if (u_mean_dist_s == "read_from_file") {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            utils::parser::get(pp, source_name, "read_ux_mean_from_path", m_read_ux_mean_path);
+            utils::parser::get(pp, source_name, "read_uy_mean_from_path", m_read_uy_mean_path);
+            utils::parser::get(pp, source_name, "read_uz_mean_from_path", m_read_uz_mean_path);
+            utils::parser::query(pp, source_name, "ux_mean_openpmd_mesh", m_ux_mean_openpmd_mesh);
+            utils::parser::query(pp, source_name, "uy_mean_openpmd_mesh", m_uy_mean_openpmd_mesh);
+            utils::parser::query(pp, source_name, "uz_mean_openpmd_mesh", m_uz_mean_openpmd_mesh);
+            {
+                std::string const key_with_src =
+                    source_name.empty() ? std::string("read_u_mean_distributed")
+                                        : source_name + ".read_u_mean_distributed";
+                if (pp.contains(key_with_src.c_str())) {
+                    pp.query(key_with_src.c_str(), m_read_u_mean_distributed);
+                } else {
+                    pp.query("read_u_mean_distributed", m_read_u_mean_distributed);
+                }
+            }
+            m_type = VelFromFileVector;
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "maxwellian_u_mean_distribution_type = read_from_file requires "
+                "WarpX built with openPMD support and is not supported in "
+                "RCYLINDER/RSPHERE geometries.");
+#endif
         }
         else {
             std::stringstream stringstream;
