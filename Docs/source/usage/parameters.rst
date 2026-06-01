@@ -1708,7 +1708,7 @@ Particle initialization
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
-    * ``maxwellian``:A Maxwellian momentum distribution. The mean normalized momentum (bulk drift) and the standard deviation (thermal spread) of each
+    * ``maxwellian``: Maxwellian momentum distribution. The mean normalized momentum (bulk drift) and the standard deviation (thermal spread) of each
       momentum component can be specified independently. They can be given either as constants or as functions of position.
       Each normalized-momentum component is sampled independently from a Gaussian distribution.
 
