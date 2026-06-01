@@ -10,7 +10,7 @@
 #include "Particles/Collision/ScatteringProcess.H"
 
 #include "Particles/Algorithms/KineticEnergy.H"
-#include "Utils/ParticleUtils.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Random.H>
@@ -211,10 +211,16 @@ public:
         const auto mc2 = m_mass1*c2;
 
         const amrex::ParticleReal up = sqrt(E_out * (E_out + 2.0_prt*mc2) / c2) / m_mass1;
+        const amrex::ParticleReal u_norm = sqrt(ux*ux + uy*uy + uz*uz);
+        const amrex::ParticleReal u_scale = up / u_norm;
 
-        // isotropically scatter electrons
-        ParticleUtils::RandomizeVelocity(ux, uy, uz, up, engine);
-        ParticleUtils::RandomizeVelocity(e_ux, e_uy, e_uz, up, engine);
+        // Forward scattering: keep both outgoing electrons collinear with the incoming electron.
+        e_ux = ux * u_scale;
+        e_uy = uy * u_scale;
+        e_uz = uz * u_scale;
+        ux *= u_scale;
+        uy *= u_scale;
+        uz *= u_scale;
 
         // get velocities for the ion from a Maxwellian distribution
         i_ux = ion_vel_std * RandomNormal(0_prt, 1.0_prt, engine);
