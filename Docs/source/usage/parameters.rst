@@ -1757,7 +1757,7 @@ Particle initialization
         The same :math:`u_\mathrm{std}` is used for all three thermal momentum spread components.
 
         * If ``constant``, the following is required ``<species_name>.T_eV``.
-        * If ``parser``, the following is required ``<species_name>.maxwellian_T_eV(x,y,z)``.
+        * If ``parser``, the following is required ``<species_name>.T_eV_function(x,y,z)``.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.

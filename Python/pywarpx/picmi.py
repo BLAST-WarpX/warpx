@@ -705,7 +705,7 @@ class DensityDistributionBase(object):
             )
             species.add_new_group_attr(
                 source_name,
-                "maxwellian_T_eV(x,y,z)",
+                "T_eV_function(x,y,z)",
                 expression,
             )
             return
@@ -715,7 +715,7 @@ class DensityDistributionBase(object):
         except (TypeError, ValueError) as exc:
             raise ValueError(
                 "warpx_maxwellian_T_eV must be a number (eV) or a string expression "
-                "for maxwellian_T_eV(x,y,z)."
+                "for T_eV_function(x,y,z)."
             ) from exc
         if T_eV < 0:
             raise ValueError("warpx_maxwellian_T_eV must be non-negative (eV).")

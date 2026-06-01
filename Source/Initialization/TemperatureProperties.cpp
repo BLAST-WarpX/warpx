@@ -112,10 +112,10 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
 
         if (!has_temperature_in_ev) {
             if (specified(pp, source_name, "T_eV") ||
-                specified(pp, source_name, "maxwellian_T_eV(x,y,z)")) {
+                specified(pp, source_name, "T_eV_function(x,y,z)")) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "Set maxwellian_T_eV_distribution_type (constant or parser) when using T_eV "
-                    "or maxwellian_T_eV(x,y,z).");
+                    "or T_eV_function(x,y,z).");
             }
 
             std::string u_std_dist_s = "constant";
@@ -192,7 +192,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             }
             else if (tev_dist_s == "parser") {
                 std::string str_tev;
-                utils::parser::Store_parserString(pp, source_name, "maxwellian_T_eV(x,y,z)", str_tev);
+                utils::parser::Store_parserString(pp, source_name, "T_eV_function(x,y,z)", str_tev);
                 m_ptr_T_eV_parser =
                     std::make_unique<amrex::Parser>(
                         utils::parser::makeParser(str_tev, {"x", "y", "z"}));

@@ -101,7 +101,7 @@ struct GetTemperatureVector
      *\return value of temperature at (x,y,z).
      *        m_ux_std, m_uy_std, m_uz_std if m_type is TempConstantVector
      *        m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z) if m_type is TempParserFunctionVector
-     *        isotropic u_std from maxwellian_T_eV(x,y,z) in eV if m_type is TempParserScalarTeV
+     *        isotropic u_std from T_eV_function(x,y,z) in eV if m_type is TempParserScalarTeV
      */
     AMREX_GPU_HOST_DEVICE
     amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
