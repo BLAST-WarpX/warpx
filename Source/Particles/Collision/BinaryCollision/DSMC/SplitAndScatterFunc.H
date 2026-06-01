@@ -456,6 +456,12 @@ public:
                 uy3 -= uCOM_y;
                 uz3 -= uCOM_z;
 
+                // calculate kinetic energy of the collision
+                const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+                const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
+                // subtract the energy cost for ionization (converted from eV to J)
+                const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
+
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle
                 // (first reactant species, slot 0, with mass m0).
@@ -465,12 +471,6 @@ public:
                     // We use the collinear model: in the center-of-mass frame, the two products
                     // (the ion and the electron) are assumed to have equal velocity, and their
                     // velocity vector is aligned with that of the incident (non-target) particle.
-
-                    // calculate kinetic energy of the collision
-                    const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
-                    const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
-                    // subtract the energy cost for ionization (converted from eV to J)
-                    const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
 
                     // Momentum and energy division after the ionization event is done as follows:
                     // we assume that, in the center of mass frame, the two products (the ion and the electron)
@@ -527,18 +527,6 @@ public:
                     // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
                     // After C is determined the momentum vectors are arranged
                     // such that the net linear momentum is zero.
-
-                    // calculate kinetic energy of the collision (in eV)
-                    const amrex::ParticleReal E1 = (
-                        0.5_prt * m0 * (ux0*ux0 + uy0*uy0 + uz0*uz0) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E2 = (
-                        0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3) / PhysConst::q_e
-                    );
-                    const amrex::ParticleReal E_coll = E1 + E2;
-
-                    // subtract the energy cost for ionization
-                    const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
 
                     const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
 
