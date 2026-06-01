@@ -655,32 +655,37 @@ for (const auto & particle_diag : particle_diags) {
     // does not match the flag guarding the write).
     amrex::Vector<int> real_flags(tmp.NumRealComps(), 0);
 #if defined(WARPX_DIM_RZ)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];      // position_x ← r
-    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];  // position_y ← theta
-    real_flags[2] = particle_diag.m_plot_flags[PIdx::z];      // position_z ← z
-    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];      // weighting
-    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];     // momentum_x
-    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];     // momentum_y
-    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];     // momentum_z
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::z];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
 #elif defined(WARPX_DIM_RCYLINDER)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];      // position_x ← r
-    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];  // position_y ← theta
-    real_flags[2] = particle_diag.m_plot_flags[PIdx::w];      // weighting
-    real_flags[3] = particle_diag.m_plot_flags[PIdx::ux];     // momentum_x
-    real_flags[4] = particle_diag.m_plot_flags[PIdx::uy];     // momentum_y
-    real_flags[5] = particle_diag.m_plot_flags[PIdx::uz];     // momentum_z
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    // note: z is unspecified (for specific values, can be assumed to be zero)
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uz];
 #elif defined(WARPX_DIM_RSPHERE)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];      // position_x ← r
-    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];  // position_y ← theta
-    real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];    // position_z ← phi
-    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];      // weighting
-    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];     // momentum_x
-    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];     // momentum_y
-    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];     // momentum_z
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];
+    // note: z can be determinied from r, theta and pi
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
 #else
     for (int i = 0; i < static_cast<int>(PIdx::nattribs); ++i) {
         real_flags[i] = particle_diag.m_plot_flags[i];
     }
+    // note: For 2D Cartesian (xz), y is unspecified
+    //       (for specific values, can be assumed to be zero).
+    //       For 1D Cartesian (z), the same applies for x,y.
 #endif
     // For extra runtime attributes (beyond PIdx::nattribs), the openPMD
     // index coincides with the SoA index, so we forward the existing flag.
