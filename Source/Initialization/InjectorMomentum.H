@@ -25,13 +25,8 @@
 #include <AMReX_Random.H>
 
 #include <AMReX_BaseFwd.H>
-#include <AMReX_BoxArray.H>
-#include <AMReX_DistributionMapping.H>
-#include <AMReX_IntVect.H>
-#include <AMReX_RealBox.H>
 
 #include <cmath>
-#include <functional>
 #include <string>
 
 // struct whose getMomentum returns constant momentum.
