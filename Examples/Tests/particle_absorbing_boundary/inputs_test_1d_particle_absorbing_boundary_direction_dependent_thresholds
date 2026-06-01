@@ -1,0 +1,50 @@
+# This test is a modified version of `inputs_test_1d_particle_absorbing_boundary`
+# where the plasma drifts along -y at gamma*beta ~ 1.33 (a similar setup is often
+# used to simulate oblique incidence in 1D). Since the plasma is drifting along y,
+# we want to thermalizer to act only in the x and z direction. Therefore, a high
+# threshold is set for the y direction (10).
+
+FILE = inputs_test_1d_particle_absorbing_boundary
+
+my_constants.beta = 0.8
+
+hydrogen.momentum_distribution_type = "constant"
+hydrogen.uy                         = -beta/sqrt(1-beta*beta)
+
+electrons.beta_distribution_type     = "constant"
+electrons.beta                       = beta
+electrons.bulk_vel_dir               = -y
+
+# the following line replaces `particle_thermalizer.momentum_threshold = 0.1`
+particle_thermalizer.momentum_threshold = 0.1 10.0 0.1
+
+# we need the z-ux and z-uy phase spaces in addition to z-uz phase space (PhaseSpaceElectrons)
+warpx.reduced_diags_names                   = PhaseSpaceElectrons_zux PhaseSpaceElectrons_zuy PhaseSpaceElectrons
+
+PhaseSpaceElectrons_zux.type                                 = ParticleHistogram2D
+PhaseSpaceElectrons_zux.intervals                            = 1000
+PhaseSpaceElectrons_zux.species                              = electrons
+PhaseSpaceElectrons_zux.bin_number_abs                       = 1000
+PhaseSpaceElectrons_zux.bin_number_ord                       = 1000
+PhaseSpaceElectrons_zux.bin_min_abs                          = -100.e-6
+PhaseSpaceElectrons_zux.bin_max_abs                          = 50.e-6
+PhaseSpaceElectrons_zux.bin_min_ord                          = -2
+PhaseSpaceElectrons_zux.bin_max_ord                          = 2
+PhaseSpaceElectrons_zux.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"
+PhaseSpaceElectrons_zux.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "ux"
+PhaseSpaceElectrons_zux.value_function(t,x,y,z,ux,uy,uz,w) = "w"
+PhaseSpaceElectrons_zux.openpmd_backend = h5
+
+PhaseSpaceElectrons_zuy.type                                 = ParticleHistogram2D
+PhaseSpaceElectrons_zuy.intervals                            = 1000
+PhaseSpaceElectrons_zuy.species                              = electrons
+PhaseSpaceElectrons_zuy.bin_number_abs                       = 1000
+PhaseSpaceElectrons_zuy.bin_number_ord                       = 1000
+PhaseSpaceElectrons_zuy.bin_min_abs                          = -100.e-6
+PhaseSpaceElectrons_zuy.bin_max_abs                          = 50.e-6
+PhaseSpaceElectrons_zuy.bin_min_ord                          = -2
+PhaseSpaceElectrons_zuy.bin_max_ord                          = 2
+PhaseSpaceElectrons_zuy.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"
+PhaseSpaceElectrons_zuy.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "uy"
+PhaseSpaceElectrons_zuy.value_function(t,x,y,z,ux,uy,uz,w) = "w"
+PhaseSpaceElectrons_zuy.openpmd_backend = h5

@@ -6,22 +6,26 @@
  */
 
 #include "ParticleThermalizer.H"
-#include <AMReX_REAL.H>
-#include <AMReX_ParmParse.H>
-#include <algorithm>
-#include <cctype>
-#include <string>
 
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Particles/ParticleCreation/AddPlasmaUtilities.H"
+#include "Utils/Parser/ParserUtils.H"
+#include "Utils/TextMsg.H"
 #include "WarpX.H"
+
+#include <AMReX_ParmParse.H>
+#include <AMReX_REAL.H>
+
+#include <algorithm>
+#include <cctype>
+#include <string>
 
 using namespace amrex::literals;
 
 ParticleThermalizer::ParticleThermalizer():
     m_start(0._rt), m_end(-1._rt),
-    m_momentum_threshold(-1._rt), m_theta(-1._rt)
+    m_momentum_threshold{-1._rt, -1._rt, -1._rt}, m_theta(-1._rt)
 {
   const amrex::ParmParse pp("particle_thermalizer");
 
@@ -70,15 +74,30 @@ ParticleThermalizer::ParticleThermalizer():
   // Read numeric parameters with defaults
   pp.get("start", m_start);
   pp.get("end", m_end);
-  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+  WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
       m_end > m_start,
       "particle_thermalizer: 'end' must be greater than 'start'");
-  pp.get("momentum_threshold", m_momentum_threshold);
-  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-      m_momentum_threshold >= 0._rt,
-      "particle_thermalizer: 'momentum_threshold' must be non-negative");
+
+  auto tvec = std::vector<amrex::Real>{};
+  utils::parser::getArrWithParser(pp,"momentum_threshold", tvec );
+  if (tvec.size() == 1){
+      m_momentum_threshold = amrex::Array<amrex::Real, 3>{tvec[0], tvec[0], tvec[0]};
+  }
+  else if (tvec.size() == 3){
+      m_momentum_threshold = amrex::Array<amrex::Real, 3>{tvec[0], tvec[1], tvec[2]};
+  }
+  else{
+    WARPX_ABORT_WITH_MESSAGE("particle_thermalizer: one or three values must be specified for 'momentum_threshold'");
+  }
+  WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+      std::all_of(
+          m_momentum_threshold.begin(),
+          m_momentum_threshold.end(),
+          [](const auto& el){return (el >= 0._rt);}),
+        "particle_thermalizer: 'momentum_threshold' must be non-negative");
+
   pp.get("theta", m_theta);
-  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+  WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
       m_theta >= 0._rt,
       "particle_thermalizer: 'theta' must be non-negative");
 
@@ -143,7 +162,9 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc) const
             const amrex::Real loend = thermalizer_region.lo(dir);
             const amrex::Real hiend = thermalizer_region.hi(dir);
 
-            const amrex::Real u_threshold = m_momentum_threshold;
+            const amrex::Real ux_threshold = m_momentum_threshold[0];
+            const amrex::Real uy_threshold = m_momentum_threshold[1];
+            const amrex::Real uz_threshold = m_momentum_threshold[2];
             const amrex::Real theta = m_theta;
 
             // Parallel loop over particles in the tile.
@@ -182,13 +203,13 @@ void ParticleThermalizer::applyThermalizer(WarpXParticleContainer &pc) const
                 } else {
                     // assign new momentum from thermal distribution
                     const amrex::Real vave = std::sqrt(theta);
-                    if (amrex::Math::abs(ux[ip]) > u_threshold*PhysConst::c) {
+                    if (amrex::Math::abs(ux[ip]) > ux_threshold*PhysConst::c) {
                         ux[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, ux[ip]);
                     }
-                    if (amrex::Math::abs(uy[ip]) > u_threshold*PhysConst::c) {
+                    if (amrex::Math::abs(uy[ip]) > uy_threshold*PhysConst::c) {
                         uy[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, uy[ip]);
                     }
-                    if (amrex::Math::abs(uz[ip]) > u_threshold*PhysConst::c) {
+                    if (amrex::Math::abs(uz[ip]) > uz_threshold*PhysConst::c) {
                         uz[ip] = std::copysign(amrex::RandomNormal(0._rt, vave, engine)*PhysConst::c, uz[ip]);
                     }
                 }

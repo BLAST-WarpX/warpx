@@ -9,6 +9,8 @@
 
 #include <string>
 #include <vector>
+
+#include <AMReX_Array.H>
 #include <AMReX_REAL.H>
 
 // Forward declaration to avoid heavy includes in the header
@@ -45,8 +47,8 @@ private:
     amrex::Real m_start;
     amrex::Real m_end;
 
-    // The momentum threshold above which particles are thermalized in normalized units (i.e. u = gamma*beta)
-    amrex::Real m_momentum_threshold;
+    // The threshold for each momentum component above which particles are thermalized in normalized units (i.e. u = gamma*beta)
+    amrex::Array<amrex::Real, 3> m_momentum_threshold;
 
     // dimensionless temperature theta = kB*T/(m*c^2) used to sample thermal momentum distribution
     amrex::Real m_theta;

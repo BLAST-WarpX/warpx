@@ -1023,7 +1023,8 @@ method used is similar to that of `Miller et al. (Phys. Plasmas 28, 112702 (2021
 The user specifies a region in which particles will be thermalized, a normal direction, a temperature, and a
 momentum threshold. Inside the thermalizing region, the probability that a particle will be affected increases
 from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta thermalized
-using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold.
+using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold
+(different thresholds can be set for each direction).
 The parameters affecting this region are as follows:
 
 .. pp:param:: particle_thermalizer.normal
@@ -1052,10 +1053,11 @@ The parameters affecting this region are as follows:
     This parameter is required if the thermalizer is enabled.
 
 .. pp:param:: particle_thermalizer.momentum_threshold
-    :type: ``float``
+    :type: ``float`` or ``3 floats``
 
     Momentum threshold used by the thermalizer. In each direction, if a particle's normalized momentum component (e.g. :math:`\gamma \beta_x`) is above this threshold, that component will be thermalized.
-    This parameter is required if the thermalizer is enabled.
+    This parameter is required if the thermalizer is enabled. One or three values can be provided. In the former case, the same threshold is applied in all directions. In the latter, different thresholds
+    are applied to ``x``, ``y``, and ``z`` directions.
 
 .. pp:param:: particle_thermalizer.theta
     :type: ``float``
