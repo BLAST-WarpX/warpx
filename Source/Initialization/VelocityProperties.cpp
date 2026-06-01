@@ -16,14 +16,14 @@
 * Construct VelocityProperties from the passed particle source parameters.
 * Parse the momentum distribution type and initialize the corresponding
 * velocity parameters: `ux_mean`, `uy_mean`, and `uz_mean` for
-* `maxwellian` distributions, or `bulk_vel_dir` and `beta` otherwise.
+* `maxwellian` distributions, or `bulk_vel_dir` and `beta` for `maxwell_juttner`.
 */
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
-    if (mom_dist_s != "maxwellian") {
+    if (mom_dist_s == "maxwell_juttner") {
         // Set defaults
         std::string vel_dist_s = "constant";
         std::string vel_dir_s = "x";
@@ -76,7 +76,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             WARPX_ABORT_WITH_MESSAGE(
                 "Velocity distribution type '" + vel_dist_s + "' not recognized.");
         }
-    } else {
+    } else if (mom_dist_s == "maxwellian") {
         std::string u_mean_dist_s = "constant";
         utils::parser::query(pp, source_name, "maxwellian_u_mean_distribution_type", u_mean_dist_s);
         if (u_mean_dist_s == "constant") {
@@ -116,5 +116,10 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             string = stringstream.str();
             WARPX_ABORT_WITH_MESSAGE(string);
         }
+    }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "VelocityProperties: unexpected momentum_distribution_type '" + mom_dist_s +
+            "' (expected 'maxwellian' or 'maxwell_juttner').");
     }
 }

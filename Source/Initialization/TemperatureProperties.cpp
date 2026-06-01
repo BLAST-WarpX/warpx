@@ -15,14 +15,14 @@
 /** Construct TemperatureProperties from the passed particle source parameters.
  *  Parse the momentum distribution type and initialize the corresponding
  *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
- *  for `maxwellian` distribution, and `theta` otherwise.
+ *  for `maxwellian` distribution, and `theta` for `maxwell_juttner`.
  */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
-    if (mom_dist_s != "maxwellian") {
+    if (mom_dist_s == "maxwell_juttner") {
         // Set defaults
         amrex::Real theta = 0; // quiet GCC warning maybe-uninitialized
         std::string temp_dist_s = "constant";
@@ -39,7 +39,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 " is less than zero, which is not allowed");
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                mom_dist_s != "maxwell_juttner" ||
                 theta >= 0.1,
                 "Temperature parameter theta = " +
                 std::to_string(theta) +
@@ -63,7 +62,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             WARPX_ABORT_WITH_MESSAGE(ss.str());
         }
     }
-    else {
+    else if (mom_dist_s == "maxwellian") {
         // ``maxwellian`` distribution uses ``u_std_*``
         std::string u_std_dist_s = "constant";
         utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
@@ -93,5 +92,10 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                << "' not recognized.";
             WARPX_ABORT_WITH_MESSAGE(ss.str());
         }
+    }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "TemperatureProperties: unexpected momentum_distribution_type '" + mom_dist_s +
+            "' (expected 'maxwellian' or 'maxwell_juttner').");
     }
 }
