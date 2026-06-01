@@ -34,8 +34,4 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) n
         m_uy_std_parser = temp.m_ptr_uy_std_parser->compile<3>();
         m_uz_std_parser = temp.m_ptr_uz_std_parser->compile<3>();
     }
-    else if (m_type == TempParserScalarTeV) {
-        m_species_mass = temp.m_species_mass;
-        m_T_eV_parser = temp.m_ptr_T_eV_parser->compile<3>();
-    }
 }

@@ -603,11 +603,6 @@ class DensityDistributionBase(object):
         if hasattr(self, "momentum_spread_expressions") and np.any(
             np.not_equal(self.momentum_spread_expressions, None)
         ):
-            if getattr(self, "warpx_maxwellian_T_eV", None) is not None:
-                raise Exception(
-                    "warpx_maxwellian_T_eV is mutually exclusive with "
-                    "warpx_momentum_spread_expressions"
-                )
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "maxwellian"
             )
@@ -624,16 +619,6 @@ class DensityDistributionBase(object):
                 "std",
                 [0.0, 0.0, 0.0],
             )
-        elif getattr(self, "warpx_maxwellian_T_eV", None) is not None:
-            if np.any(np.not_equal(self.rms_velocity, 0.0)):
-                raise Exception(
-                    "warpx_maxwellian_T_eV is mutually exclusive with non-zero rms_velocity"
-                )
-            species.add_new_group_attr(
-                source_name, "momentum_distribution_type", "maxwellian"
-            )
-            self.setup_maxwellian_mean_attrs(species, source_name)
-            self.setup_maxwellian_T_eV_spread(species, source_name)
         elif hasattr(self, "momentum_expressions") and np.any(
             np.not_equal(self.momentum_expressions, None)
         ):
@@ -687,44 +672,6 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(source_name, "density_min", self.density_min)
         if hasattr(self, "density_max"):
             species.add_new_group_attr(source_name, "density_max", self.density_max)
-
-    def setup_maxwellian_T_eV_spread(self, species, source_name):
-        T = self.warpx_maxwellian_T_eV
-        if isinstance(T, str):
-            if not T.strip():
-                raise ValueError(
-                    "warpx_maxwellian_T_eV string must be a non-empty expression (eV)."
-                )
-            expression = pywarpx.my_constants.mangle_expression(
-                T, self.mangle_dict or {}
-            )
-            species.add_new_group_attr(
-                source_name,
-                "maxwellian_T_eV_distribution_type",
-                "parser",
-            )
-            species.add_new_group_attr(
-                source_name,
-                "T_eV_function(x,y,z)",
-                expression,
-            )
-            return
-
-        try:
-            T_eV = float(T)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "warpx_maxwellian_T_eV must be a number (eV) or a string expression "
-                "for T_eV_function(x,y,z)."
-            ) from exc
-        if T_eV < 0:
-            raise ValueError("warpx_maxwellian_T_eV must be non-negative (eV).")
-        species.add_new_group_attr(
-            source_name,
-            "maxwellian_T_eV_distribution_type",
-            "constant",
-        )
-        species.add_new_group_attr(source_name, "T_eV", T_eV)
 
     def setup_maxwellian_mean_attrs(self, species, source_name):
         if hasattr(self, "momentum_expressions") and np.any(
@@ -807,16 +754,6 @@ class DensityDistributionBase(object):
 class UniformDistribution(
     picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
-    """
-    Parameters
-    ----------
-    warpx_maxwellian_T_eV: float or str, optional
-        Isotropic spread in eV
-    """
-
-    def init(self, kw):
-        self.warpx_maxwellian_T_eV = kw.pop("warpx_maxwellian_T_eV", None)
-
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -958,9 +895,6 @@ class AnalyticDistribution(
         Expressions should be in terms of the position, written as 'x', 'y', and 'z'.
         Parameters can be used in the expression with the values given as keyword arguments.
         For any axis not supplied (set to None), zero will be used.
-
-    warpx_maxwellian_T_eV: float or str
-        Isotropic spread in eV.
     """
 
     def init(self, kw):
@@ -969,7 +903,6 @@ class AnalyticDistribution(
         self.momentum_spread_expressions = kw.pop(
             "warpx_momentum_spread_expressions", [None, None, None]
         )
-        self.warpx_maxwellian_T_eV = kw.pop("warpx_maxwellian_T_eV", None)
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name

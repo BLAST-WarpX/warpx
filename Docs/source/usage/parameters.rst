@@ -1748,17 +1748,6 @@ Particle initialization
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
 
-      * ``<species_name>.maxwellian_T_eV_distribution_type`` (`string`) is an alternative (mutually exclusive) to
-        ``maxwellian_u_std_distribution_type``. This sets isotropic thermal
-        spread from a temperature in electron-volts, using species mass from the input:
-
-        .. math:: u_\mathrm{std} = \sqrt{\frac{T_\mathrm{eV}\, q_e}{m\, c^2}}
-
-        The same :math:`u_\mathrm{std}` is used for all three thermal momentum spread components.
-
-        * If ``constant``, the following is required ``<species_name>.T_eV``.
-        * If ``parser``, the following is required ``<species_name>.T_eV_function(x,y,z)``.
-
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
     * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
@@ -1796,8 +1785,7 @@ Particle initialization
     :optional:
 
     Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` or
-    ``maxwellian_T_eV_distribution_type*`` above).
+    ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` above).
     See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than
     zero are not allowed.
 

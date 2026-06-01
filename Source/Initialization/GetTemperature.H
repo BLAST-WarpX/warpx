@@ -11,10 +11,6 @@
 
 #include "TemperatureProperties.H"
 
-#include "Utils/WarpXConst.H"
-
-#include <cmath>
-
 /**
  * \brief Get temperature at a point on the grid
  *
@@ -80,9 +76,6 @@ struct GetTemperatureVector
 
     amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
-
-    amrex::Real m_species_mass{0};
-    amrex::ParserExecutor<3> m_T_eV_parser;
     /**
      * \brief Construct the functor with information provided by temp
      *
@@ -101,7 +94,6 @@ struct GetTemperatureVector
      *\return value of temperature at (x,y,z).
      *        m_ux_std, m_uy_std, m_uz_std if m_type is TempConstantVector
      *        m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z) if m_type is TempParserFunctionVector
-     *        isotropic u_std from T_eV_function(x,y,z) in eV if m_type is TempParserScalarTeV
      */
     AMREX_GPU_HOST_DEVICE
     amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
@@ -115,13 +107,6 @@ struct GetTemperatureVector
             case (TempParserFunctionVector):
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
-            }
-            case (TempParserScalarTeV):
-            {
-                const amrex::Real T_eV = m_T_eV_parser(x, y, z);
-                const amrex::Real u_std = std::sqrt(
-                    T_eV * PhysConst::q_e / (m_species_mass * PhysConst::c * PhysConst::c));
-                return amrex::XDim3{u_std, u_std, u_std};
             }
             default:
             {
