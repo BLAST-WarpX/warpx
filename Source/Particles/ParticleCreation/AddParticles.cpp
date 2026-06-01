@@ -1491,6 +1491,10 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     pos.y = 0.0_rt;
                     pos.z = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];
 #endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    // r.y needs to be set here since it is used below to calculate theta
+                    r.y = amrex::Random(engine);
+#endif
                 } else
 #endif
                 {
