@@ -209,6 +209,20 @@ public:
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
 
+    /**
+     * \brief Advance the electron pressure by one PIC step combining adiabatic
+     * compression and drag-dissipation heating:
+     *     Pe^{n+1} = Pe^n * (rho^{n+1}/rho^n)^gamma
+     *                + (gamma-1) * W_dot_drag * dt
+     * The heating field hybrid_drag_heating_fp is consumed (read then zeroed)
+     * by this call. Used only when m_use_drag_heating is true; otherwise the
+     * pure-rho closure FillElectronPressureMF is used as before.
+     *
+     * \param[in] dt PIC time step
+     */
+    void UpdateElectronPressure (amrex::Real dt) const;
+    void UpdateElectronPressure (int lev, amrex::Real dt) const;
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
      *  count guess when RKF45 adaptive stepping is active) */
@@ -235,6 +249,12 @@ public:
     amrex::Real m_n0_ref = 1.0;
     /** Electron pressure scaling exponent */
     amrex::Real m_gamma = 5.0/3.0;
+
+    /** When true, electron pressure is evolved as a state variable that
+     * combines adiabatic compression with drag-dissipation heating from the
+     * HybridResistiveDrag operator. When false (default), Pe is recomputed
+     * from rho each step using the algebraic adiabatic closure. */
+    bool m_use_drag_heating = false;
 
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;

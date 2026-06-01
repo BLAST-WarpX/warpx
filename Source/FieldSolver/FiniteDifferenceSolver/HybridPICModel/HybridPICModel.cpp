@@ -72,6 +72,13 @@ void HybridPICModel::ReadParameters ()
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
+    // Opt-in to drag-dissipation heating of the electron pressure. When
+    // enabled, Pe becomes a state variable that combines adiabatic
+    // compression with the per-cell heating accumulated by any
+    // hybrid_resistive_drag collision operator. Default off preserves the
+    // pure-rho adiabatic closure for backward compatibility.
+    pp_hybrid.query("use_drag_heating", m_use_drag_heating);
+
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
 
@@ -115,9 +122,19 @@ void HybridPICModel::AllocateLevelMFs (
 {
     using ablastr::fields::Direction;
 
-    // The "hybrid_electron_pressure_fp" multifab stores the electron pressure calculated
-    // from the specified equation of state.
+    // The "hybrid_electron_pressure_fp" multifab stores the electron pressure
+    // calculated from the specified equation of state (or, when use_drag_heating
+    // is on, evolved as a state variable that includes drag-dissipation heating
+    // from the HybridResistiveDrag operator).
     fields.alloc_init(FieldType::hybrid_electron_pressure_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+
+    // The "hybrid_drag_heating_fp" multifab stores the per-cell drag-dissipation
+    // power density (W/m^3) accumulated by the HybridResistiveDrag operator
+    // over one PIC step. Only consumed when m_use_drag_heating is true.
+    // Allocated unconditionally so the drag operator can write to it.
+    fields.alloc_init(FieldType::hybrid_drag_heating_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
@@ -659,6 +676,68 @@ void HybridPICModel::FillElectronPressureMF (
             );
         });
     }
+}
+
+void HybridPICModel::UpdateElectronPressure (amrex::Real const dt) const
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        UpdateElectronPressure(lev, dt);
+    }
+}
+
+void HybridPICModel::UpdateElectronPressure (const int lev, amrex::Real const dt) const
+{
+    // Combined adiabatic-compression + drag-dissipation heating step. Must
+    // be called once per PIC step from HybridPICEvolveFields, *after*
+    // HybridPICDepositRhoAndJ has populated rho_fp with rho^{n+1} while
+    // hybrid_rho_fp_temp still holds rho^{n} from the previous step's copy.
+    //
+    //   Pe^{n+1}(x) = Pe^{n}(x) * (rho^{n+1}/rho^{n})^gamma
+    //               + (gamma - 1) * W_dot_drag(x) * dt
+    //
+    // The first term is the adiabatic part: it telescopes exactly to the
+    // pure-rho closure used by FillElectronPressureMF when W_dot_drag = 0
+    // (i.e. when no drag is registered or use_drag_heating is off).
+    //
+    // The heating field is consumed: zeroed at the end of this call so the
+    // next step's drag accumulation starts from zero.
+    ABLASTR_PROFILE("WarpX::UpdateElectronPressure()");
+
+    auto& warpx = WarpX::GetInstance();
+    amrex::MultiFab const & rho_new = *warpx.m_fields.get(FieldType::rho_fp, lev);
+    amrex::MultiFab const & rho_old = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
+    amrex::MultiFab       & heating = *warpx.m_fields.get(FieldType::hybrid_drag_heating_fp, lev);
+    amrex::MultiFab       & Pe      = *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+
+    auto const gamma          = m_gamma;
+    auto const gamma_minus_1  = m_gamma - 1.0_rt;
+    auto const rho_floor      = m_n_floor * PhysConst::q_e;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(Pe, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    {
+        Array4<Real>       const & Pe_arr = Pe.array(mfi);
+        Array4<Real const> const & rn_arr = rho_new.const_array(mfi);
+        Array4<Real const> const & ro_arr = rho_old.const_array(mfi);
+        Array4<Real const> const & W_arr  = heating.const_array(mfi);
+
+        Box const& tbox = mfi.tilebox();
+        amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Real const rn = std::max(rn_arr(i,j,k), rho_floor);
+            Real const ro = std::max(ro_arr(i,j,k), rho_floor);
+            Real const ratio = rn / ro;
+            Pe_arr(i,j,k) = Pe_arr(i,j,k) * std::pow(ratio, gamma)
+                          + gamma_minus_1 * W_arr(i,j,k) * dt;
+        });
+    }
+
+    // Consume the heating accumulator: zero it so the next step starts fresh.
+    heating.setVal(0.0_rt);
 }
 
 void HybridPICModel::BfieldEvolve (

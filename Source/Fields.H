@@ -46,6 +46,7 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
+        hybrid_drag_heating_fp,      /**< Used with Ohm's law solver. Stores per-cell drag-dissipation power density W_dot accumulated by the HybridResistiveDrag collision operator over one PIC step; integrated into the electron pressure each step when use_drag_heating is on. */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */

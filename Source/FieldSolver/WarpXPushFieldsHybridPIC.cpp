@@ -60,6 +60,15 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
+    // If drag-dissipation heating is enabled, advance Pe by one PIC step now,
+    // while rho_fp = rho^{n+1} and hybrid_rho_fp_temp still holds rho^{n} from
+    // the previous step's copy. Pure-adiabatic case (no drag, no heating)
+    // telescopes to the same answer as the legacy CalculateElectronPressure
+    // path; with heating, the (gamma-1) W_dot_drag dt term is added in.
+    if (m_hybrid_pic_model->m_use_drag_heating) {
+        m_hybrid_pic_model->UpdateElectronPressure(dt[0]);
+    }
+
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
@@ -160,8 +169,13 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // Calculate the electron pressure at t=n+1. When drag-dissipation heating
+    // is enabled, Pe is a state variable already advanced earlier in this
+    // function by UpdateElectronPressure() (right after the deposit), so the
+    // legacy pure-rho closure must NOT overwrite it here.
+    if (!m_hybrid_pic_model->m_use_drag_heating) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(
@@ -327,6 +341,13 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // This is not a restart, so the rho_fp and current_fp multifabs are
         // still empty.
         HybridPICDepositRhoAndJ();
+
+        // Seed the electron pressure state variable from the adiabatic closure
+        // using the freshly deposited rho. When use_drag_heating is off this
+        // is also recomputed every step inside HybridPICEvolveFields and is
+        // harmless. When on, this is the initial condition for the state
+        // variable Pe that will subsequently be advanced by UpdateElectronPressure.
+        m_hybrid_pic_model->CalculateElectronPressure();
 
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {
