@@ -612,12 +612,12 @@ class DensityDistributionBase(object):
                 "maxwellian_u_std_distribution_type",
                 "parser",
             )
-            self.setup_maxwellian_parser_functions(
+            self.setup_momentum_parser_functions(
                 species,
                 source_name,
                 self.momentum_spread_expressions,
-                "std",
                 [0.0, 0.0, 0.0],
+                "u{dir}_std_function(x,y,z)",
             )
         elif hasattr(self, "momentum_expressions") and np.any(
             np.not_equal(self.momentum_expressions, None)
@@ -625,12 +625,12 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "parse_momentum_function"
             )
-            self.setup_parse_momentum_functions(
+            self.setup_momentum_parser_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
-                "",
                 self.directed_velocity,
+                "momentum_function_u{dir}(x,y,z)",
             )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
@@ -682,12 +682,12 @@ class DensityDistributionBase(object):
                 "maxwellian_u_mean_distribution_type",
                 "parser",
             )
-            self.setup_maxwellian_parser_functions(
+            self.setup_momentum_parser_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
-                "mean",
                 self.directed_velocity,
+                "u{dir}_mean_function(x,y,z)",
             )
         else:
             species.add_new_group_attr(
@@ -711,9 +711,16 @@ class DensityDistributionBase(object):
                 self.directed_velocity[2] / constants.c,
             )
 
-    def setup_parse_momentum_functions(
-        self, species, source_name, expressions, suffix, defaults
+    def setup_momentum_parser_functions(
+        self, species, source_name, expressions, defaults, attr_pattern
     ):
+        """Write per-component momentum parser expressions (divided by c) to the species.
+
+        ``attr_pattern`` is a format string with a ``{dir}`` placeholder for the
+        component, e.g. ``"momentum_function_u{dir}(x,y,z)"`` for the
+        ``parse_momentum_function`` distribution or ``"u{dir}_mean_function(x,y,z)"``
+        and ``"u{dir}_std_function(x,y,z)"`` for the ``maxwellian`` distribution.
+        """
         for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
             if expressions[idir] is not None:
                 expression = pywarpx.my_constants.mangle_expression(
@@ -723,30 +730,7 @@ class DensityDistributionBase(object):
                 expression = f"{defaults[idir]}"
             species.add_new_group_attr(
                 source_name,
-                f"momentum_function_u{sdir}{suffix}(x,y,z)",
-                f"({expression})/{constants.c}",
-            )
-
-    def setup_maxwellian_parser_functions(
-        self, species, source_name, expressions, role, defaults
-    ):
-        if role == "mean":
-            infix = "mean"
-        elif role == "std":
-            infix = "std"
-        else:
-            raise ValueError("role must be 'mean' or 'std'")
-
-        for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
-            if expressions[idir] is not None:
-                expression = pywarpx.my_constants.mangle_expression(
-                    expressions[idir], self.mangle_dict
-                )
-            else:
-                expression = f"{defaults[idir]}"
-            species.add_new_group_attr(
-                source_name,
-                f"u{sdir}_{infix}_function(x,y,z)",
+                attr_pattern.format(dir=sdir),
                 f"({expression})/{constants.c}",
             )
 
