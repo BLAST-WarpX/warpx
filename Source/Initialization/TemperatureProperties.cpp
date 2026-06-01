@@ -10,8 +10,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
-#include <ablastr/warn_manager/WarnManager.H>
-
 #include <sstream>
 
 /** Construct TemperatureProperties from the passed particle source parameters.
@@ -74,19 +72,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
             utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
             utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
-
-            const amrex::Real vx = m_ux_std * m_ux_std;
-            const amrex::Real vy = m_uy_std * m_uy_std;
-            const amrex::Real vz = m_uz_std * m_uz_std;
-            if (vx > 0.01 || vy > 0.01 || vz > 0.01) {
-                ablastr::warn_manager::WMRecordWarning(
-                    "Temperature",
-                    "Maxwellian distribution has component-wise temperature variances exceeding 0.01: "
-                    "ux_std*ux_std = " + std::to_string(vx) +
-                    ", uy_std*uy_std = " + std::to_string(vy) +
-                    ", uz_std*uz_std = " + std::to_string(vz)
-                );
-            }
             m_type = TempConstantVector;
         }
         else if (u_std_dist_s == "parser") {

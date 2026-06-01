@@ -1739,10 +1739,7 @@ Particle initialization
         * If ``constant``, the following are required: ``<species_name>.ux_std``,
           ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`, default ``0``).
           These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift
-          frame, i.e. the thermal spread per axis. If any of
-          :math:`u_{x,\mathrm{std}}^2`, :math:`u_{y,\mathrm{std}}^2`, or
-          :math:`u_{z,\mathrm{std}}^2` exceeds ``0.01``, ignored relativistic corrections can
-          exceed about 1% and WarpX may record a warning.
+          frame, i.e. the thermal spread per axis.
         * If ``parser``, the following are required:
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
