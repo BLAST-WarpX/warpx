@@ -606,11 +606,20 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "maxwellian"
             )
-            self.setup_maxwellian_mean_attrs(species, source_name)
+            # Mean drift: any axis left as None falls back to directed_velocity.
             species.add_new_group_attr(
+                source_name, "maxwellian_u_mean_distribution_type", "parser"
+            )
+            self.setup_momentum_parser_functions(
+                species,
                 source_name,
-                "maxwellian_u_std_distribution_type",
-                "parser",
+                self.momentum_expressions,
+                self.directed_velocity,
+                "u{dir}_mean_function(x,y,z)",
+            )
+            # Thermal spread: any axis left as None falls back to zero.
+            species.add_new_group_attr(
+                source_name, "maxwellian_u_std_distribution_type", "parser"
             )
             self.setup_momentum_parser_functions(
                 species,
@@ -672,44 +681,6 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(source_name, "density_min", self.density_min)
         if hasattr(self, "density_max"):
             species.add_new_group_attr(source_name, "density_max", self.density_max)
-
-    def setup_maxwellian_mean_attrs(self, species, source_name):
-        if hasattr(self, "momentum_expressions") and np.any(
-            np.not_equal(self.momentum_expressions, None)
-        ):
-            species.add_new_group_attr(
-                source_name,
-                "maxwellian_u_mean_distribution_type",
-                "parser",
-            )
-            self.setup_momentum_parser_functions(
-                species,
-                source_name,
-                self.momentum_expressions,
-                self.directed_velocity,
-                "u{dir}_mean_function(x,y,z)",
-            )
-        else:
-            species.add_new_group_attr(
-                source_name,
-                "maxwellian_u_mean_distribution_type",
-                "constant",
-            )
-            species.add_new_group_attr(
-                source_name,
-                "ux_mean",
-                self.directed_velocity[0] / constants.c,
-            )
-            species.add_new_group_attr(
-                source_name,
-                "uy_mean",
-                self.directed_velocity[1] / constants.c,
-            )
-            species.add_new_group_attr(
-                source_name,
-                "uz_mean",
-                self.directed_velocity[2] / constants.c,
-            )
 
     def setup_momentum_parser_functions(
         self, species, source_name, expressions, defaults, attr_pattern
