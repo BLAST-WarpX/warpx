@@ -610,7 +610,7 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name, "maxwellian_u_mean_distribution_type", "parser"
             )
-            self.setup_momentum_parser_functions(
+            self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
@@ -621,7 +621,7 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name, "maxwellian_u_std_distribution_type", "parser"
             )
-            self.setup_momentum_parser_functions(
+            self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_spread_expressions,
@@ -634,7 +634,7 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "parse_momentum_function"
             )
-            self.setup_momentum_parser_functions(
+            self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
@@ -682,7 +682,7 @@ class DensityDistributionBase(object):
         if hasattr(self, "density_max"):
             species.add_new_group_attr(source_name, "density_max", self.density_max)
 
-    def setup_momentum_parser_functions(
+    def setup_parse_momentum_functions(
         self, species, source_name, expressions, defaults, attr_pattern
     ):
         """Write per-component momentum parser expressions (divided by c) to the species.
