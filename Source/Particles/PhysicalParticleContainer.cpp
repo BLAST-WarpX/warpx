@@ -431,9 +431,6 @@ PhysicalParticleContainer::BackwardCompatibility ()
             "Please use momentum_distribution_type = parse_momentum_function instead.");
     }
 
-    // The Maxwell-Juttner bulk drift is now specified with the same vector syntax as the
-    // Maxwellian distribution (ux_mean/uy_mean/uz_mean), replacing the old scalar beta and
-    // bulk_vel_dir parameters.
     const std::string juttner_drift_msg =
         "The Maxwell-Juttner bulk drift is now set with the normalized momentum "
         "<species>.ux_mean/uy_mean/uz_mean (gamma*v/c), optionally selecting between a "
