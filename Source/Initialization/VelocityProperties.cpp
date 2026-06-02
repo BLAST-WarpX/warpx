@@ -11,6 +11,8 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
+#include <AMReX_Math.H>
+
 #include <cmath>
 /**
 * Construct VelocityProperties from the passed particle source parameters.
@@ -20,7 +22,7 @@
 */
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
-    using amrex::Math;
+    using namespace amrex;
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
@@ -85,7 +87,8 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
 
-            amrex::Real const u2 = powi<2>(m_ux_mean) powi<2>(m_uy_mean) + powi<2>(m_uz_mean);
+            amrex::Real const u2 =
+                Math::powi<2>(m_ux_mean) + Math::powi<2>(m_uy_mean) + Math::powi<2>(m_uz_mean);
             amrex::Real const velocity_magnitude = std::sqrt(u2/(1.0_rt+u2));
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
