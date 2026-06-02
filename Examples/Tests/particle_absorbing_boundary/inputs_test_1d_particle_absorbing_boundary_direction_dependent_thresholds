@@ -11,9 +11,10 @@ my_constants.beta = 0.8
 hydrogen.momentum_distribution_type = "constant"
 hydrogen.uy                         = -beta/sqrt(1-beta*beta)
 
-electrons.beta_distribution_type     = "constant"
-electrons.beta                       = beta
-electrons.bulk_vel_dir               = -y
+electrons.maxwellian_u_mean_distribution_type = "constant"
+electrons.ux_mean = 0
+electrons.uy_mean = -1.33
+electrons.uz_mean = 0
 
 # the following line replaces `particle_thermalizer.momentum_threshold = 0.1`
 particle_thermalizer.momentum_threshold = 0.1 10.0 0.1
