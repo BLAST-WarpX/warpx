@@ -69,9 +69,9 @@ struct VelocityProperties
     std::string m_read_ux_mean_path;
     std::string m_read_uy_mean_path;
     std::string m_read_uz_mean_path;
-    std::string m_ux_mean_openpmd_mesh{"ux_mean"};
-    std::string m_uy_mean_openpmd_mesh{"uy_mean"};
-    std::string m_uz_mean_openpmd_mesh{"uz_mean"};
+    std::string m_ux_mean_openpmd_mesh{"u_mean"};
+    std::string m_uy_mean_openpmd_mesh{"u_mean"};
+    std::string m_uz_mean_openpmd_mesh{"u_mean"};
     bool m_read_u_mean_distributed{true};
 
     amrex::Geometry m_geom;

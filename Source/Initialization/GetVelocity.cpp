@@ -80,11 +80,14 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
         // std::make_unique for exception safety; raw pointers are required because
         // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
         auto ux = std::make_unique<ExternalFieldReader>(
-            vel.m_read_ux_mean_path, vel.m_ux_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            vel.m_read_ux_mean_path, vel.m_ux_mean_openpmd_mesh, "x",
+            problo, pdx, dombox, distributed);
         auto uy = std::make_unique<ExternalFieldReader>(
-            vel.m_read_uy_mean_path, vel.m_uy_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            vel.m_read_uy_mean_path, vel.m_uy_mean_openpmd_mesh, "y",
+            problo, pdx, dombox, distributed);
         auto uz = std::make_unique<ExternalFieldReader>(
-            vel.m_read_uz_mean_path, vel.m_uz_mean_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            vel.m_read_uz_mean_path, vel.m_uz_mean_openpmd_mesh, "z",
+            problo, pdx, dombox, distributed);
         m_ux_mean_reader = ux.release();
         m_uy_mean_reader = uy.release();
         m_uz_mean_reader = uz.release();

@@ -1735,6 +1735,8 @@ Particle initialization
           The following are required: ``<species_name>.read_ux_mean_from_path``,
           ``<species_name>.read_uy_mean_from_path``,
           ``<species_name>.read_uz_mean_from_path`` (each an openPMD file path).
+          By default, the files are read as vector mesh ``u_mean`` with components ``x``,
+          ``y`` and ``z``.
           Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to
           load openPMD data in parallel, in the same way density is loaded from a file via
           ``read_density_distributed``.
@@ -1754,11 +1756,13 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
-        * If ``read_from_file``, the spatial bulk drift is read from openPMD file
+        * If ``read_from_file``, the spatial thermal spread is read from openPMD file
           (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``).
           The following are required: ``<species_name>.read_ux_std_from_path``,
           ``<species_name>.read_uy_std_from_path``,
           ``<species_name>.read_uz_std_from_path`` (each an openPMD file path).
+          By default, the files are read as vector mesh ``u_std`` with components ``x``,
+          ``y`` and ``z``.
           Optional: ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) to
           load openPMD data in parallel, in the same way density is loaded from a file via
           ``read_density_distributed``.

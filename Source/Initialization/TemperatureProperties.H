@@ -67,9 +67,9 @@ struct TemperatureProperties
     std::string m_read_ux_std_path;
     std::string m_read_uy_std_path;
     std::string m_read_uz_std_path;
-    std::string m_ux_std_openpmd_mesh{"ux_std"};
-    std::string m_uy_std_openpmd_mesh{"uy_std"};
-    std::string m_uz_std_openpmd_mesh{"uz_std"};
+    std::string m_ux_std_openpmd_mesh{"u_std"};
+    std::string m_uy_std_openpmd_mesh{"u_std"};
+    std::string m_uz_std_openpmd_mesh{"u_std"};
     bool m_read_u_std_distributed{true};
 
     amrex::Geometry m_geom;

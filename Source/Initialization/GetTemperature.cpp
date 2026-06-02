@@ -80,11 +80,14 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp)
         // std::make_unique for exception safety; raw pointers are required because
         // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
         auto ux = std::make_unique<ExternalFieldReader>(
-            temp.m_read_ux_std_path, temp.m_ux_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            temp.m_read_ux_std_path, temp.m_ux_std_openpmd_mesh, "x",
+            problo, pdx, dombox, distributed);
         auto uy = std::make_unique<ExternalFieldReader>(
-            temp.m_read_uy_std_path, temp.m_uy_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            temp.m_read_uy_std_path, temp.m_uy_std_openpmd_mesh, "y",
+            problo, pdx, dombox, distributed);
         auto uz = std::make_unique<ExternalFieldReader>(
-            temp.m_read_uz_std_path, temp.m_uz_std_openpmd_mesh, "", problo, pdx, dombox, distributed);
+            temp.m_read_uz_std_path, temp.m_uz_std_openpmd_mesh, "z",
+            problo, pdx, dombox, distributed);
         m_ux_std_reader = ux.release();
         m_uy_std_reader = uy.release();
         m_uz_std_reader = uz.release();
