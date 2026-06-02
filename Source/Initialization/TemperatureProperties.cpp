@@ -12,6 +12,11 @@
 
 #include <sstream>
 
+/** Construct TemperatureProperties from the passed particle source parameters.
+ *  Parse the momentum distribution type and initialize the corresponding
+ *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
+ *  for `maxwellian` distribution, and `theta` for `maxwell_juttner`.
+ */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
                                                 amrex::Geometry const& geom)
     : m_geom(geom)
