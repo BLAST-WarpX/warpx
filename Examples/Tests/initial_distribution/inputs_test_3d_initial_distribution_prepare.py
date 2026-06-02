@@ -51,7 +51,7 @@ def write_vector_mesh_file(filename, mesh_name, components):
 
 u_std_val = 3.1622776601683795e-05
 write_vector_mesh_file(
-    "new-example-u-std.h5",
+    "example-u-std.h5",
     "u_std",
     {
         "x": np.full_like(x, u_std_val, dtype=np.float64),
@@ -61,7 +61,7 @@ write_vector_mesh_file(
 )
 
 write_vector_mesh_file(
-    "new-example-u-mean.h5",
+    "example-u-mean.h5",
     "u_mean",
     {
         "x": np.zeros_like(x, dtype=np.float64),
