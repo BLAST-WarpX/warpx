@@ -270,8 +270,7 @@ struct InjectorMomentumJuttner
         // The bulk drift is specified as the normalized momentum u_mean = gamma*v/c.
         // Derive the corresponding bulk velocity beta = v/c, the bulk Lorentz factor
         // gamma_bulk = 1/sqrt(1-beta^2) = sqrt(1+|u_mean|^2), and the unit boost
-        // direction n = u_mean/|u_mean|. Since beta = |u_mean|/gamma_bulk < 1 for any
-        // finite u_mean, no extra check on |beta|<1 is needed.
+        // direction n = u_mean/|u_mean|.
         const amrex::XDim3 u_mean = velocity(x,y,z);
         amrex::Real const umean_mag = std::sqrt(u_mean.x*u_mean.x + u_mean.y*u_mean.y + u_mean.z*u_mean.z);
         amrex::Real const gamma_bulk = std::sqrt(1._rt + umean_mag*umean_mag);
