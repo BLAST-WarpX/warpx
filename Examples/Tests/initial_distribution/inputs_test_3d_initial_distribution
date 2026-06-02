@@ -401,3 +401,4 @@ bmmntr.species                           = beam
 diagnostics.diags_names = diag1
 diag1.intervals = 1000
 diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz T_maxwell_juttner

@@ -18,9 +18,12 @@
 # 9 denotes gaussian_parser distribution w/ spatially-varying mean and thermal velocity
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
+import sys
+
 import numpy as np
 import scipy.constants as scc
 import scipy.special as scs
+import yt
 from read_raw_data import read_reduced_diags, read_reduced_diags_histogram
 
 # print tolerance
@@ -118,6 +121,21 @@ f3_error = (
 print("Maxwell-Juttner distribution difference:", f3_error)
 
 assert f3_error < tolerance
+
+# check temperature diagnostic
+pltdir = sys.argv[1]
+ds = yt.load(pltdir)
+data = ds.covering_grid(
+    level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
+)
+
+Te_maxwell_juttner = data["boxlib", "T_maxwell_juttner"].value
+Te_analytic = theta * scc.m_e * scc.c**2 / scc.e
+Te_error_max = (np.abs(Te_maxwell_juttner - Te_analytic) / Te_analytic).max()
+
+print(f"Maxwell-Juttner temperature diagnostic error: {Te_error_max}")
+
+assert Te_error_max < 0.1
 
 # ==============
 # gaussian beam
