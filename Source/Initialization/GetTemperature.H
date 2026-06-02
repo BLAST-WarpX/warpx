@@ -69,4 +69,51 @@ struct GetTemperature
         }
     }
 };
+struct GetTemperatureVector
+{
+    /* Type of temperature initialization */
+    TemperatureInitType m_type;
+
+    amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
+    amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
+    /**
+     * \brief Construct the functor with information provided by temp
+     *
+     * \param[in] temp: const reference to the TemperatureProperties object that will be used to
+     * populate the functor
+     */
+    explicit GetTemperatureVector (TemperatureProperties const& temp) noexcept;
+
+    /**
+     * \brief Functor call. Returns the value of temperature at the location (x,y,z)
+     *
+     * \param[in] x: x-coordinate of given location
+     * \param[in] y: y-coordinate of given location
+     * \param[in] z: z-cooridnate of given location
+     *
+     *\return value of temperature at (x,y,z).
+     *        m_ux_std, m_uy_std, m_uz_std if m_type is TempConstantVector
+     *        m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z) if m_type is TempParserFunctionVector
+     */
+    AMREX_GPU_HOST_DEVICE
+    amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
+    {
+        switch (m_type)
+        {
+            case (TempConstantVector):
+            {
+                return amrex::XDim3{m_ux_std, m_uy_std, m_uz_std};
+            }
+            case (TempParserFunctionVector):
+            {
+                return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
+            }
+            default:
+            {
+                amrex::Abort("Get initial temperature: unknown type");
+                return amrex::XDim3{0.0, 0.0, 0.0};
+            }
+        }
+    }
+};
 #endif //WARPX_GET_TEMPERATURE_H_

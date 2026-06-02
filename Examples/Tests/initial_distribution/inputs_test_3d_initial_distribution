@@ -49,8 +49,15 @@ maxwell_boltzmann.injection_style            = "NRandomPerCell"
 maxwell_boltzmann.num_particles_per_cell     = 1000
 maxwell_boltzmann.profile                    = constant
 maxwell_boltzmann.density                    = 1.0e21
-maxwell_boltzmann.momentum_distribution_type = "maxwell_boltzmann"
-maxwell_boltzmann.theta                      = 9.99900009999001e-5
+maxwell_boltzmann.momentum_distribution_type = "maxwellian"
+maxwell_boltzmann.maxwellian_u_std_distribution_type= "constant"
+maxwell_boltzmann.ux_std = 0.00999950003749688
+maxwell_boltzmann.uy_std = 0.00999950003749688
+maxwell_boltzmann.uz_std = 0.00999950003749688
+maxwell_boltzmann.maxwellian_u_mean_distribution_type= "constant"
+maxwell_boltzmann.ux_mean = 0.0
+maxwell_boltzmann.uy_mean = 0.0
+maxwell_boltzmann.uz_mean = 0.0
 
 maxwell_juttner.charge                     = -q_e
 maxwell_juttner.mass                       = m_e
@@ -99,12 +106,15 @@ velocity_constant.injection_style            = "NRandomPerCell"
 velocity_constant.num_particles_per_cell     = 1000
 velocity_constant.profile                    = constant
 velocity_constant.density                    = 1.0e21
-velocity_constant.momentum_distribution_type = "maxwell_boltzmann"
-velocity_constant.theta_distribution_type    = "constant"
-velocity_constant.theta                      = 1e-9
-velocity_constant.beta_distribution_type     = "constant"
-velocity_constant.beta                       = 0.2
-velocity_constant.bulk_vel_dir               = -y
+velocity_constant.momentum_distribution_type = "maxwellian"
+velocity_constant.maxwellian_u_std_distribution_type= "constant"
+velocity_constant.ux_std = 3.1622776601683795e-05
+velocity_constant.uy_std = 3.1622776601683795e-05
+velocity_constant.uz_std = 3.1622776601683795e-05
+velocity_constant.maxwellian_u_mean_distribution_type = "constant"
+velocity_constant.ux_mean =0
+velocity_constant.uy_mean = -0.20412414523193154
+velocity_constant.uz_mean =0
 
 velocity_parser.charge                     = -q_e
 velocity_parser.mass                       = m_e
@@ -112,12 +122,15 @@ velocity_parser.injection_style            = "NRandomPerCell"
 velocity_parser.num_particles_per_cell     = 1000
 velocity_parser.profile                    = constant
 velocity_parser.density                    = 1.0e21
-velocity_parser.momentum_distribution_type = "maxwell_boltzmann"
-velocity_parser.theta_distribution_type    = "constant"
-velocity_parser.theta                      = 1e-9
-velocity_parser.beta_distribution_type     = "parser"
-velocity_parser.beta_function(x,y,z)       = "-0.2 + 0.4 * heaviside(z,0)"
-velocity_parser.bulk_vel_dir               = -y
+velocity_parser.momentum_distribution_type = "maxwellian"
+velocity_parser.maxwellian_u_std_distribution_type= "constant"
+velocity_parser.ux_std = 3.1622776601683795e-05
+velocity_parser.uy_std = 3.1622776601683795e-05
+velocity_parser.uz_std = 3.1622776601683795e-05
+velocity_parser.maxwellian_u_mean_distribution_type = "parser"
+velocity_parser.ux_mean_function(x,y,z) = "0"
+velocity_parser.uy_mean_function(x,y,z) ="(0.2 - 0.4 * heaviside(z,0)) / sqrt(1 - (0.2 - 0.4 * heaviside(z,0))^2)"
+velocity_parser.uz_mean_function(x,y,z)= "0"
 
 uniform.charge                     = q_e
 uniform.mass                       = m_e
@@ -139,24 +152,26 @@ gaussian_parser.injection_style            = "NRandomPerCell"
 gaussian_parser.num_particles_per_cell     = 1000
 gaussian_parser.profile                    = constant
 gaussian_parser.density                    = 1.0e21
-gaussian_parser.momentum_distribution_type = "gaussian_parse_momentum_function"
-gaussian_parser.momentum_function_ux_m(x,y,z) = 0.1*z
-gaussian_parser.momentum_function_uy_m(x,y,z) = 0.12*z
-gaussian_parser.momentum_function_uz_m(x,y,z) = 0.14*z
-gaussian_parser.momentum_function_ux_th(x,y,z) = 0.2*z
-gaussian_parser.momentum_function_uy_th(x,y,z) = 0.21*z
-gaussian_parser.momentum_function_uz_th(x,y,z) = 0.22*z
+gaussian_parser.momentum_distribution_type = "maxwellian"
+gaussian_parser.maxwellian_u_mean_distribution_type= "parser"
+gaussian_parser.ux_mean_function(x,y,z) = "0.1*z"
+gaussian_parser.uy_mean_function(x,y,z) = "0.12*z"
+gaussian_parser.uz_mean_function(x,y,z) = "0.14*z"
+gaussian_parser.maxwellian_u_std_distribution_type= "parser"
+gaussian_parser.ux_std_function(x,y,z) = "0.2*abs(z)"
+gaussian_parser.uy_std_function(x,y,z) = "0.21*abs(z)"
+gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 
 #################################
 ########## DIAGNOSTIC ###########
 #################################
 # 1 for gaussian
-# 2 for maxwell-boltzmann with constant temperature
+# 2 for maxwellian with constant temperature
 # 3 for maxwell-juttner with constant temperature
 # 4 for beam
 # 5 for maxwell-juttner with parser function temperature
-# 6 for maxwell-boltzmann with constant velocity
-# 7 for maxwell-boltzmann with parser velocity
+# 6 for maxwellian with constant velocity
+# 7 for maxwellian with parser velocity
 # 8 for cuboid in momentum space
 warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z
 

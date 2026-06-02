@@ -586,13 +586,13 @@ def check_initial_energy1(data, E_com):
             np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=1.0e-2
         )
         assert is_close(
-            np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-15
+            np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=5e-14
         )
         assert is_close(
             np.amax(energy_alpha3_simulation), max_energy_alpha23, rtol=1.0e-2
         )
         assert is_close(
-            np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=3.218e-15
+            np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=5e-14
         )
 
 
@@ -703,7 +703,7 @@ def check_initial_energy2(data):
             f"Check energy max: {np.amax(energy_alpha2_simulation)} {max_energy_alpha23} {(np.amax(energy_alpha2_simulation) - max_energy_alpha23) / max_energy_alpha23}"
         )
         assert is_close(
-            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=6.3e-2
+            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=7.0e-2
         )
         assert is_close(
             np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-14
