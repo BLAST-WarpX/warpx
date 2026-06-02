@@ -34,6 +34,8 @@ particles.rigid_injected_species = beam
 
 gaussian.charge                     = -q_e
 gaussian.mass                       = m_e
+gaussian.do_not_gather                = 1
+gaussian.do_not_deposit             = 1
 gaussian.injection_style            = "NRandomPerCell"
 gaussian.num_particles_per_cell     = 1000
 gaussian.profile                    = constant
@@ -45,6 +47,8 @@ gaussian.uz_th                      = 0.01
 
 maxwell_boltzmann.charge                     = -q_e
 maxwell_boltzmann.mass                       = m_e
+maxwell_boltzmann.do_not_gather                = 1
+maxwell_boltzmann.do_not_deposit             = 1
 maxwell_boltzmann.injection_style            = "NRandomPerCell"
 maxwell_boltzmann.num_particles_per_cell     = 1000
 maxwell_boltzmann.profile                    = constant
@@ -61,6 +65,8 @@ maxwell_boltzmann.uz_mean = 0.0
 
 maxwell_juttner.charge                     = -q_e
 maxwell_juttner.mass                       = m_e
+maxwell_juttner.do_not_gather                = 1
+maxwell_juttner.do_not_deposit             = 1
 maxwell_juttner.injection_style            = "NRandomPerCell"
 maxwell_juttner.num_particles_per_cell     = 1000
 maxwell_juttner.profile                    = constant
@@ -70,6 +76,8 @@ maxwell_juttner.theta                      = 1.0
 
 beam.charge                     = -q_e
 beam.mass                       = m_e
+beam.do_not_gather                = 1
+beam.do_not_deposit             = 1
 beam.injection_style            = "gaussian_beam"
 beam.x_rms                      = 0.25
 beam.y_rms                      = 0.25
@@ -92,6 +100,8 @@ beam.rigid_advance              = true
 
 maxwell_juttner_parser.charge                     = -q_e
 maxwell_juttner_parser.mass                       = m_e
+maxwell_juttner_parser.do_not_gather                = 1
+maxwell_juttner_parser.do_not_deposit             = 1
 maxwell_juttner_parser.injection_style            = "NRandomPerCell"
 maxwell_juttner_parser.num_particles_per_cell     = 1000
 maxwell_juttner_parser.profile                    = constant
@@ -102,6 +112,8 @@ maxwell_juttner_parser.theta_function(x,y,z)      = "1.0 + heaviside(x,0)"
 
 velocity_constant.charge                     = -q_e
 velocity_constant.mass                       = m_e
+velocity_constant.do_not_gather                = 1
+velocity_constant.do_not_deposit             = 1
 velocity_constant.injection_style            = "NRandomPerCell"
 velocity_constant.num_particles_per_cell     = 1000
 velocity_constant.profile                    = constant
@@ -118,6 +130,8 @@ velocity_constant.uz_mean =0
 
 velocity_parser.charge                     = -q_e
 velocity_parser.mass                       = m_e
+velocity_parser.do_not_gather                = 1
+velocity_parser.do_not_deposit             = 1
 velocity_parser.injection_style            = "NRandomPerCell"
 velocity_parser.num_particles_per_cell     = 1000
 velocity_parser.profile                    = constant
@@ -134,6 +148,8 @@ velocity_parser.uz_mean_function(x,y,z)= "0"
 
 uniform.charge                     = q_e
 uniform.mass                       = m_e
+uniform.do_not_gather                = 1
+uniform.do_not_deposit             = 1
 uniform.injection_style            = "NRandomPerCell"
 uniform.num_particles_per_cell     = 1000
 uniform.profile                    = constant
@@ -148,6 +164,8 @@ uniform.uz_max                     = 11.2
 
 gaussian_parser.charge                     = -q_e
 gaussian_parser.mass                       = m_e
+gaussian_parser.do_not_gather                = 1
+gaussian_parser.do_not_deposit             = 1
 gaussian_parser.injection_style            = "NRandomPerCell"
 gaussian_parser.num_particles_per_cell     = 1000
 gaussian_parser.profile                    = constant
