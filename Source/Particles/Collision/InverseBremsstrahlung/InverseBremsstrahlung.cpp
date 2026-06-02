@@ -126,7 +126,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 #if defined(WARPX_DIM_RZ)
     auto const lo = lbound(cbx);
     auto const hi = ubound(cbx);
-    int const nz = hi.y - lo.y + 1;
+    int const nr = hi.x - lo.x + 1;
 #endif
     amrex::XDim3 const xyzmin = WarpX::LowerCorner(cbx, lev, 0._rt);
     amrex::Real const rmin = xyzmin.x;
@@ -136,7 +136,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
 #if defined(WARPX_DIM_RZ)
         // Return the radial factor for the volume element, dV
-        int const ri = (i_cell - i_cell%nz)/nz;
+        int const ri = i_cell % nr;
         // rr is radius at the cell center
         amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
         return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
