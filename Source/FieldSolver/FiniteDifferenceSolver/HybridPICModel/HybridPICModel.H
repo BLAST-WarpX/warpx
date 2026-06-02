@@ -19,6 +19,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "Utils/Parser/IntervalsParser.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -189,11 +190,16 @@ public:
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
 
+    /** Check if rkf45 should be used */
+    [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
      *  count guess when RKF45 adaptive stepping is active) */
     int m_substeps = 10;
 
+    /** Intervals to use RKF45 integrator and to update substeps parameter */
+    utils::parser::IntervalsParser m_rkf45_intervals;
     /** Relative tolerance for RKF45 adaptive substep error control */
     amrex::Real m_substep_rtol = 1.e-4;
     /** Absolute tolerance for RKF45 adaptive substep error control */
@@ -204,8 +210,6 @@ public:
     amrex::Real m_substep_max_growth = 5.0;
     /** Maximum number of substep attempts (accepted + rejected) before abort */
     int m_max_substep_attempts = 250;
-    /** If true, use the adaptive RKF45 integrator; if false, use fixed-step RK4 */
-    bool m_use_rkf45 = false;
 
     bool m_holmstrom_vacuum_region = false;
 

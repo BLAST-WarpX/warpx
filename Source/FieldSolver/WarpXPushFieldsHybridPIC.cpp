@@ -36,7 +36,7 @@ void WarpX::HybridPICEvolveFields ()
 
     // Get substep parameters
     const int sub_steps = m_hybrid_pic_model->m_substeps;
-    const bool use_rkf45 = m_hybrid_pic_model->m_use_rkf45;
+    const bool use_rkf45 = m_hybrid_pic_model->DoRKF45(getistep(0));
 
     // Get flag to include external fields.
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;

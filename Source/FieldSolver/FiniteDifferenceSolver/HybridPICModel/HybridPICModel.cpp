@@ -45,12 +45,15 @@ void HybridPICModel::ReadParameters ()
         m_substeps += 1;
     }
 
+    // read rkf45 intervals
+    std::vector<std::string> rkf45_intervals_string_vec = {"0"};
+    pp_hybrid.queryarr("use_rkf45", rkf45_intervals_string_vec);
+    m_rkf45_intervals = utils::parser::IntervalsParser(rkf45_intervals_string_vec);
     utils::parser::queryWithParser(pp_hybrid, "substep_rtol", m_substep_rtol);
     utils::parser::queryWithParser(pp_hybrid, "substep_atol", m_substep_atol);
     utils::parser::queryWithParser(pp_hybrid, "substep_safety", m_substep_safety);
     utils::parser::queryWithParser(pp_hybrid, "substep_max_growth", m_substep_max_growth);
     pp_hybrid.query("max_substep_attempts", m_max_substep_attempts);
-    pp_hybrid.query("use_rkf45", m_use_rkf45);
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
 
@@ -1069,11 +1072,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
             dt_sub *= std::max(0.1_rt, factor);
         }
 
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ++n_attempts <= m_max_substep_attempts,
-            "BfieldEvolveRKF45: exceeded max substep attempts; "
-            "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
-        );
+        if (++n_attempts == m_max_substep_attempts) { break; }
     }
 
     // Set the number of substeps such that dt_sub on the next step will be similar
@@ -1087,6 +1086,11 @@ void HybridPICModel::BfieldEvolveRKF45 (
             << (n_attempts - n_accepted) << " rejected substeps"
             << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
     }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        n_attempts < m_max_substep_attempts,
+        "BfieldEvolveRKF45: exceeded max substep attempts;"
+        "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
+    );
 }
 
 
