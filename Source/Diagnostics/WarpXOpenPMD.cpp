@@ -674,7 +674,7 @@ for (const auto & particle_diag : particle_diags) {
     real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
     real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
     real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];
-    // note: z can be determinied from r, theta and pi
+    // note: z can be determined from r, theta and phi
     real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
     real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
     real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
@@ -1012,6 +1012,11 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
     {
         auto const real_counter = std::min(write_real_comp.size(), real_comp_names.size());
 
+        // `write_real_comp` is the `real_flags` array built by
+        // `WriteOpenPMDParticles` and forwarded here through `DumpToFile`. Its
+        // order matches the openPMD record list (`real_names`) assembled there:
+        // position_x, position_y, position_z (each added only for geometries that
+        // have it), then weighting, momenta, ...
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // reconstruct Cartesian positions for cylindrical simulations
         // r,z,theta -> x,y,z
@@ -1025,6 +1030,10 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             [](amrex::ParticleReal const *p) { delete[] p; }
         );
 #if !defined(WARPX_DIM_RCYLINDER)
+        // write_real_comp [2] is the z position for RZ, RSPHERE and Cartesian
+        // (RZ stores z directly, RSPHERE rebuilds it from r, theta, phi).
+        // RCYLINDER omits position_z, so its [2] is already the following
+        // weighting flag. Omit here.
         std::shared_ptr<amrex::ParticleReal> const z(
             new amrex::ParticleReal[(write_real_comp[2] ? numParticleOnTile : 0)],
             [](amrex::ParticleReal const *p) { delete[] p; }
@@ -1040,7 +1049,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             get_particle_position(p, xp, yp, zp);
             if (write_real_comp[0]) { x.get()[i] = xp; }
             if (write_real_comp[1]) { y.get()[i] = yp; }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
             if (write_real_comp[2]) { z.get()[i] = zp; }
 #endif
         }
@@ -1050,7 +1059,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
         if (write_real_comp[1]) {
             getComponentRecord(real_comp_names[1]).storeChunk(y, {offset}, {numParticleOnTile64});
         }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
         if (write_real_comp[2]) {
             getComponentRecord(real_comp_names[2]).storeChunk(z, {offset}, {numParticleOnTile64});
         }
