@@ -85,15 +85,6 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             utils::parser::queryWithParser(pp, source_name, "ux_mean", m_ux_mean);
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
-
-            amrex::Real const velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
-                                                  m_uy_mean*m_uy_mean +
-                                                  m_uz_mean*m_uz_mean);
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                velocity_magnitude < 1.0,
-                "Magnitude of mean velocity abs(u_mean) = " + std::to_string(velocity_magnitude) +
-                " is greater than or equal to 1"
-            );
             m_type = VelConstantVector;
         } else if (u_mean_dist_s == "parser") {
             std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
