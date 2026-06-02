@@ -20,6 +20,7 @@
 */
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
+    using amrex::Math;
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
@@ -84,12 +85,12 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
 
-            amrex::Real const velocity_magnitude = std::sqrt(m_ux_mean*m_ux_mean +
-                                                  m_uy_mean*m_uy_mean +
-                                                  m_uz_mean*m_uz_mean);
+            amrex::Real const u2 = powi<2>(m_ux_mean) powi<2>(m_uy_mean) + powi<2>(m_uz_mean);
+            amrex::Real const velocity_magnitude = std::sqrt(u2/(1.0_rt+u2));
+
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 velocity_magnitude < 1.0,
-                "Magnitude of mean velocity abs(u_mean) = " + std::to_string(velocity_magnitude) +
+                "Magnitude of mean velocity sqrt(u_mean^2/(1 + u_mean^2)) = " + std::to_string(velocity_magnitude) +
                 " is greater than or equal to 1"
             );
             m_type = VelConstantVector;
