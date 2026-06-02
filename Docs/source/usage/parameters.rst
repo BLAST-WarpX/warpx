@@ -3706,9 +3706,11 @@ Maxwell solver: kinetic-fluid hybrid
     per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
     automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is active, this is
     instead used only as the initial substep count estimate for the adaptive solver.
-    After each timestep on which :pp:param:`hybrid_pic_model.use_rkf45` is active, this value is updated to
-    the number of accepted RKF45 sub-steps taken in the most recent half-step. This provides a warm-start
-    substep-size guess for the next step.
+    After each timestep on which :pp:param:`hybrid_pic_model.use_rkf45` is active, this value is updated based on
+    ``n_accepted``, the number of accepted RKF45 sub-steps taken in the most recent half-step: if the current value
+    is less than ``2 * n_accepted``, it jumps immediately to ``2 * n_accepted``; otherwise it decays slowly toward
+    that target via exponential smoothing (95% of the current value, 5% of ``2 * n_accepted``). This warm-start
+    guess also carries over to RK4 steps on timesteps where :pp:param:`hybrid_pic_model.use_rkf45` is not active.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``string`` or ``bool``

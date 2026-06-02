@@ -1075,9 +1075,16 @@ void HybridPICModel::BfieldEvolveRKF45 (
         if (++n_attempts == m_max_substep_attempts) { break; }
     }
 
-    // Set the number of substeps such that dt_sub on the next step will be similar
-    // to what was found to work in this step
-    m_substeps = 2*n_accepted;
+    // Adjust the number of substeps. This affects both the next RKF45 or RK4 step.
+    // The adjustment is made to jump to more required substeps or slowly decrease
+    // if m_substeps is too large (using 95% of the current m_substeps value and
+    // 5% of the lower, new value).
+    if (m_substeps < 2*n_accepted) {
+        m_substeps = 2*n_accepted;
+    } else {
+        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_accepted));
+    }
+
 
     if (WarpX::GetInstance().Verbose()) {
         amrex::Print() << "RKF45 "
