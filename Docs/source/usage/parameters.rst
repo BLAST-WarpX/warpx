@@ -1750,39 +1750,23 @@ Particle initialization
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
 
-    * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
-      More specifically, the plasma is initialized with a Maxwell-Juttner distribution
-
-      .. math::
-
-        p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
-
-      (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
-      **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
-      Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
-      in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
-
-      It requires the following arguments:
-
-      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
-        Specifies the distribution type for the bulk velocity :math:`\beta`.
-        The magnitude must satisfy :math:`|\beta| < 1`.
-
-        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
-        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
-
-      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
-        Specifies the direction of the bulk velocity :math:`\beta`.
-        The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-        Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
-        The signed bulk velocity is ``beta`` times the direction given here.
-
-      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
-        Specifies the distribution type for the temperature :math:`\theta`.
-        Values less than zero are not allowed.
-
-        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
-        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+    * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
+      :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
+      Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
+      For :math:`\theta < 0.1`, the Sobol method becomes inefficient and the code instead samples an isotropic
+      Maxwellian with thermal spread :math:`\sqrt{\theta}` per component in the drift frame.
+      The plasma can be initialized to move at a bulk drift, specified (as for the
+      ``maxwellian`` distribution) by the normalized momentum
+      :math:`u_{\rm mean} = (u_{x,{\rm mean}}, u_{y,{\rm mean}}, u_{z,{\rm mean}}) = \gamma \boldsymbol{v}/c`,
+      using a combination of :pp:param:`<species_name>.maxwell_juttner_u_mean_distribution_type`,
+      ``<species_name>.ux_mean``/``uy_mean``/``uz_mean``, and
+      ``<species_name>.ux_mean_function(x,y,z)``/``uy_mean_function(x,y,z)``/``uz_mean_function(x,y,z)`` (see below).
+      The bulk velocity :math:`\beta = v/c` is derived from :math:`u_{\rm mean}` and is always in the physical range
+      :math:`|\beta| < 1`. The MJ distribution will be initialized in the drifting frame using the Sobol method,
+      and then the distribution will be transformed to the simulation frame using the flipping method
+      (boosting along the direction of :math:`u_{\rm mean}`).
+      Both the Sobol and the flipping method can be found in Zenitani 2015 (Phys. Plasmas 22, 042116).
+      By default, the bulk drift is zero (:math:`u_{\rm mean} = 0`).
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
@@ -1792,10 +1776,36 @@ Particle initialization
       :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
       method and Lorentz transform as for the Sobol-sampled momenta.
 
+      The temperature :math:`\theta` is specified via:
+
+      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the temperature :math:`\theta`.
+        Values less than zero are not allowed.
+
+        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
+        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which give the distribution of each component of the momentum as a function of space.
+
+.. pp:param:: <species_name>.maxwell_juttner_u_mean_distribution_type
+    :type: ``string``
+    :default: ``constant``
+    :optional:
+
+    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
+    ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters
+    above). Selects how the bulk drift normalized momentum
+    :math:`u_{\rm mean} = \gamma \boldsymbol{v}/c` is set.
+
+    * If ``constant``, use a constant drift, given by the float parameters
+      ``<species_name>.ux_mean``, ``<species_name>.uy_mean``, and ``<species_name>.uz_mean``
+      (all default to ``0.``).
+    * If ``parser``, use spatially-dependent analytic parser functions, given by the required
+      parameters ``<species_name>.ux_mean_function(x,y,z)``,
+      ``<species_name>.uy_mean_function(x,y,z)``, and ``<species_name>.uz_mean_function(x,y,z)``.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``

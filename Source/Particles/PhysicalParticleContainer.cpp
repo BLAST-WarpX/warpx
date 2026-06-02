@@ -430,6 +430,34 @@ PhysicalParticleContainer::BackwardCompatibility ()
             "<species>.momentum_distribution_type = radial_expansion is not supported anymore. "
             "Please use momentum_distribution_type = parse_momentum_function instead.");
     }
+
+    // The Maxwell-Juttner bulk drift is now specified with the same vector syntax as the
+    // Maxwellian distribution (ux_mean/uy_mean/uz_mean), replacing the old scalar beta and
+    // bulk_vel_dir parameters.
+    const std::string juttner_drift_msg =
+        "The Maxwell-Juttner bulk drift is now set with the normalized momentum "
+        "<species>.ux_mean/uy_mean/uz_mean (gamma*v/c), optionally selecting between a "
+        "constant and a parser value with "
+        "<species>.maxwell_juttner_u_mean_distribution_type = constant (default) or parser "
+        "(in which case provide <species>.ux_mean_function(x,y,z), uy_mean_function(x,y,z), "
+        "uz_mean_function(x,y,z)).";
+    std::string backward_string;
+    if (pp_species_name.query("bulk_vel_dir", backward_string)) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.bulk_vel_dir is no longer supported. " + juttner_drift_msg);
+    }
+    if (pp_species_name.query("beta_distribution_type", backward_string)) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.beta_distribution_type is no longer supported. " + juttner_drift_msg);
+    }
+    if (pp_species_name.query("beta_function(x,y,z)", backward_string)) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.beta_function(x,y,z) is no longer supported. " + juttner_drift_msg);
+    }
+    if (pp_species_name.query("beta", backward_string)) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "<species>.beta is no longer supported. " + juttner_drift_msg);
+    }
 }
 
 void PhysicalParticleContainer::InitData ()

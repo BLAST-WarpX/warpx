@@ -29,7 +29,7 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser
+particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_drift maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser
 particles.rigid_injected_species = beam
 
 gaussian.charge                     = -q_e
@@ -67,6 +67,21 @@ maxwell_juttner.profile                    = constant
 maxwell_juttner.density                    = 1.0e21
 maxwell_juttner.momentum_distribution_type = "maxwell_juttner"
 maxwell_juttner.theta                      = 1.0
+
+# Maxwell-Juttner with a constant diagonal bulk drift (normalized momentum gamma*v/c).
+# ux_mean = uy_mean = uz_mean = 1/3 corresponds to a bulk velocity beta = 0.5 along (1,1,1).
+maxwell_juttner_drift.charge                                 = -q_e
+maxwell_juttner_drift.mass                                   = m_e
+maxwell_juttner_drift.injection_style                        = "NRandomPerCell"
+maxwell_juttner_drift.num_particles_per_cell                 = 1000
+maxwell_juttner_drift.profile                                = constant
+maxwell_juttner_drift.density                                = 1.0e21
+maxwell_juttner_drift.momentum_distribution_type             = "maxwell_juttner"
+maxwell_juttner_drift.theta                                  = 1.0
+maxwell_juttner_drift.maxwell_juttner_u_mean_distribution_type = "constant"
+maxwell_juttner_drift.ux_mean                                = 0.3333333333333333
+maxwell_juttner_drift.uy_mean                                = 0.3333333333333333
+maxwell_juttner_drift.uz_mean                                = 0.3333333333333333
 
 maxwell_juttner_low_theta.charge                     = -q_e
 maxwell_juttner_low_theta.mass                       = m_e
@@ -183,7 +198,8 @@ gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 # 7 for maxwellian with parser velocity
 # 8 for cuboid in momentum space
 # 10 for maxwell-juttner with low theta (Gaussian fallback)
-warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h10 h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z
+# 11 for maxwell-juttner with constant diagonal bulk drift
+warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h10 h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h11
 
 h1x.type                                 = ParticleHistogram
 h1x.intervals                            = 1
@@ -424,6 +440,18 @@ h9z.bin_number                           = 50
 h9z.bin_min                              = -1
 h9z.bin_max                              = 1
 h9z.histogram_function(t,x,y,z,ux,uy,uz) = "uz/z"
+
+# Maxwell-Juttner with diagonal bulk drift: histogram the drift-frame Lorentz factor
+# gamma' = gamma_bulk*gamma - u_mean.u, which must follow the rest-frame MJ(theta=1).
+# gamma_bulk = 1/sqrt(1-0.5^2) = 1.1547005383792515, u_mean = (1/3, 1/3, 1/3).
+h11.type                                 = ParticleHistogram
+h11.intervals                            = 1
+h11.path                                 = "./"
+h11.species                              = maxwell_juttner_drift
+h11.bin_number                           = 50
+h11.bin_min                              = 1.0
+h11.bin_max                              = 12.0
+h11.histogram_function(t,x,y,z,ux,uy,uz) = "1.1547005383792515*sqrt(1.0 + ux*ux + uy*uy + uz*uz) - 0.3333333333333333*(ux + uy + uz)"
 
 # our little beam monitor
 bmmntr.type                              = BeamRelevant

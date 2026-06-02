@@ -244,14 +244,14 @@ private:
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
-// drift velocity beta, from the Maxwell-Juttner distribution. Method is from
-// Zenitani 2015 (Phys. Plasmas 22, 042116).
+// bulk drift momentum u_mean, from the Maxwell-Juttner distribution. Method is
+// from Zenitani 2015 (Phys. Plasmas 22, 042116).
 struct InjectorMomentumJuttner
 {
     // Constructor whose inputs are:
     // a reference to the initial temperature container t,
     // a reference to the initial velocity container b
-    InjectorMomentumJuttner(GetTemperature const& t, GetVelocity const& b) noexcept
+    InjectorMomentumJuttner(GetTemperature const& t, GetVelocityVector const& b) noexcept
         : velocity(b), temperature(t)
         {}
 
@@ -262,65 +262,74 @@ struct InjectorMomentumJuttner
                  amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
-        amrex::Real x1, x2, gamma;
-        amrex::Real u [3];
         amrex::Real const theta = temperature(x,y,z);
         if (theta < 0) {
             amrex::Abort("Temperature parameter theta is less than zero, "
                 "which is not allowed for Maxwell-Juttner distribution.");
         }
-        // Calculate local velocity and abort if |beta|>=1
-        amrex::Real const beta = velocity(x,y,z);
-        if (beta <= -1._rt || beta >= 1._rt) {
-            amrex::Abort("beta = v/c magnitude greater than or equal to 1");
+        // The bulk drift is specified as the normalized momentum u_mean = gamma*v/c.
+        // Derive the corresponding bulk velocity beta = v/c, the bulk Lorentz factor
+        // gamma_bulk = 1/sqrt(1-beta^2) = sqrt(1+|u_mean|^2), and the unit boost
+        // direction n = u_mean/|u_mean|. Since beta = |u_mean|/gamma_bulk < 1 for any
+        // finite u_mean, no extra check on |beta|<1 is needed.
+        const amrex::XDim3 u_mean = velocity(x,y,z);
+        amrex::Real const umean_mag = std::sqrt(u_mean.x*u_mean.x + u_mean.y*u_mean.y + u_mean.z*u_mean.z);
+        amrex::Real const gamma_bulk = std::sqrt(1._rt + umean_mag*umean_mag);
+        amrex::Real const beta = umean_mag/gamma_bulk;
+        // Unit boost direction (zero vector if there is no bulk drift)
+        amrex::Real nx = 0._rt, ny = 0._rt, nz = 0._rt;
+        if (umean_mag > 0._rt) {
+            nx = u_mean.x/umean_mag;
+            ny = u_mean.y/umean_mag;
+            nz = u_mean.z/umean_mag;
         }
-        int const dir = velocity.direction();
+        // Sample the rest-frame momentum vector e = (ex,ey,ez) and the corresponding
+        // Lorentz factor gamma. The Maxwell-Juttner distribution is isotropic in the
+        // rest frame, so e is sampled directly in the simulation axes; the bulk drift
+        // is then applied along the boost direction n further below.
+        amrex::Real ex = 0._rt, ey = 0._rt, ez = 0._rt, gamma = 0._rt;
         // The Sobol rejection method used below becomes inefficient at low
         // temperature: its acceptance efficiency is K_2(1/theta)/(2 theta^2),
         // which tends to zero as theta -> 0
         // (Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13).
         // For theta < 0.1 the Maxwell-Juttner distribution is indistinguishable
-        // from a non-relativistic Maxwellian, so we instead sample the
-        // momentum from a Gaussian with thermal spread
-        // u_th = sqrt(theta) per component (i.e. sqrt(kB*T/(m*c^2)),
-        // in the Lorentz frame that moves with the bulk drift
-        // where u is the normalized momentum u=gamma*beta.
-        // The flipping method and Lorentz transform below then handle
-        // the bulk drift, exactly as for the Sobol-sampled momentum.
+        // from a non-relativistic Maxwellian, so we instead sample the momentum
+        // from a Gaussian with thermal spread u_th = sqrt(theta) per component
+        // (i.e. sqrt(kB*T/(m*c^2)), in units of c).
         if (theta < 0.1_rt) {
             amrex::Real const u_th = std::sqrt(theta);
-            u[0] = amrex::RandomNormal(0._rt, u_th, engine);
-            u[1] = amrex::RandomNormal(0._rt, u_th, engine);
-            u[2] = amrex::RandomNormal(0._rt, u_th, engine);
-            gamma = std::sqrt(1._rt + u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
+            ex = amrex::RandomNormal(0._rt, u_th, engine);
+            ey = amrex::RandomNormal(0._rt, u_th, engine);
+            ez = amrex::RandomNormal(0._rt, u_th, engine);
+            gamma = std::sqrt(1._rt + ex*ex + ey*ey + ez*ez);
         } else {
-            // Sobol method for sampling MJ Speeds,
-            // from Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13.
-            x1 = 0._rt;
-            gamma = 0._rt;
-            u[dir] = 0._rt;
-            // This condition is equation 10 in Zenitani,
-            // though x1 is defined differently.
-            while(u[dir]-gamma <= x1)
+            // Sobol method for sampling the rest-frame momentum magnitude umag,
+            // from Zenitani et al. Phys. Plasmas 22, 042116, 2015.
+            // This condition is equation 10 in Zenitani, though x1 is defined
+            // differently.
+            amrex::Real x1 = 0._rt;
+            amrex::Real umag = 0._rt;
+            while(umag-gamma <= x1)
             {
-                u[dir] = -theta*
+                umag = -theta*
                     std::log(amrex::Random(engine)*amrex::Random(engine)*amrex::Random(engine));
-                gamma = std::sqrt(1._rt+u[dir]*u[dir]);
+                gamma = std::sqrt(1._rt+umag*umag);
                 x1 = theta*std::log(amrex::Random(engine));
             }
-            // The following code samples a random unit vector
-            // and multiplies the result by speed u[dir].
-            x1 = amrex::Random(engine);
-            x2 = amrex::Random(engine);
-            // Direction dir is an input parameter that sets the boost direction:
-            // 'x' -> d = 0, 'y' -> d = 1, 'z' -> d = 2.
-            auto const [sin_x2, cos_x2] = amrex::Math::sincos(2._rt*MathConst::pi*x2);
-            u[(dir+1)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*sin_x2;
-            u[(dir+2)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*cos_x2;
-            // The value of dir is the boost direction to be transformed.
-            u[dir] = u[dir]*(2._rt*x1-1._rt);
+            // Multiply the speed umag by a random isotropic unit vector.
+            amrex::Real const cos_theta = 2._rt*amrex::Random(engine) - 1._rt;
+            amrex::Real const sin_theta = std::sqrt(1._rt - cos_theta*cos_theta);
+            auto const [sin_phi, cos_phi] = amrex::Math::sincos(2._rt*MathConst::pi*amrex::Random(engine));
+            ex = umag*sin_theta*cos_phi;
+            ey = umag*sin_theta*sin_phi;
+            ez = umag*cos_theta;
         }
-        x1 = amrex::Random(engine);
+        // Decompose e into the component parallel to the boost direction (u_par)
+        // and the perpendicular part (e_perp = e - u_par*n).
+        amrex::Real u_par = ex*nx + ey*ny + ez*nz;
+        amrex::Real const ex_perp = ex - u_par*nx;
+        amrex::Real const ey_perp = ey - u_par*ny;
+        amrex::Real const ez_perp = ez - u_par*nz;
         // The following condition is equation 32 in Zenitani, called
         // The flipping method. It transforms the integral: d3x' -> d3x
         // where d3x' is the volume element for positions in the boosted frame.
@@ -333,17 +342,18 @@ struct InjectorMomentumJuttner
         // would be to initialize the particle positions and densities in the
         // frame moving at speed beta, and then perform a Lorentz transform
         // on their positions and MJ sampled velocities to the simulation frame.
-        if(-beta*u[dir]/gamma>x1)
+        if(-beta*u_par/gamma > amrex::Random(engine))
         {
-            u[dir] = -u[dir];
+            u_par = -u_par;
         }
         // This Lorentz transform is equation 17 in Zenitani.
         // It transforms the integral d3u' -> d3u
         // where d3u' is the volume element for momentum in the boosted frame.
-        u[dir] = 1._rt/std::sqrt(1._rt-beta*beta)*(u[dir]+gamma*beta);
+        // It only affects the component along the boost direction.
+        u_par = gamma_bulk*(u_par + gamma*beta);
         // Note that if beta = 0 then the flipping method and Lorentz transform
-        // have no effect on the u[dir] direction.
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        // have no effect, and the returned momentum is the isotropic rest-frame sample.
+        return amrex::XDim3 {ex_perp + u_par*nx, ey_perp + u_par*ny, ez_perp + u_par*nz};
     }
 
     [[nodiscard]]
@@ -351,18 +361,12 @@ struct InjectorMomentumJuttner
     amrex::XDim3
     getBulkMomentum (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
     {
-        using namespace amrex::literals;
-        amrex::Real u[3];
-        for (auto& el : u) { el = 0.0_rt; }
-        amrex::Real const beta = velocity(x,y,z);
-        int const dir = velocity.direction();
-        auto const gamma = 1._rt/std::sqrt(1._rt-beta*beta);
-        u[dir] = gamma*beta;
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        const amrex::XDim3 u_mean = velocity(x,y,z);
+        return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
     }
 
 private:
-    GetVelocity velocity;
+    GetVelocityVector velocity;
     GetTemperature temperature;
 };
 
@@ -451,7 +455,7 @@ struct InjectorMomentum
 
     // This constructor stores a InjectorMomentumJuttner in union object.
     InjectorMomentum (InjectorMomentumJuttner* t,
-                      GetTemperature const& temperature, GetVelocity const& velocity)
+                      GetTemperature const& temperature, GetVelocityVector const& velocity)
          : type(Type::juttner),
            object(t, temperature, velocity)
     { }
@@ -590,7 +594,7 @@ private:
                 GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
             : maxwellian(t,b) {}
         Object (InjectorMomentumJuttner*,
-                GetTemperature const& t, GetVelocity const& b) noexcept
+                GetTemperature const& t, GetVelocityVector const& b) noexcept
             : juttner(t,b) {}
         Object (InjectorMomentumParser*,
                 GetVelocityVector const& a_velocity) noexcept
