@@ -331,7 +331,10 @@ bin_value_x, h8x = read_reduced_diags_histogram("h8x.txt")[2:]
 bin_value_y, h8y = read_reduced_diags_histogram("h8y.txt")[2:]
 bin_value_z, h8z = read_reduced_diags_histogram("h8z.txt")[2:]
 
-# With max_step = 0, reduced diags write a single row (1D arrays).
+# With max_step = 0, reduced diagnostics write a single row,
+# which the parser squeezes into a 1D array. Reshape it to
+# a 2D array (with length 1 in the first axis), so that the
+# loop below works for both single-step and multi-step runs.
 if h8x.ndim == 1:
     h8x = h8x.reshape(1, -1)
     h8y = h8y.reshape(1, -1)
