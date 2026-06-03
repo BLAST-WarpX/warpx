@@ -89,10 +89,13 @@ collisions.correct_energy_momentum = 1
 collisions.energy_correction_sort_by_weight = true
 collision1.species = ionsA ionsB
 collision1.CoulombLog = 10.0
+collision1.scattering_method = BOBYLEV
 collisionA.species = ionsA ionsA
 collisionA.CoulombLog = 10.0
+collisionA.scattering_method = BOBYLEV
 collisionB.species = ionsB ionsB
 collisionB.CoulombLog = 10.0
+collisionB.scattering_method = BOBYLEV
 
 # Diagnostics
 diagnostics.diags_names = diag1
