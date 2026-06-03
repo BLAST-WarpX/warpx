@@ -314,6 +314,13 @@ guardCellManager::Init (
     }
 #endif
 
+    // For the hybrid-PIC solver a minimum of 2 guard cells are required to
+    // avoid the need for parallel communication after calculating curl x B.
+    if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) &&
+        (ng_FieldSolver < IntVect(AMREX_D_DECL(2, 2, 2)))) {
+        ng_FieldSolver += 1;
+    }
+
     // Number of guard cells is the max of that determined by particle shape factor and
     // the stencil used in the field solve
     ng_alloc_EB.max( ng_FieldSolver );
