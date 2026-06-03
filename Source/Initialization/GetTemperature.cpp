@@ -10,7 +10,8 @@
 
 #include <memory>
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 namespace
 {
     void prepareExternalFieldReader (
@@ -71,7 +72,8 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp)
         m_uy_std_parser = temp.m_ptr_uy_std_parser->compile<3>();
         m_uz_std_parser = temp.m_ptr_uz_std_parser->compile<3>();
     }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     else if (m_type == TempFromFileVector) {
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo = temp.m_geom.ProbLoArray();
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = temp.m_geom.CellSizeArray();
@@ -80,14 +82,11 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp)
         // std::make_unique for exception safety; raw pointers are required because
         // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
         auto ux = std::make_unique<ExternalFieldReader>(
-            temp.m_read_ux_std_path, temp.m_ux_std_openpmd_mesh, "x",
-            problo, pdx, dombox, distributed);
+            temp.m_read_u_std_path, "u_std", "x", problo, pdx, dombox, distributed);
         auto uy = std::make_unique<ExternalFieldReader>(
-            temp.m_read_uy_std_path, temp.m_uy_std_openpmd_mesh, "y",
-            problo, pdx, dombox, distributed);
+            temp.m_read_u_std_path, "u_std", "y", problo, pdx, dombox, distributed);
         auto uz = std::make_unique<ExternalFieldReader>(
-            temp.m_read_uz_std_path, temp.m_uz_std_openpmd_mesh, "z",
-            problo, pdx, dombox, distributed);
+            temp.m_read_u_std_path, "u_std", "z", problo, pdx, dombox, distributed);
         m_ux_std_reader = ux.release();
         m_uy_std_reader = uy.release();
         m_uz_std_reader = uz.release();
@@ -101,7 +100,8 @@ void GetTemperatureVector::prepare (
     amrex::IntVect const& ngrow,
     std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (m_type != TempFromFileVector) {
         return;
     }
@@ -117,7 +117,8 @@ void GetTemperatureVector::prepare (
     amrex::RealBox const& pbox, int moving_dir, int moving_sign,
     std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (m_type != TempFromFileVector) {
         return;
     }
@@ -134,7 +135,8 @@ void GetTemperatureVector::prepare (
 
 void GetTemperatureVector::prepare (int li)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (m_type != TempFromFileVector) {
         return;
     }
@@ -154,7 +156,8 @@ void GetTemperatureVector::prepare (int li)
 
 void GetTemperatureVector::clear ()
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     delete m_ux_std_reader;
     m_ux_std_reader = nullptr;
     delete m_uy_std_reader;
@@ -166,7 +169,8 @@ void GetTemperatureVector::clear ()
 
 bool GetTemperatureVector::distributed () const noexcept
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (m_type != TempFromFileVector || m_ux_std_reader == nullptr) {
         return false;
     }

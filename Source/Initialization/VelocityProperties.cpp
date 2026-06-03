@@ -103,13 +103,9 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             m_type = VelParserFunctionVector;
 
         } else if (u_mean_dist_s == "read_from_file") {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-            utils::parser::get(pp, source_name, "read_ux_mean_from_path", m_read_ux_mean_path);
-            utils::parser::get(pp, source_name, "read_uy_mean_from_path", m_read_uy_mean_path);
-            utils::parser::get(pp, source_name, "read_uz_mean_from_path", m_read_uz_mean_path);
-            utils::parser::query(pp, source_name, "ux_mean_openpmd_mesh", m_ux_mean_openpmd_mesh);
-            utils::parser::query(pp, source_name, "uy_mean_openpmd_mesh", m_uy_mean_openpmd_mesh);
-            utils::parser::query(pp, source_name, "uz_mean_openpmd_mesh", m_uz_mean_openpmd_mesh);
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            utils::parser::get(pp, source_name, "read_u_mean_from_path", m_read_u_mean_path);
             {
                 std::string const key_with_src =
                     source_name.empty() ? std::string("read_u_mean_distributed")
@@ -125,7 +121,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             WARPX_ABORT_WITH_MESSAGE(
                 "maxwellian_u_mean_distribution_type = read_from_file requires "
                 "WarpX built with openPMD support and is not supported in "
-                "RCYLINDER/RSPHERE geometries.");
+                "RZ/RCYLINDER/RSPHERE geometries.");
 #endif
         }
         else {

@@ -66,12 +66,7 @@ struct VelocityProperties
     /* Storage of the parser functions for velocity vector, if m_type == VelParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_mean_parser, m_ptr_uy_mean_parser, m_ptr_uz_mean_parser;
 
-    std::string m_read_ux_mean_path;
-    std::string m_read_uy_mean_path;
-    std::string m_read_uz_mean_path;
-    std::string m_ux_mean_openpmd_mesh{"u_mean"};
-    std::string m_uy_mean_openpmd_mesh{"u_mean"};
-    std::string m_uz_mean_openpmd_mesh{"u_mean"};
+    std::string m_read_u_mean_path;
     bool m_read_u_mean_distributed{true};
 
     amrex::Geometry m_geom;

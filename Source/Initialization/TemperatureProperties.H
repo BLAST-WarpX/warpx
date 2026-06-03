@@ -64,12 +64,7 @@ struct TemperatureProperties
     /* Storage of the parser functions for temperature vector, if m_type == TempParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_std_parser, m_ptr_uy_std_parser, m_ptr_uz_std_parser;
 
-    std::string m_read_ux_std_path;
-    std::string m_read_uy_std_path;
-    std::string m_read_uz_std_path;
-    std::string m_ux_std_openpmd_mesh{"u_std"};
-    std::string m_uy_std_openpmd_mesh{"u_std"};
-    std::string m_uz_std_openpmd_mesh{"u_std"};
+    std::string m_read_u_std_path;
     bool m_read_u_std_distributed{true};
 
     amrex::Geometry m_geom;

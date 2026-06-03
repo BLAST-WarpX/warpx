@@ -20,7 +20,6 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
-#include <cmath>
 #include <functional>
 
 /** Get velocity at a point on the grid
@@ -110,7 +109,8 @@ struct GetVelocityVector
     /** Velocity parser function, if m_type == VelParserFunctionVector */
     amrex::ParserExecutor<3> m_ux_mean_parser, m_uy_mean_parser, m_uz_mean_parser;
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     ExternalFieldView m_ux_mean_view;
     ExternalFieldView m_uy_mean_view;
     ExternalFieldView m_uz_mean_view;
@@ -130,7 +130,8 @@ struct GetVelocityVector
     //! True when bulk mean velocity is loaded from openPMD (cf. ``InjectorDensity`` ``fromfile``).
     [[nodiscard]] bool needPreparation () const noexcept
     {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         return m_type == VelFromFileVector;
 #else
         return false;
@@ -139,11 +140,9 @@ struct GetVelocityVector
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow,
-                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+                  amrex::IntVect const& ngrow);
 
-    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
-                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign);
 
     void prepare (int li);
 
@@ -171,7 +170,8 @@ struct GetVelocityVector
             return amrex::XDim3{m_ux_mean_parser(x, y, z), m_uy_mean_parser(x, y, z),
                                 m_uz_mean_parser(x, y, z)};
         }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         case (VelFromFileVector):
         {
 #if (AMREX_SPACEDIM < 3)
@@ -179,8 +179,6 @@ struct GetVelocityVector
 #endif
 #if (AMREX_SPACEDIM == 1)
             amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_RZ)
-            amrex::RealVect const pos{std::sqrt(x * x + y * y), z};
 #elif defined(WARPX_DIM_XZ)
             amrex::RealVect const pos{x, z};
 #else

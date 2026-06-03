@@ -245,7 +245,7 @@ struct InjectorMomentumMaxwellian
     {
         // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
         // not call get_zlab while preparing itself.
-        velocity.prepare(grids, dmap, ngrow, {});
+        velocity.prepare(grids, dmap, ngrow);
         temperature.prepare(grids, dmap, ngrow, get_zlab);
     }
 
@@ -254,7 +254,7 @@ struct InjectorMomentumMaxwellian
     {
         // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
         // not call get_zlab while preparing itself.
-        velocity.prepare(pbox, moving_dir, moving_sign, {});
+        velocity.prepare(pbox, moving_dir, moving_sign);
         temperature.prepare(pbox, moving_dir, moving_sign, get_zlab);
     }
 
