@@ -36,7 +36,7 @@ Eplasma = ele_energy + ion_energy
 
 if poynting_flux.shape[1] == 10:
     print("2D simulation")
-    gmres_iters_tol = 5
+    gmres_iters_tol = 6.0
     Eout_lo_x = poynting_flux[:, 6]
     Eout_lo_z = poynting_flux[:, 7]
     Eout_hi_x = poynting_flux[:, 8]
