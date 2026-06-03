@@ -1752,10 +1752,10 @@ Particle initialization
     * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
       :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
       Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
-      The Sobol method used to generate the distribution will not terminate for :math:`\theta \lesssim 0.1`, and the code will abort if it encounters a temperature below that threshold.
-      The Maxwellian (``maxwellian``) distribution is recommended when the temperature
-      parameter :math:`\theta` satisfies :math:`0.01 < \theta_i < 0.1`.
-      Errors due to relativistic effects can be expected to approximately between 1% and 10%.
+      The Sobol method used to generate the distribution becomes inefficient for :math:`\theta \lesssim 0.1` (its acceptance
+      efficiency tends to zero as :math:`\theta \rightarrow 0`). For :math:`\theta < 0.1`, where the Maxwell-Juttner distribution is
+      indistinguishable from a non-relativistic Maxwellian, the code instead samples the momentum from a Gaussian with thermal
+      spread :math:`\sqrt{\theta}` per component (in units of :math:`c`), so any non-negative temperature is supported.
       The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
       The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
       :math:`\beta` can be positive or negative and is limited to the range :math:`-1 < \beta < 1`.
