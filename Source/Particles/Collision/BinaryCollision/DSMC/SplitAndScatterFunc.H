@@ -502,20 +502,12 @@ public:
                 else
                 {
                     // Electron impact ionization (the incident particle is an electron).
-                    // We use a model similar to the one used in the MCC module
-                    // (see Source/Particles/Collision/BackgroundMCC/ImpactIonization.H):
-                    // in the center-of-mass frame, the two electrons (the incident
-                    // electron and the newly freed electron) are scattered isotropically
-                    // and are assumed to carry an equal share of the energy. Since both
-                    // electrons have the same mass, equal energy implies equal momentum
-                    // magnitude p_e. The ion momentum is then fixed by conservation of
-                    // momentum in the center-of-mass frame, and p_e is determined by
-                    // conservation of energy:
-                    //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
-                    // with, from momentum conservation, p_ion_vec = - p_e * (d0 + d1),
-                    // where d0 and d1 are the two (unit-norm) isotropic directions of the
-                    // electrons. Defining s2 = |d0 + d1|^2 so that p_ion^2 = p_e^2 * s2:
-                    //     p_e = sqrt( E_out / ( 1/m_e + 0.5 * s2 / m_ion ) ).
+                    // We use the following model: in the center-of-mass frame, the two
+                    // electrons (the incident electron and the newly freed electron)
+                    // are scattered isotropically and are assumed to carry an equal share
+                    // of the energy. All the other unknowns (magnitude of the isotropically
+                    // scattered electron momentum, momentum of the ion) are determined by
+                    // conservation of energy and momentum.
 
                     // The freed electron has the same mass as the incident electron (m0);
                     // the ion is the heavier of the two products in slots 2 and 3.
@@ -523,46 +515,50 @@ public:
 
                     // Sample two isotropic unit vectors: one for the incident electron
                     // (slot 0) and one for the newly freed electron.
-                    amrex::ParticleReal d0x, d0y, d0z;
-                    amrex::ParticleReal d1x, d1y, d1z;
-                    ParticleUtils::getRandomVector(d0x, d0y, d0z, engine);
-                    ParticleUtils::getRandomVector(d1x, d1y, d1z, engine);
+                    // These units vectors have the right direction, but not the right magnitude ;
+                    // they will be multiplied by the right magnitude p_e further down.
+                    amrex::ParticleReal scaled_ux0, scaled_uy0, scaled_uz0;
+                    amrex::ParticleReal scaled_ux_new, scaled_uy_new, scaled_uz_new;
+                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine);
+                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine);
 
                     // Sum of the two electron directions; the ion momentum is
                     // proportional to its opposite (conservation of momentum in COM).
-                    const amrex::ParticleReal sx = d0x + d1x;
-                    const amrex::ParticleReal sy = d0y + d1y;
-                    const amrex::ParticleReal sz = d0z + d1z;
-                    const amrex::ParticleReal s2 = sx*sx + sy*sy + sz*sz;
+                    const amrex::ParticleReal scaled_ux_ion = -(scaled_ux0 + scaled_ux_new);
+                    const amrex::ParticleReal scaled_uy_ion = -(scaled_uy0 + scaled_uy_new);
+                    const amrex::ParticleReal scaled_uz_ion = -(scaled_uz0 + scaled_uz_new);
+                    const amrex::ParticleReal scaled_u2_ion = scaled_ux_ion*scaled_ux_ion + scaled_uy_ion*scaled_uy_ion + scaled_uz_ion*scaled_uz_ion;
 
-                    // Common momentum magnitude of the two electrons, from conservation
-                    // of energy in the center-of-mass frame (both electrons have mass m0).
+                    // Magnitude of the momentum of the two electrons, from conservation
+                    // of energy in the center-of-mass frame (both electrons are assumed
+                    // to carry an equal share of the energy):
+                    //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
                     const amrex::ParticleReal p_e = std::sqrt(
-                        E_out / (1.0_prt/m0 + 0.5_prt*s2/m_ion) );
+                        E_out / (1.0_prt/m0 + 0.5_prt*scaled_u2_ion/m_ion) );
 
-                    // Assign the velocities (still in the COM frame; the surrounding code
+                    // Assign the normalized momenta (still in the COM frame; the surrounding code
                     // transforms them back to the lab frame). The incident electron is in
                     // slot 0; the two products of the ionized target (slots 2 and 3) are
                     // one electron and one ion, the electron being the lighter of the two.
-                    ux0 = p_e/m0 * d0x;
-                    uy0 = p_e/m0 * d0y;
-                    uz0 = p_e/m0 * d0z;
+                    ux0 = p_e/m0 * scaled_ux0;
+                    uy0 = p_e/m0 * scaled_uy0;
+                    uz0 = p_e/m0 * scaled_uz0;
                     if (mass_slot2 < mass_slot3) {
                         // slot 2 is the freed electron, slot 3 is the ion
-                        ux2 =  p_e/m0    * d1x;
-                        uy2 =  p_e/m0    * d1y;
-                        uz2 =  p_e/m0    * d1z;
-                        ux3 = -p_e/m_ion * sx;
-                        uy3 = -p_e/m_ion * sy;
-                        uz3 = -p_e/m_ion * sz;
+                        ux2 = p_e/m0 * scaled_ux_new;
+                        uy2 = p_e/m0 * scaled_uy_new;
+                        uz2 = p_e/m0 * scaled_uz_new;
+                        ux3 = p_e/m_ion * scaled_ux_ion;
+                        uy3 = p_e/m_ion * scaled_uy_ion;
+                        uz3 = p_e/m_ion * scaled_uz_ion;
                     } else {
                         // slot 3 is the freed electron, slot 2 is the ion
-                        ux3 =  p_e/m0    * d1x;
-                        uy3 =  p_e/m0    * d1y;
-                        uz3 =  p_e/m0    * d1z;
-                        ux2 = -p_e/m_ion * sx;
-                        uy2 = -p_e/m_ion * sy;
-                        uz2 = -p_e/m_ion * sz;
+                        ux3 = p_e/m0 * scaled_ux_new;
+                        uy3 = p_e/m0 * scaled_uy_new;
+                        uz3 = p_e/m0 * scaled_uz_new;
+                        ux2 = p_e/m_ion * scaled_ux_ion;
+                        uy2 = p_e/m_ion * scaled_uy_ion;
+                        uz2 = p_e/m_ion * scaled_uz_ion;
                     }
                 }
 
