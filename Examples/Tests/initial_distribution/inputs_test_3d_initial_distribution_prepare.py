@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 
 """
-Create two openPMD files for initializing WarpX particle momenta on a 3D Cartesian grid:
-
-- ``example-u-std.h5`` with mesh ``u_std`` and components ``x``, ``y``, ``z``
-- ``example-u-mean.h5`` with mesh ``u_mean`` and components ``x``, ``y``, ``z``
-
-The component values are normalized momentum components, ``u = gamma * v / c``.
-This test uses the same grid as ``inputs_test_3d_initial_distribution``.
+Create openPMD files containing the mean and standard deviation of the
+normalized momentum components with which WarpX particles should be initialized
+(on a Cartesian grid).
 """
 
 import numpy as np
 import openpmd_api as io
 
+# Define u_mean and u_std as functions of x, y, z, using numpy syntax
+# - Define the grid
 x_1d = np.linspace(-1.0, 1.0, 8)
 y_1d = np.linspace(-1.0, 1.0, 8)
 z_1d = np.linspace(-1.0, 1.0, 8)
 x, y, z = np.meshgrid(x_1d, y_1d, z_1d, indexing="ij")
+
+# - Define the normalized momentum data, u = gamma * v / c
+u_std_val = 3.1622776601683795e-05
+ux_std_data = np.full_like(x, u_std_val, dtype=np.float64)
+uy_std_data = np.full_like(x, u_std_val, dtype=np.float64)
+uz_std_data = np.full_like(x, u_std_val, dtype=np.float64)
+
+ux_mean_data = np.zeros_like(x, dtype=np.float64)
+uy_mean_data = 0.2 * (z + 1.0) / 2.0
+uz_mean_data = np.zeros_like(x, dtype=np.float64)
 
 grid_spacing = np.array(
     [
@@ -29,9 +37,12 @@ grid_offset = [x_1d.min(), y_1d.min(), z_1d.min()]
 
 
 def write_vector_mesh_file(filename, mesh_name, components):
+    # create openPMD file
     series = io.Series(filename, io.Access.create)
+    # only 1 iteration needed
     it = series.iterations[1]
 
+    # set meta information
     mesh = it.meshes[mesh_name]
     mesh.grid_spacing = grid_spacing
     mesh.grid_global_offset = grid_offset
@@ -48,14 +59,13 @@ def write_vector_mesh_file(filename, mesh_name, components):
     series.flush()
 
 
-u_std_val = 3.1622776601683795e-05
 write_vector_mesh_file(
     "example-u-std.h5",
     "u_std",
     {
-        "x": np.full_like(x, u_std_val, dtype=np.float64),
-        "y": np.full_like(y, u_std_val, dtype=np.float64),
-        "z": np.full_like(z, u_std_val, dtype=np.float64),
+        "x": ux_std_data,
+        "y": uy_std_data,
+        "z": uz_std_data,
     },
 )
 
@@ -63,8 +73,8 @@ write_vector_mesh_file(
     "example-u-mean.h5",
     "u_mean",
     {
-        "x": np.zeros_like(x, dtype=np.float64),
-        "y": 0.2 * (z + 1.0) / 2.0,
-        "z": np.zeros_like(z, dtype=np.float64),
+        "x": ux_mean_data,
+        "y": uy_mean_data,
+        "z": uz_mean_data,
     },
 )
