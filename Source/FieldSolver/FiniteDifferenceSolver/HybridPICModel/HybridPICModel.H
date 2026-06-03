@@ -14,6 +14,7 @@
 #include "HybridPICModel_fwd.H"
 
 #include "Fields.H"
+#include "Fluids/QdsmcParticleContainer_fwd.H"
 
 #include "ExternalVectorPotential.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -31,6 +32,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_DistributionMapping.H>
 
+#include <memory>
 #include <optional>
 
 /**
@@ -41,6 +43,9 @@ class HybridPICModel
 {
 public:
     HybridPICModel ();
+    // Defined out-of-line in the .cpp so the unique_ptr<QdsmcParticleContainer>
+    // member can destroy a forward-declared particle container.
+    ~HybridPICModel ();
 
     /** Read user-defined model parameters. Called in constructor. */
     void ReadParameters ();
@@ -210,18 +215,80 @@ public:
         amrex::MultiFab const& rho_field ) const;
 
     /**
-     * \brief Advance the electron pressure by one PIC step combining adiabatic
-     * compression and drag-dissipation heating:
-     *     Pe^{n+1} = Pe^n * (rho^{n+1}/rho^n)^gamma
-     *                + (gamma-1) * W_dot_drag * dt
-     * The heating field hybrid_drag_heating_fp is consumed (read then zeroed)
-     * by this call. Used only when m_use_drag_heating is true; otherwise the
-     * pure-rho closure FillElectronPressureMF is used as before.
+     * \brief Fill the nodal V_e = -(J_plasma - J_i) / (q_e n_e) MultiFabs by
+     *        interpolating the Yee-staggered total plasma current and ion
+     *        current to the nodal grid (using ablastr::coarsen::sample::Interp)
+     *        and dividing by rho. Cells with rho <= rho_floor are left at 0.
      *
-     * \param[in] dt PIC time step
+     *        Reads hybrid_current_fp_plasma (J_plasma), hybrid_current_fp_temp
+     *        (J_i at n+1/2), hybrid_rho_fp_temp (rho at n+1/2). Writes
+     *        hybrid_electron_velocity_fp (3 directions, nodal).
      */
-    void UpdateElectronPressure (amrex::Real dt) const;
-    void UpdateElectronPressure (int lev, amrex::Real dt) const;
+    void QDSMCInitializeUe (int lev) const;
+
+    /**
+     * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
+     *        from the current T_e and rho_fp_temp (= rho at n+1/2). Cells with
+     *        rho <= rho_floor are left at 0.
+     *
+     *        Reads hybrid_electron_temperature_fp (T_e in K) and
+     *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
+     */
+    void QDSMCInitializeKe (int lev) const;
+
+    /**
+     * \brief After the QDSMC scatter, recover T_e^{n+1} from
+     *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
+     *                 / (k_B / q_e)
+     *        using rho at n+1 (rho_fp), the deposited entropy field
+     *        (hybrid_entropy_fp), and the deposited weight field
+     *        (hybrid_qdsmc_weights_fp).
+     *
+     *        Writes hybrid_electron_temperature_fp.
+     */
+    void QDSMCUpdateTe (int lev) const;
+
+    /**
+     * \brief Add the resistive-heating source term to T_e^{n+1}:
+     *           T_e += dt * (gamma-1) * W_dot / (n_e * k_B)
+     *        where W_dot is the per-cell electron-ion frictional dissipation
+     *        power density (W/m^3) accumulated over the step into
+     *        hybrid_drag_heating_fp. Today's only producer is the multispecies
+     *        HybridResistiveDrag operator (kinetic per-ion friction); a future
+     *        eta J^2 Joule operator would write to the same accumulator and
+     *        be picked up by the same source term without further plumbing.
+     *
+     *        Reads hybrid_drag_heating_fp and rho_fp; writes
+     *        hybrid_electron_temperature_fp. Called once per step when
+     *        m_solve_electron_energy_equation and m_include_resistive_heating
+     *        are both true.
+     */
+    void QDSMCAddResistiveHeating (int lev, amrex::Real dt) const;
+
+    /**
+     * \brief Fill hybrid_electron_pressure_fp from T_e and n_e using the
+     *        ideal-gas relation Pe = n_e * k_B * T_e. Called at the end of
+     *        each QDSMC step so the existing Ohm's-law E-solver consumes
+     *        the QDSMC-updated pressure without modification.
+     */
+    void QDSMCFillElectronPressureFromTe (int lev) const;
+
+    /**
+     * \brief Top-level orchestrator for the QDSMC electron-energy step.
+     *
+     * Performs the full Belyaev-style entropy transport over one PIC step:
+     *   1. CalculatePlasmaCurrent so J_plasma is current
+     *   2. QDSMCInitializeUe  (V_e from J_plasma and J_i)
+     *   3. QDSMCInitializeKe  (K_e from T_e^n and rho^n)
+     *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
+     *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
+     *   6. QDSMCAddResistiveHeating (if m_include_resistive_heating is on)
+     *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
+     *   8. Reset QDSMC particles to home positions for the next step
+     *
+     * Called from HybridPICEvolveFields when m_solve_electron_energy_equation is true.
+     */
+    void AdvanceElectronEnergyQDSMC (amrex::Real dt);
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
@@ -250,11 +317,28 @@ public:
     /** Electron pressure scaling exponent */
     amrex::Real m_gamma = 5.0/3.0;
 
-    /** When true, electron pressure is evolved as a state variable that
-     * combines adiabatic compression with drag-dissipation heating from the
-     * HybridResistiveDrag operator. When false (default), Pe is recomputed
-     * from rho each step using the algebraic adiabatic closure. */
-    bool m_use_drag_heating = false;
+    /** Master gate for the electron-energy equation. When true, K_e is
+     * transported each step by QDSMC fictitious particles advecting with
+     * V_e, then T_e is recovered from K_e and n_e via the polytropic
+     * relation, then operator-split source terms (if enabled) are added,
+     * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
+     * false (default), Pe is computed from the algebraic adiabatic closure
+     * (FillElectronPressureMF) — no temperature evolution. */
+    bool m_solve_electron_energy_equation = false;
+
+    /** Operator-split T_e source term: electron-ion frictional dissipation
+     * (Topanga Eq. 12 generalized to multispecies). Reads the per-cell
+     * power density W_dot accumulated in hybrid_drag_heating_fp by whatever
+     * collisional operator is registered (today: HybridResistiveDrag), and
+     * adds it to T_e as dt * (gamma-1) * W_dot / (n_e * k_B). Only consulted
+     * when m_solve_electron_energy_equation is also true. */
+    bool m_include_resistive_heating = false;
+
+    /** Density floor used when dividing by the deposited QDSMC weight to
+     * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
+     * that no QDSMC particle reached during the push. Defaults to the
+     * same floor as the rest of the hybrid solver. */
+    amrex::Real m_qdsmc_n_floor = 1.0;
 
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
@@ -303,6 +387,14 @@ public:
     amrex::GpuArray<int, 3> Ey_IndexType;
     /** Gpu Vector with index type of the Ez multifab */
     amrex::GpuArray<int, 3> Ez_IndexType;
+
+    /** QDSMC fictitious-particle container used to transport the electron
+     *  entropy K_e by V_e over one PIC step. Lazily constructed in InitData
+     *  when m_solve_electron_energy_equation is true; otherwise nullptr.
+     *  Owned by HybridPICModel
+     *  because its lifetime is tied to the electron-energy equation that
+     *  the hybrid model is responsible for. */
+    std::unique_ptr<QdsmcParticleContainer> m_qdsmc_pc;
 };
 
 /**

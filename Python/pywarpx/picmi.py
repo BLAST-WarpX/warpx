@@ -4229,6 +4229,11 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
+                    # Hybrid-PIC electron-energy-equation state. Both are
+                    # always allocated when the hybrid solver is selected,
+                    # zero-initialized otherwise.
+                    "Te",
+                    "Pe",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:

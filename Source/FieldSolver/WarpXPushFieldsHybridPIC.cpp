@@ -60,13 +60,16 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
-    // If drag-dissipation heating is enabled, advance Pe by one PIC step now,
-    // while rho_fp = rho^{n+1} and hybrid_rho_fp_temp still holds rho^{n} from
-    // the previous step's copy. Pure-adiabatic case (no drag, no heating)
-    // telescopes to the same answer as the legacy CalculateElectronPressure
-    // path; with heating, the (gamma-1) W_dot_drag dt term is added in.
-    if (m_hybrid_pic_model->m_use_drag_heating) {
-        m_hybrid_pic_model->UpdateElectronPressure(dt[0]);
+    // Electron-pressure update. When solve_electron_energy_equation is on,
+    // run the QDSMC entropy-transport step (which also emits Pe = n_e k_B T_e
+    // at the end). Otherwise the legacy algebraic adiabatic closure is run
+    // below (at ~L213) — Pe is recomputed each step from rho with no
+    // temperature evolution.
+    //
+    // QDSMC needs rho_fp = rho^{n+1} and hybrid_rho_fp_temp = rho^{n}, which
+    // the deposit just above has established.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->AdvanceElectronEnergyQDSMC(dt[0]);
     }
 
     // Get the external current
@@ -169,11 +172,10 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1. When drag-dissipation heating
-    // is enabled, Pe is a state variable already advanced earlier in this
-    // function by UpdateElectronPressure() (right after the deposit), so the
-    // legacy pure-rho closure must NOT overwrite it here.
-    if (!m_hybrid_pic_model->m_use_drag_heating) {
+    // Calculate the electron pressure at t=n+1. When QDSMC is enabled, Pe was
+    // already emitted earlier in this function by AdvanceElectronEnergyQDSMC,
+    // so the legacy algebraic adiabatic closure must NOT overwrite it here.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
         m_hybrid_pic_model->CalculateElectronPressure();
     }
 
@@ -342,11 +344,12 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // still empty.
         HybridPICDepositRhoAndJ();
 
-        // Seed the electron pressure state variable from the adiabatic closure
-        // using the freshly deposited rho. When use_drag_heating is off this
-        // is also recomputed every step inside HybridPICEvolveFields and is
-        // harmless. When on, this is the initial condition for the state
-        // variable Pe that will subsequently be advanced by UpdateElectronPressure.
+        // Seed the electron pressure from the adiabatic closure using the
+        // freshly deposited rho. When solve_electron_energy_equation is off,
+        // this is also recomputed every step inside HybridPICEvolveFields
+        // and is harmless. When on, this provides Pe^0 for the first QDSMC
+        // step (which will overwrite it via QDSMCFillElectronPressureFromTe
+        // after the first entropy transport).
         m_hybrid_pic_model->CalculateElectronPressure();
 
         // Handle field splitting for Hybrid field push

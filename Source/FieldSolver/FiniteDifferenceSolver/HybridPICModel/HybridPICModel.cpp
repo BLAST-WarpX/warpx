@@ -17,6 +17,7 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
+#include "Fluids/QdsmcParticleContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
@@ -28,6 +29,8 @@ HybridPICModel::HybridPICModel ()
 {
     ReadParameters();
 }
+
+HybridPICModel::~HybridPICModel () = default;
 
 void HybridPICModel::ReadParameters ()
 {
@@ -72,12 +75,24 @@ void HybridPICModel::ReadParameters ()
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
-    // Opt-in to drag-dissipation heating of the electron pressure. When
-    // enabled, Pe becomes a state variable that combines adiabatic
-    // compression with the per-cell heating accumulated by any
-    // hybrid_resistive_drag collision operator. Default off preserves the
-    // pure-rho adiabatic closure for backward compatibility.
-    pp_hybrid.query("use_drag_heating", m_use_drag_heating);
+    // Master gate for the electron-energy equation. When enabled, K_e is
+    // advected each step by fictitious Lagrangian particles moving with V_e
+    // (Belyaev et al. 2024, "Topanga"); T_e is recovered from K_e and n_e
+    // via the polytropic relation; operator-split source terms are added;
+    // Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. Default off
+    // preserves the legacy algebraic adiabatic closure.
+    pp_hybrid.query("solve_electron_energy_equation",
+                    m_solve_electron_energy_equation);
+    pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
+
+    // Operator-split T_e source term: electron-ion frictional dissipation.
+    // Reads the per-cell W_dot accumulated in hybrid_drag_heating_fp by the
+    // registered collisional operator (today HybridResistiveDrag, multispecies
+    // kinetic). Reduces to the single-species fluid eta J^2 Joule-heating
+    // form (Topanga Eq. 12) under Spitzer + quasi-neutrality. Only consulted
+    // when solve_electron_energy_equation is also true.
+    pp_hybrid.query("include_resistive_heating",
+                    m_include_resistive_heating);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -123,18 +138,51 @@ void HybridPICModel::AllocateLevelMFs (
     using ablastr::fields::Direction;
 
     // The "hybrid_electron_pressure_fp" multifab stores the electron pressure
-    // calculated from the specified equation of state (or, when use_drag_heating
-    // is on, evolved as a state variable that includes drag-dissipation heating
-    // from the HybridResistiveDrag operator).
+    // consumed by the Ohm's-law E-solve. With solve_electron_energy_equation
+    // off, it is computed from the algebraic adiabatic closure each step. With
+    // it on, Pe = n_e k_B T_e is emitted by QDSMCFillElectronPressureFromTe
+    // at the end of each QDSMC entropy-transport step.
     fields.alloc_init(FieldType::hybrid_electron_pressure_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
     // The "hybrid_drag_heating_fp" multifab stores the per-cell drag-dissipation
     // power density (W/m^3) accumulated by the HybridResistiveDrag operator
-    // over one PIC step. Only consumed when m_use_drag_heating is true.
+    // over one PIC step. Only consumed when m_include_resistive_heating is true.
     // Allocated unconditionally so the drag operator can write to it.
     fields.alloc_init(FieldType::hybrid_drag_heating_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+
+    // QDSMC electron-energy-equation state. Three nodal scalar fields,
+    // all allocated unconditionally (cheap; the QDSMC orchestration
+    // only touches them when m_solve_electron_energy_equation is on, but having them always
+    // available simplifies the diagnostic side and keeps the state
+    // shape independent of the run-time flag).
+    //   * hybrid_electron_temperature_fp : T_e (Joules)
+    //   * hybrid_entropy_fp              : K_e = T_e * n_e^(1-gamma)
+    //   * hybrid_qdsmc_weights_fp        : scratch for deposited N_e
+    fields.alloc_init(FieldType::hybrid_electron_temperature_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+    fields.alloc_init(FieldType::hybrid_entropy_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+    fields.alloc_init(FieldType::hybrid_qdsmc_weights_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+
+    // Three-component electron fluid velocity V_e on a NODAL grid. Computed
+    // each step from V_e = -(J_plasma - J_i) / (q_e * n_e) via interpolation
+    // of the Yee-staggered J fields to the nodal grid; consumed by the
+    // QDSMC particle SetV step to advect the entropy carriers.
+    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{0},
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{1},
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{2},
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
@@ -337,6 +385,29 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     if (m_add_external_fields) {
         m_external_vector_potential->InitData();
     }
+
+    // Seed T_e with the uniform value parsed from <hybrid>.elec_temp (in
+    // Joules after ReadParameters, so dividing by k_B gives Kelvin). Done
+    // unconditionally so the iter-0 diag dump — which WarpX::InitData()
+    // flushes BEFORE the first call to HybridPICInitializeRhoJandB — sees
+    // a meaningful T_e rather than the zero-initialized allocation. With
+    // the energy equation on, this is the starting K_e value the QDSMC
+    // particles will read on the first step; with it off, the diagnostic
+    // value gets overwritten each step by CalculateElectronPressure.
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        amrex::MultiFab & Te_mf = *warpx.m_fields.get(
+            FieldType::hybrid_electron_temperature_fp, lev);
+        Te_mf.setVal(m_elec_temp / PhysConst::kb);
+    }
+
+    // QDSMC: lazy-construct the fictitious-particle container and lay one
+    // particle per cell.
+    if (m_solve_electron_energy_equation) {
+        m_qdsmc_pc = std::make_unique<QdsmcParticleContainer>(&warpx);
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            m_qdsmc_pc->InitParticles(lev);
+        }
+    }
 }
 
 void HybridPICModel::GetCurrentExternal ()
@@ -478,6 +549,36 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
+
+    // Diagnostic-only: mirror the algebraic closure's implied electron
+    // temperature into hybrid_electron_temperature_fp so the Te diag dump
+    // is meaningful even when solve_electron_energy_equation is off. With
+    // the polytropic Pe = n0_ref^(-gamma) * (rho/q_e)^gamma * k_B * Te_ref,
+    // the per-cell implied T_e is just Pe / (n_e * k_B). When the energy
+    // equation is on, this path is skipped and T_e is owned by QDSMC.
+    {
+        amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+        amrex::MultiFab const & Pe  = *electron_pressure_fp;
+        amrex::MultiFab const & rho = *rho_fp;
+        auto const rho_floor = PhysConst::q_e * m_n_floor;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
+            amrex::Array4<amrex::Real const> const & Pe_arr  = Pe.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+            amrex::Box const & tbox = mfi.tilebox();
+            amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
+                amrex::Real const ne      = rho_val / PhysConst::q_e;
+                Te_arr(i,j,k) = Pe_arr(i,j,k) / (ne * PhysConst::kb);
+            });
+        }
+    }
+
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
         WarpX::do_single_precision_comms,
@@ -678,67 +779,345 @@ void HybridPICModel::FillElectronPressureMF (
     }
 }
 
-void HybridPICModel::UpdateElectronPressure (amrex::Real const dt) const
+// =============================================================================
+// QDSMC electron-energy-equation orchestration
+// =============================================================================
+//
+// All four methods below are NO-OPs when m_solve_electron_energy_equation is false; they are
+// invoked from HybridPICEvolveFields only when QDSMC is enabled. They operate
+// on the level-`lev` MultiFabs of WarpX's MultiFabRegister and use the same
+// Yee->nodal interpolation (`ablastr::coarsen::sample::Interp`) as the rest
+// of the hybrid solver.
+
+void HybridPICModel::QDSMCInitializeUe (int const lev) const
 {
-    auto& warpx = WarpX::GetInstance();
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
-    {
-        UpdateElectronPressure(lev, dt);
-    }
-}
+    ABLASTR_PROFILE("HybridPICModel::QDSMCInitializeUe()");
 
-void HybridPICModel::UpdateElectronPressure (const int lev, amrex::Real const dt) const
-{
-    // Combined adiabatic-compression + drag-dissipation heating step. Must
-    // be called once per PIC step from HybridPICEvolveFields, *after*
-    // HybridPICDepositRhoAndJ has populated rho_fp with rho^{n+1} while
-    // hybrid_rho_fp_temp still holds rho^{n} from the previous step's copy.
-    //
-    //   Pe^{n+1}(x) = Pe^{n}(x) * (rho^{n+1}/rho^{n})^gamma
-    //               + (gamma - 1) * W_dot_drag(x) * dt
-    //
-    // The first term is the adiabatic part: it telescopes exactly to the
-    // pure-rho closure used by FillElectronPressureMF when W_dot_drag = 0
-    // (i.e. when no drag is registered or use_drag_heating is off).
-    //
-    // The heating field is consumed: zeroed at the end of this call so the
-    // next step's drag accumulation starts from zero.
-    ABLASTR_PROFILE("WarpX::UpdateElectronPressure()");
+    using ablastr::fields::Direction;
 
-    auto& warpx = WarpX::GetInstance();
-    amrex::MultiFab const & rho_new = *warpx.m_fields.get(FieldType::rho_fp, lev);
-    amrex::MultiFab const & rho_old = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
-    amrex::MultiFab       & heating = *warpx.m_fields.get(FieldType::hybrid_drag_heating_fp, lev);
-    amrex::MultiFab       & Pe      = *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    auto & warpx = WarpX::GetInstance();
+    amrex::Geometry const & geom = warpx.Geom(lev);
+    amrex::Periodicity const & period = geom.periodicity();
 
-    auto const gamma          = m_gamma;
-    auto const gamma_minus_1  = m_gamma - 1.0_rt;
-    auto const rho_floor      = m_n_floor * PhysConst::q_e;
+    // V_e and rho live at the nodal grid; J_plasma and J_i are Yee-staggered.
+    amrex::MultiFab       & Vex = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{0}, lev);
+    amrex::MultiFab       & Vey = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
+    amrex::MultiFab       & Vez = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
+
+    amrex::MultiFab const & rho_temp = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
+
+    ablastr::fields::VectorField J_plasma =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    ablastr::fields::VectorField J_i =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
+
+    amrex::Real const rho_floor = PhysConst::q_e * m_n_floor;
+
+    amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
+
+    Vex.setVal(0.0_rt);
+    Vey.setVal(0.0_rt);
+    Vez.setVal(0.0_rt);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for ( MFIter mfi(Pe, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for (MFIter mfi(Vex, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        Array4<Real>       const & Pe_arr = Pe.array(mfi);
-        Array4<Real const> const & rn_arr = rho_new.const_array(mfi);
-        Array4<Real const> const & ro_arr = rho_old.const_array(mfi);
-        Array4<Real const> const & W_arr  = heating.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho_temp.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jpx     = J_plasma[0]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jpy     = J_plasma[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jpz     = J_plasma[2]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jix     = J_i[0]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jiy     = J_i[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const & Jiz     = J_i[2]->const_array(mfi);
+        amrex::Array4<amrex::Real>       const & Vex_arr = Vex.array(mfi);
+        amrex::Array4<amrex::Real>       const & Vey_arr = Vey.array(mfi);
+        amrex::Array4<amrex::Real>       const & Vez_arr = Vez.array(mfi);
 
-        Box const& tbox = mfi.tilebox();
+        amrex::Box const & tbox = mfi.tilebox();
+
         amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            Real const rn = std::max(rn_arr(i,j,k), rho_floor);
-            Real const ro = std::max(ro_arr(i,j,k), rho_floor);
-            Real const ratio = rn / ro;
-            Pe_arr(i,j,k) = Pe_arr(i,j,k) * std::pow(ratio, gamma)
-                          + gamma_minus_1 * W_arr(i,j,k) * dt;
+            if (rho_arr(i,j,k) <= rho_floor) { return; }
+
+            amrex::Real const rho_val = rho_arr(i,j,k);
+
+            auto const jx  = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jy  = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jz  = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jix = ablastr::coarsen::sample::Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiy = ablastr::coarsen::sample::Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiz = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
+
+            // V_e = -(J_plasma - J_i) / (q_e * n_e) = -(J_plasma - J_i) / rho_val
+            Vex_arr(i,j,k) = -(jx - jix) / rho_val;
+            Vey_arr(i,j,k) = -(jy - jiy) / rho_val;
+            Vez_arr(i,j,k) = -(jz - jiz) / rho_val;
         });
     }
 
-    // Consume the heating accumulator: zero it so the next step starts fresh.
-    heating.setVal(0.0_rt);
+    Vex.FillBoundary(Vex.nGrowVect(), period);
+    Vey.FillBoundary(Vey.nGrowVect(), period);
+    Vez.FillBoundary(Vez.nGrowVect(), period);
 }
+
+
+void HybridPICModel::QDSMCInitializeKe (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCInitializeKe()");
+
+    auto & warpx = WarpX::GetInstance();
+    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
+
+    amrex::MultiFab       & Ke  = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,                lev);
+    amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp,   lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp,               lev);
+
+    Ke.setVal(0.0_rt);
+
+    auto const gamma     = m_gamma;
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+    // Conversion factor used by helion to keep K_e numerically O(1): T_e in K
+    // is multiplied by (k_B / q_e) so K_e ends up scaled in eV-equivalent.
+    auto const kb_over_qe = PhysConst::kb / PhysConst::q_e;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Ke, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Ke_arr  = Ke.array(mfi);
+        amrex::Array4<amrex::Real const> const & Te_arr  = Te.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+
+        amrex::Box const tbox = amrex::convert(mfi.tilebox(), Ke.ixType().toIntVect());
+        amrex::Box       box  = tbox;
+        box.grow(Ke.nGrowVect());
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            if (rho_arr(i,j,k) <= rho_floor) { return; }
+            amrex::Real const ne = rho_arr(i,j,k) / PhysConst::q_e;
+            Ke_arr(i,j,k) = Te_arr(i,j,k) * std::pow(ne, 1.0_rt - gamma) * kb_over_qe;
+        });
+    }
+
+    Ke.FillBoundary(Ke.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCUpdateTe (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCUpdateTe()");
+
+    auto & warpx = WarpX::GetInstance();
+    amrex::Geometry const & geom = warpx.Geom(lev);
+    amrex::Periodicity const & period = geom.periodicity();
+
+    // After the QDSMC scatter, weights_fp ~= n_e (density) and entropy_fp ~=
+    // K_e * N_e (entropy weighted by count, summed). Recover T_e_new:
+    //
+    //   K_e_new = entropy_fp / (weights_fp * V_cell)
+    //   T_e_new = K_e_new / (n_e_new^(1-gamma) * k_B / q_e)
+    //
+    // n_e_new comes from rho_fp (post-deposit, post-particle-push).
+
+    auto const dx_arr = geom.CellSizeArray();
+    amrex::Real cell_volume = 1.0_rt;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { cell_volume *= dx_arr[d]; }
+
+    amrex::MultiFab       & Te      = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & Ke      = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,              lev);
+    amrex::MultiFab const & weights = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp,        lev);
+    amrex::MultiFab const & rho     = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+
+    Te.setVal(0.0_rt);
+
+    auto const gamma      = m_gamma;
+    auto const n_floor    = m_qdsmc_n_floor;
+    auto const kb_over_qe = PhysConst::kb / PhysConst::q_e;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Te_arr      = Te.array(mfi);
+        amrex::Array4<amrex::Real const> const & Ke_arr      = Ke.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & weights_arr = weights.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr     = rho.const_array(mfi);
+
+        amrex::Box const tbox = amrex::convert(mfi.tilebox(), Te.ixType().toIntVect());
+        amrex::Box       box  = tbox;
+        box.grow(Te.nGrowVect());
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            if (rho_arr(i,j,k) <= 0.0_rt) { return; }
+            amrex::Real const ne = rho_arr(i,j,k) / PhysConst::q_e;
+            amrex::Real const w  = weights_arr(i,j,k) * cell_volume;
+            if ((w <= 0.0_rt) || (ne <= n_floor)) { return; }
+            Te_arr(i,j,k) = Ke_arr(i,j,k)
+                          / std::pow(ne, 1.0_rt - gamma)
+                          / w
+                          / kb_over_qe;
+        });
+    }
+
+    Te.FillBoundary(Te.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCAddResistiveHeating (int const lev, amrex::Real const dt) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCAddResistiveHeating()");
+
+    auto & warpx = WarpX::GetInstance();
+    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
+
+    // T_e += dt * W_dot_drag / ((gamma-1)^{-1} * n_e * k_B)
+    //      = dt * (gamma-1) * W_dot_drag / (n_e * k_B)
+    //
+    // Where W_dot is the per-cell electron-ion frictional dissipation power
+    // density (W/m^3) accumulated into hybrid_drag_heating_fp by the registered
+    // collisional operator (today HybridResistiveDrag). The field is consumed
+    // (zeroed) at the end so the next step starts from a clean accumulator.
+
+    amrex::MultiFab       & Te       = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & rho      = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+    amrex::MultiFab       & heating  = *warpx.m_fields.get(FieldType::hybrid_drag_heating_fp,         lev);
+
+    auto const gamma_minus_1 = m_gamma - 1.0_rt;
+    auto const rho_floor     = PhysConst::q_e * m_n_floor;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & W_arr   = heating.const_array(mfi);
+
+        amrex::Box const & tbox = mfi.tilebox();
+        amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            if (rho_arr(i,j,k) <= rho_floor) { return; }
+            amrex::Real const ne = rho_arr(i,j,k) / PhysConst::q_e;
+            Te_arr(i,j,k) += dt * gamma_minus_1 * W_arr(i,j,k) / (ne * PhysConst::kb);
+        });
+    }
+
+    heating.setVal(0.0_rt);
+    Te.FillBoundary(Te.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCFillElectronPressureFromTe()");
+
+    auto & warpx = WarpX::GetInstance();
+
+    amrex::MultiFab       & Pe  = *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Pe, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Pe_arr  = Pe.array(mfi);
+        amrex::Array4<amrex::Real const> const & Te_arr  = Te.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+
+        amrex::Box const & tbox = mfi.tilebox();
+        amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
+            amrex::Real const ne      = rho_val / PhysConst::q_e;
+            Pe_arr(i,j,k) = ne * PhysConst::kb * Te_arr(i,j,k);
+        });
+    }
+}
+
+
+void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt)
+{
+    ABLASTR_PROFILE("HybridPICModel::AdvanceElectronEnergyQDSMC()");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_qdsmc_pc != nullptr,
+        "AdvanceElectronEnergyQDSMC called with "
+        "solve_electron_energy_equation=true but the "
+        "QDSMC particle container was not constructed (InitData not run?)");
+
+    auto & warpx = WarpX::GetInstance();
+
+    // J_plasma at the current B (B^{n+1/2} from the last Faraday substep) is
+    // needed for V_e. The downstream final-state E-solve also recomputes
+    // J_plasma later, so this call is redundant work in some configurations
+    // but keeps the QDSMC sequence self-contained.
+    CalculatePlasmaCurrent(
+        warpx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, warpx.finestLevel()),
+        warpx.GetEBUpdateEFlag());
+
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        // Step 1: grid-side initialization at t = n
+        QDSMCInitializeUe(lev);
+        QDSMCInitializeKe(lev);
+
+        using ablastr::fields::Direction;
+        amrex::MultiFab const & Vex = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{0}, lev);
+        amrex::MultiFab const & Vey = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
+        amrex::MultiFab const & Vez = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
+        amrex::MultiFab const & Ke  = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,           lev);
+        amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp,          lev);
+        amrex::MultiFab       & Karr_out    = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,        lev);
+        amrex::MultiFab       & weights_out = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp, lev);
+
+        // Step 2: load each QDSMC particle with V_e and (K_e * N_e, N_e) from
+        // its home cell.
+        m_qdsmc_pc->SetV(lev, Vex, Vey, Vez);
+        m_qdsmc_pc->SetK(lev, Ke, rho);
+
+        // Step 3: forward-Euler push by dt; redistribute so particles end up
+        // in their new tile.
+        m_qdsmc_pc->PushX(lev, dt);
+
+        // Step 4: scatter the carried entropy and weight onto the grid (each
+        // call zeroes its target field, then deposits, then SumBoundary).
+        m_qdsmc_pc->DepositK(lev, Karr_out);
+        m_qdsmc_pc->DepositField(lev, weights_out);
+
+        // Step 5: recover T_e^{n+1} from (deposited K*N) / (deposited N) and
+        // the updated n_e (from rho_fp = rho^{n+1}).
+        QDSMCUpdateTe(lev);
+
+        // Step 6: add drag-dissipation heating, if enabled. Consumes (zeroes)
+        // hybrid_drag_heating_fp.
+        if (m_include_resistive_heating) {
+            QDSMCAddResistiveHeating(lev, dt);
+        }
+
+        // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law solve.
+        QDSMCFillElectronPressureFromTe(lev);
+
+        // Step 8: reset particles to home positions (and zero velocity /
+        // weight / entropy) so the next step starts with a clean grid.
+        m_qdsmc_pc->ResetParticles(lev);
+    }
+}
+
 
 void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Bfield,

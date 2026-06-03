@@ -69,7 +69,7 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     const auto drag_func = m_drag_func;
     auto const * hybrid_model = warpx.get_pointer_HybridPICModel();
     const amrex::Real electron_temp = hybrid_model->m_elec_temp;
-    const bool use_drag_heating = hybrid_model->m_use_drag_heating;
+    const bool include_resistive_heating = hybrid_model->m_include_resistive_heating;
     // Species mass per macroparticle is needed to convert the per-particle
     // friction work into a per-cell W_dot contribution to the electron-pressure
     // heating equation.
@@ -156,7 +156,7 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
                 attribs[PIdx::w].dataPtr();
 
             // Writable heating accumulator (NGP atomic deposit into the cell
-            // containing the particle). Only written when use_drag_heating is on.
+            // containing the particle). Only written when include_resistive_heating is on.
             amrex::Array4<amrex::Real> const heating_arr = heating_fp.array(pti);
 
             const auto getPosition = GetParticlePosition<PIdx>(pti);
@@ -230,11 +230,11 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
                 //   W_dot_p = w_p * m_s * nu * |V_s - V_e|^2   [J/s]
                 // to the cell containing it. Sum over particles in the cell
                 // gives W_dot per cell; dividing by cell_volume yields the
-                // per-cell power density (W/m^3) consumed by UpdateElectronPressure.
+                // per-cell power density (W/m^3) consumed by QDSMCAddResistiveHeating.
                 // NGP scatter is sufficient here: the heating is an integrated
                 // quantity and the shape-factor smoothing already lives in the
                 // gathered V_s, V_e via the binomial filter on those fields.
-                if (use_drag_heating) {
+                if (include_resistive_heating) {
                     const amrex::Real dV2 = dVx*dVx + dVy*dVy + dVz*dVz;
                     const amrex::Real Wdot_p =
                         wp_arr[ip] * species_mass * nu * dV2 * inv_cell_volume;

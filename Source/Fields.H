@@ -46,7 +46,11 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
-        hybrid_drag_heating_fp,      /**< Used with Ohm's law solver. Stores per-cell drag-dissipation power density W_dot accumulated by the HybridResistiveDrag collision operator over one PIC step; integrated into the electron pressure each step when use_drag_heating is on. */
+        hybrid_drag_heating_fp,      /**< Used with Ohm's law solver. Per-cell electron-ion frictional dissipation power density W_dot (W/m^3) accumulated by the HybridResistiveDrag collision operator over one PIC step. Consumed (read + zeroed) by QDSMCAddResistiveHeating each step when solve_electron_energy_equation and include_resistive_heating are both on. */
+        hybrid_electron_temperature_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron temperature T_e (Joules) as a state variable; updated each step from the entropy K_e after QDSMC scatter and used as input for the polytropic pressure relation. */
+        hybrid_entropy_fp,           /**< Used with the QDSMC electron-energy equation. Stores the electron entropy K_e = T_e * n_e^(1-gamma) on the grid; the QDSMC fictitious particles read this at the start of each step and rewrite it after Lagrangian advection. */
+        hybrid_qdsmc_weights_fp,     /**< Used with the QDSMC electron-energy equation. Scratch field for the per-cell weight (N_e) deposited by QDSMC particles after their push, used to recover K_e^{n+1} as (deposited K*N) / (deposited N). */
+        hybrid_electron_velocity_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components); read by QDSMC SetV at the start of each step to advect the entropy-carrying particles. */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
