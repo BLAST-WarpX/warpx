@@ -6,14 +6,17 @@
 
 # WarpX PICMI bindings w/o C++ component (used for autoclass docs)
 -e ../Python
+# render the pydantic-based PICMI classes (and warpx_ extensions) in the API docs:
+autodoc_pydantic>=2
 breathe
 docutils>=0.17.1
 
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
-picmistandard==0.34.0
-# for development against an unreleased PICMI version, use:
-# picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
+# This development branch documents the in-progress PICMI pydantic refactoring
+# (picmi-standard/picmi#133). Restore the released pin below once it is merged & released:
+# picmistandard==0.34.0
+picmistandard @ git+https://github.com/chillenzer/picmi.git@pydantic-refactoring
 
 pybtex
 pygments

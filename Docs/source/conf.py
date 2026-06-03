@@ -75,8 +75,24 @@ extensions = [
     "breathe",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "sphinxcontrib.autodoc_pydantic",
     "parmparse",
 ]
+
+# -- autodoc-pydantic ---------------------------------------------------------
+# The PICMI bindings are pydantic models; render their (and the warpx_ extension)
+# fields cleanly, hiding the pydantic internals.
+autodoc_pydantic_model_show_json = False
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_show_validator_summary = False
+autodoc_pydantic_model_show_validator_members = False
+autodoc_pydantic_model_show_field_summary = False
+autodoc_pydantic_model_member_order = "bysource"
+autodoc_pydantic_field_list_validators = False
+autodoc_pydantic_field_show_constraints = False
+autodoc_pydantic_field_show_default = True
+autodoc_pydantic_field_show_alias = True
+autodoc_pydantic_field_swap_name_and_alias = True
 
 # Google Analytics
 googleanalytics_id = "G-QZGY5060MZ"
