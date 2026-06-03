@@ -15,6 +15,60 @@
 #include <cmath>  // isnan() isinf()
 #include <limits> // numeric_limits<float>::min()
 
+enum CumulativeScatteringMethod
+{
+    NANBU,
+    BOBYLEV
+};
+
+/* \brief Helper function to sample cosine of scattering angle from Nanbu's
+ *        cumulative scattering distribution. See PhysRevE.55.4642 (1997).
+ *        @param[in] s12 is the distribution variance
+ *        @param[in] r is a random number between zero and one.
+ *        @param[in] engine is a random number engine.
+ */
+
+template <typename T_PR>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+T_PR SampleNanbu (
+    T_PR const s12, T_PR r,
+    amrex::RandomEngine const& engine )
+{
+    using namespace amrex::literals;
+
+    T_PR cosXs;
+    if ( s12 <= T_PR(0.1) )
+    {
+        while ( true )
+        {
+            cosXs = T_PR(1.0) + s12 * std::log(r);
+            // Avoid the bug when r is too small such that cosXs < -1
+            if ( cosXs >= T_PR(-1.0) ) { break; }
+            r = amrex::Random(engine);
+        }
+    }
+    else if ( s12 > T_PR(0.1) && s12 <= T_PR(3.0) )
+    {
+        T_PR const Ainv = static_cast<T_PR>(
+            0.0056958 + 0.9560202*s12 - 0.508139*s12*s12 +
+            0.47913906*s12*s12*s12 - 0.12788975*s12*s12*s12*s12 + 0.02389567*s12*s12*s12*s12*s12);
+        cosXs = Ainv * std::log( std::exp(T_PR(-1.0)/Ainv) +
+                T_PR(2.0) * r * std::sinh(T_PR(1.0)/Ainv) );
+    }
+    else if ( s12 > T_PR(3.0) && s12 <= T_PR(6.0) )
+    {
+        T_PR const A = T_PR(3.0) * std::exp(-s12);
+        cosXs = T_PR(1.0)/A * std::log( std::exp(-A) +
+                T_PR(2.0) * r * std::sinh(A) );
+    }
+    else
+    {
+        cosXs = T_PR(2.0) * r - T_PR(1.0);
+    }
+
+    return cosXs;
+}
+
 /* \brief Update particle velocities according to
  *        F. Perez et al., Phys.Plasmas.19.083104 (2012),
  *        which is based on Nanbu's method, PhysRevE.55.4642 (1997).
@@ -23,6 +77,7 @@
  *        otherwise L will be calculated based on the algorithm.
  *        @param[in] n12 = max(w1,w2)*min(N1,N2)/dV is the effective density used for s12
  *        @param[in] sigma_max is the maximum cross section based on mfp = atomic spacing
+ *        @param[in] scattering_method is the cumulative scattering method
  *        used for the normalized scattering length s12 (see Sec. II.C of Perez et al.)
  *        To see if there are nan or inf updated velocities,
  *        compile with USE_ASSERTION=TRUE.
@@ -40,6 +95,7 @@ void UpdateMomentumPerezElastic (
     T_PR const q2, T_PR const m2, T_PR const w2,
     T_PR const n12, T_PR const sigma_max,
     T_PR const L, T_PR const bmax,
+    CumulativeScatteringMethod const scattering_method,
     T_R const dt, amrex::RandomEngine const& engine )
 {
 
@@ -157,8 +213,15 @@ void UpdateMomentumPerezElastic (
         // Get random numbers
         T_PR r = amrex::Random(engine);
 
-        // Compute scattering angle using Delta function distribution
-        T_PR const cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
+        T_PR cosXs = T_PR(0.0);
+        if (scattering_method == NANBU) {
+            // Obtain scattering angle by sampling from Nanbu's distibution
+            cosXs = SampleNanbu(s12, r, engine);
+        }
+        else if (scattering_method == BOBYLEV) {
+            // Obtain scattering angle from Bobylev's delta function distribution
+            cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
+        }
         T_PR const sinXs = std::sqrt(T_PR(1.0) - cosXs*cosXs);
 
         // Get random azimuthal angle
