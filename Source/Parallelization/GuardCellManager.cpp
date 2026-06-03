@@ -186,7 +186,9 @@ guardCellManager::Init (
 
     if (use_filter)
     {
-        ng_alloc_J += bilinear_filter_stencil_length - amrex::IntVect(1);
+        const amrex::IntVect extra = bilinear_filter_stencil_length - amrex::IntVect(1);
+        ng_alloc_J += extra;
+        ng_alloc_Rho += extra;
     }
 
     // After pushing particle
