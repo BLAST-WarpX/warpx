@@ -46,7 +46,6 @@ def write_vector_mesh_file(filename, mesh_name, components):
         component.store_chunk(data)
 
     series.flush()
-    del series
 
 
 u_std_val = 3.1622776601683795e-05
