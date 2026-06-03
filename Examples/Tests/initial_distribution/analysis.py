@@ -8,14 +8,14 @@
 
 # This script tests initial distributions.
 # 1 denotes gaussian distribution.
-# 2 denotes maxwell-boltzmann distribution.
+# 2 denotes maxwellian distribution.
 # 3 denotes maxwell-juttner distribution.
 # 4 denotes gaussian position distribution.
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
-# 6 denotes maxwell-boltzmann distribution w/ constant velocity
-# 7 denotes maxwell-boltzmann distribution w/ spatially-varying velocity
+# 6 denotes maxwellian distribution w/ constant velocity
+# 7 denotes maxwellian distribution w/ spatially-varying velocity
 # 8 denotes uniform distribution
-# 9 denotes gaussian_parser distribution w/ spatially-varying mean and thermal velocity
+# 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import sys
@@ -31,7 +31,7 @@ tolerance = 0.02
 print("Tolerance:", tolerance)
 
 # ===============================
-# gaussian and maxwell-boltzmann
+# gaussian and maxwellian
 # ===============================
 
 # load data
@@ -63,7 +63,7 @@ f_peak = np.amax(f)
 
 # compute error
 # note that parameters are chosen such that gaussian and
-# maxwell-boltzmann distributions are identical
+# maxwellian distributions are identical
 f1_error = (
     np.sum(np.abs(f - h1x) + np.abs(f - h1y) + np.abs(f - h1z))
     / bin_value.size
@@ -76,7 +76,7 @@ f2_error = (
 )
 
 print("Gaussian distribution difference:", f1_error)
-print("Maxwell-Boltzmann distribution difference:", f2_error)
+print("Maxwellian distribution difference:", f2_error)
 
 assert f1_error < tolerance
 assert f2_error < tolerance
@@ -256,7 +256,7 @@ print("Maxwell-Juttner parser temperature difference:", f5_error)
 assert f5_error < tolerance
 
 # ==============================================
-# maxwell-boltzmann with constant bulk velocity
+# maxwellian with constant bulk velocity
 # ==============================================
 
 # load data
@@ -294,7 +294,7 @@ print("Maxwell-Boltzmann constant velocity difference:", f6_error)
 assert f6_error < tolerance
 
 # ============================================
-# maxwell-boltzmann with parser bulk velocity
+# maxwellian with parser bulk velocity
 # ============================================
 
 # load data
@@ -336,7 +336,7 @@ f7_error = (
     / f_peak
 )
 
-print("Maxwell-Boltzmann parser velocity difference:", f7_error)
+print("Maxwellian parser velocity difference:", f7_error)
 
 assert f7_error < tolerance
 
@@ -457,6 +457,6 @@ f9_error = (
     / bin_value_ux.size
 )
 
-print("gaussian_parse_momentum_function velocity difference:", f9_error)
+print("maxwellian parser mean/std velocity difference:", f9_error)
 
 assert f9_error < tolerance
