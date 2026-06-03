@@ -502,81 +502,65 @@ public:
                 else
                 {
                     // Electron impact ionization (the incident particle is an electron).
-                    // Distribution of momentum and energy is done as follows:
-                    // Three numbers are generated that satisfy the triangle
-                    // inequality. These numbers will be scaled to give the
-                    // momentum for each particle (satisfying the triangle
-                    // inequality ensures that the momentum vectors can be
-                    // arranged such that the net linear momentum is zero).
-                    // Product 2 is definitely an ion, so we first choose its
-                    // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
-                    // R is a random number between 0 and 1.
-                    // The other two numbers (n_0 & n_1) are then found
-                    // by choosing a random point on the ellipse characterized
-                    // by the semi-major and semi-minor axes
-                    //    a = (1 - n_0) / 2.0
-                    //    b = 0.5 * sqrt(1 - 2 * n_0)
-                    // The numbers are found by randomly sampling an x value
-                    // between -a and a, and finding the corresponding y value
-                    // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
-                    // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
-                    // n_1 = 1 - n_2 - n_0.
-                    // Next, we need to find the number C, such that if
-                    // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
-                    // where E_i = p_i^2 / (2 M_i), i.e.,
-                    // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
-                    // After C is determined the momentum vectors are arranged
-                    // such that the net linear momentum is zero.
+                    // We use a model similar to the one used in the MCC module
+                    // (see Source/Particles/Collision/BackgroundMCC/ImpactIonization.H):
+                    // in the center-of-mass frame, the two electrons (the incident
+                    // electron and the newly freed electron) are scattered isotropically
+                    // and are assumed to carry an equal share of the energy. Since both
+                    // electrons have the same mass, equal energy implies equal momentum
+                    // magnitude p_e. The ion momentum is then fixed by conservation of
+                    // momentum in the center-of-mass frame, and p_e is determined by
+                    // conservation of energy:
+                    //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
+                    // with, from momentum conservation, p_ion_vec = - p_e * (d0 + d1),
+                    // where d0 and d1 are the two (unit-norm) isotropic directions of the
+                    // electrons. Defining s2 = |d0 + d1|^2 so that p_ion^2 = p_e^2 * s2:
+                    //     p_e = sqrt( E_out / ( 1/m_e + 0.5 * s2 / m_ion ) ).
 
-                    const amrex::ParticleReal E2 = 0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3);
-                    const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
+                    // The two products of the ionized target (slots 2 and 3) are one
+                    // electron and one ion; the electron is the lighter of the two.
+                    // Identify them so that the momenta are written back to the correct slot.
+                    amrex::ParticleReal m_elec, m_ion;
+                    amrex::ParticleReal *ux_elec, *uy_elec, *uz_elec;
+                    amrex::ParticleReal *ux_ion, *uy_ion, *uz_ion;
+                    if (mass_slot2 < mass_slot3) {
+                        m_elec = mass_slot2; ux_elec = &ux2; uy_elec = &uy2; uz_elec = &uz2;
+                        m_ion  = mass_slot3; ux_ion  = &ux3; uy_ion  = &uy3; uz_ion  = &uz3;
+                    } else {
+                        m_elec = mass_slot3; ux_elec = &ux3; uy_elec = &uy3; uz_elec = &uz3;
+                        m_ion  = mass_slot2; ux_ion  = &ux2; uy_ion  = &uy2; uz_ion  = &uz2;
+                    }
 
-                    // find ellipse semi-major and minor axis
-                    const double a = 0.5 * (1.0 - n_2);
-                    const double b = 0.5 * std::sqrt(1.0 - 2.0 * n_2);
+                    // Sample two isotropic unit vectors: one for the incident electron
+                    // (slot 0) and one for the newly freed electron.
+                    amrex::ParticleReal d0x, d0y, d0z;
+                    amrex::ParticleReal d1x, d1y, d1z;
+                    ParticleUtils::getRandomVector(d0x, d0y, d0z, engine);
+                    ParticleUtils::getRandomVector(d1x, d1y, d1z, engine);
 
-                    // sample random x value and calculate y
-                    const double x = (2.0 * amrex::Random(engine) - 1.0) * a;
-                    const double y2 = b*b - b*b/(a*a) * x*x;
-                    const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25*n_2*n_2);
-                    const double n_1 = 1.0 - n_0 - n_2;
+                    // Sum of the two electron directions; the ion momentum is
+                    // proportional to its opposite (conservation of momentum in COM).
+                    const amrex::ParticleReal sx = d0x + d1x;
+                    const amrex::ParticleReal sy = d0y + d1y;
+                    const amrex::ParticleReal sz = d0z + d1z;
+                    const amrex::ParticleReal s2 = sx*sx + sy*sy + sz*sz;
 
-                    // calculate the value of C
-                    const double C = std::sqrt(E_out / (
-                        n_0*n_0 / (2.0 * m0) + n_1*n_1 / (2.0 * mass_slot2) + n_2*n_2 / (2.0 * mass_slot3)
-                    ));
+                    // Common momentum magnitude of the two electrons, from conservation
+                    // of energy in the center-of-mass frame.
+                    const amrex::ParticleReal p_e = std::sqrt(
+                        E_out / (1.0_prt/m_elec + 0.5_prt*s2/m_ion) );
 
-                    // Now that appropriate momenta are set for each outgoing species
-                    // the directions for the velocity vectors must be chosen such
-                    // that the net linear momentum in the current frame is 0.
-                    // This is achieved by arranging the momentum vectors in
-                    // a triangle and finding the required angles between the vectors.
-                    const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0 * n_0 * n_1);
-                    const double sin_alpha = std::sqrt(1.0 - cos_alpha*cos_alpha);
-                    const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0 * n_0 * n_2);
-                    const double sin_gamma = std::sqrt(1.0 - cos_gamma*cos_gamma);
-
-                    // choose random theta and phi values (orientation of the triangle)
-                    const double Theta = amrex::Random(engine) * 2.0 * MathConst::pi;
-                    const double phi = amrex::Random(engine) * MathConst::pi;
-
-                    const double cos_theta = std::cos(Theta);
-                    const double sin_theta = std::sin(Theta);
-                    const double cos_phi = std::cos(phi);
-                    const double sin_phi = std::sin(phi);
-
-                    // calculate the velocity components for each particle
-                    ux0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * cos_phi);
-                    uy0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * sin_phi);
-                    uz0 = static_cast<amrex::ParticleReal>(-C * n_0 / m0 * sin_theta);
-
-                    ux2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi));
-                    uy2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi));
-                    uz2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (cos_alpha * sin_theta));
-
-                    ux3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi));
-                    uy3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi));
-                    uz3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (cos_gamma * sin_theta));
+                    // Assign the velocities (still in the COM frame; the surrounding code
+                    // transforms them back to the lab frame). m0 == m_elec == m_e.
+                    ux0 = p_e/m0 * d0x;
+                    uy0 = p_e/m0 * d0y;
+                    uz0 = p_e/m0 * d0z;
+                    *ux_elec = p_e/m_elec * d1x;
+                    *uy_elec = p_e/m_elec * d1y;
+                    *uz_elec = p_e/m_elec * d1z;
+                    *ux_ion = -p_e/m_ion * sx;
+                    *uy_ion = -p_e/m_ion * sy;
+                    *uz_ion = -p_e/m_ion * sz;
                 }
 
                 // transform back to labframe
