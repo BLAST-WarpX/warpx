@@ -26,7 +26,7 @@ Please add the following acknowledgement sentence to your publications, it helps
 
    .. tab-item:: Plain text
 
-      This research used the open-source `particle-in-cell code WarpX <https://blast-warpx.github.io>`__. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies. We acknowledge all WarpX contributors.
+      This research used the open-source `particle-in-cell code WarpX <https://blast-warpx.github.io>`__. Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, TAE Technologies, and Realta Fusion. We acknowledge all WarpX contributors.
 
    .. tab-item:: LaTeX
 
@@ -34,7 +34,7 @@ Please add the following acknowledgement sentence to your publications, it helps
 
         \usepackage{hyperref}
         This research used the open-source \href{https://blast-warpx.github.io}{particle-in-cell code WarpX}.
-        Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, and TAE Technologies.
+        Primary WarpX contributors are with LBNL, LLNL, CEA-LIDYL, SLAC, DESY, CERN, Helion Energy, TAE Technologies, and Realta Fusion.
         We acknowledge all WarpX contributors.
 
 .. _acknowledge_warpx_ref:
@@ -75,7 +75,6 @@ If your project leads to a scientific publication, please consider citing all Wa
                       Ge, Lixin and
                       Giacomel, Lorenzo and
                       Gott, Kevin and
-                      Giacomel, Lorenzo and
                       Groenewald, Roelof E. and
                       Grote, David and
                       Gu, Junmin and
@@ -94,7 +93,6 @@ If your project leads to a scientific publication, please consider citing all Wa
                       Pech, Juliette and
                       Rheaume, Elisa and
                       Richardson, Glenn and
-                      Rheaume, Elisa and
                       Rowan, Michael E. and
                       Sandberg, Ryan Thor and
                       Scherpelz, Peter and
@@ -152,7 +150,6 @@ Since WarpX is an actively evolving project, a specific version might be used in
                       Ge, Lixin and
                       Giacomel, Lorenzo and
                       Gott, Kevin and
-                      Giacomel, Lorenzo and
                       Groenewald, Roelof E. and
                       Grote, David and
                       Gu, Junmin and
@@ -171,7 +168,6 @@ Since WarpX is an actively evolving project, a specific version might be used in
                       Pech, Juliette and
                       Rheaume, Elisa and
                       Richardson, Glenn and
-                      Rheaume, Elisa and
                       Rowan, Michael E. and
                       Sandberg, Ryan Thor and
                       Scherpelz, Peter and

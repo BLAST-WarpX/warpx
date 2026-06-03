@@ -200,13 +200,13 @@ private:
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
-// drift velocity beta, from the Maxwell-Boltzmann distribution.
-struct InjectorMomentumBoltzmann
+// bulk drift momentum u_mean, from the Maxwellian distribution.
+struct InjectorMomentumMaxwellian
 {
     // Constructor whose inputs are:
     // a reference to the initial temperature container t,
     // a reference to the initial velocity container b
-    InjectorMomentumBoltzmann(GetTemperature const& t, GetVelocity const& b) noexcept
+    InjectorMomentumMaxwellian(GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
         : velocity(b), temperature(t)
         {}
 
@@ -217,50 +217,15 @@ struct InjectorMomentumBoltzmann
                  amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
-
-        // Calculate the local temperature and check if it's too
-        // high for Boltzmann or less than zero
-        amrex::Real const theta = temperature(x,y,z);
-        if (theta < 0._rt) {
-            amrex::Abort("Negative temperature parameter theta encountered, which is not allowed");
+        const amrex::XDim3 u_std = temperature(x,y,z);
+        const amrex::XDim3 u_mean = velocity(x,y,z);
+        if (u_std.x < 0.0_rt || u_std.y < 0.0_rt || u_std.z < 0.0_rt) {
+            amrex::Abort("The standard deviation of normalized momentum must be non-negative.");
         }
-        // Calculate local velocity and abort if |beta|>=1
-        amrex::Real const beta = velocity(x,y,z);
-        if (beta <= -1._rt || beta >= 1._rt) {
-            amrex::Abort("beta = v/c magnitude greater than or equal to 1");
-        }
-        // Calculate the value of vave from the local temperature
-        amrex::Real const vave = std::sqrt(theta);
-        int const dir = velocity.direction();
-
-        amrex::Real u[3];
-        u[dir] = amrex::RandomNormal(0._rt, vave, engine);
-        u[(dir+1)%3] = amrex::RandomNormal(0._rt, vave, engine);
-        u[(dir+2)%3] = amrex::RandomNormal(0._rt, vave, engine);
-        amrex::Real const gamma = std::sqrt(1._rt + u[0]*u[0]+u[1]*u[1]+u[2]*u[2]);
-
-        // The following condition is equation 32 in Zenitani 2015
-        // (Phys. Plasmas 22, 042116) , called the flipping method. It
-        // transforms the integral: d3x' -> d3x  where d3x' is the volume
-        // element for positions in the boosted frame. The particle positions
-        // and densities can be initialized in the simulation frame.
-        // The flipping method can transform any symmetric distribution from one
-        // reference frame to another moving at a relative velocity of beta.
-        // An equivalent alternative to this method native to WarpX would be to
-        // initialize the particle positions and densities in the frame moving
-        // at speed beta, and then perform a Lorentz transform on the positions
-        // and MB sampled velocities to the simulation frame.
-        if(-beta*u[dir]/gamma > amrex::Random(engine))
-        {
-          u[dir] = -u[dir];
-        }
-        // This Lorentz transform is equation 17 in Zenitani.
-        // It transforms the integral d3u' -> d3u
-        // where d3u' is the volume element for momentum in the boosted frame.
-        u[dir] = 1._rt/std::sqrt(1._rt-beta*beta)*(u[dir]+gamma*beta);
-        // Note that if beta = 0 then the flipping method and Lorentz transform
-        // have no effect on the u[dir] direction.
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
+        const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
+        const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
+        return amrex::XDim3 {ux_std, uy_std, uz_std};
     }
 
     [[nodiscard]]
@@ -269,18 +234,13 @@ struct InjectorMomentumBoltzmann
     getBulkMomentum (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
     {
         using namespace amrex::literals;
-        amrex::Real u[3];
-        for (auto& el : u) { el = 0.0_rt; }
-        const amrex::Real beta = velocity(x,y,z);
-        int const dir = velocity.direction();
-        const auto gamma = 1._rt/std::sqrt(1._rt-beta*beta);
-        u[dir] = gamma*beta;
-        return amrex::XDim3 {u[0],u[1],u[2]};
+        const amrex::XDim3 u_mean = velocity(x,y,z);
+        return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
     }
 
 private:
-    GetVelocity velocity;
-    GetTemperature temperature;
+    GetVelocityVector velocity;
+    GetTemperatureVector temperature;
 };
 
 // struct whose getMomentum returns momentum for 1 particle with relativistic
@@ -415,47 +375,6 @@ struct InjectorMomentumParser
     amrex::ParserExecutor<3> m_ux_parser, m_uy_parser, m_uz_parser;
 };
 
-// struct whose getMomentum returns local momentum and thermal spread computed from parser.
-struct InjectorMomentumGaussianParser
-{
-    InjectorMomentumGaussianParser (amrex::ParserExecutor<3> const& a_ux_m_parser,
-                                    amrex::ParserExecutor<3> const& a_uy_m_parser,
-                                    amrex::ParserExecutor<3> const& a_uz_m_parser,
-                                    amrex::ParserExecutor<3> const& a_ux_th_parser,
-                                    amrex::ParserExecutor<3> const& a_uy_th_parser,
-                                    amrex::ParserExecutor<3> const& a_uz_th_parser) noexcept
-        : m_ux_m_parser(a_ux_m_parser), m_uy_m_parser(a_uy_m_parser), m_uz_m_parser(a_uz_m_parser),
-          m_ux_th_parser(a_ux_th_parser), m_uy_th_parser(a_uy_th_parser), m_uz_th_parser(a_uz_th_parser) {}
-
-    [[nodiscard]]
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3
-    getMomentum (amrex::Real x, amrex::Real y, amrex::Real z,
-                 amrex::RandomEngine const& engine) const noexcept
-    {
-        amrex::Real const ux_m = m_ux_m_parser(x,y,z);
-        amrex::Real const uy_m = m_uy_m_parser(x,y,z);
-        amrex::Real const uz_m = m_uz_m_parser(x,y,z);
-        amrex::Real const ux_th = m_ux_th_parser(x,y,z);
-        amrex::Real const uy_th = m_uy_th_parser(x,y,z);
-        amrex::Real const uz_th = m_uz_th_parser(x,y,z);
-        return amrex::XDim3{amrex::RandomNormal(ux_m, ux_th, engine),
-                            amrex::RandomNormal(uy_m, uy_th, engine),
-                            amrex::RandomNormal(uz_m, uz_th, engine)};
-    }
-
-    [[nodiscard]]
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3
-    getBulkMomentum (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
-    {
-        return amrex::XDim3{m_ux_m_parser(x,y,z), m_uy_m_parser(x,y,z), m_uz_m_parser(x,y,z)};
-    }
-
-    amrex::ParserExecutor<3> m_ux_m_parser, m_uy_m_parser, m_uz_m_parser;
-    amrex::ParserExecutor<3> m_ux_th_parser, m_uy_th_parser, m_uz_th_parser;
-};
-
 // Base struct for momentum injector.
 // InjectorMomentum contains a union (called Object) that holds any one
 // instance of:
@@ -463,7 +382,7 @@ struct InjectorMomentumGaussianParser
 // - InjectorMomentumGaussian       : to generate gaussian distribution;
 // - InjectorMomentumGaussianFlux   : to generate v*gaussian distribution;
 // - InjectorMomentumParser         : to generate momentum from parser;
-// - InjectorMomentumGaussianParser : to generate momentum and thermal spread from parser;
+// - InjectorMomentumMaxwellian     : to generate Maxwellian distribution;
 // The choice is made at runtime, depending in the constructor called.
 // This mimics virtual functions.
 struct InjectorMomentum
@@ -482,19 +401,6 @@ struct InjectorMomentum
                       amrex::ParserExecutor<3> const& a_uz_parser)
         : type(Type::parser),
           object(t, a_ux_parser, a_uy_parser, a_uz_parser)
-    { }
-
-    // This constructor stores a InjectorMomentumGaussianParser in union object.
-    InjectorMomentum (InjectorMomentumGaussianParser* t,
-                      amrex::ParserExecutor<3> const& a_ux_m_parser,
-                      amrex::ParserExecutor<3> const& a_uy_m_parser,
-                      amrex::ParserExecutor<3> const& a_uz_m_parser,
-                      amrex::ParserExecutor<3> const& a_ux_th_parser,
-                      amrex::ParserExecutor<3> const& a_uy_th_parser,
-                      amrex::ParserExecutor<3> const& a_uz_th_parser)
-        : type(Type::gaussianparser),
-          object(t, a_ux_m_parser, a_uy_m_parser, a_uz_m_parser,
-                    a_ux_th_parser, a_uy_th_parser, a_uz_th_parser)
     { }
 
     // This constructor stores a InjectorMomentumGaussian in union object.
@@ -522,9 +428,9 @@ struct InjectorMomentum
           object(t,a_ux_min,a_uy_min,a_uz_min,a_ux_max,a_uy_max,a_uz_max)
     { }
 
-    InjectorMomentum (InjectorMomentumBoltzmann* t,
-                       GetTemperature const& temperature, GetVelocity const& velocity)
-         : type(Type::boltzmann),
+    InjectorMomentum (InjectorMomentumMaxwellian* t,
+                       GetTemperatureVector const& temperature, GetVelocityVector const& velocity)
+         : type(Type::maxwellian),
            object(t, temperature, velocity)
     { }
 
@@ -565,10 +471,6 @@ struct InjectorMomentum
         {
             return object.gaussian.getMomentum(x,y,z,engine);
         }
-        case Type::gaussianparser:
-        {
-            return object.gaussianparser.getMomentum(x,y,z,engine);
-        }
         case Type::gaussianflux:
         {
             return object.gaussianflux.getMomentum(x,y,z,engine);
@@ -577,9 +479,9 @@ struct InjectorMomentum
         {
             return object.uniform.getMomentum(x,y,z,engine);
         }
-        case Type::boltzmann:
+        case Type::maxwellian:
         {
-            return object.boltzmann.getMomentum(x,y,z,engine);
+            return object.maxwellian.getMomentum(x,y,z,engine);
         }
         case Type::juttner:
         {
@@ -614,10 +516,6 @@ struct InjectorMomentum
         {
             return object.gaussian.getBulkMomentum(x,y,z);
         }
-        case Type::gaussianparser:
-        {
-            return object.gaussianparser.getBulkMomentum(x,y,z);
-        }
         case Type::gaussianflux:
         {
             return object.gaussianflux.getBulkMomentum(x,y,z);
@@ -626,9 +524,9 @@ struct InjectorMomentum
         {
             return object.uniform.getBulkMomentum(x,y,z);
         }
-        case Type::boltzmann:
+        case Type::maxwellian:
         {
-            return object.boltzmann.getBulkMomentum(x,y,z);
+            return object.maxwellian.getBulkMomentum(x,y,z);
         }
         case Type::juttner:
         {
@@ -646,7 +544,7 @@ struct InjectorMomentum
         }
     }
 
-    enum struct Type { constant, gaussian, gaussianflux, uniform, boltzmann, juttner, parser, gaussianparser };
+    enum struct Type { constant, gaussian, gaussianflux, uniform, maxwellian, juttner, parser };
     Type type;
 
 private:
@@ -673,9 +571,9 @@ private:
                 amrex::Real a_uz_min, amrex::Real a_ux_max,
                 amrex::Real a_uy_max, amrex::Real a_uz_max) noexcept
             : uniform(a_ux_min,a_uy_min,a_uz_min,a_ux_max,a_uy_max,a_uz_max) {}
-        Object (InjectorMomentumBoltzmann*,
-                GetTemperature const& t, GetVelocity const& b) noexcept
-            : boltzmann(t,b) {}
+        Object (InjectorMomentumMaxwellian*,
+                GetTemperatureVector const& t, GetVelocityVector const& b) noexcept
+            : maxwellian(t,b) {}
         Object (InjectorMomentumJuttner*,
                 GetTemperature const& t, GetVelocity const& b) noexcept
             : juttner(t,b) {}
@@ -684,23 +582,13 @@ private:
                 amrex::ParserExecutor<3> const& a_uy_parser,
                 amrex::ParserExecutor<3> const& a_uz_parser) noexcept
             : parser(a_ux_parser, a_uy_parser, a_uz_parser) {}
-        Object (InjectorMomentumGaussianParser*,
-                amrex::ParserExecutor<3> const& a_ux_m_parser,
-                amrex::ParserExecutor<3> const& a_uy_m_parser,
-                amrex::ParserExecutor<3> const& a_uz_m_parser,
-                amrex::ParserExecutor<3> const& a_ux_th_parser,
-                amrex::ParserExecutor<3> const& a_uy_th_parser,
-                amrex::ParserExecutor<3> const& a_uz_th_parser) noexcept
-            : gaussianparser(a_ux_m_parser, a_uy_m_parser, a_uz_m_parser,
-                             a_ux_th_parser, a_uy_th_parser, a_uz_th_parser) {}
         InjectorMomentumConstant constant;
         InjectorMomentumGaussian gaussian;
         InjectorMomentumGaussianFlux gaussianflux;
         InjectorMomentumUniform uniform;
-        InjectorMomentumBoltzmann boltzmann;
+        InjectorMomentumMaxwellian maxwellian;
         InjectorMomentumJuttner juttner;
         InjectorMomentumParser parser;
-        InjectorMomentumGaussianParser gaussianparser;
     };
     Object object;
 };

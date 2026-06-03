@@ -600,24 +600,33 @@ class DensityDistributionBase(object):
         if self.fill_in:
             species.add_new_group_attr(source_name, "do_continuous_injection", 1)
 
-        # --- Note that WarpX takes gamma*beta as input
         if hasattr(self, "momentum_spread_expressions") and np.any(
             np.not_equal(self.momentum_spread_expressions, None)
         ):
-            species.momentum_distribution_type = "gaussian_parse_momentum_function"
+            species.add_new_group_attr(
+                source_name, "momentum_distribution_type", "maxwellian"
+            )
+            # Mean drift: any axis left as None falls back to directed_velocity.
+            species.add_new_group_attr(
+                source_name, "maxwellian_u_mean_distribution_type", "parser"
+            )
             self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
-                "_m",
                 self.directed_velocity,
+                "u{dir}_mean_function(x,y,z)",
+            )
+            # Thermal spread: any axis left as None falls back to zero.
+            species.add_new_group_attr(
+                source_name, "maxwellian_u_std_distribution_type", "parser"
             )
             self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_spread_expressions,
-                "_th",
                 [0.0, 0.0, 0.0],
+                "u{dir}_std_function(x,y,z)",
             )
         elif hasattr(self, "momentum_expressions") and np.any(
             np.not_equal(self.momentum_expressions, None)
@@ -629,8 +638,8 @@ class DensityDistributionBase(object):
                 species,
                 source_name,
                 self.momentum_expressions,
-                "",
                 self.directed_velocity,
+                "momentum_function_u{dir}(x,y,z)",
             )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
@@ -674,8 +683,15 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(source_name, "density_max", self.density_max)
 
     def setup_parse_momentum_functions(
-        self, species, source_name, expressions, suffix, defaults
+        self, species, source_name, expressions, defaults, attr_pattern
     ):
+        """Write per-component momentum parser expressions (divided by c) to the species.
+
+        ``attr_pattern`` is a format string with a ``{dir}`` placeholder for the
+        component, e.g. ``"momentum_function_u{dir}(x,y,z)"`` for the
+        ``parse_momentum_function`` distribution or ``"u{dir}_mean_function(x,y,z)"``
+        and ``"u{dir}_std_function(x,y,z)"`` for the ``maxwellian`` distribution.
+        """
         for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
             if expressions[idir] is not None:
                 expression = pywarpx.my_constants.mangle_expression(
@@ -685,7 +701,7 @@ class DensityDistributionBase(object):
                 expression = f"{defaults[idir]}"
             species.add_new_group_attr(
                 source_name,
-                f"momentum_function_u{sdir}{suffix}(x,y,z)",
+                attr_pattern.format(dir=sdir),
                 f"({expression})/{constants.c}",
             )
 
@@ -834,7 +850,6 @@ class AnalyticDistribution(
         Expressions should be in terms of the position, written as 'x', 'y', and 'z'.
         Parameters can be used in the expression with the values given as keyword arguments.
         For any axis not supplied (set to None), zero will be used.
-
     """
 
     def init(self, kw):
@@ -2119,16 +2134,51 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     plasma_resistivity: float or str
         Value or expression to use for the plasma resistivity in Ohm*m.
-        Can be a constant value or an expression depending on ``rho`` (charge density)
-        and ``J`` (current density magnitude).
+        Can be a constant value or an expression depending on ``rho`` (charge density),
+        ``J`` (current density magnitude), and ``t`` (simulation time).
 
     plasma_hyper_resistivity: float or str
         Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
-    substeps: int, default=100
-        Number of substeps to take when updating the B-field.
+    substeps: int, default=10
+        Total number of substeps used to advance the B-field over one full
+        timestep (split evenly between the two half-steps, so ``substeps/2``
+        RK4 steps are taken per half-step, each of duration
+        ``dt / substeps``). Must be divisible by 2; if not, the value is
+        automatically rounded up to the next even number.
+        When ``use_rkf45=True``, this is instead used only as the initial
+        substep count estimate for the adaptive solver.
+
+    use_rkf45: bool, default=False
+        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
+        integrator (Fehlberg 1969, NASA Technical Report R-315,
+        https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
+        advance, with step-size control governed by ``substep_rtol`` and
+        ``substep_atol``. If False, use the fixed-step classical RK4
+        integrator with ``substeps`` total substeps per timestep.
+
+    substep_rtol: float, default=1e-4
+        Relative tolerance for the RKF45 adaptive step-size control.
+        Only used when ``use_rkf45=True``.
+
+    substep_atol: float, default=1e-8
+        Absolute tolerance for the RKF45 adaptive step-size control.
+        Only used when ``use_rkf45=True``.
+
+    substep_safety: float, default=0.9
+        Safety factor applied to the step-size adjustment formula.
+        Only used when ``use_rkf45=True``.
+
+    substep_max_growth: float, default=5.0
+        Maximum factor by which the substep size may grow after an accepted
+        step. Only used when ``use_rkf45=True``.
+
+    max_substep_attempts: int, default=250
+        Maximum number of substep attempts (accepted + rejected combined) per
+        half-step before the simulation aborts. Only used when
+        ``use_rkf45=True``.
 
     holmstrom_vacuum_region: bool, default=False
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
@@ -2182,6 +2232,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
         substeps=None,
+        use_rkf45=None,
+        substep_rtol=None,
+        substep_atol=None,
+        substep_safety=None,
+        substep_max_growth=None,
+        max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         Jx_external_function=None,
         Jy_external_function=None,
@@ -2201,6 +2257,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
 
         self.substeps = substeps
+        self.use_rkf45 = use_rkf45
+        self.substep_rtol = substep_rtol
+        self.substep_atol = substep_atol
+        self.substep_safety = substep_safety
+        self.substep_max_growth = substep_max_growth
+        self.max_substep_attempts = max_substep_attempts
 
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
@@ -2235,7 +2297,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.gamma = self.gamma
         pywarpx.hybridpicmodel.n_floor = self.n_floor
         pywarpx.hybridpicmodel.__setattr__(
-            "plasma_resistivity(rho,J)",
+            "plasma_resistivity(rho,J,t)",
             pywarpx.my_constants.mangle_expression(
                 self.plasma_resistivity, self.mangle_dict
             ),
@@ -2247,6 +2309,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             ),
         )
         pywarpx.hybridpicmodel.substeps = self.substeps
+        pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
+        pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
+        pywarpx.hybridpicmodel.substep_atol = self.substep_atol
+        pywarpx.hybridpicmodel.substep_safety = self.substep_safety
+        pywarpx.hybridpicmodel.substep_max_growth = self.substep_max_growth
+        pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",

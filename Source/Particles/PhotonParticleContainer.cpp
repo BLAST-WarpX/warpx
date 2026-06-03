@@ -253,15 +253,35 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                  PositionPushType position_push_type,
                                  MomentumPushType momentum_push_type,
-                                 ImplicitOptions const * /*implicit_options*/)
+                                 ImplicitOptions const * implicit_options)
 {
     // This does gather, push and deposit.
-    // Push and deposit have been re-written for photons
+    // Push and deposit have been re-written for photons.
+    // Photons do not participate in the implicit solver. When called
+    // from the implicit solver during the iteration, we skip the push entirely;
+    // photons are instead advanced once at the end of the step via
+    // FinishImplicitParticleUpdate below.
+    if (implicit_options) { return; }
     PhysicalParticleContainer::Evolve(fields,
                                       lev,
                                       current_fp_string,
                                       t, dt, subcycling_half, skip_deposition,
                                       position_push_type,
                                       momentum_push_type,
-                                      nullptr);
+                                      /*implicit_options=*/nullptr);
+}
+
+void
+PhotonParticleContainer::FinishImplicitParticleUpdate (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev, amrex::Real t, amrex::Real dt)
+{
+    // We perform a single full explicit push over [t-dt, t] here.
+    // Deposition is skipped because photons carry no charge and
+    // therefore contribute no current. We pass implicit_options=nullptr
+    // so that the early-return guard in PhotonParticleContainer::Evolve()
+    // does not fire: we do want the push this time.
+    Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt,
+           SubcyclingHalf::None, /*skip_deposition=*/true,
+           PositionPushType::Full, MomentumPushType::Full, /*implicit_options=*/nullptr);
 }
