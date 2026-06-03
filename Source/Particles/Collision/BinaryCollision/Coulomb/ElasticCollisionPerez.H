@@ -30,7 +30,7 @@
  * @param[in] m1,m2 mass of species 1/2
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] global_lamdb is the global Debye length and will be used if greater than zero
- * @param[in] scattering_method is the cumulative scattering method
+ * @param[in] scattering_method is the method used to obtain the scattering angle
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
  * @param[in] dV is the volume of the corresponding cell.
