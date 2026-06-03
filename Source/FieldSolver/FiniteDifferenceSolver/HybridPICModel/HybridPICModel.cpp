@@ -328,12 +328,6 @@ void HybridPICModel::CalculatePlasmaCurrent (
         current_fp_plasma, Bfield, eb_update_E, lev
     );
 
-    // we shouldn't apply the boundary condition to J since J = J_i - J_e but
-    // the boundary correction was already applied to J_i and the B-field
-    // boundary ensures that J itself complies with the boundary conditions, right?
-    // ApplyJfieldBoundary(lev, Jfield[0].get(), Jfield[1].get(), Jfield[2].get());
-    for (int i=0; i<3; i++) { current_fp_plasma[i]->FillBoundary(warpx.Geom(lev).periodicity()); }
-
     if (m_has_external_current) {
         // Subtract external current from "Ampere" current calculated above. Note
         // we need to include 1 ghost cell since later we will interpolate the
