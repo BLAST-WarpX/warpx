@@ -517,19 +517,9 @@ public:
                     // electrons. Defining s2 = |d0 + d1|^2 so that p_ion^2 = p_e^2 * s2:
                     //     p_e = sqrt( E_out / ( 1/m_e + 0.5 * s2 / m_ion ) ).
 
-                    // The two products of the ionized target (slots 2 and 3) are one
-                    // electron and one ion; the electron is the lighter of the two.
-                    // Identify them so that the momenta are written back to the correct slot.
-                    amrex::ParticleReal m_elec, m_ion;
-                    amrex::ParticleReal *ux_elec, *uy_elec, *uz_elec;
-                    amrex::ParticleReal *ux_ion, *uy_ion, *uz_ion;
-                    if (mass_slot2 < mass_slot3) {
-                        m_elec = mass_slot2; ux_elec = &ux2; uy_elec = &uy2; uz_elec = &uz2;
-                        m_ion  = mass_slot3; ux_ion  = &ux3; uy_ion  = &uy3; uz_ion  = &uz3;
-                    } else {
-                        m_elec = mass_slot3; ux_elec = &ux3; uy_elec = &uy3; uz_elec = &uz3;
-                        m_ion  = mass_slot2; ux_ion  = &ux2; uy_ion  = &uy2; uz_ion  = &uz2;
-                    }
+                    // The freed electron has the same mass as the incident electron (m0);
+                    // the ion is the heavier of the two products in slots 2 and 3.
+                    const amrex::ParticleReal m_ion = amrex::max(mass_slot2, mass_slot3);
 
                     // Sample two isotropic unit vectors: one for the incident electron
                     // (slot 0) and one for the newly freed electron.
@@ -546,21 +536,34 @@ public:
                     const amrex::ParticleReal s2 = sx*sx + sy*sy + sz*sz;
 
                     // Common momentum magnitude of the two electrons, from conservation
-                    // of energy in the center-of-mass frame.
+                    // of energy in the center-of-mass frame (both electrons have mass m0).
                     const amrex::ParticleReal p_e = std::sqrt(
-                        E_out / (1.0_prt/m_elec + 0.5_prt*s2/m_ion) );
+                        E_out / (1.0_prt/m0 + 0.5_prt*s2/m_ion) );
 
                     // Assign the velocities (still in the COM frame; the surrounding code
-                    // transforms them back to the lab frame). m0 == m_elec == m_e.
+                    // transforms them back to the lab frame). The incident electron is in
+                    // slot 0; the two products of the ionized target (slots 2 and 3) are
+                    // one electron and one ion, the electron being the lighter of the two.
                     ux0 = p_e/m0 * d0x;
                     uy0 = p_e/m0 * d0y;
                     uz0 = p_e/m0 * d0z;
-                    *ux_elec = p_e/m_elec * d1x;
-                    *uy_elec = p_e/m_elec * d1y;
-                    *uz_elec = p_e/m_elec * d1z;
-                    *ux_ion = -p_e/m_ion * sx;
-                    *uy_ion = -p_e/m_ion * sy;
-                    *uz_ion = -p_e/m_ion * sz;
+                    if (mass_slot2 < mass_slot3) {
+                        // slot 2 is the freed electron, slot 3 is the ion
+                        ux2 =  p_e/m0    * d1x;
+                        uy2 =  p_e/m0    * d1y;
+                        uz2 =  p_e/m0    * d1z;
+                        ux3 = -p_e/m_ion * sx;
+                        uy3 = -p_e/m_ion * sy;
+                        uz3 = -p_e/m_ion * sz;
+                    } else {
+                        // slot 3 is the freed electron, slot 2 is the ion
+                        ux3 =  p_e/m0    * d1x;
+                        uy3 =  p_e/m0    * d1y;
+                        uz3 =  p_e/m0    * d1z;
+                        ux2 = -p_e/m_ion * sx;
+                        uy2 = -p_e/m_ion * sy;
+                        uz2 = -p_e/m_ion * sz;
+                    }
                 }
 
                 // transform back to labframe
