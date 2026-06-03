@@ -655,7 +655,7 @@ for (const auto & particle_diag : particle_diags) {
     // does not match the flag guarding the write).
     amrex::Vector<int> real_flags(tmp.NumRealComps(), 0);
 #if defined(WARPX_DIM_RZ)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
     real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
     real_flags[2] = particle_diag.m_plot_flags[PIdx::z];
     real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
@@ -663,7 +663,7 @@ for (const auto & particle_diag : particle_diags) {
     real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
     real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
 #elif defined(WARPX_DIM_RCYLINDER)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
     real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
     // note: z is unspecified (for specific values, can be assumed to be zero)
     real_flags[2] = particle_diag.m_plot_flags[PIdx::w];
@@ -671,7 +671,7 @@ for (const auto & particle_diag : particle_diags) {
     real_flags[4] = particle_diag.m_plot_flags[PIdx::uy];
     real_flags[5] = particle_diag.m_plot_flags[PIdx::uz];
 #elif defined(WARPX_DIM_RSPHERE)
-    real_flags[0] = particle_diag.m_plot_flags[PIdx::x];     // note: r
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
     real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
     real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];
     // note: z can be determined from r, theta and phi
