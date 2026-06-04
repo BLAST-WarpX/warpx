@@ -1325,8 +1325,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector& plasma_injector, amrex
         const amrex::Box& tile_box = mfi.tilebox();
         amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
 
-        InjectorDensity* inj_density = plasma_injector.getInjectorDensity(mfi.LocalIndex());
-
         // This ensures that the upper end of tile_realbox is exactly the
         // same as ProbHi when it is at the upper end of the domain.
         // This is needed in case injection is done on an upper boundary
@@ -1532,6 +1530,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector& plasma_injector, amrex
 
         // local copy for device lambda capture
         amrex::ParticleReal const mass = m_mass;
+
+        InjectorDensity* inj_density = nullptr;
+        if (fixed_ppc_is_specified) {
+            inj_density = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        }
 
         // Loop over all new particles and inject them (creates too many
         // particles, in particular does not consider xmin, xmax etc.).
