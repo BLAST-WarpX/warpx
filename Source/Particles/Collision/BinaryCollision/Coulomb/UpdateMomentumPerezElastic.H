@@ -285,7 +285,7 @@ void UpdateMomentumPerezElastic (
         T_PR const p2fz = p2fsz + vcz * factor2;
 
         // Rejection method
-        r = amrex::Random(engine);
+        T_PR r = amrex::Random(engine);
         if ( w2 > r*amrex::max(w1, w2) )
         {
             u1x  = p1fx / m1;
