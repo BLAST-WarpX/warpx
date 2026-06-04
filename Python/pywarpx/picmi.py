@@ -600,24 +600,33 @@ class DensityDistributionBase(object):
         if self.fill_in:
             species.add_new_group_attr(source_name, "do_continuous_injection", 1)
 
-        # --- Note that WarpX takes gamma*beta as input
         if hasattr(self, "momentum_spread_expressions") and np.any(
             np.not_equal(self.momentum_spread_expressions, None)
         ):
-            species.momentum_distribution_type = "gaussian_parse_momentum_function"
+            species.add_new_group_attr(
+                source_name, "momentum_distribution_type", "maxwellian"
+            )
+            # Mean drift: any axis left as None falls back to directed_velocity.
+            species.add_new_group_attr(
+                source_name, "maxwellian_u_mean_distribution_type", "parser"
+            )
             self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_expressions,
-                "_m",
                 self.directed_velocity,
+                "u{dir}_mean_function(x,y,z)",
+            )
+            # Thermal spread: any axis left as None falls back to zero.
+            species.add_new_group_attr(
+                source_name, "maxwellian_u_std_distribution_type", "parser"
             )
             self.setup_parse_momentum_functions(
                 species,
                 source_name,
                 self.momentum_spread_expressions,
-                "_th",
                 [0.0, 0.0, 0.0],
+                "u{dir}_std_function(x,y,z)",
             )
         elif hasattr(self, "momentum_expressions") and np.any(
             np.not_equal(self.momentum_expressions, None)
@@ -629,8 +638,8 @@ class DensityDistributionBase(object):
                 species,
                 source_name,
                 self.momentum_expressions,
-                "",
                 self.directed_velocity,
+                "momentum_function_u{dir}(x,y,z)",
             )
         elif np.any(np.not_equal(self.rms_velocity, 0.0)):
             species.add_new_group_attr(
@@ -674,8 +683,15 @@ class DensityDistributionBase(object):
             species.add_new_group_attr(source_name, "density_max", self.density_max)
 
     def setup_parse_momentum_functions(
-        self, species, source_name, expressions, suffix, defaults
+        self, species, source_name, expressions, defaults, attr_pattern
     ):
+        """Write per-component momentum parser expressions (divided by c) to the species.
+
+        ``attr_pattern`` is a format string with a ``{dir}`` placeholder for the
+        component, e.g. ``"momentum_function_u{dir}(x,y,z)"`` for the
+        ``parse_momentum_function`` distribution or ``"u{dir}_mean_function(x,y,z)"``
+        and ``"u{dir}_std_function(x,y,z)"`` for the ``maxwellian`` distribution.
+        """
         for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
             if expressions[idir] is not None:
                 expression = pywarpx.my_constants.mangle_expression(
@@ -685,7 +701,7 @@ class DensityDistributionBase(object):
                 expression = f"{defaults[idir]}"
             species.add_new_group_attr(
                 source_name,
-                f"momentum_function_u{sdir}{suffix}(x,y,z)",
+                attr_pattern.format(dir=sdir),
                 f"({expression})/{constants.c}",
             )
 
@@ -834,7 +850,6 @@ class AnalyticDistribution(
         Expressions should be in terms of the position, written as 'x', 'y', and 'z'.
         Parameters can be used in the expression with the values given as keyword arguments.
         For any axis not supplied (set to None), zero will be used.
-
     """
 
     def init(self, kw):
