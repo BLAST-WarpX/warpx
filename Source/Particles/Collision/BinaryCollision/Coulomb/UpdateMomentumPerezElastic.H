@@ -176,13 +176,11 @@ void UpdateMomentumPerezElastic (
         T_PR const b0 = amrex::Math::abs(q1*q2) /
                         (T_PR(2.0)*MathConst::pi*PhysConst::epsilon_0*muRst*vrelst*vrelst_invar);
 
-
         // Compute the Coulomb log lnLmd first
         T_PR lnLmd;
         if ( L > T_PR(0.0) ) { lnLmd = L; }
         else
         {
-
             // Compute the minimum impact parameter from quantum: bqm = lDB/(4*pi) = hbar/(2*p1sm)
             // See NRL formulary. Also see "An introduction to the physics of the Coulomb logarithm,
             // with emphasis on quantum-mechanical effects", J. Plasma Phys. vol. 85 (2019). by J.A. Krommes.
