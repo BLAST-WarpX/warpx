@@ -207,6 +207,13 @@ namespace SpeciesUtils {
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+#if defined(WARPX_DIM_RZ)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                style != "nfluxpercell" ||
+                    (!h_mom_temp->needPreparation() && !h_mom_vel->needPreparation()),
+                "maxwellian read_from_file momentum is not supported with "
+                "injection_style = NFluxPerCell in RZ geometry.");
+#endif
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){

@@ -22,6 +22,7 @@
 
 #include "Utils/WarpXConst.H"
 
+#include <cmath>
 #include <functional>
 
 /**
@@ -90,8 +91,8 @@ struct GetTemperatureVector
     amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     ExternalFieldView m_ux_std_view;
     ExternalFieldView m_uy_std_view;
     ExternalFieldView m_uz_std_view;
@@ -109,8 +110,8 @@ struct GetTemperatureVector
 
     [[nodiscard]] bool needPreparation () const noexcept
     {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
         return m_type == TempFromFileVector;
 #else
         return false;
@@ -155,10 +156,13 @@ struct GetTemperatureVector
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
             }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
             case (TempFromFileVector):
             {
+#if defined(WARPX_DIM_RZ)
+                amrex::RealVect const pos{std::sqrt(x*x + y*y), z};
+#else
 #if (AMREX_SPACEDIM < 3)
                 amrex::ignore_unused(x, y, z);
 #endif
@@ -168,6 +172,7 @@ struct GetTemperatureVector
                 amrex::RealVect const pos{x, z};
 #else
                 amrex::RealVect const pos{x, y, z};
+#endif
 #endif
                 return amrex::XDim3{m_ux_std_view(pos), m_uy_std_view(pos), m_uz_std_view(pos)};
             }

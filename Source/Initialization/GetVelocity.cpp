@@ -10,8 +10,8 @@
 
 #include <memory>
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
 namespace
 {
     void prepareExternalFieldReader (
@@ -70,8 +70,8 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
         m_uy_mean_parser = vel.m_ptr_uy_mean_parser->compile<3>();
         m_uz_mean_parser = vel.m_ptr_uz_mean_parser->compile<3>();
     }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     else if (m_type == VelFromFileVector) {
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo = vel.m_geom.ProbLoArray();
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = vel.m_geom.CellSizeArray();
@@ -79,10 +79,17 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
         bool const distributed = vel.m_read_u_mean_distributed;
         // std::make_unique for exception safety; raw pointers are required because
         // InjectorMomentum::prepare() may std::memcpy copies for OpenMP+distributed.
+#if defined(WARPX_DIM_RZ)
+        auto ux = std::make_unique<ExternalFieldReader>(
+            vel.m_read_u_mean_path, "u_mean", "r", problo, pdx, dombox, distributed);
+        auto uy = std::make_unique<ExternalFieldReader>(
+            vel.m_read_u_mean_path, "u_mean", "t", problo, pdx, dombox, distributed);
+#else
         auto ux = std::make_unique<ExternalFieldReader>(
             vel.m_read_u_mean_path, "u_mean", "x", problo, pdx, dombox, distributed);
         auto uy = std::make_unique<ExternalFieldReader>(
             vel.m_read_u_mean_path, "u_mean", "y", problo, pdx, dombox, distributed);
+#endif
         auto uz = std::make_unique<ExternalFieldReader>(
             vel.m_read_u_mean_path, "u_mean", "z", problo, pdx, dombox, distributed);
         m_ux_mean_reader = ux.release();
@@ -97,8 +104,8 @@ void GetVelocityVector::prepare (
     amrex::DistributionMapping const& dmap,
     amrex::IntVect const& ngrow)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     if (m_type != VelFromFileVector) {
         return;
     }
@@ -113,8 +120,8 @@ void GetVelocityVector::prepare (
 void GetVelocityVector::prepare (
     amrex::RealBox const& pbox, int moving_dir, int moving_sign)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     if (m_type != VelFromFileVector) {
         return;
     }
@@ -131,8 +138,8 @@ void GetVelocityVector::prepare (
 
 void GetVelocityVector::prepare (int li)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     if (m_type != VelFromFileVector) {
         return;
     }
@@ -152,8 +159,8 @@ void GetVelocityVector::prepare (int li)
 
 void GetVelocityVector::clear ()
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     delete m_ux_mean_reader;
     m_ux_mean_reader = nullptr;
     delete m_uy_mean_reader;
@@ -165,8 +172,8 @@ void GetVelocityVector::clear ()
 
 bool GetVelocityVector::distributed () const noexcept
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     if (m_type != VelFromFileVector || m_ux_mean_reader == nullptr) {
         return false;
     }

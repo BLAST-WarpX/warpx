@@ -89,8 +89,8 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_type = TempParserFunctionVector;
         }
         else if (u_std_dist_s == "read_from_file") {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
             utils::parser::get(pp, source_name, "read_u_std_from_path", m_read_u_std_path);
             {
                 std::string const key_with_src =
@@ -107,7 +107,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             WARPX_ABORT_WITH_MESSAGE(
                 "maxwellian_u_std_distribution_type = read_from_file requires "
                 "WarpX built with openPMD support and is not supported in "
-                "RZ/RCYLINDER/RSPHERE geometries.");
+                "RCYLINDER/RSPHERE geometries.");
 #endif
         }
         else {

@@ -222,6 +222,27 @@ struct InjectorMomentumMaxwellian
         if (u_std.x < 0.0_rt || u_std.y < 0.0_rt || u_std.z < 0.0_rt) {
             amrex::Abort("The standard deviation of normalized momentum must be non-negative.");
         }
+#if defined(WARPX_DIM_RZ)
+        bool const is_temperature_from_file = temperature.m_type == TempFromFileVector;
+        if (is_temperature_from_file) {
+            amrex::ignore_unused(z);
+            amrex::Real const r = std::sqrt(x*x + y*y);
+            amrex::Real const cos_theta = (r > 0.0_rt) ? x/r : 1.0_rt;
+            amrex::Real const sin_theta = (r > 0.0_rt) ? y/r : 0.0_rt;
+            amrex::XDim3 const u_sampled{
+                amrex::RandomNormal(0.0_rt, u_std.x, engine),
+                amrex::RandomNormal(0.0_rt, u_std.y, engine),
+                amrex::RandomNormal(0.0_rt, u_std.z, engine)};
+            amrex::XDim3 const u_sampled_cartesian{
+                cos_theta*u_sampled.x - sin_theta*u_sampled.y,
+                sin_theta*u_sampled.x + cos_theta*u_sampled.y,
+                u_sampled.z};
+            return amrex::XDim3{
+                u_mean.x + u_sampled_cartesian.x,
+                u_mean.y + u_sampled_cartesian.y,
+                u_mean.z + u_sampled_cartesian.z};
+        }
+#endif
         const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
         const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
         const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
