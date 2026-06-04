@@ -169,10 +169,6 @@ Particle distributions can be continuously injected from a boundary
 
 .. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
 
-.. autoclass:: pywarpx.picmi.UniformThermalPlasmaFluxDistribution
-
-.. autoclass:: pywarpx.picmi.AnalyticThermalPlasmaFluxDistribution
-
 Particle layouts determine how to microscopically place macro particles in a grid cell.
 
 .. autoclass:: pywarpx.picmi.GriddedLayout
