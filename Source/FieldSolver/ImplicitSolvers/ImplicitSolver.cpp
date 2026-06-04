@@ -491,20 +491,10 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             pp.query("mass_matrices_pc_width", m_mass_matrices_pc_width);
 #endif
         }
-#if defined(WARPX_DIM_RCYLINDER)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RCYLINDER!");
-#endif
 #if defined(WARPX_DIM_RSPHERE)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSHERE!");
-#endif
-#if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RZ");
+            "Using mass matrices is not setup for DIM = RSPHERE!");
 #endif
 #if defined(WARPX_DIM_3D)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -918,6 +908,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
             amrex::MultiFab::Add(*MM_PC[2], *MM_zz, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_zz[0], MM_zz->nGrowVect());
         }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 
     // Do addOp Exchange on MassMatrices_PC
@@ -945,7 +938,7 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     // The pc_type petsc already has the one from the curl curl operator
     // Note: This should be done after Sync/communication has been called
 
-    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const amrex::Real pc_factor = PhysConst::c2 * PhysConst::mu0 * a_theta_dt;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
         amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);

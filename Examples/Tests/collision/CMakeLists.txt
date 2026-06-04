@@ -52,6 +52,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_collision_pulsed_decay  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_collision_pulsed_decay  # inputs
+    "analysis_collision_3d_pulsed_decay.py diags/"  # analysis
+    "analysis_default_regression.py --path diags/diag1025000"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_collision_iso  # name
     3  # dims
     1  # nprocs
@@ -108,6 +118,16 @@ add_warpx_test(
     inputs_test_1d_collision_z_Bremsstrahlung_picmi.py  # inputs
     "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_charge_exchange_dsmc  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_charge_exchange_dsmc  # inputs
+    "analysis_test_2d_collisions_split_momentum_push.py --path diags/reducedfiles/"  # analysis
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
 

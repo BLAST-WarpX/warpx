@@ -94,6 +94,8 @@ public:
 
     amrex::ParticleReal maxParticleVelocity();
 
+    void TransformMomentumToCurvilinear (bool forward);
+
     void AllocData ();
 
     void InitData ();
@@ -196,6 +198,7 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
+    std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();
 
     void doFieldIonization (int lev,
@@ -462,7 +465,7 @@ protected:
 
     static constexpr auto m_default_quantum_sync_photon_creation_energy_threshold =
         static_cast<amrex::ParticleReal>(
-        2.0 * PhysConst::m_e * PhysConst::c * PhysConst::c );  /*!< Default value of the energy threshold for photon creation in Quantum Synchrotron process.*/
+        2.0 * PhysConst::m_e * PhysConst::c2 );  /*!< Default value of the energy threshold for photon creation in Quantum Synchrotron process.*/
 
 
     amrex::ParticleReal m_quantum_sync_photon_creation_energy_threshold =

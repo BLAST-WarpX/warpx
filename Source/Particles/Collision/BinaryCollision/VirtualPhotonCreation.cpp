@@ -65,7 +65,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
-        amrex::Real const inv_c2 = 1._rt / (PhysConst::c * PhysConst::c);
+        amrex::Real constexpr inv_c2 = PhysConst::inv_c2;
         amrex::Real const mass = primary.getMass();
 
         int const nlevs = std::max(0, primary.finestLevel()+1);
@@ -178,16 +178,16 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
                     const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
 #elif defined (WARPX_DIM_RZ)
-                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal r  = soa.m_rdata[PIdx::r][i];
                     const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
                     const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
 #elif defined (WARPX_DIM_1D_Z)
                     const amrex::ParticleReal z  = soa.m_rdata[PIdx::z][i];
 #elif defined (WARPX_DIM_RCYLINDER)
-                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal r  = soa.m_rdata[PIdx::r][i];
                     const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
 #elif defined(WARPX_DIM_RSPHERE)
-                    const amrex::ParticleReal x  = soa.m_rdata[PIdx::x][i];
+                    const amrex::ParticleReal r  = soa.m_rdata[PIdx::r][i];
                     const amrex::ParticleReal theta  = soa.m_rdata[PIdx::theta][i];
                     const amrex::ParticleReal phi  = soa.m_rdata[PIdx::phi][i];
 #endif
@@ -198,7 +198,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     // This will allow to update the parent lepton if needed
 
                     // Minimum fractional (wrt primary particle) photon energy
-                    const amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c * PhysConst::c);
+                    const amrex::Real y_min = vphoton_min_energy / (mass * gamma_primary * PhysConst::c2);
                     const amrex::Real umin = 0._rt;
                     const amrex::Real umax = std::log(y_min) * std::log(y_min);
 
@@ -266,16 +266,16 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         pa_vp[PIdx::x][ip] = x;
                         pa_vp[PIdx::z][ip] = z;
 #elif defined (WARPX_DIM_RZ)
-                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::r][ip] = r;
                         pa_vp[PIdx::z][ip] = z;
                         pa_vp[PIdx::theta][ip] = theta;
 #elif defined (WARPX_DIM_1D_Z)
                         pa_vp[PIdx::z][ip] = z;
 #elif defined (WARPX_DIM_RCYLINDER)
-                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::r][ip] = r;
                         pa_vp[PIdx::theta][ip] = theta;
 #elif defined(WARPX_DIM_RSPHERE)
-                        pa_vp[PIdx::x][ip] = x;
+                        pa_vp[PIdx::r][ip] = r;
                         pa_vp[PIdx::theta][ip] = theta;
                         pa_vp[PIdx::phi][ip] = phi;
 #endif

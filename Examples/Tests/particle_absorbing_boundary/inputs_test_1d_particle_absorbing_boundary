@@ -72,8 +72,11 @@ electrons.injection_style = NUniformPerCell
 electrons.num_particles_per_cell_each_dim = 64
 # 2D case:
 #electrons.num_particles_per_cell_each_dim = 8 8
-electrons.momentum_distribution_type = "maxwell_boltzmann"
-electrons.theta = 0.0002  # corresponds to 0.1 keV temperature
+electrons.momentum_distribution_type = "maxwellian"
+electrons.maxwellian_u_std_distribution_type = "constant"
+electrons.ux_std = 0.01414
+electrons.uy_std = 0.01414
+electrons.uz_std = 0.01414 # corresponds to 0.1 keV temperature
 electrons.zmin = zmin
 electrons.profile = parse_density_function
 

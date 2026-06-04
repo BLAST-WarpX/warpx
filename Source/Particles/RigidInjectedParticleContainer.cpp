@@ -113,7 +113,7 @@ RigidInjectedParticleContainer::RemapParticles()
         const ParticleReal t_lab = 0._prt;
 
         const ParticleReal uz_boost = WarpX::gamma_boost*WarpX::beta_boost*PhysConst::c;
-        const ParticleReal csqi = 1._prt/(PhysConst::c*PhysConst::c);
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         vzbeam_ave_boosted = meanParticleVelocity(false)[2];
 
@@ -146,14 +146,14 @@ RigidInjectedParticleContainer::RemapParticles()
                         ParticleReal xp, yp, zp;
                         GetPosition(i, xp, yp, zp);
 
-                        const ParticleReal gammapr = std::sqrt(1._prt + (uxp[i]*uxp[i] + uyp[i]*uyp[i] + uzp[i]*uzp[i])*csqi);
+                        const ParticleReal gammapr = std::sqrt(1._prt + (uxp[i]*uxp[i] + uyp[i]*uyp[i] + uzp[i]*uzp[i])*inv_c2);
                         const ParticleReal vzpr = uzp[i]/gammapr;
 
                         // Back out the value of z_lab
-                        const ParticleReal z_lab = (zp + uz_boost*t_lab + gamma_boost*t_lab*vzpr)/(gamma_boost + uz_boost*vzpr*csqi);
+                        const ParticleReal z_lab = (zp + uz_boost*t_lab + gamma_boost*t_lab*vzpr)/(gamma_boost + uz_boost*vzpr*inv_c2);
 
                         // Time of the particle in the boosted frame given its position in the lab frame at t=0.
-                        const ParticleReal tpr = gamma_boost*t_lab - uz_boost*z_lab*csqi;
+                        const ParticleReal tpr = gamma_boost*t_lab - uz_boost*z_lab*inv_c2;
 
                         // Adjust the position, taking away its motion from its own velocity and adding
                         // the motion from the average velocity
@@ -241,7 +241,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
-        constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         if (position_push_type == PositionPushType::Full) {
             amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
                 amrex::ParticleReal xp, yp, zp;
@@ -257,7 +257,7 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                             1._prt /
                             std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
                                                 uz[i] * uz[i]) *
-                                                inv_csq);
+                                                inv_c2);
                         zp += dt * uz[i] * gi;
                         if (rigid == RigidAdvanceMode::v) {
                             xp += dt * ux[i] * gi;
@@ -393,7 +393,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uz_save = uzp_save.dataPtr();
 
             // Loop over the particles and update their momentum
-            const amrex::ParticleReal q = this->charge;
+            const amrex::ParticleReal q = this->m_charge;
             const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;

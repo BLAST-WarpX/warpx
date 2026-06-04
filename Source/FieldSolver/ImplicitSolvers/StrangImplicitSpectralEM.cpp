@@ -91,11 +91,12 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
     UpdateWarpXFields(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    amrex::Real const new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance E and B fields from time n+1/2 to time n+1
-    amrex::Real const new_time = start_time + m_dt;
     FinishFieldUpdate(new_time);
 
     // Advance the fields to time n+1 source free
@@ -121,7 +122,7 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;
     a_RHS.Copy(FieldType::current_fp, warpx::fields::FieldType::None, allow_type_mismatch);
-    amrex::Real constexpr coeff = PhysConst::c * PhysConst::c * PhysConst::mu0;
+    amrex::Real constexpr coeff = PhysConst::c2 * PhysConst::mu0;
     a_RHS.scale(-coeff * 0.5_rt*m_dt);
 
 }
