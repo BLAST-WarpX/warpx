@@ -148,7 +148,7 @@ struct FindEmbeddedBoundaryIntersection {
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = normal[1];
 #elif (defined WARPX_DIM_RZ)
-        dst.m_rdata[PIdx::x][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
+        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
         dst.m_rdata[PIdx::theta][dst_i] = std::atan2(y_temp, x_temp);
         //save normal components
@@ -164,8 +164,12 @@ struct FindEmbeddedBoundaryIntersection {
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = 0.0;
 #elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
-        dst.m_rdata[PIdx::x][dst_i] = x_temp;
-        amrex::ignore_unused(y_temp, z_temp);
+#if defined(WARPX_DIM_RCYLINDER)
+        amrex::ignore_unused(z_temp);
+        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
+#else // WARPX_DIM_RSPHERE
+        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp + z_temp*z_temp);
+#endif
         //normal not defined
         dst.m_runtime_rdata[m_normal_index][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;

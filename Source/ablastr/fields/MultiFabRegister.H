@@ -43,7 +43,7 @@ namespace
         if constexpr(is_castable_to_string<T>())
         {
             // already a unique string key
-            return std::string(name);
+            return std::string(std::move(name));
         } else
         {
             // user-defined AMREX_ENUM or compile error
@@ -309,7 +309,7 @@ namespace ablastr::fields
         )
         {
             return internal_alloc_init(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level,
                 ba,
                 dm,
@@ -354,7 +354,7 @@ namespace ablastr::fields
         )
         {
             return internal_alloc_init(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 dir,
                 level,
                 ba,
@@ -440,7 +440,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_has(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -461,7 +461,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_has(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 dir,
                 level
             );
@@ -481,7 +481,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_has_vector(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -502,7 +502,7 @@ namespace ablastr::fields
         )
         {
             return internal_get(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -525,7 +525,7 @@ namespace ablastr::fields
         )
         {
             return internal_get(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 dir,
                 level
             );
@@ -547,7 +547,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_get(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -570,7 +570,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_get(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 dir,
                 level
             );
@@ -595,7 +595,7 @@ namespace ablastr::fields
         )
         {
             return internal_get_mr_levels(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 finest_level,
                 skip_level_0
             );
@@ -609,7 +609,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_get_mr_levels(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 finest_level,
                 skip_level_0
             );
@@ -633,7 +633,7 @@ namespace ablastr::fields
         )
         {
             return internal_get_alldirs(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -645,7 +645,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_get_alldirs(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 level
             );
         }
@@ -671,7 +671,7 @@ namespace ablastr::fields
         )
         {
             return internal_get_mr_levels_alldirs(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 finest_level,
                 skip_level_0
             );
@@ -685,7 +685,7 @@ namespace ablastr::fields
         ) const
         {
             return internal_get_mr_levels_alldirs(
-                getExtractedName(name),
+                getExtractedName(std::move(name)),
                 finest_level,
                 skip_level_0
             );
@@ -711,7 +711,7 @@ namespace ablastr::fields
             int level
         )
         {
-            internal_erase(getExtractedName(name), level);
+            internal_erase(getExtractedName(std::move(name)), level);
         }
 
         /** Deallocate and remove a vector field component.

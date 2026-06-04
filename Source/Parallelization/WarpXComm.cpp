@@ -1007,8 +1007,8 @@ WarpX::FillBoundaryB_avg (int lev, PatchType patch_type, IntVect ng)
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period);
         } else {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                ng.allLE(m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect()),
-                "Error: in FillBoundaryB, requested more guard cells than allocated");
+                ng.allLE(m_fields.get(FieldType::Bfield_avg_fp, Direction{0}, lev)->nGrowVect()),
+                "Error: in FillBoundaryB_avg, requested more guard cells than allocated");
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][0], ng, WarpX::do_single_precision_comms, period);
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][1], ng, WarpX::do_single_precision_comms, period);
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][2], ng, WarpX::do_single_precision_comms, period);

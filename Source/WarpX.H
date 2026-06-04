@@ -141,7 +141,7 @@ public:
     //
     void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
-    void FinishImplicitParticleUpdate ();
+    void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
@@ -570,6 +570,11 @@ public:
     void ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx,
                                                     amrex::MultiFab* Jy,
                                                     amrex::MultiFab* Jz,
+                                                    int lev) const;
+
+    void ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx,
+                                                    amrex::MultiFab* Syy,
+                                                    amrex::MultiFab* Szz,
                                                     int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,

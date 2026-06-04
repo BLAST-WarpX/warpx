@@ -151,15 +151,15 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::y][i_dst] = yp;
         dst.m_rdata[PIdx::z][i_dst] = zp;
 #elif defined (WARPX_DIM_RZ)
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined(WARPX_DIM_RCYLINDER)
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
         dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
 #elif defined (WARPX_DIM_XZ)
