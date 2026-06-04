@@ -24,7 +24,7 @@ Plasma-Based Acceleration
 
    examples/lwfa/README.rst
 
-* :ref:`Laser-Wakefield Acceleration of Electrons in a Lab Frame <examples-lwfa>`
+* :ref:`Laser-Wakefield Acceleration of Electrons in the Lab Frame <examples-lwfa>`
 * :ref:`Laser-Wakefield Acceleration of Electrons in a Boosted Frame <examples-lwfa-boosted>`
 
 .. toctree::
