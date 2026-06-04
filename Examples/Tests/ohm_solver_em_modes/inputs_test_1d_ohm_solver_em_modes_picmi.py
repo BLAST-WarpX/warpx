@@ -56,14 +56,15 @@ class EMModes(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = [[1e-7, 1e-7], [1e-7, 1e-5], [1e-7, 1e-4]]
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 40
 
-    def __init__(self, test, dim, B_dir, verbose):
+    def __init__(self, test, dim, B_dir, verbose, use_rkf45):
         """Get input parameters for the specific case desired."""
         self.test = test
         self.dim = int(dim)
         self.B_dir = B_dir
         self.verbose = verbose or self.test
+        self.use_rkf45 = use_rkf45
 
         # sanity check
         assert dim > 0 and dim < 4, f"{dim}-dimensions not a valid input"
@@ -216,6 +217,7 @@ class EMModes(object):
             n0=self.n_plasma,
             plasma_resistivity=self.eta,
             substeps=self.substeps,
+            use_rkf45=self.use_rkf45,
         )
         simulation.solver = self.solver
 
@@ -369,8 +371,19 @@ parser.add_argument(
     help="Verbose output",
     action="store_true",
 )
+parser.add_argument(
+    "--use_rkf45",
+    help="Use adaptive RKF45 subcycling for the B-field update",
+    action="store_true",
+)
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
-run = EMModes(test=args.test, dim=args.dim, B_dir=args.bdir, verbose=args.verbose)
+run = EMModes(
+    test=args.test,
+    dim=args.dim,
+    B_dir=args.bdir,
+    verbose=args.verbose,
+    use_rkf45=args.use_rkf45,
+)
 simulation.step()

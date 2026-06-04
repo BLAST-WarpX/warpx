@@ -13,9 +13,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
@@ -96,7 +96,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
         std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section.c_str(), cross_section_file);
+        pp_collision_name.query(kw_cross_section, cross_section_file);
 
         amrex::ParticleReal energy = 0.0;
         // if the scattering process is excitation or ionization get the
@@ -206,10 +206,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
               * std::sqrt(2.0_prt / m_mass1 * PhysConst::q_e)
               * sigma_E * std::sqrt(E)
               );
-        if (nu > nu_max) {
-            nu_max = nu;
-        }
-
+        nu_max = std::max(nu_max, nu);
         E+=E_step;
     }
     return nu_max;
@@ -218,7 +215,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
 void
 BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundMCCCollision::doCollisions()");
+    ABLASTR_PROFILE("BackgroundMCCCollision::doCollisions()");
     using namespace amrex::literals;
 
     auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -478,7 +475,7 @@ void BackgroundMCCCollision::doBackgroundIonization
 ( int lev, amrex::LayoutData<amrex::Real>* cost,
   WarpXParticleContainer& species1, WarpXParticleContainer& species2, amrex::Real t)
 {
-    WARPX_PROFILE("BackgroundMCCCollision::doBackgroundIonization()");
+    ABLASTR_PROFILE("BackgroundMCCCollision::doBackgroundIonization()");
 
     const SmartCopyFactory copy_factory_elec(species1, species1);
     const SmartCopyFactory copy_factory_ion(species1, species2);

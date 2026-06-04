@@ -151,15 +151,15 @@ struct LorentzTransformParticles
         dst.m_rdata[PIdx::y][i_dst] = yp;
         dst.m_rdata[PIdx::z][i_dst] = zp;
 #elif defined (WARPX_DIM_RZ)
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::z][i_dst] = zp;
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined(WARPX_DIM_RCYLINDER)
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
 #elif defined(WARPX_DIM_RSPHERE)
         amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
-        dst.m_rdata[PIdx::x][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
+        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
         dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
 #elif defined (WARPX_DIM_XZ)
@@ -208,7 +208,7 @@ class BackTransformParticleFunctor final : public ComputeParticleDiagFunctor
 public:
     BackTransformParticleFunctor(WarpXParticleContainer *pc_src, std::string species_name, int num_buffers);
     /** Computes the Lorentz transform of source particles to obtain lab-frame data in pc_dst*/
-    void operator () (PinnedMemoryParticleContainer& pc_dst, int &TotalParticleCounter, int i_buffer) const override;
+    void operator () (WarpXParticleContainer::Base& pc_dst, int &TotalParticleCounter, int i_buffer) const override;
     void InitData() override;
     /** \brief Prepare data required to back-transform particle attributes for lab-frame snapshot, i_buffer
      *

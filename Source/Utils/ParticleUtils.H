@@ -13,6 +13,7 @@
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_Particles.H>
+#include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
 
@@ -123,7 +124,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -160,7 +161,7 @@ namespace ParticleUtils {
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         amrex::ParticleReal const Usq = Ux*Ux + Uy*Uy + Uz*Uz;
         amrex::ParticleReal const U = std::sqrt(Usq);
@@ -181,28 +182,27 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate random unit vector in 3 dimensions
-     * https://mathworld.wolfram.com/SpherePointPicking.html
+     * \brief Generate a random unit vector with isotropic distribution,
+     * following the method described in equations (27)-(31) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
-     * @param[out] x x-component of resulting random vector
-     * @param[out] y y-component of resulting random vector
-     * @param[out] z z-component of resulting random vector
+     * @param[out] x x-component of the random unit vector
+     * @param[out] y y-component of the random unit vector
+     * @param[out] z z-component of the random unit vector
      * @param[in] engine the random-engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
                            amrex::ParticleReal& z, amrex::RandomEngine const& engine )
     {
-        using std::sqrt;
-        using std::cos;
-        using std::sin;
         using namespace amrex::literals;
 
-        auto const theta = amrex::Random(engine) * 2.0_prt * MathConst::pi;
-        z = 2.0_prt * amrex::Random(engine) - 1.0_prt;
-        auto const xy = sqrt(1_prt - z*z);
-        x = xy * cos(theta);
-        y = xy * sin(theta);
+        auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
+        x = sin_theta * std::cos(phi);
+        y = sin_theta * std::sin(phi);
+        z = cos_theta;
     }
 
 
@@ -245,6 +245,123 @@ namespace ParticleUtils {
                           && (xlo[2] <= point.z) && (point.z <= xhi[2]));
     }
 
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version
+     * \param[in] x0 The initial particle position
+     * \param[in/out] x1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double & x1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            x1 = xmin;
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            x1 = xmax;
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 2D version
+     * \param[in] x0, z0 The initial particle position
+     * \param[in/out] x1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double x0, double z0,
+                          double & x1, double & z1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            x1 = xmin;
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            x1 = xmax;
+            z1 = z0 + fx*(z1 - z0);
+        }
+    }
+
+    /* \brief Crops the position at the specified boundary if do_cropping is true, 3D version
+     * \param[in] x0, y0, z0 The initial particle position
+     * \param[in/out] x1, y1, z1 The final particle position, with the returned value being cropped
+     * \param[in] xmin The lower boundary of the domain in grid units
+     * \param[in] xmax The upper boundary of the domain in grid units
+     * \param[in] do_cropping Whether to crop at each of the boundaries
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void crop_at_boundary(double x0, double y0, double z0,
+                          double & x1, double & y1, double & z1,
+                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+        if (do_cropping[0] && x1 < xmin) {
+            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            x1 = xmin;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
+        else if (do_cropping[1] && x1 > xmax) {
+            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            x1 = xmax;
+            y1 = y0 + fx*(y1 - y0);
+            z1 = z0 + fx*(z1 - z0);
+        }
+    }
+
+    /* \brief Check if the particle position is out of bounds at a boundary
+     *        where orbit cropping is being performed.
+     * \param[in] xp, yp, zp      The particle position
+     * \param[in] dinv            3D cell size inverse
+     * \param[in] xyzmin          Physical lower bounds of domain
+     * \param[in] domain_double   The domain boundary indicies cast to double values
+     * \param[in] do_cropping     Whether to crop particle orbits at domain boundaries
+     * return whether position is out of bounds
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool is_out_of_bounds ([[maybe_unused]] double xp,
+                           [[maybe_unused]] double yp,
+                           [[maybe_unused]] double zp,
+                           const amrex::XDim3 & dinv,
+                           const amrex::XDim3 & xyzmin,
+                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping)
+    {
+
+        // Store logical particle position (in grid units) in temporary array
+        amrex::GpuArray<double,AMREX_SPACEDIM> xp_grid;
+#if defined(WARPX_DIM_3D)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (yp - xyzmin.y)*dinv.y;
+        xp_grid[2] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_XZ)
+        xp_grid[0] = (xp - xyzmin.x)*dinv.x;
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_1D_Z)
+        xp_grid[0] = (zp - xyzmin.z)*dinv.z;
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        const double rp = std::sqrt(xp*xp + yp*yp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#if defined(WARPX_DIM_RZ)
+        xp_grid[1] = (zp - xyzmin.z)*dinv.z;
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+        const double rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+        xp_grid[0] = (rp - xyzmin.x)*dinv.x;
+#endif
+
+        // Check if particle's position is out of bounds
+        for (int dim = 0; dim < AMREX_SPACEDIM; dim++) {
+            if ( (do_cropping[dim][0] && xp_grid[dim] <= domain_double[dim][0]) ||
+                 (do_cropping[dim][1] && xp_grid[dim] >= domain_double[dim][1])) {
+                return true;
+            }
+        }
+        return false;
+
+    }
 
     /* \brief Add or subtract a small percent of energy from a
      *        pair of particles such that momentum is not disturbed.
@@ -261,47 +378,43 @@ namespace ParticleUtils {
      * \param[in] cell_stop start index of particles in the next cell
      * \param[in] mass mass of the particles
      * \param[in] energy_fraction fraction of pair's relative energy to change
-     * \param[in] energy_fraction_max max fracton of total relative energy that can be changed
      * \param[in/out] deltaE amount of energy to be distributed in this species
      */
     template <typename T_index>
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uyp,
-                               amrex::ParticleReal * const AMREX_RESTRICT uzp,
-                               amrex::ParticleReal * const AMREX_RESTRICT w,
+    bool ModifyEnergyPairwise (amrex::ParticleReal * const AMREX_RESTRICT uxp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uyp, //NOLINT(readability-non-const-parameter)
+                               amrex::ParticleReal * const AMREX_RESTRICT uzp, //NOLINT(readability-non-const-parameter)
+                               const amrex::ParticleReal * const AMREX_RESTRICT w,
                                T_index const * const AMREX_RESTRICT indices,
                                T_index const cell_start,
                                T_index const cell_stop,
                                amrex::ParticleReal const mass,
                                amrex::ParticleReal const energy_fraction,
-                               amrex::ParticleReal const energy_fraction_max,
                                amrex::ParticleReal & deltaE )
     {
         using namespace amrex::literals;
 
-        constexpr auto c2 = PhysConst::c * PhysConst::c;
+        constexpr auto c2 = PhysConst::c2;
 
         int const numCell = (cell_stop - cell_start);
+
+        if (numCell < 2) {
+            return true;
+        }
 
         // Adjust particle's momentum to absorb deltaE.
         // This loops over the particles, two at a time, distributing
         // the energy until all of it has been distributed or failing if not.
-        // If deltaE < 0, it should never fail since energy can always be added
-        // to the particles.
-        // if deltaE > 0, it will sometimes fail because energy cannot always be
-        // removed from the particles without changing the momentum.
         // The loop is setup to switch between even first and odd first pairs
         // each loop over the particles.
         int loop_count = 0;
         int const max_loop_count = 10;
-        amrex::ParticleReal Erel_cumm = 0.0_prt;
-        amrex::ParticleReal fmult_fact = 1.0_prt;
-        amrex::ParticleReal energy_frac_eff = 0.0_prt;
-        T_index i1 = cell_start;
+        int pair_offset = 0;
+        T_index i1 = cell_start + pair_offset;
         bool correction_failed = false;
         bool deltaE_is_zero = false;
-        while (!deltaE_is_zero && !correction_failed && loop_count <= max_loop_count) {
+        while (!deltaE_is_zero) {
 
             T_index i2 = i1 + 1;
             if (i2 == cell_stop) {
@@ -309,7 +422,7 @@ namespace ParticleUtils {
                 i2 = cell_start;
             }
 
-            int const sign = (deltaE < 0.0 ? -1 : 1);
+            int const sign = (deltaE < 0.0_prt ? -1 : 1);
 
             const amrex::ParticleReal ux1 = uxp[ indices[i1] ];
             const amrex::ParticleReal uy1 = uyp[ indices[i1] ];
@@ -343,83 +456,130 @@ namespace ParticleUtils {
             const amrex::ParticleReal pztot = wpmp1*uz1 + wpmp2*uz2;
             const amrex::ParticleReal Ecm = std::sqrt(Etot*Etot - (pxtot*pxtot + pytot*pytot + pztot*pztot)*c2);
             const amrex::ParticleReal Erel = Ecm - wpmp1*c2 - wpmp2*c2;
-            if (Erel <= 0.0) { continue; }
 
-            // Set the amount of energy change for this pair based on the
-            // relative energy in the center of momentum.
-            // If deltaE > 0, no more that Erel can be removed from this pair.
-            // If deltaE < 0, limit the energy added by Erel at first, but
-            // after the first loop, add whatever is left (using the adjusted fmult_fact).
-            amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction*fmult_fact)*Erel;
-            if (std::abs(deltaEpair) >= std::abs(deltaE)) {
-                deltaEpair = deltaE;
-                deltaE = 0.0_prt;
-                deltaE_is_zero = true;
-            } else {
-                deltaE -= deltaEpair;
+            if (Erel > 0.0_prt) {
+
+                // Set the amount of energy change for this pair based on the
+                // relative energy in the center of momentum.
+                bool deltaE_finishes = false;
+                amrex::ParticleReal deltaEpair = static_cast<amrex::ParticleReal>(sign*energy_fraction)*Erel;
+                if (std::abs(deltaEpair) >= std::abs(deltaE)) {
+                    deltaEpair = deltaE;
+                    deltaE_finishes = true;
+                }
+
+                const amrex::ParticleReal A = Etot - deltaEpair;
+                const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
+                const amrex::ParticleReal p2dotu = wpmp2*(ux2*ux + uy2*uy + uz2*uz);
+                const amrex::ParticleReal ptdotu = pxtot*ux + pytot*uy + pztot*uz;
+
+                // Compute coefficients for quadratic equation for alpha.
+                const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
+                const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
+                const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
+
+                const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
+                if (root >= 0.0_prt && amrex::Math::abs(a) > 0.0_prt) {
+
+                    // Update particle velocities.
+                    const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
+                    const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
+                    const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
+                    uxp[ indices[i1] ] += ratio1*ux;
+                    uyp[ indices[i1] ] += ratio1*uy;
+                    uzp[ indices[i1] ] += ratio1*uz;
+                    uxp[ indices[i2] ] -= ratio2*ux;
+                    uyp[ indices[i2] ] -= ratio2*uy;
+                    uzp[ indices[i2] ] -= ratio2*uz;
+
+                    // Update energy violation.
+                    if (deltaE_finishes) {
+                        deltaE = 0.0_prt;
+                        deltaE_is_zero = true;
+                    }
+                    else {
+                        deltaE -= deltaEpair;
+                    }
+
+                }
+
             }
 
-            const amrex::ParticleReal A = Etot - deltaEpair;
-            const amrex::ParticleReal D = A*A + E2*E2 - E1*E1;
-            const amrex::ParticleReal p2dotu = static_cast<amrex::ParticleReal>(wpmp2*(ux2*ux + uy2*uy + uz2*uz));
-            const amrex::ParticleReal ptdotu = (pxtot*ux + pytot*uy + pztot*uz);
-
-            // Compute coefficients for quadratic equation for alpha.
-            const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
-            const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-            const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
-
-            const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-            if (root < 0.0 || a == 0.0) { continue; }
-            const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
-
-            // Update particle velocities.
-            const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
-            const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
-            uxp[ indices[i1] ] += ratio1*ux;
-            uyp[ indices[i1] ] += ratio1*uy;
-            uzp[ indices[i1] ] += ratio1*uz;
-            uxp[ indices[i2] ] -= ratio2*ux;
-            uyp[ indices[i2] ] -= ratio2*uy;
-            uzp[ indices[i2] ] -= ratio2*uz;
-
-            Erel_cumm += Erel - deltaEpair;
-
+            // Update particle 1 index.
             if (i1 < cell_stop - 2) {
-                // If not done with the loop, increment to the next pair of particles
                 i1 = i2 + 1;
             } else {
                 loop_count++;
-                // On next time through the loop, use a different set of pairs.
-                // What index to start with depends on whether the number of particles
-                // is even or odd.
-                if (i1 == cell_stop - 2) {
-                    if ((numCell % 2) == 0) { i1 = cell_start + 1; }
-                    if ((numCell % 2) != 0) { i1 = cell_start; }
-                } else {
-                    if ((numCell % 2) == 0) { i1 = cell_start; }
-                    if ((numCell % 2) != 0) { i1 = cell_start + 1; }
-                }
-                // Compute the energy fraction to correct with one more loop.
-                // This is the remaining energy correction divided by the cummulated Erel,
-                // the amount of "free" energy available.
-                // If deltaE < 0, this check always passes since the amount of energy that
-                // can be added is unlimited.
-                energy_frac_eff = std::abs(deltaE)/Erel_cumm;
-                if (energy_frac_eff > energy_fraction_max || loop_count > max_loop_count) {
+                if (loop_count >= max_loop_count) {
                     correction_failed = true;
                     break;
-                } else if (deltaE < 0.) {
-                    // If after the first time around, there is energy left to distribute,
-                    // increase the multiplier to distribute the rest faster.
-                    fmult_fact = std::max(1._prt, energy_frac_eff/energy_fraction);
                 }
-            }
 
+                pair_offset = 1 - pair_offset; // 0, 1, 0, 1, ...
+                i1 = cell_start + pair_offset;
+            }
         }
 
         return correction_failed;
     }
+
+    /**
+     * \brief A GPU compartible sort of a index vector vector
+     * based on another GPU vector's values, sorting to decreasing order.
+     * The heap-sort functions below were obtained from
+     * https://www.geeksforgeeks.org/iterative-heap-sort/ and
+     * modified for the current purpose. It achieves the same as
+     * ```
+     * std::sort(
+     *    sorted_indices_data + cell_start, sorted_indices_data + cell_stop,
+     *    [&momentum_bin_number_data](size_t i1, size_t i2) {
+     *        return momentum_bin_number_data[i1] > momentum_bin_number_data[i2];
+     *    }
+     * );
+     * ```
+     * but with support for device execution.
+    */
+    struct HeapSortDecreasing {
+
+        template <typename T_index>
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        void operator() (T_index index_array[], const amrex::ParticleReal bin_array[], const T_index start, const T_index n) const
+        {
+            // sort index_array into a max heap structure
+            for (T_index i = 1; i < n; i++)
+            {
+                auto j = i;
+                // move child through heap if it is less than its parent
+                while (j > 0 && bin_array[index_array[j+start]] < bin_array[index_array[(j - 1)/2 + start]]) {
+                    // swap child and parent until branch is properly ordered
+                    amrex::Swap(index_array[j+start], index_array[(j - 1)/2 + start]);
+                    j = (j - 1) / 2;
+                }
+            }
+
+            for (T_index i = n - 1; i > 0; i--)
+            {
+                // swap value of first (now the smallest value) to the new end point
+                amrex::Swap(index_array[start], index_array[i+start]);
+
+                // remake the max heap
+                T_index j = 0, index;
+                while (j < i) {
+                    index = 2 * j + 1;
+
+                    // if left child is larger than right child, point index variable to right child
+                    if (index + 1 < i && bin_array[index_array[index+start]] > bin_array[index_array[index+1+start]]) {
+                        index++;
+                    }
+                    // if parent is larger than child, swap parent with child having lower value
+                    if (index < i && bin_array[index_array[j+start]] > bin_array[index_array[index+start]]) {
+                        amrex::Swap(index_array[j+start], index_array[index+start]);
+                    }
+                    j = index;
+                }
+            }
+        }
+    };
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_

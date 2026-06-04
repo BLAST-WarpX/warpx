@@ -15,8 +15,8 @@ raw data of all grids.
 Write Raw Data
 --------------
 
-For a given diagnostic the user has the option to write the raw data by setting ``<diag_name>.plot_raw_fields = 1``.
-Moreover, the user has the option to write also the values of the fields in the guard cells by setting ``<diag_name>.plot_raw_fields_guards = 1``.
+For a given diagnostic the user has the option to write the raw data by setting :pp:param:`<diag_name>.plot_raw_fields = 1`.
+Moreover, the user has the option to write also the values of the fields in the guard cells by setting :pp:param:`<diag_name>.plot_raw_fields_guards = 1`.
 Please refer to :ref:`Input Parameters <running-cpp-parameters>` for more information.
 
 Read Raw Data
@@ -39,7 +39,7 @@ Meta-data relevant to this topic (for example, number and locations of grids in 
     # List available fields
     ds.field_list
 
-When ``<diag_name>.plot_raw_fields = 1``, here are some useful commands to access properties of a grid and the Ex field on the fine patch:
+When :pp:param:`<diag_name>.plot_raw_fields = 1`, here are some useful commands to access properties of a grid and the Ex field on the fine patch:
 
 .. code-block:: python
 

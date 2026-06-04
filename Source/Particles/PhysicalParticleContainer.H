@@ -53,7 +53,7 @@ public:
                                int ispecies,
                                const std::string& name);
 
-    PhysicalParticleContainer (amrex::AmrCore* amr_core);
+    explicit PhysicalParticleContainer (amrex::AmrCore* amr_core);
 
     /** This function queries deprecated input parameters and abort
      *  the run if one of them is specified. */
@@ -66,7 +66,7 @@ public:
     PhysicalParticleContainer(PhysicalParticleContainer&& )                    = default;
     PhysicalParticleContainer& operator=(PhysicalParticleContainer&& )         = default;
 
-    virtual void AllocData () override;
+    void AllocData () override;
 
     void InitData () override;
 
@@ -110,6 +110,13 @@ public:
                  PositionPushType position_push_type=PositionPushType::Full,
                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
+
+    /**
+     * \brief Deposit mass matrices.
+     */
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
+                              int lev,
+                              amrex::Real dt) override;
 
     /**
      * \brief Gather fields and push particles in one fused kernel.
@@ -171,9 +178,9 @@ public:
                                   amrex::FArrayBox const * bzfab,
                                   ImplicitOptions const * implicit_options,
                                   amrex::IntVect ngEB,
-                                  amrex::MultiFab * const jx,
-                                  amrex::MultiFab * const jy,
-                                  amrex::MultiFab * const jz,
+                                  amrex::MultiFab* jx,
+                                  amrex::MultiFab* jy,
+                                  amrex::MultiFab* jz,
                                   long offset,
                                   int lev, int gather_lev,
                                   amrex::Real dt,
@@ -188,7 +195,8 @@ public:
                         const amrex::MultiFab& Ez,
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
-                        const amrex::MultiFab& Bz) override;
+                        const amrex::MultiFab& Bz,
+                        MomentumPushType momentum_push_type) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
@@ -229,7 +237,7 @@ public:
      * (this box should correspond to an integer number of cells in each direction,
      * but its boundaries need not be aligned with the actual cells of the simulation)
     */
-    void AddPlasma (PlasmaInjector const& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
+    void AddPlasma (PlasmaInjector& plasma_injector, int lev, amrex::RealBox part_realbox = amrex::RealBox());
 
     /**
      * Create new macroparticles for this species, with a fixed
@@ -279,7 +287,7 @@ public:
      * These are NOT initialized by this function.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& pinned_tile,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& pinned_tile,
         int n_external_attr_real,
         int n_external_attr_int) final;
 
@@ -401,6 +409,12 @@ public:
     bool has_virtual_photons () const override;
 
     /**
+    * Tells if beam size effect is enabled for
+    * the virtual photons
+    */
+    bool has_virtual_photons_beam_size_effect () const override;
+
+    /**
      * Gets the index of the PhysicalParticleContainer
      * that corresponds to the virtual photons
      * @return index of the virtual photon species
@@ -425,22 +439,22 @@ public:
     }
 
     // By default this returns false; overridden here to return runtime value
-    virtual bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
+    bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
 
-    virtual void AccumulateVelocitiesAndComputeTemperature (
+    void AccumulateVelocitiesAndComputeTemperature (
         ablastr::fields::MultiLevelVectorField const & T_vf,
         amrex::Real relative_time) override;
 
-    virtual void DepositTemperature (
+    void DepositTemperature (
         WarpXParIter& pti,
         RealVector const & wp, RealVector const & uxp,
         RealVector const & uyp, RealVector const & uzp,
-        amrex::MultiFab * const Tx, amrex::MultiFab * const Ty, amrex::MultiFab * const Tz,
-        long const offset, long const np_to_deposit,
-        int const thread_num, const int lev, int const depos_lev,
-        amrex::Real const relative_time, PushType push_type,
-        const warpx::particles::deposition::TemperatureDepositionType type,
-        const warpx::particles::deposition::TemperatureDepositionPass pass) override;
+        amrex::MultiFab* Tx, amrex::MultiFab* Ty, amrex::MultiFab* Tz,
+        long offset, long np_to_deposit,
+        int thread_num, int lev, int depos_lev,
+        amrex::Real relative_time, PushType push_type,
+        warpx::particles::deposition::TemperatureDepositionType type,
+        warpx::particles::deposition::TemperatureDepositionPass pass) override;
 
 protected:
 
@@ -459,7 +473,7 @@ protected:
     // particle and the time of the boosted frame.
     bool boost_adjust_transverse_positions = false;
     bool do_backward_propagation = false;
-    bool m_rz_random_theta = true;
+    bool m_random_theta = true;
 
     // Impose t_lab from the openPMD file for externally loaded species
     bool impose_t_lab_from_file = false;
@@ -502,6 +516,10 @@ protected:
 
     // A flag to enable virtual photons
     bool m_do_qed_virtual_photons = false;
+
+    // A flag to enable beam size effect ala xsuite/guineapig in radiative bhabha and pairs
+    bool m_qed_virtual_photons_do_beam_size_effect = false;
+
 #endif
     /* Vector of user-defined integer attributes for species, species_name */
     std::vector<std::string> m_user_int_attribs;

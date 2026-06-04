@@ -17,9 +17,9 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -83,7 +83,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     : WarpXParticleContainer(amr_core, ispecies),
       m_laser_name{name}
 {
-    charge = 1.0;
+    m_charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_laser_name(m_laser_name);
@@ -568,8 +568,8 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("LaserParticleContainer::Evolve()");
-    WARPX_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
+    ABLASTR_PROFILE("LaserParticleContainer::Evolve()");
+    ABLASTR_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
 
@@ -646,7 +646,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             //
             // Particle Push
             //
-            WARPX_PROFILE_VAR_START(blp_pp);
+            ABLASTR_PROFILE_VAR_START(blp_pp);
             // Find the coordinates of the particles in the emission plane
             calculate_laser_plane_coordinates(pti, static_cast<int>(np),
                                               plane_Xp.dataPtr(),
@@ -662,7 +662,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             update_laser_particle(pti, static_cast<int>(np), uxp.dataPtr(), uyp.dataPtr(),
                                   uzp.dataPtr(), wp.dataPtr(),
                                   amplitude_E.dataPtr(), dt, push_type );
-            WARPX_PROFILE_VAR_STOP(blp_pp);
+            ABLASTR_PROFILE_VAR_STOP(blp_pp);
 
             // Current Deposition
             using ablastr::fields::Direction;
@@ -742,12 +742,12 @@ LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
     const auto eps = static_cast<Real>(dx[0]*small_coeff);
 #endif
 #if defined(WARPX_DIM_3D)
-    Sx = std::min(std::min(dx[0]/(std::abs(m_u_X[0])+eps),
-                           dx[1]/(std::abs(m_u_X[1])+eps)),
-                           dx[2]/(std::abs(m_u_X[2])+eps));
-    Sy = std::min(std::min(dx[0]/(std::abs(m_u_Y[0])+eps),
-                           dx[1]/(std::abs(m_u_Y[1])+eps)),
-                           dx[2]/(std::abs(m_u_Y[2])+eps));
+    Sx = std::min({dx[0]/(std::abs(m_u_X[0])+eps),
+                   dx[1]/(std::abs(m_u_X[1])+eps),
+                   dx[2]/(std::abs(m_u_X[2])+eps)});
+    Sy = std::min({dx[0]/(std::abs(m_u_Y[0])+eps),
+                   dx[1]/(std::abs(m_u_Y[1])+eps),
+                   dx[2]/(std::abs(m_u_Y[2])+eps)});
 #elif defined(WARPX_DIM_RZ)
     Sx = dx[0];
     Sy = 1.0;
@@ -783,9 +783,11 @@ LaserParticleContainer::ComputeWeightMobility ([[maybe_unused]] Real Sx, [[maybe
 void
 LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
-                               const MultiFab&, const MultiFab&, const MultiFab&)
+                               const MultiFab&, const MultiFab&, const MultiFab&,
+                               MomentumPushType /*momentum_push_type*/)
 {
-    // I don't think we need to do anything.
+    // Laser particles are not advanced using a particle pusher.
+    // Therefore, PushP does nothing in this implementation.
 }
 
 /* \brief compute particles position in laser plane coordinate.

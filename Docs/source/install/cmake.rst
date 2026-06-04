@@ -426,6 +426,7 @@ CMake Option                  Default & Values                             Descr
 ``WarpX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
 ``WarpX_DIMS``                **3**/2/1/RZ/RCYLINDER/RSPHERE               Simulation dimensionality. Use ``"1;2;3;RZ;RCYLINDER;RSPHERE"`` for all.
 ``WarpX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ, RCYLINDER, and RSPHERE  yet)
+``WarpX_PETSC``               ON/**OFF**                                   PETSc linear/nonlinear solvers via AMReX
 ``WarpX_IPO``                 ON/**OFF**                                   Compile WarpX with interprocedural optimization (aka LTO)
 ``WarpX_LIB``                 ON/**OFF**                                   Build WarpX as a library, e.g., for PICMI Python
 ``WarpX_MPI``                 **ON**/OFF                                   Multi-node support (message-passing)
@@ -467,7 +468,7 @@ CMake Option                  Default & Values                               Des
 ``WarpX_amrex_internal``      **ON**/OFF                                     Needs a pre-installed AMReX library if set to ``OFF``
 ``WarpX_openpmd_src``         *None*                                         Path to openPMD-api source directory (preferred if set)
 ``WarpX_openpmd_repo``        ``https://github.com/openPMD/openPMD-api.git`` Repository URI to pull and build openPMD-api from
-``WarpX_openpmd_branch``      ``0.16.1``                                     Repository branch for ``WarpX_openpmd_repo``
+``WarpX_openpmd_branch``      ``0.17.0``                                     Repository branch for ``WarpX_openpmd_repo``
 ``WarpX_openpmd_internal``    **ON**/OFF                                     Needs a pre-installed openPMD-api library if set to ``OFF``
 ``WarpX_picsar_src``          *None*                                         Path to PICSAR source directory (preferred if set)
 ``WarpX_picsar_repo``         ``https://github.com/ECP-WarpX/picsar.git``    Repository URI to pull and build PICSAR from
@@ -516,6 +517,7 @@ Environment Variable          Default & Values                             Descr
 ``WARPX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
 ``WARPX_DIMS``                ``"1;2;3;RZ;RCYLINDER;RSPHERE"``             Simulation dimensionalities (semicolon-separated list)
 ``WARPX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ, RCYLINDER, and RSPHERE yet)
+``WARPX_PETSC``               ON/**OFF**                                   PETSc linear/nonlinear solvers via AMReX
 ``WARPX_MPI``                 ON/**OFF**                                   Multi-node support (message-passing)
 ``WARPX_OPENPMD``             **ON**/OFF                                   openPMD I/O (HDF5, ADIOS)
 ``WARPX_PRECISION``           SINGLE/**DOUBLE**                            Floating point precision (single/double)

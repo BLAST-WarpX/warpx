@@ -13,12 +13,12 @@
 #define ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H
 
 #include <ablastr/constant.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/TextMsg.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "PoissonSolver.H"
 
 #if defined(WARPX_USE_FFT) && defined(WARPX_DIM_3D)
@@ -117,9 +117,9 @@ computeEffectivePotentialPhi (
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
-    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt,
+    [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 ) {
     using namespace amrex::literals;
 

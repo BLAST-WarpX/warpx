@@ -17,10 +17,10 @@
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXUtil.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Parallelization/WarpXComm_K.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/VectorPoissonSolver.H>
@@ -61,7 +61,7 @@ using namespace amrex;
 void
 WarpX::ComputeMagnetostaticField()
 {
-    WARPX_PROFILE("WarpX::ComputeMagnetostaticField");
+    ABLASTR_PROFILE("WarpX::ComputeMagnetostaticField");
     // Fields have been reset in Electrostatic solver for this time step, these fields
     // are added into the B fields after electrostatic solve
 
@@ -77,7 +77,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::AddMagnetostaticFieldLabFrame");
+    ABLASTR_PROFILE("WarpX::AddMagnetostaticFieldLabFrame");
 
     // Store the boundary conditions for the field solver if they haven't been
     // stored yet
@@ -126,22 +126,11 @@ WarpX::AddMagnetostaticFieldLabFrame()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !IsPythonCallbackInstalled("poissonsolver"),
         "Python Level Poisson Solve not supported for Magnetostatic implementation.");
 
-    // const amrex::Real magnetostatic_absolute_tolerance = self_fields_absolute_tolerance*PhysConst::c;
-    // temporary fix!!!
-    const amrex::Real absolute_tolerance = 0.0;
-    amrex::Real required_precision;
-    if constexpr (std::is_same_v<Real, float>) {
-        required_precision = 1e-5;
-    }
-    else {
-        required_precision = 1e-11;
-    }
-
     computeVectorPotential(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level),
-        required_precision, absolute_tolerance, magnetostatic_solver_max_iters,
-        magnetostatic_solver_verbosity
+        magnetostatic_solver_required_precision, magnetostatic_solver_absolute_tolerance,
+        magnetostatic_solver_max_iters, magnetostatic_solver_verbosity
     );
 }
 

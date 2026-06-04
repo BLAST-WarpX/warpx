@@ -16,13 +16,13 @@
 #include "Filter/BilinearFilter.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
 #include "Particles/MultiParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/average.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
@@ -119,7 +119,7 @@ namespace
 void
 WarpX::UpdateAuxilaryData ()
 {
-    WARPX_PROFILE("WarpX::UpdateAuxilaryData()");
+    ABLASTR_PROFILE("WarpX::UpdateAuxilaryData()");
 
     using ablastr::fields::Direction;
 
@@ -133,39 +133,63 @@ WarpX::UpdateAuxilaryData ()
         UpdateAuxilaryDataStagToNodal();
     }
 
-    // When loading particle fields from file: add the external fields:
+    // When loading particle fields from file: add the external fields
     for (int lev = 0; lev <= finest_level; ++lev) {
+
+        // external particle E field maps
         if (mypc->m_E_ext_particle_s == "read_from_file") {
+            ablastr::fields::VectorField E_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
+            const auto& E_ext = m_fields.get_alldirs(FieldType::E_external_particle_field, lev);
 
-            // Scale the field read from file (E_ext) by a scalar time dependency and add it to Efield_aux
+            const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
+            const int ncomp_src = E_ext[0]->nComp();
 
-            const amrex::ParticleReal time_factor = mypc->m_Efield_time_partparser(t_new[lev]);
+            // number of external particle fields must match m_field ncomps
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ncomp_src == static_cast<int>(metaE.size()),
+                "Mismatch: E_external_particle_field nComp != number of E field metadata entries."
+            );
 
-            ablastr::fields::VectorField Efield_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
-            const auto& E_ext_lev = m_fields.get_alldirs(FieldType::E_external_particle_field, lev);
+            // Loop over field maps, multiply with time dependency function, add to field map
+            for (int ic = 0; ic < ncomp_src; ++ic) {
+                const amrex::ParticleReal time_factor = metaE[ic].time_executor(t_new[lev]);
 
-            amrex::Saxpy(*Efield_aux[0], time_factor, *E_ext_lev[0], 0, 0, E_ext_lev[0]->nComp(),
-                 guard_cells.ng_FieldGather);
-            amrex::Saxpy(*Efield_aux[1], time_factor, *E_ext_lev[1], 0, 0, E_ext_lev[1]->nComp(),
-                 guard_cells.ng_FieldGather);
-            amrex::Saxpy(*Efield_aux[2], time_factor, *E_ext_lev[2], 0, 0, E_ext_lev[2]->nComp(),
-                 guard_cells.ng_FieldGather);
+                // dst += time_factor * src(component=ic)
+                amrex::Saxpy(*E_aux[0], time_factor, *E_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+                amrex::Saxpy(*E_aux[1], time_factor, *E_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+                amrex::Saxpy(*E_aux[2], time_factor, *E_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+            }
         }
+
+        // external particle B field maps
         if (mypc->m_B_ext_particle_s == "read_from_file") {
+            ablastr::fields::VectorField B_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
+            const auto& B_ext = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
 
-            // Scale the field read from file (B_ext) by a scalar time dependency and add it to Bfield_aux
+            const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
+            const int ncomp_src = B_ext[0]->nComp();
 
-            const amrex::ParticleReal time_factor = mypc->m_Bfield_time_partparser(t_new[lev]);
+            // number of external particle fields must match m_field ncomps
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ncomp_src == static_cast<int>(metaB.size()),
+                "Mismatch: B_external_particle_field nComp != number of B field metadata entries."
+            );
 
-            ablastr::fields::VectorField Bfield_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
-            const auto& B_ext_lev = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
+            // Loop over field maps, multiply with time dependency function, add to field map
+            for (int ic = 0; ic < ncomp_src; ++ic) {
+                const amrex::ParticleReal time_factor = metaB[ic].time_executor(t_new[lev]);
 
-            amrex::Saxpy(*Bfield_aux[0], time_factor, *B_ext_lev[0], 0, 0, B_ext_lev[0]->nComp(),
-                 guard_cells.ng_FieldGather);
-            amrex::Saxpy(*Bfield_aux[1], time_factor, *B_ext_lev[1], 0, 0, B_ext_lev[1]->nComp(),
-                 guard_cells.ng_FieldGather);
-            amrex::Saxpy(*Bfield_aux[2], time_factor, *B_ext_lev[2], 0, 0, B_ext_lev[2]->nComp(),
-                 guard_cells.ng_FieldGather);
+                // dst += time_factor * src(component=ic)
+                amrex::Saxpy(*B_aux[0], time_factor, *B_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+                amrex::Saxpy(*B_aux[1], time_factor, *B_ext[1], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+                amrex::Saxpy(*B_aux[2], time_factor, *B_ext[2], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
+                            guard_cells.ng_FieldGather);
+            }
         }
     }
 
@@ -784,14 +808,31 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
+    if (do_single_precision_comms)
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryE, requested more guard cells than allocated");
+        for (int i = 0; i < 3; ++i)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ng.allLE(mf[i]->nGrowVect()),
+                "Error: in FillBoundaryE, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+            const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+            ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+        }
+    }
+    else
+    {
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        if (nodal_sync)
+        {
+            amrex::FillBoundaryAndSync_nowait(vec_mf, period);
+            amrex::FillBoundaryAndSync_finish(vec_mf);
+        }
+        else
+        {
+            amrex::FillBoundary_nowait(vec_mf, period);
+            amrex::FillBoundary_finish(vec_mf);
+        }
     }
 }
 
@@ -849,14 +890,31 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
     }
 
     // Fill guard cells in valid domain
-    for (int i = 0; i < 3; ++i)
+    if (do_single_precision_comms)
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ng.allLE(mf[i]->nGrowVect()),
-            "Error: in FillBoundaryB, requested more guard cells than allocated");
+        for (int i = 0; i < 3; ++i)
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                ng.allLE(mf[i]->nGrowVect()),
+                "Error: in FillBoundaryB, requested more guard cells than allocated");
 
-        const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
-        ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+            const amrex::IntVect nghost = (m_safe_guard_cells) ? mf[i]->nGrowVect() : ng;
+            ablastr::utils::communication::FillBoundary(*mf[i], nghost, do_single_precision_comms, period, nodal_sync);
+        }
+    }
+    else
+    {
+        const amrex::Vector<MultiFab*> vec_mf(mf.begin(), mf.end());
+        if (nodal_sync)
+        {
+            amrex::FillBoundaryAndSync_nowait(vec_mf, period);
+            amrex::FillBoundaryAndSync_finish(vec_mf);
+        }
+        else
+        {
+            amrex::FillBoundary_nowait(vec_mf, period);
+            amrex::FillBoundary_finish(vec_mf);
+        }
     }
 }
 
@@ -949,8 +1007,8 @@ WarpX::FillBoundaryB_avg (int lev, PatchType patch_type, IntVect ng)
             ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period);
         } else {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                ng.allLE(m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect()),
-                "Error: in FillBoundaryB, requested more guard cells than allocated");
+                ng.allLE(m_fields.get(FieldType::Bfield_avg_fp, Direction{0}, lev)->nGrowVect()),
+                "Error: in FillBoundaryB_avg, requested more guard cells than allocated");
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][0], ng, WarpX::do_single_precision_comms, period);
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][1], ng, WarpX::do_single_precision_comms, period);
             ablastr::utils::communication::FillBoundary(*Bfield_avg_fp[lev][2], ng, WarpX::do_single_precision_comms, period);
@@ -1113,7 +1171,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 {
     using ablastr::fields::Direction;
 
-    WARPX_PROFILE("WarpX::SyncCurrent()");
+    ABLASTR_PROFILE("WarpX::SyncCurrent()");
 
     bool const skip_lev0_coarse_patch = true;
 
@@ -1288,7 +1346,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 void
 WarpX::SyncMassMatricesPC ()
 {
-    WARPX_PROFILE("WarpX::SyncMassMatricesPC()");
+    ABLASTR_PROFILE("WarpX::SyncMassMatricesPC()");
 
     ablastr::fields::MultiLevelVectorField const& Sigma_fp = m_fields.get_mr_levels_alldirs("MassMatrices_PC", finest_level);
 
@@ -1324,7 +1382,7 @@ WarpX::SyncRho (
     const ablastr::fields::MultiLevelScalarField& charge_cp,
     ablastr::fields::MultiLevelScalarField const & charge_buffer)
 {
-    WARPX_PROFILE("WarpX::SyncRho()");
+    ABLASTR_PROFILE("WarpX::SyncRho()");
 
     if (!charge_fp[0]) { return; }
     const int ncomp = charge_fp[0]->nComp();

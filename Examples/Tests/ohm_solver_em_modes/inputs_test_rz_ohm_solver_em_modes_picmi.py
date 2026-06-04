@@ -54,7 +54,7 @@ class CylindricalNormalModes(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 5e-4
     # Number of substeps used to update B
-    substeps = 20
+    substeps = 40
 
     def __init__(self, test, verbose):
         """Get input parameters for the specific case desired."""
@@ -217,15 +217,23 @@ class CylindricalNormalModes(object):
         )
         simulation.add_diagnostic(field_diag)
 
-        # add particle diagnostic for checksum
+        # add field and particle diagnostics for checksum
         if self.test:
-            part_diag = picmi.ParticleDiagnostic(
+            checksum_field_diag = picmi.FieldDiagnostic(
+                name="diag1",
+                grid=self.grid,
+                period=self.total_steps,
+                data_list=["B", "E"],
+            )
+            simulation.add_diagnostic(checksum_field_diag)
+
+            checksum_part_diag = picmi.ParticleDiagnostic(
                 name="diag1",
                 period=self.total_steps,
                 species=[self.ions],
                 data_list=["ux", "uy", "uz", "weighting"],
             )
-            simulation.add_diagnostic(part_diag)
+            simulation.add_diagnostic(checksum_part_diag)
 
 
 ##########################

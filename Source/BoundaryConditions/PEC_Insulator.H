@@ -69,6 +69,44 @@ public:
                                      amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
                                      int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios,
                                      amrex::Real time);
+    /**
+     * \brief Zeros the parallel fields on the boundary
+     *        When the E field is being set, the field is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the field is zeroed only in the conductor.
+     *
+     * \param[in,out] field
+     * \param[in]     field_boundary_lo   lower field boundary conditions
+     * \param[in]     field_boundary_hi   upper field boundary conditions
+     * \param[in]     ng_fieldgather      number of guard cells used by field gather
+     * \param[in]     geom                geometry object of level "lev"
+     * \param[in]     lev                 level of the Multifab
+     * \param[in]     patch_type          coarse or fine
+     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     */
+    void ZeroParallelFieldInConductor (std::array<amrex::MultiFab*, 3> field,
+                                       amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+                                       amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+                                       amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
+                                       int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios);
+
+    /**
+     * \brief Zeros the scalar on the boundary
+     *        When the E field is being set, the scalar is zeroed everywhere, in both insulator and conductor.
+     *        When the B field id being set, the scalar is zeroed only in the conductor.
+     *
+     * \param[in,out] scalar
+     * \param[in]     field_boundary_lo   lower field boundary conditions
+     * \param[in]     field_boundary_hi   upper field boundary conditions
+     * \param[in]     geom                geometry object of level "lev"
+     * \param[in]     lev                 level of the Multifab
+     * \param[in]     patch_type          coarse or fine
+     * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     */
+    void ZeroParallelScalarInConductor (amrex::MultiFab* scalar,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_lo,
+                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
+                                        amrex::Geometry const & geom, int lev, PatchType patch_type,
+                                        amrex::Vector<amrex::IntVect> const & ref_ratios);
 
     /**
      * \brief The work routine applying the boundary condition
@@ -84,6 +122,7 @@ public:
      * \param[in]     time                current time of the simulation
      * \param[in]     split_pml_field     whether pml the multifab is the regular Efield or split pml field
      * \param[in]     E_like              whether the field is E like or B like
+     * \param[in]     only_zero_parallel_field only zero the parallel field on the boundary
      * \param[in]     set_Fx_lo           the flags for the x-field at the lower boundaries
      * \param[in]     set_Fy_lo           the flags for the y-field at the lower boundaries
      * \param[in]     set_Fz_lo           the flags for the z-field at the lower boundaries
@@ -109,6 +148,7 @@ public:
                                amrex::Real time,
                                bool split_pml_field,
                                bool E_like,
+                               bool only_zero_parallel_field,
                                amrex::Vector<int> const & set_Fx_lo,
                                amrex::Vector<int> const & set_Fy_lo,
                                amrex::Vector<int> const & set_Fz_lo,
@@ -127,14 +167,14 @@ public:
      * \param[in] iside side to check, 0 is lower, 1 is upper
      * \return whether the E field is set on the boundary
      */
-    int IsESet(int idim, int iside) const { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
+    [[nodiscard]] int IsESet(int idim, int iside) const { return ( iside == 1 ? m_set_E_hi[idim] : m_set_E_lo[idim] ); }
 
     /* \brief Returns whether any B field is set on a boundary
      * \param[in] idim dimension to check
      * \param[in] iside side to check, 0 is lower, 1 is upper
      * \return whether the B field is set on the boundary
      */
-    int IsBSet(int idim, int iside) const { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
+    [[nodiscard]] int IsBSet(int idim, int iside) const { return ( iside == 1 ? m_set_B_hi[idim] : m_set_B_lo[idim] ); }
 
     /* \brief Returns whether the E field is set on a boundary
      * \param[in] idim dimension to check
@@ -142,7 +182,7 @@ public:
      * \param[in] ifield which field to check, 0, 1, or 2
      * \return whether the E field is set on the boundary
      */
-    int IsESet(int idim, int iside, int ifield) const;
+    [[nodiscard]] int IsESet(int idim, int iside, int ifield) const;
 
     /* \brief Returns whether the B field is set on a boundary
      * \param[in] idim dimension to check
@@ -150,24 +190,10 @@ public:
      * \param[in] ifield which field to check, 0, 1, or 2
      * \return whether the B field is set on the boundary
      */
-    int IsBSet(int idim, int iside, int ifield) const;
+    [[nodiscard]] int IsBSet(int idim, int iside, int ifield) const;
 
 private:
 
-    /* \brief Read in the parsers for the tangential fields, returning whether
-     *        the input parameter was specified.
-     * \param[in]  pp_insulator ParmParse instance
-     * \param[out] parsers vector holding the parsers generated from the input
-     * \param[in]  input_name the name of the input parameter
-     * \param[in]  coord1 the first coordinate in the plane
-     * \param[in]  coord2 the second coordinate in the plane
-     * \return wether the parameter was specified
-     */
-    bool ReadTangentialFieldParser (amrex::ParmParse const & pp_insulator,
-                                    amrex::Vector<std::unique_ptr<amrex::Parser>> & parsers,
-                                    std::string const & input_name,
-                                    std::string const & coord1,
-                                    std::string const & coord2);
 
     // Parsers specifying the region of each boundary that is insulator
     amrex::Vector<std::unique_ptr<amrex::Parser>> m_insulator_area_lo;
