@@ -1187,15 +1187,15 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 pa[PIdx::z][ip] = pos.z;
 #elif defined(WARPX_DIM_RZ)
                 pa[PIdx::theta][ip] = theta;
-                pa[PIdx::x][ip] = xb;
+                pa[PIdx::r][ip] = xb;
                 pa[PIdx::z][ip] = pos.z;
 #elif defined(WARPX_DIM_RCYLINDER)
                 pa[PIdx::theta][ip] = theta;
-                pa[PIdx::x][ip] = xb;
+                pa[PIdx::r][ip] = xb;
 #elif defined(WARPX_DIM_RSPHERE)
                 pa[PIdx::theta][ip] = theta;
                 pa[PIdx::phi][ip] = phi;
-                pa[PIdx::x][ip] = xb;
+                pa[PIdx::r][ip] = xb;
 #elif defined(WARPX_DIM_1D_Z)
                 pa[PIdx::z][ip] = pos.z;
 #endif
@@ -1704,18 +1704,18 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_RZ)
                 pa[PIdx::theta][ip] = std::atan2(pposy, pposx);
-                pa[PIdx::x][ip] = std::sqrt(pposx*pposx + pposy*pposy);
+                pa[PIdx::r][ip] = std::sqrt(pposx*pposx + pposy*pposy);
                 pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_XZ)
                 pa[PIdx::x][ip] = pposx;
                 pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_RCYLINDER)
                 pa[PIdx::theta][ip] = theta;
-                pa[PIdx::x][ip] = radial_position;
+                pa[PIdx::r][ip] = radial_position;
 #elif defined(WARPX_DIM_RSPHERE)
                 pa[PIdx::theta][ip] = theta;
                 pa[PIdx::phi][ip] = phi;
-                pa[PIdx::x][ip] = radial_position;
+                pa[PIdx::r][ip] = radial_position;
 #elif defined(WARPX_DIM_1D_Z)
                 pa[PIdx::z][ip] = pposz;
 #endif

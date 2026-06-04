@@ -201,9 +201,6 @@ protected:
     std::unique_ptr<amrex::Parser> ux_parser;
     std::unique_ptr<amrex::Parser> uy_parser;
     std::unique_ptr<amrex::Parser> uz_parser;
-    std::unique_ptr<amrex::Parser> ux_th_parser;
-    std::unique_ptr<amrex::Parser> uy_th_parser;
-    std::unique_ptr<amrex::Parser> uz_th_parser;
 
     // Keep a pointer to TemperatureProperties to ensure the lifetime of the
     // contained Parser
