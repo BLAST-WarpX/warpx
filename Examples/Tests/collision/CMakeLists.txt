@@ -112,6 +112,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_collision_z_Bremsstrahlung_picmi  # name
+    1  # dims
+    1  # nprocs
+    inputs_test_1d_collision_z_Bremsstrahlung_picmi.py  # inputs
+    "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_charge_exchange_dsmc  # name
     2  # dims
     1  # nprocs
