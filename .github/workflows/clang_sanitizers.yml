@@ -43,7 +43,7 @@ jobs:
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=100M
+        export CCACHE_MAXSIZE=300M
         ccache -z
 
         export CXX=$(which clang++-19)
@@ -105,7 +105,7 @@ jobs:
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
-        export CCACHE_MAXSIZE=100M
+        export CCACHE_MAXSIZE=300M
         ccache -z
 
         export CXX=$(which clang++-19)

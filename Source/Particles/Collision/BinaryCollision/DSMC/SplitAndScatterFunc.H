@@ -344,11 +344,11 @@ public:
 #elif defined(WARPX_DIM_XZ)
                     constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::z};
 #elif defined(WARPX_DIM_RZ)
-                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::z, PIdx::theta};
+                    constexpr std::array<int, 3> position_indices = {PIdx::r, PIdx::z, PIdx::theta};
 #elif defined(WARPX_DIM_RCYLINDER)
-                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::theta};
+                    constexpr std::array<int, 2> position_indices = {PIdx::r, PIdx::theta};
 #elif defined(WARPX_DIM_RSPHERE)
-                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::theta, PIdx::phi};
+                    constexpr std::array<int, 3> position_indices = {PIdx::r, PIdx::theta, PIdx::phi};
 #elif defined(WARPX_DIM_3D)
                     constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
 #endif
