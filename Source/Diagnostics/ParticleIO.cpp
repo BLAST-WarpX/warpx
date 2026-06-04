@@ -114,7 +114,7 @@ RigidInjectedParticleContainer::WriteHeader (std::ostream& os) const
 void
 PhysicalParticleContainer::ReadHeader (std::istream& is)
 {
-    is >> charge >> m_mass;
+    is >> m_charge >> m_mass;
     ablastr::utils::text::goto_next_line(is);
 }
 
@@ -122,7 +122,7 @@ void
 PhysicalParticleContainer::WriteHeader (std::ostream& os) const
 {
     // no need to write species_id
-    os << charge << " " << m_mass << "\n";
+    os << m_charge << " " << m_mass << "\n";
 }
 
 void

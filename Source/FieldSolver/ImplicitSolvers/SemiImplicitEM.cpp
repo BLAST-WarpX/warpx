@@ -96,13 +96,14 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     m_WarpX->SetElectricFieldAndApplyBCs(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    const amrex::Real new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance Eg from time n+1/2 to time n+1
     // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
     m_E.linComb(2._rt, m_E, -1._rt, m_Eold);
-    const amrex::Real new_time = start_time + m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
 
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}

@@ -491,20 +491,10 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             pp.query("mass_matrices_pc_width", m_mass_matrices_pc_width);
 #endif
         }
-#if defined(WARPX_DIM_RCYLINDER)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RCYLINDER!");
-#endif
 #if defined(WARPX_DIM_RSPHERE)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSHERE!");
-#endif
-#if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RZ");
+            "Using mass matrices is not setup for DIM = RSPHERE!");
 #endif
 #if defined(WARPX_DIM_3D)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -918,6 +908,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
             amrex::MultiFab::Add(*MM_PC[2], *MM_zz, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_zz[0], MM_zz->nGrowVect());
         }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 
     // Do addOp Exchange on MassMatrices_PC
