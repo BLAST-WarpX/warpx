@@ -1228,7 +1228,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 }
 
 void
-PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt)
+PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector& plasma_injector, amrex::Real dt)
 {
     ABLASTR_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()");
 
@@ -1288,6 +1288,23 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                                      m_user_real_attribs.size(),
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
+
+    if (fixed_ppc_is_specified) {
+        InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
+        const amrex::Real gamma_boost = WarpX::gamma_boost;
+        const amrex::Real beta_boost = WarpX::beta_boost;
+
+        auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+        {
+            return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
+                                            gamma_boost, beta_boost, t);
+        };
+
+        // Initial particle injection
+        plasma_injector.prepare(this->ParticleBoxArray(level_zero),
+                                this->ParticleDistributionMap(level_zero), IntVect(0),
+                                get_zlab);
+    }
 
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
