@@ -3325,6 +3325,31 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         Mutually exclusive with ndt_supercycle.
     """
 
+    def __init__(
+        self,
+        name,
+        species,
+        energy_fraction=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
+        self.name = name
+        self.species = species
+        self.energy_fraction = energy_fraction
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "inverse_bremsstrahlung"
+        collision.species = [species.name for species in self.species]
+        collision.energy_fraction = self.energy_fraction
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
+
 
 class EmbeddedBoundary(picmistandard.base._ClassWithInit):
     """
