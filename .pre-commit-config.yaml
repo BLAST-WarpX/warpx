@@ -102,3 +102,9 @@ repos:
     # This is a slow hook, so only run this if --hook-stage manual is passed
     stages: [manual]
     additional_dependencies: [cmake, ninja]
+
+# Scan for secret files that should not be committed
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.24.2
+  hooks:
+  - id: gitleaks
