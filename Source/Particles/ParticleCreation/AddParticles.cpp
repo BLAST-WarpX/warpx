@@ -1274,7 +1274,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
     InjectorPosition* flux_pos = plasma_injector.getInjectorFluxPosition();
     InjectorFlux*  inj_flux = plasma_injector.getInjectorFlux();
-    InjectorDensity* inj_density = plasma_injector.getInjectorDensity();
     InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     constexpr int level_zero = 0;
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
@@ -1308,6 +1307,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
         const amrex::Box& tile_box = mfi.tilebox();
         amrex::RealBox tile_realbox = WarpX::getRealBox(tile_box, 0);
+
+        InjectorDensity* inj_density = plasma_injector.getInjectorDensity(mfi.LocalIndex());
 
         // This ensures that the upper end of tile_realbox is exactly the
         // same as ProbHi when it is at the upper end of the domain.

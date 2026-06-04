@@ -612,7 +612,7 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
     } else if (flux_prof_s == "fixed_num_particles_per_cell") {
         fixed_ppc_is_specified = true;
         utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
-        SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
+        SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     } else {
         SpeciesUtils::StringParseAbortMessage("Flux profile type", flux_prof_s);
     }
