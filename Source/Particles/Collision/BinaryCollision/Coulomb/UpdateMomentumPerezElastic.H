@@ -24,17 +24,18 @@ enum CumulativeScatteringMethod
 /* \brief Helper function to sample cosine of scattering angle from Nanbu's
  *        cumulative scattering distribution. See PhysRevE.55.4642 (1997).
  *        @param[in] s12 is the distribution variance
- *        @param[in] r is a random number between zero and one.
  *        @param[in] engine is a random number engine.
  */
 
 template <typename T_PR>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 T_PR SampleNanbu (
-    T_PR const s12, T_PR r,
+    T_PR const s12,
     amrex::RandomEngine const& engine )
 {
     using namespace amrex::literals;
+
+    T_PR r = amrex::Random(engine);
 
     T_PR cosXs;
     if ( s12 <= T_PR(0.1) )
@@ -210,13 +211,10 @@ void UpdateMomentumPerezElastic (
     // Only modify momenta if s12 is non-zero
     if (s12 > std::numeric_limits<T_PR>::min()) {
 
-        // Get random numbers
-        T_PR r = amrex::Random(engine);
-
         T_PR cosXs = T_PR(0.0);
         if (scattering_method == NANBU) {
             // Obtain scattering angle by sampling from Nanbu's distibution
-            cosXs = SampleNanbu(s12, r, engine);
+            cosXs = SampleNanbu(s12, engine);
         }
         else if (scattering_method == BOBYLEV) {
             // Obtain scattering angle from Bobylev's delta function distribution
