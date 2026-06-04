@@ -598,29 +598,11 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
                    flux_prof_s.begin(), ::tolower);
     if (flux_prof_s == "constant") {
         utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
-#ifdef WARPX_DIM_RZ
-        if (WarpX::n_rz_azimuthal_modes > 1) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                num_particles_per_cell_real>=2*WarpX::n_rz_azimuthal_modes,
-                "Error: For accurate use of WarpX cylindrical geometry the number "
-                "of particles should be at least two times n_rz_azimuthal_modes "
-                "(Please visit PR#765 for more information.)");
-        }
-#endif
         utils::parser::getWithParser(pp_species, source_name, "flux", flux);
         // Construct InjectorFlux with InjectorFluxConstant.
         h_inj_flux.reset(new InjectorFlux((InjectorFluxConstant*)nullptr, flux));
     } else if (flux_prof_s == "parse_flux_function") {
         utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
-#ifdef WARPX_DIM_RZ
-        if (WarpX::n_rz_azimuthal_modes > 1) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                num_particles_per_cell_real>=2*WarpX::n_rz_azimuthal_modes,
-                "Error: For accurate use of WarpX cylindrical geometry the number "
-                "of particles should be at least two times n_rz_azimuthal_modes "
-                "(Please visit PR#765 for more information.)");
-        }
-#endif
         utils::parser::Store_parserString(pp_species, source_name, "flux_function(x,y,z,t)", str_flux_function);
         // Construct InjectorFlux with InjectorFluxParser.
         flux_parser = std::make_unique<amrex::Parser>(
@@ -630,15 +612,6 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
     } else if (flux_prof_s == "fixed_num_particles_per_cell") {
         fixed_ppc_is_specified = true;
         utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
-#ifdef WARPX_DIM_RZ
-        if (WarpX::n_rz_azimuthal_modes > 1) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            num_particles_per_cell>=2*WarpX::n_rz_azimuthal_modes,
-            "Error: For accurate use of WarpX cylindrical geometry the number "
-            "of particles should be at least two times n_rz_azimuthal_modes "
-            "(Please visit PR#765 for more information.)");
-        }
-#endif
         SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser);
     } else {
         SpeciesUtils::StringParseAbortMessage("Flux profile type", flux_prof_s);
