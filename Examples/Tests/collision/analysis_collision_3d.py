@@ -25,13 +25,12 @@
 # Possible running time: ~ 30.0 s
 
 import glob
-import math
 import sys
 
 import numpy as np
 import post_processing_utils
 import yt
-from scipy.constants import c, m_e, e
+from scipy.constants import e, m_e
 
 ng = 512
 ne = ng * 200
@@ -47,7 +46,7 @@ a_tolerance = 0.01
 b_tolerance = 0.1
 
 a_fit = 6.980918134261288
-b_fit = -6.944721119341786e+05
+b_fit = -6.944721119341786e05
 
 last_fn = sys.argv[1]
 if last_fn[-1] == "/":
@@ -60,8 +59,8 @@ fn_list = glob.glob(prefix + "*[0-9]")
 fn_list.sort(key=lambda fn: int(fn[-6:]))
 
 time_arr = []
-Te_arr   = []
-Ti_arr   = []
+Te_arr = []
+Ti_arr = []
 
 for fn in fn_list:
     # load file
@@ -84,12 +83,12 @@ for fn in fn_list:
     vzi = np.mean(pzi) / mi
 
     # compute thermal velocity
-    vtesq  = np.mean((pxe/m_e - vxe)**2)
-    vtesq += np.mean((pye/m_e - vye)**2)
-    vtesq += np.mean((pze/m_e - vze)**2)
-    vtisq  = np.mean((pxi/mi - vxi)**2)
-    vtisq += np.mean((pyi/mi - vyi)**2)
-    vtisq += np.mean((pzi/mi - vzi)**2)
+    vtesq = np.mean((pxe / m_e - vxe) ** 2)
+    vtesq += np.mean((pye / m_e - vye) ** 2)
+    vtesq += np.mean((pze / m_e - vze) ** 2)
+    vtisq = np.mean((pxi / mi - vxi) ** 2)
+    vtisq += np.mean((pyi / mi - vyi) ** 2)
+    vtisq += np.mean((pzi / mi - vzi) ** 2)
 
     Te_eV = m_e / e * vtesq / 3.0
     Ti_eV = mi / e * vtisq / 3.0
@@ -99,8 +98,8 @@ for fn in fn_list:
     Ti_arr.append(Ti_eV)
 
 time_arr = np.array(time_arr)
-Te_arr   = np.array(Te_arr)
-Ti_arr   = np.array(Ti_arr)
+Te_arr = np.array(Te_arr)
+Ti_arr = np.array(Ti_arr)
 
 # Compute fit in time window where temerature difference
 # displays exponential decay
@@ -108,10 +107,10 @@ deltaT = Te_arr - Ti_arr
 mask = (time_arr > 1.0e-6) & (time_arr < 4.0e-6)
 logTdiff = np.log(deltaT[mask])
 tfit = time_arr[mask]
-b, a = np.polyfit(tfit,logTdiff,1)
+b, a = np.polyfit(tfit, logTdiff, 1)
 
-a_error = np.abs((a - a_fit)/a_fit)
-b_error = np.abs((b - b_fit)/b_fit)
+a_error = np.abs((a - a_fit) / a_fit)
+b_error = np.abs((b - b_fit) / b_fit)
 
 print("a_error = ", a_error)
 print("a_tolerance = ", a_tolerance)
