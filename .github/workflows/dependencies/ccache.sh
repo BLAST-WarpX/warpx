@@ -5,7 +5,7 @@ set -eu -o pipefail
 if [[ $# -eq 2 ]]; then
   CVER=$1
 else
-  CVER=4.8.3
+  CVER=4.13.6
 fi
 
 wget https://github.com/ccache/ccache/releases/download/v${CVER}/ccache-${CVER}-linux-x86_64.tar.xz
