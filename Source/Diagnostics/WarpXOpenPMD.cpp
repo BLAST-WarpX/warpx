@@ -640,8 +640,55 @@ for (const auto & particle_diag : particle_diags) {
         real_names[i] = ::detail::snakeToCamel(rn[i]);
     }
 
-    amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
-    real_flags.resize(tmp.NumRealComps());
+    // The flags in `real_flags` index into `real_names` (openPMD-order),
+    // whereas `particle_diag.m_plot_flags` indexes into the WarpX SoA
+    // (PIdx-order). For Cartesian geometries (1D Z, 2D XZ, 3D) the two
+    // orderings coincide for the first PIdx::nattribs entries. For
+    // cylindrical and spherical geometries openPMD reports Cartesian
+    // (x, y, z) positions reconstructed from the SoA's (r, theta, [phi], z),
+    // so the position part of the flags has to be remapped here. Without
+    // this remap, downstream indexing (e.g. `getParticlePositionComponentLabels`
+    // and the position-reconstruction block in `SaveRealProperty`) would
+    // pick up unrelated flags such as the weighting or z flags, which can
+    // both produce wrong output and can cause out-of-bounds accesses in SoAs
+    // (the latter because the reconstruction buffer was sized by a flag that
+    // does not match the flag guarding the write).
+    amrex::Vector<int> real_flags(tmp.NumRealComps(), 0);
+#if defined(WARPX_DIM_RZ)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::z];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
+#elif defined(WARPX_DIM_RCYLINDER)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    // note: z is unspecified (for specific values, can be assumed to be zero)
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uz];
+#elif defined(WARPX_DIM_RSPHERE)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];
+    // note: z can be determined from r, theta and phi
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
+#else
+    for (int i = 0; i < static_cast<int>(PIdx::nattribs); ++i) {
+        real_flags[i] = particle_diag.m_plot_flags[i];
+    }
+    // note: For 2D Cartesian (xz), y is unspecified
+    //       (for specific values, can be assumed to be zero).
+    //       For 1D Cartesian (z), the same applies for x,y.
+#endif
+    // For extra runtime attributes (beyond PIdx::nattribs), the openPMD
+    // index coincides with the SoA index, so we forward the existing flag.
     for (size_t index = PIdx::nattribs; index < rn.size(); ++index) {
         real_flags[index] = tmp.h_redistribute_real_comp[index];
     }
@@ -965,6 +1012,11 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
     {
         auto const real_counter = std::min(write_real_comp.size(), real_comp_names.size());
 
+        // `write_real_comp` is the `real_flags` array built by
+        // `WriteOpenPMDParticles` and forwarded here through `DumpToFile`. Its
+        // order matches the openPMD record list (`real_names`) assembled there:
+        // position_x, position_y, position_z (each added only for geometries that
+        // have it), then weighting, momenta, ...
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // reconstruct Cartesian positions for cylindrical simulations
         // r,z,theta -> x,y,z
@@ -978,8 +1030,12 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             [](amrex::ParticleReal const *p) { delete[] p; }
         );
 #if !defined(WARPX_DIM_RCYLINDER)
+        // write_real_comp [2] is the z position for RZ, RSPHERE and Cartesian
+        // (RZ stores z directly, RSPHERE rebuilds it from r, theta, phi).
+        // RCYLINDER omits position_z, so its [2] is already the following
+        // weighting flag. Omit here.
         std::shared_ptr<amrex::ParticleReal> const z(
-            new amrex::ParticleReal[(write_real_comp[1] ? numParticleOnTile : 0)],
+            new amrex::ParticleReal[(write_real_comp[2] ? numParticleOnTile : 0)],
             [](amrex::ParticleReal const *p) { delete[] p; }
         );
 #endif
@@ -993,7 +1049,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             get_particle_position(p, xp, yp, zp);
             if (write_real_comp[0]) { x.get()[i] = xp; }
             if (write_real_comp[1]) { y.get()[i] = yp; }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
             if (write_real_comp[2]) { z.get()[i] = zp; }
 #endif
         }
@@ -1003,7 +1059,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
         if (write_real_comp[1]) {
             getComponentRecord(real_comp_names[1]).storeChunk(y, {offset}, {numParticleOnTile64});
         }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
         if (write_real_comp[2]) {
             getComponentRecord(real_comp_names[2]).storeChunk(z, {offset}, {numParticleOnTile64});
         }
@@ -1017,11 +1073,14 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
         int const cartesian_attributes = AMREX_SPACEDIM + 4; // position + w + velocities
         int const extra_attributes = PIdx::nattribs - cartesian_attributes; // e.g. theta and phi
         for (auto idx=idx_start; idx<real_counter; idx++) {
-            // make names and write flags to SoA real array number
+            // `idx` indexes into `real_comp_names`/`write_real_comp` (openPMD-order),
+            // `soa_r_idx` indexes into the underlying SoA (PIdx-order). For cylindrical
+            // and spherical geometries the two differ by `extra_attributes` (theta, phi)
+            // which are folded into the reconstructed Cartesian positions written above.
             int const soa_r_idx = (idx < PIdx::nattribs) ?
                          idx - extra_attributes :
                          idx;
-            if (write_real_comp[soa_r_idx]) {
+            if (write_real_comp[idx]) {
                 getComponentRecord(real_comp_names[idx]).storeChunkRaw(
                     soa.GetRealData(soa_r_idx).data(), {offset}, {numParticleOnTile64});
             }

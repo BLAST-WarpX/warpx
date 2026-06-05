@@ -675,6 +675,14 @@ FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_real" );
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_imag" );
     }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Radial-only geometries have no azimuthal modes (a single, real
+    // component per field), so the plain field name is added once. This
+    // mirrors the single functor created per field in
+    // `InitializeFieldFunctorsRZopenPMD` and keeps `m_varnames` in sync
+    // with the field functors.
+    amrex::ignore_unused(ncomp);
+    m_varnames.push_back(field);
 #else
     amrex::ignore_unused(field, ncomp);
 #endif

@@ -141,7 +141,7 @@ add_warpx_test(
     2  # nprocs
     inputs_test_rz_laser_acceleration_picmi.py  # inputs
     OFF  # analysis
-    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
 label_warpx_test(test_rz_laser_acceleration_picmi slow)
