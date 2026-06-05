@@ -789,9 +789,7 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                 amrex::ParallelFor(box,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                         amrex::Real const LDe = debye_array(i,j,k);
-                        if (LDe > 0.) {
-                            global_debye_array(i,j,k) += 1.0_rt/(LDe*LDe);
-                        }
+                        global_debye_array(i,j,k) += (LDe > 0._rt ? 1.0_rt/(LDe*LDe) : 0._rt);
                     });
             }
         }
