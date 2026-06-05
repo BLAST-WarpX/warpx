@@ -10,4 +10,4 @@ fi
 
 wget https://github.com/ccache/ccache/releases/download/v${CVER}/ccache-${CVER}-linux-x86_64-glibc.tar.xz
 tar xvf ccache-${CVER}-linux-x86_64-glibc.tar.xz
-sudo cp -f ccache-${CVER}-linux-x86_64/ccache /usr/local/bin/
+sudo cp -f ccache-${CVER}-linux-x86_64-glibc/ccache /usr/local/bin/
