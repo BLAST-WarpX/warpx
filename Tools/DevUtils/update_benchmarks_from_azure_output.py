@@ -82,7 +82,7 @@ def update_benchmarks_from_log_text(log_text):
                 print(f"\nDumping new checksums file {json_filename}:")
                 print(json_file_string)
                 with open(json_filepath, "w") as json_f:
-                    json.dump(json_file, json_f, indent=2)
+                    json.dump(json_file, json_f, sort_keys=True, indent=2)
                 updated.append(json_filename)
                 # reset to continue searching for more failing tests
                 failing_test = ""
