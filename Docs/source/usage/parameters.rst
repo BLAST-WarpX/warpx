@@ -3144,9 +3144,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0.05
     :optional:
 
-    Only for ``pairwisecoulomb`` and ``inverse_bremsstrahlung`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
+    Only for ``pairwisecoulomb`` collisions with :pp:param:`collisions.correct_energy_momentum` set, and for ``inverse_bremsstrahlung``.
+    In both cases, the energy difference is applied to pairs of particles in their center of momentum frame in such a way that the momentum is conserved.
+    This parameter limits the change in the energy of the electrons to the specified fraction of the energy in the COM frame of the pair of particles.
+    With ``pairwisecoulomb`` collisions, energy can be added or removed, and if residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
+    With ``inverse_bremsstrahlung``, energy is always added, and it there if residual energy remaining after 10 passes, that remaining energy is distributed evenly among the particles without conservation of momentum.
     This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
-    This parameter is the fraction of the relative energy in the COM frame that is used in the correction. If residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``

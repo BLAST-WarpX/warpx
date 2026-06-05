@@ -2031,12 +2031,11 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(mfi);
         amrex::ParallelFor(box,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (N_array(i,j,k) > 0) {
-                        const amrex::Real invsum = 1._rt/N_array(i,j,k);
-                        ux_array(i,j,k) *= invsum;
-                        uy_array(i,j,k) *= invsum;
-                        uz_array(i,j,k) *= invsum;
-                    }
+                    if (N_array(i,j,k) == 0._rt) { return; }
+                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                    ux_array(i,j,k) *= invsum;
+                    uy_array(i,j,k) *= invsum;
+                    uz_array(i,j,k) *= invsum;
                 });
     }
 
@@ -2089,10 +2088,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (N_array(i,j,k) > 0) {
-                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
-                    temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
-                }
+                if (N_array(i,j,k) == 0._rt) { return; }
+                const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
             });
     }
 
@@ -2150,6 +2148,8 @@ WarpXParticleContainer::GetDebyeLength (int lev)
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                 amrex::Real const N = num_array(i,j,k);  // number of particles
+                if (N == 0._rt) { return; }
+
                 amrex::Real const T = temp_array(i,j,k)*PhysConst::q_e;  // temp_array is in eV
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -2254,6 +2254,8 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
         amrex::Array4<const amrex::Real> const & debye_array = global_debye_length.array(mfi);
         amrex::Array4<amrex::Real> const & nuei_array = species_nuei.array(mfi);
 
+        constexpr amrex::Real m_e_J = PhysConst::m_e*PhysConst::c2;
+
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
@@ -2302,11 +2304,11 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
                                           + std::pow(uxe_array(i,j,k) - uxi_array(i,j,k), 2._rt)
                                           + std::pow(uye_array(i,j,k) - uyi_array(i,j,k), 2._rt)
                                           + std::pow(uze_array(i,j,k) - uzi_array(i,j,k), 2._rt);
-                amrex::Real const g12sq_norm = g12sq/(PhysConst::c*PhysConst::c);
-                amrex::Real constexpr b0_factor = PhysConst::q_e/(PhysConst::c*PhysConst::c)/
-                                                  (2.0_rt*MathConst::pi*PhysConst::epsilon_0*PhysConst::m_e)*PhysConst::q_e; // [m]
+                amrex::Real const g12sq_norm = g12sq*PhysConst::inv_c2;
+                amrex::Real constexpr b0_factor = PhysConst::q_e/
+                                                  (2.0_rt*MathConst::pi*PhysConst::epsilon_0*m_e_J)*PhysConst::q_e; // [m]
                 amrex::Real const mu = PhysConst::m_e*rimass/(PhysConst::m_e + rimass);
-                amrex::Real const b0 = b0_factor*Zi/(mu*g12sq_norm + 2.0_rt*EF/(PhysConst::m_e*PhysConst::c*PhysConst::c)); // [m]
+                amrex::Real const b0 = b0_factor*Zi/(mu*g12sq_norm + 2.0_rt*EF/m_e_J); // [m]
 
                 // set the Coulomb logarithm
                 amrex::Real constexpr bqm_factor = PhysConst::hbar/(2.0_rt*PhysConst::m_e*PhysConst::c); // [m]

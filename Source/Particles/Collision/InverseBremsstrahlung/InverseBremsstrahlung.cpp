@@ -315,7 +315,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
                 amrex::ParticleReal const dKE = KE_in_each_cell[i_cell]/w_sum_electrons_in_each_cell[i_cell];
                 if (dKE == 0.) { return; }
 
-                amrex::ParticleReal constexpr c2 = PhysConst::c * PhysConst::c;
+                amrex::ParticleReal constexpr c2 = PhysConst::c2;
 
                 amrex::ParticleReal const dgamma = dKE/(m_electrons*c2);
 
