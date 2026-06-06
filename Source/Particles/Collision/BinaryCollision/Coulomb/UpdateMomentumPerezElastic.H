@@ -15,7 +15,7 @@
 #include <cmath>  // isnan() isinf()
 #include <limits> // numeric_limits<float>::min()
 
-enum CumulativeScatteringMethod
+enum CumulativeScatteringModel
 {
     NANBU,
     BOBYLEV
@@ -78,7 +78,7 @@ T_PR SampleNanbu (
  *        otherwise L will be calculated based on the algorithm.
  *        @param[in] n12 = max(w1,w2)*min(N1,N2)/dV is the effective density used for s12
  *        @param[in] sigma_max is the maximum cross section based on mfp = atomic spacing
- *        @param[in] scattering_method is the method used to obtain the scattering angle
+ *        @param[in] scattering_model is the model used to obtain the scattering angle
  *        used for the normalized scattering length s12 (see Sec. II.C of Perez et al.)
  *        To see if there are nan or inf updated velocities,
  *        compile with USE_ASSERTION=TRUE.
@@ -96,7 +96,7 @@ void UpdateMomentumPerezElastic (
     T_PR const q2, T_PR const m2, T_PR const w2,
     T_PR const n12, T_PR const sigma_max,
     T_PR const L, T_PR const bmax,
-    CumulativeScatteringMethod const scattering_method,
+    CumulativeScatteringModel const scattering_model,
     T_R const dt, amrex::RandomEngine const& engine )
 {
 
@@ -210,11 +210,11 @@ void UpdateMomentumPerezElastic (
     if (s12 > std::numeric_limits<T_PR>::min()) {
 
         T_PR cosXs = T_PR(0.0);
-        if (scattering_method == NANBU) {
+        if (scattering_model == NANBU) {
             // Obtain scattering angle by sampling from Nanbu's distibution
             cosXs = SampleNanbu(s12, engine);
         }
-        else if (scattering_method == BOBYLEV) {
+        else if (scattering_model == BOBYLEV) {
             // Obtain scattering angle from Bobylev's delta function distribution
             cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
         }

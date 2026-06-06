@@ -71,9 +71,9 @@ collision3.CoulombLog = 15.9
 collision1.ndt_supercycle = 2
 collision2.ndt_supercycle = 2
 collision3.ndt_supercycle = 2
-collision1.scattering_method = BOBYLEV
-collision2.scattering_method = BOBYLEV
-collision3.scattering_method = BOBYLEV
+collision1.cumulative_scattering_angle_model = BOBYLEV
+collision2.cumulative_scattering_angle_model = BOBYLEV
+collision3.cumulative_scattering_angle_model = BOBYLEV
 
 # Diagnostics
 diagnostics.diags_names = diag1 diag_parser_filter diag_uniform_filter diag_random_filter

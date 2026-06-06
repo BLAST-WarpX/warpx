@@ -30,7 +30,7 @@
  * @param[in] m1,m2 mass of species 1/2
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] global_lamdb is the global Debye length and will be used if greater than zero
- * @param[in] scattering_method is the method used to obtain the scattering angle
+ * @param[in] scattering_model is the model used to obtain the scattering angle
  * @param[in] L is the Coulomb log and will be used if greater than zero,
  *            otherwise will be computed.
  * @param[in] dV is the volume of the corresponding cell.
@@ -52,7 +52,7 @@ void ElasticCollisionPerez (
     T_PR const  q1, T_PR const  q2,
     T_PR const  m1, T_PR const  m2,
     T_R const  dt, T_R const global_lamdb,
-    CumulativeScatteringMethod const scattering_method,
+    CumulativeScatteringModel const scattering_model,
     T_PR const  L, T_R const  dV,
     amrex::RandomEngine const& engine,
     bool const isSameSpecies, T_index coll_idx)
@@ -119,7 +119,7 @@ void ElasticCollisionPerez (
               u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
               u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
               q1, m1, w1[ I1[i1] ], q2, m2, w2[ I2[i2] ],
-              n12, sigma_max, L, bmax, scattering_method, dt, engine );
+              n12, sigma_max, L, bmax, scattering_model, dt, engine );
 
           if (max_N == NI1) {
             i1 += min_N;

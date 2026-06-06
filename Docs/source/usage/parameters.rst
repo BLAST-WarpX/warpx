@@ -2904,8 +2904,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``pairwisecoulomb``. Specifies the cumulative scattering distribution used to compute the scattering angle.
     The possible values are ``bobylev`` and ``nanbu``.
-    With ``bobylev``, the scattering angle is sampled from Bobylev's distribution :cite:t:`param-BobylevJCP2013`.
-    With ``nanbu``, the scattering angle is sampled from Nanbu's distribution :cite:t:`param-NanbuPRE1997`.
+    With ``bobylev``, the scattering angle is sampled from Bobylev's distribution (see :cite:t:`param-BobylevJCP2013`).
+    With ``nanbu``, the scattering angle is sampled from Nanbu's distribution (see :cite:t:`param-NanbuPRE1997`).
     See :cite:t:`param-AngusJCP2025` and :cite:t:`param-AngusJCP2026` for further discussion of cumulative scattering distributions.
 
 .. pp:param:: <collision_name>.CoulombLog
