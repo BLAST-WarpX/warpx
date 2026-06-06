@@ -11,9 +11,9 @@
     "jz": 0.0
   },
   "ionsA": {
-    "particle_momentum_x": -3.8744131160906304e19,
-    "particle_momentum_y": -3.9624991709591705e19,
-    "particle_momentum_z": -4.1234243899807045e18,
+    "particle_momentum_x": 3.8744131160906304e-19,
+    "particle_momentum_y": 3.9624991709591705e-19,
+    "particle_momentum_z": 4.1234243899807045e-18,
     "particle_position_x": 0.07121495149048303,
     "particle_weight": 4.4444444444444443e+21
   },
