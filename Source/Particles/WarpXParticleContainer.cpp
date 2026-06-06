@@ -2215,10 +2215,6 @@ WarpXParticleContainer::GetDebyeLength (int lev)
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
                 amrex::Real const N = num_array(i,j,k);
-                if (N <= 0.0_rt) {
-                    debye_array(i,j,k) = 0.0_rt;
-                    return;
-                }
                 amrex::Real const T = temp_array(i,j,k)*PhysConst::q_e;  // temp_array is in eV
                 amrex::Real const R = 1.0_rt/std::cbrt(4.0_rt/3.0_rt*MathConst::pi*N); // atomic spacing [m]
 
