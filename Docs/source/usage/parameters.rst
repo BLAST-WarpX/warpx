@@ -2897,6 +2897,17 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
 
+.. pp:param:: <collision_name>.cumulative_scattering_angle_model
+    :type: ``string``
+    :default: ``bobylev``
+    :optional:
+
+    Only for ``pairwisecoulomb``. Specifies the cumulative scattering distribution used to compute the scattering angle.
+    The possible values are ``bobylev`` and ``nanbu``.
+    With ``bobylev``, the scattering angle is sampled from Bobylev's distribution :cite:t:`param-BobylevJCP2013`.
+    With ``nanbu``, the scattering angle is sampled from Nanbu's distribution :cite:t:`param-NanbuPRE1997`.
+    See :cite:t:`param-AngusJCP2025` and :cite:t:`param-AngusJCP2026` for further discussion of cumulative scattering distributions.
+
 .. pp:param:: <collision_name>.CoulombLog
     :type: ``float``
     :optional:
