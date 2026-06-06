@@ -68,7 +68,7 @@ public:
             m_exe.m_computeSpeciesTemperatures = true;
         }
 
-        std::string scattering_method_str = "NANBU";
+        std::string scattering_method_str = "BOBYLEV";
         pp_collision_name.query("scattering_method", scattering_method_str);
 
         if (scattering_method_str == "NANBU") {
