@@ -27,7 +27,7 @@
 import glob
 import sys
 
-import numpy as np
+import numpy
 import post_processing_utils
 import yt
 from scipy.constants import e, m_e
@@ -35,7 +35,7 @@ from scipy.constants import e, m_e
 ng = 512
 ne = ng * 200
 ni = ng * 200
-nptot = ne + ni
+np = ne + ni
 
 mi = m_e * 5.0
 
@@ -75,20 +75,20 @@ for fn in fn_list:
     pzi = ad["ion", "particle_momentum_z"].to_ndarray()
 
     # compute mean drift velocity
-    vxe = np.mean(pxe) / m_e
-    vye = np.mean(pye) / m_e
-    vze = np.mean(pze) / m_e
-    vxi = np.mean(pxi) / mi
-    vyi = np.mean(pyi) / mi
-    vzi = np.mean(pzi) / mi
+    vxe = numpy.mean(pxe) / m_e
+    vye = numpy.mean(pye) / m_e
+    vze = numpy.mean(pze) / m_e
+    vxi = numpy.mean(pxi) / mi
+    vyi = numpy.mean(pyi) / mi
+    vzi = numpy.mean(pzi) / mi
 
     # compute thermal velocity
-    vtesq = np.mean((pxe / m_e - vxe) ** 2)
-    vtesq += np.mean((pye / m_e - vye) ** 2)
-    vtesq += np.mean((pze / m_e - vze) ** 2)
-    vtisq = np.mean((pxi / mi - vxi) ** 2)
-    vtisq += np.mean((pyi / mi - vyi) ** 2)
-    vtisq += np.mean((pzi / mi - vzi) ** 2)
+    vtesq = numpy.mean((pxe / m_e - vxe) ** 2)
+    vtesq += numpy.mean((pye / m_e - vye) ** 2)
+    vtesq += numpy.mean((pze / m_e - vze) ** 2)
+    vtisq = numpy.mean((pxi / mi - vxi) ** 2)
+    vtisq += numpy.mean((pyi / mi - vyi) ** 2)
+    vtisq += numpy.mean((pzi / mi - vzi) ** 2)
 
     Te_eV = m_e / e * vtesq / 3.0
     Ti_eV = mi / e * vtisq / 3.0
@@ -97,9 +97,9 @@ for fn in fn_list:
     Te_arr.append(Te_eV)
     Ti_arr.append(Ti_eV)
 
-time_arr = np.array(time_arr)
-Te_arr = np.array(Te_arr)
-Ti_arr = np.array(Ti_arr)
+time_arr = numpy.array(time_arr)
+Te_arr = numpy.array(Te_arr)
+Ti_arr = numpy.array(Ti_arr)
 
 # Compute fit in time window where temerature difference
 # displays exponential decay
@@ -107,10 +107,10 @@ deltaT = Te_arr - Ti_arr
 mask = (time_arr > 1.0e-6) & (time_arr < 4.0e-6)
 logTdiff = np.log(deltaT[mask])
 tfit = time_arr[mask]
-b, a = np.polyfit(tfit, logTdiff, 1)
+b, a = numpy.polyfit(tfit, logTdiff, 1)
 
-a_error = np.abs((a - a_fit) / a_fit)
-b_error = np.abs((b - b_fit) / b_fit)
+a_error = numpy.abs((a - a_fit) / a_fit)
+b_error = numpy.abs((b - b_fit) / b_fit)
 
 print("a_error = ", a_error)
 print("a_tolerance = ", a_tolerance)
@@ -126,7 +126,7 @@ dim = "3d"
 species_name = "electron"
 
 parser_filter_fn = "diags/diag_parser_filter" + last_it
-parser_filter_expression = "(px*py*pz < 0) * (nptot.sqrt(x**2+y**2+z**2)<100)"
+parser_filter_expression = "(px*py*pz < 0) * (np.sqrt(x**2+y**2+z**2)<100)"
 post_processing_utils.check_particle_filter(
     last_fn, parser_filter_fn, parser_filter_expression, dim, species_name
 )
