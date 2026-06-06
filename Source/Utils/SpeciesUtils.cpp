@@ -123,6 +123,7 @@ namespace SpeciesUtils {
         std::unique_ptr<amrex::Parser>& uz_parser,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
+        amrex::Geometry const& geom,
         int flux_normal_axis, int flux_direction)
     {
         using namespace amrex::literals;
@@ -203,15 +204,22 @@ namespace SpeciesUtils {
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwellian") {
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+#if defined(WARPX_DIM_RZ)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                style != "nfluxpercell" ||
+                    (!h_mom_temp->needPreparation() && !h_mom_vel->needPreparation()),
+                "maxwellian read_from_file momentum is not supported with "
+                "injection_style = NFluxPerCell in RZ geometry.");
+#endif
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocity getVel(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));

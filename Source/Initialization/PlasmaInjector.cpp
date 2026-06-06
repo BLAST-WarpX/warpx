@@ -272,7 +272,7 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     gaussian_beam = true;
     SpeciesUtils::parseMomentum(species_name, source_name, "gaussian_beam", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 
 #if defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( y_rms > 0._rt,
@@ -326,7 +326,7 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
     SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nrandompercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 }
 
 void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
@@ -421,7 +421,7 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
     parseFlux(pp_species);
     SpeciesUtils::parseMomentum(species_name, source_name, "nfluxpercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
-                                h_mom_temp, h_mom_vel,
+                                h_mom_temp, h_mom_vel, m_geom,
                                 flux_normal_axis, flux_direction);
 }
 
@@ -480,7 +480,7 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
     SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nuniformpercell", h_inj_mom,
                                 ux_parser, uy_parser, uz_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 }
 
 void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
@@ -710,11 +710,37 @@ PlasmaInjector::getInjectorMomentumHost () const
     return h_inj_mom.get();
 }
 
+InjectorMomentum*
+PlasmaInjector::getInjectorMomentum (int li) const
+{
+    auto* inj_mom = d_inj_mom;
+    if (inj_mom_mean_file_prepared && inj_mom_mean_file_distributed) {
+        h_inj_mom->prepare(li, &inj_mom);
+    }
+    return inj_mom;
+}
+
 void PlasmaInjector::prepare (amrex::BoxArray const& grids,
                               amrex::DistributionMapping const& dmap,
                               amrex::IntVect const& ngrow,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
+    if (h_inj_mom && h_inj_mom->needPreparation()) {
+        // Density read from file may use get_zlab, which needs the bulk momentum.
+        h_inj_mom->prepare(grids, dmap, ngrow, get_zlab);
+        inj_mom_mean_file_distributed = h_inj_mom->distributed();
+#ifdef AMREX_USE_GPU
+        if (! inj_mom_mean_file_distributed) {
+            amrex::Gpu::htod_memcpy_async(d_inj_mom, h_inj_mom.get(), sizeof(InjectorMomentum));
+            amrex::Gpu::streamSynchronize();
+        }
+#endif
+        inj_mom_mean_file_prepared = true;
+    } else {
+        inj_mom_mean_file_prepared = false;
+        inj_mom_mean_file_distributed = false;
+    }
+
     if (h_inj_rho) {
         h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
         inj_rho_distributed = h_inj_rho->distributed();
@@ -731,6 +757,20 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
 void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
+    if (h_inj_mom && h_inj_mom->needPreparation()) {
+        // Density read from file may use get_zlab, which needs the bulk momentum.
+        h_inj_mom->prepare(pbox, moving_dir, moving_sign, get_zlab);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::htod_memcpy_async(d_inj_mom, h_inj_mom.get(), sizeof(InjectorMomentum));
+        amrex::Gpu::streamSynchronize();
+#endif
+        inj_mom_mean_file_distributed = false;
+        inj_mom_mean_file_prepared = true;
+    } else {
+        inj_mom_mean_file_prepared = false;
+        inj_mom_mean_file_distributed = false;
+    }
+
     if (h_inj_rho) {
         h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
 #ifdef AMREX_USE_GPU

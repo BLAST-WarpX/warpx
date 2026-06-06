@@ -14,13 +14,15 @@
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
 # 6 denotes maxwellian distribution w/ constant velocity
 # 7 denotes maxwellian distribution w/ spatially-varying velocity
-# 8 denotes uniform distribution
-# 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
+# 8 denotes maxwellian distribution w/ spatially-varying velocity bulk velocity from openpmd file
+# 9 denotes uniform distribution
+# 10 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
 import scipy.constants as scc
 import scipy.special as scs
+from openpmd_viewer import OpenPMDTimeSeries
 from read_raw_data import read_reduced_diags, read_reduced_diags_histogram
 
 # print tolerance
@@ -271,7 +273,7 @@ f6_error = (
     / f_peak
 )
 
-print("Maxwell-Boltzmann constant velocity difference:", f6_error)
+print("Maxwellian constant velocity difference:", f6_error)
 
 assert f6_error < tolerance
 
@@ -322,6 +324,21 @@ print("Maxwellian parser velocity difference:", f7_error)
 
 assert f7_error < tolerance
 
+# ==============================================
+# maxwellian with bulk velocity from openpmd file
+# ==============================================
+ts = OpenPMDTimeSeries("./diags/diag1")
+
+for iteration in ts.iterations:
+    uy, z = ts.get_particle(
+        ["uy", "z"], species="velocity_from_file", iteration=iteration
+    )
+
+    uy_theory = 0.2 * (z + 1) / 2
+    norm = np.max(np.abs(uy_theory))
+    rel_err = np.abs(uy - uy_theory) / norm
+
+    assert np.all(rel_err < 1e-3)
 
 # ============================================
 # Cuboid distribution in momentum space

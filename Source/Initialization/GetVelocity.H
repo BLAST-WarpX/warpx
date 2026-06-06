@@ -8,7 +8,20 @@
 #ifndef WARPX_GET_VELOCITY_H_
 #define WARPX_GET_VELOCITY_H_
 
+#include "ExternalField.H"
 #include "VelocityProperties.H"
+
+#include <AMReX.H>
+#include <AMReX_Box.H>
+#include <AMReX_Dim3.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_RealBox.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_REAL.H>
+
+#include <cmath>
+#include <functional>
 
 /** Get velocity at a point on the grid
  *
@@ -96,43 +109,105 @@ struct GetVelocityVector
     amrex::Real m_ux_mean{0}, m_uy_mean{0}, m_uz_mean{0};
     /** Velocity parser function, if m_type == VelParserFunctionVector */
     amrex::ParserExecutor<3> m_ux_mean_parser, m_uy_mean_parser, m_uz_mean_parser;
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
+    ExternalFieldView m_ux_mean_view;
+    ExternalFieldView m_uy_mean_view;
+    ExternalFieldView m_uz_mean_view;
+    ExternalFieldReader* m_ux_mean_reader{nullptr};
+    ExternalFieldReader* m_uy_mean_reader{nullptr};
+    ExternalFieldReader* m_uz_mean_reader{nullptr};
+#endif
+
     /**
      * \brief Construct the functor with information provided by vel
      *
      * \param[in] vel: const reference to the VelocityProperties object that will be used to
      * populate the functor
      */
-    explicit GetVelocityVector (VelocityProperties const& vel) noexcept;
+    explicit GetVelocityVector (VelocityProperties const& vel);
+
+    //! True when bulk mean velocity is loaded from openPMD (cf. ``InjectorDensity`` ``fromfile``).
+    [[nodiscard]] bool needPreparation () const noexcept
+    {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
+        return m_type == VelFromFileVector;
+#else
+        return false;
+#endif
+    }
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign);
+
+    void prepare (int li);
+
+    void clear ();
+
+    [[nodiscard]] bool distributed () const noexcept;
 
     /**
      * \brief Functor call. Returns the value of velocity at the location (x,y,z)
      *
-     * \param[in] x x-coordinate of given location
-     * \param[in] y y-coordinate of given location
-     * \param[in] z z-cooridnate of given location
-     *
-     *\return value of velocity at (x,y,z).
-     *        m_ux_mean, m_uy_mean, m_uz_mean if m_type is VelConstantVector
-     *        m_ux_mean_parser(x,y,z), m_uy_mean_parser(x,y,z), m_uz_mean_parser(x,y,z) if m_type is VelParserFunctionVector
+     * Defined inline so HIP/CUDA device code is emitted in TUs that launch kernels
+     * capturing this functor (device link cannot resolve out-of-line .cpp definitions).
      */
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
+    AMREX_GPU_HOST_DEVICE amrex::XDim3
+    operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
     {
         switch (m_type)
         {
-            case (VelConstantVector):
-            {
-                return amrex::XDim3{ m_ux_mean, m_uy_mean, m_uz_mean };
-            }
-            case (VelParserFunctionVector):
-            {
-                return amrex::XDim3{ m_ux_mean_parser(x,y,z), m_uy_mean_parser(x,y,z), m_uz_mean_parser(x,y,z) };
-            }
-            default:
-            {
-                amrex::Abort("Get initial velocity: unknown type");
-                return amrex::XDim3{0.0, 0.0, 0.0};
-            }
+        case (VelConstantVector):
+        {
+            return amrex::XDim3{m_ux_mean, m_uy_mean, m_uz_mean};
+        }
+        case (VelParserFunctionVector):
+        {
+            return amrex::XDim3{m_ux_mean_parser(x, y, z), m_uy_mean_parser(x, y, z),
+                                m_uz_mean_parser(x, y, z)};
+        }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
+        case (VelFromFileVector):
+        {
+#if defined(WARPX_DIM_RZ)
+            using namespace amrex::literals;
+            amrex::Real const r = std::sqrt(x*x + y*y);
+            amrex::Real const cos_theta = (r > 0.0_rt) ? x/r : 1.0_rt;
+            amrex::Real const sin_theta = (r > 0.0_rt) ? y/r : 0.0_rt;
+            amrex::RealVect const pos{r, z};
+            amrex::Real const ur = m_ux_mean_view(pos);
+            amrex::Real const ut = m_uy_mean_view(pos);
+            amrex::Real const uz = m_uz_mean_view(pos);
+            return amrex::XDim3{
+                cos_theta*ur - sin_theta*ut,
+                sin_theta*ur + cos_theta*ut,
+                uz};
+#else
+#if (AMREX_SPACEDIM < 3)
+            amrex::ignore_unused(x, y, z);
+#endif
+#if (AMREX_SPACEDIM == 1)
+            amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_XZ)
+            amrex::RealVect const pos{x, z};
+#else
+            amrex::RealVect const pos{x, y, z};
+#endif
+#endif
+            return amrex::XDim3{m_ux_mean_view(pos), m_uy_mean_view(pos), m_uz_mean_view(pos)};
+        }
+#endif
+        default:
+        {
+            amrex::Abort("Get initial velocity (vector): unknown type");
+            return amrex::XDim3{0.0, 0.0, 0.0};
+        }
         }
     }
 };

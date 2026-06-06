@@ -775,7 +775,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
-    InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
@@ -842,6 +841,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         }
 
         auto* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentum(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
@@ -1271,9 +1271,24 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
     InjectorPosition* flux_pos = plasma_injector.getInjectorFluxPosition();
     InjectorFlux*  inj_flux = plasma_injector.getInjectorFlux();
-    InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     constexpr int level_zero = 0;
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
+
+    InjectorMomentum* h_inj_mom_flux = plasma_injector.getInjectorMomentumHost();
+    const amrex::Real gamma_boost_flux = WarpX::gamma_boost;
+    const amrex::Real beta_boost_flux = WarpX::beta_boost;
+    auto get_zlab_flux = [=] (amrex::Real z) -> amrex::Real {
+        if (!h_inj_mom_flux) {
+            return z;
+        }
+        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom_flux,
+                                        gamma_boost_flux, beta_boost_flux, t);
+    };
+    if (h_inj_mom_flux && h_inj_mom_flux->needPreparation()) {
+        auto& plasma_injector_nc = const_cast<PlasmaInjector&>(plasma_injector);
+        plasma_injector_nc.prepare(
+            ParticleBoxArray(0), ParticleDistributionMap(0), amrex::IntVect(0), get_zlab_flux);
+    }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real radial_numpercell_power = plasma_injector.radial_numpercell_power;
@@ -1333,6 +1348,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             {AMREX_D_DECL(overlap_realbox.lo(0),
                           overlap_realbox.lo(1),
                           overlap_realbox.lo(2))};
+
+        InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentum(mfi.LocalIndex());
 
         // count the number of particles that each cell in overlap_box could add
         amrex::Gpu::DeviceVector<int> counts(overlap_box.numPts(), 0);

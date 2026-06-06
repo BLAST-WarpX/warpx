@@ -1730,6 +1730,15 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, the spatial bulk drift is read from an openPMD file
+          (requires a WarpX build with openPMD). The following is required:
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file is read
+          as vector mesh ``u_mean``. Cartesian geometries use components ``x``, ``y`` and
+          ``z``. RZ uses cylindrical components ``r``, ``t`` and ``z``.
+          This option is not supported yet in ``RCYLINDER`` / ``RSPHERE``.
+          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to
+          load openPMD data in parallel, in the same way density is loaded from a file via
+          ``read_density_distributed``.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1746,6 +1755,18 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
+        * If ``read_from_file``, the spatial thermal spread is read from an openPMD file
+          (requires a WarpX build with openPMD). The following is required:
+          ``<species_name>.read_u_std_from_path`` (openPMD file path). The file is read
+          as vector mesh ``u_std``. Cartesian geometries use components ``x``, ``y`` and
+          ``z``. RZ uses cylindrical components ``r``, ``t`` and ``z``.
+          This option is not supported yet in ``RCYLINDER`` / ``RSPHERE``.
+          Optional: ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) to
+          load openPMD data in parallel, in the same way density is loaded from a file via
+          ``read_density_distributed``.
+          In RZ, momentum components loaded from the OpenPMD file are converted to Cartesian particle momenta
+          after sampling. RZ ``read_from_file`` Maxwellian momentum is not supported with
+          ``injection_style = NFluxPerCell``.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.

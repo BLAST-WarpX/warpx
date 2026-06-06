@@ -153,6 +153,7 @@ public:
     [[nodiscard]] InjectorFlux*  getInjectorFlux () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumDevice () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumHost () const;
+    [[nodiscard]] InjectorMomentum* getInjectorMomentum (int li) const;
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
@@ -190,6 +191,8 @@ protected:
     InjectorDensity* d_inj_rho = nullptr;
     bool inj_rho_distributed = false;
     bool inj_rho_prepared = false;
+    bool inj_mom_mean_file_prepared = false;
+    bool inj_mom_mean_file_distributed = false;
     std::unique_ptr<amrex::Parser> density_parser;
 
     std::unique_ptr<InjectorFlux,InjectorFluxDeleter> h_inj_flux;

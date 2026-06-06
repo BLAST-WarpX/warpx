@@ -222,6 +222,27 @@ struct InjectorMomentumMaxwellian
         if (u_std.x < 0.0_rt || u_std.y < 0.0_rt || u_std.z < 0.0_rt) {
             amrex::Abort("The standard deviation of normalized momentum must be non-negative.");
         }
+#if defined(WARPX_DIM_RZ)
+        bool const is_temperature_from_file = temperature.m_type == TempFromFileVector;
+        if (is_temperature_from_file) {
+            amrex::ignore_unused(z);
+            amrex::Real const r = std::sqrt(x*x + y*y);
+            amrex::Real const cos_theta = (r > 0.0_rt) ? x/r : 1.0_rt;
+            amrex::Real const sin_theta = (r > 0.0_rt) ? y/r : 0.0_rt;
+            amrex::XDim3 const u_sampled{
+                amrex::RandomNormal(0.0_rt, u_std.x, engine),
+                amrex::RandomNormal(0.0_rt, u_std.y, engine),
+                amrex::RandomNormal(0.0_rt, u_std.z, engine)};
+            amrex::XDim3 const u_sampled_cartesian{
+                cos_theta*u_sampled.x - sin_theta*u_sampled.y,
+                sin_theta*u_sampled.x + cos_theta*u_sampled.y,
+                u_sampled.z};
+            return amrex::XDim3{
+                u_mean.x + u_sampled_cartesian.x,
+                u_mean.y + u_sampled_cartesian.y,
+                u_mean.z + u_sampled_cartesian.z};
+        }
+#endif
         const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
         const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
         const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);
@@ -236,6 +257,48 @@ struct InjectorMomentumMaxwellian
         using namespace amrex::literals;
         const amrex::XDim3 u_mean = velocity(x,y,z);
         return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
+    }
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(grids, dmap, ngrow);
+        temperature.prepare(grids, dmap, ngrow, get_zlab);
+    }
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(pbox, moving_dir, moving_sign);
+        temperature.prepare(pbox, moving_dir, moving_sign, get_zlab);
+    }
+
+    void prepare (int li)
+    {
+        velocity.prepare(li);
+        temperature.prepare(li);
+    }
+
+    void clear ()
+    {
+        velocity.clear();
+        temperature.clear();
+    }
+
+    [[nodiscard]] bool distributed () const noexcept
+    {
+        return velocity.distributed() || temperature.distributed();
+    }
+
+    [[nodiscard]] bool needPreparation () const noexcept
+    {
+        return velocity.needPreparation() || temperature.needPreparation();
     }
 
 private:
@@ -453,6 +516,20 @@ struct InjectorMomentum
 
     void clear ();
 
+    [[nodiscard]] bool needPreparation () const noexcept;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (int li, InjectorMomentum** inj_mom);
+
+    [[nodiscard]] bool distributed () const noexcept;
+
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).
     [[nodiscard]]
@@ -591,6 +668,10 @@ private:
         InjectorMomentumParser parser;
     };
     Object object;
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+    std::unique_ptr<void, amrex::DataDeleter> inj_mom_mean_file_data;
+    amrex::Vector<InjectorMomentum*> inj_mom_mean_file_omp;
+#endif
 };
 
 // In order for InjectorMomentum to be trivially copyable, its destructor
