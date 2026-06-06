@@ -105,7 +105,7 @@ Ti_arr = numpy.array(Ti_arr)
 # displays exponential decay
 deltaT = Te_arr - Ti_arr
 mask = (time_arr > 1.0e-6) & (time_arr < 4.0e-6)
-logTdiff = np.log(deltaT[mask])
+logTdiff = numpy.log(deltaT[mask])
 tfit = time_arr[mask]
 b, a = numpy.polyfit(tfit, logTdiff, 1)
 
