@@ -42,6 +42,15 @@ assert abs(ds_u.current_time.to_value() - ds_n.current_time.to_value()) == 0.0, 
 )
 
 fields = ["Ex", "Ey", "Ez", "Bx", "By", "Bz", "jx", "jy", "jz"]
+
+# normalization floor for the B components: in electrostatic-like problems
+# (e.g., Langmuir waves) B is numerical noise, so normalize it against the
+# physically meaningful field scale E/c instead of against its own noise
+c = 299792458.0
+E_scale = max(
+    np.abs(data_n[("boxlib", f)].to_ndarray()).max() for f in ("Ex", "Ey", "Ez")
+)
+
 failed = []
 for field in fields:
     f_u = np.squeeze(data_u[("boxlib", field)].to_ndarray())
@@ -52,6 +61,8 @@ for field in fields:
         continue
     assert f_u.shape == f_n.shape, f"{field}: shape mismatch {f_u.shape} vs {f_n.shape}"
     norm = np.abs(f_n).max()
+    if field.startswith("B"):
+        norm = max(norm, E_scale / c)
     err = np.abs(f_u - f_n).max()
     rel = err / norm if norm > 0.0 else err
     exact = " (bitwise)" if err == 0.0 else ""

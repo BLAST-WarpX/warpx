@@ -95,6 +95,7 @@ if(BUILD_TESTING)
                     ${Python_EXECUTABLE} ${analysis_dir}/compare_native.py
                     ${work_dir}/diags/plt00040
                     ${native_dir}/diags/diag1000040
+                    1.e-12
             )
             set_tests_properties(test_unified_langmuir_${D}d.compare_native PROPERTIES
                 DEPENDS "test_unified_langmuir_${D}d.run;test_unified_langmuir_${D}d.native_run"

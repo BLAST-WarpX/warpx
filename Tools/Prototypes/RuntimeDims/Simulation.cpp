@@ -95,6 +95,11 @@ Simulation::ReadParameters ()
     std::string field_gathering = "energy-conserving";
     pp_algo.query("field_gathering", field_gathering);
     m_galerkin_interpolation = (field_gathering == "energy-conserving");
+    // Use same shape factors in all directions with direct current deposition
+    // and the electromagnetic solver, cf. WarpX::ReadParameters
+    if (current_deposition == "direct") {
+        m_galerkin_interpolation = false;
+    }
 
     // simplified diagnostics: only a plotfile interval and prefix
     const amrex::ParmParse pp_diag("diag1");
@@ -498,9 +503,22 @@ PushAndDepositSpecies (Species& sp,
             problo[1] + depos_box.smallEnd(1)*dx_arr[1],
             problo[2] + depos_box.smallEnd(2)*dx_arr[2]};
 
-        amrex::FArrayBox& jx_fab = (*j[0])[pti];
-        amrex::FArrayBox& jy_fab = (*j[1])[pti];
-        amrex::FArrayBox& jz_fab = (*j[2])[pti];
+        // Deposit into zeroed local arrays and accumulate them into j
+        // afterwards, like the CPU path of WarpXParticleContainer::
+        // DepositCurrent (this also keeps the per-cell floating-point
+        // summation order identical for the bitwise comparison runs)
+        amrex::Box tbx = amrex::convert(pti.validbox(), j[0]->ixType().toIntVect());
+        amrex::Box tby = amrex::convert(pti.validbox(), j[1]->ixType().toIntVect());
+        amrex::Box tbz = amrex::convert(pti.validbox(), j[2]->ixType().toIntVect());
+        tbx.grow(j[0]->nGrowVect());
+        tby.grow(j[1]->nGrowVect());
+        tbz.grow(j[2]->nGrowVect());
+        amrex::FArrayBox jx_fab(tbx, 1);
+        amrex::FArrayBox jy_fab(tby, 1);
+        amrex::FArrayBox jz_fab(tbz, 1);
+        jx_fab.setVal<amrex::RunOn::Device>(0.0_rt);
+        jy_fab.setVal<amrex::RunOn::Device>(0.0_rt);
+        jz_fab.setVal<amrex::RunOn::Device>(0.0_rt);
 
         {
         BL_PROFILE("PushAndDeposit::CurrentDeposition");
@@ -521,6 +539,10 @@ PushAndDepositSpecies (Species& sp,
                                      jx_fab, jy_fab, jz_fab, np, -0.5_rt*dt, dinv,
                                      dxyzmin, dlo, q, 1);
         }
+
+        (*j[0])[pti].lockAdd(jx_fab, tbx, tbx, 0, 0, 1);
+        (*j[1])[pti].lockAdd(jy_fab, tby, tby, 0, 0, 1);
+        (*j[2])[pti].lockAdd(jz_fab, tbz, tbz, 0, 0, 1);
         }
     }
 }
@@ -750,6 +772,25 @@ Simulation::RunDiagnostics (int const step, amrex::Real const time)
         amrex::Print() << "  writing plotfile " << plotname << "\n";
         amrex::WriteSingleLevelPlotfile(plotname, mf,
             {names.begin(), names.end()}, m_geom, time, step);
+        for (auto& sp : m_species) {
+            // full-precision CSV of the particle data, for debugging and
+            // bitwise comparisons against native runs (serial only)
+            if (amrex::ParallelDescriptor::NProcs() == 1) {
+                std::ofstream ofs(plotname + "/" + sp.name + "_particles.csv");
+                ofs.precision(17);
+                ofs << "x,y,z,w,ux,uy,uz\n";
+                for (UnifiedParIter pti(*sp.pc, 0); pti.isValid(); ++pti) {
+                    auto& soa = pti.GetStructOfArrays();
+                    auto const np = pti.numParticles();
+                    for (int i = 0; i < np; ++i) {
+                        for (int comp = 0; comp < PIdx::nattribs; ++comp) {
+                            ofs << soa.GetRealData(comp)[i]
+                                << (comp + 1 < PIdx::nattribs ? "," : "\n");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
