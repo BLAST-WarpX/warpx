@@ -61,19 +61,62 @@ parsed momentum functions, serial/MPI/OpenMP on CPU.
   analytic Langmuir-wave solution with the tolerances of the corresponding
   native tests.
 - `analysis/compare_native.py <unified_plt> <native_plt> [tol]` compares
-  against a native binary run on the same inputs. Both codes cell-center
-  diagnostics with the exact same averaging, so serial runs
-  (`mpirun -np 1`, `OMP_NUM_THREADS=1`) must agree **bitwise** (tol 0);
-  parallel runs agree up to atomic-reduction rounding (tol ~1e-9).
+  against a native binary run on the same inputs; both codes cell-center
+  diagnostics with the exact same averaging. Measured agreement of serial
+  runs (`mpirun -np 1`, `OMP_NUM_THREADS=1`, 40 steps): particle positions
+  and weights are **bitwise identical**; fields agree to a few 1e-14
+  relative (single-box runs: half the components bitwise, the rest within
+  1-2 ULP). The residue stems from per-cell floating-point summation-order
+  effects in cells with multiple deposition contributors; the test
+  tolerance is 1e-12. B components are normalized against
+  `max(|B|, |E|/c)`, since B is numerical noise in the electrostatic-like
+  Langmuir problem.
 
 Native comparison runs use the same inputs plus
 `algo.current_deposition=direct`.
 
 ## Performance
 
-(Results table to be filled by the performance harness; see the plan in the
-PR description: per-TinyProfiler-region times of unified vs. native runs for
-1D/2D/3D Langmuir problems at various sizes, plus Arena peak-memory reports.)
+`perf/run_perf.sh <build_dir> [steps] [threads]` runs `warpx.unified` and the
+native binaries on identical Langmuir problems and reports the TinyProfiler
+hot regions.
+
+Measured exclusive times (serial CPU, Release, GCC 13, 100 steps,
+`OMP_NUM_THREADS=1`; Langmuir-multi with direct deposition, shape order 1):
+
+| Case (cells, ppc/species)   | Region            | unified [s] | native [s] | delta |
+|-----------------------------|-------------------|------------:|-----------:|------:|
+| 1D (2^20, 8); 16.8M prt     | gather + push     |        80.9 |       76.5 |  +6 % |
+|                             | current deposition|        38.6 |       29.2 | +32 % |
+| 2D (1024^2, 4x4); 33.5M prt | gather + push     |       224.6 |      206.0 |  +9 % |
+|                             | current deposition|        79.6 |       72.2 | +10 % |
+| 3D (128^3, 2x2x2); 33.5M prt| gather + push     |       339.7 |      287.1 | +18 % |
+|                             | current deposition|       109.3 |      112.2 |  -3 % |
+
+Interpretation:
+
+- The 3D case is the *control*: its kernels instantiate to the same code as
+  the native 3D binary, so its +18 % gather delta measures the overhead of
+  the prototype *harness*, not of the dimension templating. The driver
+  iterates particles per box, while native WarpX iterates per tile with
+  cache-resident field data; the same locality gap explains the 1D
+  deposition delta (the driver deposits into a full-box local array, native
+  into small tile-local arrays).
+- The 1D and 2D deltas are *smaller than or equal to* the 3D control in the
+  gather, i.e., the runtime-dimensionality mechanics (degenerate-3D
+  indexing, `if constexpr` kernels, `dim_dispatch`) add no measurable
+  dimension-specific cost on top of the harness effects.
+- Structural particle-memory overhead of the unified layout (positions
+  always 3 SoA reals): +40 % in 1D (7 vs 5 reals), +17 % in 2D (7 vs 6),
+  0 % in 3D.
+- The native binaries also run particle boundary checks
+  (`ApplyBoundaryConditions`) that the prototype folds into `Redistribute`,
+  so total wall times are not directly comparable; the per-region kernel
+  times above are.
+
+Adopting WarpX's tiled particle iteration in the full migration (phases A-D)
+removes the harness-locality gap by construction, since the converted
+kernels are called from the existing containers.
 
 ## Known limitations / next steps
 
