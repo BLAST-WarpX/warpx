@@ -10,6 +10,8 @@
 
 #include "FieldAccessorFunctors.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/WarpXDim.H"
+#include "Utils/WarpXDimIndexing.H"
 
 #include <AMReX.H>
 #include <AMReX_Array4.H>
@@ -19,12 +21,14 @@
 #include <array>
 #include <cmath>
 
-
 /**
  * This struct contains only static functions to initialize the stencil coefficients
  * and to compute finite-difference derivatives for the Cartesian Yee algorithm.
+ *
+ * \tparam D dimensionality of the simulation
  */
-struct CartesianYeeAlgorithm {
+template <warpx::Dim D>
+struct CartesianYeeAlgorithmND {
 
     static void InitializeStencilCoefficients (
         std::array<amrex::Real,3>& cell_size,
@@ -44,14 +48,25 @@ struct CartesianYeeAlgorithm {
 
     /**
      * Compute the maximum timestep, for which the scheme remains stable
-     * (Courant-Friedrichs-Levy limit) */
+     * (Courant-Friedrichs-Levy limit)
+     *
+     * The sum extends over the axes present on the grid only, so that the
+     * unit cell sizes of collapsed dimensions in unified
+     * (runtime-dimensionality) builds do not perturb the timestep.
+     */
     static amrex::Real ComputeMaxDt ( amrex::Real const * const dx ) {
         using namespace amrex::literals;
-        amrex::Real const delta_t  = 1._rt / ( std::sqrt( AMREX_D_TERM(
-                                           1._rt / (dx[0]*dx[0]),
-                                         + 1._rt / (dx[1]*dx[1]),
-                                         + 1._rt / (dx[2]*dx[2])
-                                     ) ) * PhysConst::c );
+        amrex::Real inv_dx2_sum = 0._rt;
+        if constexpr (warpx::has_x<D>) {
+            inv_dx2_sum += 1._rt / (dx[warpx::IdxMap<D>::x]*dx[warpx::IdxMap<D>::x]);
+        }
+        if constexpr (warpx::has_y<D>) {
+            inv_dx2_sum += 1._rt / (dx[warpx::IdxMap<D>::y]*dx[warpx::IdxMap<D>::y]);
+        }
+        if constexpr (warpx::has_z<D>) {
+            inv_dx2_sum += 1._rt / (dx[warpx::IdxMap<D>::z]*dx[warpx::IdxMap<D>::z]);
+        }
+        amrex::Real const delta_t = 1._rt / ( std::sqrt( inv_dx2_sum ) * PhysConst::c );
         return delta_t;
     }
 
@@ -59,8 +74,77 @@ struct CartesianYeeAlgorithm {
      * \brief Returns maximum number of guard cells required by the field-solve
      */
     static amrex::IntVect GetMaxGuardCell () {
-        // The yee solver requires one guard cell in each dimension
-        return amrex::IntVect{AMREX_D_DECL(1,1,1)};
+        // The yee solver requires one guard cell along each axis present on the grid
+        amrex::IntVect ng(0);
+        if constexpr (warpx::has_x<D>) { ng[warpx::IdxMap<D>::x] = 1; }
+        if constexpr (warpx::has_y<D>) { ng[warpx::IdxMap<D>::y] = 1; }
+        if constexpr (warpx::has_z<D>) { ng[warpx::IdxMap<D>::z] = 1; }
+        return ng;
+    }
+
+    /**
+     * Perform an upward (cell-centered, from a nodal field `F`) first
+     * derivative along the array slot `slot` */
+    template <int slot, typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real UpwardD (
+        T_Field const& F,
+        amrex::Real const * const coefs,
+        int const i, int const j, int const k, int const ncomp ) {
+
+        using namespace amrex::literals;
+        static_assert(0 <= slot && slot <= 2);
+        amrex::Real const inv_d = coefs[0];
+        if constexpr (slot == 0) {
+            return inv_d*( F(i+1,j,k,ncomp) - F(i,j,k,ncomp) );
+        } else if constexpr (slot == 1) {
+            return inv_d*( F(i,j+1,k,ncomp) - F(i,j,k,ncomp) );
+        } else {
+            return inv_d*( F(i,j,k+1,ncomp) - F(i,j,k,ncomp) );
+        }
+    }
+
+    /**
+     * Perform a downward (nodal, from a cell-centered field `F`) first
+     * derivative along the array slot `slot` */
+    template <int slot, typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DownwardD (
+        T_Field const& F,
+        amrex::Real const * const coefs,
+        int const i, int const j, int const k, int const ncomp ) {
+
+        using namespace amrex::literals;
+        static_assert(0 <= slot && slot <= 2);
+        amrex::Real const inv_d = coefs[0];
+        if constexpr (slot == 0) {
+            return inv_d*( F(i,j,k,ncomp) - F(i-1,j,k,ncomp) );
+        } else if constexpr (slot == 1) {
+            return inv_d*( F(i,j,k,ncomp) - F(i,j-1,k,ncomp) );
+        } else {
+            return inv_d*( F(i,j,k,ncomp) - F(i,j,k-1,ncomp) );
+        }
+    }
+
+    /**
+     * Perform a centered second derivative along the array slot `slot` */
+    template <int slot, typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DD (
+        T_Field const& F,
+        amrex::Real const * const coefs,
+        int const i, int const j, int const k, int const ncomp ) {
+
+        using namespace amrex::literals;
+        static_assert(0 <= slot && slot <= 2);
+        amrex::Real const inv_d2 = coefs[0]*coefs[0];
+        if constexpr (slot == 0) {
+            return inv_d2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
+        } else if constexpr (slot == 1) {
+            return inv_d2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
+        } else {
+            return inv_d2*( F(i,j,k-1,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j,k+1,ncomp) );
+        }
     }
 
     /**
@@ -68,17 +152,17 @@ struct CartesianYeeAlgorithm {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDx (
         amrex::Array4<amrex::Real const> const& F,
-        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        amrex::Real const * const coefs_x, int const n_coefs_x,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if (defined WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
-        return 0._rt; // 1D Cartesian: derivative along x is 0
-#else
-        amrex::Real const inv_dx = coefs_x[0];
-        return inv_dx*( F(i+1,j,k,ncomp) - F(i,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_x);
+        if constexpr (warpx::has_x<D>) {
+            return UpwardD<warpx::IdxMap<D>::x>(F, coefs_x, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+            return 0._rt; // 1D Cartesian: derivative along x is 0
+        }
     }
 
     /**
@@ -87,17 +171,17 @@ struct CartesianYeeAlgorithm {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDx (
         T_Field const& F,
-        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        amrex::Real const * const coefs_x, int const n_coefs_x,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if (defined WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
-        return 0._rt; // 1D Cartesian: derivative along x is 0
-#else
-        amrex::Real const inv_dx = coefs_x[0];
-        return inv_dx*( F(i,j,k,ncomp) - F(i-1,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_x);
+        if constexpr (warpx::has_x<D>) {
+            return DownwardD<warpx::IdxMap<D>::x>(F, coefs_x, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+            return 0._rt; // 1D Cartesian: derivative along x is 0
+        }
     }
 
     /**
@@ -106,17 +190,17 @@ struct CartesianYeeAlgorithm {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dxx (
         T_Field const& F,
-        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        amrex::Real const * const coefs_x, int const n_coefs_x,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if (defined WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
-        return 0._rt; // 1D Cartesian: derivative along x is 0
-#else
-        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
-        return inv_dx2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_x);
+        if constexpr (warpx::has_x<D>) {
+            return DD<warpx::IdxMap<D>::x>(F, coefs_x, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+            return 0._rt; // 1D Cartesian: derivative along x is 0
+        }
     }
 
     /**
@@ -128,18 +212,13 @@ struct CartesianYeeAlgorithm {
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if defined WARPX_DIM_3D
-        Real const inv_dy = coefs_y[0];
         amrex::ignore_unused(n_coefs_y);
-        return inv_dy*( F(i,j+1,k,ncomp) - F(i,j,k,ncomp) );
-#elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_y, n_coefs_y,
-            i, j, k, ncomp);
-        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
-#else
-        amrex::ignore_unused(F, coefs_y, n_coefs_y,
-            i, j, k, ncomp);
-#endif
+        if constexpr (warpx::has_y<D>) {
+            return UpwardD<warpx::IdxMap<D>::y>(F, coefs_y, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+            return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+        }
     }
 
     /**
@@ -152,56 +231,50 @@ struct CartesianYeeAlgorithm {
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if defined WARPX_DIM_3D
-        Real const inv_dy = coefs_y[0];
         amrex::ignore_unused(n_coefs_y);
-        return inv_dy*( F(i,j,k,ncomp) - F(i,j-1,k,ncomp) );
-#elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_y, n_coefs_y,
-            i, j, k, ncomp);
-        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
-#else
-        amrex::ignore_unused(F, coefs_y, n_coefs_y,
-            i, j, k, ncomp);
-#endif
+        if constexpr (warpx::has_y<D>) {
+            return DownwardD<warpx::IdxMap<D>::y>(F, coefs_y, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+            return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+        }
     }
 
     /**
-     * Perform derivative along y on a nodal grid, from a cell-centered field `F`*/
+     * Perform second derivative along y on a cell-centered grid, from a cell-centered field `F`*/
     template< typename T_Field>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dyy (
         T_Field const& F,
-        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        amrex::Real const * const coefs_y, int const n_coefs_y,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-#if defined WARPX_DIM_3D
-        Real const inv_dy2 = coefs_y[0]*coefs_y[0];
-        return inv_dy2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
-#elif (defined WARPX_DIM_XZ || WARPX_DIM_1D_Z)
-        amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
-        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
-#endif
+        amrex::ignore_unused(n_coefs_y);
+        if constexpr (warpx::has_y<D>) {
+            return DD<warpx::IdxMap<D>::y>(F, coefs_y, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+            return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+        }
     }
 
     /**
      * Perform derivative along z on a cell-centered grid, from a nodal field `F`*/
-   AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
         amrex::Array4<amrex::Real const> const& F,
-        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-        Real const inv_dz = coefs_z[0];
-#if defined WARPX_DIM_3D
-        return inv_dz*( F(i,j,k+1,ncomp) - F(i,j,k,ncomp) );
-#elif (defined WARPX_DIM_XZ)
-        return inv_dz*( F(i,j+1,k,ncomp) - F(i,j,k,ncomp) );
-#elif (defined WARPX_DIM_1D_Z)
-        return inv_dz*( F(i+1,j,k,ncomp) - F(i,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_z);
+        if constexpr (warpx::has_z<D>) {
+            return UpwardD<warpx::IdxMap<D>::z>(F, coefs_z, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_z, i, j, k, ncomp);
+            return 0._rt; // 1D radial: derivative along z is 0
+        }
     }
 
     /**
@@ -210,18 +283,17 @@ struct CartesianYeeAlgorithm {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real DownwardDz (
         T_Field const& F,
-        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-        Real const inv_dz = coefs_z[0];
-#if defined WARPX_DIM_3D
-        return inv_dz*( F(i,j,k,ncomp) - F(i,j,k-1,ncomp) );
-#elif (defined WARPX_DIM_XZ)
-        return inv_dz*( F(i,j,k,ncomp) - F(i,j-1,k,ncomp) );
-#elif (defined WARPX_DIM_1D_Z)
-        return inv_dz*( F(i,j,k,ncomp) - F(i-1,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_z);
+        if constexpr (warpx::has_z<D>) {
+            return DownwardD<warpx::IdxMap<D>::z>(F, coefs_z, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_z, i, j, k, ncomp);
+            return 0._rt; // 1D radial: derivative along z is 0
+        }
     }
 
     /**
@@ -230,20 +302,23 @@ struct CartesianYeeAlgorithm {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real Dzz (
         T_Field const& F,
-        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-        Real const inv_dz2 = coefs_z[0]*coefs_z[0];
-#if defined WARPX_DIM_3D
-        return inv_dz2*( F(i,j,k-1,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j,k+1,ncomp) );
-#elif (defined WARPX_DIM_XZ)
-        return inv_dz2*( F(i,j-1,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i,j+1,k,ncomp) );
-#elif (defined WARPX_DIM_1D_Z)
-        return inv_dz2*( F(i-1,j,k,ncomp) - 2._rt*F(i,j,k,ncomp) + F(i+1,j,k,ncomp) );
-#endif
+        amrex::ignore_unused(n_coefs_z);
+        if constexpr (warpx::has_z<D>) {
+            return DD<warpx::IdxMap<D>::z>(F, coefs_z, i, j, k, ncomp);
+        } else {
+            amrex::ignore_unused(F, coefs_z, i, j, k, ncomp);
+            return 0._rt; // 1D radial: derivative along z is 0
+        }
     }
 
 };
+
+/** In per-dimension builds, the unqualified name refers to the algorithm of
+ *  the compiled dimensionality, so that existing use sites stay unchanged. */
+using CartesianYeeAlgorithm = CartesianYeeAlgorithmND<warpx::CompileDim>;
 
 #endif // WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_YEE_H_
