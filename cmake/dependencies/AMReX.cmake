@@ -163,6 +163,10 @@ macro(find_amrex)
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
         list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
         list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
+        if(WarpX_RUNTIME_DIMS_PROTO)
+            # the runtime-dimensionality prototype is always built against AMReX 3D
+            list(APPEND WarpX_amrex_dim 3)
+        endif()
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(AMReX_SPACEDIM ${WarpX_amrex_dim} CACHE INTERNAL "")
 

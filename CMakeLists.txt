@@ -120,6 +120,12 @@ math(EXPR list_last "${list_len} - 1")
 list(GET WarpX_DIMS ${list_last} WarpX_DIMS_LAST)
 warpx_set_suffix_dims(WarpX_DIMS_LAST ${WarpX_DIMS_LAST})
 
+# prototype of the runtime-dimensionality WarpX architecture:
+# one binary, built against AMReX 3D only, selecting 1D/2D/3D at runtime
+option(WarpX_RUNTIME_DIMS_PROTO
+    "Build the runtime-dimensionality prototype app (AMReX 3D)" OFF)
+mark_as_advanced(WarpX_RUNTIME_DIMS_PROTO)
+
 set(WarpX_PRECISION_VALUES SINGLE DOUBLE)
 set(WarpX_PRECISION DOUBLE CACHE STRING "Floating point precision (SINGLE/DOUBLE)")
 set_property(CACHE WarpX_PRECISION PROPERTY STRINGS ${WarpX_PRECISION_VALUES})
@@ -235,6 +241,10 @@ set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
 list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
 list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
 list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
+if(WarpX_RUNTIME_DIMS_PROTO)
+    # the runtime-dimensionality prototype is always built against AMReX 3D
+    list(APPEND WarpX_amrex_dim 3)
+endif()
 list(REMOVE_DUPLICATES WarpX_amrex_dim)
 
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/AMReX.cmake)
@@ -510,6 +520,9 @@ if(WarpX_LIB)
 endif()
 if(WarpX_QED_TOOLS)
     add_subdirectory(Tools/QedTablesUtils)
+endif()
+if(WarpX_RUNTIME_DIMS_PROTO)
+    add_subdirectory(Tools/Prototypes/RuntimeDims)
 endif()
 
 # Interprocedural optimization (IPO) / Link-Time Optimization (LTO)
