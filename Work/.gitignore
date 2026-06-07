@@ -1,0 +1,19 @@
+# Simulation output — large, not versioned
+diags/
+*.mp4
+*.gif
+frames_*/
+*.log
+run.log
+run_rz.log
+
+# Intermediate / duplicate run directories
+run_r40/
+tisa_lwfa_example/
+
+# Python
+__pycache__/
+*.pyc
+
+# WarpX crash output
+Backtrace.*

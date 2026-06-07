@@ -1,0 +1,64 @@
+# LWFA — RZ (quasi-3D) geometry — 2 azimuthal modes
+# Mode 0: axisymmetric plasma bubble
+# Mode 1: linearly polarized laser (cos/sin decomposition)
+# ~20x fewer grid points than 3D Cartesian, proper cylindrical diffraction
+
+max_step = 4000
+amr.n_cell =  64  512
+amr.max_grid_size = 64
+amr.blocking_factor = 32
+amr.max_level = 0
+
+geometry.dims = RZ
+warpx.n_rz_azimuthal_modes = 2
+
+# r ∈ [0, 20 µm],  z ∈ [-56, 12] µm  (same z as 2D clean run)
+geometry.prob_lo = 0.       -56.e-6
+geometry.prob_hi = 20.e-6    12.e-6
+
+boundary.field_lo = none pec
+boundary.field_hi = pec  pec
+
+warpx.verbose = 1
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.filter_npass_each_dir = 0 1    # RZ: no filtering in r, 1-pass in z
+warpx.cfl = 1.
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0
+warpx.serialize_initial_conditions = 1
+
+algo.particle_shape = 3
+
+particles.species_names = electrons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 4 2
+electrons.xmin = 0.e-6
+electrons.xmax = 20.e-6
+electrons.zmin = 10.e-6
+electrons.profile = constant
+electrons.density = 2.e23
+electrons.momentum_distribution_type = at_rest
+electrons.do_continuous_injection = 1
+
+# Ti:Sa 800nm, a0=4, y-polarized (mode 1 in RZ)
+lasers.names = laser1
+laser1.profile      = Gaussian
+laser1.position     = 0. 0. 9.e-6
+laser1.direction    = 0. 0. 1.
+laser1.polarization = 0. 1. 0.
+laser1.e_max        = 16.e12
+laser1.profile_waist = 5.e-6
+laser1.profile_duration = 15.e-15
+laser1.profile_t_peak   = 30.e-15
+laser1.profile_focal_distance = 100.e-6
+laser1.wavelength = 0.8e-6
+
+diagnostics.diags_names = diag1
+diag1.intervals = 200
+diag1.diag_type = Full
+diag1.fields_to_plot = Et Ez rho
+diag1.format = openpmd

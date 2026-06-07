@@ -1,0 +1,133 @@
+##################################################
+# Ti:Sapphire Laser Hole Boring & Ion Acceleration
+# 2D simulation, 800 nm laser, solid-density target
+#
+# Physics: A high-intensity Ti:Sa laser (a0=16)
+# impinges on an overdense hydrogen foil (30 nc).
+# Radiation pressure drives hole boring into the
+# target; ions are accelerated forward (TNSA/RPA).
+#
+# Hole boring velocity: v_HB = c * sqrt(I / (rho * c^3))
+#   ~ c * sqrt(a0^2 * nc / n0) ~ 0.1 c for these params
+#
+# Based on: Examples/Physics_applications/laser_ion/
+##################################################
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 100   # increase to 1000+ for production ion spectra
+stop_time = 0.2e-12
+
+amr.n_cell = 384 512
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = -7.5e-6  -5.e-6
+geometry.prob_hi =  7.5e-6  25.e-6
+
+boundary.field_lo = pml pml
+boundary.field_hi = pml pml
+
+algo.particle_shape = 3
+interpolation.galerkin_scheme = 0
+
+warpx.cfl = 0.999
+warpx.use_filter = 1
+warpx.numprocs = 1 1
+
+algo.load_balance_intervals = 100
+algo.load_balance_costs_update = Heuristic
+
+#################################
+# Target Profile
+#################################
+my_constants.nc    = 1.742e27   # critical density for 800 nm [m^-3]
+my_constants.n0    = 30.0       # target density in units of nc
+my_constants.L     = 0.05e-6    # pre-plasma scale length [m]
+my_constants.Lcut  = 2.0e-6     # hard cutoff from surface [m]
+my_constants.r0    = 2.5e-6     # foil half-thickness [m]
+my_constants.eps_z = 0.05e-6
+my_constants.zmax  = r0 + Lcut + eps_z
+
+particles.species_names = electrons hydrogen
+
+hydrogen.species_type = hydrogen
+hydrogen.injection_style = NUniformPerCell
+hydrogen.num_particles_per_cell_each_dim = 2 2
+hydrogen.momentum_distribution_type = at_rest
+hydrogen.zmin = -zmax
+hydrogen.zmax =  zmax
+hydrogen.profile = parse_density_function
+hydrogen.density_function(x,y,z) = "nc*n0*(
+    if(abs(z)<=r0, 1.0, if(abs(z)<r0+Lcut, exp((-abs(z)+r0)/L), 0.0)) )"
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = .01
+electrons.uz_th = .01
+electrons.zmin = -zmax
+electrons.zmax =  zmax
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = "nc*n0*(
+    if(abs(z)<=r0, 1.0, if(abs(z)<r0+Lcut, exp((-abs(z)+r0)/L), 0.0)) )"
+
+#################################
+# Laser Pulse
+#################################
+# a0 = 16 for hole boring / RPA regime
+# To study transparency, increase a0 to > sqrt(n0): a0 > sqrt(30) ~ 5.5
+lasers.names = laser1
+laser1.position     = 0. 0. -4.0e-6
+laser1.direction    = 0. 0. 1.
+laser1.polarization = 1. 0. 0.
+laser1.a0           = 16.0              # normalized amplitude
+laser1.wavelength   = 0.8e-6           # Ti:Sapphire 800 nm
+laser1.profile      = Gaussian
+laser1.profile_waist = 4.e-6
+laser1.profile_duration = 30.e-15
+laser1.profile_t_peak   = 50.e-15
+laser1.profile_focal_distance = 4.0e-6
+
+#################################
+# Diagnostics
+#################################
+diagnostics.diags_names = diagInst
+diagInst.intervals = 50
+diagInst.diag_type = Full
+diagInst.fields_to_plot = Ex Ey Ez Bx By Bz rho rho_electrons rho_hydrogen
+diagInst.coarsening_ratio = 2 2
+diagInst.format = openpmd
+
+warpx.reduced_diags_names = histuH histue FieldProbe_Z
+
+# Ion energy spectrum (forward direction, 2 deg acceptance)
+histuH.type = ParticleHistogram
+histuH.intervals = 50
+histuH.species = hydrogen
+histuH.bin_number = 500
+histuH.bin_min =  0.0
+histuH.bin_max =  0.474   # 100 MeV protons in units of m_p*c
+histuH.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
+histuH.filter_function(t,x,y,z,ux,uy,uz)    = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz/sqrt(u2)))<=0.0349, 0)"
+
+# Electron energy spectrum
+histue.type = ParticleHistogram
+histue.intervals = 50
+histue.species = electrons
+histue.bin_number = 500
+histue.bin_min =  0.0
+histue.bin_max =  197.
+histue.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
+histue.filter_function(t,x,y,z,ux,uy,uz)    = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz/sqrt(u2)))<=0.0349, 0)"
+
+FieldProbe_Z.type = FieldProbe
+FieldProbe_Z.intervals = 50
+FieldProbe_Z.integrate = 0
+FieldProbe_Z.probe_geometry = Line
+FieldProbe_Z.x_probe  = 0.0
+FieldProbe_Z.z_probe  = -5.0e-6
+FieldProbe_Z.x1_probe = 0.0
+FieldProbe_Z.z1_probe = 25.0e-6
+FieldProbe_Z.resolution = 512

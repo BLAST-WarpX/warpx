@@ -1,0 +1,107 @@
+# Ti:Sa Hole Boring — RZ (quasi-3D) geometry
+# Cylindrically symmetric target + laser → RZ is the correct geometry
+# a0=16, n0=30 nc(800nm), solid hydrogen foil
+# Mode 0: target plasma (axisymmetric)
+# Mode 1: linearly polarized laser
+
+max_step = 1000
+stop_time = 0.2e-12
+
+amr.n_cell = 384 512
+amr.max_level = 0
+
+geometry.dims = RZ
+warpx.n_rz_azimuthal_modes = 2
+
+# r ∈ [0, 7.5 µm],  z ∈ [-5, 25 µm]
+geometry.prob_lo = 0.      -5.e-6
+geometry.prob_hi = 7.5e-6  25.e-6
+
+boundary.field_lo = none pec
+boundary.field_hi = pec  pec
+
+algo.particle_shape = 3
+
+warpx.cfl = 0.999
+warpx.use_filter = 1
+warpx.filter_npass_each_dir = 0 1    # no filtering in r for RZ FDTD
+
+algo.load_balance_intervals = 100
+algo.load_balance_costs_update = Heuristic
+
+#################################
+# Target Profile
+#################################
+my_constants.nc   = 1.742e27
+my_constants.n0   = 30.0
+my_constants.L    = 0.05e-6
+my_constants.Lcut = 2.0e-6
+my_constants.r0   = 2.5e-6
+my_constants.eps_z = 0.05e-6
+my_constants.zmax = r0 + Lcut + eps_z
+
+particles.species_names = electrons hydrogen
+
+hydrogen.species_type = hydrogen
+hydrogen.injection_style = NUniformPerCell
+hydrogen.num_particles_per_cell_each_dim = 2 2 4
+hydrogen.momentum_distribution_type = at_rest
+hydrogen.zmin = -zmax
+hydrogen.zmax =  zmax
+hydrogen.profile = parse_density_function
+hydrogen.density_function(x,y,z) = "nc*n0*(if(abs(z)<=r0, 1.0, if(abs(z)<r0+Lcut, exp((-abs(z)+r0)/L), 0.0)))"
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2 4
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = .01
+electrons.uz_th = .01
+electrons.zmin = -zmax
+electrons.zmax =  zmax
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = "nc*n0*(if(abs(z)<=r0, 1.0, if(abs(z)<r0+Lcut, exp((-abs(z)+r0)/L), 0.0)))"
+
+#################################
+# Laser Pulse — x-polarized = mode 1 in RZ
+#################################
+lasers.names = laser1
+laser1.position     = 0. 0. -4.0e-6
+laser1.direction    = 0. 0. 1.
+laser1.polarization = 1. 0. 0.
+laser1.a0           = 16.0
+laser1.wavelength   = 0.8e-6
+laser1.profile      = Gaussian
+laser1.profile_waist = 4.e-6
+laser1.profile_duration = 30.e-15
+laser1.profile_t_peak   = 50.e-15
+laser1.profile_focal_distance = 4.0e-6
+
+#################################
+# Diagnostics
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 50
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Et Ez rho rho_electrons rho_hydrogen
+diag1.format = openpmd
+
+warpx.reduced_diags_names = histuH histue
+
+histuH.type = ParticleHistogram
+histuH.intervals = 50
+histuH.species = hydrogen
+histuH.bin_number = 500
+histuH.bin_min = 0.0
+histuH.bin_max = 0.474
+histuH.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
+histuH.filter_function(t,x,y,z,ux,uy,uz)    = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz/sqrt(u2)))<=0.0349, 0)"
+
+histue.type = ParticleHistogram
+histue.intervals = 50
+histue.species = electrons
+histue.bin_number = 500
+histue.bin_min = 0.0
+histue.bin_max = 197.
+histue.histogram_function(t,x,y,z,ux,uy,uz) = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, sqrt(u2), 0.0)"
+histue.filter_function(t,x,y,z,ux,uy,uz)    = "u2=ux*ux+uy*uy+uz*uz; if(u2>0, abs(acos(uz/sqrt(u2)))<=0.0349, 0)"

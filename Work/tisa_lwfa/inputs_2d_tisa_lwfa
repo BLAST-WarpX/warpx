@@ -1,0 +1,119 @@
+##################################################
+# Ti:Sapphire Laser Wakefield Acceleration (LWFA)
+# 2D simulation, 800 nm laser
+#
+# Physics: An ultrashort Ti:Sa laser pulse (a0~1)
+# propagates through underdense plasma and drives
+# a plasma wake. An electron beam is injected and
+# trapped in the wake, gaining energy.
+#
+# Based on: Examples/Physics_applications/laser_acceleration/inputs_base_2d
+##################################################
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 2000  # t_max ~ 440 fs ~ 5.6 plasma periods (lambda_p/c = 79 fs)
+amr.n_cell =  64  512
+amr.max_grid_size = 64
+amr.blocking_factor = 32
+geometry.dims = 2
+geometry.prob_lo = -30.e-6  -56.e-6
+geometry.prob_hi =  30.e-6   12.e-6
+amr.max_level = 1
+warpx.fine_tag_lo = -5.e-6  -35.e-6
+warpx.fine_tag_hi =  5.e-6  -25.e-6
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = pml pml
+boundary.field_hi = pml pml
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.cfl = 1.
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0
+warpx.serialize_initial_conditions = 1
+
+algo.particle_shape = 3
+
+#################################
+############ PLASMA #############
+#################################
+# Background plasma: underdense (n/nc ~ 0.001)
+# Plasma wavelength lambda_p ~ 23.6 um
+# Critical density nc(800nm) = 1.742e27 m^-3
+particles.species_names = electrons beam
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 1 1
+electrons.xmin = -20.e-6
+electrons.xmax =  20.e-6
+electrons.zmin =  10.e-6
+electrons.profile = constant
+electrons.density = 2.e23   # 2e17 cm^-3, n/nc ~ 0.00115
+electrons.momentum_distribution_type = at_rest
+electrons.do_continuous_injection = 1
+
+# Test beam: 100 electrons injected at focus
+beam.species_type = electron
+beam.injection_style = gaussian_beam
+beam.x_rms = .5e-6
+beam.y_rms = .5e-6
+beam.z_rms = .5e-6
+beam.x_m = 0.
+beam.y_m = 0.
+beam.z_m = -28.e-6
+beam.npart = 100
+beam.q_tot = -1.e-12
+beam.momentum_distribution_type = gaussian
+beam.uz_m = 500.   # initial Lorentz factor ~500
+beam.ux_th = 2.
+beam.uz_th = 50.
+
+#################################
+############ LASER ##############
+#################################
+# a0 = e_max * lambda / (2*pi * m_e * c^2 / e) ~ 1
+# Increase e_max to > 4e12 V/m (a0 > 1) for bubble/blowout regime
+lasers.names = laser1
+laser1.profile      = Gaussian
+laser1.position     = 0. 0. 9.e-6
+laser1.direction    = 0. 0. 1.
+laser1.polarization = 0. 1. 0.
+laser1.e_max        = 16.e12        # a0 ~ 4 (nonlinear LWFA)
+laser1.profile_waist = 5.e-6
+laser1.profile_duration = 15.e-15
+laser1.profile_t_peak   = 30.e-15
+laser1.profile_focal_distance = 100.e-6
+laser1.wavelength = 0.8e-6          # Ti:Sapphire 800 nm
+
+#################################
+############ DIAGNOSTICS ########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 200
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jz rho
+diag1.format = openpmd
+
+warpx.reduced_diags_names = FP
+
+FP.type = FieldProbe
+FP.intervals = 50
+FP.integrate = 0
+FP.probe_geometry = Line
+FP.x_probe  = 0
+FP.z_probe  = -56e-6
+FP.x1_probe = 0
+FP.z1_probe =  12e-6
+FP.resolution = 300
+FP.do_moving_window_FP = 1

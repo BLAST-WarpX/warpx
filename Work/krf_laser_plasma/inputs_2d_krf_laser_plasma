@@ -1,0 +1,124 @@
+##################################################
+# KrF Laser - Plasma Interaction
+# 2D simulation, 248 nm laser
+#
+# Physics: A KrF laser (lambda=248nm) interacts with
+# a near-critical density plasma. KrF has 10.4x higher
+# critical density than Ti:Sa (800nm):
+#
+#   nc(KrF, 248nm)  = 1.814e28 m^-3
+#   nc(TiSa, 800nm) = 1.742e27 m^-3
+#
+# A plasma that is overdense for 800nm (e.g. 2*nc_TiSa)
+# is only ~0.19*nc_KrF for KrF -> underdense!
+# This demo uses n ~ 2*nc_KrF (overdense for KrF too)
+# to show the interaction with a steep density profile.
+#
+# Key advantage of KrF: shorter lambda -> finer spatial
+# resolution of laser-matter interaction, better coupling
+# to dense ICF targets.
+#
+# NOTE: Cell size ~25nm needed to resolve lambda=248nm.
+# Domain is small (10x20 um) but physics is valid.
+##################################################
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 300
+
+amr.n_cell = 384 768        # dx~26nm, dz~26nm ~ lambda/10
+amr.max_grid_size = 128
+amr.blocking_factor = 32
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = -5.e-6    0.
+geometry.prob_hi =  5.e-6   20.e-6
+warpx.verbose = 1
+warpx.serialize_initial_conditions = 1
+
+boundary.field_lo = pml pml
+boundary.field_hi = pml pml
+
+warpx.cfl = 1.0
+warpx.use_filter = 1
+algo.particle_shape = 3
+
+#################################
+############ PLASMA #############
+#################################
+# nc(KrF) = nc(800nm) * (800/248)^2 = 1.742e27 * 10.41 = 1.814e28 m^-3
+# Target: 2*nc(KrF) plateau with exponential pre-plasma ramp
+#
+# Skin depth at 2*nc: c/omega_p = lambda/(2*pi*sqrt(2)) ~ 28 nm
+# -> at this resolution, physics is qualitatively correct
+
+my_constants.nc_krf = 1.814e28   # critical density for 248 nm [m^-3]
+my_constants.zc     = 8.e-6      # position of critical surface
+my_constants.lgrad  = 0.2e-6     # pre-plasma scale length
+my_constants.zp     = 8.028e-6   # start of flat-top
+my_constants.zp2    = 12.e-6     # end of flat-top
+my_constants.zc2    = 12.028e-6  # back surface
+
+particles.species_names = electrons ions
+
+electrons.charge = -q_e
+electrons.mass   = m_e
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = .01
+electrons.uz_th = .01
+electrons.zmin = "zc - lgrad*log(200)"
+electrons.zmax = 12.5e-6
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = "if(z<zp, nc_krf*exp((z-zc)/lgrad), if(z<=zp2, 2.*nc_krf, nc_krf*exp(-(z-zc2)/lgrad)))"
+
+ions.charge = q_e
+ions.mass   = m_p
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 2 2
+ions.momentum_distribution_type = at_rest
+ions.zmin = 7.e-6
+ions.zmax = 12.5e-6
+ions.profile = parse_density_function
+ions.density_function(x,y,z) = "if(z<zp, nc_krf*exp((z-zc)/lgrad), if(z<=zp2, 2.*nc_krf, nc_krf*exp(-(z-zc2)/lgrad)))"
+
+#################################
+############# LASER #############
+#################################
+# a0 = 2 for KrF: e_max = a0 * m_e*c*omega/e = 2 * 1.297e13 = 2.59e13 V/m
+# Transparency threshold: a0 > sqrt(2)*n/nc = sqrt(2)*2 = 2.83
+# -> at a0=2 we are below transparency; increase to 4+ to see penetration
+lasers.names = laser1
+laser1.position     = 0. 0. 1.e-6
+laser1.direction    = 0. 0. 1.
+laser1.polarization = 1. 0. 0.
+laser1.e_max        = 2.6e13       # a0 ~ 2 (reflecting regime for 2*nc)
+laser1.wavelength   = 0.248e-6    # KrF excimer laser 248 nm
+laser1.profile      = Gaussian
+laser1.profile_waist = 2.e-6
+laser1.profile_duration = 15.e-15
+laser1.profile_t_peak   = 30.e-15
+laser1.profile_focal_distance = 8.e-6
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 30
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho rho_electrons rho_ions
+diag1.format = openpmd
+
+warpx.reduced_diags_names = FP_z
+
+FP_z.type = FieldProbe
+FP_z.intervals = 10
+FP_z.integrate = 0
+FP_z.probe_geometry = Line
+FP_z.x_probe  = 0.
+FP_z.z_probe  = 0.
+FP_z.x1_probe = 0.
+FP_z.z1_probe = 20.e-6
+FP_z.resolution = 800
