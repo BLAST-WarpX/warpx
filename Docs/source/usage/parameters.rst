@@ -1621,20 +1621,15 @@ Particle initialization
       user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
 
     * ``read_from_file``: load the density profile from an openPMD file.
+      (requires a WarpX build with openPMD; not supported in ``RCYLINDER`` / ``RSPHERE``)
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field named ``density``. See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file. There is
-      another optional parameter,
-      ``<species_name>.read_density_distributed=true``, which controls how the
-      openPMD data are distributed among processes. If it is set to false, the
-      openPMD data are loaded and duplicated on every process. If it is set to
-      true, the openPMD data required for initializing the density profile
-      are distributed among MPI processes. If particles are continuously
-      injected during the simulation and
-      ``<species_name>.read_density_distributed`` is true, chunks of the
-      openPMD data are loaded and cached as needed.
+      for an example of how to prepare the openPMD data file.
+      Optional: ``<species_name>.read_density_distributed`` (`0` or `1`, default `1`)
+      If `1`, each MPI rank loads only a chunk of the openPMD data,
+      otherwise the entire openPMD data is loaded on all MPI ranks.
 
 .. pp:param:: <species_name>.flux_profile
     :type: ``string``
@@ -1733,11 +1728,13 @@ Particle initialization
         * If ``read_from_file``, the spatial bulk drift is read from an openPMD file
           (requires a WarpX build with openPMD; not supported in ``RZ`` / ``RCYLINDER`` /
           ``RSPHERE``). The following is required:
-          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file is read
-          as vector mesh ``u_mean`` with components ``x``, ``y`` and ``z``.
-          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`) to
-          load openPMD data in parallel, in the same way density is loaded from a file via
-          ``read_density_distributed``.
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
+          Optional: ``<species_name>.read_u_mean_distributed`` (`0` or `1`, default `1`)
+          If `1`, each MPI rank loads only a chunk of the openPMD data,
+          otherwise the entire openPMD data is loaded on all MPI ranks.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1757,11 +1754,13 @@ Particle initialization
         * If ``read_from_file``, the spatial thermal spread is read from an openPMD file
           (requires a WarpX build with openPMD; not supported in ``RZ`` / ``RCYLINDER`` /
           ``RSPHERE``). The following is required:
-          ``<species_name>.read_u_std_from_path`` (openPMD file path). The file is read
-          as vector mesh ``u_std`` with components ``x``, ``y`` and ``z``.
-          Optional: ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`) to
-          load openPMD data in parallel, in the same way density is loaded from a file via
-          ``read_density_distributed``.
+          ``<species_name>.read_u_std_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
+          Optional: ``<species_name>.read_u_std_distributed`` (`0` or `1`, default `1`)
+          If `1`, each MPI rank loads only a chunk of the openPMD data,
+          otherwise the entire openPMD data is loaded on all MPI ranks.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
