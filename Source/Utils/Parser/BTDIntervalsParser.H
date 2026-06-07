@@ -6,8 +6,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_UTILS_PARSER_INTERVALSPARSER_H_
-#define WARPX_UTILS_PARSER_INTERVALSPARSER_H_
+#ifndef WARPX_UTILS_PARSER_BTDINTERVALSPARSER_H_
+#define WARPX_UTILS_PARSER_BTDINTERVALSPARSER_H_
 
 #include <ablastr/utils/text/IntervalsParser.H>
 
@@ -16,12 +16,6 @@
 
 namespace utils::parser
 {
-    /** \brief Parser for slices of the form i:j:k */
-    using SliceParser = ablastr::utils::text::SliceParser;
-
-    /** \brief Parser for multiple slices of the form x,y,z,... */
-    using IntervalsParser = ablastr::utils::text::IntervalsParser;
-
     /**
      * \brief This class is a parser for multiple slices of the form x,y,z,... where x, y and z are
      * slices of the form i:j:k, as defined in the SliceParser class. This class contains a vector of
@@ -70,11 +64,11 @@ namespace utils::parser
 
     private:
         std::vector<int> m_btd_iterations;
-        std::vector<SliceParser> m_slices;
+        std::vector<ablastr::utils::text::SliceParser> m_slices;
         std::vector<int> m_slice_starting_i_buffer;
         static constexpr char m_separator = ',';
         bool m_activated = false;
     };
 }
 
-#endif // WARPX_UTILS_PARSER_INTERVALSPARSER_H_
+#endif // WARPX_UTILS_PARSER_BTDINTERVALSPARSER_H_

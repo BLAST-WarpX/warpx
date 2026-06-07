@@ -6,7 +6,7 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#include "IntervalsParser.H"
+#include "BTDIntervalsParser.H"
 
 #include <ablastr/utils/text/StringUtils.H>
 
@@ -27,7 +27,7 @@ utils::parser::BTDIntervalsParser::BTDIntervalsParser (
     for(const auto& inslc : insplit)
     {
         constexpr bool require_stop = true;
-        const SliceParser temp_slice(inslc, require_stop);
+        const ablastr::utils::text::SliceParser temp_slice(inslc, require_stop);
         if (!m_slices.empty())
         {
             // find the last index i_slice where
