@@ -191,7 +191,21 @@ MacroscopicProperties::InitData (
         Ez_IndexType[idim]      = Ez_stag[idim];
         macro_cr_ratio[idim]    = 1;
     }
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_1D_Z)
+        // The idim loop above runs only over AMREX_SPACEDIM (=1) components, so the
+        // transverse (y- and z-) index components are left uninitialized in 1D. Set
+        // them explicitly so ablastr::coarsen::sample::Interp() has well-defined
+        // staggering and coarsening ratios when interpolating the macroscopic
+        // coefficients to the field locations (uninitialized values here lead to
+        // undefined behavior in the macroscopic E-update).
+        sigma_IndexType[1]   = 0;  sigma_IndexType[2]   = 0;
+        epsilon_IndexType[1] = 0;  epsilon_IndexType[2] = 0;
+        mu_IndexType[1]      = 0;  mu_IndexType[2]      = 0;
+        Ex_IndexType[1]      = 0;  Ex_IndexType[2]      = 0;
+        Ey_IndexType[1]      = 0;  Ey_IndexType[2]      = 0;
+        Ez_IndexType[1]      = 0;  Ez_IndexType[2]      = 0;
+        macro_cr_ratio[1]    = 1;  macro_cr_ratio[2]    = 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         sigma_IndexType[2]   = 0;
         epsilon_IndexType[2] = 0;
         mu_IndexType[2]      = 0;
@@ -223,7 +237,10 @@ MacroscopicProperties::InitializeMacroMultiFabUsingParser (
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
                 const amrex::Real fac_z = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j * dx_lev[0] + prob_domain_lev.lo(0) + fac_z;
+                // In 1D the single spatial loop index is i (j and k are always 0),
+                // so the cell-center z must use i; using j evaluated every cell at
+                // z = prob_lo, collapsing any spatially varying macroscopic profile.
+                const amrex::Real z = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_z;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const amrex::Real fac_x = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
                 const amrex::Real x = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_x;
