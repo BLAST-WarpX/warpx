@@ -322,7 +322,7 @@ h10.species                               = maxwell_juttner_low_theta
 h10.bin_number                            = 50
 h10.bin_min                               = 1.0
 h10.bin_max                               = 1.5
-h10.histogram_function(t,x,y,z,ux,uy,uz)  = "sqrt(1.0+(ux*ux+uy*uy+uz*uz))"
+h10.histogram_function(t,x,y,z,ux,uy,uz)  = "sqrt(1.0 + ux*ux + uy*uy + uz*uz)"
 
 h6.type                                   = ParticleHistogram
 h6.intervals                              = 1
