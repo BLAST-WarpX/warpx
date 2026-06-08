@@ -6,6 +6,7 @@
  */
 #include "InverseBremsstrahlung.H"
 
+#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -76,7 +77,7 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
             {
                 amrex::Gpu::synchronize();
                 wt = static_cast<amrex::Real>(amrex::second()) - wt;
-                amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+                amrex::HostDevice::Atomic::Add(&(*cost)[mfi.index()], wt);
             }
         }
     }
@@ -182,7 +183,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     amrex::ParticleReal * const AMREX_RESTRICT uz_electrons = soa_electrons.m_rdata[PIdx::uz];
 
     // Loop over photons
-    amrex::ParallelFor( np_photons,
+    amrex::ParallelFor(np_photons,
         [=] AMREX_GPU_DEVICE (int ip) noexcept
         {
             const int i_cell = bins_photons_ptr[ip];
@@ -236,7 +237,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
         });
 
     // Need total electron weight to determine how much momentum is given to each electron
-    amrex::ParallelFor( np_electrons,
+    amrex::ParallelFor(np_electrons,
         [=] AMREX_GPU_DEVICE (int ie) noexcept
         {
             const int i_cell = bins_electrons_ptr[ie];
@@ -244,7 +245,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
         });
 
     // Distribute momentum absorbed from photons to electrons
-    amrex::ParallelFor( np_electrons,
+    amrex::ParallelFor(np_electrons,
         [=] AMREX_GPU_DEVICE (int ie) noexcept
         {
             const int i_cell = bins_electrons_ptr[ie];
@@ -269,6 +270,21 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
         });
 
+    amrex::ParallelForRNG(n_cells,
+        [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+        {
+            // The particles from species1 that are in the cell `i_cell` are
+            // given by the `indices_electrons[cell_start_electrons:cell_stop_electrons]`
+            index_type const cell_start_electrons = cell_offsets_electrons[i_cell];
+            index_type const cell_stop_electrons  = cell_offsets_electrons[i_cell+1];
+
+            // Do not shuffle if there is only one particle in the cell
+            if (cell_stop_electrons - cell_start_electrons <= 1) { return; }
+
+            ShuffleFisherYates(indices_electrons, cell_start_electrons, cell_stop_electrons, engine);
+        }
+    );
+
     amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
     amrex::Long* failed_corrections_ptr = failed_corrections.data();
 
@@ -276,7 +292,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
     // Distribute any remaining energy to the electrons using the pairwise
     // operation (that does not affect the total momentum)
-    amrex::ParallelFor( n_cells,
+    amrex::ParallelFor(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell) noexcept
         {
 
@@ -308,7 +324,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
         // Distribute the remaining energy among the electrons without conserving momentum
         // Note that this only works if the particle energy is nonzero
-        amrex::ParallelFor( np_electrons,
+        amrex::ParallelFor(np_electrons,
             [=] AMREX_GPU_DEVICE (int ie) noexcept
             {
                 const int i_cell = bins_electrons_ptr[ie];
