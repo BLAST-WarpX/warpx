@@ -313,8 +313,9 @@ struct InjectorMomentumJuttner
             x2 = amrex::Random(engine);
             // Direction dir is an input parameter that sets the boost direction:
             // 'x' -> d = 0, 'y' -> d = 1, 'z' -> d = 2.
-            u[(dir+1)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*std::sin(2._rt*MathConst::pi*x2);
-            u[(dir+2)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*std::cos(2._rt*MathConst::pi*x2);
+            auto const [sin_x2, cos_x2] = amrex::Math::sincos(2._rt*MathConst::pi*x2);
+            u[(dir+1)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*sin_x2;
+            u[(dir+2)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*cos_x2;
             // The value of dir is the boost direction to be transformed.
             u[dir] = u[dir]*(2._rt*x1-1._rt);
         }
