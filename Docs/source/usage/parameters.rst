@@ -1757,7 +1757,7 @@ Particle initialization
 
         p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
 
-      (with :math:`\gamma = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
+      (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
       **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
       Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
       in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
@@ -1769,7 +1769,7 @@ Particle initialization
         The magnitude must satisfy :math:`|\beta| < 1`.
 
         * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
-        * If ``parser``, the following are required: ``<species_name>.beta_function(x,y,z)``.
+        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
 
       * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
         Specifies the direction of the bulk velocity :math:`\beta`.
@@ -1781,13 +1781,13 @@ Particle initialization
         Specifies the distribution type for the temperature :math:`\theta`.
         Values less than zero are not allowed.
 
-        * If ``constant``, the following are required: ``<species_name>.theta`` (`float`).
-        * If ``parser``, the following are required: ``<species_name>.theta_function(x,y,z)``.
+        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
+        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
-      efficiency tends to zero as :math:`\theta \rightarrow 0`) and the Maxwell-Juttner distribution
-      becomes almost indistinguishable from a non-relativistic Maxwellian.
+      efficiency tends to zero as :math:`\theta \rightarrow 0`) and, at the same time, the Maxwell-Juttner
+      distribution becomes almost indistinguishable from a non-relativistic Maxwellian.
       Thus, for :math:`\theta < 0.1`, the code instead samples an isotropic Maxwellian with thermal spread
       :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
       method and Lorentz transform as for the Sobol-sampled momenta.
