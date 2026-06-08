@@ -266,8 +266,8 @@ struct InjectorMomentumJuttner
         amrex::Real u [3];
         amrex::Real const theta = temperature(x,y,z);
         if (theta < 0) {
-            amrex::Abort("Temperature parameter theta = " + std::to_string(theta) +
-                " is less than zero, which is not allowed for Maxwell-Juttner distribution.");
+            amrex::Abort("Temperature parameter theta is less than zero, "
+                "which is not allowed for Maxwell-Juttner distribution.");
         }
         // Calculate local velocity and abort if |beta|>=1
         amrex::Real const beta = velocity(x,y,z);

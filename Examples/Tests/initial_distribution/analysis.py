@@ -12,6 +12,7 @@
 # 3 denotes maxwell-juttner distribution.
 # 4 denotes gaussian position distribution.
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
+# 10 denotes maxwell-juttner distribution w/ low temperature (Gaussian fallback)
 # 6 denotes maxwellian distribution w/ constant velocity
 # 7 denotes maxwellian distribution w/ spatially-varying velocity
 # 8 denotes uniform distribution
@@ -236,6 +237,39 @@ f5_error = (
 print("Maxwell-Juttner parser temperature difference:", f5_error)
 
 assert f5_error < tolerance
+
+# =======================================================
+# maxwell-juttner with low temperature (Gaussian fallback)
+# =======================================================
+
+# load data
+bin_value, bin_data = read_reduced_diags_histogram("h10.txt")[2:]
+
+# parameters of theory
+theta = 0.05
+K2 = scs.kn(2, 1.0 / theta)
+n = 1.0e21
+V = 8.0
+db = 0.01
+
+# compute the analytical solution
+f = (
+    n
+    * V
+    * db
+    * bin_value**2
+    * np.sqrt(1.0 - 1.0 / bin_value**2)
+    / (theta * K2)
+    * np.exp(-bin_value / theta)
+)
+f_peak = np.amax(f)
+
+# compute error
+f10_error = np.sum(np.abs(f - bin_data)) / bin_value.size / f_peak
+
+print("Maxwell-Juttner low-theta distribution difference:", f10_error)
+
+assert f10_error < tolerance
 
 # ==============================================
 # maxwellian with constant bulk velocity
