@@ -270,6 +270,7 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
         });
 
+    // Shuffle the electrons so that the pairs used below are randomized
     amrex::ParallelForRNG(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
         {
