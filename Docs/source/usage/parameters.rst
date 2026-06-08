@@ -1764,64 +1764,38 @@ Particle initialization
 
       It requires the following arguments:
 
-      * :pp:param:`<species_name>.beta_distribution_type` (`string`, default ``constant``):
+      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the bulk velocity :math:`\beta`.
+        The magnitude must satisfy :math:`|\beta| < 1`.
 
-        * If ``constant``, the following are required: ``<species_name>.beta`` (`float`, default ``0``).
+        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
         * If ``parser``, the following are required: ``<species_name>.beta_function(x,y,z)``.
 
-      * :pp:param:`<species_name>.bulk_vel_dir` (`string`, default ``x``):
+      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
         Specifies the direction of the bulk velocity :math:`\beta`.
         The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
         Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
+        The signed bulk velocity is ``beta`` times the direction given here.
 
-      * :pp:param:`<species_name>.theta_distribution_type` (`string`, default ``constant``):
+      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
+        Values less than zero are not allowed.
 
-        * If ``constant``, the following are required: ``<species_name>.theta`` (`float`, default ``0``).
+        * If ``constant``, the following are required: ``<species_name>.theta`` (`float`).
         * If ``parser``, the following are required: ``<species_name>.theta_function(x,y,z)``.
 
-      This uses the Sobol sampling method described in :cite:t:`param-ZenitaniPOP2015`.
-      For :math:`\theta \lesssim 0.1`, this method becomes inefficient (its acceptance
-      efficiency tends to zero as :math:`\theta \rightarrow 0`) and, on the other hand,
-      the Maxwell-Juttner distribution becomes almost indistinguishable from a non-relativistic
-      Maxwellian in this regime. Thus, for :math:`\theta < 0.1`, the code instead samples
-      the momentum from a simple Maxwellian (in the drifting Lorentz frame).
+      Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
+      For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
+      efficiency tends to zero as :math:`\theta \rightarrow 0`) and the Maxwell-Juttner distribution
+      becomes almost indistinguishable from a non-relativistic Maxwellian.
+      Thus, for :math:`\theta < 0.1`, the code instead samples an isotropic Maxwellian with thermal spread
+      :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
+      method and Lorentz transform as for the Sobol-sampled momenta.
 
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which gives the distribution of each component of the momentum as a function of space.
-
-.. pp:param:: <species_name>.theta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than
-    zero are not allowed.
-
-    * If ``constant``, use a constant temperature, given by the required float parameter
-      ``<species_name>.theta``.
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required
-      parameter ``<species_name>.theta_function(x,y,z)``.
-
-.. pp:param:: <species_name>.beta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters
-    above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
-
-    * If ``constant``, use a constant speed, given by the required float parameter
-      ``<species_name>.beta``.
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required
-      parameter ``<species_name>.beta_function(x,y,z)``.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
