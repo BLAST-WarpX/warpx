@@ -8,99 +8,6 @@
 
 #include "GetTemperature.H"
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-GetTemperatureVectorFromFile::GetTemperatureVectorFromFile (TemperatureProperties const& temp)
-{
-    if (temp.m_type != TempFromFileVector) {
-        return;
-    }
-
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo = temp.m_geom.ProbLoArray();
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = temp.m_geom.CellSizeArray();
-    amrex::Box const dombox = amrex::convert(temp.m_geom.Domain(), amrex::IntVect(1));
-    bool const distributed = temp.m_read_u_std_distributed;
-    m_ux_std_reader = new ExternalFieldReader(
-        temp.m_read_u_std_path, "u_std", "x", problo, pdx, dombox, distributed);
-    m_uy_std_reader = new ExternalFieldReader(
-        temp.m_read_u_std_path, "u_std", "y", problo, pdx, dombox, distributed);
-    m_uz_std_reader = new ExternalFieldReader(
-        temp.m_read_u_std_path, "u_std", "z", problo, pdx, dombox, distributed);
-}
-
-void GetTemperatureVectorFromFile::clear ()
-{
-    delete m_ux_std_reader;
-    m_ux_std_reader = nullptr;
-    delete m_uy_std_reader;
-    m_uy_std_reader = nullptr;
-    delete m_uz_std_reader;
-    m_uz_std_reader = nullptr;
-}
-
-void GetTemperatureVectorFromFile::prepare (
-    amrex::BoxArray const& grids,
-    amrex::DistributionMapping const& dmap,
-    amrex::IntVect const& ngrow,
-    std::function<amrex::Real(amrex::Real)> const& get_zlab)
-{
-    if (m_ux_std_reader) {
-        m_ux_std_reader->prepare(grids, dmap, ngrow, get_zlab);
-        m_ux_std_view = m_ux_std_reader->getView();
-    }
-    if (m_uy_std_reader) {
-        m_uy_std_reader->prepare(grids, dmap, ngrow, get_zlab);
-        m_uy_std_view = m_uy_std_reader->getView();
-    }
-    if (m_uz_std_reader) {
-        m_uz_std_reader->prepare(grids, dmap, ngrow, get_zlab);
-        m_uz_std_view = m_uz_std_reader->getView();
-    }
-}
-
-void GetTemperatureVectorFromFile::prepare (
-    amrex::RealBox const& pbox,
-    int moving_dir,
-    int moving_sign,
-    std::function<amrex::Real(amrex::Real)> const& get_zlab)
-{
-    if (m_ux_std_reader) {
-        m_ux_std_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
-        m_ux_std_view = m_ux_std_reader->getView();
-    }
-    if (m_uy_std_reader) {
-        m_uy_std_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
-        m_uy_std_view = m_uy_std_reader->getView();
-    }
-    if (m_uz_std_reader) {
-        m_uz_std_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
-        m_uz_std_view = m_uz_std_reader->getView();
-    }
-}
-
-void GetTemperatureVectorFromFile::prepare (int li)
-{
-    if (m_ux_std_reader) {
-        m_ux_std_view = m_ux_std_reader->getView(li);
-    }
-    if (m_uy_std_reader) {
-        m_uy_std_view = m_uy_std_reader->getView(li);
-    }
-    if (m_uz_std_reader) {
-        m_uz_std_view = m_uz_std_reader->getView(li);
-    }
-}
-
-bool GetTemperatureVectorFromFile::distributed () const noexcept
-{
-    if (m_ux_std_reader) {
-        return m_ux_std_reader->distributed();
-    } else {
-        return false;
-    }
-}
-#endif
-
 // Constructor for single-component (scalar) temperature
 GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
@@ -118,7 +25,8 @@ GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp)
     : m_type{temp.m_type}
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    , m_from_file{temp}
+    , m_from_file{temp.m_read_u_std_path, "u_std", temp.m_geom, temp.m_read_u_std_distributed,
+                  temp.m_type == TempFromFileVector}
 #endif
 {
     if (m_type == TempConstantVector) {

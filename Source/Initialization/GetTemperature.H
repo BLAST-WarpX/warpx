@@ -82,61 +82,6 @@ struct GetTemperature
         }
     }
 };
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-// struct whose getTemperature returns normalized momentum spread from file.
-struct GetTemperatureVectorFromFile
-{
-    explicit GetTemperatureVectorFromFile (TemperatureProperties const& temp);
-
-    void clear ();
-
-    // This function needs to be called before initializing particles, if the
-    // openPMD data are distributed.
-    void prepare (amrex::BoxArray const& grids,
-                  amrex::DistributionMapping const& dmap,
-                  amrex::IntVect const& ngrow,
-                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
-
-    // This function needs to be called before we do continuous injection of
-    // particles to inform the injector to load the data we need.
-    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
-                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
-
-    // For distributed data, this function prepares the injector for loading
-    // data in this Box. Here `li` is the local index for the Box in a
-    // particle container.
-    void prepare (int li);
-
-    [[nodiscard]] bool distributed () const noexcept;
-
-    [[nodiscard]]
-    AMREX_GPU_HOST_DEVICE
-    amrex::XDim3
-    getTemperature (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
-    {
-#if (AMREX_SPACEDIM < 3)
-        amrex::ignore_unused(x, y, z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-        amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_XZ)
-        amrex::RealVect const pos{x, z};
-#else
-        amrex::RealVect const pos{x, y, z};
-#endif
-        return amrex::XDim3{m_ux_std_view(pos), m_uy_std_view(pos), m_uz_std_view(pos)};
-    }
-
-private:
-    ExternalFieldView m_ux_std_view;
-    ExternalFieldView m_uy_std_view;
-    ExternalFieldView m_uz_std_view;
-    ExternalFieldReader* m_ux_std_reader{nullptr};
-    ExternalFieldReader* m_uy_std_reader{nullptr};
-    ExternalFieldReader* m_uz_std_reader{nullptr};
-};
-#endif
 
 struct GetTemperatureVector
 {
@@ -148,7 +93,7 @@ struct GetTemperatureVector
 
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    GetTemperatureVectorFromFile m_from_file;
+    ExternalFieldVectorFromFile m_from_file;
 #endif
 
     /**
@@ -169,6 +114,11 @@ struct GetTemperatureVector
 #endif
     }
 
+    // When u_std is loaded from openPMD (TempFromFileVector), same distributed-data
+    // prepare requirement as GetVelocityVector.
+    // get_zlab converts simulation-frame z coordinate to lab-frame z before reading
+    // the file (needed in boosted-frame runs).
+    // u_mean must already be prepared; see InjectorMomentumMaxwellian::prepare.
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
                   amrex::IntVect const& ngrow,
@@ -211,7 +161,7 @@ struct GetTemperatureVector
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             case (TempFromFileVector):
             {
-                return m_from_file.getTemperature(x, y, z);
+                return m_from_file.getValue(x, y, z);
             }
 #endif
             default:
@@ -222,4 +172,5 @@ struct GetTemperatureVector
         }
     }
 };
+
 #endif //WARPX_GET_TEMPERATURE_H_

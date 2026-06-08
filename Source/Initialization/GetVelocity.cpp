@@ -8,95 +8,6 @@
 
 #include "GetVelocity.H"
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-GetVelocityVectorFromFile::GetVelocityVectorFromFile (VelocityProperties const& vel)
-{
-    if (vel.m_type != VelFromFileVector) {
-        return;
-    }
-
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo = vel.m_geom.ProbLoArray();
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const pdx = vel.m_geom.CellSizeArray();
-    amrex::Box const dombox = amrex::convert(vel.m_geom.Domain(), amrex::IntVect(1));
-    bool const distributed = vel.m_read_u_mean_distributed;
-    m_ux_mean_reader = new ExternalFieldReader(
-        vel.m_read_u_mean_path, "u_mean", "x", problo, pdx, dombox, distributed);
-    m_uy_mean_reader = new ExternalFieldReader(
-        vel.m_read_u_mean_path, "u_mean", "y", problo, pdx, dombox, distributed);
-    m_uz_mean_reader = new ExternalFieldReader(
-        vel.m_read_u_mean_path, "u_mean", "z", problo, pdx, dombox, distributed);
-}
-
-void GetVelocityVectorFromFile::clear ()
-{
-    delete m_ux_mean_reader;
-    m_ux_mean_reader = nullptr;
-    delete m_uy_mean_reader;
-    m_uy_mean_reader = nullptr;
-    delete m_uz_mean_reader;
-    m_uz_mean_reader = nullptr;
-}
-
-void GetVelocityVectorFromFile::prepare (
-    amrex::BoxArray const& grids,
-    amrex::DistributionMapping const& dmap,
-    amrex::IntVect const& ngrow)
-{
-    if (m_ux_mean_reader) {
-        m_ux_mean_reader->prepare(grids, dmap, ngrow);
-        m_ux_mean_view = m_ux_mean_reader->getView();
-    }
-    if (m_uy_mean_reader) {
-        m_uy_mean_reader->prepare(grids, dmap, ngrow);
-        m_uy_mean_view = m_uy_mean_reader->getView();
-    }
-    if (m_uz_mean_reader) {
-        m_uz_mean_reader->prepare(grids, dmap, ngrow);
-        m_uz_mean_view = m_uz_mean_reader->getView();
-    }
-}
-
-void GetVelocityVectorFromFile::prepare (
-    amrex::RealBox const& pbox, int moving_dir, int moving_sign)
-{
-    if (m_ux_mean_reader) {
-        m_ux_mean_reader->prepare(pbox, moving_dir, moving_sign);
-        m_ux_mean_view = m_ux_mean_reader->getView();
-    }
-    if (m_uy_mean_reader) {
-        m_uy_mean_reader->prepare(pbox, moving_dir, moving_sign);
-        m_uy_mean_view = m_uy_mean_reader->getView();
-    }
-    if (m_uz_mean_reader) {
-        m_uz_mean_reader->prepare(pbox, moving_dir, moving_sign);
-        m_uz_mean_view = m_uz_mean_reader->getView();
-    }
-}
-
-void GetVelocityVectorFromFile::prepare (int li)
-{
-    if (m_ux_mean_reader) {
-        m_ux_mean_view = m_ux_mean_reader->getView(li);
-    }
-    if (m_uy_mean_reader) {
-        m_uy_mean_view = m_uy_mean_reader->getView(li);
-    }
-    if (m_uz_mean_reader) {
-        m_uz_mean_view = m_uz_mean_reader->getView(li);
-    }
-}
-
-bool GetVelocityVectorFromFile::distributed () const noexcept
-{
-    if (m_ux_mean_reader) {
-        return m_ux_mean_reader->distributed();
-    } else {
-        return false;
-    }
-}
-#endif
-
 // Constructor for single-component (scalar) velocity
 GetVelocity::GetVelocity (VelocityProperties const& vel) noexcept
     : m_type{vel.m_type}, m_dir{vel.m_dir}, m_sign_dir{vel.m_sign_dir}
@@ -114,7 +25,8 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel)
     : m_type{vel.m_type}
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    , m_from_file{vel}
+    , m_from_file{vel.m_read_u_mean_path, "u_mean", vel.m_geom, vel.m_read_u_mean_distributed,
+                  vel.m_type == VelFromFileVector}
 #endif
 {
     if (m_type == VelConstantVector) {
