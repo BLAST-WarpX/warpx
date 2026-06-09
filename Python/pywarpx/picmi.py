@@ -3660,6 +3660,11 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     warpx_reduced_diags_precision: integer, optional
         Sets the default precision for reduced diagnostic output files
+
+    warpx_tiny_profiler_flush_interval: string, optional
+        Sets interval to write out tiny profiler data.
+        When not set, the tiny profiler data will only be written out
+        at the end of the simulation.
     """
 
     # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
@@ -3734,6 +3739,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.reduced_diags_intervals = kw.pop("warpx_reduced_diags_intervals", None)
         self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
         self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
+
+        self.tiny_profiler_flush_interval = kw.pop(
+            "warpx_tiny_profiler_flush_interval", None
+        )
 
         self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
 
@@ -3818,6 +3827,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         reduced_diags.intervals = self.reduced_diags_intervals
         reduced_diags.separator = self.reduced_diags_separator
         reduced_diags.precision = self.reduced_diags_precision
+
+        pywarpx.warpx.tiny_profiler_flush_interval = self.tiny_profiler_flush_interval
 
         particle_shape = self.particle_shape
         for s in self.species:
