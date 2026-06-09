@@ -17,10 +17,10 @@ z_1d = np.linspace(-1.0, 1.0, 8)
 x, y, z = np.meshgrid(x_1d, y_1d, z_1d, indexing="ij")
 
 # - Define the normalized momentum data, u = gamma * v / c
-u_std_val = 3.1622776601683795e-05
-ux_std_data = np.full_like(x, u_std_val, dtype=np.float64)
-uy_std_data = np.full_like(x, u_std_val, dtype=np.float64)
-uz_std_data = np.full_like(x, u_std_val, dtype=np.float64)
+ux_std_data = 0.2 * abs(z)
+uy_std_data = 0.21 * abs(z)
+uz_std_data = 0.22 * abs(z)
+
 
 ux_mean_data = np.zeros_like(x, dtype=np.float64)
 uy_mean_data = 0.2 * (z + 1.0) / 2.0

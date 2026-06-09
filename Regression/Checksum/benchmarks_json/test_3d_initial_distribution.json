@@ -65,12 +65,12 @@
     "particle_weight": 8e+21
   },
   "temperature_from_file": {
-    "particle_position_x": 255996.24956064616,
-    "particle_position_y": 256069.3388914725,
-    "particle_position_z": 256090.20703770325,
-    "particle_momentum_x": 3.526063401140316e-21,
-    "particle_momentum_y": 2.854132215041078e-17,
-    "particle_momentum_z": 3.528709370042904e-21,
+    "particle_position_x": 255955.3833611564,
+    "particle_position_y": 255949.3893817396,
+    "particle_position_z": 255972.39837074146,
+    "particle_momentum_x": 1.2518904506066939e-17,
+    "particle_momentum_y": 1.3589021578930227e-17,
+    "particle_momentum_z": 1.466593174669613e-17,
     "particle_weight": 8e+21
   },
   "uniform": {

@@ -340,6 +340,24 @@ for iteration in ts.iterations:
 
     assert np.all(rel_err < 1e-3)
 
+# ==============================================
+# maxwellian with thermal velocity spread from openpmd file
+# ==============================================
+ts = OpenPMDTimeSeries("./diags/diag1")
+
+for iteration in ts.iterations:
+    ux, uy, uz, z = ts.get_particle(
+        ["ux", "uy", "uz", "z"], species="temperature_from_file", iteration=iteration
+    )
+
+for u, u_theory in [
+    (ux, 0.2 * np.abs(z)),
+    (uy, 0.21 * np.abs(z)),
+    (uz, 0.22 * np.abs(z)),
+]:
+    rel_err = np.abs(u - u_theory) / np.max(np.abs(u_theory))
+    assert np.all(rel_err < 1e-3)
+
 # ============================================
 # Cuboid distribution in momentum space
 # ============================================

@@ -156,9 +156,9 @@ temperature_from_file.momentum_distribution_type = "maxwellian"
 temperature_from_file.maxwellian_u_std_distribution_type = "read_from_file"
 temperature_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
 temperature_from_file.maxwellian_u_mean_distribution_type = "parser"
-temperature_from_file.ux_mean_function(x,y,z) = "0"
-temperature_from_file.uy_mean_function(x,y,z) ="(0.2 - 0.4 * heaviside(z,0)) / sqrt(1 - (0.2 - 0.4 * heaviside(z,0))^2)"
-temperature_from_file.uz_mean_function(x,y,z)= "0"
+temperature_from_file.ux_mean_function(x,y,z) = "0.1*z"
+temperature_from_file.uy_mean_function(x,y,z) = "0.12*z"
+temperature_from_file.uz_mean_function(x,y,z) = "0.14*z"
 
 
 uniform.charge                     = q_e
