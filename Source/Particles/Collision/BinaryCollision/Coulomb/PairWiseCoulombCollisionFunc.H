@@ -68,7 +68,22 @@ public:
             m_exe.m_computeSpeciesTemperatures = true;
         }
 
+        std::string scattering_model_str = "BOBYLEV";
+        pp_collision_name.query("cumulative_scattering_angle_model", scattering_model_str);
+
+        if (scattering_model_str == "NANBU") {
+            m_scattering_model = NANBU;
+        }
+        else if (scattering_model_str == "BOBYLEV") {
+            m_scattering_model = BOBYLEV;
+        }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+            "PairWiseCoulombCollisionFunc: Unknown cumulative_scattering_angle_model = " + scattering_model_str);
+        }
+
         m_exe.m_isSameSpecies = m_isSameSpecies;
+        m_exe.m_scattering_model = m_scattering_model;
 
     }
 
@@ -117,10 +132,12 @@ public:
                     I1s, I1e, I2s, I2e, I1, I2,
                     soa_1, soa_2, n1, n2, T1, T2,
                     q1, q2, m1, m2,
-                    dt, global_lamdb, m_CoulombLog, dV, engine, m_isSameSpecies, coll_idx);
+                    dt, global_lamdb, m_scattering_model, m_CoulombLog,
+                    dV, engine, m_isSameSpecies, coll_idx);
         }
 
         amrex::ParticleReal m_CoulombLog;
+        CumulativeScatteringModel m_scattering_model;
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
@@ -138,6 +155,7 @@ private:
     Executor m_exe;
 
     bool m_use_global_debye_length = false;
+    CumulativeScatteringModel m_scattering_model;
 
 };
 
