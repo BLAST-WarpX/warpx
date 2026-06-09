@@ -23,6 +23,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -315,6 +316,8 @@ struct ExternalFieldVectorFromFile
         amrex::RealVect const pos{z};
 #elif defined(WARPX_DIM_XZ)
         amrex::RealVect const pos{x, z};
+#elif defined(WARPX_DIM_RZ)
+        amrex::RealVect const pos{std::sqrt(x * x + y * y), z};
 #else
         amrex::RealVect const pos{x, y, z};
 #endif
