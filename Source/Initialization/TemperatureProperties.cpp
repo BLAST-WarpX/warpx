@@ -40,13 +40,6 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 "Temperature parameter theta = " + std::to_string(theta) +
                 " is less than zero, which is not allowed");
 
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                theta >= 0.1,
-                "Temperature parameter theta = " +
-                std::to_string(theta) +
-                " is less than minimum 0.1 allowed for Maxwell-Juttner."
-            );
-
             m_type = TempConstantValue;
             m_temperature = theta;
         }
