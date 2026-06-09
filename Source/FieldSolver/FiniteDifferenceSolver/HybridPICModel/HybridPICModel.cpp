@@ -1235,6 +1235,12 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
     // AFTER this orchestrator call returns).
     ablastr::fields::VectorField Ve_nodal =
         warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
+    // B field on Yee staggering; needed (as |B|) only when a per-species
+    // resistivity parser is registered for a species visited in this loop.
+    // The Yee->nodal interp is cheap; we always compute it inside the kernel
+    // because the branch fast-paths to skip the parser call when not needed.
+    ablastr::fields::VectorField B_fp =
+        warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
 
     auto const gamma_minus_1 = m_gamma - 1.0_rt;
     auto const rho_floor     = PhysConst::q_e * m_n_floor;
@@ -1244,6 +1250,9 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
     amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
     amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
     amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const & Bx_stag = Bx_IndexType;
+    amrex::GpuArray<int, 3> const & By_stag = By_IndexType;
+    amrex::GpuArray<int, 3> const & Bz_stag = Bz_IndexType;
     amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
     amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
 
@@ -1295,6 +1304,15 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
         amrex::MultiFab const & rho_s =
             *warpx.m_fields.get("rho_fp_" + spec_name, lev);
 
+        // Per-species resistivity overlay parser, if registered. The
+        // captured executor is only called from inside the kernel when
+        // has_eta_per is true; default-constructed ParserExecutor is
+        // never invoked.
+        auto const eta_per_it     = m_eta_per_species.find(spec_name);
+        bool const has_eta_per    = (eta_per_it != m_eta_per_species.end());
+        amrex::ParserExecutor<7> eta_s_per{};
+        if (has_eta_per) { eta_s_per = eta_per_it->second; }
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1313,6 +1331,9 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
             amrex::Array4<amrex::Real const> const & Jsx        = Js[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jsy        = Js[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jsz        = Js[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Bx_arr     = B_fp[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & By_arr     = B_fp[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Bz_arr     = B_fp[2]->const_array(mfi);
 
             amrex::Box const & tbox = mfi.tilebox();
             amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -1325,9 +1346,6 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 // = Z_s n_s / n_e (unitless; RZ 2π·r factor cancels). Then
                 // the true per-species number density:
                 //   n_s = f_s · n_e / Z_s
-                // For single species this reduces to n_s = n_e/Z_s; for
-                // multispecies it correctly apportions n_e among species
-                // by charge-weighted fraction.
                 amrex::Real const rhos_val_raw  = rhos_arr(i,j,k);
                 amrex::Real const rhos_sum_val  = std::max(rhosum_arr(i,j,k), rho_floor);
                 amrex::Real const f_s           = rhos_val_raw / rhos_sum_val;
@@ -1336,14 +1354,17 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 // denominator below; the 2π·r factor cancels in that ratio.
                 amrex::Real const rhos_val = std::max(rhos_val_raw, rho_floor);
 
-                // η is the Ohm's-law parser evaluated at the same cell
-                // with the same (rho, |J|, t) the E-solve uses. This makes
-                // the per-cell heat reduce to η J² exactly in single species.
+                // |J| at the nodal grid (where Te lives). Used by the
+                // global η parser and forwarded to per-species parsers.
                 auto const jx = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 auto const jy = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
                 auto const jz = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
                 amrex::Real const Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
-                amrex::Real const eta_val = eta(rho_val, Jmag, t_new);
+
+                // η_global: same Ohm's-law parser the E-solve uses, evaluated
+                // per cell. This makes the per-cell heat reduce to η J²
+                // exactly in single species (when no per-species overlay).
+                amrex::Real eta_s_eff = eta(rho_val, Jmag, t_new);
 
                 // V_e: already nodal, no interp needed (just read).
                 amrex::Real const vex = Vex(i, j, k);
@@ -1364,13 +1385,28 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 amrex::Real const dvz = vsz - vez;
                 amrex::Real const dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
 
+                // η_per_species overlay (Topanga form). Only evaluated when
+                // a per-species parser is registered for this species --
+                // for the other species we just see eta_s_eff = eta_global.
+                if (has_eta_per) {
+                    amrex::Real const Te_K_val = Te_arr(i,j,k);
+                    amrex::Real const Jsmag    = std::sqrt(
+                        jsx_nodal*jsx_nodal + jsy_nodal*jsy_nodal + jsz_nodal*jsz_nodal);
+                    auto const bx = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const by = ablastr::coarsen::sample::Interp(By_arr, By_stag, nodal, coarsen, i, j, k, 0);
+                    auto const bz = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, nodal, coarsen, i, j, k, 0);
+                    amrex::Real const Bmag = std::sqrt(bx*bx + by*by + bz*bz);
+                    eta_s_eff += eta_s_per(rhos_val_raw, rho_val, Te_K_val,
+                                           Jmag, Jsmag, Bmag, t_new);
+                }
+
                 // Per-species contribution to S_e at this cell.
-                //   ν_{s,e} n_s m_s |V_s - V_e|² = Z_s e² η n_e n_s |dV|²
+                //   ν_{s,e} n_s m_s |V_s - V_e|² = Z_s e² η_s_eff n_e n_s |dV|²
                 // Dividing by (n_e k_B) for the T_e update:
-                //   dT_e_s = dt (γ-1) · Z_s e² η n_s |dV|² / k_B
+                //   dT_e_s = dt (γ-1) · Z_s e² η_s_eff n_s |dV|² / k_B
                 Te_arr(i,j,k) += dt * gamma_minus_1
                                * Z_s * PhysConst::q_e * PhysConst::q_e
-                               * eta_val * ns * dv2 / PhysConst::kb;
+                               * eta_s_eff * ns * dv2 / PhysConst::kb;
             });
         }
     }
