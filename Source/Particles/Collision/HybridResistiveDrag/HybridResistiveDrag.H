@@ -33,8 +33,8 @@
  *
  * The corresponding electron-heat dissipation is NOT computed here.
  * S_e on T_e is instead built per cell from gridded fields by
- * HybridPICModel::QDSMCAddJouleHeatingKinetic (Topanga Eq. 12), which is
- * a separate concern controlled by `joule_heating_mode`. Registering
+ * HybridPICModel::QDSMCAddJouleHeating (Topanga Eq. 12), which is a
+ * separate concern controlled by `include_joule_heating`. Registering
  * this drag operator therefore changes only ion dynamics -- it adds the
  * Newton's 3rd-law back-reaction to the eta*J piece of qE that ions feel
  * through Ohm's law, cancelling the well-known hybrid-PIC anti-friction.

@@ -85,26 +85,14 @@ void HybridPICModel::ReadParameters ()
                     m_solve_electron_energy_equation);
     pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
 
-    // Topanga S_J = eta * J^2 resistive electron-heating source term, with
-    // implementation chosen by `hybrid_pic_model.joule_heating_mode`:
-    //   "off"     -- no source on T_e
-    //   "fluid"   -- evaluate S_J = eta * |J|^2 per cell deterministically
-    //                (QDSMCAddJouleHeating)
-    //   "kinetic" -- per-cell Belyaev Eq. 12 sum over ion species,
-    //                S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2 with
-    //                ν_{s,e} = Z_s e² η n_e / m_s, evaluated from the
-    //                gridded Vs_fp_<s>, Ve_fp, rho_fp(_s) fields
-    //                (QDSMCAddJouleHeatingKinetic). Independent of whether
-    //                the HybridResistiveDrag collision is registered.
-    // Default off. Only consulted when solve_electron_energy_equation is on.
-    std::string joule_mode_str = "off";
-    pp_hybrid.query("joule_heating_mode", joule_mode_str);
-    if      (joule_mode_str == "off")     { m_joule_heating_mode = JouleHeatingMode::Off; }
-    else if (joule_mode_str == "fluid")   { m_joule_heating_mode = JouleHeatingMode::Fluid; }
-    else if (joule_mode_str == "kinetic") { m_joule_heating_mode = JouleHeatingMode::Kinetic; }
-    else {
-        Abort("hybrid_pic_model.joule_heating_mode must be 'off', 'fluid', or 'kinetic'");
-    }
+    // Topanga (Belyaev 2024 Eq. 12) resistive electron-heating source:
+    //   S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2,  ν_{s,e} = Z_s e² η n_e / m_s
+    // added per cell to T_e. Evaluated from the gridded Vs_fp_<s>, Ve_fp,
+    // rho_fp(_s) fields by QDSMCAddJouleHeating. Reduces to η J^2 in single
+    // species; resolves inter-species drift-dispersion in multispecies.
+    // Independent of whether HybridResistiveDrag is registered.
+    // Default off; only consulted when solve_electron_energy_equation is on.
+    pp_hybrid.query("include_joule_heating", m_include_joule_heating);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -982,74 +970,6 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
     ABLASTR_PROFILE("HybridPICModel::QDSMCAddJouleHeating()");
 
     using ablastr::fields::Direction;
-
-    auto & warpx = WarpX::GetInstance();
-    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
-
-    // T_e += dt * (gamma-1) * eta(rho, |J|, t) * |J|^2 / (n_e * k_B)
-    //
-    // This is the Topanga S_J = eta * J^2 fluid Joule-heating source. Uses
-    // the same eta parser already employed in HybridPICSolveE for the
-    // resistive E-term, and the same Yee->NODAL interpolation pattern as
-    // QDSMCInitializeUe for the J components. No accumulator field is
-    // needed: the dissipation is a deterministic per-cell function of the
-    // current step's (rho, J), evaluated and added directly.
-
-    amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
-    ablastr::fields::VectorField J_plasma =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-
-    auto const gamma_minus_1 = m_gamma - 1.0_rt;
-    auto const rho_floor     = PhysConst::q_e * m_n_floor;
-    auto const eta           = m_eta;
-    auto const t_new         = warpx.gett_new(0);
-
-    amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
-    amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
-    amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
-    amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
-    amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
-        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
-        amrex::Array4<amrex::Real const> const & Jpx     = J_plasma[0]->const_array(mfi);
-        amrex::Array4<amrex::Real const> const & Jpy     = J_plasma[1]->const_array(mfi);
-        amrex::Array4<amrex::Real const> const & Jpz     = J_plasma[2]->const_array(mfi);
-
-        amrex::Box const & tbox = mfi.tilebox();
-        amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            amrex::Real const rho_val = rho_arr(i,j,k);
-            if (rho_val <= rho_floor) { return; }
-            amrex::Real const ne = rho_val / PhysConst::q_e;
-
-            auto const jx = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jy = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jz = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
-
-            amrex::Real const J2   = jx*jx + jy*jy + jz*jz;
-            amrex::Real const Jmag = std::sqrt(J2);
-            amrex::Real const eta_val = eta(rho_val, Jmag, t_new);
-
-            Te_arr(i,j,k) += dt * gamma_minus_1 * eta_val * J2 / (ne * PhysConst::kb);
-        });
-    }
-
-    Te.FillBoundary(Te.nGrowVect(), period);
-}
-
-
-void HybridPICModel::QDSMCAddJouleHeatingKinetic (int const lev, amrex::Real const dt) const
-{
-    ABLASTR_PROFILE("HybridPICModel::QDSMCAddJouleHeatingKinetic()");
-
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     // Per-cell kinetic Joule-heating source. Belyaev 2024 "Topanga" Eq. 12:
@@ -1075,10 +995,10 @@ void HybridPICModel::QDSMCAddJouleHeatingKinetic (int const lev, amrex::Real con
     ablastr::fields::VectorField J_plasma =
         warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     // V_e on a NODAL grid, freshly written this step by QDSMCInitializeUe
-    // (V_e = -(J_plasma - J_i)/rho with the SAME J_plasma and J_i seen by
-    // the fluid path below). Using this avoids the one-step staleness of
-    // the Yee-staggered Ve_fp (which is only updated at the end of
-    // HybridPICEvolveFields, i.e. AFTER this orchestrator call returns).
+    // (V_e = -(J_plasma - J_i)/rho with the current-step J_plasma and J_i).
+    // Using this avoids the one-step staleness of the Yee-staggered Ve_fp
+    // (which is only updated at the end of HybridPICEvolveFields, i.e.
+    // AFTER this orchestrator call returns).
     ablastr::fields::VectorField Ve_nodal =
         warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
 
@@ -1182,10 +1102,9 @@ void HybridPICModel::QDSMCAddJouleHeatingKinetic (int const lev, amrex::Real con
                 // denominator below; the 2π·r factor cancels in that ratio.
                 amrex::Real const rhos_val = std::max(rhos_val_raw, rho_floor);
 
-                // η is the same Ohm's-law parser, evaluated at the same cell
-                // with the same (rho, |J|, t) as QDSMCAddJouleHeating uses
-                // for the fluid path. This makes the kinetic source reduce
-                // to η J² exactly in single species.
+                // η is the Ohm's-law parser evaluated at the same cell
+                // with the same (rho, |J|, t) the E-solve uses. This makes
+                // the per-cell heat reduce to η J² exactly in single species.
                 auto const jx = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 auto const jy = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
                 auto const jz = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
@@ -1311,21 +1230,10 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt)
         // the updated n_e (from rho_fp = rho^{n+1}).
         QDSMCUpdateTe(lev);
 
-        // Step 6: add the Joule-heating source S_J = eta J^2 to T_e via the
-        // mode selected by `hybrid_pic_model.joule_heating_mode`. Fluid and
-        // Kinetic modes are mutually exclusive by construction -- they
-        // implement the same physics two different ways and enabling both
-        // would double-count. The single source of truth for eta is the
-        // Ohm's-law parser; the kinetic path's nu_{s,e} is derived from it.
-        switch (m_joule_heating_mode) {
-            case JouleHeatingMode::Off:
-                break;
-            case JouleHeatingMode::Fluid:
-                QDSMCAddJouleHeating(lev, dt);
-                break;
-            case JouleHeatingMode::Kinetic:
-                QDSMCAddJouleHeatingKinetic(lev, dt);
-                break;
+        // Step 6: Belyaev Eq. 12 Joule-heating source on T_e, per-cell from
+        // the gridded Vs_fp_<s>, Ve_fp, rho_fp(_s), and Ohm's-law η parser.
+        if (m_include_joule_heating) {
+            QDSMCAddJouleHeating(lev, dt);
         }
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law solve.

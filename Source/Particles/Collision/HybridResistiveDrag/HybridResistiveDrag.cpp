@@ -46,15 +46,15 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     // applied identically to every particle in the cell -- preserves the
     // thermal moment around V_s. The corresponding W_dot dissipation into
     // T_e is NOT computed here; the Joule-heating source on T_e is the
-    // separate, gridded HybridPICModel::QDSMCAddJouleHeatingKinetic call,
-    // which evaluates the same Sigma_s n_s m_s nu |V_s - V_e|^2 expression
-    // per cell from the existing fields. Decoupling lets the user pick:
-    //   * register this drag operator     -> ions feel the back-reaction
-    //                                        to qE_eta in Ohm's law
-    //                                        (anti-friction cancelled)
-    //   * don't register it                -> ions feel only qE
-    //                                        (Topanga convention)
-    // independently of joule_heating_mode.
+    // separate, gridded HybridPICModel::QDSMCAddJouleHeating call, which
+    // evaluates the same Σ_s n_s m_s ν |V_s - V_e|^2 expression per cell
+    // from the existing fields. Decoupling lets the user pick:
+    //   * register this drag operator -> ions feel the back-reaction to
+    //                                    qE_eta in Ohm's law
+    //                                    (anti-friction cancelled)
+    //   * don't register it            -> ions feel only qE
+    //                                    (Topanga convention)
+    // independently of include_joule_heating.
 
     auto & warpx = WarpX::GetInstance();
     auto & species = mypc->GetParticleContainerFromName(m_species_names[0]);
