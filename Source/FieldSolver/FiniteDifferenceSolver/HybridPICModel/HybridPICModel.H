@@ -32,6 +32,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_DistributionMapping.H>
 
+#include <map>
 #include <memory>
 #include <optional>
 
@@ -366,6 +367,40 @@ public:
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
+
+    /** Per-species resistivity overlay (Topanga-style, Belyaev 2024 Eq. 10).
+     *  Optional. For any charged species <spec> for which the user provides
+     *
+     *      hybrid_pic_model.plasma_resistivity_<spec>(rho_s,rho,Te,J,J_s,B,t) = "..."
+     *
+     *  the parser is compiled and stored here. The total per-species
+     *  effective resistivity used by Ohm's law, the Joule-heating source,
+     *  and the resistive-drag operator is
+     *
+     *      eta_s_eff = eta_global(rho, |J|, t)              [the global m_eta]
+     *                + eta_per_species_s(rho_s, rho, Te,    [this map]
+     *                                    |J|, |J_s|, |B|, t)
+     *
+     *  so the global parser remains the shared anomalous (e.g. Chodura)
+     *  layer and the per-species parser overlays species-resolved physics
+     *  (e.g. classical Spitzer with Z^2 scaling). Species without a
+     *  per-species parser registered fall back to the global parser only.
+     *  Parser variables, in order, are:
+     *    rho_s : per-species charge density        (C/m^3, unscaled in RZ)
+     *    rho   : total plasma charge density       (C/m^3, volume-scaled)
+     *    Te    : electron temperature              (Kelvin)
+     *    J     : |J_plasma|                        (A/m^2)
+     *    J_s   : |J_<species>|                     (A/m^2, unscaled in RZ)
+     *    B     : |B|                               (Tesla)
+     *    t     : time                              (seconds)
+     */
+    std::map<std::string, std::unique_ptr<amrex::Parser>> m_per_species_resistivity_parser;
+    std::map<std::string, amrex::ParserExecutor<7>>       m_eta_per_species;
+    /** Fast-path flag: true if at least one charged species has a
+     *  registered per-species resistivity parser. When false the
+     *  per-species code paths short-circuit to the global parser only,
+     *  preserving the existing single-eta behaviour with zero overhead. */
+    bool m_has_per_species_eta = false;
 
     /** Plasma hyper-resisitivity */
     std::string m_eta_h_expression = "0.0";

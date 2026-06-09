@@ -280,6 +280,72 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
 
+    // --- Per-species resistivity overlay (Belyaev 2024 Eq. 10) -------------
+    // Optional. For any charged species <spec> the user may supply
+    //   hybrid_pic_model.plasma_resistivity_<spec>(rho_s,rho,Te,J,J_s,B,t)="..."
+    // This parser overlays species-resolved physics on top of the global
+    // m_eta parser; the total per-species effective resistivity used by
+    // Ohm's law, the Joule-heating source, and the resistive-drag operator
+    // is the sum eta_global + eta_per_species_s (so existing single-eta
+    // input scripts keep their exact behaviour with eta_per_species_s = 0).
+    // Done here in InitData rather than ReadParameters because species
+    // names are not available at parameter-parse time.
+    {
+        const amrex::ParmParse pp_hybrid_init("hybrid_pic_model");
+        auto const & mypc = WarpX::GetInstance().GetPartContainer();
+        std::vector<std::string> species_with_per_eta;
+        for (auto const & spec_name : mypc.GetSpeciesNames()) {
+            if (mypc.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
+                continue;
+            }
+            std::string const param_name =
+                "plasma_resistivity_" + spec_name + "(rho_s,rho,Te,J,J_s,B,t)";
+            std::string expr;
+            if (pp_hybrid_init.query(param_name.c_str(), expr)) {
+                auto parser = std::make_unique<amrex::Parser>(
+                    utils::parser::makeParser(
+                        expr, {"rho_s","rho","Te","J","J_s","B","t"}));
+                m_eta_per_species[spec_name] = parser->compile<7>();
+                m_per_species_resistivity_parser[spec_name] = std::move(parser);
+                species_with_per_eta.push_back(spec_name);
+                m_has_per_species_eta = true;
+            }
+        }
+
+        // Startup summary on rank 0: which species use only the global
+        // eta, and which additionally have a per-species overlay.
+        if (amrex::ParallelDescriptor::IOProcessor()) {
+            amrex::Print() << "\n[HybridPICModel] Resistivity configuration\n";
+            amrex::Print() << "  global plasma_resistivity(rho,J,t) = "
+                           << m_eta_expression << "\n";
+            if (m_has_per_species_eta) {
+                amrex::Print() << "  per-species overlays (eta_s_eff = "
+                                  "eta_global + eta_per_species):\n";
+                for (auto const & spec_name : mypc.GetSpeciesNames()) {
+                    if (mypc.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
+                        continue;
+                    }
+                    auto it = m_per_species_resistivity_parser.find(spec_name);
+                    if (it != m_per_species_resistivity_parser.end()) {
+                        std::string expr;
+                        pp_hybrid_init.query(
+                            ("plasma_resistivity_" + spec_name +
+                             "(rho_s,rho,Te,J,J_s,B,t)").c_str(), expr);
+                        amrex::Print() << "    " << spec_name
+                                       << "  : " << expr << "\n";
+                    } else {
+                        amrex::Print() << "    " << spec_name
+                                       << "  : (global only)\n";
+                    }
+                }
+            } else {
+                amrex::Print() << "  per-species overlays              : none "
+                                  "(all charged species use the global parser)\n";
+            }
+            amrex::Print() << "\n";
+        }
+    }
+
     m_include_hyper_resistivity_term = (m_eta_h_expression != "0.0");
     m_hyper_resistivity_parser = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_eta_h_expression, {"rho","B"}));
