@@ -1749,64 +1749,53 @@ Particle initialization
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
-    * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
-      :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
-      Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
-      The Sobol method used to generate the distribution will not terminate for :math:`\theta \lesssim 0.1`, and the code will abort if it encounters a temperature below that threshold.
-      The Maxwellian (``maxwellian``) distribution is recommended when the temperature
-      parameter :math:`\theta` satisfies :math:`0.01 < \theta_i < 0.1`.
-      Errors due to relativistic effects can be expected to approximately between 1% and 10%.
-      The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
-      The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
-      :math:`\beta` can be positive or negative and is limited to the range :math:`-1 < \beta < 1`.
-      The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-      Please leave no whitespace
-      between the sign and the character on input. A direction without a sign will be treated as
-      positive. The MJ distribution will be initialized in the moving frame using the Sobol method,
-      and then the distribution will be transformed to the simulation frame using the flipping method.
-      Both the Sobol and the flipping method can be found in Zenitani 2015 (Phys. Plasmas 22, 042116).
-      By default, ``beta`` is equal to ``0.`` and ``bulk_vel_dir`` is ``+x``.
 
-      Please take notice that particles initialized with this setting can be relativistic in two ways.
-      In the simulation frame, they can drift with a relativistic speed beta. Then, in the drifting
-      frame they are still moving with relativistic speeds due to high temperature. This is as opposed
-      to the Maxwellian (``maxwellian``) setting, which initializes non-relativistic plasma in their relativistic
-      drifting frame.
+    * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
+      More specifically, the plasma is initialized with a Maxwell-Juttner distribution
+
+      .. math::
+
+        p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
+
+      (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
+      **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
+      Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
+      in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
+
+      It requires the following arguments:
+
+      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk velocity :math:`\beta`.
+        The magnitude must satisfy :math:`|\beta| < 1`.
+
+        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
+        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
+
+      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
+        Specifies the direction of the bulk velocity :math:`\beta`.
+        The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
+        Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
+        The signed bulk velocity is ``beta`` times the direction given here.
+
+      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the temperature :math:`\theta`.
+        Values less than zero are not allowed.
+
+        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
+        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+
+      Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
+      For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
+      efficiency tends to zero as :math:`\theta \rightarrow 0`) and, at the same time, the Maxwell-Juttner
+      distribution becomes almost indistinguishable from a non-relativistic Maxwellian.
+      Thus, for :math:`\theta < 0.1`, the code instead samples an isotropic Maxwellian with thermal spread
+      :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
+      method and Lorentz transform as for the Sobol-sampled momenta.
 
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
-      which gives the distribution of each component of the momentum as a function of space.
-
-.. pp:param:: <species_name>.theta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the spread uses ``maxwellian_u_std_distribution_type*`` above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\theta`. Temperatures less than
-    zero are not allowed.
-
-    * If ``constant``, use a constant temperature, given by the required float parameter
-      ``<species_name>.theta``.
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required
-      parameter ``<species_name>.theta_function(x,y,z)``.
-
-.. pp:param:: <species_name>.beta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters
-    above).
-    See the ``maxwell_juttner`` bullet for constraints on :math:`\beta`.
-
-    * If ``constant``, use a constant speed, given by the required float parameter
-      ``<species_name>.beta``.
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required
-      parameter ``<species_name>.beta_function(x,y,z)``.
+      which give the distribution of each component of the momentum as a function of space.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
@@ -2896,6 +2885,17 @@ Details about the collision models can be found in the :ref:`theory section <mul
     The effective collision time step is ``dt_collision = dt_PIC / ndt_subcycle``.
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
+
+.. pp:param:: <collision_name>.cumulative_scattering_angle_model
+    :type: ``string``
+    :default: ``bobylev``
+    :optional:
+
+    Only for ``pairwisecoulomb``. Specifies the cumulative scattering distribution used to compute the scattering angle.
+    The possible values are ``bobylev`` and ``nanbu``.
+    With ``bobylev``, the scattering angle is sampled from Bobylev's distribution (see :cite:t:`param-BobylevJCP2013`).
+    With ``nanbu``, the scattering angle is sampled from Nanbu's distribution (see :cite:t:`param-NanbuPRE1997`).
+    See :cite:t:`param-AngusJCP2025` and :cite:t:`param-AngusJCP2026` for further discussion of cumulative scattering distributions.
 
 .. pp:param:: <collision_name>.CoulombLog
     :type: ``float``

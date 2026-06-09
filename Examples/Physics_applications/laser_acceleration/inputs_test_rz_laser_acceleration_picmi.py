@@ -116,13 +116,15 @@ field_diag = picmi.FieldDiagnostic(
     period=10,
     data_list=diag_field_list,
     warpx_dump_rz_modes=1,
+    warpx_format="openpmd",
 )
-diag_particle_list = ["weighting", "momentum"]
+diag_particle_list = ["weighting", "position", "momentum"]
 particle_diag = picmi.ParticleDiagnostic(
     name="diag1",
     period=10,
     species=[electrons, beam],
     data_list=diag_particle_list,
+    warpx_format="openpmd",
 )
 
 # Set up simulation
