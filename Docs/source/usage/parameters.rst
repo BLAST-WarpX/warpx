@@ -2827,6 +2827,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
       from Goldston and Rutherford, section 14.2.
     - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
       This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
+    - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions of electrons and ions.
+      The absorbed energy and momentum from the photons is distributed among the electrons in the cell so that the quantities are exactly conserved.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
@@ -2846,16 +2848,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
 .. pp:param:: <collision_name>.species
     :type: ``strings``
 
-    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, or ``bremsstrahlung``, this should be the name(s) of the species,
+    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, ``bremsstrahlung``, or ``inverse_bremsstrahlung`` this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
     With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
+    Wtih ``inverse_bremsstrahlung``, this is the photon species being absorbed and the electron species they are colliding with, in that order.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     If using ``pulsed_decay`` type this should be the name of the parent species.
     In these three cases, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
-
 
 .. pp:param:: <collision_name>.product_species
     :type: ``strings``
@@ -3142,9 +3144,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0.05
     :optional:
 
-    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
+    Only for ``pairwisecoulomb`` collisions with :pp:param:`collisions.correct_energy_momentum` set, and for ``inverse_bremsstrahlung``.
+    In both cases, the energy difference is applied to pairs of particles in their center of momentum frame in such a way that the momentum is conserved.
+    This parameter limits the change in the energy of the electrons to the specified fraction of the energy in the COM frame of the pair of particles.
+    With ``pairwisecoulomb`` collisions, energy can be added or removed, and if residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
+    With ``inverse_bremsstrahlung``, energy is always added, and it there if residual energy remaining after 10 passes, that remaining energy is distributed evenly among the particles without conservation of momentum.
     This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
-    This parameter is the fraction of the relative energy in the COM frame that is used in the correction. If residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``
