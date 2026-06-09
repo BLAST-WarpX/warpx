@@ -1776,6 +1776,23 @@ Particle initialization
       :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
       method and Lorentz transform as for the Sobol-sampled momenta.
 
+      * ``<species_name>.maxwell_juttner_u_mean_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``.
+        Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
+        representing the normalized momentum, defined as
+        :math:`u_\mathrm{mean} = \gamma \beta`, where
+        :math:`\beta = v/c` and :math:`\gamma = 1/\sqrt{1-\beta^2}`.
+        The distribution is boosted from the drift frame to the simulation frame along the
+        direction of :math:`u_\mathrm{mean}`; the bulk velocity :math:`\beta` derived from
+        :math:`u_\mathrm{mean}` is therefore always in the physical range :math:`|\beta| < 1`.
+
+        * If ``constant``, the following are required: ``<species_name>.ux_mean``,
+          ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``).
+        * If ``parser``, the following are required:
+          ``<species_name>.ux_mean_function(x,y,z)``,
+          ``<species_name>.uy_mean_function(x,y,z)``,
+          ``<species_name>.uz_mean_function(x,y,z)``.
+
       The temperature :math:`\theta` is specified via:
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
@@ -1789,23 +1806,6 @@ Particle initialization
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which give the distribution of each component of the momentum as a function of space.
-
-.. pp:param:: <species_name>.maxwell_juttner_u_mean_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if ``<species_name>.momentum_distribution_type`` is ``maxwell_juttner`` (for
-    ``maxwellian``, the drift is set using ``maxwellian_u_mean_distribution_type`` parameters
-    above). Selects how the bulk drift normalized momentum
-    :math:`u_{\rm mean} = \gamma \boldsymbol{v}/c` is set.
-
-    * If ``constant``, use a constant drift, given by the float parameters
-      ``<species_name>.ux_mean``, ``<species_name>.uy_mean``, and ``<species_name>.uz_mean``
-      (all default to ``0.``).
-    * If ``parser``, use spatially-dependent analytic parser functions, given by the required
-      parameters ``<species_name>.ux_mean_function(x,y,z)``,
-      ``<species_name>.uy_mean_function(x,y,z)``, and ``<species_name>.uz_mean_function(x,y,z)``.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
