@@ -66,6 +66,17 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     auto const eta_func = hybrid_model->m_eta;
     auto const t_now    = warpx.gett_new(0);
 
+    // Per-species resistivity overlay parser (Topanga form, Belyaev 2024
+    // Eq. 10): if registered for this collision's species, it is added to
+    // the global eta inside the per-particle kernel so the drag rate uses
+    //   eta_s_eff = eta_global + eta_s_per
+    // — the same per-species effective resistivity that Ohm's law (Phase 2)
+    // and QDSMCAddJouleHeating (Phase 3) see.
+    auto const eta_per_it     = hybrid_model->m_eta_per_species.find(m_species_names[0]);
+    bool const has_eta_per    = (eta_per_it != hybrid_model->m_eta_per_species.end());
+    amrex::ParserExecutor<7> eta_s_per{};
+    if (has_eta_per) { eta_s_per = eta_per_it->second; }
+
     amrex::Real const species_mass = species.getMass();
     amrex::Real const Z_s          = species.getCharge() / PhysConst::q_e;
     amrex::Real const Z_e2_over_ms = Z_s * PhysConst::q_e * PhysConst::q_e / species_mass;
@@ -85,11 +96,18 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     bool const galerkin_interpolation = WarpX::galerkin_interpolation;
 
     for (int lev = 0; lev <= species.finestLevel(); ++lev) {
-        ablastr::fields::VectorField Ve_fp = warpx.m_fields.get_alldirs("Ve_fp", lev);
-        ablastr::fields::VectorField Vs_fp = warpx.m_fields.get_alldirs("Vs_fp_" + m_species_names[0], lev);
-        ablastr::fields::VectorField B_fp  = warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
-        ablastr::fields::VectorField J_fp  = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-        amrex::MultiFab const & rho_fp     = *warpx.m_fields.get(FieldType::rho_fp, lev);
+        ablastr::fields::VectorField Ve_fp  = warpx.m_fields.get_alldirs("Ve_fp", lev);
+        ablastr::fields::VectorField Vs_fp  = warpx.m_fields.get_alldirs("Vs_fp_" + m_species_names[0], lev);
+        ablastr::fields::VectorField B_fp   = warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        ablastr::fields::VectorField J_fp   = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+        // Per-species J_s and rho_s, plus T_e (nodal). Only consulted inside
+        // the kernel when has_eta_per is true; looked up here unconditionally
+        // so the kernel can capture their arrays cheaply (the lookup is a
+        // const-time field-registry query).
+        ablastr::fields::VectorField Js_fp  = warpx.m_fields.get_alldirs("current_fp_" + m_species_names[0], lev);
+        amrex::MultiFab const & rho_fp      = *warpx.m_fields.get(FieldType::rho_fp, lev);
+        amrex::MultiFab const & rhos_fp     = *warpx.m_fields.get("rho_fp_" + m_species_names[0], lev);
+        amrex::MultiFab const & Te_fp       = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
 
         amrex::XDim3 const dinv = WarpX::InvCellSize(lev);
         auto const dxi = warpx.Geom(lev).InvCellSizeArray();
@@ -104,19 +122,24 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
             amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
             amrex::Dim3 const lo = amrex::lbound(box);
 
-            auto const Vex_arr = Ve_fp[0]->const_array(pti);
-            auto const Vey_arr = Ve_fp[1]->const_array(pti);
-            auto const Vez_arr = Ve_fp[2]->const_array(pti);
-            auto const Vsx_arr = Vs_fp[0]->const_array(pti);
-            auto const Vsy_arr = Vs_fp[1]->const_array(pti);
-            auto const Vsz_arr = Vs_fp[2]->const_array(pti);
-            auto const Bx_arr  = B_fp[0]->const_array(pti);
-            auto const By_arr  = B_fp[1]->const_array(pti);
-            auto const Bz_arr  = B_fp[2]->const_array(pti);
-            auto const Jx_arr  = J_fp[0]->const_array(pti);
-            auto const Jy_arr  = J_fp[1]->const_array(pti);
-            auto const Jz_arr  = J_fp[2]->const_array(pti);
-            auto const rho_arr = rho_fp.const_array(pti);
+            auto const Vex_arr  = Ve_fp[0]->const_array(pti);
+            auto const Vey_arr  = Ve_fp[1]->const_array(pti);
+            auto const Vez_arr  = Ve_fp[2]->const_array(pti);
+            auto const Vsx_arr  = Vs_fp[0]->const_array(pti);
+            auto const Vsy_arr  = Vs_fp[1]->const_array(pti);
+            auto const Vsz_arr  = Vs_fp[2]->const_array(pti);
+            auto const Bx_arr   = B_fp[0]->const_array(pti);
+            auto const By_arr   = B_fp[1]->const_array(pti);
+            auto const Bz_arr   = B_fp[2]->const_array(pti);
+            auto const Jx_arr   = J_fp[0]->const_array(pti);
+            auto const Jy_arr   = J_fp[1]->const_array(pti);
+            auto const Jz_arr   = J_fp[2]->const_array(pti);
+            auto const Jsx_arr  = Js_fp[0]->const_array(pti);
+            auto const Jsy_arr  = Js_fp[1]->const_array(pti);
+            auto const Jsz_arr  = Js_fp[2]->const_array(pti);
+            auto const rho_arr  = rho_fp.const_array(pti);
+            auto const rhos_arr = rhos_fp.const_array(pti);
+            auto const Te_arr   = Te_fp.const_array(pti);
 
             amrex::IndexType const Vex_type = Ve_fp[0]->ixType();
             amrex::IndexType const Vey_type = Ve_fp[1]->ixType();
@@ -130,6 +153,9 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
             amrex::IndexType const Jx_type  = J_fp[0]->ixType();
             amrex::IndexType const Jy_type  = J_fp[1]->ixType();
             amrex::IndexType const Jz_type  = J_fp[2]->ixType();
+            amrex::IndexType const Jsx_type = Js_fp[0]->ixType();
+            amrex::IndexType const Jsy_type = Js_fp[1]->ixType();
+            amrex::IndexType const Jsz_type = Js_fp[2]->ixType();
 
             auto& attribs = pti.GetAttribs();
             amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
@@ -171,11 +197,34 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
                 if (rho_val <= rho_floor) { return; }
 
                 amrex::Real const Jmag = std::sqrt(Jxp*Jxp + Jyp*Jyp + Jzp*Jzp);
-                amrex::Real const eta_val = eta_func(rho_val, Jmag, t_now);
+                amrex::Real eta_s_eff = eta_func(rho_val, Jmag, t_now);
 
-                // ν_{s,e} = Z_s * e^2 * eta * n_e / m_s
+                // Per-species overlay: add eta_s_per(rho_s, rho, Te, |J|,
+                // |J_s|, |B|, t) to eta_s_eff when registered for this
+                // species. When not registered, eta_s_eff stays at the
+                // global eta and the drag rate matches the pre-Phase-4
+                // path exactly.
+                if (has_eta_per) {
+                    amrex::Real const rhos_val = ablastr::particles::doGatherScalarFieldNodal(
+                        xp, yp, zp, rhos_arr, dxi, plo);
+                    amrex::Real const Te_val   = ablastr::particles::doGatherScalarFieldNodal(
+                        xp, yp, zp, Te_arr, dxi, plo);
+                    amrex::ParticleReal Jsxp = 0._prt, Jsyp = 0._prt, Jszp = 0._prt;
+                    amrex::ParticleReal _dx = 0._prt, _dy = 0._prt, _dz = 0._prt;
+                    doGatherShapeN(xp, yp, zp, Jsxp, Jsyp, Jszp, _dx, _dy, _dz,
+                                   Jsx_arr, Jsy_arr, Jsz_arr, Bx_arr, By_arr, Bz_arr,
+                                   Jsx_type, Jsy_type, Jsz_type, Bx_type, By_type, Bz_type,
+                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
+                                   nox, galerkin_interpolation);
+                    amrex::Real const Jsmag = std::sqrt(Jsxp*Jsxp + Jsyp*Jsyp + Jszp*Jszp);
+                    amrex::Real const Bmag  = std::sqrt(Bxp*Bxp + Byp*Byp + Bzp*Bzp);
+                    eta_s_eff += eta_s_per(rhos_val, rho_val, Te_val,
+                                           Jmag, Jsmag, Bmag, t_now);
+                }
+
+                // ν_{s,e} = Z_s * e^2 * eta_s_eff * n_e / m_s
                 amrex::Real const n_e = rho_val * inv_qe;
-                amrex::Real const nu  = Z_e2_over_ms * eta_val * n_e;
+                amrex::Real const nu  = Z_e2_over_ms * eta_s_eff * n_e;
 
                 amrex::Real const one_minus_fac = -std::expm1(-nu * dt);
 
