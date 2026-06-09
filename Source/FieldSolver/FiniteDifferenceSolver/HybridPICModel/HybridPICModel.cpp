@@ -1072,7 +1072,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
             dt_sub *= std::max(0.1_rt, factor);
         }
 
-        if (++n_attempts == m_max_substep_attempts) { break; }
+        if (++n_attempts > m_max_substep_attempts) { break; }
     }
 
     // Adjust the number of substeps. This affects both the next RKF45 or RK4 step.
@@ -1094,7 +1094,7 @@ void HybridPICModel::BfieldEvolveRKF45 (
             << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        n_attempts < m_max_substep_attempts,
+        n_attempts <= m_max_substep_attempts,
         "BfieldEvolveRKF45: exceeded max substep attempts;"
         "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
     );
