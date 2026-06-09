@@ -1795,7 +1795,7 @@ Particle initialization
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
-      which gives the distribution of each component of the momentum as a function of space.
+      which give the distribution of each component of the momentum as a function of space.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
