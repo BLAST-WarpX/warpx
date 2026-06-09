@@ -1,9 +1,9 @@
 .. _examples-lwfa:
 
-Laser-Wakefield Acceleration of Electrons in a Lab Frame
-========================================================
+Laser-Wakefield Acceleration of Electrons in the Lab Frame
+==========================================================
 
-This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996` either in a lab frame or a boosted frame of reference.
+This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996` either in the lab frame or in a boosted frame of reference.
 
 Laser-wakefield acceleration is best performed in 3D or quasi-cylindrical (RZ) geometry, in order to correctly capture some of the key physics (laser diffraction, beamloading, shape of the accelerating bubble in the blowout regime, etc.).
 For physical situations that have close-to-cylindrical symmetry, simulations in RZ geometry capture the relevant physics at a fraction of the computational cost of a 3D simulation.
