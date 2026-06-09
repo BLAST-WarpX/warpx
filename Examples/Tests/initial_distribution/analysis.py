@@ -12,11 +12,11 @@
 # 3 denotes maxwell-juttner distribution.
 # 4 denotes gaussian position distribution.
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
-# 10 denotes maxwell-juttner distribution w/ low temperature (Gaussian fallback)
 # 6 denotes maxwellian distribution w/ constant velocity
 # 7 denotes maxwellian distribution w/ spatially-varying velocity
 # 8 denotes uniform distribution
 # 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
+# 10 denotes maxwell-juttner distribution w/ low temperature (Gaussian fallback)
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
