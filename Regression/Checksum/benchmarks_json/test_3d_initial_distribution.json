@@ -1,94 +1,103 @@
 {
-  "lev=0": {
-    "Bx": 1.1322007677983124e-11,
-    "By": 4.88500076227207e-12,
-    "Bz": 2.3249076479514564e-12,
-    "Ex": 496300.8152137889,
-    "Ey": 2676667.8280783007,
-    "Ez": 13308016.843366198,
-    "jx": 912714689724.4735,
-    "jy": 4922486466494.304,
-    "jz": 24473911973746.797
+  "beam": {
+    "particle_momentum_x": 1.0677258027791073e-16,
+    "particle_momentum_y": 1.0642327172576899e-16,
+    "particle_momentum_z": 1.0649655718108267e-16,
+    "particle_position_x": 97549.08011720661,
+    "particle_position_y": 97398.65902857072,
+    "particle_position_z": 88237.1657021335,
+    "particle_weight": 0.0595802021991665
   },
   "gaussian": {
-    "particle_momentum_x": 1.1148694869600368e-18,
-    "particle_momentum_y": 1.11395048622375e-18,
-    "particle_momentum_z": 1.1145095477229826e-18,
-    "particle_position_x": 256080.87917030844,
-    "particle_position_y": 255990.74838430836,
-    "particle_position_z": 255985.3138786131,
-    "particle_weight": 8e+21
-  },
-  "velocity_constant": {
-    "particle_momentum_x": 3.5306141215943206e-21,
-    "particle_momentum_y": 2.854132560777671e-17,
-    "particle_momentum_z": 3.531717714358998e-21,
-    "particle_position_x": 255970.47138428764,
-    "particle_position_y": 255940.72281900013,
-    "particle_position_z": 256067.351557402,
-    "particle_weight": 8e+21
-  },
-  "maxwell_juttner": {
-    "particle_momentum_x": 2.213190294484951e-16,
-    "particle_momentum_y": 2.2159390042428948e-16,
-    "particle_momentum_z": 2.2136915789630418e-16,
-    "particle_position_x": 256040.84064782923,
-    "particle_position_y": 256006.39845867426,
-    "particle_position_z": 255946.40880295975,
-    "particle_weight": 8e+21
-  },
-  "beam": {
-    "particle_momentum_x": 1.0659500560274131e-16,
-    "particle_momentum_y": 1.0645257698559126e-16,
-    "particle_momentum_z": 1.064284015638362e-16,
-    "particle_position_x": 97509.13686270427,
-    "particle_position_y": 97385.64317275691,
-    "particle_position_z": 88434.58073217829,
-    "particle_weight": 0.059591783124207
-  },
-  "maxwell_juttner_parser": {
-    "particle_momentum_x": 3.243585309702505e-16,
-    "particle_momentum_y": 3.250526809939847e-16,
-    "particle_momentum_z": 3.246280747276941e-16,
-    "particle_position_x": 255968.35982141763,
-    "particle_position_y": 256025.70591794158,
-    "particle_position_z": 256028.1573406855,
+    "particle_momentum_x": 1.1148694869594825e-18,
+    "particle_momentum_y": 1.1139504862235434e-18,
+    "particle_momentum_z": 1.114509547715221e-18,
+    "particle_position_x": 256080.8791703179,
+    "particle_position_y": 255990.7483843093,
+    "particle_position_z": 255985.31387862918,
     "particle_weight": 8e+21
   },
   "gaussian_parser": {
-    "particle_momentum_x": 1.2522794073580236e-17,
-    "particle_momentum_y": 1.3572424566731724e-17,
-    "particle_momentum_z": 1.4684894173684644e-17,
-    "particle_position_x": 255945.56253756362,
-    "particle_position_y": 255905.00878641685,
-    "particle_position_z": 256016.52876705496,
+    "particle_momentum_x": 1.2495207710138256e-17,
+    "particle_momentum_y": 1.3568946435216231e-17,
+    "particle_momentum_z": 1.469563642873113e-17,
+    "particle_position_x": 256015.69619301357,
+    "particle_position_y": 256062.7175546781,
+    "particle_position_z": 255971.83353801683,
     "particle_weight": 8e+21
   },
-  "velocity_parser": {
-    "particle_momentum_x": 3.5247247987447086e-21,
-    "particle_momentum_y": 2.8541330843275173e-17,
-    "particle_momentum_z": 3.525364851160952e-21,
-    "particle_position_x": 255947.17062645964,
-    "particle_position_y": 256009.31274964032,
-    "particle_position_z": 256046.93143920175,
+  "lev=0": {
+    "Bx": 0.0,
+    "By": 0.0,
+    "Bz": 0.0,
+    "Ex": 0.0,
+    "Ey": 0.0,
+    "Ez": 0.0,
+    "jx": 0.0,
+    "jy": 0.0,
+    "jz": 0.0
+  },
+  "maxwell_boltzmann": {
+    "particle_momentum_x": 1.11648887392627e-18,
+    "particle_momentum_y": 1.1162850676261615e-18,
+    "particle_momentum_z": 1.1156179166624973e-18,
+    "particle_position_x": 256013.9727528227,
+    "particle_position_y": 255917.250607293,
+    "particle_position_z": 255873.76981101296,
+    "particle_weight": 8e+21
+  },
+  "maxwell_juttner": {
+    "particle_momentum_x": 2.21319029448496e-16,
+    "particle_momentum_y": 2.2159390042429052e-16,
+    "particle_momentum_z": 2.2136915789630448e-16,
+    "particle_position_x": 256040.8406483202,
+    "particle_position_y": 256006.39845876803,
+    "particle_position_z": 255946.40880285134,
+    "particle_weight": 8e+21
+  },
+  "maxwell_juttner_low_theta": {
+    "particle_momentum_x": 2.491094324507013e-17,
+    "particle_momentum_y": 2.493746463508034e-17,
+    "particle_momentum_z": 2.4887948235557145e-17,
+    "particle_position_x": 256011.2799097483,
+    "particle_position_y": 255960.80418139862,
+    "particle_position_z": 255981.16849761683,
+    "particle_weight": 8e+21
+  },
+  "maxwell_juttner_parser": {
+    "particle_momentum_x": 3.2331707579693567e-16,
+    "particle_momentum_y": 3.241370611374955e-16,
+    "particle_momentum_z": 3.2339371519936777e-16,
+    "particle_position_x": 255959.8106332125,
+    "particle_position_y": 256002.41380976443,
+    "particle_position_z": 256018.77140335785,
     "particle_weight": 8e+21
   },
   "uniform": {
-    "particle_momentum_x": 1.8163881989644428e-17,
-    "particle_momentum_y": 6.990040186864935e-18,
-    "particle_momentum_z": 1.4820090886778152e-15,
-    "particle_position_x": 256091.08697468182,
-    "particle_position_y": 256039.99556877319,
-    "particle_position_z": 255970.29035347153,
+    "particle_momentum_x": 1.816327193484862e-17,
+    "particle_momentum_y": 6.990699597780058e-18,
+    "particle_momentum_z": 1.4820054235451135e-15,
+    "particle_position_x": 256022.52920912058,
+    "particle_position_y": 256016.9923117968,
+    "particle_position_z": 256074.14585152344,
     "particle_weight": 8e+21
   },
-  "maxwell_boltzmann": {
-    "particle_momentum_x": 1.1164888739264963e-18,
-    "particle_momentum_y": 1.1162850676272339e-18,
-    "particle_momentum_z": 1.1156179166503066e-18,
-    "particle_position_x": 256013.97275282157,
-    "particle_position_y": 255917.250607292,
-    "particle_position_z": 255873.7698110248,
+  "velocity_constant": {
+    "particle_momentum_x": 3.524469856191352e-21,
+    "particle_momentum_y": 2.8541327914583444e-17,
+    "particle_momentum_z": 3.525532523450686e-21,
+    "particle_position_x": 255953.33639302623,
+    "particle_position_y": 255942.25452884092,
+    "particle_position_z": 256077.94018310693,
+    "particle_weight": 8e+21
+  },
+  "velocity_parser": {
+    "particle_momentum_x": 3.525122356520455e-21,
+    "particle_momentum_y": 2.8541307142142744e-17,
+    "particle_momentum_z": 3.5275957461994946e-21,
+    "particle_position_x": 255951.54395114427,
+    "particle_position_y": 255975.20809870676,
+    "particle_position_z": 255985.171103885,
     "particle_weight": 8e+21
   }
 }

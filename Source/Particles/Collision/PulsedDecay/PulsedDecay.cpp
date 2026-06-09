@@ -220,11 +220,9 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                     const amrex::ParticleReal wtot1 = wtot1_in_each_cell[i_cell];
                     if (wtot1 == 0.0_prt) { return; }
 
-                    // Note that ParticleUtils::findParticlesInEachCell() uses DenseBins,
-                    // which maps like i_cell = ix * nz + iz for 2D
-                    // and i_cell = ix * (ny * nz) + iy * nz + iz for 3D.
-                    // Don't use box.getOffset(i_cell), which assumes i_cell = ix + nx * iz
-                    // for 2D and i_cell = ix + nx * (iy + ny * iz) for 3D.
+                    // DenseBins uses x-fastest ordering:
+                    // 2D: i_cell = iz * nx + ix
+                    // 3D: i_cell = (iz * ny + iy) * nx + ix
 
                     // Get physical coordinates at cell center.
                     amrex::XDim3 xyz_cc = {0.0_rt, 0.0_rt, 0.0_rt};
@@ -234,14 +232,14 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                     xyz_cc.x = xyzmin.x + (i_cell + half)*dx[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    const int ix = i_cell / len[1];
-                    const int iz = i_cell % len[1];
+                    const int ix = i_cell % len[0];
+                    const int iz = i_cell / len[0];
                     xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
                     xyz_cc.z = xyzmin.z + (iz + half)*dx[1];
 #elif defined(WARPX_DIM_3D)
-                    const int ix = i_cell / (len[1] * len[2]);
-                    const int iy = (i_cell / len[2]) % len[1];
-                    const int iz = i_cell % len[2];
+                    const int ix = i_cell % len[0];
+                    const int iy = (i_cell / len[0]) % len[1];
+                    const int iz = i_cell / (len[0] * len[1]);
                     xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
                     xyz_cc.y = xyzmin.y + (iy + half)*dx[1];
                     xyz_cc.z = xyzmin.z + (iz + half)*dx[2];
