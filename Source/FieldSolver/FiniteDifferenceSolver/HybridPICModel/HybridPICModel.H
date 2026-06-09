@@ -304,6 +304,39 @@ public:
      */
     void AdvanceElectronEnergyQDSMC (amrex::Real dt);
 
+    /**
+     * \brief Compute the per-species resistive overlay vector field added to
+     *        Ohm's-law E alongside the existing +η_global · J term:
+     *
+     *           overlay_d(i,j,k) = Σ_s [ η_s_per · ρ_s · ρ / ρ_sum
+     *                                       · (V_s_d − V_e_d) ]
+     *
+     *        summed over charged species that have a per-species
+     *        resistivity parser registered. The total friction term that
+     *        Ohm's law sees becomes
+     *
+     *           E_friction = +η_global · J + overlay
+     *                      = +e · Σ_s Z_s · (η_global + η_s_per) · n_s
+     *                                       · (V_s − V_e)
+     *
+     *        i.e. effectively η_s_eff = η_global + η_s_per per species.
+     *
+     *        Output multifabs are at the Jx/Jy/Jz staggering (== E
+     *        component staggering). When m_has_per_species_eta is false
+     *        the overlay is set to zero and the function returns early
+     *        (single-η behaviour is exactly recovered when callers add
+     *        a field of zeros to E).
+     *
+     *        Computed once per E-solve call. Caller passes pre-allocated
+     *        Yee-staggered MultiFabs (one per direction) sized to match
+     *        Jx/Jy/Jz at this level.
+     */
+    void ComputeResistiveOverlay (
+        int lev,
+        amrex::MultiFab & overlay_x,
+        amrex::MultiFab & overlay_y,
+        amrex::MultiFab & overlay_z) const;
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
      *  count guess when RKF45 adaptive stepping is active) */

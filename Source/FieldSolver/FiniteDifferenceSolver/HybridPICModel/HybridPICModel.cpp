@@ -807,6 +807,174 @@ void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
     }
 }
 
+void HybridPICModel::ComputeResistiveOverlay (
+    int const lev,
+    amrex::MultiFab & overlay_x,
+    amrex::MultiFab & overlay_y,
+    amrex::MultiFab & overlay_z) const
+{
+    ABLASTR_PROFILE("HybridPICModel::ComputeResistiveOverlay()");
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Result is the per-species friction contribution added to Ohm's-law E:
+    //   overlay_d(i,j,k) = Σ_s [ η_s_per · ρ_s · ρ / ρ_sum · (V_s_d − V_e_d) ]
+    // summed over charged species with a registered per-species parser.
+    // η_s_per is evaluated at (ρ_s, ρ, T_e [K], |J|, |J_s|, |B|, t) per cell
+    // at the d-component staggering. We always zero the output first; if
+    // no per-species parsers are registered we return immediately (single-η
+    // path is then exactly recovered when the caller adds a field of zeros).
+
+    overlay_x.setVal(0.0_rt);
+    overlay_y.setVal(0.0_rt);
+    overlay_z.setVal(0.0_rt);
+
+    if (!m_has_per_species_eta) { return; }
+
+    auto & warpx = WarpX::GetInstance();
+    auto const & mypc = warpx.GetPartContainer();
+    auto const species_names = mypc.GetSpeciesNames();
+    auto const t_new = warpx.gett_new(lev);
+
+    amrex::MultiFab const & rho_total =
+        *warpx.m_fields.get(FieldType::rho_fp, lev);
+    amrex::MultiFab const & Te_K =
+        *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    ablastr::fields::VectorField J_plasma =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    ablastr::fields::VectorField B_fp =
+        warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+    ablastr::fields::VectorField Ve_fp =
+        warpx.m_fields.get_alldirs("Ve_fp", lev);
+
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+
+    // Precompute ρ_sum = Σ_t ρ_fp_<t> over all charged species. This is
+    // the unscaled "raw deposit" sum, paired with rho_s_raw in the same
+    // form so the 2π·r RZ factor cancels in the species-fraction ratio.
+    amrex::MultiFab rho_sum(rho_total.boxArray(), rho_total.DistributionMap(),
+                            1, rho_total.nGrowVect());
+    rho_sum.setVal(0.0_rt);
+    for (auto const & spec_name : species_names) {
+        if (mypc.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
+            continue;
+        }
+        amrex::MultiFab const & rho_s =
+            *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        amrex::MultiFab::Add(rho_sum, rho_s, 0, 0, 1, rho_total.nGrowVect());
+    }
+
+    amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const & Bx_stag = Bx_IndexType;
+    amrex::GpuArray<int, 3> const & By_stag = By_IndexType;
+    amrex::GpuArray<int, 3> const & Bz_stag = Bz_IndexType;
+    amrex::GpuArray<int, 3> const nodal   = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+
+    // Single kernel pass per (species, direction) pair. Each pass reads
+    // the species's parser executor by value (amrex::ParserExecutor is
+    // device-callable), interpolates the global and per-species scalar
+    // fields to the d-component staggering, evaluates the parser, and
+    // accumulates the contribution into overlay_<d>. The d-component
+    // values of V_s and V_e are read directly because Vs_fp and Ve_fp are
+    // both at the d staggering by construction; only the cross components
+    // of J, J_s and B need interp to compute magnitudes.
+    for (auto const & spec_name : species_names) {
+        auto & pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0._prt) { continue; }
+
+        auto eta_s_per_it = m_eta_per_species.find(spec_name);
+        if (eta_s_per_it == m_eta_per_species.end()) { continue; }
+        auto const eta_s_per = eta_s_per_it->second;
+
+        amrex::MultiFab const & rho_s_mf =
+            *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        ablastr::fields::VectorField Vs_fp =
+            warpx.m_fields.get_alldirs("Vs_fp_" + spec_name, lev);
+        ablastr::fields::VectorField Js_fp =
+            warpx.m_fields.get_alldirs("current_fp_" + spec_name, lev);
+
+        // Lambda: accumulate this species's overlay contribution into a
+        // single output multifab at the given d staggering.
+        auto accumulate_one_direction = [&] (
+            amrex::MultiFab       & out,
+            amrex::GpuArray<int,3>  const d_stag,
+            int                     d_idx)
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(out, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                amrex::Array4<amrex::Real>       const & out_arr     = out.array(mfi);
+                amrex::Array4<amrex::Real const> const & rho_arr     = rho_total.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & rhos_arr    = rho_s_mf.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & rhosum_arr  = rho_sum.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Te_arr      = Te_K.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpx_arr     = J_plasma[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpy_arr     = J_plasma[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpz_arr     = J_plasma[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsx_arr     = Js_fp[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsy_arr     = Js_fp[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsz_arr     = Js_fp[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Bx_arr      = B_fp[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & By_arr      = B_fp[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Bz_arr      = B_fp[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Vsd_arr     = Vs_fp[d_idx]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Ved_arr     = Ve_fp[d_idx]->const_array(mfi);
+
+                amrex::Box const & tbox = mfi.tilebox(out.ixType().toIntVect());
+                amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    using ablastr::coarsen::sample::Interp;
+                    amrex::Real const rho_val = Interp(rho_arr, nodal, d_stag, coarsen, i, j, k, 0);
+                    if (rho_val <= rho_floor) { return; }
+
+                    amrex::Real const rhos_val   = Interp(rhos_arr,   nodal, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const rhosum_val = std::max(
+                        Interp(rhosum_arr, nodal, d_stag, coarsen, i, j, k, 0), rho_floor);
+                    amrex::Real const Te_val     = Interp(Te_arr,     nodal, d_stag, coarsen, i, j, k, 0);
+
+                    // |J|, |J_s|, |B| at d staggering. Interp every Yee
+                    // component (the d-component interp from its own
+                    // staggering to itself is identity, so this is safe).
+                    amrex::Real const jpx = Interp(Jpx_arr, Jx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jpy = Interp(Jpy_arr, Jy_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jpz = Interp(Jpz_arr, Jz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Jmag = std::sqrt(jpx*jpx + jpy*jpy + jpz*jpz);
+
+                    amrex::Real const jsx = Interp(Jsx_arr, Jx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jsy = Interp(Jsy_arr, Jy_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jsz = Interp(Jsz_arr, Jz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Jsmag = std::sqrt(jsx*jsx + jsy*jsy + jsz*jsz);
+
+                    amrex::Real const bx = Interp(Bx_arr, Bx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const by = Interp(By_arr, By_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const bz = Interp(Bz_arr, Bz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Bmag = std::sqrt(bx*bx + by*by + bz*bz);
+
+                    amrex::Real const dv_d  = Vsd_arr(i,j,k) - Ved_arr(i,j,k);
+                    amrex::Real const eta_s = eta_s_per(rhos_val, rho_val, Te_val,
+                                                        Jmag, Jsmag, Bmag, t_new);
+                    out_arr(i,j,k) += eta_s * rhos_val * rho_val / rhosum_val * dv_d;
+                });
+            }
+        };
+
+        accumulate_one_direction(overlay_x, Jx_stag, 0);
+        accumulate_one_direction(overlay_y, Jy_stag, 1);
+        accumulate_one_direction(overlay_z, Jz_stag, 2);
+    }
+
+    overlay_x.FillBoundary(warpx.Geom(lev).periodicity());
+    overlay_y.FillBoundary(warpx.Geom(lev).periodicity());
+    overlay_z.FillBoundary(warpx.Geom(lev).periodicity());
+}
+
+
 void HybridPICModel::FillElectronPressureMF (
     amrex::MultiFab& Pe_field,
     amrex::MultiFab const& rho_field
