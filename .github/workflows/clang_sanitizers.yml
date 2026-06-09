@@ -27,7 +27,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -37,7 +37,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -58,7 +58,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with UB sanitizer
+    - name: Run WarpX with UB sanitizer
       run: |
         export OMP_NUM_THREADS=2
         #MPI implementations often leak memory
@@ -78,7 +78,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -88,7 +88,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -109,7 +109,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with UB sanitizer
+    - name: Run WarpX with UB sanitizer
       run: |
         export OMP_NUM_THREADS=2
         #MPI implementations often leak memory
@@ -129,7 +129,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -139,7 +139,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -160,7 +160,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with UB sanitizer
+    - name: Run WarpX with UB sanitizer
       run: |
         export OMP_NUM_THREADS=2
         #MPI implementations often leak memory
@@ -180,7 +180,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -190,7 +190,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -213,7 +213,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with thread sanitizer
+    - name: Run WarpX with thread sanitizer
       run: |
         # Disabling the gds/shmem component by using gds/hash instead
         # is required to avoid issues with shared memory.
@@ -243,7 +243,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -253,7 +253,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -276,7 +276,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with thread sanitizer
+    - name: Run WarpX with thread sanitizer
       run: |
         # Disabling the gds/shmem component by using gds/hash instead
         # is required to avoid issues with shared memory.
@@ -311,7 +311,7 @@ jobs:
       CXX: clang++
     steps:
     - uses: actions/checkout@v4
-    - name: install dependencies
+    - name: Install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
     - name: CCache Cache
@@ -321,7 +321,7 @@ jobs:
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
              ccache-${{ github.workflow }}-${{ github.job }}-git-
-    - name: build WarpX
+    - name: Build WarpX
       run: |
         export CCACHE_COMPRESS=1
         export CCACHE_COMPRESSLEVEL=10
@@ -344,7 +344,7 @@ jobs:
         cmake --build build -j 4
         ccache -s
         du -hs ~/.cache/ccache
-    - name: run with thread sanitizer
+    - name: Run WarpX with thread sanitizer
       run: |
         # Disabling the gds/shmem component by using gds/hash instead
         # is required to avoid issues with shared memory.
