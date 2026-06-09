@@ -86,8 +86,8 @@ add_warpx_test(
     3  # dims
     1  # nprocs
     inputs_test_3d_collision_xyz  # inputs
-    "analysis_collision_3d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150"  # checksum
+    "analysis_collision_3d.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 
