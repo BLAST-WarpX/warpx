@@ -249,21 +249,53 @@ public:
     void QDSMCUpdateTe (int lev) const;
 
     /**
-     * \brief Add the resistive-heating source term to T_e^{n+1}:
-     *           T_e += dt * (gamma-1) * W_dot / (n_e * k_B)
-     *        where W_dot is the per-cell electron-ion frictional dissipation
-     *        power density (W/m^3) accumulated over the step into
-     *        hybrid_drag_heating_fp. Today's only producer is the multispecies
-     *        HybridResistiveDrag operator (kinetic per-ion friction); a future
-     *        eta J^2 Joule operator would write to the same accumulator and
-     *        be picked up by the same source term without further plumbing.
+     * \brief Kinetic-path Joule-heating source (Belyaev 2024 "Topanga" Eq. 12).
+     *        Adds, per cell,
+     *           T_e += dt * (gamma-1) * S_e / (n_e * k_B)
+     *        with
+     *           S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2
+     *               = e^2 η n_e · Σ_s Z_s n_s |V_s - V_e|^2
+     *        where ν_{s,e} = Z_s e^2 η n_e / m_s is derived from the same
+     *        Ohm's-law eta parser as the fluid path. Iterates over every
+     *        charged ion species. Inputs per cell:
+     *          * V_e: hybrid_electron_velocity_fp (nodal, freshly written
+     *            this step by QDSMCInitializeUe).
+     *          * V_s: J_s/rho_s computed inline from current_fp_<s> and
+     *            rho_fp_<s> (the 2π·r factors cancel in this ratio, so V_s
+     *            is in correct m/s without explicit RZ scaling).
+     *          * n_s: recovered from the species charge fraction
+     *            f_s = rho_fp_<s> / Σ_t rho_fp_<t> = Z_s n_s/n_e (unitless,
+     *            2π·r-cancelling) -> n_s = f_s · n_e / Z_s, where n_e is
+     *            from the volume-scaled total rho_fp.
+     *          * η: same parser as fluid path, evaluated with rho_fp and |J|.
      *
-     *        Reads hybrid_drag_heating_fp and rho_fp; writes
-     *        hybrid_electron_temperature_fp. Called once per step when
-     *        m_solve_electron_energy_equation and m_include_resistive_heating
-     *        are both true.
+     *        Reduces algebraically to S_J = η J² in single species and
+     *        resolves inter-species drift-dispersion heating in multispecies
+     *        (Cauchy-Schwarz upper bound on η J²). Deterministic, no per-
+     *        particle scatter, no accumulator field. Called when
+     *        m_joule_heating_mode == Kinetic.
      */
-    void QDSMCAddResistiveHeating (int lev, amrex::Real dt) const;
+    void QDSMCAddJouleHeatingKinetic (int lev, amrex::Real dt) const;
+
+    /**
+     * \brief Fluid-path Joule-heating source. Adds
+     *           T_e += dt * (gamma-1) * eta(rho, |J|, t) * J^2 / (n_e * k_B)
+     *        per cell, where J is the total plasma current (curl B / mu0)
+     *        and eta is the same Ohm's-law resistivity parser already used
+     *        in the E-solve. This is the Topanga S_J = eta * J^2 source
+     *        term in Belyaev (2024) Eq. (12), evaluated deterministically
+     *        on the grid (no per-particle accumulator, no scatter noise).
+     *
+     *        Reads hybrid_current_fp_plasma and rho_fp; writes
+     *        hybrid_electron_temperature_fp directly. Called when
+     *        m_joule_heating_mode == Fluid.
+     *
+     *        Equivalent to the Kinetic mode in single species (modulo NGP
+     *        scatter that vanishes as 1/sqrt(ppc)). In multispecies the
+     *        Fluid mode undercounts inter-species drift-dispersion heating
+     *        which the Kinetic mode resolves correctly.
+     */
+    void QDSMCAddJouleHeating (int lev, amrex::Real dt) const;
 
     /**
      * \brief Fill hybrid_electron_pressure_fp from T_e and n_e using the
@@ -282,7 +314,11 @@ public:
      *   3. QDSMCInitializeKe  (K_e from T_e^n and rho^n)
      *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
      *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
-     *   6. QDSMCAddResistiveHeating (if m_include_resistive_heating is on)
+     *   6. Joule-heating source on T_e, per m_joule_heating_mode:
+     *        Off     -> no source added
+     *        Fluid   -> QDSMCAddJouleHeating        (S_J = eta * J^2 per cell)
+     *        Kinetic -> QDSMCAddJouleHeatingKinetic (Belyaev Eq. 12,
+     *                   per-species sum from gridded Vs_fp_<s>, Ve_fp)
      *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
      *   8. Reset QDSMC particles to home positions for the next step
      *
@@ -320,19 +356,39 @@ public:
     /** Master gate for the electron-energy equation. When true, K_e is
      * transported each step by QDSMC fictitious particles advecting with
      * V_e, then T_e is recovered from K_e and n_e via the polytropic
-     * relation, then operator-split source terms (if enabled) are added,
+     * relation, then the Joule-heating source (if enabled) is added,
      * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
      * false (default), Pe is computed from the algebraic adiabatic closure
      * (FillElectronPressureMF) — no temperature evolution. */
     bool m_solve_electron_energy_equation = false;
 
-    /** Operator-split T_e source term: electron-ion frictional dissipation
-     * (Topanga Eq. 12 generalized to multispecies). Reads the per-cell
-     * power density W_dot accumulated in hybrid_drag_heating_fp by whatever
-     * collisional operator is registered (today: HybridResistiveDrag), and
-     * adds it to T_e as dt * (gamma-1) * W_dot / (n_e * k_B). Only consulted
-     * when m_solve_electron_energy_equation is also true. */
-    bool m_include_resistive_heating = false;
+    /** Implementation of the Topanga S_J = eta J^2 resistive electron-heating
+     * source term (Belyaev 2024 Eq. 12), selected by
+     * `hybrid_pic_model.joule_heating_mode`:
+     *
+     *   Off     : no Joule-heating source on T_e. Use when running a pure
+     *             isothermal/polytropic electron closure or when validating
+     *             the QDSMC LHS in isolation.
+     *
+     *   Fluid   : evaluate S_J = eta(rho, |J|, t) * |J|^2 per cell using the
+     *             same Ohm's-law eta parser and add directly to T_e. Cheap,
+     *             deterministic, no Monte-Carlo noise. Exact for single ion
+     *             species; undercounts inter-species drift-dispersion
+     *             heating in multispecies.
+     *
+     *   Kinetic : per-cell sum over ion species, Belyaev (2024) Eq. 12,
+     *             S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2 with
+     *             ν_{s,e} = Z_s e^2 η n_e / m_s, computed deterministically
+     *             from the gridded Vs_fp_<s>, Ve_fp, rho_fp(_s) fields.
+     *             Reduces exactly to the fluid form in single species and
+     *             resolves inter-species drift-dispersion heating in
+     *             multispecies. No per-particle scatter; orthogonal to
+     *             whether HybridResistiveDrag is registered on ions
+     *             (that controls particle dynamics, not the T_e source).
+     *
+     * Only consulted when m_solve_electron_energy_equation is also true. */
+    enum class JouleHeatingMode { Off, Fluid, Kinetic };
+    JouleHeatingMode m_joule_heating_mode = JouleHeatingMode::Off;
 
     /** Density floor used when dividing by the deposited QDSMC weight to
      * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
