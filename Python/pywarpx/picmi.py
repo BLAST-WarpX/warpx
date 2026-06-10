@@ -3295,6 +3295,62 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 collision.add_new_attr(process + "_" + key, val)
 
 
+class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle setup of inverse Bremsstrahlung collisions in WarpX. If
+    collision initialization is added to picmistandard this can be changed to
+    inherit that functionality.
+
+    Parameters
+    ----------
+    name: string
+        Name of instance (used in the inputs file)
+
+    species: list of species instances
+        The species involved in the collision. Must be of length 2.
+        The photon species must be given first, followed by the electron species.
+
+    energy_fraction: float
+        The fraction of the relative energy in the collision COM frame that is used in the distribution
+        of the absorbed photon energy.
+
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
+    """
+
+    def __init__(
+        self,
+        name,
+        species,
+        energy_fraction=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
+        self.name = name
+        self.species = species
+        self.energy_fraction = energy_fraction
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "inverse_bremsstrahlung"
+        collision.species = [species.name for species in self.species]
+        collision.energy_fraction = self.energy_fraction
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
+
+
 class EmbeddedBoundary(picmistandard.base._ClassWithInit):
     """
     Custom class to handle set up of embedded boundaries specific to WarpX.
