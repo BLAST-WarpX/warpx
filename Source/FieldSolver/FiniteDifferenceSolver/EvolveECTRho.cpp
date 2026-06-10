@@ -53,7 +53,9 @@ void FiniteDifferenceSolver::EvolveECTRho (
     const int lev) {
 
 #if !defined(WARPX_DIM_RZ) and !defined(WARPX_DIM_RCYLINDER) and !defined(WARPX_DIM_RSPHERE) and defined(AMREX_USE_EB)
-    if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+        (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+         WarpX::UseConformalEBSolve())) {
 
         EvolveRhoCartesianECT(Efield, edge_lengths, face_areas, ECTRhofield, lev);
 

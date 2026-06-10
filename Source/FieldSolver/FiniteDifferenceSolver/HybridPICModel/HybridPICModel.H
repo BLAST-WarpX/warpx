@@ -245,6 +245,12 @@ public:
     bool m_add_external_fields = false;
     std::unique_ptr<ExternalVectorPotential> m_external_vector_potential;
 
+    /** If true, use the conformal embedded-boundary Faraday update (enlarged
+     *  cell technique, Xiao and Liu, IEEE MWCL 2004) for the B-field push
+     *  instead of the stair-step approximation. Requires embedded boundaries
+     *  and a 3D Cartesian staggered grid. */
+    bool m_use_conformal_eb = false;
+
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;
     /** Gpu Vector with index type of the Jy multifab */

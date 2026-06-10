@@ -93,6 +93,27 @@ void HybridPICModel::ReadParameters ()
     if (m_add_external_fields) {
         m_external_vector_potential = std::make_unique<ExternalVectorPotential>();
     }
+
+    // conformal (enlarged-cell technique) embedded-boundary Faraday update
+    pp_hybrid.query("use_conformal_eb", m_use_conformal_eb);
+
+    if (m_use_conformal_eb) {
+#if !defined(WARPX_DIM_3D)
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.use_conformal_eb is only supported in 3D Cartesian geometry");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
+            "hybrid_pic_model.use_conformal_eb requires embedded boundaries to be enabled");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::grid_type != ablastr::utils::enums::GridType::Collocated,
+            "hybrid_pic_model.use_conformal_eb requires a staggered grid");
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::field_boundary_lo[idim] != FieldBoundaryType::PML &&
+                WarpX::field_boundary_hi[idim] != FieldBoundaryType::PML,
+                "hybrid_pic_model.use_conformal_eb is not compatible with PML boundaries");
+        }
+    }
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -1110,6 +1131,22 @@ void HybridPICModel::FieldPush (
     if (Bz_IndexType[0] == Ez_IndexType[0]) {
         warpx.FillBoundaryE(ng, nodal_sync);
     }
+
+#ifdef AMREX_USE_EB
+    // With the conformal embedded-boundary update, recompute the face-centered
+    // electromotive-force density (ECTRhofield) from the new E-field so that
+    // the following Faraday push uses circulations consistent with Ohm's law
+    if (m_use_conformal_eb) {
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            warpx.get_pointer_fdtd_solver_fp(lev)->EvolveECTRho(
+                Efield[lev],
+                warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
+                warpx.m_fields.get_alldirs(FieldType::face_areas, lev),
+                warpx.m_fields.get_alldirs(FieldType::ECTRhofield, lev),
+                lev);
+        }
+    }
+#endif
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);

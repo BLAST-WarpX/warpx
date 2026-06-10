@@ -105,6 +105,13 @@ void FiniteDifferenceSolver::EvolveB (
 
         EvolveBCartesian <CartesianNodalAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
 
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+               (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+                WarpX::UseConformalEBSolve())) {
+
+        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
+                            borrowing, lev, dt);
+
     } else if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee) ||
                (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)) {
 
@@ -113,9 +120,6 @@ void FiniteDifferenceSolver::EvolveB (
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         EvolveBCartesian <CartesianCKCAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
-    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
-        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
-                            borrowing, lev, dt);
 #endif
     } else {
         WARPX_ABORT_WITH_MESSAGE("EvolveB: Unknown algorithm");

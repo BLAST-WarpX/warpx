@@ -3760,6 +3760,20 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
 
+.. pp:param:: hybrid_pic_model.use_conformal_eb
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this enables the conformal embedded-boundary
+    Faraday update for the B-field push (the enlarged cell technique of :cite:t:`param-XiaoIEEE2005`,
+    shared with the ``ect`` Maxwell solver) instead of the default stair-step approximation.
+    Faces cut by the embedded boundary are advanced using the conformal circulation of E over the
+    uncovered face area, and faces that are too small to be stable at the full time step are enlarged
+    into their neighbors, avoiding any time-step reduction. This makes the field solution near embedded
+    boundaries second-order accurate instead of first-order. Requires embedded boundaries and a
+    3D Cartesian staggered grid (not compatible with collocated grids, RZ geometry, or PML boundaries).
+
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
     :default: ``false``

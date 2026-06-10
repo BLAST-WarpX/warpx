@@ -1310,7 +1310,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
 #ifdef AMREX_USE_EB
         if (eb_enabled) {
             // We initialize ECTRhofield consistently with the Efield
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            if (WarpX::UseConformalEBSolve()) {
                 m_fdtd_solver_fp[lev]->EvolveECTRho(
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     m_fields.get_alldirs(FieldType::edge_lengths, lev),
@@ -1337,7 +1337,7 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 lev, PatchType::coarse, m_eb_update_E);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
-                if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+                if (WarpX::UseConformalEBSolve()) {
                     // We initialize ECTRhofield consistently with the Efield
                     m_fdtd_solver_cp[lev]->EvolveECTRho(
                         m_fields.get_alldirs(FieldType::Efield_cp, lev),
@@ -1596,7 +1596,7 @@ void WarpX::InitializeEBGridData (int lev)
         {
             using warpx::fields::FieldType;
 
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            if (WarpX::UseConformalEBSolve()) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
                 warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
