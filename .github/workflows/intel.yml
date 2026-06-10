@@ -98,7 +98,7 @@ jobs:
     - name: install dependencies
       shell: bash
       run: |
-        .github/workflows/dependencies/dpcpp.sh
+        .github/workflows/dependencies/dpcpp.sh --rz-fft
     - name: CCache Cache
       uses: actions/cache@v4
       with:
