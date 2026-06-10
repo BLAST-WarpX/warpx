@@ -80,7 +80,7 @@ then
     source /opt/intel/oneapi/setvars.sh
     set -eu
 
-    git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git build_dpc_deps/blaspp
+    git clone -b v2025.05.28 https://github.com/icl-utk-edu/blaspp.git build_dpc_deps/blaspp
     CXX=icpx CXXFLAGS="-fsycl -qmkl" cmake -S build_dpc_deps/blaspp -B build_dpc_deps/blaspp-build \
         -Duse_openmp=OFF \
         -Dgpu_backend=sycl \
@@ -91,7 +91,7 @@ then
     cmake --build build_dpc_deps/blaspp-build -j 4
     sudo cmake --build build_dpc_deps/blaspp-build --target install
 
-    git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git build_dpc_deps/lapackpp
+    git clone -b v2025.05.28 https://github.com/icl-utk-edu/lapackpp.git build_dpc_deps/lapackpp
     CXX=icpx CXXFLAGS="-DLAPACK_FORTRAN_ADD_ -fsycl -qmkl" cmake \
         -S build_dpc_deps/lapackpp \
         -B build_dpc_deps/lapackpp-build \
