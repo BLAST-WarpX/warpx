@@ -1,24 +1,23 @@
-# This runs on:
-#   - every merge to development
-#   - run on every PR on GitHub that adds a tag
-#   synced every 5min:
-#   - sync schedule https://gitlab.spack.io/warpx/warpx/-/pipeline_schedules
-#   - sync logic https://gitlab.spack.io/warpx/warpx/-/blob/gh-gl-sync/.gitlab/ci.yaml?ref_type=heads
-#   status of recent runs:
-#     https://gitlab.spack.io/warpx/warpx/-/jobs?sources=PUSH&kind=BUILD
+# This pipeline runs:
+#   - on every merge to `development`
+#   - on every GitHub PR that adds the relevant CI tag
+# It is synced from GitHub to GitLab every 5 minutes:
+#   - schedule: https://gitlab.spack.io/warpx/warpx/-/pipeline_schedules
+#   - logic: https://gitlab.spack.io/warpx/warpx/-/blob/gh-gl-sync/.gitlab/ci.yaml
+# Status of recent runs:
+#   https://gitlab.spack.io/warpx/warpx/-/jobs?sources=PUSH&kind=BUILD
 #
-# Frank status:
-#   - HPSF CI working group Slack, contacts: Zack Galbreath (Kitware) and Luke Peyralans (U of Oregon)
+# Frank status and contacts:
+#   - CI/CD working group channel (#wg-cicd) in the HPSF Slack (hpsf.slack.com)
+#   - Contacts: Zack Galbreath (Kitware), Luke Peyralans (University of Oregon)
 #
-# Available runners:
-#   https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
+# Available runners: https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
 #
 .install-dependencies:
   before_script:
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
     - python3 -m venv venv
     - source venv/bin/activate
-#    - pip install openpmd-api openpmd_viewer numpy periodictable picmistandard yt
 
 Nvidia-H100-single-precision:
   extends: .install-dependencies
@@ -31,7 +30,7 @@ Nvidia-H100-single-precision:
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=ON                                \
-          -DAMReX_CUDA_ARCH=6.0                            \
+          -DAMReX_CUDA_ARCH=9.0                            \
           -DWarpX_OPENPMD=ON                               \
           -DWarpX_PRECISION=SINGLE                         \
           -DWarpX_FFT=ON                                   \
@@ -43,7 +42,7 @@ Nvidia-H100-single-precision:
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
 
-AMD-MI100:
+AMD-MI300:
   extends: .install-dependencies
   tags: [amd-mi300]
   image: rocm/dev-ubuntu-24.04:6.4.3-complete
@@ -93,7 +92,7 @@ Intel-PVC:
           -DWarpX_EB=ON                         \
           -DWarpX_FFT=ON                        \
           -DWarpX_PYTHON=ON                     \
-          -DWarpX_MPI=OFF                       \
+          -DWarpX_MPI=ON                        \
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=SINGLE
