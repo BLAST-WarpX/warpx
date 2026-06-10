@@ -1,0 +1,102 @@
+# This runs on:
+#   - every merge to development
+#   - run on every PR on GitHub that adds a tag
+#   synced every 5min:
+#   - sync schedule https://gitlab.spack.io/warpx/warpx/-/pipeline_schedules
+#   - sync logic https://gitlab.spack.io/warpx/warpx/-/blob/gh-gl-sync/.gitlab/ci.yaml?ref_type=heads
+#   status of recent runs:
+#     https://gitlab.spack.io/warpx/warpx/-/jobs?sources=PUSH&kind=BUILD
+#
+# Frank status:
+#   - HPSF CI working group Slack, contacts: Zack Galbreath (Kitware) and Luke Peyralans (U of Oregon)
+#
+# Available runners:
+#   https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
+#
+.install-dependencies:
+  before_script:
+    - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
+    - python3 -m venv venv
+    - source venv/bin/activate
+#    - pip install openpmd-api openpmd_viewer numpy periodictable picmistandard yt
+
+Nvidia-H100-single-precision:
+  extends: .install-dependencies
+  tags: [nvidia-h100]
+  image: nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu24.04
+  script:
+    - |
+      cmake -S . -B build                                  \
+          -DCMAKE_VERBOSE_MAKEFILE=ON                      \
+          -DWarpX_COMPUTE=CUDA                             \
+          -DWarpX_EB=ON                                    \
+          -DWarpX_PYTHON=ON                                \
+          -DAMReX_CUDA_ARCH=6.0                            \
+          -DWarpX_OPENPMD=ON                               \
+          -DWarpX_PRECISION=SINGLE                         \
+          -DWarpX_FFT=ON                                   \
+          -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
+          -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
+    - cmake --build build -j 16
+    - export OMPI_ALLOW_RUN_AS_ROOT=1
+    - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
+    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+
+AMD-MI100:
+  extends: .install-dependencies
+  tags: [amd-mi300]
+  image: rocm/dev-ubuntu-24.04:6.4.3-complete
+  script:
+    - export ROCM_PATH=/opt/rocm-6.4.3
+    - export PATH=$ROCM_PATH/bin:$ROCM_PATH/llvm/bin:$PATH
+    - export LD_LIBRARY_PATH=$ROCM_PATH/lib:$ROCM_PATH/lib64:$LD_LIBRARY_PATH
+    - export HIP_PATH=$ROCM_PATH
+    - export HIP_CLANG_PATH=$ROCM_PATH/llvm/bin
+    - export CMAKE_PREFIX_PATH=$ROCM_PATH:$CMAKE_PREFIX_PATH
+    - |
+      cmake -S . -B build                              \
+          -DCMAKE_C_COMPILER=$(which clang)            \
+          -DCMAKE_CXX_COMPILER=$(which clang++)        \
+          -DCMAKE_VERBOSE_MAKEFILE=ON                  \
+          -DAMReX_AMD_ARCH=gfx90a                      \
+          -DWarpX_COMPUTE=HIP                          \
+          -DWarpX_EB=ON                                \
+          -DWarpX_PYTHON=ON                            \
+          -DWarpX_MPI=ON                               \
+          -DWarpX_OPENPMD=ON                           \
+          -DWarpX_PRECISION=SINGLE                     \
+          -DWarpX_FFT=ON
+    - cmake --build build -j 16
+    - export OMPI_ALLOW_RUN_AS_ROOT=1
+    - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
+    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+
+Intel-PVC:
+  extends: .install-dependencies
+  tags: [intel-data-center-max-1100]
+  image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
+  script:
+    - sycl-ls
+    - export ONEAPI_DEVICE_SELECTOR=level_zero:gpu
+    - |
+      cmake -S . -B build                       \
+          -DBUILD_SHARED_LIBS=ON                \
+          -DCMAKE_VERBOSE_MAKEFILE=ON           \
+          -DCMAKE_C_COMPILER=$(which icx)       \
+          -DCMAKE_CXX_COMPILER=$(which icpx)    \
+          -DCMAKE_CXX_FLAGS="-fp-model=precise" \
+          -DWarpX_COMPUTE=SYCL                  \
+          -DAMReX_INTEL_ARCH=pvc                \
+          -DAMReX_PARALLEL_LINK_JOBS=4          \
+          -DWarpX_EB=ON                         \
+          -DWarpX_FFT=ON                        \
+          -DWarpX_PYTHON=ON                     \
+          -DWarpX_MPI=OFF                       \
+          -DWarpX_OPENPMD=ON                    \
+          -DWarpX_PRECISION=DOUBLE              \
+          -DWarpX_PARTICLE_PRECISION=SINGLE
+    - cmake --build build -j 16
+    - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
+    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
