@@ -58,7 +58,7 @@ AMD-MI300:
           -DCMAKE_C_COMPILER=$(which clang)            \
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
           -DCMAKE_VERBOSE_MAKEFILE=ON                  \
-          -DAMReX_AMD_ARCH=gfx90a                      \
+          -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
           -DWarpX_PYTHON=ON                            \
