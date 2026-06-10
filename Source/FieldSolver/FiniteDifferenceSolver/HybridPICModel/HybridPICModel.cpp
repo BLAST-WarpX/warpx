@@ -13,6 +13,7 @@
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include "EBJBoundary.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
@@ -114,6 +115,10 @@ void HybridPICModel::ReadParameters ()
                 "hybrid_pic_model.use_conformal_eb is not compatible with PML boundaries");
         }
     }
+
+    // controls for the embedded-boundary PEC field boundary condition
+    utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
+    utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -358,6 +363,17 @@ void HybridPICModel::CalculatePlasmaCurrent (
             current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
         }
     }
+
+    // Enforce the PEC current boundary condition at the embedded boundary:
+    // tangential J vanishes at the surface, normal J has zero normal gradient
+    // and the deep conductor interior carries no volume current
+    if (EB::enabled()) {
+        warpx::hybrid::ApplyPECBoundaryToEdgeField(
+            current_fp_plasma, eb_update_E,
+            *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+            warpx.Geom(lev),
+            m_eb_bc_rtol, m_eb_bc_max_iters);
+    }
 }
 
 void HybridPICModel::HybridPICSolveE (
@@ -422,6 +438,19 @@ void HybridPICModel::HybridPICSolveE (
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
+
+    // Unlike the EM solvers, where E is integrated from the conformally
+    // updated B and is therefore self-consistent at embedded boundaries, the
+    // Ohm's-law E is algebraic, so the PEC condition must be enforced on the
+    // masked edges directly (tangential E vanishes at the surface, normal E
+    // has zero normal gradient, zero deep inside the conductor)
+    if (EB::enabled()) {
+        warpx::hybrid::ApplyPECBoundaryToEdgeField(
+            Efield, eb_update_E,
+            *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+            warpx.Geom(lev),
+            m_eb_bc_rtol, m_eb_bc_max_iters);
+    }
 }
 
 void HybridPICModel::CalculateElectronPressure() const

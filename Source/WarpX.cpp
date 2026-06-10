@@ -2605,19 +2605,22 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
 
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
+                // Initialized to 1 ("update") so that ghost entries outside the
+                // domain that are not touched by the marking routines or by
+                // FillBoundary hold a well-defined value
                 AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]", 1);
                 AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]", 1);
                 AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]", 1);
 
                 AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]", 1);
                 AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]", 1);
                 AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]");
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]", 1);
             }
             if (WarpX::UseConformalEBSolve()) {
 

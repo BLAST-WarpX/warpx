@@ -40,8 +40,17 @@ MAX_STEPS = 200
 DIFFUSIVITY = ETA / constants.mu0  # magnetic diffusivity (m^2/s)
 DECAY_RATE = DIFFUSIVITY * (np.pi / CAVITY_SIDE) ** 2  # analytic decay rate (1/s)
 
+# Parameters for the --pec-j variant, which checks the PEC current boundary
+# condition at the embedded boundary: a uniform external current (inert for
+# the By diffusion away from the wall) plus a thermal proton fill that presses
+# against the conducting wall and spills deposited current onto interior edges
+J_EXT = 0.1 * B1 * np.pi / (CAVITY_SIDE * constants.mu0)  # A/m^2
+T_ION = 10.0  # eV
+N_PLASMA = 1.0e18  # m^-3
+PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 
-def setup_simulation(resolution, substeps, use_conformal_eb, verbose):
+
+def setup_simulation(resolution, substeps, use_conformal_eb, pec_j, verbose):
     """Create the PICMI simulation object.
 
     Parameters
@@ -53,6 +62,10 @@ def setup_simulation(resolution, substeps, use_conformal_eb, verbose):
     use_conformal_eb: bool
         Use the conformal (enlarged cell technique) embedded-boundary update
         instead of the default stair-step approximation.
+    pec_j: bool
+        Add a uniform external current and a thermal proton fill, and output
+        the current densities, to test the embedded-boundary PEC current
+        boundary condition.
     verbose: int
         WarpX verbosity.
     """
@@ -61,26 +74,46 @@ def setup_simulation(resolution, substeps, use_conformal_eb, verbose):
     # the measured convergence is purely spatial
     t_end = 0.5 / DECAY_RATE
     dt = t_end / MAX_STEPS
+    max_steps = PEC_J_STEPS if pec_j else MAX_STEPS
+
+    if pec_j:
+        # Full-depth y (thin y boxes trip an OpenMP deposition issue with
+        # particles) and a z split for parallel runs; this variant uses the
+        # stair-step masks, so no conformal face borrowing occurs
+        n_cell = [resolution, resolution, resolution]
+        y_extent = 0.8
+        decomposition = dict(
+            warpx_max_grid_size=2048,
+            warpx_max_grid_size_z=max(resolution // 2, 8),
+            warpx_blocking_factor=8,
+        )
+    else:
+        # Thin periodic y; split MPI domains only along y so that the
+        # conformal face borrowing, which acts within x-z planes, never
+        # crosses a box boundary
+        n_cell = [resolution, 8, resolution]
+        y_extent = 0.2
+        decomposition = dict(
+            warpx_max_grid_size=2048,
+            warpx_max_grid_size_y=4,
+            warpx_blocking_factor=8,
+            warpx_blocking_factor_y=4,
+        )
 
     grid = picmi.Cartesian3DGrid(
-        number_of_cells=[resolution, 8, resolution],
-        lower_bound=[-0.8, -0.2, -0.8],
-        upper_bound=[0.8, 0.2, 0.8],
+        number_of_cells=n_cell,
+        lower_bound=[-0.8, -y_extent, -0.8],
+        upper_bound=[0.8, y_extent, 0.8],
         lower_boundary_conditions=["dirichlet", "periodic", "dirichlet"],
         upper_boundary_conditions=["dirichlet", "periodic", "dirichlet"],
         lower_boundary_conditions_particles=["absorbing", "periodic", "absorbing"],
         upper_boundary_conditions_particles=["absorbing", "periodic", "absorbing"],
-        # Split MPI domains only along y so that the conformal face borrowing,
-        # which acts within x-z planes, never crosses a box boundary
-        warpx_max_grid_size=2048,
-        warpx_max_grid_size_y=4,
-        warpx_blocking_factor=8,
-        warpx_blocking_factor_y=4,
+        **decomposition,
     )
 
     sim = picmi.Simulation(
         time_step_size=dt,
-        max_steps=MAX_STEPS,
+        max_steps=max_steps,
         particle_shape=1,
         verbose=verbose,
     )
@@ -95,6 +128,7 @@ def setup_simulation(resolution, substeps, use_conformal_eb, verbose):
         substeps=substeps,
         holmstrom_vacuum_region=True,
         use_conformal_eb=True if use_conformal_eb else None,
+        Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
 
     sim.embedded_boundary = picmi.EmbeddedBoundary(
@@ -109,23 +143,57 @@ def setup_simulation(resolution, substeps, use_conformal_eb, verbose):
 
     # Initial B field: the (0,1) Neumann eigenmode of the cavity. By depends
     # only on the in-plane coordinates so it is exactly divergence free and
-    # the projection-based divergence cleaner can be skipped
-    B_init = picmi.AnalyticInitialField(
-        Bx_expression="0",
-        By_expression="B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))",
-        Bz_expression="0",
-        B1=B1,
-        a=CAVITY_SIDE,
-        theta=THETA,
-        warpx_do_initial_div_cleaning=False,
-    )
-    sim.add_applied_field(B_init)
+    # the projection-based divergence cleaner can be skipped. The --pec-j
+    # variant starts from B=0 instead: parser-based B initialization combined
+    # with particles and the hybrid solver triggers a pre-existing OpenMP
+    # deposition crash, and the boundary-condition check is driven entirely
+    # by the external current and the deposited ion current
+    if not pec_j:
+        B_init = picmi.AnalyticInitialField(
+            Bx_expression="0",
+            By_expression="B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))",
+            Bz_expression="0",
+            B1=B1,
+            a=CAVITY_SIDE,
+            theta=THETA,
+            warpx_do_initial_div_cleaning=False,
+        )
+        sim.add_applied_field(B_init)
+
+    if pec_j:
+        # Thermal protons filling the cavity (zero density inside the wall);
+        # particles stream against the conducting wall and their deposition
+        # would spill current onto interior edges without the PEC J boundary
+        # condition
+        vth = np.sqrt(T_ION * constants.q_e / constants.m_p)
+        ions = picmi.Species(
+            name="ions",
+            particle_type="proton",
+            initial_distribution=picmi.AnalyticDistribution(
+                density_expression=(
+                    "n_p*(abs(x*cos(-theta)+z*sin(-theta))<hw)"
+                    "*(abs(-x*sin(-theta)+z*cos(-theta))<hw)"
+                ),
+                momentum_expressions=["0", "0", "0"],
+                warpx_momentum_spread_expressions=[f"{vth}"] * 3,
+                warpx_density_min=0.5 * N_PLASMA,
+                n_p=N_PLASMA,
+                theta=THETA,
+                hw=HALF_WIDTH,
+            ),
+        )
+        sim.add_species(
+            ions,
+            layout=picmi.PseudoRandomLayout(grid=grid, n_macroparticles_per_cell=4),
+        )
 
     field_diag = picmi.FieldDiagnostic(
         name="diag1",
         grid=grid,
-        period=MAX_STEPS,
-        data_list=["B"],
+        period=max_steps,
+        data_list=["B", "E", "J", "J_displacement"]
+        if pec_j
+        else ["B", "J", "J_displacement"],
         write_dir="diags",
         warpx_format="plotfile",
     )
@@ -160,6 +228,11 @@ def main():
         default=4,
     )
     parser.add_argument(
+        "--pec-j",
+        help="test the embedded-boundary PEC current boundary condition",
+        action="store_true",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -169,7 +242,9 @@ def main():
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    sim = setup_simulation(args.resolution, args.substeps, args.conformal, args.verbose)
+    sim = setup_simulation(
+        args.resolution, args.substeps, args.conformal, args.pec_j, args.verbose
+    )
     sim.step()
 
 

@@ -251,6 +251,13 @@ public:
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
 
+    /** Relative residual tolerance of the embedded-boundary PEC field
+     *  boundary-condition band relaxation (applied to J and E) */
+    amrex::Real m_eb_bc_rtol = 1.e-4;
+    /** Maximum number of Jacobi sweeps for the embedded-boundary PEC field
+     *  boundary-condition band relaxation (applied to J and E) */
+    int m_eb_bc_max_iters = 10;
+
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;
     /** Gpu Vector with index type of the Jy multifab */

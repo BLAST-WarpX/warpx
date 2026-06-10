@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from analysis import CAVITY_SIDE, DECAY_RATE, compute_error  # noqa: E402
+from analysis import CAVITY_SIDE, DECAY_RATE, compute_errors  # noqa: E402
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUTS = os.path.join(THIS_DIR, "inputs_test_3d_ohm_solver_eb_diffusion_picmi.py")
@@ -72,7 +72,7 @@ def run_case(resolution, conformal, nprocs, outdir):
     plotfile = sorted(glob.glob(os.path.join(rundir, "diags", "diag1" + "[0-9]" * 6)))[
         -1
     ]
-    return compute_error(plotfile)
+    return compute_errors(plotfile)
 
 
 def main():
@@ -94,15 +94,18 @@ def main():
     results = {}
     for mode, conformal in (("stair-step", False), ("conformal (ECT)", True)):
         errs = []
+        errs_j = []
         hs = []
         for n in args.resolutions:
-            err, h = run_case(n, conformal, args.np, args.outdir)
-            print(f"{mode} N={n}: err = {err:.4e}")
-            errs.append(err)
+            err_b, err_j, h = run_case(n, conformal, args.np, args.outdir)
+            print(f"{mode} N={n}: B err = {err_b:.4e}, J err = {err_j:.4e}")
+            errs.append(err_b)
+            errs_j.append(err_j)
             hs.append(h)
         order = np.polyfit(np.log(hs), np.log(errs), 1)[0]
+        order_j = np.polyfit(np.log(hs), np.log(errs_j), 1)[0]
         results[mode] = (np.array(hs), np.array(errs), order)
-        print(f"{mode}: fitted order = {order:.2f}")
+        print(f"{mode}: fitted order B = {order:.2f}, J (=E/eta) = {order_j:.2f}")
 
     fig, ax = plt.subplots(figsize=(5, 4))
     markers = {"stair-step": "x", "conformal (ECT)": "o"}

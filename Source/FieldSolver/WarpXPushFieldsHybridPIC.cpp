@@ -7,7 +7,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/EBJBoundary.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -307,6 +309,21 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 Geom(lev).periodicity(),
                 true
             );
+        }
+    }
+
+    // Enforce the PEC current boundary condition on the deposited ion current
+    // at the embedded boundary (deposition shape functions and filtering can
+    // otherwise spill current onto edges inside the conductor)
+    if (EB::enabled()) {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            warpx::hybrid::ApplyPECBoundaryToEdgeField(
+                m_fields.get_alldirs(FieldType::current_fp, lev),
+                m_eb_update_E[lev],
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                m_hybrid_pic_model->m_eb_bc_rtol,
+                m_hybrid_pic_model->m_eb_bc_max_iters);
         }
     }
 }
