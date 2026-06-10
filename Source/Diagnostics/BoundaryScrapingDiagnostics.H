@@ -8,7 +8,9 @@
 #define WARPX_BOUNDARYSCRAPINGDIAGNOSTICS_H_
 
 #include "Diagnostics.H"
-#include "Utils/Parser/IntervalsParser.H"
+#include "Particles/MultiParticleContainer.H"
+
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <string>
 
@@ -22,6 +24,7 @@ public:
      *
      * @param i index of diagnostics in MultiDiagnostics::alldiags
      * @param name diagnostics name in the inputs file
+     * @param diag_type diagnostics type (e.g., full, back-transformed, time-averaged, etc.)
      */
     BoundaryScrapingDiagnostics (int i, const std::string& name, DiagTypes diag_type);
 
@@ -30,7 +33,7 @@ private:
     void ReadParameters ();
 
     /** Determines timesteps at which the particles are written out */
-    utils::parser::IntervalsParser m_intervals;
+    ablastr::utils::text::IntervalsParser m_intervals;
 
     /** \brief Flush data to file. */
     void Flush (int i_buffer, bool /* force_flush */) override;
@@ -57,10 +60,12 @@ private:
      * This is not used for BoundaryScrapingDiagnostics: no field to output
      */
     void InitializeFieldFunctors (int lev) override;
+
     /** Initialize the diagnostics by pointing to the `ParticleBoundaryBuffer`
      * that correspond to the species requested by the user.
+     * \param[in] mpc a constant reference to the multi-particle container.
      */
-    void InitializeParticleBuffer () override;
+    void InitializeParticleBuffer (const MultiParticleContainer& mpc) override;
 
 };
 #endif // WARPX_BOUNDARYSCRAPINGDIAGNOSTICS_H_

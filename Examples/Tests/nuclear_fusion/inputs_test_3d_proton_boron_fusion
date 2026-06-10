@@ -32,9 +32,8 @@ algo.particle_shape = 1
 particles.species_names = proton1 boron1 alpha1 proton2 boron2 alpha2 proton3 boron3 alpha3 \
                           proton4 boron4 alpha4 proton5 boron5 alpha5
 
-my_constants.m_b11 = 11.00930536*m_u # Boron 11 mass
-my_constants.m_h = 1.00782503223*m_u # Hydrogen 1 mass
-my_constants.m_reduced = m_h*m_b11/(m_h+m_b11)
+my_constants.m_b11 = 11.00930536*m_u - 5*m_e # Boron 11 mass
+my_constants.m_reduced = m_p*m_b11/(m_p+m_b11)
 my_constants.keV_to_J = 1.e3*q_e
 my_constants.Energy_step = 22. * keV_to_J
 
@@ -47,7 +46,7 @@ proton1.momentum_distribution_type = "parse_momentum_function"
 proton1.momentum_function_ux(x,y,z) = 0.
 proton1.momentum_function_uy(x,y,z) = 0.
 ## Thanks to the floor, all particles in the same cell have the exact same momentum
-proton1.momentum_function_uz(x,y,z) = sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_h*clight)
+proton1.momentum_function_uz(x,y,z) = sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_p*clight)
 proton1.do_not_push = 1
 proton1.do_not_deposit = 1
 
@@ -82,7 +81,7 @@ proton2.momentum_distribution_type = "parse_momentum_function"
 proton2.momentum_function_ux(x,y,z) = 0.
 proton2.momentum_function_uy(x,y,z) = 0.
 proton2.momentum_function_uz(x,y,z) = "if(y - floor(y) < 0.1,
-                                          0., sqrt(2*m_h*Energy_step*(floor(z)**2))/(m_h*clight))"
+                                          0., sqrt(2*m_p*Energy_step*(floor(z)**2))/(m_p*clight))"
 proton2.do_not_push = 1
 proton2.do_not_deposit = 1
 
@@ -106,8 +105,11 @@ proton3.injection_style = "NRandomPerCell"
 proton3.num_particles_per_cell = 600
 proton3.profile = constant
 proton3.density = 1.e28
-proton3.momentum_distribution_type = "maxwell_boltzmann"
-proton3.theta = temperature/(m_h*clight**2)
+proton3.momentum_distribution_type = "maxwellian"
+proton3.maxwellian_u_std_distribution_type = "constant"
+proton3.ux_std = sqrt(temperature/(m_p*clight**2))
+proton3.uy_std = sqrt(temperature/(m_p*clight**2))
+proton3.uz_std = sqrt(temperature/(m_p*clight**2))
 proton3.do_not_push = 1
 proton3.do_not_deposit = 1
 
@@ -116,8 +118,11 @@ boron3.injection_style = "NRandomPerCell"
 boron3.num_particles_per_cell = 1000
 boron3.profile = constant
 boron3.density = 5.e28
-boron3.momentum_distribution_type = "maxwell_boltzmann"
-boron3.theta = temperature/(m_b11*clight**2)
+boron3.momentum_distribution_type = "maxwellian"
+boron3.maxwellian_u_std_distribution_type = "constant"
+boron3.ux_std = sqrt(temperature/(m_b11*clight**2))
+boron3.uy_std = sqrt(temperature/(m_b11*clight**2))
+boron3.uz_std = sqrt(temperature/(m_b11*clight**2))
 boron3.do_not_push = 1
 boron3.do_not_deposit = 1
 
@@ -133,7 +138,7 @@ proton4.num_particles_per_cell = 100
 proton4.profile = "constant"
 proton4.density = 1.e35
 proton4.momentum_distribution_type = "constant"
-proton4.uz = sqrt(2*m_h*proton4_energy)/(m_h*clight)
+proton4.uz = sqrt(2*m_p*proton4_energy)/(m_p*clight)
 proton4.do_not_push = 1
 proton4.do_not_deposit = 1
 
@@ -156,7 +161,7 @@ proton5.num_particles_per_cell = 100
 proton5.profile = "constant"
 proton5.density = 1.e35
 proton5.momentum_distribution_type = "constant"
-proton5.uz = sqrt(2*m_h*proton4_energy)/(m_h*clight)
+proton5.uz = sqrt(2*m_p*proton4_energy)/(m_p*clight)
 proton5.do_not_push = 1
 proton5.do_not_deposit = 1
 
@@ -180,29 +185,29 @@ collisions.collision_names = PBF1 PBF2 PBF3 PBF4 PBF5
 PBF1.species = proton1 boron1
 PBF1.product_species = alpha1
 PBF1.type = nuclearfusion
-PBF1.fusion_multiplier = 1.e50
+PBF1.event_multiplier = 1.e50
 
 PBF2.species = proton2 boron2
 PBF2.product_species = alpha2
 PBF2.type = nuclearfusion
-PBF2.fusion_multiplier = 1.e15
-PBF2.fusion_probability_target_value = 0.02
+PBF2.event_multiplier = 1.e15
+PBF2.probability_target_value = 0.02
 
 PBF3.species = proton3 boron3
 PBF3.product_species = alpha3
 PBF3.type = nuclearfusion
-PBF3.fusion_multiplier = 1.e15
+PBF3.event_multiplier = 1.e15
 
 PBF4.species = proton4 boron4
 PBF4.product_species = alpha4
 PBF4.type = nuclearfusion
-PBF4.fusion_multiplier = 1.e21
+PBF4.event_multiplier = 1.e21
 
 PBF5.species = proton5 boron5
 PBF5.product_species = alpha5
 PBF5.type = nuclearfusion
-PBF5.fusion_multiplier = 1.e21
-PBF5.fusion_probability_threshold = 1e123
+PBF5.event_multiplier = 1.e21
+PBF5.probability_threshold = 1e123
 
 # Diagnostics
 diagnostics.diags_names = diag1

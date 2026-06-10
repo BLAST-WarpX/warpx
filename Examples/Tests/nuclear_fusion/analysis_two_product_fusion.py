@@ -65,24 +65,24 @@ if re.search("tritium", warpx_used_inputs):
     reactant_species = ["deuterium", "tritium"]
     product_species = ["helium4", "neutron"]
     ntests = 2
-    E_fusion = 17.5893 * MeV_to_Joule  # Energy released during the fusion reaction
+    E_fusion = 17.58929696 * MeV_to_Joule
 else:
     # else, this is the D+D test
     reaction_type = "DD"
     reactant_species = ["deuterium", "hydrogen2"]
     product_species = ["helium3", "neutron"]
     ntests = 1
-    E_fusion = 3.268911e6 * MeV_to_Joule
+    E_fusion = 3.26891111e6 * MeV_to_Joule
 
 mass = {
-    "deuterium": 2.01410177812 * scc.m_u,
-    "hydrogen2": 2.01410177812 * scc.m_u,
-    "tritium": 3.0160492779 * scc.m_u,
-    "helium3": 3.016029 * scc.m_u,
-    "helium4": 4.00260325413 * scc.m_u,
+    "deuterium": 2.01410177812 * scc.m_u - scc.m_e,
+    "hydrogen2": 2.01410177812 * scc.m_u - scc.m_e,
+    "tritium": 3.0160492779 * scc.m_u - scc.m_e,
+    "helium3": 3.016029 * scc.m_u - 2 * scc.m_e,
+    "helium4": 4.00260325413 * scc.m_u - 2 * scc.m_e,
     "neutron": 1.0013784193052508 * scc.m_p,
 }
-m_reduced = np.product([mass[s] for s in reactant_species]) / np.sum(
+m_reduced = np.prod([mass[s] for s in reactant_species]) / np.sum(
     [mass[s] for s in reactant_species]
 )
 

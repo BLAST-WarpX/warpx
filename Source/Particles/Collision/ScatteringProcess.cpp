@@ -9,7 +9,6 @@
 #include "ScatteringProcess.H"
 
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
@@ -83,6 +82,8 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::BACK;
     } else if (scattering_process == "charge_exchange") {
         return ScatteringProcessType::CHARGE_EXCHANGE;
+    } else if (scattering_process == "two_product_reaction") {
+        return ScatteringProcessType::TWOPRODUCT_REACTION;
     } else if (scattering_process == "ionization") {
         return ScatteringProcessType::IONIZATION;
     } else if (scattering_process.find("excitation") != std::string::npos) {

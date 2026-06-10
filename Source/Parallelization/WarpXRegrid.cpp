@@ -20,9 +20,9 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_BLassert.H>
@@ -73,8 +73,8 @@ WarpX::CheckLoadBalance (int step)
 void
 WarpX::LoadBalance ()
 {
-    WARPX_PROFILE_REGION("LoadBalance");
-    WARPX_PROFILE("WarpX::LoadBalance()");
+    ABLASTR_PROFILE_REGION("LoadBalance");
+    ABLASTR_PROFILE("WarpX::LoadBalance()");
 
     AMREX_ALWAYS_ASSERT(!costs.empty());
     AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
@@ -126,6 +126,10 @@ WarpX::LoadBalance ()
 
         ParallelDescriptor::Bcast(&doLoadBalance, 1,
                                   ParallelDescriptor::IOProcessorNumber());
+
+        amrex::Print() << Utils::TextMsg::Info("current LB efficiency = " + std::to_string(currentEfficiency)
+                          + " proposed LB efficiency = " + std::to_string(proposedEfficiency)
+                          + " LoadBalance is set to : " + std::to_string(doLoadBalance) );
 
         if (doLoadBalance)
         {
@@ -179,7 +183,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         const IntVect& ng = mf->nGrowVect();
         auto pmf = std::remove_reference_t<decltype(mf)>{};
         AllocInitMultiFab(pmf, mf->boxArray(), dm, mf->nComp(), ng, lev, mf->tags()[0]);
-        mf = std::move(pmf);
+        *mf = std::move(*pmf);
     };
 
     bool const eb_enabled = EB::enabled();
@@ -289,12 +293,6 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 #endif
         }
 
-        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
-            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
-                BuildBufferMasks();
-            }
-        }
-
         // Re-initialize the lattice element finder with the new ba and dm.
         m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
@@ -310,6 +308,18 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         SetDistributionMap(lev, dm);
+
+        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
+            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
+                if (current_buffer_masks[lev]) {
+                    RemakeMultiFab( current_buffer_masks[lev] );
+                }
+                if (gather_buffer_masks[lev]) {
+                    RemakeMultiFab( gather_buffer_masks[lev] );
+                }
+                BuildBufferMasks();
+            }
+        }
 
     } else
     {

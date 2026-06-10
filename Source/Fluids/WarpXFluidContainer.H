@@ -7,12 +7,13 @@
 #ifndef WARPX_WarpXFluidContainer_H_
 #define WARPX_WarpXFluidContainer_H_
 
-#include "Evolve/WarpXDtType.H"
 #include "Initialization/PlasmaInjector.H"
 #include "MultiFluidContainer.H"
 
-#include<AMReX_MultiFab.H>
-#include<AMReX_Vector.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_Vector.H>
+#include <AMReX_REAL.H>
 
 #include <string>
 
@@ -40,7 +41,9 @@ public:
 
     void AllocateLevelMFs (ablastr::fields::MultiFabRegister& m_fields, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm, int lev) const;
 
-    void InitData (ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev);
+    void InitData (
+        ablastr::fields::MultiFabRegister& m_fields, amrex::Box init_box, amrex::Real cur_time, int lev,
+        const amrex::Geometry& geom_lev, amrex::Real gamma_boost, amrex::Real beta_boost);
 
     void ReadParameters ();
 
@@ -59,6 +62,7 @@ public:
      *
      * \brief Advective term, cold-rel. fluids
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void AdvectivePush_Muscl (ablastr::fields::MultiFabRegister& m_fields, int lev);
@@ -70,17 +74,19 @@ public:
      *
      * \brief Apply non-periodic BC to fluids and communicate boundaries
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegister& m_fields, int lev);
 
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     /**
      * centrifugal_source_rz adds contributions due to curvature acceleration for a
      * single timestep using an SSP-RK3 timestep for RZ specifically
      *
      * \brief Centrifugal source term
      *
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in] lev refinement level
      */
     void centrifugal_source_rz (ablastr::fields::MultiFabRegister& m_fields, int lev);
@@ -92,7 +98,7 @@ public:
      *
      * \brief Lorentz Momentum Source
      *
-     * \param[in] lev refinement level
+     * \param[in,out] m_fields MultiFab register of fields
      * \param[in] Ex Yee electric field (x)
      * \param[in] Ey Yee electric field (y)
      * \param[in] Ez Yee electric field (z)
@@ -100,6 +106,7 @@ public:
      * \param[in] By Yee magnetic field (y)
      * \param[in] Bz Yee magnetic field (z)
      * \param[in] t Current time
+     * \param[in] lev refinement level
      */
     void GatherAndPush (ablastr::fields::MultiFabRegister& m_fields,
         const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
@@ -112,10 +119,11 @@ public:
      *
      * \brief Deposit fluid current density.
      *
-     * \param[in] lev refinement level
+     * \param[in,out] m_fields MultiFab register of fields
      * \param[in,out] jx current density MultiFab x comp.
      * \param[in,out] jy current density MultiFab y comp.
      * \param[in,out] jz current density MultiFab z comp.
+     * \param[in] lev refinement level
      */
     void DepositCurrent (ablastr::fields::MultiFabRegister& m_fields,
         amrex::MultiFab& jx, amrex::MultiFab& jy, amrex::MultiFab& jz, int lev);
@@ -126,8 +134,10 @@ public:
      *
      * \brief Deposit fluid charge density.
      *
-     * \param[in] lev refinement level
+     * \param m_fields reference to MultiFab register storing all fields
      * \param[in,out] rho charge density MultiFab.
+     * \param[in] lev refinement level
+     * \param[in] icomp Fourth component index of the rho MultiFab to deposit in
      */
     void DepositCharge (ablastr::fields::MultiFabRegister& m_fields, amrex::MultiFab &rho, int lev, int icomp = 0);
 
@@ -174,9 +184,6 @@ protected:
     std::unique_ptr<amrex::Parser> ux_parser;
     std::unique_ptr<amrex::Parser> uy_parser;
     std::unique_ptr<amrex::Parser> uz_parser;
-    std::unique_ptr<amrex::Parser> ux_th_parser;
-    std::unique_ptr<amrex::Parser> uy_th_parser;
-    std::unique_ptr<amrex::Parser> uz_th_parser;
 
     // Keep a pointer to TemperatureProperties to ensure the lifetime of the
     // contained Parser

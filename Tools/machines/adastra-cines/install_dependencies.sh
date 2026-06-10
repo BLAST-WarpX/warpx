@@ -20,7 +20,8 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 
 # Remove old dependencies #####################################################
 #
-SW_DIR="${SHAREDHOMEDIR}/sw/adastra/gpu"
+SW_DIR="${WORKDIR}/sw/adastra/gpu"
+SRC_DIR="${WORKDIR}/src"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
@@ -33,63 +34,77 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 # General extra dependencies ##################################################
 #
 
+# define how many threads are used for compilation
+PARALLEL=16
+
 # BLAS++ (for PSATD+RZ)
-if [ -d $SHAREDHOMEDIR/src/blaspp ]
+if [ -d ${SRC_DIR}/blaspp ]
 then
-  cd $SHAREDHOMEDIR/src/blaspp
+  cd ${SRC_DIR}/blaspp
   git fetch --prune
   git checkout v2024.05.31
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $SHAREDHOMEDIR/src/blaspp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git ${SRC_DIR}/blaspp
 fi
-rm -rf $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build
-CXX=$(which CC) cmake -S $SHAREDHOMEDIR/src/blaspp -B $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
-cmake --build $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build --target install --parallel 16
-rm -rf $SHAREDHOMEDIR/src/blaspp-adastra-gpu-build
+rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
+cmake -S ${SRC_DIR}/blaspp -B ${SRC_DIR}/blaspp-adastra-gpu-build -Duse_openmp=OFF -Dgpu_backend=hip -DGPU_TARGETS=gfx90a  -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+cmake --build ${SRC_DIR}/blaspp-adastra-gpu-build --target install --parallel ${PARALLEL}
+rm -rf ${SRC_DIR}/blaspp-adastra-gpu-build
 
 # LAPACK++ (for PSATD+RZ)
-if [ -d $SHAREDHOMEDIR/src/lapackpp ]
+if [ -d ${SRC_DIR}/lapackpp ]
 then
-  cd $SHAREDHOMEDIR/src/lapackpp
+  cd ${SRC_DIR}/lapackpp
   git fetch --prune
   git checkout v2024.05.31
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $SHAREDHOMEDIR/src/lapackpp
+  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git ${SRC_DIR}/lapackpp
 fi
-rm -rf $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $SHAREDHOMEDIR/src/lapackpp -B $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
-cmake --build $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build --target install --parallel 16
-rm -rf $SHAREDHOMEDIR/src/lapackpp-adastra-gpu-build
+rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
+cmake -S ${SRC_DIR}/lapackpp -B ${SRC_DIR}/lapackpp-adastra-gpu-build -DGPU_TARGETS=gfx90a  -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+cmake --build ${SRC_DIR}/lapackpp-adastra-gpu-build --target install --parallel ${PARALLEL}
+rm -rf ${SRC_DIR}/lapackpp-adastra-gpu-build
 
-# c-blosc (I/O compression, for OpenPMD)
-if [ -d $SHAREDHOMEDIR/src/c-blosc ]
+# Boost (QED tables)
+rm -rf ${SRC_DIR}/boost-temp
+mkdir -p ${SRC_DIR}/boost-temp
+curl -Lo ${SRC_DIR}/boost-temp/boost.tar.gz https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.gz
+tar -xzf ${SRC_DIR}/boost-temp/boost.tar.gz -C ${SRC_DIR}/boost-temp
+cd ${SRC_DIR}/boost-temp/boost_1_88_0
+./bootstrap.sh -with-libraries=math  --prefix=${SW_DIR}/boost-1.88.0
+./b2 --with-math cxxflags="-std=c++17" install -j ${PARALLEL}
+cd -
+rm -rf ${SRC_DIR}/boost-temp
+
+# c-blosc2 (I/O compression, for OpenPMD)
+if [ -d ${SRC_DIR}/c-blosc2 ]
 then
   # git repository is already there
   :
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $SHAREDHOMEDIR/src/c-blosc
+  git clone -b v2.23.0 https://github.com/Blosc/c-blosc2.git ${SRC_DIR}/c-blosc2
 fi
-rm -rf $SHAREDHOMEDIR/src/c-blosc-ad-build
-cmake -S $SHAREDHOMEDIR/src/c-blosc -B $SHAREDHOMEDIR/src/c-blosc-ad-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build $SHAREDHOMEDIR/src/c-blosc-ad-build --target install --parallel 16
-rm -rf $SHAREDHOMEDIR/src/c-blosc-ad-build
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
+cmake -S ${SRC_DIR}/c-blosc2 -B ${SRC_DIR}/c-blosc2-ad-build -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF  -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-2.23.0
+cmake --build ${SRC_DIR}/c-blosc2-ad-build --target install --parallel ${PARALLEL}
+rm -rf ${SRC_DIR}/c-blosc2-ad-build
 
 # ADIOS2 v. 2.10.2 (for OpenPMD)
-if [ -d $SHAREDHOMEDIR/src/adios2 ]
+if [ -d ${SRC_DIR}/adios2 ]
 then
-  cd $SHAREDHOMEDIR/src/adios2
+  cd ${SRC_DIR}/adios2
   git fetch --prune
   git checkout v2.10.2
   cd -
 else
-  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $SHAREDHOMEDIR/src/adios2
+  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${SRC_DIR}/adios2
 fi
-rm -rf $SHAREDHOMEDIR/src/adios2-ad-build
-cmake -S $SHAREDHOMEDIR/src/adios2 -B $SHAREDHOMEDIR/src/adios2-ad-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
-cmake --build $SHAREDHOMEDIR/src/adios2-ad-build --target install -j 16
-rm -rf $SHAREDHOMEDIR/src/adios2-ad-build
+rm -rf ${SRC_DIR}/adios2-ad-build
+cmake -S ${SRC_DIR}/adios2 -B ${SRC_DIR}/adios2-ad-build -DADIOS2_USE_Blosc2=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
+cmake --build ${SRC_DIR}/adios2-ad-build --target install -j ${PARALLEL}
+rm -rf ${SRC_DIR}/adios2-ad-build
 
 
 # Python ######################################################################
@@ -109,14 +124,16 @@ python3 -m pip install --upgrade cython
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade pandas
 python3 -m pip install --upgrade scipy
+python3 -m pip install --upgrade jupyter
 MPICC="cc -shared" python3 -m pip install --upgrade mpi4py --no-cache-dir --no-build-isolation --no-binary mpi4py
 python3 -m pip install --upgrade openpmd-api
 python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
+python3 -m pip install --upgrade openpmd-viewer
+python3 -m pip install --upgrade adios2
 # install or update WarpX dependencies such as picmistandard
-python3 -m pip install --upgrade -r $SHAREDHOMEDIR/src/warpx/requirements.txt
-# optional: for libEnsemble
-python3 -m pip install -r $SHAREDHOMEDIR/src/warpx/Tools/LibEnsemble/requirements.txt
+python3 -m pip install --upgrade -r ${SRC_DIR}/warpx/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-#python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/rocm5.4.2
-#python3 -m pip install -r $SHAREDHOMEDIR/src/warpx/Tools/optimas/requirements.txt
+python3 -m pip install 'optimas[all]'
+# optional: for lasy
+python3 -m pip install --upgrade lasy

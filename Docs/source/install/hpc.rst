@@ -1,7 +1,7 @@
 .. _install-hpc:
 
-HPC
-===
+HPC Systems
+===========
 
 On selected high-performance computing (HPC) systems, WarpX has documented or even pre-build installation routines.
 Follow the guide here instead of the generic installation routines for optimal stability and best performance.
@@ -33,6 +33,7 @@ This section documents quick-start guides for a selection of supercomputers that
    :maxdepth: 1
 
    hpc/adastra
+   hpc/aurora
    hpc/crusher
    hpc/frontier
    hpc/fugaku
@@ -40,7 +41,6 @@ This section documents quick-start guides for a selection of supercomputers that
    hpc/hpc3
    hpc/juwels
    hpc/karolina
-   hpc/lassen
    hpc/lawrencium
    hpc/leonardo
    hpc/lonestar6
@@ -51,9 +51,8 @@ This section documents quick-start guides for a selection of supercomputers that
    hpc/pitzer
    hpc/polaris
    hpc/dane
-   hpc/summit
    hpc/taurus
-   hpc/tioga
+   hpc/tuolumne
 
 .. tip::
 
@@ -79,6 +78,14 @@ Slurm is a modern and very popular batch system.
 Slurm is used at NERSC, OLCF Frontier, among others.
 
 .. include:: batch/slurm.rst
+
+Flux
+""""
+
+Flux is a modern batch system and resource manager framework.
+Flux is used at LLNL LC, among others.
+
+.. include:: batch/flux.rst
 
 
 LSF

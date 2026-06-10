@@ -63,7 +63,7 @@ public:
     ThetaImplicitEM(ThetaImplicitEM&&) = delete;
     ThetaImplicitEM& operator=(ThetaImplicitEM&&) = delete;
 
-    void Define ( WarpX*  a_WarpX ) override;
+    void Define (WarpX*  a_WarpX, bool  from_restart) override;
 
     void PrintParameters () const override;
 
@@ -84,20 +84,22 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+    // This parameter is used for the time-step fraction in the PC for implicit
+    // treatment of light waves in the curl-curl MLMG solver.
+    // This function should return zero if light waves are not treated implicitly
+    [[nodiscard]] amrex::Real  GetThetaForPC () const override { return m_theta; }
+
     /**
-     * \brief Return pointer to MultiFab array for mass matrix
+     * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
-    [[nodiscard]] const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* GetSigmaCoeff() const override
-    {
-        return &m_sigma_mfarrvec;
-    }
+    [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (int lev, int field_dir) const override;
+
+    /**
+     * \brief Inititialize the BC masks for the curl curl operator
+     */
+    void InitializeCurlCurlBCMasks ();
 
 private:
-
-    /**
-     * \brief Array of multifab pointers to mass matrix
-     */
-    amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_sigma_mfarrvec;
 
     /**
      * \brief Solver vectors to be used in the nonlinear solver to solve for the

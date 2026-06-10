@@ -30,7 +30,7 @@ algo.particle_shape = 1
 ############ PLASMA #############
 #################################
 particles.species_names = deuterium_1 hydrogen2_1 helium3_1 neutron_1
-my_constants.m_deuterium = 2.01410177812*m_u
+my_constants.m_deuterium = 2.01410177812*m_u - m_e
 my_constants.keV_to_J = 1.e3*q_e
 my_constants.Energy_step = 22. * keV_to_J
 
@@ -74,7 +74,7 @@ collisions.collision_names = DDNHeF1
 DDNHeF1.species = deuterium_1 hydrogen2_1
 DDNHeF1.product_species = helium3_1 neutron_1
 DDNHeF1.type = nuclearfusion
-DDNHeF1.fusion_multiplier = 1.e50
+DDNHeF1.event_multiplier = 1.e50
 
 # Diagnostics
 diagnostics.diags_names = diag1

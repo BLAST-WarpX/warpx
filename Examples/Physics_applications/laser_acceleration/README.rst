@@ -1,16 +1,20 @@
 .. _examples-lwfa:
 
-Laser-Wakefield Acceleration of Electrons
-=========================================
+Laser-Wakefield Acceleration of Electrons in the Lab Frame
+==========================================================
 
-This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996`.
+This example shows how to model a laser-wakefield accelerator (LWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996` either in the lab frame or in a boosted frame of reference.
 
 Laser-wakefield acceleration is best performed in 3D or quasi-cylindrical (RZ) geometry, in order to correctly capture some of the key physics (laser diffraction, beamloading, shape of the accelerating bubble in the blowout regime, etc.).
 For physical situations that have close-to-cylindrical symmetry, simulations in RZ geometry capture the relevant physics at a fraction of the computational cost of a 3D simulation.
 On the other hand, for physical situation with strong asymmetries (e.g., non-round laser driver, strong hosing of the accelerated beam, etc.), only 3D simulations are suitable.
 
+.. _examples-lwfa-boosted:
+
+Laser-Wakefield Acceleration of Electrons in a Boosted Frame
+============================================================
 For LWFA scenarios with long propagation lengths, use the :ref:`boosted frame method <theory-boostedframe>`.
-An example can be seen in the :ref:`PWFA example <examples-pwfa>`.
+An RZ example using the Galilean PSATD algorithm and :math:`\gamma_{\mathrm{boost}} = 30` is given below. More examples showing how to set up a boosted-frame simulation can be found in the :ref:`PWFA example <examples-pwfa>`.
 
 
 Run
@@ -35,13 +39,13 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
                 :language: python3
                 :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py``.
 
-         .. tab-item:: Executable: Input File
+         .. tab-item:: Inputs: Parameter List
 
-             .. literalinclude:: inputs_test_3d_laser_acceleration
-                :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration``.
+             .. literalinclude:: inputs_base_3d
+                :language: none
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_base_3d``.
 
-   .. tab-item:: RZ
+   .. tab-item:: RZ (lab frame)
 
       This example can be run **either** as:
 
@@ -56,11 +60,25 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
                 :language: python3
                 :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration_picmi.py``.
 
-         .. tab-item:: Executable: Input File
+         .. tab-item:: Inputs: Parameter List
 
-             .. literalinclude:: inputs_test_rz_laser_acceleration
-                :language: ini
-                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration``.
+             .. literalinclude:: inputs_base_rz
+                :language: none
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_base_rz``.
+
+   .. tab-item:: RZ (boosted frame)
+
+      This example can be run as:
+
+      * WarpX **executable** using an input file: ``warpx.rz inputs_test_rz_laser_acceleration_boosted_opmd``
+
+      .. tab-set::
+
+         .. tab-item:: Inputs: Parameter List
+
+             .. literalinclude:: inputs_test_rz_laser_acceleration_boosted_opmd
+                :language: none
+                :caption: You can copy this file from ``Examples/Physics_applications/laser_acceleration/inputs_test_rz_laser_acceleration_boosted_opmd``.
 
 Analyze
 -------

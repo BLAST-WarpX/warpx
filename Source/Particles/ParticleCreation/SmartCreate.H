@@ -52,13 +52,20 @@ struct SmartCreate
         prt.m_rdata[PIdx::x][i_prt] = x;
         prt.m_rdata[PIdx::y][i_prt] = y;
         prt.m_rdata[PIdx::z][i_prt] = z;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_XZ)
         prt.m_rdata[PIdx::x][i_prt] = x;
         prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(y);
-#else
+#elif defined(WARPX_DIM_RZ)
+        prt.m_rdata[PIdx::r][i_prt] = x;
+        prt.m_rdata[PIdx::z][i_prt] = z;
+        amrex::ignore_unused(y);
+#elif defined(WARPX_DIM_1D_Z)
         prt.m_rdata[PIdx::z][i_prt] = z;
         amrex::ignore_unused(x,y);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        prt.m_rdata[PIdx::r][i_prt] = x;
+        amrex::ignore_unused(y,z);
 #endif
 
         prt.m_idcpu[i_prt] = amrex::SetParticleIDandCPU(id, cpu);
@@ -96,6 +103,7 @@ class SmartCreateFactory
 
 public:
     template <class PartTileData>
+    explicit
     SmartCreateFactory (const PartTileData& part) noexcept:
         m_policy_real{getPolicies(part.GetRealSoANames())},
         m_policy_int{getPolicies(part.GetIntSoANames())},

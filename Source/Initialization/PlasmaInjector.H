@@ -25,10 +25,7 @@
 
 #include <AMReX_BaseFwd.H>
 
-#ifdef WARPX_USE_OPENPMD
-#   include <openPMD/openPMD.hpp>
-#endif
-
+#include <any>
 #include <limits>
 #include <memory>
 #include <string>
@@ -109,17 +106,22 @@ public:
     amrex::Real y_cut = std::numeric_limits<amrex::Real>::max();
     amrex::Real z_cut = std::numeric_limits<amrex::Real>::max();
     amrex::Real q_tot = 0.0;
+    amrex::Real N_tot = 0.0;
     long npart;
     int do_symmetrize = 0;
     int symmetrization_order = 4;
     bool do_focusing = false;
     amrex::Real focal_distance;
+    bool do_rotation = false;
+    bool do_rotation_momenta = false;
+    amrex::Real rotation_angle;
+    amrex::Vector<amrex::Real> rotation_axis;
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
 #ifdef WARPX_USE_OPENPMD
     //! openPMD::Series to load from in external_file injection
-    std::unique_ptr<openPMD::Series> m_openpmd_input_series;
+    std::any m_openpmd_input_series;
 #endif
 
     amrex::Real surface_flux_pos; // surface location
@@ -131,9 +133,10 @@ public:
     int flux_normal_axis;
     int flux_direction; // -1 for left, +1 for right
 
-    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
+    // With radial geometry, the number of particles per cell will be proportional to r**radial_numpercell_power
+    amrex::Real radial_numpercell_power;
 
-    bool radially_weighted = true;
+    bool m_inject_from_eb = false; // whether to inject from the embedded boundary
 
     std::string str_flux_function;
 
@@ -145,11 +148,21 @@ public:
 
     [[nodiscard]] InjectorPosition* getInjectorPosition () const;
     [[nodiscard]] InjectorPosition* getInjectorFluxPosition () const;
-    [[nodiscard]] InjectorDensity*  getInjectorDensity () const;
+    [[nodiscard]] InjectorDensity*  getInjectorDensity (int li) const;
 
     [[nodiscard]] InjectorFlux*  getInjectorFlux () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumDevice () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumHost () const;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    [[nodiscard]] bool distributedInjectorDensity () const { return inj_rho_distributed; }
 
 protected:
 
@@ -165,6 +178,8 @@ protected:
     std::string species_name;
     std::string source_name;
 
+    amrex::Geometry m_geom;
+
     std::unique_ptr<InjectorPosition> h_inj_pos;
     InjectorPosition* d_inj_pos = nullptr;
 
@@ -173,6 +188,8 @@ protected:
 
     std::unique_ptr<InjectorDensity,InjectorDensityDeleter> h_inj_rho;
     InjectorDensity* d_inj_rho = nullptr;
+    bool inj_rho_distributed = false;
+    bool inj_rho_prepared = false;
     std::unique_ptr<amrex::Parser> density_parser;
 
     std::unique_ptr<InjectorFlux,InjectorFluxDeleter> h_inj_flux;
@@ -184,9 +201,6 @@ protected:
     std::unique_ptr<amrex::Parser> ux_parser;
     std::unique_ptr<amrex::Parser> uy_parser;
     std::unique_ptr<amrex::Parser> uz_parser;
-    std::unique_ptr<amrex::Parser> ux_th_parser;
-    std::unique_ptr<amrex::Parser> uy_th_parser;
-    std::unique_ptr<amrex::Parser> uz_th_parser;
 
     // Keep a pointer to TemperatureProperties to ensure the lifetime of the
     // contained Parser

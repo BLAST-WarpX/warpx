@@ -49,7 +49,7 @@ public:
     *
     * @param[in] opt_depth_runtime_comp Index of the optical depth component in the runtime real data
     */
-    PhotonEmissionFilterFunc(int const opt_depth_runtime_comp)
+    explicit PhotonEmissionFilterFunc(int const opt_depth_runtime_comp)
         : m_opt_depth_runtime_comp(opt_depth_runtime_comp)
         {}
 
@@ -106,6 +106,8 @@ public:
     * @param[in] bxfab constant reference to the FArrayBox of the x component of the magnetic field
     * @param[in] byfab constant reference to the FArrayBox of the y component of the magnetic field
     * @param[in] bzfab constant reference to the FArrayBox of the z component of the magnetic field
+    * @param[in] E_external_particle reference to the external E field
+    * @param[in] B_external_particle reference to the external B field
     * @param[in] a_offset offset to apply to the particle indices
     */
     PhotonEmissionTransformFunc (

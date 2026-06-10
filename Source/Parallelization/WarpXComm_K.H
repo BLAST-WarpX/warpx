@@ -95,6 +95,7 @@ void warpx_interp (int j, int k, int l,
  * \param[in,out] arr_aux output array where interpolated values are stored
  * \param[in] arr_fine input fine-patch array storing the values to interpolate
  * \param[in] arr_coarse input coarse-patch array storing the values to interpolate
+ * \param[in] arr_tmp temporary array to store a copy of the 'aux' MultiFab with given guard cells
  * \param[in] arr_fine_stag IndexType of the fine-patch arrays
  * \param[in] arr_coarse_stag IndexType of the coarse-patch arrays
  * \param[in] rr mesh refinement ratios along each direction
@@ -267,6 +268,7 @@ void warpx_interp (int j, int k, int l,
 
     // NOTE Indices (j,k,l) in the following refer to:
     // - (z,-,-) in 1D
+    // - (r,-,-) in RCYLINDER and RSPHERE
     // - (x,z,-) in 2D
     // - (r,z,-) in RZ
     // - (x,y,z) in 3D
@@ -334,12 +336,12 @@ void warpx_interp (const int j,
                    amrex::Array4<amrex::Real const> const& src_arr,
                    const amrex::IntVect& dst_stag,
                    const amrex::IntVect& src_stag,
-                   const int nox = 2,
-                   const int noy = 2,
-                   const int noz = 2,
-                   amrex::Real const* stencil_coeffs_x = nullptr,
-                   amrex::Real const* stencil_coeffs_y = nullptr,
-                   amrex::Real const* stencil_coeffs_z = nullptr)
+                   [[maybe_unused]] const int nox = 2,
+                   [[maybe_unused]] const int noy = 2,
+                   [[maybe_unused]] const int noz = 2,
+                   [[maybe_unused]] amrex::Real const* stencil_coeffs_x = nullptr,
+                   [[maybe_unused]] amrex::Real const* stencil_coeffs_y = nullptr,
+                   [[maybe_unused]] amrex::Real const* stencil_coeffs_z = nullptr)
 {
     using namespace amrex;
 

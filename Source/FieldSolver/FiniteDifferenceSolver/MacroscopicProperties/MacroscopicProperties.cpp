@@ -101,7 +101,7 @@ MacroscopicProperties::ReadParameters ()
     }
     if (!mu_specified) {
         std::stringstream warnMsg;
-        warnMsg << "Material permittivity is not specified. Using default vacuum value of " <<
+        warnMsg << "Material permeability is not specified. Using default vacuum value of " <<
             m_mu << " in the simulation.";
         ablastr::warn_manager::WMRecordWarning("Macroscopic properties",
             warnMsg.str());
@@ -191,7 +191,16 @@ MacroscopicProperties::InitData (
         Ez_IndexType[idim]      = Ez_stag[idim];
         macro_cr_ratio[idim]    = 1;
     }
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+// Initialize components that were left uninitialized by the above loop
+#if defined(WARPX_DIM_1D_Z)
+        sigma_IndexType[1]   = 0;  sigma_IndexType[2]   = 0;
+        epsilon_IndexType[1] = 0;  epsilon_IndexType[2] = 0;
+        mu_IndexType[1]      = 0;  mu_IndexType[2]      = 0;
+        Ex_IndexType[1]      = 0;  Ex_IndexType[2]      = 0;
+        Ey_IndexType[1]      = 0;  Ey_IndexType[2]      = 0;
+        Ez_IndexType[1]      = 0;  Ez_IndexType[2]      = 0;
+        macro_cr_ratio[1]    = 1;  macro_cr_ratio[2]    = 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         sigma_IndexType[2]   = 0;
         epsilon_IndexType[2] = 0;
         mu_IndexType[2]      = 0;
@@ -223,7 +232,7 @@ MacroscopicProperties::InitializeMacroMultiFabUsingParser (
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
                 const amrex::Real fac_z = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
-                const amrex::Real z = j * dx_lev[0] + prob_domain_lev.lo(0) + fac_z;
+                const amrex::Real z = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_z;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const amrex::Real fac_x = (1._rt - iv[0]) * dx_lev[0] * 0.5_rt;
                 const amrex::Real x = i * dx_lev[0] + prob_domain_lev.lo(0) + fac_x;

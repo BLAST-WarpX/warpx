@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2024 The WarpX Community
+# Copyright 2024-2025 The WarpX Community
 #
 # This file is part of WarpX.
 #
@@ -71,7 +71,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-pm-gpu-build
-CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
+CXX=$(which CC) cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-pm-gpu-build -Duse_openmp=OFF -Dgpu_backend=cuda -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build $HOME/src/blaspp-pm-gpu-build --target install --parallel 16
 rm -rf $HOME/src/blaspp-pm-gpu-build
 
@@ -86,7 +86,7 @@ else
   git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-pm-gpu-build
-CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
+CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-pm-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
 cmake --build $HOME/src/lapackpp-pm-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-pm-gpu-build
 
@@ -113,9 +113,8 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies such as picmistandard
 python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
-python3 -m pip install cupy-cuda11x  # CUDA 11.8 compatible wheel
-# optional: for libEnsemble
-python3 -m pip install -r $HOME/src/warpx/Tools/LibEnsemble/requirements.txt
-# optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-python3 -m pip install --upgrade torch  # CUDA 11.8 compatible wheel
-python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt
+python3 -m pip install cupy-cuda12x  # CUDA 12.6 compatible wheel
+# optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
+python3 -m pip install --upgrade torch  # CUDA 12.6 compatible wheel
+python3 -m pip install --upgrade optimas[all]
+python3 -m pip install --upgrade lasy

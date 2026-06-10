@@ -7,12 +7,14 @@
 
 #include "GuardCellManager.H"
 
-#ifndef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#elif defined(WARPX_DIM_RSPHERE)
+#    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
+#else
 #    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
-#else
-#    include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Filter/NCIGodfreyFilter.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -39,15 +41,17 @@ guardCellManager::Init (
     ablastr::utils::enums::GridType grid_type,
     const bool do_moving_window,
     const int moving_window_dir,
+    const int particle_max_grid_crossings,
     const int nox,
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
     const ElectromagneticSolverAlgo electromagnetic_solver_id,
+    const EvolveScheme evolve_scheme,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
     const amrex::Vector<amrex::Real>& v_comoving,
     const bool safe_guard_cells,
-    const int do_multi_J,
+    const int do_psatd_JRhom,
     const bool fft_do_time_averaging,
     const bool do_pml,
     const int do_pml_in_domain,
@@ -125,6 +129,10 @@ guardCellManager::Init (
     ng_alloc_EB = IntVect(ngz);
     ng_alloc_J = IntVect(ngJz);
     amrex::ignore_unused(ngx, ngJx, ngy, ngJy);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ng_alloc_EB = IntVect(ngx);
+    ng_alloc_J = IntVect(ngJx);
+    amrex::ignore_unused(ngy, ngJy, ngz, ngJz);
 #endif
 
     // TODO Adding one cell for rho should not be necessary, given that the number of guard cells
@@ -138,20 +146,21 @@ guardCellManager::Init (
     // both at the beginning and at the end of the PIC iteration).
     // For the hybrid-PIC solver, the same number of guard cells are used as for
     // the electrostatic solver.
-    if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
+    if (evolve_scheme == EvolveScheme::Explicit &&
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::None &&
         electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
     {
         for (int i = 0; i < AMREX_SPACEDIM; i++)
         {
             amrex::Real dt_Rho = dt;
             amrex::Real dt_J = 0.5_rt*dt;
-            if (do_multi_J) {
-                // With multi_J + time averaging, particles can move during 2*dt per PIC cycle.
+            if (do_psatd_JRhom) {
+                // With PSATD-JRhom + time averaging, particles can move during 2*dt per PIC cycle.
                 if (fft_do_time_averaging){
                     dt_Rho = 2._rt*dt;
                     dt_J = 2._rt*dt;
                 }
-                // With multi_J but without time averaging, particles can move during dt per PIC
+                // With PSATD-JRhom but without time averaging, particles can move during dt per PIC
                 // cycle for the current deposition as well.
                 else {
                     dt_J = dt;
@@ -159,6 +168,15 @@ guardCellManager::Init (
             }
             ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
             ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
+        }
+    } else if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+               evolve_scheme == EvolveScheme::SemiImplicitEM ||
+               evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // When using these implicit schemes, the speed of light Courant limit may be significantly
+        // violated, but the number of guard cells only need to be adjusted based on the particle motion.
+        for (int i = 0; i < AMREX_SPACEDIM; i++) {
+            ng_alloc_Rho[i] = nox + particle_max_grid_crossings - 1;
+            ng_alloc_J[i]   = nox + particle_max_grid_crossings - 1;
         }
     }
 
@@ -168,7 +186,9 @@ guardCellManager::Init (
 
     if (use_filter)
     {
-        ng_alloc_J += bilinear_filter_stencil_length - amrex::IntVect(1);
+        const amrex::IntVect extra = bilinear_filter_stencil_length - amrex::IntVect(1);
+        ng_alloc_J += extra;
+        ng_alloc_Rho += extra;
     }
 
     // After pushing particle
@@ -216,6 +236,8 @@ guardCellManager::Init (
         auto ngFFT = IntVect(ngFFt_x, ngFFt_z);
 #elif defined(WARPX_DIM_1D_Z)
         auto ngFFT = IntVect(ngFFt_z);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        auto ngFFT = IntVect(ngFFt_x);
 #endif
 
 #ifdef WARPX_DIM_RZ
@@ -255,13 +277,21 @@ guardCellManager::Init (
         ng_FieldSolverF = ng_alloc_EB;
         ng_FieldSolverG = ng_alloc_EB;
     }
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
              electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
              electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ) {
         ng_FieldSolver  = CylindricalYeeAlgorithm::GetMaxGuardCell();
         ng_FieldSolverF = CylindricalYeeAlgorithm::GetMaxGuardCell();
         ng_FieldSolverG = CylindricalYeeAlgorithm::GetMaxGuardCell();
+    }
+#elif defined(WARPX_DIM_RSPHERE)
+    else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+             electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
+             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ) {
+        ng_FieldSolver  = SphericalYeeAlgorithm::GetMaxGuardCell();
+        ng_FieldSolverF = SphericalYeeAlgorithm::GetMaxGuardCell();
+        ng_FieldSolverG = SphericalYeeAlgorithm::GetMaxGuardCell();
     }
 #else
     else {
@@ -283,6 +313,13 @@ guardCellManager::Init (
         }
     }
 #endif
+
+    // For the hybrid-PIC solver a minimum of 2 guard cells are required to
+    // avoid the need for parallel communication after calculating curl x B.
+    if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) &&
+        (ng_FieldSolver < IntVect(AMREX_D_DECL(2, 2, 2)))) {
+        ng_FieldSolver += 1;
+    }
 
     // Number of guard cells is the max of that determined by particle shape factor and
     // the stencil used in the field solve
@@ -317,9 +354,11 @@ guardCellManager::Init (
 
         // If NCI filter, add guard cells in the z direction
         IntVect ng_NCIFilter = IntVect::TheZeroVector();
+#if defined(WARPX_ZINDEX)
         if (do_fdtd_nci_corr) {
             ng_NCIFilter[WARPX_ZINDEX] = NCIGodfreyFilter::m_stencil_width;
         }
+#endif
 
         // Note: communications of guard cells for bilinear filter are handled
         // separately.
@@ -341,4 +380,14 @@ guardCellManager::Init (
             ng_MovingWindow[moving_window_dir] = 1;
         }
     }
+
+    if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
+        evolve_scheme == EvolveScheme::SemiImplicitEM ||
+        evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        // For these implicit schemes, the number of ghost cells
+        // for EB gather must be consistent with those for J.
+        ng_alloc_EB.max( ng_alloc_J );
+        ng_FieldGather.max( ng_alloc_J );
+    }
+
 }

@@ -31,8 +31,8 @@ algo.particle_shape = 1
 #################################
 particles.species_names = deuterium_1 tritium_1 helium4_1 neutron_1 deuterium_2 tritium_2 helium4_2 neutron_2
 
-my_constants.m_deuterium = 2.01410177812*m_u
-my_constants.m_tritium = 3.0160492779*m_u
+my_constants.m_deuterium = 2.01410177812*m_u - m_e
+my_constants.m_tritium = 3.0160492779*m_u - m_e
 my_constants.m_reduced = m_deuterium*m_tritium/(m_deuterium+m_tritium)
 my_constants.keV_to_J = 1.e3*q_e
 my_constants.Energy_step = 22. * keV_to_J
@@ -114,13 +114,13 @@ collisions.collision_names = DTF1 DTF2
 DTF1.species = deuterium_1 tritium_1
 DTF1.product_species = helium4_1 neutron_1
 DTF1.type = nuclearfusion
-DTF1.fusion_multiplier = 1.e50
+DTF1.event_multiplier = 1.e50
 
 DTF2.species = deuterium_2 tritium_2
 DTF2.product_species = helium4_2 neutron_2
 DTF2.type = nuclearfusion
-DTF2.fusion_multiplier = 1.e15
-DTF2.fusion_probability_target_value = 0.02
+DTF2.event_multiplier = 1.e15
+DTF2.probability_target_value = 0.02
 
 # Diagnostics
 diagnostics.diags_names = diag1

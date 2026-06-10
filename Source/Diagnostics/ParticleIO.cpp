@@ -9,34 +9,38 @@
 
 #include "Fields.H"
 #include "Particles/ParticleIO.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
-#include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include "ablastr/fields/MultiFabRegister.H"
 #include <ablastr/utils/text/StreamUtils.H>
 
+#include <AMReX_Array.H>
+#include <AMReX_Array4.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Config.H>
-#include <AMReX_Extension.H>
+#include <AMReX_FArrayBox.H>
+#include <AMReX_FabArray.H>
+#include <AMReX_Geometry.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
-#include <AMReX_PODVector.H>
+#include <AMReX_IndexType.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParIter.H>
 #include <AMReX_ParticleIO.H>
+#include <AMReX_Print.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
 #include <algorithm>
-#include <array>
-#include <istream>
 #include <memory>
 #include <string>
 #include <sstream>
@@ -110,7 +114,7 @@ RigidInjectedParticleContainer::WriteHeader (std::ostream& os) const
 void
 PhysicalParticleContainer::ReadHeader (std::istream& is)
 {
-    is >> charge >> mass;
+    is >> m_charge >> m_mass;
     ablastr::utils::text::goto_next_line(is);
 }
 
@@ -118,7 +122,7 @@ void
 PhysicalParticleContainer::WriteHeader (std::ostream& os) const
 {
     // no need to write species_id
-    os << charge << " " << mass << "\n";
+    os << m_charge << " " << m_mass << "\n";
 }
 
 void
@@ -246,10 +250,10 @@ MultiParticleContainer::WriteHeader (std::ostream& os) const
 }
 
 void
-storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
+storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
     ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic ) {
 
-    using PinnedParIter = typename PinnedMemoryParticleContainer::ParIterType;
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame) ||
@@ -294,6 +298,124 @@ storePhiOnParticles ( PinnedMemoryParticleContainer& tmp,
                         xp, yp, zp, plo, dxi, i, j, k, W);
                     amrex::Real const phi_value  = ablastr::particles::interp_field_nodal(i, j, k, W, phi_grid);
                     phi_particle_arr[ip] = phi_value;
+                }
+            );
+        }
+    }
+}
+
+void
+storeFieldOnParticles ( WarpXParticleContainer::Base& tmp, bool is_full_diagnostic,
+                        bool save_Ex, bool save_Ey, bool save_Ez,
+                        bool save_Bx, bool save_By, bool save_Bz) {
+
+    using PinnedParIter = typename WarpXParticleContainer::ParIterType;
+    using ablastr::fields::Direction;
+
+    // When this is not a full diagnostic, the particles are not written at the same physical time (i.e. PIC iteration)
+    // that they were collected. This happens for diagnostics that use buffering (e.g. BackTransformed, BoundaryScraping).
+    // Here the field is gathered at the iteration when particles are written (not collected) and is thus mismatched.
+    // To avoid confusion, we raise an error in this case.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        is_full_diagnostic,
+        "Output of the fields on the particles was requested, "
+        "but this is only available with `diag_type = Full`.");
+
+    if (save_Ex) { tmp.AddRealComp("Ex"); }
+    if (save_Ey) { tmp.AddRealComp("Ey"); }
+    if (save_Ez) { tmp.AddRealComp("Ez"); }
+    if (save_Bx) { tmp.AddRealComp("Bx"); }
+    if (save_By) { tmp.AddRealComp("By"); }
+    if (save_Bz) { tmp.AddRealComp("Bz"); }
+
+    int const Ex_index = save_Ex ? tmp.GetRealCompIndex("Ex") : -1;
+    int const Ey_index = save_Ey ? tmp.GetRealCompIndex("Ey") : -1;
+    int const Ez_index = save_Ez ? tmp.GetRealCompIndex("Ez") : -1;
+    int const Bx_index = save_Bx ? tmp.GetRealCompIndex("Bx") : -1;
+    int const By_index = save_By ? tmp.GetRealCompIndex("By") : -1;
+    int const Bz_index = save_Bz ? tmp.GetRealCompIndex("Bz") : -1;
+
+    auto & warpx = WarpX::GetInstance();
+    auto & fields = warpx.m_fields;
+
+    const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+    const int nox = WarpX::nox;
+    const bool galerkin_interpolation = WarpX::galerkin_interpolation;
+
+    for (int lev=0; lev<=warpx.finestLevel(); lev++) {
+
+        const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
+
+        amrex::MultiFab & Ex = *fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        amrex::MultiFab & Ey = *fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        amrex::MultiFab & Ez = *fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        amrex::MultiFab & Bx = *fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        amrex::MultiFab & By = *fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        amrex::MultiFab & Bz = *fields.get(FieldType::Bfield_aux, Direction{2}, lev);
+
+#ifdef AMREX_USE_OMP
+        #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (PinnedParIter pti(tmp, lev); pti.isValid(); ++pti) {
+
+            const amrex::Box box = pti.tilebox();
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const Dim3 lo = lbound(box);
+
+            FArrayBox const* exfab = &Ex[pti];
+            FArrayBox const* eyfab = &Ey[pti];
+            FArrayBox const* ezfab = &Ez[pti];
+            FArrayBox const* bxfab = &Bx[pti];
+            FArrayBox const* byfab = &By[pti];
+            FArrayBox const* bzfab = &Bz[pti];
+
+            amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
+            amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
+            amrex::Array4<const amrex::Real> const& ez_arr = ezfab->array();
+            amrex::Array4<const amrex::Real> const& bx_arr = bxfab->array();
+            amrex::Array4<const amrex::Real> const& by_arr = byfab->array();
+            amrex::Array4<const amrex::Real> const& bz_arr = bzfab->array();
+
+            amrex::IndexType const ex_type = exfab->box().ixType();
+            amrex::IndexType const ey_type = eyfab->box().ixType();
+            amrex::IndexType const ez_type = ezfab->box().ixType();
+            amrex::IndexType const bx_type = bxfab->box().ixType();
+            amrex::IndexType const by_type = byfab->box().ixType();
+            amrex::IndexType const bz_type = bzfab->box().ixType();
+
+            const auto getPosition = GetParticlePosition<PIdx>(pti);
+
+            amrex::ParticleReal* Ex_particle_arr = save_Ex ? pti.GetStructOfArrays().GetRealData(Ex_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Ey_particle_arr = save_Ey ? pti.GetStructOfArrays().GetRealData(Ey_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Ez_particle_arr = save_Ez ? pti.GetStructOfArrays().GetRealData(Ez_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Bx_particle_arr = save_Bx ? pti.GetStructOfArrays().GetRealData(Bx_index).dataPtr() : nullptr;
+            amrex::ParticleReal* By_particle_arr = save_By ? pti.GetStructOfArrays().GetRealData(By_index).dataPtr() : nullptr;
+            amrex::ParticleReal* Bz_particle_arr = save_Bz ? pti.GetStructOfArrays().GetRealData(Bz_index).dataPtr() : nullptr;
+
+            // Loop over the particles and update their position
+            amrex::ParallelFor( pti.numParticles(),
+                [=] AMREX_GPU_DEVICE (long ip) {
+
+                    amrex::ParticleReal xp, yp, zp;
+                    getPosition(ip, xp, yp, zp);
+
+                    amrex::ParticleReal Exp = 0., Eyp = 0., Ezp = 0.;
+                    amrex::ParticleReal Bxp = 0., Byp = 0., Bzp = 0.;
+
+                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                   ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                   ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
+                                   nox, galerkin_interpolation);
+
+
+                    if (Ex_particle_arr) { Ex_particle_arr[ip] = Exp; }
+                    if (Ey_particle_arr) { Ey_particle_arr[ip] = Eyp; }
+                    if (Ez_particle_arr) { Ez_particle_arr[ip] = Ezp; }
+                    if (Bx_particle_arr) { Bx_particle_arr[ip] = Bxp; }
+                    if (By_particle_arr) { By_particle_arr[ip] = Byp; }
+                    if (Bz_particle_arr) { Bz_particle_arr[ip] = Bzp; }
+
                 }
             );
         }

@@ -82,7 +82,7 @@ namespace ablastr::fields
     amrex::Real
     SumOfIntegratedPotential3D (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy, amrex::Real dz)
     {
-        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
                   IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
                 - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
                 - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
@@ -108,7 +108,7 @@ namespace ablastr::fields
     amrex::Real
     SumOfIntegratedPotential2D (amrex::Real x, amrex::Real y, amrex::Real dx, amrex::Real dy)
     {
-        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::ep0) * (
+        return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
                   IntegratedPotential2D( x+0.5_rt*dx, y+0.5_rt*dy )
                 - IntegratedPotential2D( x+0.5_rt*dx, y-0.5_rt*dy )
                 - IntegratedPotential2D( x-0.5_rt*dx, y+0.5_rt*dy )
@@ -123,14 +123,12 @@ namespace ablastr::fields
      * @param[in] rho the charge density amrex::MultiFab
      * @param[out] phi the electrostatic potential amrex::MultiFab
      * @param[in] cell_size an arreay of 3 reals dx dy dz
-     * @param[in] ba amrex::BoxArray with the grid of a given level
-     * @param[in] is_igf_2d boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
+     * @param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      */
     void
     computePhiIGF (amrex::MultiFab const & rho,
                    amrex::MultiFab & phi,
                    std::array<amrex::Real, 3> const & cell_size,
-                   amrex::BoxArray const & ba,
                    bool is_igf_2d_slices);
 
 } // namespace ablastr::fields
