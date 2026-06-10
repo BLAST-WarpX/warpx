@@ -95,8 +95,12 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     // process name
     for (const auto& scattering_process : scattering_process_names) {
         const std::string kw_cross_section = scattering_process + "_cross_section";
+        const std::string kw_cross_section_momentum = scattering_process + "_cross_section_momentum";
         std::string cross_section_file;
+        std::string cross_section_file_momentum;
+
         pp_collision_name.query(kw_cross_section, cross_section_file);
+        pp_collision_name.query(kw_cross_section_momentum, cross_section_file_momentum);
 
         amrex::ParticleReal energy = 0.0;
         // if the scattering process is excitation or ionization get the
@@ -116,8 +120,13 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
-        ScatteringProcess process(scattering_process, cross_section_file, energy);
+ScatteringProcess process = cross_section_file_momentum.empty()
+    ? ScatteringProcess(scattering_process, cross_section_file, energy)
+    : ScatteringProcess(scattering_process, cross_section_file, energy, cross_section_file_momentum);
 
+    else if (scattering_process.find("rutherford") != std::string::npos) {
+
+        }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                          "Cannot add an unknown scattering process type");
 
@@ -167,6 +176,11 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
 #endif
 }
 
+amrex::ParticleReal
+BackgroundMCCCollision::get_eta(amrex::Vector<ScatteringProcess> const& mcc_processes) const
+{
+
+}
 /** Calculate the maximum collision frequency using a fixed energy grid that
  *  ranges from 1e-4 to 5000 eV in 0.2 eV increments
  */
@@ -450,6 +464,32 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                           vx, vy, vz, sqrt(vx*vx + vy*vy + vz*vz), engine
                                       );
                                   }
+
+                                else if (scattering_process.m_type == ScatteringProcessType::RUTHERFORD)
+                                      { amrex::ParticleReal Ux;
+                                        amrex::ParticleReal Uy;
+                                        amrex::ParticleReal Uz;
+                                        amrex::ParticleReal Upx;
+                                        amrex::ParticleReal Vpy;
+                                        amrex::ParticleReal Upz;
+                                        amrex::ParticleReal fac = sqrt(Ux*vx + Uy*vy +Uz*vz)
+                                        amrex::ParticleReal norm_fac = sqrt(vx*vx + vy*vy + vz*vz)/sqrt(1-pow(fac,2));
+                                        ParticleUtils::RandomizeVelocity(
+                                          Ux, Uy, Uz, 1, engine
+                                      );
+
+                                       Upx = norm_fac*(Ux+fac*vx);
+                                       Upy = norm_fac*(Uy+fac*vy);  
+                                       Upz = norm_fac*(Uz+fac*vz);
+                                    x=amrex::Random(engine)
+                                    eta=get_eta(static_cast<amrex::ParticleReal>(E_coll));
+                                    amrex::ParticleReal costheta = 1-2*x/(1-x+eta);
+                                    amrex::ParticleReal sintheta = sqrt(1 - costheta*costheta);
+                                    vx = vx*costheta+Upx*sintheta;
+                                    vy = vy*costheta+Upx*sintheta;
+                                    vz = vz*costheta+Upx*sintheta;
+                                    }   
+
                                   else if (scattering_process.m_type == ScatteringProcessType::BACK) {
                                       // elastic scattering with cos(chi) = -1 (i.e. 180 degrees)
                                       vx *= -1.0_prt;

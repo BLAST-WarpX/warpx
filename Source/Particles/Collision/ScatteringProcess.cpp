@@ -13,10 +13,11 @@
 ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
                         const std::string& cross_section_file,
-                        const amrex::ParticleReal energy )
+                        const amrex::ParticleReal energy,
+                        const std::string& cross_section_file_momentum )
 {
     // read the cross-section data file into memory
-    readCrossSectionFile(cross_section_file, m_energies, m_sigmas_h);
+    readCrossSectionFile(cross_section_file, m_energies, m_sigmas_h,cross_section_file_momentum, m_sigmas_mt_h);
 
     init(scattering_process, energy);
 }
@@ -26,11 +27,15 @@ ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
                         const InputVector&& energies,
                         const InputVector&& sigmas,
-                        const amrex::ParticleReal energy )
+                        const amrex::ParticleReal energy,
+                        const InputVector&& sigmas_mt )
 {
     m_energies.insert(m_energies.begin(), std::begin(energies), std::end(energies));
     m_sigmas_h.insert(m_sigmas_h.begin(), std::begin(sigmas),   std::end(sigmas));
-
+    if(!sigmas_mt.empty())
+    {
+        m_sigmas_mt_h.insert(m_sigmas_mt_h.begin(), std::begin(sigmas_mt),   std::end(sigmas_mt));
+    }
     init(scattering_process, energy);
 }
 
@@ -39,7 +44,11 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 {
     using namespace amrex::literals;
     m_exe_h.m_sigmas_data = m_sigmas_h.data();
-
+    if (!m_sigmas_mt_h.empty()) {
+        m_exe_h.m_sigmas_mt_data = m_sigmas_mt_h.data();
+        m_exe_h.m_sigma_mt_lo = m_sigmas_mt_h[0];
+        m_exe_h.m_sigma_mt_hi = m_sigmas_mt_h[m_grid_size-1];
+    }
     // save energy grid parameters for easy use
     m_grid_size = static_cast<int>(m_energies.size());
     m_exe_h.m_energy_lo = m_energies[0];
@@ -66,9 +75,14 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 #ifdef AMREX_USE_GPU
     m_exe_d = m_exe_h;
     m_sigmas_d.resize(m_sigmas_h.size());
+    m_sigmas_mt_d.resize(m_sigmas_mt_h.size());
+
     m_exe_d.m_sigmas_data = m_sigmas_d.data();
+    m_exe_d.m_sigmas_mt_data = m_sigmas_mt_d.data();
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_sigmas_h.begin(), m_sigmas_h.end(),
                           m_sigmas_d.begin());
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_sigmas_mt_h.begin(), m_sigmas_mt_h.end(),
+                          m_sigmas_mt_d.begin());
     amrex::Gpu::streamSynchronize();
 #endif
 }
@@ -78,6 +92,8 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
 {
     if (scattering_process == "elastic") {
         return ScatteringProcessType::ELASTIC;
+    } else if (scattering_process == "rutherford") {
+        return ScatteringProcessType::RUTHERFORD;
     } else if (scattering_process == "back") {
         return ScatteringProcessType::BACK;
     } else if (scattering_process == "charge_exchange") {
@@ -99,7 +115,10 @@ void
 ScatteringProcess::readCrossSectionFile (
                                   const std::string& cross_section_file,
                                   amrex::Vector<amrex::ParticleReal>& energies,
-                                  amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas )
+                                  amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas,
+                                  const std::string& cross_section_file_momentum,
+                                  amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas_mt    
+                                  )
 {
     std::ifstream infile(cross_section_file);
     if(!infile.is_open()) { WARPX_ABORT_WITH_MESSAGE("Failed to open cross-section data file"); }
@@ -108,10 +127,23 @@ ScatteringProcess::readCrossSectionFile (
     while (infile >> energy >> sigma) {
         energies.push_back(energy);
         sigmas.push_back(sigma);
-    }
+    };
     if (infile.bad()) { WARPX_ABORT_WITH_MESSAGE("Failed to read cross-section data from file."); }
     infile.close();
+
+    if(!cross_section_file_momentum.empty()) {
+    std::ifstream infile2(cross_section_file_momentum);
+    if(!infile2.is_open()) { WARPX_ABORT_WITH_MESSAGE("Failed to open cross-section momentum data file"); }
+
+    amrex::ParticleReal sigma_mt;
+    while (infile2 >> energy >> sigma_mt) {
+        sigmas_mt.push_back(sigma_mt);
+    };
+    if (infile2.bad()) { WARPX_ABORT_WITH_MESSAGE("Failed to read cross-section momentum data from file."); }
+    infile2.close();
+    };
 }
+
 
 void
 ScatteringProcess::sanityCheckEnergyGrid (
