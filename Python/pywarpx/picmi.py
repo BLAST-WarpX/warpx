@@ -2201,8 +2201,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         field on edges inside the conductor from the level-set geometry
         (tangential component zero at the surface, normal component with zero
         normal gradient, zero deep inside) using mirror-image interpolation;
-        the internal layer is relaxed with Jacobi sweeps until this tolerance
-        (or ``eb_bc_max_iters``) is reached.
+        the internal layer is relaxed with Jacobi sweeps until the largest
+        change, relative to the largest field magnitude in the boundary band,
+        drops below this tolerance (or ``eb_bc_max_iters`` is reached).
 
     eb_bc_max_iters: int, default=10
         Maximum number of Jacobi sweeps of the embedded-boundary PEC

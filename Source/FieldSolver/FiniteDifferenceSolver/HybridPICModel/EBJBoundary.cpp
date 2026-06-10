@@ -11,6 +11,7 @@
 #include "EmbeddedBoundary/DistanceToEB.H"
 
 #include <ablastr/particles/NodalFieldGather.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
@@ -93,6 +94,8 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
 
+    ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToEdgeField()");
+
     if (!eb_update_E[0]) { return; }
 
     auto const plo = geom.ProbLoArray();
@@ -140,8 +143,12 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                                   field[c]->nComp(), field[c]->nGrowVect());
         }
 
-        amrex::ReduceOps<amrex::ReduceOpMax> reduce_op;
-        amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+        // Track both the largest change and the largest band value so that
+        // convergence is measured relative to the boundary-band field
+        // magnitude (a per-edge relative criterion can never be met by edges
+        // holding near-zero values)
+        amrex::ReduceOps<amrex::ReduceOpMax, amrex::ReduceOpMax> reduce_op;
+        amrex::ReduceData<amrex::Real, amrex::Real> reduce_data(reduce_op);
         using ReduceTuple = typename decltype(reduce_data)::Type;
 
         for (int c = 0; c < 3; ++c) {
@@ -164,7 +171,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                 reduce_op.eval(tb, ncomp, reduce_data,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) -> ReduceTuple
                 {
-                    if (mask(i, j, k) != 0) { return {0._rt}; }
+                    if (mask(i, j, k) != 0) { return {0._rt, 0._rt}; }
 
                     // edge-center position in grid coordinates
                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
@@ -193,7 +200,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                     if (s < -d_band) {
                         // deep inside the conductor: no volume current
                         Jc(i, j, k, n) = 0._rt;
-                        return {(v_old != 0._rt) ? 1._rt : 0._rt};
+                        return {std::abs(v_old), 0._rt};
                     }
 
                     // boundary normal (toward the plasma) from the level set
@@ -207,7 +214,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                         // degenerate level-set gradient (e.g. saturated far
                         // field): treat as deep interior
                         Jc(i, j, k, n) = 0._rt;
-                        return {(v_old != 0._rt) ? 1._rt : 0._rt};
+                        return {std::abs(v_old), 0._rt};
                     }
                     DistanceToEB::normalize(nv);
 
@@ -245,14 +252,17 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
 
                     Jc(i, j, k, n) = v_new;
 
-                    amrex::Real const scale = amrex::max(std::abs(v_new), std::abs(v_old), 1.e-300_rt);
-                    return {std::abs(v_new - v_old) / scale};
+                    return {std::abs(v_new - v_old), std::abs(v_new)};
                 });
             }
         }
 
-        resid = amrex::get<0>(reduce_data.value(reduce_op));
-        amrex::ParallelDescriptor::ReduceRealMax(resid);
+        auto const result = reduce_data.value(reduce_op);
+        amrex::Real dmax = amrex::get<0>(result);
+        amrex::Real smax = amrex::get<1>(result);
+        amrex::ParallelDescriptor::ReduceRealMax(dmax);
+        amrex::ParallelDescriptor::ReduceRealMax(smax);
+        resid = dmax / amrex::max(smax, std::numeric_limits<amrex::Real>::min());
         ++iter;
     }
 

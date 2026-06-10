@@ -38,8 +38,9 @@ namespace warpx::hybrid
      *
      * Because the interpolation stencil at the image point can itself reach
      * other masked edges, the band is relaxed with Jacobi sweeps (each
-     * preceded by a ghost-cell exchange) until the relative change drops
-     * below \c rtol or \c max_iters sweeps have been performed.
+     * preceded by a ghost-cell exchange) until the largest change, measured
+     * relative to the largest field magnitude in the band, drops below
+     * \c rtol or \c max_iters sweeps have been performed.
      *
      * Unmasked (including conformally cut) edges are never modified.
      *

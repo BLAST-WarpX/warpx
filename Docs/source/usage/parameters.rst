@@ -3791,9 +3791,11 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``1e-4``
     :optional:
 
-    Relative residual tolerance of the embedded-boundary PEC boundary-condition band relaxation applied
-    to the current density and the Ohm's-law electric field by the hybrid solver (see
-    :pp:param:`hybrid_pic_model.use_conformal_eb` for a description of the boundary condition).
+    Residual tolerance of the embedded-boundary PEC boundary-condition band relaxation applied
+    to the current density and the Ohm's-law electric field by the hybrid solver: the relaxation stops
+    when the largest change in the band, relative to the largest field magnitude in the band, drops
+    below this value (see :pp:param:`hybrid_pic_model.use_conformal_eb` for a description of the
+    boundary condition).
 
 .. pp:param:: hybrid_pic_model.eb_bc_max_iters
     :type: ``int``
