@@ -81,25 +81,25 @@ then
     set -eu
 
     git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git build_dpc_deps/blaspp
-    CXX=icpx CXXFLAGS="-qmkl" cmake -S build_dpc_deps/blaspp -B build_dpc_deps/blaspp-build \
+    CXX=icpx CXXFLAGS="-fsycl -qmkl" cmake -S build_dpc_deps/blaspp -B build_dpc_deps/blaspp-build \
         -Duse_openmp=OFF \
         -Dgpu_backend=sycl \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_EXE_LINKER_FLAGS="-qmkl" \
+        -DCMAKE_EXE_LINKER_FLAGS="-fsycl -qmkl" \
         -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)
     cmake --build build_dpc_deps/blaspp-build -j 4
     sudo cmake --build build_dpc_deps/blaspp-build --target install
 
     git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git build_dpc_deps/lapackpp
-    CXX=icpx CXXFLAGS="-DLAPACK_FORTRAN_ADD_ -qmkl" cmake \
+    CXX=icpx CXXFLAGS="-DLAPACK_FORTRAN_ADD_ -fsycl -qmkl" cmake \
         -S build_dpc_deps/lapackpp \
         -B build_dpc_deps/lapackpp-build \
         -DCMAKE_CXX_STANDARD=20 \
         -Dbuild_tests=OFF \
         -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_EXE_LINKER_FLAGS="-qmkl" \
+        -DCMAKE_EXE_LINKER_FLAGS="-fsycl -qmkl" \
         -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)
     cmake --build build_dpc_deps/lapackpp-build -j 4
     sudo cmake --build build_dpc_deps/lapackpp-build --target install
