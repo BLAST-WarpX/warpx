@@ -95,7 +95,15 @@ def power_law_resistivity(
 
 
 def setup_simulation(
-    resolution, nppc, max_steps, diag_period, verbose, holmstrom=False
+    resolution,
+    nppc,
+    max_steps,
+    diag_period,
+    verbose,
+    holmstrom=False,
+    eta_power=ETA_POWER,
+    eta_ntrans=N_TRANSITION_FRAC,
+    f_t_ci=F_T_CI,
 ):
     """Create the PICMI simulation object.
 
@@ -125,7 +133,7 @@ def setup_simulation(
     # time step from the reversed-field ion cyclotron period
     w_ci = constants.q_e * abs(BZ_REV) / m_i
     t_ci = 2.0 * np.pi / w_ci
-    dt = F_T_CI * t_ci
+    dt = f_t_ci * t_ci
 
     # ion skin depth and Alfven speed at the reversed field, for the
     # Chacon-style hyper-resistivity floor; CFL-limited vacuum resistivity
@@ -189,9 +197,9 @@ def setup_simulation(
         **power_law_resistivity(
             ETA_PLASMA,
             ETA_VAC_FRAC * eta_max,
-            ETA_POWER,
+            eta_power,
             N_FLOOR_FRAC,
-            N_TRANSITION_FRAC,
+            eta_ntrans,
             N_I,
         ),
     )
@@ -281,6 +289,26 @@ def main():
         default=None,
     )
     parser.add_argument(
+        "--eta-power",
+        help="power of the density-scaled resistivity ramp",
+        type=float,
+        default=ETA_POWER,
+    )
+    parser.add_argument(
+        "--eta-ntrans",
+        help="transition density fraction of the resistivity ramp",
+        type=float,
+        default=N_TRANSITION_FRAC,
+    )
+    parser.add_argument(
+        "--f-tci",
+        help="time step as a fraction of the reversed-field ion cyclotron "
+        "period (reduce to manage whistler stiffness, e.g. with the Hall "
+        "term active in low-density regions)",
+        type=float,
+        default=F_T_CI,
+    )
+    parser.add_argument(
         "--holmstrom",
         help="zero the Ohm's-law E in vacuum regions (Holmstrom treatment): "
         "suppresses the floor-density Hall amplification in the gap between "
@@ -307,7 +335,7 @@ def main():
         nppc = args.nppc
         m_i = M_AMU * constants.m_p
         t_ci = 2.0 * np.pi * m_i / (constants.q_e * abs(BZ_REV))
-        dt = F_T_CI * t_ci
+        dt = args.f_tci * t_ci
         max_steps = (
             args.steps if args.steps is not None else int((TAU_RAMP + t_ci) / dt)
         )
@@ -316,7 +344,15 @@ def main():
         )
 
     sim = setup_simulation(
-        resolution, nppc, max_steps, diag_period, args.verbose, args.holmstrom
+        resolution,
+        nppc,
+        max_steps,
+        diag_period,
+        args.verbose,
+        args.holmstrom,
+        args.eta_power,
+        args.eta_ntrans,
+        args.f_tci,
     )
     sim.step()
 
