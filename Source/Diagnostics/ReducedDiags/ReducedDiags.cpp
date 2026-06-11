@@ -8,9 +8,10 @@
 #include "ReducedDiags.H"
 
 #include "WarpX.H"
-#include "Utils/Parser/IntervalsParser.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -66,7 +67,7 @@ m_rd_name{rd_name}
     std::vector<std::string> intervals_string_vec = {"1"};
     pp_rd.queryarr("intervals", intervals_string_vec);
     pp_rd_name.queryarr("intervals", intervals_string_vec);
-    m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
+    m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
 
     // read separator
     pp_rd.query("separator", m_sep);

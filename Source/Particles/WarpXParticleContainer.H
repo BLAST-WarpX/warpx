@@ -70,13 +70,13 @@ struct PIdx
     enum                          { x ,  z ,  w ,  ux ,  uy ,  uz,                 nattribs};
     static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz"};
 #elif defined(WARPX_DIM_RZ)
-    enum                          { x ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
+    enum                          { r ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
     static constexpr auto names = {"r", "z", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RCYLINDER)
-    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
+    enum                          { r ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
     static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RSPHERE)
-    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
+    enum                          { r ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
     static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta", "phi"};
 #elif defined(WARPX_DIM_3D)
     enum                          { x ,  y,   z,   w,   ux,   uy,   uz,            nattribs};
@@ -207,7 +207,7 @@ public:
     // DiagnosticParticleData (see above) on this tile.
     using DiagnosticParticles = amrex::Vector<std::map<std::pair<int, int>, DiagnosticParticleData> >;
 
-    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies);
+    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
     ~WarpXParticleContainer() override = default;
 
     // Move and copy operations
@@ -412,14 +412,15 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
-    std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
+    void DepositTotalNGPTemperature (int lev);
+    void CalculateNuei(amrex::MultiFab & species_nuei,
+                       WarpXParticleContainer const & electron_species, int lev);
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
     std::unique_ptr<amrex::MultiFab> GetPlasmaFrequency (int lev);
-    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositMassMatrices (WarpXParIter& pti,
                         const RealVector& wp,
@@ -648,8 +649,11 @@ public:
         return (pos != int_names.end());
     }
 
+    std::string const & getName() { return species_name; }
+
 protected:
     int species_id;
+    std::string species_name;
 
     amrex::ParticleReal m_charge;
     amrex::ParticleReal m_mass;
