@@ -312,17 +312,23 @@ void WarpX::HybridPICDepositRhoAndJ ()
         }
     }
 
-    // Enforce the PEC current boundary condition on the deposited ion current
-    // at the embedded boundary (deposition shape functions and filtering can
-    // otherwise spill current onto edges inside the conductor), and the
-    // Dirichlet condition on the deposited charge density (the density
-    // vanishes at the conducting wall; the odd mirror keeps the near-wall
-    // Ohm's-law interpolation of rho second-order accurate)
+    // At the embedded boundary: first fold the deposit collected by covered
+    // points back across the surface with the PEC image parities (matching
+    // the domain treatment; otherwise the shape-function charge and current
+    // of wall-adjacent particles is discarded), then enforce the PEC current
+    // boundary condition on the deposited ion current and the Dirichlet
+    // condition on the deposited charge density
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             if (static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size()) <= lev) {
                 m_hybrid_pic_model->m_eb_bc_status_E.resize(lev+1);
             }
+            warpx::hybrid::FoldEBDepositToField(
+                m_fields.get_alldirs(FieldType::current_fp, lev),
+                m_eb_update_E[lev],
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
             warpx::hybrid::ApplyPECBoundaryToField(
                 m_fields.get_alldirs(FieldType::current_fp, lev),
                 m_eb_update_E[lev],
@@ -333,6 +339,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 m_hybrid_pic_model->m_eb_bc_direct_fill,
                 /*normal_odd=*/false, /*fill_covered_centers=*/true,
                 &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
+            warpx::hybrid::FoldEBDepositToNodalScalar(
+                *m_fields.get(FieldType::rho_fp, lev),
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev));
             warpx::hybrid::ApplyEBBoundaryToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),

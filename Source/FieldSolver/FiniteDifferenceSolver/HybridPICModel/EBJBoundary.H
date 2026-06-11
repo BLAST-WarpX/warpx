@@ -142,6 +142,64 @@ namespace warpx::hybrid
         amrex::MultiFab const& distance_to_eb,
         amrex::Geometry const& geom,
         bool odd);
+
+    /** \brief Fold the deposit collected by covered points of a nodal scalar
+     * field (the charge density) back across the embedded surface, with the
+     * PEC image parity, before the covered points are overwritten by the
+     * mirror fill.
+     *
+     * Particles within a shape length of a conducting wall deposit part of
+     * their charge onto points on or inside the embedded surface; without a
+     * fold that charge is discarded when the boundary condition rewrites the
+     * covered points. Matching the domain treatment
+     * (PEC::ApplyReflectiveBoundarytoRhofield), every fluid point within the
+     * deposit reach of the surface gathers the covered-side deposit at its
+     * mirror-image position inside the conductor (raw masked interpolation:
+     * fluid stencil points contribute nothing) and SUBTRACTS it (image
+     * charge of the opposite sign). In the planar limit this reproduces the
+     * domain fold exactly and conserves the folded amount.
+     *
+     * Call after the deposit (including guard-cell sums) and before
+     * ApplyEBBoundaryToNodalScalar.
+     *
+     * \param[in,out] field nodal scalar field holding the raw deposit
+     * \param[in] distance_to_eb nodal signed-distance function to the boundary
+     * \param[in] geom level geometry
+     */
+    void FoldEBDepositToNodalScalar (
+        amrex::MultiFab& field,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom);
+
+    /** \brief Fold the deposit collected by covered points of a staggered
+     * vector field (the deposited ion current) back across the embedded
+     * surface, with the PEC image parities, before the covered points are
+     * overwritten by the mirror fill.
+     *
+     * Matching the domain treatment (PEC::ApplyReflectiveBoundarytoJfield),
+     * the covered-side deposit gathered at the mirror image of each
+     * near-surface fluid point is folded with the image-current parities:
+     * the tangential part is SUBTRACTED (image current antiparallel) and the
+     * normal part is ADDED. Covered points are identified by the fill
+     * classification (the write set of ApplyPECBoundaryToField with
+     * \c fill_covered_centers), so cut edges with covered centers fold too.
+     *
+     * Call after the deposit (including guard-cell sums) and before
+     * ApplyPECBoundaryToField.
+     *
+     * \param[in,out] field staggered vector field holding the raw deposit
+     * \param[in] eb_update per-component embedded-boundary update masks
+     * \param[in] distance_to_eb nodal signed-distance function to the boundary
+     * \param[in] geom level geometry
+     * \param[in,out] status_cache caller-owned fill classification (see
+     *            ApplyPECBoundaryToField); may be nullptr
+     */
+    void FoldEBDepositToField (
+        ablastr::fields::VectorField const& field,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom,
+        EBFillStatus* status_cache = nullptr);
 }
 
 #endif // WARPX_EBJBOUNDARY_H_

@@ -265,6 +265,56 @@ void init_WarpX (py::module& m)
             "(normal odd / tangential even) to the registered face vector "
             "field Bfield_fp."
         )
+        .def("hybrid_fold_eb_deposit_to_edge_field",
+            [](WarpX& wx, std::string const& name, int const lev) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (!EB::enabled() || hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_fold_eb_deposit_to_edge_field requires "
+                        "embedded boundaries and the hybrid solver");
+                }
+                if (name != "current_fp") {
+                    throw std::runtime_error(
+                        "hybrid_fold_eb_deposit_to_edge_field: unknown field " + name);
+                }
+                if (static_cast<int>(hybrid->m_eb_bc_status_E.size()) <= lev) {
+                    hybrid->m_eb_bc_status_E.resize(lev+1);
+                }
+                warpx::hybrid::FoldEBDepositToField(
+                    wx.m_fields.get_alldirs(FieldType::current_fp, lev),
+                    wx.GetEBUpdateEFlag()[lev],
+                    *wx.m_fields.get(FieldType::distance_to_eb, lev),
+                    wx.Geom(lev),
+                    &hybrid->m_eb_bc_status_E[lev]);
+            },
+            py::arg("name"), py::arg("lev") = 0,
+            "Fold the deposit collected by covered points of the registered "
+            "edge vector field current_fp back across the embedded surface "
+            "with the PEC image parities (tangential subtracted, normal added)."
+        )
+        .def("hybrid_fold_eb_deposit_to_nodal_scalar",
+            [](WarpX& wx, std::string const& name, int const lev) {
+                using warpx::fields::FieldType;
+                if (!EB::enabled()) {
+                    throw std::runtime_error(
+                        "hybrid_fold_eb_deposit_to_nodal_scalar requires "
+                        "embedded boundaries");
+                }
+                if (name != "rho_fp") {
+                    throw std::runtime_error(
+                        "hybrid_fold_eb_deposit_to_nodal_scalar: unknown field " + name);
+                }
+                warpx::hybrid::FoldEBDepositToNodalScalar(
+                    *wx.m_fields.get(FieldType::rho_fp, lev),
+                    *wx.m_fields.get(FieldType::distance_to_eb, lev),
+                    wx.Geom(lev));
+            },
+            py::arg("name"), py::arg("lev") = 0,
+            "Fold the deposit collected by covered points of the registered "
+            "nodal scalar field rho_fp back across the embedded surface with "
+            "the PEC image parity (subtracted: image charge of opposite sign)."
+        )
         .def("hybrid_apply_eb_boundary_to_nodal_scalar",
             [](WarpX& wx, std::string const& name, int const lev, bool const odd) {
                 using warpx::fields::FieldType;

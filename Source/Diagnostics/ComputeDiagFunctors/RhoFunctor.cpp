@@ -79,14 +79,20 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
     amrex::ignore_unused(m_apply_rz_psatd_filter);
 #endif
 
-    // For the hybrid solver, enforce the embedded-boundary Dirichlet
-    // condition on the freshly deposited charge density (the density
-    // vanishes at a conducting wall), after the filter and guard-cell sum
-    // so the mirrored values are not smeared into the conductor, matching
-    // the solver's own rho treatment in HybridPICDepositRhoAndJ
+    // For the hybrid solver, fold the deposit collected by covered points
+    // back across the embedded surface and enforce the embedded-boundary
+    // Dirichlet condition on the freshly deposited charge density (the
+    // density vanishes at a conducting wall), after the filter and
+    // guard-cell sum so the mirrored values are not smeared into the
+    // conductor, matching the solver's own rho treatment in
+    // HybridPICDepositRhoAndJ
     if (EB::enabled() &&
         WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
+        warpx::hybrid::FoldEBDepositToNodalScalar(
+            *rho,
+            *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
+            warpx.Geom(m_lev));
         warpx::hybrid::ApplyEBBoundaryToNodalScalar(
             *rho,
             *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),

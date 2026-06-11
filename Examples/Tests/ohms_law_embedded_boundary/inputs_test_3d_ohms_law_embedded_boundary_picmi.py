@@ -297,7 +297,76 @@ def run_plane_battery(sim):
         )
     ck.close("Pe even: deep zero", p[node_rows(-100.0, -1.0), :, :], 0.0, 0.0)
 
-    # --- 6) selectivity against a spatially varying field ----------------
+    # --- 6) deposit fold: PEC image parities, planar closed forms ---------
+    # The covered node row at s=-0.7h holds a deposit c (the shape-function
+    # spill of wall-adjacent particles). Its mirror lands 0.6 of the way
+    # between the first two fluid rows, so the fold delivers -0.6c and -0.4c
+    # (PEC image charge: subtracted) and conserves the folded amount.
+    i_dep = node_rows(-1.0, -0.05)  # s = -0.7h (single row for this wall)
+    i_first = node_rows(0.05, 0.5)  # s = +0.3h
+    i_second = node_rows(1.0, 1.5)  # s = +1.3h
+    rho[...] = 0.0
+    for i in i_dep:
+        rho[i, :, :] = c
+    wx.hybrid_fold_eb_deposit_to_nodal_scalar("rho_fp", 0)
+    r = rho[...]
+    r = r[..., 0] if r.ndim == 4 else r
+    ck.close(
+        "fold rho: first fluid row receives -0.6c", r[i_first, :, :], -0.6 * c, 1e-12
+    )
+    ck.close(
+        "fold rho: second fluid row receives -0.4c", r[i_second, :, :], -0.4 * c, 1e-12
+    )
+    ck.close(
+        "fold rho: fluid beyond the fold reach untouched",
+        r[node_rows(1.6, 10.0), :, :],
+        0.0,
+        0.0,
+    )
+    ck.close(
+        "fold rho: covered deposit left in place for the fill", r[i_dep, :, :], c, 0.0
+    )
+    ck.close(
+        "fold rho: folded amount conserved (sum = -c)",
+        r[i_first[0], :, :] + r[i_second[0], :, :],
+        -c,
+        1e-12,
+    )
+
+    # tangential J: image current antiparallel (subtracted), same geometry
+    Jx = fields.JxFPWrapper()
+    Jy = fields.JyFPWrapper()
+    Jz = fields.JzFPWrapper()
+    Jx[...] = 0.0
+    Jz[...] = 0.0
+    Jy[...] = 0.0
+    for i in i_dep:
+        Jy[i, :, :] = c
+    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0)
+    jy = Jy[...]
+    ck.close("fold J tangential: subtracted -0.6c", jy[i_first, :, :], -0.6 * c, 1e-12)
+    ck.close("fold J tangential: subtracted -0.4c", jy[i_second, :, :], -0.4 * c, 1e-12)
+
+    # normal J: image current parallel (added); the deposit sits on the cut
+    # x-edge with covered center (s=-0.2h), its mirror lands 0.6 of the way
+    # between the first two fluid x-edge rows
+    Jx[...] = 0.0
+    Jy[...] = 0.0
+    Jz[...] = 0.0
+    for i in i_cut:
+        Jx[i, :, :] = c
+    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0)
+    jx = Jx[...]
+    i_cn = cent_rows(0.5, 1.0)  # s = +0.8h
+    ck.close("fold J normal: added +0.4c", jx[i_cn, :, :], 0.4 * c, 1e-12)
+    ck.close(
+        "fold J normal: fluid beyond the fold reach untouched",
+        jx[cent_rows(1.6, 10.0), :, :],
+        0.0,
+        0.0,
+    )
+
+    # --- 7) selectivity against a spatially varying field ----------------
     shape = np.asarray(Ey[...]).shape
     ii, jj, kk = np.meshgrid(
         np.arange(shape[0]), np.arange(shape[1]), np.arange(shape[2]), indexing="ij"

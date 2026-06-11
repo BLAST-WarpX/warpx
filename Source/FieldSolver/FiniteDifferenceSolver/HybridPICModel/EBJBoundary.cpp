@@ -186,6 +186,7 @@ namespace
         bool band;        //!< in the fill band with a usable boundary normal
         amrex::Real s;    //!< signed distance of the point (< 0 in the conductor)
         amrex::Real d_im; //!< distance of the image point from the surface
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;  //!< point position
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim; //!< image position
         amrex::RealVect nv; //!< unit boundary normal (toward the plasma)
     };
@@ -205,7 +206,7 @@ namespace
         MirrorGeom g{};
 
         // point position in physical coordinates
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
+        auto& xe = g.xe;
 #if defined(WARPX_DIM_3D)
         xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
         xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
@@ -826,6 +827,222 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #else
     amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
                          direct_fill, normal_odd, fill_covered_centers, status_cache);
+#endif
+}
+
+void warpx::hybrid::FoldEBDepositToNodalScalar (
+    amrex::MultiFab& field,
+    amrex::MultiFab const& distance_to_eb,
+    amrex::Geometry const& geom)
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    using namespace amrex::literals;
+
+    ABLASTR_PROFILE("warpx::hybrid::FoldEBDepositToNodalScalar()");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(field.ixType().nodeCentered(),
+        "FoldEBDepositToNodalScalar requires a fully nodal field");
+
+    auto const plo = geom.ProbLoArray();
+    auto const dxi = geom.InvCellSizeArray();
+    auto const dx_arr = geom.CellSizeArray();
+
+#if defined(WARPX_DIM_3D)
+    amrex::Real const h_max = std::max({dx_arr[0], dx_arr[1], dx_arr[2]});
+#else
+    amrex::Real const h_max = std::max(dx_arr[0], dx_arr[1]);
+#endif
+    // deposit shape functions reach one cell past the surface; fold targets
+    // mirror that reach on the fluid side
+    amrex::Real const fold_band = 1.5_rt * h_max;
+
+    // covered-side ghosts must hold the guard-summed deposit
+    field.FillBoundary(geom.periodicity());
+
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const stag0{};
+
+    for (amrex::MFIter mfi(field, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        amrex::Box const tb = mfi.tilebox();
+        int const ncomp = field.nComp();
+
+        auto const& f = field.array(mfi);
+        auto const& f_r = field.const_array(mfi);
+        auto const& phi = distance_to_eb.const_array(mfi);
+
+        amrex::ParallelFor(tb, ncomp,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+        {
+            // fluid points within the fold reach of the surface receive the
+            // image of the deposit collected by the covered points (write
+            // set phi > 0 and gather set phi <= 0 are disjoint)
+            amrex::Real const s = phi(i, j, k);
+            if (s <= 0._rt || s > fold_band) { return; }
+
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
+#if defined(WARPX_DIM_3D)
+            xe[0] = plo[0] + i*dx_arr[0];
+            xe[1] = plo[1] + j*dx_arr[1];
+            xe[2] = plo[2] + k*dx_arr[2];
+            amrex::Real const yq = xe[1];
+            amrex::Real const zq = xe[2];
+#else
+            xe[0] = plo[0] + i*dx_arr[0];
+            xe[1] = plo[1] + j*dx_arr[1];
+            amrex::Real const yq = 0._rt;
+            amrex::Real const zq = xe[1];
+#endif
+
+            int ii, jj, kk;
+            amrex::Real W[AMREX_SPACEDIM][2];
+            ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
+            int ic, jc, kc;
+            amrex::Real Wc[AMREX_SPACEDIM][2];
+            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
+                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
+            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
+            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) { return; }
+            DistanceToEB::normalize(nv);
+
+            // exact mirror image of this point inside the conductor
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xm;
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                xm[d] = xe[d] - 2._rt*s*nv[d];
+            }
+
+            // raw (un-renormalized) covered-only interpolation: fluid
+            // stencil points contribute nothing, so only the deposit that
+            // actually landed on covered points is folded
+            auto const [v, w] = gather_staggered_pred(
+                f_r,
+                [&] (int ig, int jg, int kg) { return phi(ig, jg, kg) <= 0._rt; },
+                xm, stag0, plo, dxi, n);
+
+            // PEC image charge has the opposite sign (matches the domain
+            // treatment in PEC::ApplyReflectiveBoundarytoRhofield)
+            f(i, j, k, n) -= v*w;
+        });
+    }
+#else
+    amrex::ignore_unused(field, distance_to_eb, geom);
+#endif
+}
+
+void warpx::hybrid::FoldEBDepositToField (
+    ablastr::fields::VectorField const& field,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
+    amrex::MultiFab const& distance_to_eb,
+    amrex::Geometry const& geom,
+    EBFillStatus* status_cache)
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    using namespace amrex::literals;
+
+    ABLASTR_PROFILE("warpx::hybrid::FoldEBDepositToField()");
+
+    if (!eb_update[0]) { return; }
+
+    auto const plo = geom.ProbLoArray();
+    auto const dxi = geom.InvCellSizeArray();
+    auto const dx_arr = geom.CellSizeArray();
+
+#if defined(WARPX_DIM_3D)
+    amrex::Real const h_max = std::max({dx_arr[0], dx_arr[1], dx_arr[2]});
+#else
+    amrex::Real const h_max = std::max(dx_arr[0], dx_arr[1]);
+#endif
+    amrex::Real const d_band = h_max;
+    amrex::Real const d_img_min = 0.5_rt * h_max;
+    amrex::Real const fold_band = 1.5_rt * h_max;
+
+    std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> stag{};
+    for (int c = 0; c < 3; ++c) {
+        auto const t = field[c]->ixType();
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            stag[c][d] = t.nodeCentered(d) ? 0.0_rt : 0.5_rt;
+        }
+    }
+
+    // the covered set of the fold is exactly the write set of the fill with
+    // covered-center cut edges included
+    warpx::hybrid::EBFillStatus local_status;
+    warpx::hybrid::EBFillStatus& st = status_cache ? *status_cache : local_status;
+    if (st.empty()) {
+        ::build_fill_status(st, field, eb_update, distance_to_eb, geom, stag,
+                            d_band, d_img_min, h_max,
+                            /*fill_covered_centers=*/true);
+    }
+
+    for (int c = 0; c < 3; ++c) {
+        field[c]->FillBoundary(geom.periodicity());
+    }
+
+    for (int c = 0; c < 3; ++c) {
+        auto const stag_own = stag[c];
+        auto const stag_x = stag[0];
+        auto const stag_y = stag[1];
+        auto const stag_z = stag[2];
+
+        for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+            int const ncomp = field[c]->nComp();
+
+            auto const& Jc = field[c]->array(mfi);
+            auto const& Jx_l = field[0]->const_array(mfi);
+            auto const& Jy_l = field[1]->const_array(mfi);
+            auto const& Jz_l = field[2]->const_array(mfi);
+            auto const& stat = st.status[c]->const_array(mfi);
+            auto const& stat_x = st.status[0]->const_array(mfi);
+            auto const& stat_y = st.status[1]->const_array(mfi);
+            auto const& stat_z = st.status[2]->const_array(mfi);
+            auto const& phi = distance_to_eb.const_array(mfi);
+
+            amrex::ParallelFor(tb, ncomp,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                // fluid (solution) points near the surface receive the fold;
+                // covered points are read only (disjoint sets, race-free)
+                if (stat(i, j, k) != S_SOLUTION) { return; }
+
+                auto const g = ::mirror_geom(i, j, k, stag_own, phi,
+                    plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                if (g.s <= 0._rt || g.s > fold_band || !g.band) { return; }
+
+                // exact mirror image of this point inside the conductor
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xm;
+                for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                    xm[d] = g.xe[d] - 2._rt*g.s*g.nv[d];
+                }
+
+                // raw covered-only interpolation of the deposit per component
+                auto const cov_x = [&] (int ig, int jg, int kg) { return stat_x(ig, jg, kg) != S_SOLUTION; };
+                auto const cov_y = [&] (int ig, int jg, int kg) { return stat_y(ig, jg, kg) != S_SOLUTION; };
+                auto const cov_z = [&] (int ig, int jg, int kg) { return stat_z(ig, jg, kg) != S_SOLUTION; };
+                auto const [vx, wx] = gather_staggered_pred(Jx_l, cov_x, xm, stag_x, plo, dxi, n);
+                auto const [vy, wy] = gather_staggered_pred(Jy_l, cov_y, xm, stag_y, plo, dxi, n);
+                auto const [vz, wz] = gather_staggered_pred(Jz_l, cov_z, xm, stag_z, plo, dxi, n);
+                amrex::Real const gx = vx*wx;
+                amrex::Real const gy = vy*wy;
+                amrex::Real const gz = vz*wz;
+
+#if defined(WARPX_DIM_3D)
+                amrex::Real const ndotg = g.nv[0]*gx + g.nv[1]*gy + g.nv[2]*gz;
+                amrex::Real const e_dot_n = g.nv[c];
+#else
+                amrex::Real const ndotg = g.nv[0]*gx + g.nv[1]*gz;
+                amrex::Real const e_dot_n = (c == 0) ? g.nv[0] : ((c == 2) ? g.nv[1] : 0._rt);
+#endif
+                amrex::Real const g_e = (c == 0) ? gx : ((c == 1) ? gy : gz);
+
+                // PEC image current: normal part added, tangential part
+                // subtracted (matches PEC::ApplyReflectiveBoundarytoJfield)
+                Jc(i, j, k, n) += ndotg*e_dot_n - (g_e - ndotg*e_dot_n);
+            });
+        }
+    }
+#else
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache);
 #endif
 }
 
