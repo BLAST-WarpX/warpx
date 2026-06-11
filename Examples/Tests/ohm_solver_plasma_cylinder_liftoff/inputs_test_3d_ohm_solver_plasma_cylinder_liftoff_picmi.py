@@ -16,6 +16,13 @@
 # --- numerically seeded azimuthal modes (the Cartesian grid breaks the
 # --- rotational symmetry with an m=4 perturbation), measured by the
 # --- companion analysis script from the azimuthal spectra of rho and Bz.
+# ---
+# --- NOTE (multi-box runs): the conformal face borrowing does not
+# --- communicate across grid boxes (inherited ECT limitation, see the
+# --- use_conformal_eb documentation), and in this slab the z direction is a
+# --- single block, so any decomposition puts box seams across the wall
+# --- circle. Single-box (single-GPU) runs are unaffected; for mode-growth
+# --- studies on many ranks, ghost-aware borrowing is pending follow-up work.
 
 import argparse
 import sys

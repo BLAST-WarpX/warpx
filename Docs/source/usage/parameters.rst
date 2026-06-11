@@ -3773,6 +3773,15 @@ Maxwell solver: kinetic-fluid hybrid
     into their neighbors, avoiding any time-step reduction. This makes the field solution near embedded
     boundaries second-order accurate instead of first-order. Requires embedded boundaries and a
     3D Cartesian staggered grid (not compatible with collocated grids, RZ geometry, or PML boundaries).
+    Known limitation (inherited from the ``ect`` Maxwell solver, also present there): the
+    enlarged-cell face borrowing is local to each grid box and does not communicate across box
+    boundaries, so cut faces whose stabilizing neighbors live in another box are handled
+    inconsistently (deterministically, but with locally reduced accuracy at the box seam).
+    Single-box (e.g. single-GPU) runs are unaffected. For multi-box runs, decompose the domain
+    such that box boundaries do not cross cut cells where possible (e.g. split only along the
+    extrusion direction of the embedded boundary). Making the borrowing ghost-aware is planned
+    follow-up work.
+
     With embedded boundaries the hybrid solver also enforces the PEC boundary condition on the
     Ampere/plasma current (including the external-current subtraction), on the deposited ion current,
     and on the Ohm's-law electric field (which, unlike the EM solvers' E that is integrated from the
