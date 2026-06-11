@@ -14,6 +14,8 @@
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/MultiFabRegister.H>
 
+#include <AMReX_Functional.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_Scan.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
@@ -357,6 +359,54 @@ namespace
         amrex::Abort("SetNeigh: dim must be 0, 1 or 2");
     }
 
+
+    /**
+    * \brief Get the address of the value of arr in the neighbor (i_n, j_n) on
+    * the plane with normal 'dim' (same indexing convention as GetNeigh), for
+    * atomic updates of the neighbor's value.
+    *
+    * \param[in] arr data to be accessed
+    * \param[in] i, j, k the indices of the "center" cell
+    * \param[in] i_n the offset of the neighbor in the first direction
+    * \param[in] j_n the offset of the neighbor in the second direction
+    * \param[in] dim normal direction to the plane in consideration (0 for x, 1 for y, 2 for z)
+    */
+    template <class T>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    constexpr
+    T*
+    GetNeighPtr(const amrex::Array4<T>& arr,
+            const int i, const int j, const int k,
+            const int i_n, const int j_n, const int dim){
+
+        if(dim == 0){
+            return &arr(i, j + i_n, k + j_n);
+        }
+    #ifdef WARPX_DIM_XZ
+        else if(dim == 1 || (dim == 2)){
+            return &arr(i + i_n, j + j_n, k);
+        }
+    #elif defined(WARPX_DIM_3D)
+        else if(dim == 1){
+            return &arr(i + i_n, j, k + j_n);
+        }
+        else if(dim == 2){
+            return &arr(i + i_n, j + j_n, k);
+        }
+    #else
+        else if(dim == 1){
+            amrex::Abort("GetNeighPtr: Only implemented in 2D3V and 3D3V");
+        }
+        else if(dim == 2){
+            return &arr(i + i_n, j + j_n, k);
+        }
+    #endif
+
+        amrex::Abort("GetNeighPtr: dim must be 0, 1 or 2");
+
+        return nullptr;
+    }
+
 #ifdef AMREX_USE_EB
 
 #ifndef WARPX_DIM_RZ
@@ -665,6 +715,7 @@ WarpX::ComputeOneWayExtensions ()
                     const amrex::Real S_stab = ::ComputeSStab(i, j, k, lx, ly, lz, dx, dy, dz, idim);
 
                     const amrex::Real S_ext = S_stab - S(i, j, k);
+                    int n_borrowed = 0;
                     for (int i_n = -1; i_n < 2; i_n++) {
                         for (int j_n = -1; j_n < 2; j_n++) {
                             //This if makes sure that we don't visit the "diagonal neighbours"
@@ -674,15 +725,22 @@ WarpX::ComputeOneWayExtensions ()
                                 // has given away already some area, so we use Sz_red rather than Sz.
                                 // If no face is available we don't do anything and we will need to use the
                                 // multi-face extensions.
-                                if (::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) > S_ext
-                                    && (::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
-                                         || GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
-                                    && flag_ext_face(i, j, k)) {
+                                // The area is taken with an atomic test-and-subtract: on GPU
+                                // several faces can try to borrow from the same intruded face
+                                // concurrently, and a plain read-test-write lets the intruded
+                                // face give the same area away more than once (issue #2257;
+                                // equivalent to the fix proposed in PR #2298)
+                                const bool borrowed = amrex::Gpu::Atomic::If(
+                                    ::GetNeighPtr(S_mod, i, j, k, i_n, j_n, idim),
+                                    S_ext, amrex::Minus<amrex::Real>(),
+                                    [=] (amrex::Real rem) {
+                                        return rem > amrex::Real(0.)
+                                            && (::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
+                                                || ::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
+                                            && flag_ext_face(i, j, k);
+                                    });
 
-                                    ::SetNeigh(S_mod,
-                                             ::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - S_ext,
-                                             i, j, k, i_n, j_n, idim);
-
+                                if (borrowed) {
                                     // Insert the index of the face info
                                     borrowing_inds[ps] = ps;
                                     // Store the information about the intruded face in the dataset of the
@@ -695,9 +753,18 @@ WarpX::ComputeOneWayExtensions ()
                                     // Add the area to the intruding face.
                                     S_mod(i, j, k) = S(i, j, k) + S_ext;
                                     flag_ext_face(i, j, k) = false;
+                                    n_borrowed += 1;
                                 }
                             }
                         }
+                    }
+                    // A concurrently extended face may have drained the intruded
+                    // face between the counting and the borrowing pass: keep the
+                    // recorded size consistent with the entries actually written
+                    // (the face then remains flagged for the eight-ways extension)
+                    borrowing_size(i, j, k) = n_borrowed;
+                    if (n_borrowed == 0) {
+                        borrowing_inds_pointer(i, j, k) = nullptr;
                     }
                 }
             }, amrex::Scan::Type::exclusive);
@@ -847,10 +914,25 @@ WarpX::ComputeEightWaysExtensions ()
                     if(denom >= S_ext){
                         S_mod(i, j, k) = S(i, j, k);
                         int count = 0;
+                        bool all_borrowed = true;
                         for (int i_n = -1; i_n < 2; i_n++) {
                             for (int j_n = -1; j_n < 2; j_n++) {
-                                if(local_avail(i_n + 1, j_n + 1) != 0_rt){
+                                if(local_avail(i_n + 1, j_n + 1) != 0_rt && count < nborrow){
                                     const amrex::Real patch = S_ext * ::GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
+                                    // Atomic test-and-subtract, for the same reason as in
+                                    // ComputeOneWayExtensions: an intruded face shared by
+                                    // concurrently extended faces must not give the same
+                                    // area away more than once (issue #2257, PR #2298)
+                                    const bool borrowed = amrex::Gpu::Atomic::If(
+                                        ::GetNeighPtr(S_mod, i, j, k, i_n, j_n, idim),
+                                        patch, amrex::Minus<amrex::Real>(),
+                                        [=] (amrex::Real rem) {
+                                            return rem > amrex::Real(0.);
+                                        });
+                                    if (!borrowed) {
+                                        all_borrowed = false;
+                                        continue;
+                                    }
                                     borrowing_inds[ps + count] = ps + count;
                                     FaceInfoBox::addConnectedNeighbor(i_n, j_n, ps + count,
                                                                       borrowing_neigh_faces);
@@ -859,14 +941,28 @@ WarpX::ComputeEightWaysExtensions ()
                                     ::SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
 
                                     S_mod(i, j, k) += patch;
-                                    ::SetNeigh(S_mod,
-                                             ::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch,
-                                             i, j, k, i_n, j_n, idim);
                                     count +=1;
                                 }
                             }
                         }
-                        flag_ext_face(i, j, k) = false;
+                        // Keep the recorded size consistent with the entries actually
+                        // written; only a fully extended face is unflagged (a partially
+                        // extended face would not reach its stable area and is reported
+                        // by the unstable-faces check)
+                        borrowing_size(i, j, k) = count;
+                        if (count == 0) {
+                            borrowing_inds_pointer(i, j, k) = nullptr;
+                        }
+                        if (all_borrowed) {
+                            flag_ext_face(i, j, k) = false;
+                        }
+                    }
+                    else {
+                        // The face could not be extended after all (the area
+                        // available shrank between the counting and the
+                        // borrowing pass): record that nothing was borrowed
+                        borrowing_size(i, j, k) = 0;
+                        borrowing_inds_pointer(i, j, k) = nullptr;
                     }
                 }
             }, amrex::Scan::Type::exclusive);

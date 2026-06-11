@@ -352,7 +352,12 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                         kp = k;
                     }
 
-                    Venl_dim(ip, jp, kp) += rho_enl * borrowing_dim_area[ind];
+                    // Several enlarged faces can intrude the same neighbor:
+                    // the scatter into the intruded face must be atomic on GPU
+                    // (lost updates here feed first-order errors into the
+                    // intruded faces' B push at every substep)
+                    amrex::Gpu::Atomic::AddNoRet(
+                        &Venl_dim(ip, jp, kp), rho_enl * borrowing_dim_area[ind]);
 
                 }
 
