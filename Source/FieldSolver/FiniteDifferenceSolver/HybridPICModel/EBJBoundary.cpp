@@ -149,21 +149,22 @@ namespace
 #endif
 }
 
-void warpx::hybrid::ApplyPECBoundaryToEdgeField (
+void warpx::hybrid::ApplyPECBoundaryToField (
     ablastr::fields::VectorField const& field,
-    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_E,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
     amrex::Real rtol,
     int max_iters,
-    bool direct_fill)
+    bool direct_fill,
+    bool normal_odd)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
 
-    ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToEdgeField()");
+    ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToField()");
 
-    if (!eb_update_E[0]) { return; }
+    if (!eb_update[0]) { return; }
 
     auto const plo = geom.ProbLoArray();
     auto const dxi = geom.InvCellSizeArray();
@@ -214,10 +215,10 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                 auto const& Jx_l = field[0]->const_array(mfi);
                 auto const& Jy_l = field[1]->const_array(mfi);
                 auto const& Jz_l = field[2]->const_array(mfi);
-                auto const& mask = eb_update_E[c]->const_array(mfi);
-                auto const& mask_x = eb_update_E[0]->const_array(mfi);
-                auto const& mask_y = eb_update_E[1]->const_array(mfi);
-                auto const& mask_z = eb_update_E[2]->const_array(mfi);
+                auto const& mask = eb_update[c]->const_array(mfi);
+                auto const& mask_x = eb_update[0]->const_array(mfi);
+                auto const& mask_y = eb_update[1]->const_array(mfi);
+                auto const& mask_z = eb_update[2]->const_array(mfi);
                 auto const& phi = distance_to_eb.const_array(mfi);
 
                 amrex::ParallelFor(tb, ncomp,
@@ -292,9 +293,11 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
 #endif
                     amrex::Real const J_im_e = (c == 0) ? Jx_im : ((c == 1) ? Jy_im : Jz_im);
 
-                    // normal component is even across the surface (zero normal
-                    // gradient), tangential part is odd (zero at the surface)
-                    Jc(i, j, k, n) = ndotJ*e_dot_n + (s/d_im)*(J_im_e - ndotJ*e_dot_n);
+                    // edge fields (E, J): normal even / tangential odd;
+                    // magnetic field: normal odd / tangential even
+                    amrex::Real const w_n = normal_odd ? s/d_im : 1._rt;
+                    amrex::Real const w_t = normal_odd ? 1._rt : s/d_im;
+                    Jc(i, j, k, n) = w_n*ndotJ*e_dot_n + w_t*(J_im_e - ndotJ*e_dot_n);
                 });
             }
         }
@@ -347,7 +350,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
                 auto const& Jx_o = Jold[0].const_array(mfi);
                 auto const& Jy_o = Jold[1].const_array(mfi);
                 auto const& Jz_o = Jold[2].const_array(mfi);
-                auto const& mask = eb_update_E[c]->const_array(mfi);
+                auto const& mask = eb_update[c]->const_array(mfi);
                 auto const& phi = distance_to_eb.const_array(mfi);
 
                 reduce_op.eval(tb, ncomp, reduce_data,
@@ -428,9 +431,11 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
 #endif
                     amrex::Real const J_im_e = (c == 0) ? Jx_im : ((c == 1) ? Jy_im : Jz_im);
 
-                    // normal component is even across the surface (zero normal
-                    // gradient), tangential part is odd (zero at the surface)
-                    amrex::Real const v_new = ndotJ*e_dot_n + (s/d_im)*(J_im_e - ndotJ*e_dot_n);
+                    // edge fields (E, J): normal even / tangential odd;
+                    // magnetic field: normal odd / tangential even
+                    amrex::Real const w_n = normal_odd ? s/d_im : 1._rt;
+                    amrex::Real const w_t = normal_odd ? 1._rt : s/d_im;
+                    amrex::Real const v_new = w_n*ndotJ*e_dot_n + w_t*(J_im_e - ndotJ*e_dot_n);
 
                     Jc(i, j, k, n) = v_new;
 
@@ -451,7 +456,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
     if (resid > rtol) {
         ablastr::warn_manager::WMRecordWarning(
             "HybridPIC",
-            "ApplyPECBoundaryToEdgeField: the embedded-boundary field band "
+            "ApplyPECBoundaryToField: the embedded-boundary field band "
             "relaxation did not reach the requested tolerance "
             "(hybrid_pic_model.eb_bc_rtol) within "
             "hybrid_pic_model.eb_bc_max_iters sweeps.",
@@ -464,7 +469,7 @@ void warpx::hybrid::ApplyPECBoundaryToEdgeField (
         field[c]->FillBoundary(geom.periodicity());
     }
 #else
-    amrex::ignore_unused(field, eb_update_E, distance_to_eb, geom, rtol, max_iters,
-                         direct_fill);
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
+                         direct_fill, normal_odd);
 #endif
 }

@@ -317,7 +317,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // otherwise spill current onto edges inside the conductor)
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
-            warpx::hybrid::ApplyPECBoundaryToEdgeField(
+            warpx::hybrid::ApplyPECBoundaryToField(
                 m_fields.get_alldirs(FieldType::current_fp, lev),
                 m_eb_update_E[lev],
                 *m_fields.get(FieldType::distance_to_eb, lev),

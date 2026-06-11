@@ -21,20 +21,23 @@
 namespace warpx::hybrid
 {
     /** \brief Enforce the PEC boundary condition on embedded-boundary masked
-     * edges of an edge-staggered vector field (the hybrid solver's current
-     * density and Ohm's-law electric field).
+     * points of a staggered vector field (the hybrid solver's current
+     * density, Ohm's-law electric field, and recovered magnetic field).
      *
-     * On every edge where \c eb_update_E is 0 the field is rewritten from the
-     * level-set geometry (nodal signed distance \c distance_to_eb, < 0 inside
-     * the conductor, and the boundary normal from its gradient):
+     * On every point where the update mask is 0 the field is rewritten from
+     * the level-set geometry (nodal signed distance \c distance_to_eb, < 0
+     * inside the conductor, and the boundary normal from its gradient):
      *
-     * - edges deeper than a band of one cell inside the conductor are set to 0
-     *   (no volume current and no electric field inside a perfect conductor);
-     * - edges in the boundary band are filled from a mirror image point in the
-     *   plasma: the component normal to the boundary is even across the
-     *   surface (zero normal gradient) while the tangential part is odd
-     *   (zero at the surface), which enforces the PEC condition at the actual
-     *   embedded boundary to second order.
+     * - points deeper than a band of one cell inside the conductor are set
+     *   to 0 (no fields inside a perfect conductor);
+     * - points in the boundary band are filled from a mirror image point in
+     *   the plasma. For edge fields (E, J; \c normal_odd = false) the
+     *   tangential part is odd across the surface (zero at the wall) and the
+     *   normal component is even (zero normal gradient). For the magnetic
+     *   field (\c normal_odd = true) the parities are swapped: the normal
+     *   component is odd (flux-excluding PEC, B.n = 0 at the wall) and the
+     *   tangential part is even. Either way the PEC condition is enforced at
+     *   the actual embedded boundary to second order.
      *
      * Two fill strategies are available. With \c direct_fill the mirrored
      * interpolation uses only unmasked (solution-domain) values, with the
@@ -48,23 +51,27 @@ namespace warpx::hybrid
      *
      * Unmasked (including conformally cut) edges are never modified.
      *
-     * \param[in,out] field edge-staggered vector field (all 3 components)
-     * \param[in] eb_update_E per-component embedded-boundary update masks
+     * \param[in,out] field staggered vector field (all 3 components)
+     * \param[in] eb_update per-component embedded-boundary update masks
      * \param[in] distance_to_eb nodal signed-distance function to the boundary
      * \param[in] geom level geometry
      * \param[in] rtol residual tolerance of the band relaxation
      * \param[in] max_iters maximum number of Jacobi sweeps
      * \param[in] direct_fill use the single-pass masked-stencil fill instead
      *            of the Jacobi relaxation
+     * \param[in] normal_odd reflect the normal component oddly and the
+     *            tangential part evenly (magnetic-field parity) instead of
+     *            the converse (electric-field/current parity)
      */
-    void ApplyPECBoundaryToEdgeField (
+    void ApplyPECBoundaryToField (
         ablastr::fields::VectorField const& field,
-        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_E,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
         amrex::MultiFab const& distance_to_eb,
         amrex::Geometry const& geom,
         amrex::Real rtol,
         int max_iters,
-        bool direct_fill);
+        bool direct_fill,
+        bool normal_odd = false);
 }
 
 #endif // WARPX_EBJBOUNDARY_H_

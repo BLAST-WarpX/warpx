@@ -369,7 +369,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // tangential J vanishes at the surface, normal J has zero normal gradient
     // and the deep conductor interior carries no volume current
     if (EB::enabled()) {
-        warpx::hybrid::ApplyPECBoundaryToEdgeField(
+        warpx::hybrid::ApplyPECBoundaryToField(
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
@@ -446,7 +446,7 @@ void HybridPICModel::HybridPICSolveE (
     // masked edges directly (tangential E vanishes at the surface, normal E
     // has zero normal gradient, zero deep inside the conductor)
     if (EB::enabled()) {
-        warpx::hybrid::ApplyPECBoundaryToEdgeField(
+        warpx::hybrid::ApplyPECBoundaryToField(
             Efield, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
