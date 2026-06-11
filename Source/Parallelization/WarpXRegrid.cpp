@@ -211,6 +211,17 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
             }
         }
 
+        // The cached embedded-boundary fill classification of the hybrid
+        // solver depends on the grid layout: rebuild on first use
+        if (eb_enabled && m_hybrid_pic_model) {
+            if (lev < static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size())) {
+                m_hybrid_pic_model->m_eb_bc_status_E[lev].reset();
+            }
+            if (lev < static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_B.size())) {
+                m_hybrid_pic_model->m_eb_bc_status_B[lev].reset();
+            }
+        }
+
         if (eb_enabled) {
 #ifdef AMREX_USE_EB
             int const max_guard = guard_cells.ng_FieldSolver.max();

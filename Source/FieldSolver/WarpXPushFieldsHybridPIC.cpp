@@ -320,6 +320,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // Ohm's-law interpolation of rho second-order accurate)
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
+            if (static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size()) <= lev) {
+                m_hybrid_pic_model->m_eb_bc_status_E.resize(lev+1);
+            }
             warpx::hybrid::ApplyPECBoundaryToField(
                 m_fields.get_alldirs(FieldType::current_fp, lev),
                 m_eb_update_E[lev],
@@ -327,7 +330,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 Geom(lev),
                 m_hybrid_pic_model->m_eb_bc_rtol,
                 m_hybrid_pic_model->m_eb_bc_max_iters,
-                m_hybrid_pic_model->m_eb_bc_direct_fill);
+                m_hybrid_pic_model->m_eb_bc_direct_fill,
+                /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
             warpx::hybrid::ApplyEBBoundaryToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),

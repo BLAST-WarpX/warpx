@@ -367,13 +367,19 @@ void HybridPICModel::CalculatePlasmaCurrent (
 
     // Enforce the PEC current boundary condition at the embedded boundary:
     // tangential J vanishes at the surface, normal J has zero normal gradient
-    // and the deep conductor interior carries no volume current
+    // and the deep conductor interior carries no volume current. Cut edges
+    // whose centers are on or inside the surface are filled too (the Ampere
+    // current is evaluated at the covered centers and is not meaningful
+    // there).
     if (EB::enabled()) {
+        if (static_cast<int>(m_eb_bc_status_E.size()) <= lev) { m_eb_bc_status_E.resize(lev+1); }
         warpx::hybrid::ApplyPECBoundaryToField(
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill);
+            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
+            /*normal_odd=*/false, /*fill_covered_centers=*/true,
+            &m_eb_bc_status_E[lev]);
     }
 }
 
@@ -444,13 +450,19 @@ void HybridPICModel::HybridPICSolveE (
     // updated B and is therefore self-consistent at embedded boundaries, the
     // Ohm's-law E is algebraic, so the PEC condition must be enforced on the
     // masked edges directly (tangential E vanishes at the surface, normal E
-    // has zero normal gradient, zero deep inside the conductor)
+    // has zero normal gradient, zero deep inside the conductor), including
+    // cut edges whose centers are on or inside the surface (Ohm's law
+    // evaluates them at the covered centers, where the interpolated density
+    // collapses to the floor and the result is spurious)
     if (EB::enabled()) {
+        if (static_cast<int>(m_eb_bc_status_E.size()) <= lev) { m_eb_bc_status_E.resize(lev+1); }
         warpx::hybrid::ApplyPECBoundaryToField(
             Efield, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill);
+            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
+            /*normal_odd=*/false, /*fill_covered_centers=*/true,
+            &m_eb_bc_status_E[lev]);
     }
 }
 

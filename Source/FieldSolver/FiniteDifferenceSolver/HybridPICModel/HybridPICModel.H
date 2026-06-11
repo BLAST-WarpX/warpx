@@ -15,6 +15,7 @@
 
 #include "Fields.H"
 
+#include "EBJBoundary.H"
 #include "ExternalVectorPotential.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
@@ -261,6 +262,14 @@ public:
      *  with a single-pass mirrored interpolation over unmasked
      *  (solution-domain) values instead of the Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
+
+    /** Cached embedded-boundary fill classification for the edge fields
+     *  (current density and Ohm's-law E), one entry per level; reset on
+     *  regrid. Mutable: the cache is (re)built inside const solver calls. */
+    mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_E;
+    /** Cached embedded-boundary fill classification for the recovered
+     *  magnetic field, one entry per level; reset on regrid */
+    mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_B;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

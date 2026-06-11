@@ -3786,13 +3786,17 @@ Maxwell solver: kinetic-fluid hybrid
     Ampere/plasma current (including the external-current subtraction), on the deposited ion current,
     and on the Ohm's-law electric field (which, unlike the EM solvers' E that is integrated from the
     conformally updated B, is algebraic and therefore needs the boundary condition imposed directly):
-    on every edge where the E field is not updated, the field is rewritten from the level-set geometry
-    (signed distance and boundary normal) by mirror-image interpolation such that the tangential
-    component vanishes at the embedded surface, the normal component has zero normal gradient (Neumann),
-    and the deep conductor interior carries neither volume current nor electric field. The internal
-    layer is relaxed with Jacobi sweeps to make neighboring values consistent to second order (see
-    :pp:param:`hybrid_pic_model.eb_bc_rtol`). Consequently, prescribing
-    ``hybrid_pic_model.J*_external_grid_function`` inside a conductor has no effect; use
+    on every edge where the E field is not updated — and on cut edges whose centers lie on or inside
+    the embedded surface, where the algebraic Ohm's law would otherwise be evaluated at a covered
+    point and produce spurious values that the conformal Faraday update integrates into B — the field
+    is rewritten from the level-set geometry (signed distance and boundary normal) by mirror-image
+    interpolation such that the tangential component vanishes at the embedded surface, the normal
+    component has zero normal gradient (Neumann), and the deep conductor interior carries neither
+    volume current nor electric field. Fill points whose mirror-image interpolation is well posed
+    (most of the stencil weight in the solution domain) are set directly in one deterministic pass;
+    the remainder (sharp corners, thin gaps, shallow-angle walls) are resolved by a deterministic
+    cascade that locks the direct values and fills the rest from them sweep by sweep. Consequently,
+    prescribing ``hybrid_pic_model.J*_external_grid_function`` inside a conductor has no effect; use
     ``external_vector_potential`` to drive coils embedded in conductors.
 
     In addition, the deposited ion charge density is mirrored oddly across the embedded surface
@@ -3832,10 +3836,12 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If ``true`` (default), the embedded-boundary PEC boundary condition is filled with a single-pass
-    mirrored interpolation that uses only solution-domain (unmasked) values, with the stencil weights
-    renormalized over the unmasked points. If ``false``, the iterative Jacobi band relaxation is used
-    instead, controlled by :pp:param:`hybrid_pic_model.eb_bc_rtol` and
-    :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
+    mirrored interpolation that uses only solution-domain values (stencil weights renormalized over
+    those points), followed, where the interpolation is ill posed, by a deterministic cascade that
+    locks the direct-pass values and fills the remaining points from them (capped at
+    :pp:param:`hybrid_pic_model.eb_bc_max_iters` sweeps). The fill classification is cached between
+    calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
+    :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
 .. pp:param:: hybrid_pic_model.use_global_A_recovery
     :type: ``bool``
