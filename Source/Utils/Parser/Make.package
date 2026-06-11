@@ -1,4 +1,4 @@
-CEXE_sources += IntervalsParser.cpp
+CEXE_sources += BTDIntervalsParser.cpp
 CEXE_sources += ParserUtils.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Utils/Parser
