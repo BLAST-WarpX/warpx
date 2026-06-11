@@ -304,15 +304,12 @@ struct InjectorMomentumJuttner
                  amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
-        // Sobol method for sampling MJ Speeds,
-        // from Zenitani 2015 (Phys. Plasmas 22, 042116).
         amrex::Real x1, x2, gamma;
         amrex::Real u [3];
         amrex::Real const theta = temperature(x,y,z);
-        // Check if temperature is too low to do sampling method. Abort for now,
-        // in future should implement an alternate method e.g. inverse transform
-        if (theta < 0.1_rt) {
-            amrex::Abort("Temperature parameter theta is less than minimum 0.1 allowed for Maxwell-Juttner");
+        if (theta < 0) {
+            amrex::Abort("Temperature parameter theta is less than zero, "
+                "which is not allowed for Maxwell-Juttner distribution.");
         }
         // Calculate local velocity and abort if |beta|>=1
         amrex::Real const beta = velocity(x,y,z);
@@ -320,28 +317,51 @@ struct InjectorMomentumJuttner
             amrex::Abort("beta = v/c magnitude greater than or equal to 1");
         }
         int const dir = velocity.direction();
-        x1 = static_cast<amrex::Real>(0._rt);
-        gamma = static_cast<amrex::Real>(0._rt);
-        u[dir] = static_cast<amrex::Real>(0._rt);
-        // This condition is equation 10 in Zenitani,
-        // though x1 is defined differently.
-        while(u[dir]-gamma <= x1)
-        {
-            u[dir] = -theta*
-                std::log(amrex::Random(engine)*amrex::Random(engine)*amrex::Random(engine));
-            gamma = std::sqrt(1._rt+u[dir]*u[dir]);
-            x1 = theta*std::log(amrex::Random(engine));
+        // The Sobol rejection method used below becomes inefficient at low
+        // temperature: its acceptance efficiency is K_2(1/theta)/(2 theta^2),
+        // which tends to zero as theta -> 0
+        // (Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13).
+        // For theta < 0.1 the Maxwell-Juttner distribution is indistinguishable
+        // from a non-relativistic Maxwellian, so we instead sample the
+        // momentum from a Gaussian with thermal spread
+        // u_th = sqrt(theta) per component (i.e. sqrt(kB*T/(m*c^2)),
+        // in the Lorentz frame that moves with the bulk drift
+        // where u is the normalized momentum u=gamma*beta.
+        // The flipping method and Lorentz transform below then handle
+        // the bulk drift, exactly as for the Sobol-sampled momentum.
+        if (theta < 0.1_rt) {
+            amrex::Real const u_th = std::sqrt(theta);
+            u[0] = amrex::RandomNormal(0._rt, u_th, engine);
+            u[1] = amrex::RandomNormal(0._rt, u_th, engine);
+            u[2] = amrex::RandomNormal(0._rt, u_th, engine);
+            gamma = std::sqrt(1._rt + u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
+        } else {
+            // Sobol method for sampling MJ Speeds,
+            // from Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13.
+            x1 = 0._rt;
+            gamma = 0._rt;
+            u[dir] = 0._rt;
+            // This condition is equation 10 in Zenitani,
+            // though x1 is defined differently.
+            while(u[dir]-gamma <= x1)
+            {
+                u[dir] = -theta*
+                    std::log(amrex::Random(engine)*amrex::Random(engine)*amrex::Random(engine));
+                gamma = std::sqrt(1._rt+u[dir]*u[dir]);
+                x1 = theta*std::log(amrex::Random(engine));
+            }
+            // The following code samples a random unit vector
+            // and multiplies the result by speed u[dir].
+            x1 = amrex::Random(engine);
+            x2 = amrex::Random(engine);
+            // Direction dir is an input parameter that sets the boost direction:
+            // 'x' -> d = 0, 'y' -> d = 1, 'z' -> d = 2.
+            auto const [sin_x2, cos_x2] = amrex::Math::sincos(2._rt*MathConst::pi*x2);
+            u[(dir+1)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*sin_x2;
+            u[(dir+2)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*cos_x2;
+            // The value of dir is the boost direction to be transformed.
+            u[dir] = u[dir]*(2._rt*x1-1._rt);
         }
-        // The following code samples a random unit vector
-        // and multiplies the result by speed u[dir].
-        x1 = amrex::Random(engine);
-        x2 = amrex::Random(engine);
-        // Direction dir is an input parameter that sets the boost direction:
-        // 'x' -> d = 0, 'y' -> d = 1, 'z' -> d = 2.
-        u[(dir+1)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*std::sin(2._rt*MathConst::pi*x2);
-        u[(dir+2)%3] = 2._rt*u[dir]*std::sqrt(x1*(1._rt-x1))*std::cos(2._rt*MathConst::pi*x2);
-        // The value of dir is the boost direction to be transformed.
-        u[dir] = u[dir]*(2._rt*x1-1._rt);
         x1 = amrex::Random(engine);
         // The following condition is equation 32 in Zenitani, called
         // The flipping method. It transforms the integral: d3x' -> d3x

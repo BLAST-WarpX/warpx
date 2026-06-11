@@ -291,7 +291,7 @@ class Checksum:
             print("Benchmark: %s" % ref_benchmark.data.keys())
             print("Test file: %s" % self.data.keys())
             print(f"\nNew checksums file {self.test_name}.json:")
-            print(json.dumps(self.data, indent=2))
+            print(json.dumps(self.data, sort_keys=True, indent=2))
             sys.exit(1)
 
         # Dictionaries have same inner keys (field and particle quantities)?
@@ -308,7 +308,7 @@ class Checksum:
                 )
                 print("Test file inner keys in %s: %s" % (key1, self.data[key1].keys()))
                 print(f"\nNew checksums file {self.test_name}.json:")
-                print(json.dumps(self.data, indent=2))
+                print(json.dumps(self.data, sort_keys=True, indent=2))
                 sys.exit(1)
 
         # Dictionaries have same values?
@@ -347,5 +347,5 @@ class Checksum:
         print("\nMaximum relative error: {:.2e}".format(max_rel_err))
         if checksums_differ:
             print(f"\nNew checksums file {self.test_name}.json:")
-            print(json.dumps(self.data, indent=2))
+            print(json.dumps(self.data, sort_keys=True, indent=2))
             sys.exit(1)

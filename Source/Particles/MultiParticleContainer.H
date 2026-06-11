@@ -201,6 +201,12 @@ public:
     std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();
 
+    /*
+     * \brief Calculates the electron-ion collision frequency for the specified species
+     * @param[in] electron_species_name name of the electon species
+     */
+    void CalculateNuei (std::string const & electron_species_name);
+
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
