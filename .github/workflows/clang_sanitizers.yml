@@ -28,7 +28,7 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19
@@ -90,7 +90,7 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/clang.sh 19

@@ -25,7 +25,7 @@ jobs:
     env:
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc_minimal.sh
@@ -66,7 +66,7 @@ jobs:
       CXX: "g++-13"
       CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc.sh 13
@@ -113,7 +113,7 @@ jobs:
       CXX: "g++-13"
       CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc_blaspp_lapackpp.sh 13
@@ -161,7 +161,7 @@ jobs:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc_minimal.sh
@@ -200,7 +200,7 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install dependencies
       run: |
         .github/workflows/dependencies/pyfull.sh
