@@ -756,6 +756,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) {
+                    // the embedded-boundary Dirichlet mirror of rho is
+                    // negative inside the conductor: keep the resistivity
+                    // parsers on their physical domain
+                    const Real rho_val_eta = std::max(rho_val, 0._rt);
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -765,7 +769,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    Er(i, j, 0) += eta(rho_val_eta, jtot_val, t_new) * Jr(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -783,7 +787,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                             + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - Jr(i, j, 0)/(r*r);
 
-                        Er(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jr;
+                        Er(i, j, 0) -= eta_h(rho_val_eta, btot_val) * nabla2Jr;
                     }
                 }
 
@@ -827,6 +831,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) {
+                    // the embedded-boundary Dirichlet mirror of rho is
+                    // negative inside the conductor: keep the resistivity
+                    // parsers on their physical domain
+                    const Real rho_val_eta = std::max(rho_val, 0._rt);
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -836,7 +844,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    Etheta(i, j, 0) += eta(rho_val_eta, jtot_val, t_new) * Jtheta(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -857,7 +865,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                                 + T_Algo::Dzz(Jtheta, coefs_z, n_coefs_z, i, j, 0, 0) - Jtheta(i, j, 0)/(r*r);
                         }
 
-                        Etheta(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jtheta;
+                        Etheta(i, j, 0) -= eta_h(rho_val_eta, btot_val) * nabla2Jtheta;
                     }
                 }
 
@@ -895,6 +903,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
                 // Add resistivity only if E field value is used to update B
                 if (solve_for_Faraday) {
+                    // the embedded-boundary Dirichlet mirror of rho is
+                    // negative inside the conductor: keep the resistivity
+                    // parsers on their physical domain
+                    const Real rho_val_eta = std::max(rho_val, 0._rt);
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -904,7 +916,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    Ez(i, j, 0) += eta(rho_val_eta, jtot_val, t_new) * Jz(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -930,7 +942,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                             nabla2Jz += T_Algo::Drr(Jz, coefs_r, n_coefs_r, i, j, 0, 0);
                         }
 
-                        Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
+                        Ez(i, j, 0) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
                     }
                 }
 
@@ -1196,6 +1208,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
+                // the embedded-boundary Dirichlet mirror of rho is negative
+                // inside the conductor: keep the resistivity parsers on
+                // their physical domain
+                const Real rho_val_eta = std::max(rho_val, 0._rt);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1205,7 +1221,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                Ex(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jx(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1222,7 +1238,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
 
-                    Ex(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jx;
+                    Ex(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jx;
                 }
             }
 
@@ -1260,6 +1276,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
+                // the embedded-boundary Dirichlet mirror of rho is negative
+                // inside the conductor: keep the resistivity parsers on
+                // their physical domain
+                const Real rho_val_eta = std::max(rho_val, 0._rt);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1269,7 +1289,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                Ey(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jy(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1286,7 +1306,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
 
-                    Ey(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jy;
+                    Ey(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jy;
                 }
             }
 
@@ -1324,6 +1344,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
+                // the embedded-boundary Dirichlet mirror of rho is negative
+                // inside the conductor: keep the resistivity parsers on
+                // their physical domain
+                const Real rho_val_eta = std::max(rho_val, 0._rt);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1333,7 +1357,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                Ez(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jz(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1350,7 +1374,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
                         + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
 
-                    Ez(i, j, k) -= eta_h(rho_val, btot_val) * nabla2Jz;
+                    Ez(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
                 }
             }
 

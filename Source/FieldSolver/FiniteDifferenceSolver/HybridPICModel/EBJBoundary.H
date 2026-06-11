@@ -72,6 +72,37 @@ namespace warpx::hybrid
         int max_iters,
         bool direct_fill,
         bool normal_odd = false);
+
+    /** \brief Enforce an embedded-boundary condition on a nodal scalar field
+     * (the hybrid solver's ion charge density and electron pressure).
+     *
+     * The nodal level set \c distance_to_eb is collocated with the field, so
+     * every node with a nonpositive signed distance s (on or inside the
+     * conductor surface) is rewritten from a mirror image point in the fluid:
+     *
+     * - \c odd = true: the value is reflected oddly, vanishing at the surface
+     *   (Dirichlet 0; ghost values inside the conductor have the opposite
+     *   sign of the fluid values, e.g. a negative mirrored charge density);
+     * - \c odd = false: the value is reflected evenly (zero normal gradient,
+     *   Neumann; e.g. the wall supports the plasma pressure).
+     *
+     * Nodes deeper than one cell inside the conductor are set to 0. The
+     * mirrored interpolation uses only fluid nodes (positive level set),
+     * with the stencil weights renormalized over those nodes; since the
+     * written nodes are never part of the gather stencil, a single
+     * deterministic pass is exact. Fluid nodes are never modified.
+     *
+     * \param[in,out] field nodal scalar field
+     * \param[in] distance_to_eb nodal signed-distance function to the boundary
+     * \param[in] geom level geometry
+     * \param[in] odd reflect oddly (Dirichlet 0 at the surface) instead of
+     *            evenly (zero normal gradient)
+     */
+    void ApplyEBBoundaryToNodalScalar (
+        amrex::MultiFab& field,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom,
+        bool odd);
 }
 
 #endif // WARPX_EBJBOUNDARY_H_

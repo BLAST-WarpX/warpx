@@ -22,7 +22,7 @@ import sys
 
 import numpy as np
 
-from pywarpx import picmi
+from pywarpx import callbacks, fields, picmi
 
 constants = picmi.constants
 
@@ -48,6 +48,13 @@ J_EXT = 0.1 * B1 * np.pi / (CAVITY_SIDE * constants.mu0)  # A/m^2
 T_ION = 10.0  # eV
 N_PLASMA = 1.0e18  # m^-3
 PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
+
+# Tolerance of the in-situ electron-pressure Neumann check in the --pec-j
+# variant: largest pressure jump across the wall (samples a quarter cell on
+# either side along the analytic wall normal) relative to the peak pressure.
+# Calibrated at resolution 32 with at least 2x margin; without the even
+# embedded-boundary reflection of the pressure the jump is order unity.
+TOL_PE_NEUMANN = 0.06
 
 
 def setup_simulation(resolution, substeps, use_conformal_eb, pec_j, verbose):
@@ -191,13 +198,94 @@ def setup_simulation(resolution, substeps, use_conformal_eb, pec_j, verbose):
         name="diag1",
         grid=grid,
         period=max_steps,
-        data_list=["B", "E", "J", "J_displacement"]
+        data_list=["B", "E", "J", "J_displacement", "rho"]
         if pec_j
         else ["B", "J", "J_displacement"],
         write_dir="diags",
         warpx_format="plotfile",
     )
     sim.add_diagnostic(field_diag)
+
+    if pec_j:
+        # In-situ check of the electron-pressure embedded-boundary condition
+        # (the pressure field is internal to the solver and not written by
+        # any diagnostic): the wall supports the plasma back-pressure, so the
+        # even mirror across the embedded boundary must leave no pressure
+        # jump at the wall, and the pressure deep inside the conductor is
+        # exactly zero.
+        state = {"step": 0}
+
+        def check_electron_pressure():
+            state["step"] += 1
+            if state["step"] < max_steps:
+                return
+
+            pe = fields.ElectronPressureFPWrapper()[...]
+            assert np.all(np.isfinite(pe)), (
+                "non-finite electron pressure (equation of state applied to "
+                "the mirrored charge density inside the conductor?)"
+            )
+
+            # nodal coordinates and the analytic rotated-frame wall distance
+            nx, ny, nz = pe.shape
+            x = np.linspace(-0.8, 0.8, nx)
+            z = np.linspace(-0.8, 0.8, nz)
+            h = x[1] - x[0]
+            hy = 2.0 * y_extent / (ny - 1)
+            X, Z = np.meshgrid(x, z, indexing="ij")
+            xr = X * np.cos(THETA) - Z * np.sin(THETA)
+            zr = X * np.sin(THETA) + Z * np.cos(THETA)
+            s = HALF_WIDTH - np.maximum(np.abs(xr), np.abs(zr))  # >0 in fluid
+
+            # deep inside the conductor the pressure is set exactly to zero
+            deep = np.broadcast_to((s < -2.5 * h)[:, None, :], pe.shape)
+            assert np.max(np.abs(pe[deep])) == 0.0, (
+                "nonzero electron pressure deep inside the conductor"
+            )
+
+            def trilinear(arr, px, py, pz):
+                fi = (px + 0.8) / h
+                fj = (py + y_extent) / hy
+                fk = (pz + 0.8) / h
+                i0 = np.clip(np.floor(fi).astype(int), 0, nx - 2)
+                j0 = np.clip(np.floor(fj).astype(int), 0, ny - 2)
+                k0 = np.clip(np.floor(fk).astype(int), 0, nz - 2)
+                wx, wy, wz = fi - i0, fj - j0, fk - k0
+                v = 0.0
+                for di in (0, 1):
+                    for dj in (0, 1):
+                        for dk in (0, 1):
+                            w = (
+                                (wx if di else 1.0 - wx)
+                                * (wy if dj else 1.0 - wy)
+                                * (wz if dk else 1.0 - wz)
+                            )
+                            v = v + w * arr[i0 + di, j0 + dj, k0 + dk]
+                return v
+
+            # pressure jump across the xr = +hw wall face, sampled a
+            # quarter cell on either side along the analytic outward
+            # normal (samples deeper inside would mix in the correctly
+            # zeroed deep-interior nodes past the one-cell mirror band)
+            zr_s = np.linspace(-0.6, 0.6, 13) * HALF_WIDTH
+            y_s = np.zeros_like(zr_s)
+            jump = np.empty_like(zr_s)
+            for sign, buf in ((1.0, "plus"), (-1.0, "minus")):
+                xr_s = HALF_WIDTH + sign * 0.25 * h
+                px = xr_s * np.cos(THETA) + zr_s * np.sin(THETA)
+                pz = -xr_s * np.sin(THETA) + zr_s * np.cos(THETA)
+                if buf == "plus":
+                    jump = trilinear(pe, px, y_s, pz)
+                else:
+                    jump = jump - trilinear(pe, px, y_s, pz)
+            resid = np.max(np.abs(jump)) / np.max(pe)
+            print(f"electron pressure wall jump (relative): {resid:.3e}")
+            assert resid < TOL_PE_NEUMANN, (
+                f"electron pressure jump at the wall {resid:.3e} exceeds "
+                f"{TOL_PE_NEUMANN} (Neumann embedded-boundary condition)"
+            )
+
+        callbacks.installafterstep(check_electron_pressure)
 
     return sim
 

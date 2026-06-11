@@ -3786,6 +3786,18 @@ Maxwell solver: kinetic-fluid hybrid
     ``hybrid_pic_model.J*_external_grid_function`` inside a conductor has no effect; use
     ``external_vector_potential`` to drive coils embedded in conductors.
 
+    In addition, the deposited ion charge density is mirrored oddly across the embedded surface
+    (a Dirichlet condition: the plasma density vanishes at the conducting wall and is zero deep
+    inside the conductor), and the electron pressure is mirrored evenly (a Neumann condition: the
+    wall supports the plasma back-pressure with zero normal pressure gradient), so that the
+    Ohm's-law density interpolation and the pressure-gradient stencils that straddle the wall see
+    boundary-consistent values. These scalar conditions are always active when the hybrid solver
+    is used with embedded boundaries (also without ``use_conformal_eb``) and introduce no input
+    parameters. Note that the mirrored charge density inside the conductor is negative by
+    construction (it interpolates to zero exactly at the surface); it is excluded from the
+    resistivity parsers and from the electron-pressure equation of state, but appears in the
+    ``rho`` diagnostic as a thin negative band inside conducting walls.
+
 .. pp:param:: hybrid_pic_model.eb_bc_rtol
     :type: ``float``
     :default: ``1e-4``

@@ -396,6 +396,10 @@ def RhoFPWrapper(level=0):
     return MultiFabWrapper(mf_name="rho_fp", level=level)
 
 
+def ElectronPressureFPWrapper(level=0):
+    return MultiFabWrapper(mf_name="hybrid_electron_pressure_fp", level=level)
+
+
 def PhiFPWrapper(level=0):
     return MultiFabWrapper(mf_name="phi_fp", level=level)
 

@@ -13,6 +13,14 @@
 # --- external-current subtraction to the PEC invariant). When a second,
 # --- coarser run is supplied via --lo-path, the wall residuals of both E and
 # --- J must shrink with resolution at ~2nd order.
+# ---
+# --- The deposited charge density must satisfy the Dirichlet condition at
+# --- the wall (the plasma density vanishes at a conducting surface): rho is
+# --- mirrored oddly across the embedded boundary, so it crosses zero at the
+# --- surface, carries a negative mirror band just inside the conductor, and
+# --- is exactly zero deeper in. (The matching Neumann condition on the
+# --- electron pressure is asserted in situ by the simulation script, since
+# --- the pressure field is not written by any diagnostic.)
 
 import argparse
 
@@ -42,7 +50,16 @@ FIELDS = (
     "Bx",
     "By",
     "Bz",
+    "rho",
 )
+
+# Largest charge density at the wall surface relative to the peak density
+# (measured 0.13 at resolution 32: the residual is set by the deposition
+# truncation of the 4-ppc thermal plasma against the absorbing wall, not by
+# the boundary condition). Without the Dirichlet condition the deposition
+# spill gives ~0.25, above the tolerance, and the deep-zero and
+# negative-mirror checks below fail outright.
+TOL_RHO_WALL = 0.2
 
 
 def load_fields(plotfile):
@@ -93,11 +110,41 @@ def wall_bc_residuals(plotfile):
     #    (each cell's edges all lie deeper than the boundary band)
     # ------------------------------------------------------------------
     deep = np.maximum(np.abs(xr), np.abs(zr)) > (HALF_WIDTH + 2.5 * h)
-    for name in FIELDS[:9]:
+    for name in FIELDS[:9] + ("rho",):
         deep_max = np.max(np.abs(np.mean(fields[name], axis=1)[deep]))
         assert deep_max == 0.0, (
             f"{name} not exactly zero deep inside the conductor ({deep_max:.3e})"
         )
+
+    # ------------------------------------------------------------------
+    # 1b) Dirichlet condition on the charge density: rho crosses zero at
+    #     the wall surface (odd mirror), so the band just inside the
+    #     conductor must hold negative values, and the interpolated density
+    #     at the surface must be small relative to the peak density
+    # ------------------------------------------------------------------
+    rho_mean = np.mean(fields["rho"], axis=1)
+    rho_scale = np.max(np.abs(rho_mean))
+    band = (np.maximum(np.abs(xr), np.abs(zr)) > HALF_WIDTH) & ~deep
+    rho_band_min = np.min(rho_mean[band])
+    print(
+        f"rho: min of mirror band inside the wall / scale = {rho_band_min / rho_scale:.3e}"
+    )
+    assert rho_band_min < 0.0, (
+        "no negative mirrored charge density inside the conductor (the odd "
+        "Dirichlet reflection is missing; deposition spill is nonnegative)"
+    )
+
+    rho_interp = RegularGridInterpolator((x, z), rho_mean, bounds_error=True)
+    rho_wall = []
+    for zr_val in np.linspace(-0.3, 0.3, 25):
+        pos = [(HALF_WIDTH + s) * XHAT_R + zr_val * ZHAT_R for s in (-0.5 * h, 0.5 * h)]
+        rho_wall.append(0.5 * sum(rho_interp((p[0], p[1])) for p in pos))
+    rho_wall_max = np.max(np.abs(rho_wall)) / rho_scale
+    print(f"rho: max |rho| at wall / scale                  = {rho_wall_max:.3e}")
+    assert rho_wall_max < TOL_RHO_WALL, (
+        f"charge density at the wall {rho_wall_max:.3e} exceeds {TOL_RHO_WALL} "
+        "(Dirichlet embedded-boundary condition)"
+    )
 
     # ------------------------------------------------------------------
     # 2) PEC boundary condition at the wall: sample J and E along the wall

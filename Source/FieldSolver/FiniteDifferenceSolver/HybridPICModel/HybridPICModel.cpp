@@ -476,6 +476,18 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *electron_pressure_fp,
         *rho_fp
     );
+    // The conducting wall supports the plasma back-pressure: reflect the
+    // pressure evenly across the embedded boundary (zero normal gradient)
+    // so that the pressure-gradient stencils straddling the wall see
+    // boundary-consistent values instead of the equation of state evaluated
+    // on the mirrored (nonpositive) charge density inside the conductor
+    if (EB::enabled()) {
+        warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+            *electron_pressure_fp,
+            *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+            warpx.Geom(lev),
+            /*odd=*/false);
+    }
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
@@ -507,8 +519,12 @@ void HybridPICModel::FillElectronPressureMF (
         const Box& tilebox  = mfi.tilebox();
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            // The embedded-boundary Dirichlet condition mirrors the charge
+            // density to negative values inside the conductor: clamp the
+            // equation-of-state input to its physical domain (the covered
+            // nodes are subsequently overwritten by the even EB reflection)
             Pe(i, j, k) = ElectronPressure::get_pressure(
-                n0_ref, elec_temp, gamma, rho(i, j, k)
+                n0_ref, elec_temp, gamma, amrex::max(rho(i, j, k), 0._rt)
             );
         });
     }

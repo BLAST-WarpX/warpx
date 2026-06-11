@@ -15,6 +15,7 @@
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
+#include <AMReX_BLassert.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_MFIter.H>
@@ -81,14 +82,15 @@ namespace
 #endif
     }
 
-    /** Like gather_staggered, but using only unmasked (solution-domain)
-     *  points: masked stencil points get zero weight and the result is
+    /** Like gather_staggered, but using only stencil points accepted by the
+     *  \c fluid predicate: rejected points get zero weight and the result is
      *  renormalized by the remaining weight, which is also returned (zero if
-     *  the entire stencil is masked). */
+     *  the entire stencil is rejected). */
+    template <typename FluidPred>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    amrex::GpuTuple<amrex::Real, amrex::Real> gather_staggered_masked (
+    amrex::GpuTuple<amrex::Real, amrex::Real> gather_staggered_pred (
         amrex::Array4<amrex::Real const> const& a,
-        amrex::Array4<int const> const& msk,
+        FluidPred const& fluid,
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
@@ -120,7 +122,7 @@ namespace
                     amrex::Real const w = (di ? wx : 1._rt-wx)
                                         * (dj ? wy : 1._rt-wy)
                                         * (dk ? wz : 1._rt-wz);
-                    if (msk(i0+di, j0+dj, k0+dk) != 0) {
+                    if (fluid(i0+di, j0+dj, k0+dk)) {
                         vsum += w*a(i0+di, j0+dj, k0+dk, n);
                         wsum += w;
                     }
@@ -136,7 +138,7 @@ namespace
         for (int dj = 0; dj < 2; ++dj) {
             for (int di = 0; di < 2; ++di) {
                 amrex::Real const w = (di ? wx : 1._rt-wx) * (dj ? wz : 1._rt-wz);
-                if (msk(i0+di, j0+dj, 0) != 0) {
+                if (fluid(i0+di, j0+dj, 0)) {
                     vsum += w*a(i0+di, j0+dj, 0, n);
                     wsum += w;
                 }
@@ -145,6 +147,23 @@ namespace
 #endif
         amrex::Real const v = (wsum > 0._rt) ? vsum/wsum : 0._rt;
         return {v, wsum};
+    }
+
+    /** Predicate-renormalized gather using only unmasked (update mask != 0)
+     *  points. */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::GpuTuple<amrex::Real, amrex::Real> gather_staggered_masked (
+        amrex::Array4<amrex::Real const> const& a,
+        amrex::Array4<int const> const& msk,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        int n) noexcept
+    {
+        return gather_staggered_pred(a,
+            [&] (int i, int j, int k) { return msk(i, j, k) != 0; },
+            pos, stag, plo, dxi, n);
     }
 #endif
 }
@@ -471,5 +490,128 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #else
     amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
                          direct_fill, normal_odd);
+#endif
+}
+
+void warpx::hybrid::ApplyEBBoundaryToNodalScalar (
+    amrex::MultiFab& field,
+    amrex::MultiFab const& distance_to_eb,
+    amrex::Geometry const& geom,
+    bool odd)
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    using namespace amrex::literals;
+
+    ABLASTR_PROFILE("warpx::hybrid::ApplyEBBoundaryToNodalScalar()");
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(field.ixType().nodeCentered(),
+        "ApplyEBBoundaryToNodalScalar requires a fully nodal field");
+
+    auto const plo = geom.ProbLoArray();
+    auto const dxi = geom.InvCellSizeArray();
+    auto const dx_arr = geom.CellSizeArray();
+
+#if defined(WARPX_DIM_3D)
+    amrex::Real const h_max = std::max({dx_arr[0], dx_arr[1], dx_arr[2]});
+#else
+    amrex::Real const h_max = std::max(dx_arr[0], dx_arr[1]);
+#endif
+    amrex::Real const d_band = h_max;
+    amrex::Real const d_img_min = 0.5_rt * h_max;
+
+    // Image-point gathers can reach fluid nodes owned by neighboring boxes.
+    // The write set (nodes on or inside the surface) and the gather set
+    // (fluid nodes) are disjoint, so a single deterministic pass is exact.
+    field.FillBoundary(geom.periodicity());
+
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const stag0{};
+
+    for (amrex::MFIter mfi(field, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        amrex::Box const tb = mfi.tilebox();
+        int const ncomp = field.nComp();
+
+        auto const& f = field.array(mfi);
+        auto const& f_r = field.const_array(mfi);
+        auto const& phi = distance_to_eb.const_array(mfi);
+
+        amrex::ParallelFor(tb, ncomp,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+        {
+            // The level set is collocated with the field, so the signed
+            // distance at this node is just the nodal value (< 0 in the
+            // conductor). Fluid nodes are never modified; on-surface nodes
+            // (s == 0) are written so the odd parity pins them to zero.
+            amrex::Real const s = phi(i, j, k);
+            if (s > 0._rt) { return; }
+
+            if (s < -d_band) {
+                // deep inside the conductor
+                f(i, j, k, n) = 0._rt;
+                return;
+            }
+
+            // node position
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
+#if defined(WARPX_DIM_3D)
+            xe[0] = plo[0] + i*dx_arr[0];
+            xe[1] = plo[1] + j*dx_arr[1];
+            xe[2] = plo[2] + k*dx_arr[2];
+            amrex::Real const yq = xe[1];
+            amrex::Real const zq = xe[2];
+#else
+            xe[0] = plo[0] + i*dx_arr[0];
+            xe[1] = plo[1] + j*dx_arr[1];
+            amrex::Real const yq = 0._rt;
+            amrex::Real const zq = xe[1];
+#endif
+
+            // boundary normal (toward the plasma) from the level set
+            int ii, jj, kk;
+            amrex::Real W[AMREX_SPACEDIM][2];
+            ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
+            int ic, jc, kc;
+            amrex::Real Wc[AMREX_SPACEDIM][2];
+            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
+                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
+            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
+            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
+                // degenerate level-set gradient: treat as deep interior
+                f(i, j, k, n) = 0._rt;
+                return;
+            }
+            DistanceToEB::normalize(nv);
+
+            // image point in the plasma at the exact mirror distance
+            // (regularized very close to the surface so the interpolation
+            // stencil retains fluid nodes); unlike the staggered vector
+            // fill, the gather below never touches written nodes, so the
+            // image needs no additional decoupling offset
+            amrex::Real const d_im = amrex::max(std::abs(s), d_img_min);
+            amrex::Real const offset = d_im - s;
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim;
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                xim[d] = xe[d] + offset*nv[d];
+            }
+
+            // field value at the image point from fluid nodes only; if the
+            // whole stencil is covered (thin gap, sharp corner) this is zero
+            auto const [f_im, w_im] = gather_staggered_pred(
+                f_r,
+                [&] (int ig, int jg, int kg) { return phi(ig, jg, kg) > 0._rt; },
+                xim, stag0, plo, dxi, n);
+            amrex::ignore_unused(w_im);
+
+            // odd: value vanishes at the surface (Dirichlet 0, ghost values
+            // change sign across the wall); even: zero normal gradient
+            f(i, j, k, n) = odd ? (s/d_im)*f_im : f_im;
+        });
+    }
+
+    // leave ghost nodes consistent for the stencils that consume the field
+    field.FillBoundary(geom.periodicity());
+#else
+    amrex::ignore_unused(field, distance_to_eb, geom, odd);
 #endif
 }

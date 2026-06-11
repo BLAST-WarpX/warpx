@@ -314,7 +314,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Enforce the PEC current boundary condition on the deposited ion current
     // at the embedded boundary (deposition shape functions and filtering can
-    // otherwise spill current onto edges inside the conductor)
+    // otherwise spill current onto edges inside the conductor), and the
+    // Dirichlet condition on the deposited charge density (the density
+    // vanishes at the conducting wall; the odd mirror keeps the near-wall
+    // Ohm's-law interpolation of rho second-order accurate)
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             warpx::hybrid::ApplyPECBoundaryToField(
@@ -325,6 +328,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 m_hybrid_pic_model->m_eb_bc_rtol,
                 m_hybrid_pic_model->m_eb_bc_max_iters,
                 m_hybrid_pic_model->m_eb_bc_direct_fill);
+            warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+                *m_fields.get(FieldType::rho_fp, lev),
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                /*odd=*/true);
         }
     }
 }

@@ -6,10 +6,13 @@
     #include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
     #include "Utils/WarpXAlgorithmSelection.H"
 #endif
+#include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/EBJBoundary.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -75,6 +78,21 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
 #else
     amrex::ignore_unused(m_apply_rz_psatd_filter);
 #endif
+
+    // For the hybrid solver, enforce the embedded-boundary Dirichlet
+    // condition on the freshly deposited charge density (the density
+    // vanishes at a conducting wall), after the filter and guard-cell sum
+    // so the mirrored values are not smeared into the conductor, matching
+    // the solver's own rho treatment in HybridPICDepositRhoAndJ
+    if (EB::enabled() &&
+        WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
+    {
+        warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+            *rho,
+            *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
+            warpx.Geom(m_lev),
+            /*odd=*/true);
+    }
 
     InterpolateMFForDiag(mf_dst, *rho, dcomp, warpx.DistributionMap(m_lev),
                          m_convertRZmodes2cartesian);
