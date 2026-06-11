@@ -3805,6 +3805,17 @@ Maxwell solver: kinetic-fluid hybrid
     Maximum number of Jacobi sweeps of the embedded-boundary PEC boundary-condition band relaxation
     used by the hybrid solver.
 
+.. pp:param:: hybrid_pic_model.eb_bc_direct_fill
+    :type: ``bool``
+    :default: ``true``
+    :optional:
+
+    If ``true`` (default), the embedded-boundary PEC boundary condition is filled with a single-pass
+    mirrored interpolation that uses only solution-domain (unmasked) values, with the stencil weights
+    renormalized over the unmasked points. If ``false``, the iterative Jacobi band relaxation is used
+    instead, controlled by :pp:param:`hybrid_pic_model.eb_bc_rtol` and
+    :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
+
 .. pp:param:: hybrid_pic_model.use_global_A_recovery
     :type: ``bool``
     :default: ``false``

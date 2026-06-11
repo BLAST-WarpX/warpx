@@ -323,7 +323,8 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 *m_fields.get(FieldType::distance_to_eb, lev),
                 Geom(lev),
                 m_hybrid_pic_model->m_eb_bc_rtol,
-                m_hybrid_pic_model->m_eb_bc_max_iters);
+                m_hybrid_pic_model->m_eb_bc_max_iters,
+                m_hybrid_pic_model->m_eb_bc_direct_fill);
         }
     }
 }

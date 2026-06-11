@@ -257,6 +257,10 @@ public:
     /** Maximum number of Jacobi sweeps for the embedded-boundary PEC field
      *  boundary-condition band relaxation (applied to J and E) */
     int m_eb_bc_max_iters = 10;
+    /** If true (default), fill the embedded-boundary PEC boundary condition
+     *  with a single-pass mirrored interpolation over unmasked
+     *  (solution-domain) values instead of the Jacobi band relaxation */
+    bool m_eb_bc_direct_fill = true;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

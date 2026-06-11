@@ -119,6 +119,7 @@ void HybridPICModel::ReadParameters ()
     // controls for the embedded-boundary PEC field boundary condition
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
+    pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -372,7 +373,7 @@ void HybridPICModel::CalculatePlasmaCurrent (
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters);
+            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill);
     }
 }
 
@@ -449,7 +450,7 @@ void HybridPICModel::HybridPICSolveE (
             Efield, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters);
+            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill);
     }
 }
 

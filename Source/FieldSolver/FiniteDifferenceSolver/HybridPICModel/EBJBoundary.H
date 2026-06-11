@@ -36,8 +36,12 @@ namespace warpx::hybrid
      *   (zero at the surface), which enforces the PEC condition at the actual
      *   embedded boundary to second order.
      *
-     * Because the interpolation stencil at the image point can itself reach
-     * other masked edges, the band is relaxed with Jacobi sweeps (each
+     * Two fill strategies are available. With \c direct_fill the mirrored
+     * interpolation uses only unmasked (solution-domain) values, with the
+     * stencil weights renormalized over the unmasked points, so every ghost
+     * value is set independently in a single deterministic pass. Otherwise
+     * the plain interpolation stencil at the image point can itself reach
+     * other masked edges, and the band is relaxed with Jacobi sweeps (each
      * preceded by a ghost-cell exchange) until the largest change, measured
      * relative to the largest field magnitude in the band, drops below
      * \c rtol or \c max_iters sweeps have been performed.
@@ -48,8 +52,10 @@ namespace warpx::hybrid
      * \param[in] eb_update_E per-component embedded-boundary update masks
      * \param[in] distance_to_eb nodal signed-distance function to the boundary
      * \param[in] geom level geometry
-     * \param[in] rtol relative residual tolerance of the band relaxation
+     * \param[in] rtol residual tolerance of the band relaxation
      * \param[in] max_iters maximum number of Jacobi sweeps
+     * \param[in] direct_fill use the single-pass masked-stencil fill instead
+     *            of the Jacobi relaxation
      */
     void ApplyPECBoundaryToEdgeField (
         ablastr::fields::VectorField const& field,
@@ -57,7 +63,8 @@ namespace warpx::hybrid
         amrex::MultiFab const& distance_to_eb,
         amrex::Geometry const& geom,
         amrex::Real rtol,
-        int max_iters);
+        int max_iters,
+        bool direct_fill);
 }
 
 #endif // WARPX_EBJBOUNDARY_H_
