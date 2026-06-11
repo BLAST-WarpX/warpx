@@ -1,13 +1,13 @@
 # This pipeline runs:
 #   - on every merge to `development`
-#   - on every GitHub PR that adds the relevant CI tag
+#   - on every GitHub PR labeled "bot: run GPU"
 # It is synced from GitHub to GitLab every 5 minutes:
 #   - schedule: https://gitlab.spack.io/warpx/warpx/-/pipeline_schedules
 #   - logic: https://gitlab.spack.io/warpx/warpx/-/blob/gh-gl-sync/.gitlab/ci.yaml
 # Status of recent runs:
 #   https://gitlab.spack.io/warpx/warpx/-/jobs?sources=PUSH&kind=BUILD
 #
-# Frank status and contacts:
+# Frank cluster status and contacts:
 #   - CI/CD working group channel (#wg-cicd) in the HPSF Slack (hpsf.slack.com)
 #   - Contacts: Zack Galbreath (Kitware), Luke (University of Oregon)
 #
