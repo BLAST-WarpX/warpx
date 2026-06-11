@@ -94,7 +94,9 @@ def power_law_resistivity(
     }
 
 
-def setup_simulation(resolution, nppc, max_steps, diag_period, verbose):
+def setup_simulation(
+    resolution, nppc, max_steps, diag_period, verbose, holmstrom=False
+):
     """Create the PICMI simulation object.
 
     Parameters
@@ -177,6 +179,7 @@ def setup_simulation(resolution, nppc, max_steps, diag_period, verbose):
         n_floor=n_floor,
         plasma_hyper_resistivity=eta_hyper,
         substeps=SUBSTEPS,
+        holmstrom_vacuum_region=True if holmstrom else None,
         use_rkf45=True,
         substep_rtol=1.0e-3,
         substep_atol=1.0e-8,
@@ -278,6 +281,13 @@ def main():
         default=None,
     )
     parser.add_argument(
+        "--holmstrom",
+        help="zero the Ohm's-law E in vacuum regions (Holmstrom treatment): "
+        "suppresses the floor-density Hall amplification in the gap between "
+        "the column and the wall",
+        action="store_true",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -305,7 +315,9 @@ def main():
             args.diag_steps if args.diag_steps is not None else max(max_steps // 100, 1)
         )
 
-    sim = setup_simulation(resolution, nppc, max_steps, diag_period, args.verbose)
+    sim = setup_simulation(
+        resolution, nppc, max_steps, diag_period, args.verbose, args.holmstrom
+    )
     sim.step()
 
 
