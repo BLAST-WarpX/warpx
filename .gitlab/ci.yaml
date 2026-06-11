@@ -29,7 +29,7 @@ Nvidia-H100-single-precision:
           -DCMAKE_VERBOSE_MAKEFILE=ON                      \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
-          -DWarpX_PYTHON=ON                                \
+          -DWarpX_PYTHON=OFF                               \
           -DAMReX_CUDA_ARCH=9.0                            \
           -DWarpX_OPENPMD=ON                               \
           -DWarpX_PRECISION=SINGLE                         \
@@ -61,7 +61,7 @@ AMD-MI300:
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
-          -DWarpX_PYTHON=ON                            \
+          -DWarpX_PYTHON=OFF                           \
           -DWarpX_MPI=ON                               \
           -DWarpX_OPENPMD=ON                           \
           -DWarpX_PRECISION=SINGLE                     \
@@ -91,7 +91,7 @@ Intel-PVC:
           -DAMReX_PARALLEL_LINK_JOBS=4          \
           -DWarpX_EB=ON                         \
           -DWarpX_FFT=ON                        \
-          -DWarpX_PYTHON=ON                     \
+          -DWarpX_PYTHON=OFF                    \
           -DWarpX_MPI=ON                        \
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
