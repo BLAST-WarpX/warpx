@@ -11,6 +11,7 @@
 #include <BoundaryConditions/PML.H>
 #include <Diagnostics/MultiDiagnostics.H>
 #include <Diagnostics/ReducedDiags/MultiReducedDiags.H>
+#include <EmbeddedBoundary/Enabled.H>
 #include <EmbeddedBoundary/WarpXFaceInfoBox.H>
 #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H>
 #include <FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H>
@@ -191,6 +192,106 @@ void init_WarpX (py::module& m)
         // accross tiles and apply appropriate boundary conditions
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
+        )
+
+        // Expose the hybrid solver's embedded-boundary fill operators (unit
+        // tests of the boundary application; see
+        // Examples/Tests/ohms_law_embedded_boundary)
+        .def("hybrid_apply_eb_boundary_to_edge_field",
+            [](WarpX& wx, std::string const& name, int const lev) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (!EB::enabled() || hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_edge_field requires "
+                        "embedded boundaries and the hybrid solver");
+                }
+                FieldType field_type;
+                if (name == "Efield_fp") { field_type = FieldType::Efield_fp; }
+                else if (name == "current_fp") { field_type = FieldType::current_fp; }
+                else if (name == "hybrid_current_fp_plasma") {
+                    field_type = FieldType::hybrid_current_fp_plasma;
+                }
+                else {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_edge_field: unknown field " + name);
+                }
+                if (static_cast<int>(hybrid->m_eb_bc_status_E.size()) <= lev) {
+                    hybrid->m_eb_bc_status_E.resize(lev+1);
+                }
+                warpx::hybrid::ApplyPECBoundaryToField(
+                    wx.m_fields.get_alldirs(field_type, lev),
+                    wx.GetEBUpdateEFlag()[lev],
+                    *wx.m_fields.get(FieldType::distance_to_eb, lev),
+                    wx.Geom(lev),
+                    hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
+                    hybrid->m_eb_bc_direct_fill,
+                    /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                    &hybrid->m_eb_bc_status_E[lev]);
+            },
+            py::arg("name"), py::arg("lev") = 0,
+            "Apply the hybrid embedded-boundary PEC fill (tangential odd / "
+            "normal even, covered-center cut edges included) to a registered "
+            "edge vector field: Efield_fp, current_fp or hybrid_current_fp_plasma."
+        )
+        .def("hybrid_apply_eb_boundary_to_face_field",
+            [](WarpX& wx, std::string const& name, int const lev) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (!EB::enabled() || hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_face_field requires "
+                        "embedded boundaries and the hybrid solver");
+                }
+                if (name != "Bfield_fp") {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_face_field: unknown field " + name);
+                }
+                if (static_cast<int>(hybrid->m_eb_bc_status_B.size()) <= lev) {
+                    hybrid->m_eb_bc_status_B.resize(lev+1);
+                }
+                warpx::hybrid::ApplyPECBoundaryToField(
+                    wx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    wx.GetEBUpdateBFlag()[lev],
+                    *wx.m_fields.get(FieldType::distance_to_eb, lev),
+                    wx.Geom(lev),
+                    hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
+                    hybrid->m_eb_bc_direct_fill,
+                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                    &hybrid->m_eb_bc_status_B[lev]);
+            },
+            py::arg("name"), py::arg("lev") = 0,
+            "Apply the hybrid embedded-boundary PEC fill with magnetic parity "
+            "(normal odd / tangential even) to the registered face vector "
+            "field Bfield_fp."
+        )
+        .def("hybrid_apply_eb_boundary_to_nodal_scalar",
+            [](WarpX& wx, std::string const& name, int const lev, bool const odd) {
+                using warpx::fields::FieldType;
+                if (!EB::enabled()) {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_nodal_scalar requires "
+                        "embedded boundaries");
+                }
+                FieldType field_type;
+                if (name == "rho_fp") { field_type = FieldType::rho_fp; }
+                else if (name == "hybrid_electron_pressure_fp") {
+                    field_type = FieldType::hybrid_electron_pressure_fp;
+                }
+                else {
+                    throw std::runtime_error(
+                        "hybrid_apply_eb_boundary_to_nodal_scalar: unknown field " + name);
+                }
+                warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+                    *wx.m_fields.get(field_type, lev),
+                    *wx.m_fields.get(FieldType::distance_to_eb, lev),
+                    wx.Geom(lev),
+                    odd);
+            },
+            py::arg("name"), py::arg("lev") = 0, py::arg("odd") = true,
+            "Apply the embedded-boundary mirror fill to a registered nodal "
+            "scalar field (rho_fp or hybrid_electron_pressure_fp): odd "
+            "(Dirichlet 0 at the surface) or even (Neumann)."
         )
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
