@@ -37,22 +37,27 @@ See the :ref:`detailed workflow page <usage-python-extend>` on how to extend War
 Simulation and Grid Setup
 -------------------------
 
-.. autoclass:: pywarpx.picmi.Simulation
-    :members: step, add_species, add_laser, add_applied_field, add_interaction, add_diagnostic, write_input_file
+.. autopydantic_model:: pywarpx.picmi.Simulation
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.Cartesian3DGrid
+.. autopydantic_model:: pywarpx.picmi.Cartesian3DGrid
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.Cartesian2DGrid
+.. autopydantic_model:: pywarpx.picmi.Cartesian2DGrid
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.Cartesian1DGrid
+.. autopydantic_model:: pywarpx.picmi.Cartesian1DGrid
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.CylindricalGrid
+.. autopydantic_model:: pywarpx.picmi.CylindricalGrid
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.EmbeddedBoundary
 
 Field solvers define the updates of electric and magnetic fields.
 
-.. autoclass:: pywarpx.picmi.ElectromagneticSolver
+.. autopydantic_model:: pywarpx.picmi.ElectromagneticSolver
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.ElectrostaticSolver
 
@@ -60,7 +65,8 @@ Field solvers define the updates of electric and magnetic fields.
 
 Object that allows smoothing of fields.
 
-.. autoclass:: pywarpx.picmi.BinomialSmoother
+.. autopydantic_model:: pywarpx.picmi.BinomialSmoother
+    :inherited-members: BaseModel
 
 Evolve Schemes
 --------------
@@ -123,13 +129,17 @@ Instances of the classes below need to be passed to the method `add_applied_fiel
 Diagnostics
 -----------
 
-.. autoclass:: pywarpx.picmi.ParticleDiagnostic
+.. autopydantic_model:: pywarpx.picmi.ParticleDiagnostic
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.FieldDiagnostic
+.. autopydantic_model:: pywarpx.picmi.FieldDiagnostic
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+.. autopydantic_model:: pywarpx.picmi.TimeAveragedFieldDiagnostic
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ElectrostaticFieldDiagnostic
+.. autopydantic_model:: pywarpx.picmi.ElectrostaticFieldDiagnostic
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.Checkpoint
 
@@ -147,7 +157,8 @@ Particles
 Species objects are a collection of particles with similar properties.
 For instance, background plasma electrons, background plasma ions and an externally injected beam could each be their own particle species.
 
-.. autoclass:: pywarpx.picmi.Species
+.. autopydantic_model:: pywarpx.picmi.Species
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.MultiSpecies
 
@@ -155,9 +166,11 @@ Particle distributions can be used for to initialize particles in a particle spe
 
 .. autoclass:: pywarpx.picmi.GaussianBunchDistribution
 
-.. autoclass:: pywarpx.picmi.UniformDistribution
+.. autopydantic_model:: pywarpx.picmi.UniformDistribution
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.AnalyticDistribution
+.. autopydantic_model:: pywarpx.picmi.AnalyticDistribution
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.UniformFluxDistribution
 
@@ -169,9 +182,11 @@ Particle distributions can be used for to initialize particles in a particle spe
 
 Particle layouts determine how to microscopically place macro particles in a grid cell.
 
-.. autoclass:: pywarpx.picmi.GriddedLayout
+.. autopydantic_model:: pywarpx.picmi.GriddedLayout
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.PseudoRandomLayout
+.. autopydantic_model:: pywarpx.picmi.PseudoRandomLayout
+    :inherited-members: BaseModel
 
 Other operations related to particles:
 
@@ -188,7 +203,8 @@ Laser Pulses
 
 Laser profiles can be used to initialize laser pulses in the simulation.
 
-.. autoclass:: pywarpx.picmi.GaussianLaser
+.. autopydantic_model:: pywarpx.picmi.GaussianLaser
+    :inherited-members: BaseModel
 
 .. autoclass:: pywarpx.picmi.AnalyticLaser
 

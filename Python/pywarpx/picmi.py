@@ -11,9 +11,11 @@
 import os
 import re
 from dataclasses import dataclass
+from typing import Any, ClassVar
 
 import numpy as np
 import periodictable
+from pydantic import ConfigDict, Field, model_validator
 
 import picmistandard
 import pywarpx
@@ -51,152 +53,223 @@ class constants:
 picmistandard.register_constants(constants)
 
 
+def warpx_options(picmi_base):
+    """Expose the extra fields that a WarpX PICMI subclass adds as ``warpx_<name>`` options.
+
+    A WarpX subclass extends a PICMI standard class with code-specific inputs. Rather than
+    spelling out ``Field(alias="warpx_<name>")`` on every one of them, set this as the
+    class' ``alias_generator``: any field the subclass adds becomes a ``warpx_<name>``
+    keyword for the user, while the inherited PICMI standard fields keep their plain names.
+
+    Usage::
+
+        class Species(picmistandard.PICMI_Species):
+            model_config = ConfigDict(
+                alias_generator=warpx_options(picmistandard.PICMI_Species)
+            )
+
+            do_not_push: bool | None = None  # user passes warpx_do_not_push=...
+
+    A field whose WarpX option name is not simply ``warpx_<field name>`` (for example
+    ``warpx_potential_lo_x`` maps to the ``potential_xmin`` field) still declares an
+    explicit ``Field(alias=...)``, which takes precedence over this generator.
+    """
+    standard_options = set(picmi_base.model_fields)
+    return lambda name: name if name in standard_options else f"warpx_{name}"
+
+
 class Species(picmistandard.PICMI_Species):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_boost_adjust_transverse_positions: bool, default=False
-        Whether to adjust transverse positions when apply the boost
-        to the simulation frame
-
-    warpx_self_fields_required_precision: float, default=1.e-11
-        Relative precision on the electrostatic solver
-        (when using the relativistic solver)
-
-    warpx_self_fields_absolute_tolerance: float, default=0.
-        Absolute precision on the electrostatic solver
-        (when using the relativistic solver)
-
-    warpx_self_fields_max_iters: integer, default=200
-        Maximum number of iterations for the electrostatic
-        solver for the species
-
-    warpx_self_fields_verbosity: integer, default=2
-        Level of verbosity for the electrostatic solver
-
-    warpx_save_previous_position: bool, default=False
-        Whether to save the old particle positions
-
-    warpx_do_not_deposit: bool, default=False
-        Whether or not to deposit the charge and current density for
-        for this species
-
-    warpx_do_not_push: bool, default=False
-        Whether or not to push this species
-
-    warpx_do_not_gather: bool, default=False
-        Whether or not to gather the fields from grids for this species
-
-    warpx_radial_numpercell_power: float, default=0.
-        With cylindrical geometry, specifies the radial power of the number of particles per cell
-
-    warpx_random_theta: bool, default=True
-        Whether or not to add random angle to the particles in theta
-        when in RZ mode.
-
-    warpx_reflection_model_xlo: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the lower x boundary
-
-    warpx_reflection_model_xhi: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the upper x boundary
-
-    warpx_reflection_model_ylo: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the lower y boundary
-
-    warpx_reflection_model_yhi: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the upper y boundary
-
-    warpx_reflection_model_zlo: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the lower z boundary
-
-    warpx_reflection_model_zhi: string, default='0.'
-        Expression (in terms of the velocity "v") specifying the probability
-        that the particle will reflect on the upper z boundary
-
-    warpx_save_particles_at_xlo: bool, default=False
-        Whether to save particles lost at the lower x boundary
-
-    warpx_save_particles_at_xhi: bool, default=False
-        Whether to save particles lost at the upper x boundary
-
-    warpx_save_particles_at_ylo: bool, default=False
-        Whether to save particles lost at the lower y boundary
-
-    warpx_save_particles_at_yhi: bool, default=False
-        Whether to save particles lost at the upper y boundary
-
-    warpx_save_particles_at_zlo: bool, default=False
-        Whether to save particles lost at the lower z boundary
-
-    warpx_save_particles_at_zhi: bool, default=False
-        Whether to save particles lost at the upper z boundary
-
-    warpx_save_particles_at_eb: bool, default=False
-        Whether to save particles lost at the embedded boundary
-
-    warpx_do_resampling: bool, default=False
-        Whether particles will be resampled
-
-    warpx_resampling_min_ppc: int, default=1
-        Cells with fewer particles than this number will be
-        skipped during resampling.
-
-    warpx_resampling_algorithm_target_weight: float
-        Weight that the product particles from resampling will not exceed.
-
-    warpx_resampling_trigger_intervals: bool, default=0
-        Timesteps at which to resample
-
-    warpx_resampling_trigger_max_avg_ppc: int, default=infinity
-        Resampling will be done when the average number of
-        particles per cell exceeds this number
-
-    warpx_resampling_algorithm: str, default="leveling_thinning"
-        Resampling algorithm to use.
-
-    warpx_resampling_algorithm_velocity_grid_type: str, default="spherical"
-        Type of grid to use when clustering particles in velocity space. Only
-        applicable with the `velocity_coincidence_thinning` algorithm.
-
-    warpx_resampling_algorithm_delta_ur: float
-        Size of velocity window used for clustering particles during grid-based
-        merging, with `velocity_grid_type == "spherical"`.
-
-    warpx_resampling_algorithm_n_theta: int
-        Number of bins to use in theta when clustering particle velocities
-        during grid-based merging, with `velocity_grid_type == "spherical"`.
-
-    warpx_resampling_algorithm_n_phi: int
-        Number of bins to use in phi when clustering particle velocities
-        during grid-based merging, with `velocity_grid_type == "spherical"`.
-
-    warpx_resampling_algorithm_delta_u: array of floats or float
-        Size of velocity window used in ux, uy and uz for clustering particles
-        during grid-based merging, with `velocity_grid_type == "cartesian"`. If
-        a single number is given the same du value will be used in all three
-        directions.
-
-    warpx_add_int_attributes: dict
-        Dictionary of extra integer particle attributes initialized from an
-        expression that is a function of the variables (x, y, z, ux, uy, uz, t).
-
-    warpx_add_real_attributes: dict
-        Dictionary of extra real particle attributes initialized from an
-        expression that is a function of the variables (x, y, z, ux, uy, uz, t).
-
-    warpx_do_temperature_deposition: bool, default=False
-        This flag is set per species to do another pass to deposit temperature
-        on each timestep if required. Currently only works with Ohm's Law Hybrid Solver.
     """
 
-    def init(self, kw):
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_Species)
+    )
+
+    # WarpX accepts code-specific string expressions (e.g. "q_e", "2*m_e") for the charge
+    # and mass, in addition to plain floats, so widen the standard's float-only typing.
+    charge: float | str | None = Field(
+        default=None,
+        description="Particle charge [C], or a WarpX expression such as 'q_e'. If not specified, determined from the particle type.",
+    )
+    mass: float | str | None = Field(
+        default=None,
+        description="Particle mass [kg], or a WarpX expression such as 'm_e'. If not specified, determined from the particle type.",
+    )
+
+    # --- WarpX-specific extension inputs (exposed to users as ``warpx_<name>``).
+    boost_adjust_transverse_positions: bool | None = Field(
+        default=None,
+        description="Whether to adjust transverse positions when apply the boost to the simulation frame",
+    )
+
+    # For the relativistic electrostatic solver
+    self_fields_required_precision: float | None = Field(
+        default=None,
+        description="Relative precision on the electrostatic solver (when using the relativistic solver)",
+    )
+    self_fields_absolute_tolerance: float | None = Field(
+        default=None,
+        description="Absolute precision on the electrostatic solver (when using the relativistic solver)",
+    )
+    self_fields_max_iters: int | None = Field(
+        default=None,
+        description="Maximum number of iterations for the electrostatic solver for the species",
+    )
+    self_fields_verbosity: int | None = Field(
+        default=None, description="Level of verbosity for the electrostatic solver"
+    )
+    save_previous_position: bool | None = Field(
+        default=None, description="Whether to save the old particle positions"
+    )
+    do_not_deposit: bool | None = Field(
+        default=None,
+        description="Whether or not to deposit the charge and current density for for this species",
+    )
+    do_not_push: bool | None = Field(
+        default=None, description="Whether or not to push this species"
+    )
+    do_not_gather: bool | None = Field(
+        default=None,
+        description="Whether or not to gather the fields from grids for this species",
+    )
+    radial_numpercell_power: float | None = Field(
+        default=None,
+        description="With cylindrical geometry, specifies the radial power of the number of particles per cell",
+    )
+    random_theta: bool | None = Field(
+        default=None,
+        description="Whether or not to add random angle to the particles in theta when in RZ mode.",
+    )
+
+    # For particle reflection
+    reflection_model_xlo: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the lower x boundary',
+    )
+    reflection_model_xhi: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the upper x boundary',
+    )
+    reflection_model_ylo: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the lower y boundary',
+    )
+    reflection_model_yhi: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the upper y boundary',
+    )
+    reflection_model_zlo: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the lower z boundary',
+    )
+    reflection_model_zhi: float | str | None = Field(
+        default=None,
+        description='Expression (in terms of the velocity "v") specifying the probability that the particle will reflect on the upper z boundary',
+    )
+
+    # For the scraper buffer
+    save_particles_at_xlo: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the lower x boundary",
+    )
+    save_particles_at_xhi: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the upper x boundary",
+    )
+    save_particles_at_ylo: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the lower y boundary",
+    )
+    save_particles_at_yhi: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the upper y boundary",
+    )
+    save_particles_at_zlo: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the lower z boundary",
+    )
+    save_particles_at_zhi: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the upper z boundary",
+    )
+    save_particles_at_eb: bool | None = Field(
+        default=None,
+        description="Whether to save particles lost at the embedded boundary",
+    )
+
+    # Resampling settings
+    do_resampling: bool | None = Field(
+        default=None, description="Whether particles will be resampled"
+    )
+    resampling_algorithm: str | None = Field(
+        default=None, description="Resampling algorithm to use."
+    )
+    resampling_min_ppc: int | None = Field(
+        default=None,
+        description="Cells with fewer particles than this number will be skipped during resampling.",
+    )
+    resampling_trigger_intervals: Any | None = Field(
+        default=None, description="Timesteps at which to resample"
+    )
+    # option name (warpx_resampling_trigger_max_avg_ppc) differs from the field name:
+    resampling_triggering_max_avg_ppc: float | None = Field(
+        default=None,
+        alias="warpx_resampling_trigger_max_avg_ppc",
+        description="Resampling will be done when the average number of particles per cell exceeds this number",
+    )
+    resampling_algorithm_target_weight: float | None = Field(
+        default=None,
+        description="Weight that the product particles from resampling will not exceed.",
+    )
+    resampling_algorithm_velocity_grid_type: str | None = Field(
+        default=None,
+        description="Type of grid to use when clustering particles in velocity space. Only applicable with the `velocity_coincidence_thinning` algorithm.",
+    )
+    resampling_algorithm_delta_ur: float | None = Field(
+        default=None,
+        description='Size of velocity window used for clustering particles during grid-based merging, with `velocity_grid_type == "spherical"`.',
+    )
+    resampling_algorithm_n_theta: int | None = Field(
+        default=None,
+        description='Number of bins to use in theta when clustering particle velocities during grid-based merging, with `velocity_grid_type == "spherical"`.',
+    )
+    resampling_algorithm_n_phi: int | None = Field(
+        default=None,
+        description='Number of bins to use in phi when clustering particle velocities during grid-based merging, with `velocity_grid_type == "spherical"`.',
+    )
+    resampling_algorithm_delta_u: float | list[float] | None = Field(
+        default=None,
+        description='Size of velocity window used in ux, uy and uz for clustering particles during grid-based merging, with `velocity_grid_type == "cartesian"`. If a single number is given the same du value will be used in all three directions.',
+    )
+
+    # extra particle attributes (option names differ from the field names):
+    extra_int_attributes: dict | None = Field(
+        default=None,
+        alias="warpx_add_int_attributes",
+        description="Dictionary of extra integer particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
+    )
+    extra_real_attributes: dict | None = Field(
+        default=None,
+        alias="warpx_add_real_attributes",
+        description="Dictionary of extra real particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
+    )
+
+    do_temperature_deposition: bool | None = Field(
+        default=None,
+        description="This flag is set per species to do another pass to deposit temperature on each timestep if required. Currently only works with Ohm's Law Hybrid Solver.",
+    )
+
+    # --- Computed state (not user inputs; populated during/after initialization).
+    species_type: Any = Field(default=None, init=False, exclude=True)
+    element: Any = Field(default=None, init=False, exclude=True)
+    species_number: int | None = Field(default=None, init=False, exclude=True)
+    species: Any = Field(default=None, init=False, exclude=True)
+
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
+
         self.species_type = None
         if self.particle_type in [
             "unspecified",
@@ -239,83 +312,11 @@ class Species(picmistandard.PICMI_Species):
                 else:
                     raise Exception('The species "particle_type" is not known')
 
-        self.boost_adjust_transverse_positions = kw.pop(
-            "warpx_boost_adjust_transverse_positions", None
-        )
-
-        # For the relativistic electrostatic solver
-        self.self_fields_required_precision = kw.pop(
-            "warpx_self_fields_required_precision", None
-        )
-        self.self_fields_absolute_tolerance = kw.pop(
-            "warpx_self_fields_absolute_tolerance", None
-        )
-        self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
-        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
-        self.save_previous_position = kw.pop("warpx_save_previous_position", None)
-        self.do_not_deposit = kw.pop("warpx_do_not_deposit", None)
-        self.do_not_push = kw.pop("warpx_do_not_push", None)
-        self.do_not_gather = kw.pop("warpx_do_not_gather", None)
-        self.radial_numpercell_power = kw.pop("warpx_radial_numpercell_power", None)
-        self.random_theta = kw.pop("warpx_random_theta", None)
-
-        # For particle reflection
-        self.reflection_model_xlo = kw.pop("warpx_reflection_model_xlo", None)
-        self.reflection_model_xhi = kw.pop("warpx_reflection_model_xhi", None)
-        self.reflection_model_ylo = kw.pop("warpx_reflection_model_ylo", None)
-        self.reflection_model_yhi = kw.pop("warpx_reflection_model_yhi", None)
-        self.reflection_model_zlo = kw.pop("warpx_reflection_model_zlo", None)
-        self.reflection_model_zhi = kw.pop("warpx_reflection_model_zhi", None)
-        # self.reflection_model_eb = kw.pop('warpx_reflection_model_eb', None)
-
-        # For the scraper buffer
-        self.save_particles_at_xlo = kw.pop("warpx_save_particles_at_xlo", None)
-        self.save_particles_at_xhi = kw.pop("warpx_save_particles_at_xhi", None)
-        self.save_particles_at_ylo = kw.pop("warpx_save_particles_at_ylo", None)
-        self.save_particles_at_yhi = kw.pop("warpx_save_particles_at_yhi", None)
-        self.save_particles_at_zlo = kw.pop("warpx_save_particles_at_zlo", None)
-        self.save_particles_at_zhi = kw.pop("warpx_save_particles_at_zhi", None)
-        self.save_particles_at_eb = kw.pop("warpx_save_particles_at_eb", None)
-
-        # Resampling settings
-        self.do_resampling = kw.pop("warpx_do_resampling", None)
-        self.resampling_algorithm = kw.pop("warpx_resampling_algorithm", None)
-        self.resampling_min_ppc = kw.pop("warpx_resampling_min_ppc", None)
-        self.resampling_trigger_intervals = kw.pop(
-            "warpx_resampling_trigger_intervals", None
-        )
-        self.resampling_triggering_max_avg_ppc = kw.pop(
-            "warpx_resampling_trigger_max_avg_ppc", None
-        )
-        self.resampling_algorithm_target_weight = kw.pop(
-            "warpx_resampling_algorithm_target_weight", None
-        )
-        self.resampling_algorithm_velocity_grid_type = kw.pop(
-            "warpx_resampling_algorithm_velocity_grid_type", None
-        )
-        self.resampling_algorithm_delta_ur = kw.pop(
-            "warpx_resampling_algorithm_delta_ur", None
-        )
-        self.resampling_algorithm_n_theta = kw.pop(
-            "warpx_resampling_algorithm_n_theta", None
-        )
-        self.resampling_algorithm_n_phi = kw.pop(
-            "warpx_resampling_algorithm_n_phi", None
-        )
-        self.resampling_algorithm_delta_u = kw.pop(
-            "warpx_resampling_algorithm_delta_u", None
-        )
         if (
             self.resampling_algorithm_delta_u is not None
             and np.size(self.resampling_algorithm_delta_u) == 1
         ):
             self.resampling_algorithm_delta_u = [self.resampling_algorithm_delta_u] * 3
-
-        # extra particle attributes
-        self.extra_int_attributes = kw.pop("warpx_add_int_attributes", None)
-        self.extra_real_attributes = kw.pop("warpx_add_real_attributes", None)
-
-        self.do_temperature_deposition = kw.pop("warpx_do_temperature_deposition", None)
 
     def species_initialize_inputs(
         self,
@@ -399,8 +400,10 @@ class Species(picmistandard.PICMI_Species):
         pywarpx.Particles.particles_list.append(self.species)
 
         if self.initial_distribution is not None:
-            distributions_is_list = np.iterable(self.initial_distribution)
-            layout_is_list = np.iterable(layout)
+            # Note: PICMI objects are pydantic models, which are themselves iterable, so
+            # check explicitly for an actual list/tuple of distributions/layouts here.
+            distributions_is_list = isinstance(self.initial_distribution, (list, tuple))
+            layout_is_list = isinstance(layout, (list, tuple))
             if not distributions_is_list and not layout_is_list:
                 self.initial_distribution.distribution_initialize_inputs(
                     self.species_number, layout, self.species, self.density_scale, ""
@@ -709,6 +712,9 @@ class DensityDistributionBase(object):
 class UniformDistribution(
     picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
+    # Runtime state populated by the DensityDistributionBase mixin.
+    mangle_dict: Any = Field(default=None, init=False, exclude=True)
+
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -833,31 +839,30 @@ class UniformFluxDistribution(
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
 ):
-    """
-    Parameters
-    ----------
+    """ """
 
-    warpx_density_min: float
-        Minimum plasma density. No particle is injected where the density is
-        below this value.
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_AnalyticDistribution)
+    )
 
-    warpx_density_max: float
-        Maximum plasma density. The density at each point is the minimum between
-        the value given in the profile, and density_max.
+    density_min: float | None = Field(
+        default=None,
+        description="Minimum plasma density. No particle is injected where the density is below this value.",
+    )
+    density_max: float | None = Field(
+        default=None,
+        description="Maximum plasma density. The density at each point is the minimum between the value given in the profile, and density_max.",
+    )
+    # Re-declare the standard ``momentum_spread_expressions`` under the WarpX alias to
+    # preserve the historical ``warpx_`` spelling (both spellings are accepted).
+    momentum_spread_expressions: list[str | None] = Field(
+        default_factory=lambda: [None, None, None],
+        alias="warpx_momentum_spread_expressions",
+        description="Analytic expressions describing the gamma*velocity spread for each axis [m/s]. Expressions should be in terms of the position, written as 'x', 'y', and 'z'. Parameters can be used in the expression with the values given as keyword arguments. For any axis not supplied (set to None), zero will be used.",
+    )
 
-    warpx_momentum_spread_expressions: list of string
-        Analytic expressions describing the gamma*velocity spread for each axis [m/s].
-        Expressions should be in terms of the position, written as 'x', 'y', and 'z'.
-        Parameters can be used in the expression with the values given as keyword arguments.
-        For any axis not supplied (set to None), zero will be used.
-    """
-
-    def init(self, kw):
-        self.density_min = kw.pop("warpx_density_min", None)
-        self.density_max = kw.pop("warpx_density_max", None)
-        self.momentum_spread_expressions = kw.pop(
-            "warpx_momentum_spread_expressions", [None, None, None]
-        )
+    # Runtime state populated by the DensityDistributionBase mixin.
+    mangle_dict: Any = Field(default=None, init=False, exclude=True)
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
@@ -932,7 +937,8 @@ class GriddedLayout(picmistandard.PICMI_GriddedLayout):
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
-    def init(self, kw):
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         if self.seed is not None:
             print(
                 "Warning: WarpX does not support specifying the random number seed in PseudoRandomLayout"
@@ -960,84 +966,81 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
     This assumes that WarpX was compiled with USE_RZ = TRUE
 
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_max_grid_size: integer, default=32
-       Maximum block size in either direction
-
-    warpx_max_grid_size_x: integer, optional
-       Maximum block size in radial direction
-
-    warpx_max_grid_size_y: integer, optional
-       Maximum block size in longitudinal direction
-
-    warpx_blocking_factor: integer, optional
-       Blocking factor (which controls the block size)
-
-    warpx_blocking_factor_x: integer, optional
-       Blocking factor (which controls the block size) in the radial direction
-
-    warpx_blocking_factor_y: integer, optional
-       Blocking factor (which controls the block size) in the longitudinal direction
-
-    warpx_potential_lo_r: float, default=0.
-       Electrostatic potential on the lower radial boundary
-
-    warpx_potential_hi_r: float, default=0.
-       Electrostatic potential on the upper radial boundary
-
-    warpx_potential_lo_z: float, default=0.
-       Electrostatic potential on the lower longitudinal boundary
-
-    warpx_potential_hi_z: float, default=0.
-       Electrostatic potential on the upper longitudinal boundary
-
-    warpx_reflect_all_velocities: bool default=False
-        Whether the sign of all of the particle velocities are changed upon
-        reflection on a boundary, or only the velocity normal to the surface
-
-    warpx_start_moving_window_step: int, default=0
-       The timestep at which the moving window starts
-
-    warpx_end_moving_window_step: int, default=-1
-       The timestep at which the moving window ends. If -1, the moving window
-       will continue until the end of the simulation.
-
-    warpx_boundary_u_th: dict, default=None
-        If a thermal boundary is used for particles, this dictionary should
-        specify the thermal speed for each species in the form {`<species>`: u_th}.
-        Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
     """
 
-    def init(self, kw):
-        self.max_grid_size = kw.pop("warpx_max_grid_size", 32)
-        self.max_grid_size_x = kw.pop("warpx_max_grid_size_x", None)
-        self.max_grid_size_y = kw.pop("warpx_max_grid_size_y", None)
-        self.blocking_factor = kw.pop("warpx_blocking_factor", None)
-        self.blocking_factor_x = kw.pop("warpx_blocking_factor_x", None)
-        self.blocking_factor_y = kw.pop("warpx_blocking_factor_y", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_CylindricalGrid)
+    )
 
-        self.potential_xmin = kw.pop("warpx_potential_lo_r", None)
-        self.potential_xmax = kw.pop("warpx_potential_hi_r", None)
-        self.potential_ymin = None
-        self.potential_ymax = None
-        self.potential_zmin = kw.pop("warpx_potential_lo_z", None)
-        self.potential_zmax = kw.pop("warpx_potential_hi_z", None)
-        self.reflect_all_velocities = kw.pop("warpx_reflect_all_velocities", None)
+    max_grid_size: int | list[int] = Field(
+        default=32, description="Maximum block size in either direction"
+    )
+    max_grid_size_x: int | None = Field(
+        default=None, description="Maximum block size in radial direction"
+    )
+    max_grid_size_y: int | None = Field(
+        default=None, description="Maximum block size in longitudinal direction"
+    )
+    blocking_factor: int | list[int] | None = Field(
+        default=None, description="Blocking factor (which controls the block size)"
+    )
+    blocking_factor_x: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the radial direction",
+    )
+    blocking_factor_y: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the longitudinal direction",
+    )
+    # option names (warpx_potential_lo/hi_r/z) differ from the field names:
+    potential_xmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_r",
+        description="Electrostatic potential on the lower radial boundary",
+    )
+    potential_xmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_r",
+        description="Electrostatic potential on the upper radial boundary",
+    )
+    potential_zmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_z",
+        description="Electrostatic potential on the lower longitudinal boundary",
+    )
+    potential_zmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_z",
+        description="Electrostatic potential on the upper longitudinal boundary",
+    )
+    reflect_all_velocities: bool | None = Field(
+        default=None,
+        description="Whether the sign of all of the particle velocities are changed upon reflection on a boundary, or only the velocity normal to the surface",
+    )
+    start_moving_window_step: int | None = Field(
+        default=None, description="The timestep at which the moving window starts"
+    )
+    end_moving_window_step: int | None = Field(
+        default=None,
+        description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
+    )
+    thermal_boundary_u_th: dict | None = Field(
+        default=None,
+        alias="warpx_boundary_u_th",
+        description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
+    )
+    # RZ geometry has no second Cartesian axis; these stay None.
+    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
 
-        self.start_moving_window_step = kw.pop("warpx_start_moving_window_step", None)
-        self.end_moving_window_step = kw.pop("warpx_end_moving_window_step", None)
-
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         # Geometry
         # Set these as soon as the information is available
         # (since these are needed to determine which shared object to load)
         pywarpx.geometry.dims = "RZ"
         pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
         pywarpx.geometry.prob_hi = self.upper_bound
-
-        # if a thermal boundary is used for particles, get the thermal speeds
-        self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1112,65 +1115,62 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_max_grid_size: integer, default=32
-       Maximum block size in either direction
-
-    warpx_max_grid_size_x: integer, optional
-       Maximum block size in longitudinal direction
-
-    warpx_blocking_factor: integer, optional
-       Blocking factor (which controls the block size)
-
-    warpx_blocking_factor_x: integer, optional
-       Blocking factor (which controls the block size) in the longitudinal direction
-
-    warpx_potential_lo_z: float, default=0.
-       Electrostatic potential on the lower longitudinal boundary
-
-    warpx_potential_hi_z: float, default=0.
-       Electrostatic potential on the upper longitudinal boundary
-
-    warpx_start_moving_window_step: int, default=0
-       The timestep at which the moving window starts
-
-    warpx_end_moving_window_step: int, default=-1
-       The timestep at which the moving window ends. If -1, the moving window
-       will continue until the end of the simulation.
-
-    warpx_boundary_u_th: dict, default=None
-        If a thermal boundary is used for particles, this dictionary should
-        specify the thermal speed for each species in the form {`<species>`: u_th}.
-        Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
     """
 
-    def init(self, kw):
-        self.max_grid_size = kw.pop("warpx_max_grid_size", 32)
-        self.max_grid_size_x = kw.pop("warpx_max_grid_size_x", None)
-        self.blocking_factor = kw.pop("warpx_blocking_factor", None)
-        self.blocking_factor_x = kw.pop("warpx_blocking_factor_x", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_Cartesian1DGrid)
+    )
 
-        self.potential_xmin = None
-        self.potential_xmax = None
-        self.potential_ymin = None
-        self.potential_ymax = None
-        self.potential_zmin = kw.pop("warpx_potential_lo_z", None)
-        self.potential_zmax = kw.pop("warpx_potential_hi_z", None)
+    max_grid_size: int | list[int] = Field(
+        default=32, description="Maximum block size in either direction"
+    )
+    max_grid_size_x: int | None = Field(
+        default=None, description="Maximum block size in longitudinal direction"
+    )
+    blocking_factor: int | list[int] | None = Field(
+        default=None, description="Blocking factor (which controls the block size)"
+    )
+    blocking_factor_x: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the longitudinal direction",
+    )
+    # option names (warpx_potential_lo/hi_z) differ from the field names:
+    potential_zmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_z",
+        description="Electrostatic potential on the lower longitudinal boundary",
+    )
+    potential_zmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_z",
+        description="Electrostatic potential on the upper longitudinal boundary",
+    )
+    start_moving_window_step: int | None = Field(
+        default=None, description="The timestep at which the moving window starts"
+    )
+    end_moving_window_step: int | None = Field(
+        default=None,
+        description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
+    )
+    thermal_boundary_u_th: dict | None = Field(
+        default=None,
+        alias="warpx_boundary_u_th",
+        description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
+    )
+    # 1D geometry has only the longitudinal (z) axis; these stay None.
+    potential_xmin: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_xmax: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
 
-        self.start_moving_window_step = kw.pop("warpx_start_moving_window_step", None)
-        self.end_moving_window_step = kw.pop("warpx_end_moving_window_step", None)
-
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         # Geometry
         # Set these as soon as the information is available
         # (since these are needed to determine which shared object to load)
         pywarpx.geometry.dims = "1"
         pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
         pywarpx.geometry.prob_hi = self.upper_bound
-
-        # if a thermal boundary is used for particles, get the thermal speeds
-        self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1227,79 +1227,77 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_max_grid_size: integer, default=32
-       Maximum block size in either direction
-
-    warpx_max_grid_size_x: integer, optional
-       Maximum block size in x direction
-
-    warpx_max_grid_size_y: integer, optional
-       Maximum block size in z direction
-
-    warpx_blocking_factor: integer, optional
-       Blocking factor (which controls the block size)
-
-    warpx_blocking_factor_x: integer, optional
-       Blocking factor (which controls the block size) in the x direction
-
-    warpx_blocking_factor_y: integer, optional
-       Blocking factor (which controls the block size) in the z direction
-
-    warpx_potential_lo_x: float, default=0.
-       Electrostatic potential on the lower x boundary
-
-    warpx_potential_hi_x: float, default=0.
-       Electrostatic potential on the upper x boundary
-
-    warpx_potential_lo_z: float, default=0.
-       Electrostatic potential on the lower z boundary
-
-    warpx_potential_hi_z: float, default=0.
-       Electrostatic potential on the upper z boundary
-
-    warpx_start_moving_window_step: int, default=0
-       The timestep at which the moving window starts
-
-    warpx_end_moving_window_step: int, default=-1
-       The timestep at which the moving window ends. If -1, the moving window
-       will continue until the end of the simulation.
-
-    warpx_boundary_u_th: dict, default=None
-        If a thermal boundary is used for particles, this dictionary should
-        specify the thermal speed for each species in the form {`<species>`: u_th}.
-        Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
     """
 
-    def init(self, kw):
-        self.max_grid_size = kw.pop("warpx_max_grid_size", 32)
-        self.max_grid_size_x = kw.pop("warpx_max_grid_size_x", None)
-        self.max_grid_size_y = kw.pop("warpx_max_grid_size_y", None)
-        self.blocking_factor = kw.pop("warpx_blocking_factor", None)
-        self.blocking_factor_x = kw.pop("warpx_blocking_factor_x", None)
-        self.blocking_factor_y = kw.pop("warpx_blocking_factor_y", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_Cartesian2DGrid)
+    )
 
-        self.potential_xmin = kw.pop("warpx_potential_lo_x", None)
-        self.potential_xmax = kw.pop("warpx_potential_hi_x", None)
-        self.potential_ymin = None
-        self.potential_ymax = None
-        self.potential_zmin = kw.pop("warpx_potential_lo_z", None)
-        self.potential_zmax = kw.pop("warpx_potential_hi_z", None)
+    max_grid_size: int | list[int] = Field(
+        default=32, description="Maximum block size in either direction"
+    )
+    max_grid_size_x: int | None = Field(
+        default=None, description="Maximum block size in x direction"
+    )
+    max_grid_size_y: int | None = Field(
+        default=None, description="Maximum block size in z direction"
+    )
+    blocking_factor: int | list[int] | None = Field(
+        default=None, description="Blocking factor (which controls the block size)"
+    )
+    blocking_factor_x: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the x direction",
+    )
+    blocking_factor_y: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the z direction",
+    )
+    # option names (warpx_potential_lo/hi_x/z) differ from the field names:
+    potential_xmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_x",
+        description="Electrostatic potential on the lower x boundary",
+    )
+    potential_xmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_x",
+        description="Electrostatic potential on the upper x boundary",
+    )
+    potential_zmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_z",
+        description="Electrostatic potential on the lower z boundary",
+    )
+    potential_zmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_z",
+        description="Electrostatic potential on the upper z boundary",
+    )
+    start_moving_window_step: int | None = Field(
+        default=None, description="The timestep at which the moving window starts"
+    )
+    end_moving_window_step: int | None = Field(
+        default=None,
+        description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
+    )
+    thermal_boundary_u_th: dict | None = Field(
+        default=None,
+        alias="warpx_boundary_u_th",
+        description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
+    )
+    # 2D geometry is the x-z plane; there is no second (y) axis.
+    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
 
-        self.start_moving_window_step = kw.pop("warpx_start_moving_window_step", None)
-        self.end_moving_window_step = kw.pop("warpx_end_moving_window_step", None)
-
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         # Geometry
         # Set these as soon as the information is available
         # (since these are needed to determine which shared object to load)
         pywarpx.geometry.dims = "2"
         pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
         pywarpx.geometry.prob_hi = self.upper_bound
-
-        # if a thermal boundary is used for particles, get the thermal speeds
-        self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1363,93 +1361,90 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_max_grid_size: integer, default=32
-       Maximum block size in either direction
-
-    warpx_max_grid_size_x: integer, optional
-       Maximum block size in x direction
-
-    warpx_max_grid_size_y: integer, optional
-       Maximum block size in z direction
-
-    warpx_max_grid_size_z: integer, optional
-       Maximum block size in z direction
-
-    warpx_blocking_factor: integer, optional
-       Blocking factor (which controls the block size)
-
-    warpx_blocking_factor_x: integer, optional
-       Blocking factor (which controls the block size) in the x direction
-
-    warpx_blocking_factor_y: integer, optional
-       Blocking factor (which controls the block size) in the z direction
-
-    warpx_blocking_factor_z: integer, optional
-       Blocking factor (which controls the block size) in the z direction
-
-    warpx_potential_lo_x: float, default=0.
-       Electrostatic potential on the lower x boundary
-
-    warpx_potential_hi_x: float, default=0.
-       Electrostatic potential on the upper x boundary
-
-    warpx_potential_lo_y: float, default=0.
-       Electrostatic potential on the lower z boundary
-
-    warpx_potential_hi_y: float, default=0.
-       Electrostatic potential on the upper z boundary
-
-    warpx_potential_lo_z: float, default=0.
-       Electrostatic potential on the lower z boundary
-
-    warpx_potential_hi_z: float, default=0.
-       Electrostatic potential on the upper z boundary
-
-    warpx_start_moving_window_step: int, default=0
-       The timestep at which the moving window starts
-
-    warpx_end_moving_window_step: int, default=-1
-       The timestep at which the moving window ends. If -1, the moving window
-       will continue until the end of the simulation.
-
-    warpx_boundary_u_th: dict, default=None
-        If a thermal boundary is used for particles, this dictionary should
-        specify the thermal speed for each species in the form {`<species>`: u_th}.
-        Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
     """
 
-    def init(self, kw):
-        self.max_grid_size = kw.pop("warpx_max_grid_size", 32)
-        self.max_grid_size_x = kw.pop("warpx_max_grid_size_x", None)
-        self.max_grid_size_y = kw.pop("warpx_max_grid_size_y", None)
-        self.max_grid_size_z = kw.pop("warpx_max_grid_size_z", None)
-        self.blocking_factor = kw.pop("warpx_blocking_factor", None)
-        self.blocking_factor_x = kw.pop("warpx_blocking_factor_x", None)
-        self.blocking_factor_y = kw.pop("warpx_blocking_factor_y", None)
-        self.blocking_factor_z = kw.pop("warpx_blocking_factor_z", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_Cartesian3DGrid)
+    )
 
-        self.potential_xmin = kw.pop("warpx_potential_lo_x", None)
-        self.potential_xmax = kw.pop("warpx_potential_hi_x", None)
-        self.potential_ymin = kw.pop("warpx_potential_lo_y", None)
-        self.potential_ymax = kw.pop("warpx_potential_hi_y", None)
-        self.potential_zmin = kw.pop("warpx_potential_lo_z", None)
-        self.potential_zmax = kw.pop("warpx_potential_hi_z", None)
+    max_grid_size: int | list[int] = Field(
+        default=32, description="Maximum block size in either direction"
+    )
+    max_grid_size_x: int | None = Field(
+        default=None, description="Maximum block size in x direction"
+    )
+    max_grid_size_y: int | None = Field(
+        default=None, description="Maximum block size in z direction"
+    )
+    max_grid_size_z: int | None = Field(
+        default=None, description="Maximum block size in z direction"
+    )
+    blocking_factor: int | list[int] | None = Field(
+        default=None, description="Blocking factor (which controls the block size)"
+    )
+    blocking_factor_x: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the x direction",
+    )
+    blocking_factor_y: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the z direction",
+    )
+    blocking_factor_z: int | None = Field(
+        default=None,
+        description="Blocking factor (which controls the block size) in the z direction",
+    )
+    potential_xmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_x",
+        description="Electrostatic potential on the lower x boundary",
+    )
+    potential_xmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_x",
+        description="Electrostatic potential on the upper x boundary",
+    )
+    potential_ymin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_y",
+        description="Electrostatic potential on the lower z boundary",
+    )
+    potential_ymax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_y",
+        description="Electrostatic potential on the upper z boundary",
+    )
+    potential_zmin: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_lo_z",
+        description="Electrostatic potential on the lower z boundary",
+    )
+    potential_zmax: float | str | None = Field(
+        default=None,
+        alias="warpx_potential_hi_z",
+        description="Electrostatic potential on the upper z boundary",
+    )
+    start_moving_window_step: int | None = Field(
+        default=None, description="The timestep at which the moving window starts"
+    )
+    end_moving_window_step: int | None = Field(
+        default=None,
+        description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
+    )
+    thermal_boundary_u_th: dict | None = Field(
+        default=None,
+        alias="warpx_boundary_u_th",
+        description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
+    )
 
-        self.start_moving_window_step = kw.pop("warpx_start_moving_window_step", None)
-        self.end_moving_window_step = kw.pop("warpx_end_moving_window_step", None)
-
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         # Geometry
         # Set these as soon as the information is available
         # (since these are needed to determine which shared object to load)
         pywarpx.geometry.dims = "3"
         pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
         pywarpx.geometry.prob_hi = self.upper_bound
-
-        # if a thermal boundary is used for particles, get the thermal speeds
-        self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1521,74 +1516,73 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
 
-    Parameters
-    ----------
-    warpx_pml_ncell: integer, optional
-        The depth of the PML, in number of cells
-
-    warpx_periodic_single_box_fft: bool, default=False
-        Whether to do the spectral solver FFTs assuming a single
-        simulation block
-
-    warpx_current_correction: bool, default=True
-        Whether to do the current correction for the spectral solver.
-        See documentation for exceptions to the default value.
-
-    warpx_psatd_update_with_rho: bool, optional
-        Whether to update with the actual rho for the spectral solver
-
-    warpx_psatd_do_time_averaging: bool, optional
-        Whether to do the time averaging for the spectral solver
-
-    warpx_psatd_JRhom: str
-        This determines whether the PSATD JRhom algorithm is used.
-        The parameter is a string composed by two characters and one digit.
-        The first character represents the time dependency of J within the
-        time step over which the electromagnetic fields are evolved, e.g.,
-        "C" for constant in time, "L" for linear in time, "Q" for quadratic
-        in time.
-        The second character represents the time dependency of rho within the
-        time step over which the electromagnetic fields are evolved, following
-        the same naming convention as for J.
-        The last digit is an integer that represents the number of subintervals
-        used in the JRhom algorithm.
-        Examples: "CL1" (equivalent to the standard PSATD PIC algorithm),
-        "CL2", "LL4", etc.
-        By default, the string is empty and the JRhom algorithm is not used.
-
-    warpx_do_pml_in_domain: bool, default=False
-        Whether to do the PML boundaries within the domain (versus
-        in the guard cells)
-
-    warpx_pml_has_particles: bool, default=False
-        Whether to allow particles in the PML region
-
-    warpx_do_pml_j_damping: bool, default=False
-        Whether to do damping of J in the PML
     """
 
-    def init(self, kw):
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_ElectromagneticSolver)
+    )
+
+    pml_ncell: int | None = Field(
+        default=None, description="The depth of the PML, in number of cells"
+    )
+    # option name (warpx_periodic_single_box_fft) differs from the field name:
+    psatd_periodic_single_box_fft: bool | None = Field(
+        default=None,
+        alias="warpx_periodic_single_box_fft",
+        description="Whether to do the spectral solver FFTs assuming a single simulation block",
+    )
+    # option name (warpx_current_correction) differs from the field name:
+    psatd_current_correction: bool | None = Field(
+        default=None,
+        alias="warpx_current_correction",
+        description="Whether to do the current correction for the spectral solver. See documentation for exceptions to the default value.",
+    )
+    psatd_update_with_rho: bool | None = Field(
+        default=None,
+        description="Whether to update with the actual rho for the spectral solver",
+    )
+    psatd_do_time_averaging: bool | None = Field(
+        default=None,
+        description="Whether to do the time averaging for the spectral solver",
+    )
+    psatd_JRhom: str | None = Field(
+        default=None,
+        description=(
+            "This determines whether the PSATD JRhom algorithm is used. "
+            "The parameter is a string composed by two characters and one digit. "
+            "The first character represents the time dependency of J within the "
+            "time step over which the electromagnetic fields are evolved, e.g., "
+            '"C" for constant in time, "L" for linear in time, "Q" for quadratic '
+            "in time. "
+            "The second character represents the time dependency of rho within the "
+            "time step over which the electromagnetic fields are evolved, following "
+            "the same naming convention as for J. "
+            "The last digit is an integer that represents the number of subintervals "
+            "used in the JRhom algorithm. "
+            'Examples: "CL1" (equivalent to the standard PSATD PIC algorithm), '
+            '"CL2", "LL4", etc. '
+            "By default, the string is empty and the JRhom algorithm is not used."
+        ),
+    )
+    do_pml_in_domain: bool | None = Field(
+        default=None,
+        description="Whether to do the PML boundaries within the domain (versus in the guard cells)",
+    )
+    pml_has_particles: bool | None = Field(
+        default=None, description="Whether to allow particles in the PML region"
+    )
+    do_pml_j_damping: bool | None = Field(
+        default=None, description="Whether to do damping of J in the PML"
+    )
+
+    def model_post_init(self, context) -> None:
+        super().model_post_init(context)
         assert self.method is None or self.method in [
             "Yee",
             "CKC",
             "PSATD",
             "ECT",
         ], Exception("Only 'Yee', 'CKC', 'PSATD', and 'ECT' are supported")
-
-        self.pml_ncell = kw.pop("warpx_pml_ncell", None)
-
-        if self.method == "PSATD":
-            self.psatd_periodic_single_box_fft = kw.pop(
-                "warpx_periodic_single_box_fft", None
-            )
-            self.psatd_current_correction = kw.pop("warpx_current_correction", None)
-            self.psatd_update_with_rho = kw.pop("warpx_psatd_update_with_rho", None)
-            self.psatd_do_time_averaging = kw.pop("warpx_psatd_do_time_averaging", None)
-            self.psatd_JRhom = kw.pop("warpx_psatd_JRhom", None)
-
-        self.do_pml_in_domain = kw.pop("warpx_do_pml_in_domain", None)
-        self.pml_has_particles = kw.pop("warpx_pml_has_particles", None)
-        self.do_pml_j_damping = kw.pop("warpx_do_pml_j_damping", None)
 
     def solver_initialize_inputs(self):
         self.grid.grid_initialize_inputs()
@@ -2527,6 +2521,10 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
 
 class GaussianLaser(picmistandard.PICMI_GaussianLaser):
+    # Computed state populated during laser_initialize_inputs.
+    laser: Any = Field(default=None, init=False, exclude=True)
+    laser_number: int | None = Field(default=None, init=False, exclude=True)
+
     def laser_initialize_inputs(self):
         self.laser_number = len(pywarpx.lasers.names) + 1
         if self.name is None:
@@ -3529,281 +3527,233 @@ class PlasmaLens(picmistandard.base._ClassWithInit):
 class Simulation(picmistandard.PICMI_Simulation):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_evolve_scheme: solver scheme instance, optional
-        Which evolve scheme to use
-
-    warpx_current_deposition_algo: {'direct', 'esirkepov', and 'vay'}, optional
-        Current deposition algorithm. The default depends on conditions.
-
-    warpx_charge_deposition_algo: {'standard'}, optional
-        Charge deposition algorithm.
-
-    warpx_field_gathering_algo: {'energy-conserving', 'momentum-conserving'}, optional
-        Field gathering algorithm. The default depends on conditions.
-
-    warpx_particle_pusher_algo: {'boris', 'vay', 'higuera'}, default='boris'
-        Particle pushing algorithm.
-
-    warpx_use_filter: bool, optional
-        Whether to use filtering. The default depends on the conditions.
-
-    warpx_grid_type: {'collocated', 'staggered', 'hybrid'}, default='staggered'
-        Whether to use a collocated grid (all fields defined at the cell nodes),
-        a staggered grid (fields defined on a Yee grid), or a hybrid grid
-        (fields and currents are interpolated back and forth between a staggered grid
-        and a collocated grid, must be used with momentum-conserving field gathering algorithm).
-
-    warpx_do_current_centering: bool, optional
-        If true, the current is deposited on a nodal grid and then centered
-        to a staggered grid (Yee grid), using finite-order interpolation.
-        Default: warpx.do_current_centering=0 with collocated or staggered grids,
-        warpx.do_current_centering=1 with hybrid grids.
-
-    warpx_field_centering_nox/noy/noz: integer, optional
-        The order of interpolation used with staggered or hybrid grids (``warpx_grid_type=staggered``
-        or ``warpx_grid_type=hybrid``) and momentum-conserving field gathering
-        (``warpx_field_gathering_algo=momentum-conserving``) to interpolate the
-        electric and magnetic fields from the cell centers to the cell nodes,
-        before gathering the fields from the cell nodes to the particle positions.
-        Default: ``warpx_field_centering_no<x,y,z>=2`` with staggered grids,
-        ``warpx_field_centering_no<x,y,z>=8`` with hybrid grids (typically necessary
-        to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
-
-    warpx_current_centering_nox/noy/noz: integer, optional
-        The order of interpolation used with hybrid grids (``warpx_grid_type=hybrid``)
-        to interpolate the currents from the cell nodes to the cell centers when
-        ``warpx_do_current_centering=1``, before pushing the Maxwell fields on staggered grids.
-        Default: ``warpx_current_centering_no<x,y,z>=8`` with hybrid grids (typically necessary
-        to ensure stability in boosted-frame simulations of relativistic plasmas and beams).
-
-    warpx_serialize_initial_conditions: bool, default=False
-        Controls the random numbers used for initialization.
-        This parameter should only be used for testing and continuous integration.
-
-    warpx_random_seed: string or int, optional
-        (See documentation)
-
-    warpx_do_dynamic_scheduling: bool, default=True
-        Whether to do dynamic scheduling with OpenMP
-
-    warpx_roundrobin_sfc: bool, default=False
-        Whether to use the RRSFC strategy for making DistributionMapping
-
-    warpx_load_balance_intervals: string, default='0'
-        The intervals for doing load balancing
-
-    warpx_load_balance_efficiency_ratio_threshold: float, default=1.1
-        (See documentation)
-
-    warpx_load_balance_with_sfc: bool, default=0
-        (See documentation)
-
-    warpx_load_balance_knapsack_factor: float, default=1.24
-        (See documentation)
-
-    warpx_load_balance_costs_update: {'heuristic' or 'timers'}, optional
-        (See documentation)
-
-    warpx_costs_heuristic_particles_wt: float, optional
-        (See documentation)
-
-    warpx_costs_heuristic_cells_wt: float, optional
-        (See documentation)
-
-    warpx_use_fdtd_nci_corr: bool, optional
-        Whether to use the NCI correction when using the FDTD solver
-
-    warpx_amr_check_input: bool, optional
-        Whether AMReX should perform checks on the input
-        (primarily related to the max grid size and blocking factors)
-
-    warpx_amr_restart: string, optional
-        The name of the restart to use
-
-    warpx_amrex_the_arena_is_managed: bool, optional
-        Whether to use managed memory in the AMReX Arena
-
-    warpx_amrex_the_arena_init_size: long int, optional
-        The amount of memory in bytes to allocate in the Arena.
-
-    warpx_amrex_use_gpu_aware_mpi: bool, optional
-        Whether to use GPU-aware MPI communications
-
-    warpx_do_device_synchronize: bool, optional
-        Whether to synchronize GPU threads at ends of profiling regions.
-        Note that if this is set to False, the TinyProfiler table can be
-        misleading.
-
-    warpx_zmax_plasma_to_compute_max_step: float, optional
-        Sets the simulation run time based on the maximum z value
-
-    warpx_compute_max_step_from_btd: bool, default=0
-        If specified, automatically calculates the number of iterations
-        required in the boosted frame for all back-transformed diagnostics
-        to be completed.
-
-    warpx_collisions: collision instance, optional
-        The collision instance specifying the particle collisions
-
-    warpx_collisions_split_momentum_push: bool, default=1
-        If true, collisions are performed in the middle of the momentum push,
-        which is split into two substeps.
-        This improves energy conservation, as demonstrated in
-        (Vay et al., Phys. Rev. E 111, 2025).
-        This is only implemented for the explicit evolve scheme
-        and is not available for the implicit evolve schemes.
-
-    warpx_embedded_boundary: embedded boundary instance, optional
-
-    warpx_break_signals: list of strings
-        Signals on which to break
-
-    warpx_checkpoint_signals: list of strings
-        Signals on which to write out a checkpoint
-
-    warpx_synchronize_velocity: bool, default=False
-        Flags whether the particle velocities are synchronized in time with
-        the positions in the diagnostics. When False, the particles are
-        one half step behind the positions (except for the final diagnostic).
-
-    warpx_numprocs: list of ints (1 in 1D, 2 in 2D, 3 in 3D)
-        Domain decomposition on the coarsest level.
-        The domain will be chopped into the exact number of pieces in each dimension as specified by this parameter.
-        https://warpx.readthedocs.io/en/latest/usage/parameters.html#distribution-across-mpi-ranks-and-parallelization
-        https://warpx.readthedocs.io/en/latest/usage/domain_decomposition.html#simple-method
-
-    warpx_sort_intervals: string, optional (defaults: -1 on CPU; 4 on GPU)
-        Using the Intervals parser syntax, this string defines the timesteps at which particles are sorted. If <=0, do not sort particles.
-        It is turned on on GPUs for performance reasons (to improve memory locality).
-
-    warpx_sort_particles_for_deposition: bool, optional (default: true for the CUDA backend, otherwise false)
-        This option controls the type of sorting used if particle sorting is turned on, i.e. if sort_intervals is not <=0.
-        If `true`, particles will be sorted by cell to optimize deposition with many particles per cell, in the order `x` -> `y` -> `z` -> `ppc`.
-        If `false`, particles will be sorted by bin, using the sort_bin_size parameter below, in the order `ppc` -> `x` -> `y` -> `z`.
-        `true` is recommended for best performance on NVIDIA GPUs, especially if there are many particles per cell.
-
-    warpx_sort_idx_type: list of int, optional (default: 0 0 0)
-        This controls the type of grid used to sort the particles when sort_particles_for_deposition is true.
-        Possible values are:
-
-        * idx_type = {0, 0, 0}: Sort particles to a cell centered grid,
-        * idx_type = {1, 1, 1}: Sort particles to a node centered grid,
-        * idx_type = {2, 2, 2}: Compromise between a cell and node centered grid.
-
-        In 2D (XZ and RZ), only the first two elements are read. In 1D, only the first element is read.
-
-    warpx_sort_bin_size: list of int, optional (default 1 1 1)
-        If `sort_intervals` is activated and `sort_particles_for_deposition` is false, particles are sorted in bins of `sort_bin_size` cells.
-        In 2D, only the first two elements are read.
-
-    warpx_used_inputs_file: string, optional
-        The name of the text file that the used input parameters is written to,
-
-    warpx_reduced_diags_path: string, optional
-        Sets the default path for reduced diagnostic output files
-
-    warpx_reduced_diags_extension: string, optional
-        Sets the default extension for reduced diagnostic output files
-
-    warpx_reduced_diags_intervals: string, optional
-        Sets the default intervals for reduced diagnostic output files
-
-    warpx_reduced_diags_separator: string, optional
-        Sets the default separator for reduced diagnostic output files
-
-    warpx_reduced_diags_precision: integer, optional
-        Sets the default precision for reduced diagnostic output files
     """
 
-    # Set the C++ WarpX interface (see _libwarpx.LibWarpX) as an extension to
-    # Simulation objects. In the future, LibWarpX objects may actually be owned
-    # by Simulation objects to permit multiple WarpX runs simultaneously.
-    extension = pywarpx.libwarpx
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_Simulation)
+    )
 
-    def init(self, kw):
-        self.evolve_scheme = kw.pop("warpx_evolve_scheme", None)
-        self.current_deposition_algo = kw.pop("warpx_current_deposition_algo", None)
-        self.charge_deposition_algo = kw.pop("warpx_charge_deposition_algo", None)
-        self.field_gathering_algo = kw.pop("warpx_field_gathering_algo", None)
-        self.particle_pusher_algo = kw.pop("warpx_particle_pusher_algo", None)
-        self.use_filter = kw.pop("warpx_use_filter", None)
-        self.grid_type = kw.pop("warpx_grid_type", None)
-        self.do_current_centering = kw.pop("warpx_do_current_centering", None)
-        self.field_centering_order = kw.pop("warpx_field_centering_order", None)
-        self.current_centering_order = kw.pop("warpx_current_centering_order", None)
-        self.serialize_initial_conditions = kw.pop(
-            "warpx_serialize_initial_conditions", None
-        )
-        self.random_seed = kw.pop("warpx_random_seed", None)
-        self.do_dynamic_scheduling = kw.pop("warpx_do_dynamic_scheduling", None)
-        self.roundrobin_sfc = kw.pop("warpx_roundrobin_sfc", None)
-        self.load_balance_intervals = kw.pop("warpx_load_balance_intervals", None)
-        self.load_balance_efficiency_ratio_threshold = kw.pop(
-            "warpx_load_balance_efficiency_ratio_threshold", None
-        )
-        self.load_balance_with_sfc = kw.pop("warpx_load_balance_with_sfc", None)
-        self.load_balance_knapsack_factor = kw.pop(
-            "warpx_load_balance_knapsack_factor", None
-        )
-        self.load_balance_costs_update = kw.pop("warpx_load_balance_costs_update", None)
-        self.costs_heuristic_particles_wt = kw.pop(
-            "warpx_costs_heuristic_particles_wt", None
-        )
-        self.costs_heuristic_cells_wt = kw.pop("warpx_costs_heuristic_cells_wt", None)
-        self.use_fdtd_nci_corr = kw.pop("warpx_use_fdtd_nci_corr", None)
-        self.amr_check_input = kw.pop("warpx_amr_check_input", None)
-        self.amr_restart = kw.pop("warpx_amr_restart", None)
-        self.amrex_the_arena_is_managed = kw.pop(
-            "warpx_amrex_the_arena_is_managed", None
-        )
-        self.amrex_the_arena_init_size = kw.pop("warpx_amrex_the_arena_init_size", None)
-        self.amrex_use_gpu_aware_mpi = kw.pop("warpx_amrex_use_gpu_aware_mpi", None)
-        self.do_device_synchronize = kw.pop("warpx_do_device_synchronize", None)
-        self.zmax_plasma_to_compute_max_step = kw.pop(
-            "warpx_zmax_plasma_to_compute_max_step", None
-        )
-        self.compute_max_step_from_btd = kw.pop("warpx_compute_max_step_from_btd", None)
-        self.sort_intervals = kw.pop("warpx_sort_intervals", None)
-        self.sort_particles_for_deposition = kw.pop(
-            "warpx_sort_particles_for_deposition", None
-        )
-        self.sort_idx_type = kw.pop("warpx_sort_idx_type", None)
-        self.sort_bin_size = kw.pop("warpx_sort_bin_size", None)
-        self.used_inputs_file = kw.pop("warpx_used_inputs_file", None)
+    # NOTE: In the future, LibWarpX objects may actually be owned by Simulation
+    # objects to permit multiple WarpX runs simultaneously.
+    extension: ClassVar[Any] = pywarpx.libwarpx
+    """Handle to the running, compiled WarpX library (a ``LibWarpX`` instance).
 
-        self.collisions = kw.pop("warpx_collisions", None)
-        self.collisions_split_momentum_push = kw.pop(
-            "warpx_collisions_split_momentum_push", None
-        )
+    This is the low-level bridge from a PICMI input script to the live C++ WarpX
+    instance. It is most useful for interactive runs (stepping the simulation from
+    Python), where it exposes the running simulation state and the pybind11-bound API.
 
-        self.embedded_boundary = kw.pop("warpx_embedded_boundary", None)
+    Commonly used entry points:
 
-        self.break_signals = kw.pop("warpx_break_signals", None)
-        self.checkpoint_signals = kw.pop("warpx_checkpoint_signals", None)
-        self.numprocs = kw.pop("warpx_numprocs", None)
+    - ``extension.warpx`` -- the C++ ``WarpX`` instance, e.g.
+      ``sim.extension.warpx.getistep(lev=0)`` (current step),
+      ``sim.extension.warpx.gett_new(0)`` (current time),
+      ``sim.extension.warpx.getdt(0)`` (time-step size), or
+      ``sim.extension.warpx.set_potential_on_eb("2.")`` (set the embedded-boundary potential).
+    - ``extension.amr`` -- the AMReX adaptive mesh-refinement core object.
+    - ``extension.getNProcs()`` -- the number of MPI processes.
+    - ``extension.libwarpx_so`` -- the raw pybind11 module for direct access to the
+      compiled bindings.
 
-        self.reduced_diags_path = kw.pop("warpx_reduced_diags_path", None)
-        self.reduced_diags_extension = kw.pop("warpx_reduced_diags_extension", None)
-        self.reduced_diags_intervals = kw.pop("warpx_reduced_diags_intervals", None)
-        self.reduced_diags_separator = kw.pop("warpx_reduced_diags_separator", None)
-        self.reduced_diags_precision = kw.pop("warpx_reduced_diags_precision", None)
+    Field and particle data are usually accessed more conveniently through the
+    ``fields`` and ``particles`` properties, which wrap this handle. See
+    :ref:`usage-python-extend` for the full runtime-extension workflow.
+    """
 
-        self.synchronize_velocity = kw.pop("warpx_synchronize_velocity", None)
+    # --- WarpX-specific extension inputs (typed, exposed under the ``warpx_`` alias).
+    # --- See the class docstring above for a description of each.
+    evolve_scheme: Any | None = Field(
+        default=None, description="Which evolve scheme to use"
+    )
+    current_deposition_algo: str | None = Field(
+        default=None,
+        description="Current deposition algorithm. The default depends on conditions.",
+    )
+    charge_deposition_algo: str | None = Field(
+        default=None, description="Charge deposition algorithm."
+    )
+    field_gathering_algo: str | None = Field(
+        default=None,
+        description="Field gathering algorithm. The default depends on conditions.",
+    )
+    particle_pusher_algo: str | None = Field(
+        default=None, description="Particle pushing algorithm."
+    )
+    use_filter: bool | None = Field(
+        default=None,
+        description="Whether to use filtering. The default depends on the conditions.",
+    )
+    grid_type: str | None = Field(
+        default=None,
+        description="Whether to use a collocated grid (all fields defined at the cell nodes), a staggered grid (fields defined on a Yee grid), or a hybrid grid (fields and currents are interpolated back and forth between a staggered grid and a collocated grid, must be used with momentum-conserving field gathering algorithm).",
+    )
+    do_current_centering: bool | None = Field(
+        default=None,
+        description="If true, the current is deposited on a nodal grid and then centered to a staggered grid (Yee grid), using finite-order interpolation. Default: warpx.do_current_centering=0 with collocated or staggered grids, warpx.do_current_centering=1 with hybrid grids.",
+    )
+    field_centering_order: list | None = Field(
+        default=None,
+        description="The order of interpolation used with staggered or hybrid grids (``warpx_grid_type=staggered`` or ``warpx_grid_type=hybrid``) and momentum-conserving field gathering (``warpx_field_gathering_algo=momentum-conserving``) to interpolate the electric and magnetic fields from the cell centers to the cell nodes, before gathering the fields from the cell nodes to the particle positions. Default: ``warpx_field_centering_no<x,y,z>=2`` with staggered grids, ``warpx_field_centering_no<x,y,z>=8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).",
+    )
+    current_centering_order: list | None = Field(
+        default=None,
+        description="The order of interpolation used with hybrid grids (``warpx_grid_type=hybrid``) to interpolate the currents from the cell nodes to the cell centers when ``warpx_do_current_centering=1``, before pushing the Maxwell fields on staggered grids. Default: ``warpx_current_centering_no<x,y,z>=8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).",
+    )
+    serialize_initial_conditions: bool | None = Field(
+        default=None,
+        description="Controls the random numbers used for initialization. This parameter should only be used for testing and continuous integration.",
+    )
+    random_seed: int | str | None = Field(
+        default=None, description="(See documentation)"
+    )
+    do_dynamic_scheduling: bool | None = Field(
+        default=None, description="Whether to do dynamic scheduling with OpenMP"
+    )
+    roundrobin_sfc: bool | None = Field(
+        default=None,
+        description="Whether to use the RRSFC strategy for making DistributionMapping",
+    )
+    load_balance_intervals: int | str | None = Field(
+        default=None, description="The intervals for doing load balancing"
+    )
+    load_balance_efficiency_ratio_threshold: float | None = Field(
+        default=None, description="(See documentation)"
+    )
+    load_balance_with_sfc: bool | None = Field(
+        default=None, description="(See documentation)"
+    )
+    load_balance_knapsack_factor: float | None = Field(
+        default=None, description="(See documentation)"
+    )
+    load_balance_costs_update: str | None = Field(
+        default=None, description="(See documentation)"
+    )
+    costs_heuristic_particles_wt: float | None = Field(
+        default=None, description="(See documentation)"
+    )
+    costs_heuristic_cells_wt: float | None = Field(
+        default=None, description="(See documentation)"
+    )
+    use_fdtd_nci_corr: bool | None = Field(
+        default=None,
+        description="Whether to use the NCI correction when using the FDTD solver",
+    )
+    amr_check_input: bool | None = Field(
+        default=None,
+        description="Whether AMReX should perform checks on the input (primarily related to the max grid size and blocking factors)",
+    )
+    amr_restart: str | None = Field(
+        default=None, description="The name of the restart to use"
+    )
+    amrex_the_arena_is_managed: bool | None = Field(
+        default=None, description="Whether to use managed memory in the AMReX Arena"
+    )
+    amrex_the_arena_init_size: int | None = Field(
+        default=None,
+        description="The amount of memory in bytes to allocate in the Arena.",
+    )
+    amrex_use_gpu_aware_mpi: bool | None = Field(
+        default=None, description="Whether to use GPU-aware MPI communications"
+    )
+    do_device_synchronize: bool | None = Field(
+        default=None,
+        description="Whether to synchronize GPU threads at ends of profiling regions. Note that if this is set to False, the TinyProfiler table can be misleading.",
+    )
+    zmax_plasma_to_compute_max_step: float | None = Field(
+        default=None,
+        description="Sets the simulation run time based on the maximum z value",
+    )
+    compute_max_step_from_btd: bool | None = Field(
+        default=None,
+        description="If specified, automatically calculates the number of iterations required in the boosted frame for all back-transformed diagnostics to be completed.",
+    )
+    sort_intervals: int | str | None = Field(
+        default=None,
+        description="Using the Intervals parser syntax, this string defines the timesteps at which particles are sorted. If <=0, do not sort particles. It is turned on on GPUs for performance reasons (to improve memory locality).",
+    )
+    sort_particles_for_deposition: bool | None = Field(
+        default=None,
+        description="This option controls the type of sorting used if particle sorting is turned on, i.e. if sort_intervals is not <=0. If `true`, particles will be sorted by cell to optimize deposition with many particles per cell, in the order `x` -> `y` -> `z` -> `ppc`. If `false`, particles will be sorted by bin, using the sort_bin_size parameter below, in the order `ppc` -> `x` -> `y` -> `z`. `true` is recommended for best performance on NVIDIA GPUs, especially if there are many particles per cell.",
+    )
+    sort_idx_type: list | None = Field(
+        default=None,
+        description=(
+            "This controls the type of grid used to sort the particles when sort_particles_for_deposition is true.\n"
+            "Possible values are:\n"
+            "\n"
+            "* idx_type = {0, 0, 0}: Sort particles to a cell centered grid,\n"
+            "* idx_type = {1, 1, 1}: Sort particles to a node centered grid,\n"
+            "* idx_type = {2, 2, 2}: Compromise between a cell and node centered grid.\n"
+            "\n"
+            "In 2D (XZ and RZ), only the first two elements are read. In 1D, only the first element is read."
+        ),
+    )
+    sort_bin_size: list | None = Field(
+        default=None,
+        description="If `sort_intervals` is activated and `sort_particles_for_deposition` is false, particles are sorted in bins of `sort_bin_size` cells. In 2D, only the first two elements are read.",
+    )
+    used_inputs_file: str | None = Field(
+        default=None,
+        description="The name of the text file that the used input parameters is written to,",
+    )
+    collisions: Any | None = Field(
+        default=None,
+        description="The collision instance specifying the particle collisions",
+    )
+    collisions_split_momentum_push: bool | None = Field(
+        default=None,
+        description="If true, collisions are performed in the middle of the momentum push, which is split into two substeps. This improves energy conservation, as demonstrated in (Vay et al., Phys. Rev. E 111, 2025). This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes.",
+    )
+    embedded_boundary: Any | None = Field(default=None, alias="warpx_embedded_boundary")
+    break_signals: list | None = Field(
+        default=None, description="Signals on which to break"
+    )
+    checkpoint_signals: list | None = Field(
+        default=None, description="Signals on which to write out a checkpoint"
+    )
+    numprocs: list | None = Field(
+        default=None,
+        description="Domain decomposition on the coarsest level. The domain will be chopped into the exact number of pieces in each dimension as specified by this parameter. https://warpx.readthedocs.io/en/latest/usage/parameters.html#distribution-across-mpi-ranks-and-parallelization https://warpx.readthedocs.io/en/latest/usage/domain_decomposition.html#simple-method",
+    )
+    reduced_diags_path: str | None = Field(
+        default=None,
+        description="Sets the default path for reduced diagnostic output files",
+    )
+    reduced_diags_extension: str | None = Field(
+        default=None,
+        description="Sets the default extension for reduced diagnostic output files",
+    )
+    reduced_diags_intervals: int | str | None = Field(
+        default=None,
+        description="Sets the default intervals for reduced diagnostic output files",
+    )
+    reduced_diags_separator: str | None = Field(
+        default=None,
+        description="Sets the default separator for reduced diagnostic output files",
+    )
+    reduced_diags_precision: int | None = Field(
+        default=None,
+        description="Sets the default precision for reduced diagnostic output files",
+    )
+    synchronize_velocity: bool | None = Field(
+        default=None,
+        description="Flags whether the particle velocities are synchronized in time with the positions in the diagnostics. When False, the particles are one half step behind the positions (except for the final diagnostic).",
+    )
+    self_fields_required_precision: float | None = Field(
+        default=None, alias="warpx_self_fields_required_precision"
+    )
+    self_fields_absolute_tolerance: float | None = Field(
+        default=None, alias="warpx_self_fields_absolute_tolerance"
+    )
+    self_fields_max_iters: int | None = Field(
+        default=None, alias="warpx_self_fields_max_iters"
+    )
+    self_fields_verbosity: int | None = Field(
+        default=None, alias="warpx_self_fields_verbosity"
+    )
 
-        self.self_fields_required_precision = kw.pop(
-            "warpx_self_fields_required_precision", None
-        )
-        self.self_fields_absolute_tolerance = kw.pop(
-            "warpx_self_fields_absolute_tolerance", None
-        )
-        self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
-        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
-
-        self.inputs_initialized = False
-        self.warpx_initialized = False
+    # --- Computed state (not user inputs).
+    inputs_initialized: bool = Field(default=False, init=False, exclude=True)
+    warpx_initialized: bool = Field(default=False, init=False, exclude=True)
 
     def initialize_inputs(self):
         if self.inputs_initialized:
@@ -4091,66 +4041,62 @@ class ParticleFieldDiagnostic:
 class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_plot_raw_fields: bool, optional
-        Flag whether to dump the raw fields
-
-    warpx_plot_raw_fields_guards: bool, optional
-        Flag whether the raw fields should include the guard cells
-
-    warpx_format: {plotfile, checkpoint, openpmd, ascent, sensei}, optional
-        Diagnostic file format
-
-    warpx_openpmd_backend: {bp, h5, json}, optional
-        Openpmd backend file format
-
-    warpx_openpmd_encoding: 'v' (variable based), 'f' (file based) or 'g' (group based), optional
-        Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding.
-        File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-        Variable based is an experimental feature with ADIOS2. Default: `'f'`.
-
-    warpx_file_prefix: string, optional
-        Prefix on the diagnostic file name
-
-    warpx_file_min_digits: integer, optional
-        Minimum number of digits for the time step number in the file name
-
-    warpx_dump_rz_modes: bool, optional
-        Flag whether to dump the data for all RZ modes
-
-    warpx_dump_last_timestep: bool, optional
-        If true, the last timestep is dumped regardless of the diagnostic period/intervals.
-
-    warpx_particle_fields_to_plot: list of ParticleFieldDiagnostics
-        List of ParticleFieldDiagnostic classes to install in the simulation. Error
-        checking is handled in the class itself.
-
-    warpx_particle_fields_species: list of strings, optional
-        Species for which to calculate particle_fields_to_plot functions. Fields will
-        be calculated separately for each specified species. If not passed, default is
-        all of the available particle species.
-
-    warpx_verbose: int, optional
-        Verbosity level to use for printing diagnostic output information.
     """
 
-    def init(self, kw):
-        self.plot_raw_fields = kw.pop("warpx_plot_raw_fields", None)
-        self.plot_raw_fields_guards = kw.pop("warpx_plot_raw_fields_guards", None)
-        self.plot_finepatch = kw.pop("warpx_plot_finepatch", None)
-        self.plot_crsepatch = kw.pop("warpx_plot_crsepatch", None)
-        self.format = kw.pop("warpx_format", "plotfile")
-        self.openpmd_backend = kw.pop("warpx_openpmd_backend", None)
-        self.openpmd_encoding = kw.pop("warpx_openpmd_encoding", None)
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.dump_rz_modes = kw.pop("warpx_dump_rz_modes", None)
-        self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
-        self.particle_fields_to_plot = kw.pop("warpx_particle_fields_to_plot", [])
-        self.particle_fields_species = kw.pop("warpx_particle_fields_species", None)
-        self.verbose = kw.pop("warpx_verbose", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_FieldDiagnostic)
+    )
+
+    period: int | str = Field(
+        description="Period of time steps at which the diagnostic is performed; WarpX also accepts the Intervals parser string syntax (e.g. '::10')."
+    )
+
+    plot_raw_fields: bool | None = Field(
+        default=None, description="Flag whether to dump the raw fields"
+    )
+    plot_raw_fields_guards: bool | None = Field(
+        default=None,
+        description="Flag whether the raw fields should include the guard cells",
+    )
+    plot_finepatch: bool | None = Field(default=None, alias="warpx_plot_finepatch")
+    plot_crsepatch: bool | None = Field(default=None, alias="warpx_plot_crsepatch")
+    format: str = Field(default="plotfile", description="Diagnostic file format")
+    openpmd_backend: str | None = Field(
+        default=None, description="Openpmd backend file format"
+    )
+    openpmd_encoding: str | None = Field(
+        default=None,
+        description="Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding. File based: one file per timestep (slower), group/variable based: one file for all steps (faster)). Variable based is an experimental feature with ADIOS2. Default: `'f'`.",
+    )
+    file_prefix: str | None = Field(
+        default=None, description="Prefix on the diagnostic file name"
+    )
+    file_min_digits: int | None = Field(
+        default=None,
+        description="Minimum number of digits for the time step number in the file name",
+    )
+    dump_rz_modes: bool | None = Field(
+        default=None, description="Flag whether to dump the data for all RZ modes"
+    )
+    dump_last_timestep: bool | None = Field(
+        default=None,
+        description="If true, the last timestep is dumped regardless of the diagnostic period/intervals.",
+    )
+    particle_fields_to_plot: list = Field(
+        default_factory=list,
+        description="List of ParticleFieldDiagnostic classes to install in the simulation. Error checking is handled in the class itself.",
+    )
+    particle_fields_species: list | None = Field(
+        default=None,
+        description="Species for which to calculate particle_fields_to_plot functions. Fields will be calculated separately for each specified species. If not passed, default is all of the available particle species.",
+    )
+    verbose: int | None = Field(
+        default=None,
+        description="Verbosity level to use for printing diagnostic output information.",
+    )
+
+    # Computed state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    diagnostic: Any = Field(default=None, init=False, exclude=True)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -4299,39 +4245,35 @@ ElectrostaticFieldDiagnostic = FieldDiagnostic
 class TimeAveragedFieldDiagnostic(FieldDiagnostic):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_time_average_mode: str
-        Type of time averaging diagnostic
-        Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``
-
-            * ``"none"`` for no averaging (instantaneous fields)
-            * ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time
-            * ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)
-
-    warpx_average_period_steps: int, optional
-        Configures the number of time steps in an averaging period.
-        Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set.
-        Will be ignored in the ``"fixed_start"`` mode (with warning).
-
-    warpx_average_period_time: float, optional
-        Configures the time (SI units) in an averaging period.
-        Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set.
-        Will be ignored in the ``"fixed_start"`` mode (with warning).
-
-    warpx_average_start_steps: int, optional
-        Configures the time step at which time-averaging begins.
-        Set this only in the ``"fixed_start"`` mode.
-        Will be ignored in the ``"dynamic_start"`` mode (with warning).
     """
 
-    def init(self, kw):
-        super().init(kw)
-        self.time_average_mode = kw.pop("warpx_time_average_mode", None)
-        self.average_period_steps = kw.pop("warpx_average_period_steps", None)
-        self.average_period_time = kw.pop("warpx_average_period_time", None)
-        self.average_start_step = kw.pop("warpx_average_start_step", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_FieldDiagnostic)
+    )
+
+    time_average_mode: str | None = Field(
+        default=None,
+        description=(
+            "Type of time averaging diagnostic\n"
+            'Supported values include ``"none"``, ``"fixed_start"``, and ``"dynamic_start"``\n'
+            "\n"
+            '* ``"none"`` for no averaging (instantaneous fields)\n'
+            '* ``"fixed_start"`` for a diagnostic that averages all fields between the current output step and a fixed point in time\n'
+            '* ``"dynamic_start"`` for a constant averaging period and output at different points in time (non-overlapping)'
+        ),
+    )
+    average_period_steps: int | None = Field(
+        default=None,
+        description='Configures the number of time steps in an averaging period. Set this only in the ``"dynamic_start"`` mode and only if ``warpx_average_period_time`` has not already been set. Will be ignored in the ``"fixed_start"`` mode (with warning).',
+    )
+    average_period_time: float | None = Field(
+        default=None,
+        description='Configures the time (SI units) in an averaging period. Set this only in the ``"dynamic_start"`` mode and only if ``average_period_steps`` has not already been set. Will be ignored in the ``"fixed_start"`` mode (with warning).',
+    )
+    average_start_step: int | None = Field(
+        default=None,
+        description='Configures the time step at which time-averaging begins. Set this only in the ``"fixed_start"`` mode. Will be ignored in the ``"dynamic_start"`` mode (with warning).',
+    )
 
     def diagnostic_initialize_inputs(self):
         super().diagnostic_initialize_inputs()
@@ -4395,72 +4337,88 @@ class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
 class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnosticBase):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_format: {plotfile, checkpoint, openpmd, ascent, sensei}, optional
-        Diagnostic file format
-
-    warpx_openpmd_backend: {bp, h5, json}, optional
-        Openpmd backend file format
-
-    warpx_openpmd_encoding: 'v' (variable based), 'f' (file based) or 'g' (group based), optional
-        Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding.
-        File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-        Variable based is an experimental feature with ADIOS2. Default: `'f'`.
-
-    warpx_file_prefix: string, optional
-        Prefix on the diagnostic file name
-
-    warpx_file_min_digits: integer, optional
-        Minimum number of digits for the time step number in the file name
-
-    warpx_random_fraction: float or dict, optional
-        Random fraction of particles to include in the diagnostic. If a float
-        is given the same fraction will be used for all species, if a dictionary
-        is given the keys should be species with the value specifying the random
-        fraction for that species.
-
-    warpx_uniform_stride: integer or dict, optional
-        Stride to down select to the particles to include in the diagnostic.
-        If an integer is given the same stride will be used for all species, if
-        a dictionary is given the keys should be species with the value
-        specifying the stride for that species.
-
-    warpx_dump_last_timestep: bool, optional
-        If true, the last timestep is dumped regardless of the diagnostic period/intervals.
-
-    warpx_plot_filter_function: string, optional
-        Analytic expression to down select the particles to in the diagnostic
-
-    warpx_verbose: int, optional
-        Verbosity level to use for printing diagnostic output information.
     """
 
-    def init(self, kw):
-        self.format = kw.pop("warpx_format", "plotfile")
-        self.openpmd_backend = kw.pop("warpx_openpmd_backend", None)
-        self.openpmd_encoding = kw.pop("warpx_openpmd_encoding", None)
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.random_fraction = kw.pop("warpx_random_fraction", None)
-        self.uniform_stride = kw.pop("warpx_uniform_stride", None)
-        self.plot_filter_function = kw.pop("warpx_plot_filter_function", None)
-        self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
-        self.verbose = kw.pop("warpx_verbose", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_ParticleDiagnostic)
+    )
 
-        self.user_defined_kw = {}
-        if self.plot_filter_function is not None:
-            # This allows variables to be used in the plot_filter_function, but
-            # in order not to break other codes, the variables must begin with "warpx_"
-            for k in list(kw.keys()):
+    format: str = Field(default="plotfile", description="Diagnostic file format")
+    openpmd_backend: str | None = Field(
+        default=None, description="Openpmd backend file format"
+    )
+    openpmd_encoding: str | None = Field(
+        default=None,
+        description="Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding. File based: one file per timestep (slower), group/variable based: one file for all steps (faster)). Variable based is an experimental feature with ADIOS2. Default: `'f'`.",
+    )
+    file_prefix: str | None = Field(
+        default=None, description="Prefix on the diagnostic file name"
+    )
+    file_min_digits: int | None = Field(
+        default=None,
+        description="Minimum number of digits for the time step number in the file name",
+    )
+    period: int | str = Field(
+        description="Period of time steps at which the diagnostic is performed; WarpX also accepts the Intervals parser string syntax (e.g. '::10')."
+    )
+    random_fraction: float | dict | None = Field(
+        default=None,
+        description="Random fraction of particles to include in the diagnostic. If a float is given the same fraction will be used for all species, if a dictionary is given the keys should be species with the value specifying the random fraction for that species.",
+    )
+    uniform_stride: int | dict | None = Field(
+        default=None,
+        description="Stride to down select to the particles to include in the diagnostic. If an integer is given the same stride will be used for all species, if a dictionary is given the keys should be species with the value specifying the stride for that species.",
+    )
+    plot_filter_function: str | None = Field(
+        default=None,
+        description="Analytic expression to down select the particles to in the diagnostic",
+    )
+    dump_last_timestep: bool | None = Field(
+        default=None,
+        description="If true, the last timestep is dumped regardless of the diagnostic period/intervals.",
+    )
+    verbose: int | None = Field(
+        default=None,
+        description="Verbosity level to use for printing diagnostic output information.",
+    )
+
+    # ``warpx_``-prefixed constants referenced in plot_filter_function, collected from the
+    # otherwise-unrecognized keyword arguments.
+    user_defined_kw: dict = Field(default_factory=dict)
+
+    # Computed state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    diagnostic: Any = Field(default=None, init=False, exclude=True)
+    mangle_dict: Any = Field(default=None, init=False, exclude=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _collect_plot_filter_kw(cls, data):
+        # This allows variables to be used in the plot_filter_function, but in order not to
+        # break other codes, the variables must begin with "warpx_".
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        plot_filter_function = (
+            data.get("warpx_plot_filter_function")
+            or data.get("plot_filter_function")
+            or ""
+        )
+        user_defined_kw = dict(data.get("user_defined_kw", {}))
+        if plot_filter_function:
+            known = set()
+            for fname, finfo in cls.model_fields.items():
+                known.add(fname)
+                if finfo.alias:
+                    known.add(finfo.alias)
+            for k in list(data.keys()):
+                if k in known:
+                    continue
                 if k.startswith("warpx_") and re.search(
-                    r"\b%s\b" % k, self.plot_filter_function
+                    r"\b%s\b" % k, plot_filter_function
                 ):
-                    self.user_defined_kw[k] = kw[k]
-                    del kw[k]
-
-        self.mangle_dict = None
+                    user_defined_kw[k] = data.pop(k)
+        data["user_defined_kw"] = user_defined_kw
+        return data
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
@@ -4554,7 +4512,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         # species list
         if self.species is None:
             species_names = pywarpx.particles.species_names
-        elif np.iterable(self.species):
+        elif isinstance(self.species, (list, tuple)):
             species_names = [species.name for species in self.species]
         else:
             species_names = [self.species.name]
@@ -4869,7 +4827,7 @@ class LabFrameParticleDiagnostic(
         # species list
         if self.species is None:
             species_names = pywarpx.particles.species_names
-        elif np.iterable(self.species):
+        elif isinstance(self.species, (list, tuple)):
             species_names = [species.name for species in self.species]
         else:
             species_names = [self.species.name]
@@ -5347,7 +5305,7 @@ class ParticleBoundaryScrapingDiagnostic(
         # species list
         if self.species is None:
             species_names = pywarpx.particles.species_names
-        elif np.iterable(self.species):
+        elif isinstance(self.species, (list, tuple)):
             species_names = [species.name for species in self.species]
         else:
             species_names = [self.species.name]
