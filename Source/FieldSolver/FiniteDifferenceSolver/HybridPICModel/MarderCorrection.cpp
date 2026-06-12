@@ -20,8 +20,11 @@
 
 #include <AMReX_Array4.H>
 #include <AMReX_GpuControl.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Reduce.H>
 
 #include <algorithm>
 #include <cmath>
@@ -72,7 +75,8 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     std::optional<int> max_iterations,
     std::optional<amrex::Real> rtol,
     std::optional<amrex::Real> atol,
-    std::optional<MarderTarget> target) const
+    std::optional<MarderTarget> target,
+    const bool allow_target_cache) const
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
     using namespace ablastr::coarsen::sample;
@@ -121,7 +125,33 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     // ---------------------------------------------------------------------
     // Assemble the divergence target
     // ---------------------------------------------------------------------
-    if (target_v == MarderTarget::Zero) {
+    // The grad_pe_only target depends only on Pe and the rho the call site
+    // passes, both of which are constant across all the substep E
+    // evaluations between two field-epoch bumps of the hybrid advance, so
+    // its assembly is cached per level. The ohm target reads J and B, which
+    // change every stage, and is never cached. The Python unit-test binding
+    // disables the cache (allow_target_cache=false) since it pokes Pe
+    // directly through the field wrappers.
+    const bool use_cache = allow_target_cache
+        && (target_v == MarderTarget::GradPeOnly);
+    bool cache_hit = false;
+    if (use_cache) {
+        if (static_cast<int>(m_marder_target_cache.size()) <= lev) {
+            m_marder_target_cache.resize(lev+1);
+            m_marder_target_cache_epoch.resize(lev+1, -1);
+            m_marder_target_cache_rho.resize(lev+1, nullptr);
+        }
+        if (m_marder_target_cache_epoch[lev] == m_marder_field_epoch
+            && m_marder_target_cache_rho[lev] == static_cast<const void*>(&rhofield)
+            && m_marder_target_cache[lev].boxArray() == nodal_ba) {
+            MultiFab::Copy(div_target, m_marder_target_cache[lev], 0, 0, 1, 0);
+            cache_hit = true;
+        }
+    }
+
+    if (cache_hit) {
+        // div_target already holds the cached grad_pe_only assembly
+    } else if (target_v == MarderTarget::Zero) {
         div_target.setVal(0.0_rt);
     } else {
         const bool with_jxb = (target_v == MarderTarget::Ohm);
@@ -309,7 +339,20 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
         }
 
         fdtd->ComputeDivE(E_target, div_target);
+
+        if (use_cache) {
+            m_marder_target_cache[lev].define(
+                nodal_ba, rhofield.DistributionMap(), 1, IntVect::TheZeroVector());
+            MultiFab::Copy(m_marder_target_cache[lev], div_target, 0, 0, 1, 0);
+            m_marder_target_cache_epoch[lev] = m_marder_field_epoch;
+            m_marder_target_cache_rho[lev] = static_cast<const void*>(&rhofield);
+        }
     }
+
+    // owner mask for the residual norm: nodal points shared between boxes
+    // must be counted once (same semantics as MultiFab::norm2 with
+    // periodicity); built once per application, reused every iteration
+    auto owner_mask = amrex::OwnerMask(div_err, geom.periodicity());
 
     // ---------------------------------------------------------------------
     // Fixed-point iteration: E += alpha_scaled * mask * grad(div(E) - div_target)
@@ -319,10 +362,10 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     Real final_resid = std::numeric_limits<Real>::infinity();
 
     for (n_iter = 1; n_iter <= max_iters_v; ++n_iter) {
-        // the nodal divergence at box faces reads E ghosts
+        // the nodal divergence at box faces reads one E ghost layer
         for (int c = 0; c < 3; ++c) {
             ablastr::utils::communication::FillBoundary(
-                *Efield[c], Efield[c]->nGrowVect(),
+                *Efield[c], IntVect(1),
                 WarpX::do_single_precision_comms, geom.periodicity());
         }
 
@@ -330,25 +373,31 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 
         // restrict the error to the transition band (0 < rho <= rho_floor),
         // excluding nodes inside the conductor (the mirrored rho can be
-        // positive there when the Neumann rho fill is selected)
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
+        // positive there when the Neumann rho fill is selected), and
+        // accumulate the owner-masked L2 residual in the same sweep
+        amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+        amrex::ReduceData<Real> reduce_data(reduce_op);
         for (MFIter mfi(div_err, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             Array4<Real> const& derr = div_err.array(mfi);
             Array4<Real const> const& dtar = div_target.const_array(mfi);
             Array4<Real const> const& rho = rhofield.const_array(mfi);
+            Array4<int const> const& own = owner_mask->const_array(mfi);
             Array4<Real const> phi;
             if (eb_enabled) { phi = phi_mf->const_array(mfi); }
-            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
+            reduce_op.eval(mfi.tilebox(), reduce_data,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) -> amrex::GpuTuple<Real>
+            {
                 const bool in_band = (rho(i, j, k) > 0.0_rt)
                     && (rho(i, j, k) <= rho_floor)
                     && (!phi || phi(i, j, k) > 0.0_rt);
-                derr(i, j, k) = in_band ? (derr(i, j, k) - dtar(i, j, k)) : 0.0_rt;
+                const Real err = in_band ? (derr(i, j, k) - dtar(i, j, k)) : 0.0_rt;
+                derr(i, j, k) = err;
+                return {own(i, j, k) ? err*err : 0.0_rt};
             });
         }
-
-        const Real resid = div_err.norm2(0, geom.periodicity());
+        Real sumsq = amrex::get<0>(reduce_data.value(reduce_op));
+        amrex::ParallelDescriptor::ReduceRealSum(sumsq);
+        const Real resid = std::sqrt(sumsq);
         if (n_iter == 1) { resid0 = std::max(resid, 1.e-30_rt); }
         final_resid = resid;
         if (resid < atol_v || resid < rtol_v*resid0) { break; }

@@ -243,7 +243,8 @@ public:
         std::optional<int> max_iterations = std::nullopt,
         std::optional<amrex::Real> rtol = std::nullopt,
         std::optional<amrex::Real> atol = std::nullopt,
-        std::optional<MarderTarget> target = std::nullopt) const;
+        std::optional<MarderTarget> target = std::nullopt,
+        bool allow_target_cache = true) const;
 
     /**
      * \brief
@@ -368,6 +369,17 @@ public:
     /** Substep E-evaluation counter for the interval cadence; reset at the
      *  start of every hybrid field advance */
     int m_marder_substep_counter = 0;
+
+    /** Epoch counter for the fields entering the Marder divergence target
+     *  (Pe and the rho the call sites pass); bumped by the hybrid field
+     *  advance whenever either changes, so the per-stage target of the
+     *  grad_pe_only mode can be cached between bumps */
+    long m_marder_field_epoch = 0;
+    /** Cached grad_pe_only divergence target, one per level (valid while
+     *  the epoch stamp and source-rho identity match) */
+    mutable amrex::Vector<amrex::MultiFab> m_marder_target_cache;
+    mutable amrex::Vector<long> m_marder_target_cache_epoch;
+    mutable amrex::Vector<const void*> m_marder_target_cache_rho;
 
     /** Cached embedded-boundary fill classification for the edge fields
      *  (current density and Ohm's-law E), one entry per level; reset on

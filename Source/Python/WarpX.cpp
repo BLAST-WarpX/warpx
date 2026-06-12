@@ -379,7 +379,8 @@ void init_WarpX (py::module& m)
                     wx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     *wx.m_fields.get(FieldType::rho_fp, lev),
                     wx.GetEBUpdateEFlag()[lev], lev,
-                    alpha, max_iterations, rtol, atol, target_v);
+                    alpha, max_iterations, rtol, atol, target_v,
+                    /*allow_target_cache=*/false);
                 return py::make_tuple(result.first, result.second);
             },
             py::arg("lev") = 0, py::arg("alpha") = py::none(),

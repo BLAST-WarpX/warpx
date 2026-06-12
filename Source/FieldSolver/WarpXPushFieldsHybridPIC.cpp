@@ -44,8 +44,11 @@ void WarpX::HybridPICEvolveFields ()
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
 
     // Reset the Marder substep cadence counter so the reduced-cadence
-    // application pattern is deterministic per step and across restarts
+    // application pattern is deterministic per step and across restarts,
+    // and invalidate the cached Marder target (the deposition below
+    // changes rho)
     m_hybrid_pic_model->m_marder_substep_counter = 0;
+    ++m_hybrid_pic_model->m_marder_field_epoch;
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
@@ -151,6 +154,8 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt, *m_fields.get(FieldType::rho_fp, lev), 0, 0, 1, rho_fp_temp[lev]->nGrowVect()
         );
     }
+    // rho_fp_temp changed: invalidate the cached Marder target
+    ++m_hybrid_pic_model->m_marder_field_epoch;
 
     if (add_external_fields) {
         // Get the external fields at E^{n+1/2}
@@ -221,8 +226,10 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1
+    // Calculate the electron pressure at t=n+1 (changes Pe: invalidate the
+    // cached Marder target)
     m_hybrid_pic_model->CalculateElectronPressure();
+    ++m_hybrid_pic_model->m_marder_field_epoch;
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(
