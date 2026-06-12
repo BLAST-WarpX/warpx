@@ -2209,6 +2209,17 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Maximum number of Jacobi sweeps of the embedded-boundary PEC
         boundary-condition band relaxation.
 
+    eb_deposit_fold: str, default='pec'
+        Image parity of the embedded-boundary deposit fold: 'pec' subtracts
+        the covered-side deposit at its mirror (image charge of the opposite
+        sign, density vanishes at the wall); 'reflect' adds it back
+        (mass-conserving, for a wall-supported column).
+
+    eb_rho_dirichlet: bool, default=True
+        Parity of the embedded-boundary charge-density mirror fill: True is
+        the odd reflection (Dirichlet 0 at the wall); False is the even
+        reflection (Neumann, for a wall-supported column).
+
     eb_bc_direct_fill: bool, default=True
         If True (default), fill the embedded-boundary PEC boundary condition
         with a single-pass mirrored interpolation that uses only
@@ -2297,6 +2308,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
+        eb_deposit_fold=None,
+        eb_rho_dirichlet=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2328,6 +2341,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
+        self.eb_deposit_fold = eb_deposit_fold
+        self.eb_rho_dirichlet = eb_rho_dirichlet
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2383,6 +2398,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
+        pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
+        pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(

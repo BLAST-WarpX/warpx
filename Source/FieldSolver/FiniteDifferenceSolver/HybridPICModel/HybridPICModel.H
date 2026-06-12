@@ -262,6 +262,15 @@ public:
      *  with a single-pass mirrored interpolation over unmasked
      *  (solution-domain) values instead of the Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
+    /** Image parity of the embedded-boundary deposit fold: true (default)
+     *  folds with the PEC image signs (charge and tangential current
+     *  subtracted, normal current added); false uses the reflecting-wall
+     *  parities (mass-conserving for a wall-supported column) */
+    bool m_eb_fold_pec = true;
+    /** Parity of the embedded-boundary rho mirror fill: true (default) is
+     *  the odd reflection (Dirichlet 0 at the wall); false is the even
+     *  reflection (Neumann: the wall supports the column) */
+    bool m_eb_rho_dirichlet = true;
 
     /** Cached embedded-boundary fill classification for the edge fields
      *  (current density and Ohm's-law E), one entry per level; reset on

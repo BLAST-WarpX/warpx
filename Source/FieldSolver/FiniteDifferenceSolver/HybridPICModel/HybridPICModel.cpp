@@ -120,6 +120,22 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
+
+    // embedded-boundary treatment of the deposited density: image parity of
+    // the deposit fold ("pec": image charge of the opposite sign, density
+    // vanishes at the wall; "reflect": deposit folded back with its own
+    // sign, mass-conserving for a wall-supported column) and the parity of
+    // the rho mirror fill (Dirichlet 0 by default, Neumann when the wall
+    // supports the column)
+    std::string fold = "pec";
+    pp_hybrid.query("eb_deposit_fold", fold);
+    if (fold == "pec") { m_eb_fold_pec = true; }
+    else if (fold == "reflect") { m_eb_fold_pec = false; }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.eb_deposit_fold must be 'pec' or 'reflect'");
+    }
+    pp_hybrid.query("eb_rho_dirichlet", m_eb_rho_dirichlet);
 }
 
 void HybridPICModel::AllocateLevelMFs (

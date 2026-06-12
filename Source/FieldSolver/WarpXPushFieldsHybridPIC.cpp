@@ -328,7 +328,8 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 m_eb_update_E[lev],
                 *m_fields.get(FieldType::distance_to_eb, lev),
                 Geom(lev),
-                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev],
+                m_hybrid_pic_model->m_eb_fold_pec);
             warpx::hybrid::ApplyPECBoundaryToField(
                 m_fields.get_alldirs(FieldType::current_fp, lev),
                 m_eb_update_E[lev],
@@ -342,12 +343,13 @@ void WarpX::HybridPICDepositRhoAndJ ()
             warpx::hybrid::FoldEBDepositToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),
-                Geom(lev));
+                Geom(lev),
+                m_hybrid_pic_model->m_eb_fold_pec);
             warpx::hybrid::ApplyEBBoundaryToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),
                 Geom(lev),
-                /*odd=*/true);
+                /*odd=*/m_hybrid_pic_model->m_eb_rho_dirichlet);
         }
     }
 }

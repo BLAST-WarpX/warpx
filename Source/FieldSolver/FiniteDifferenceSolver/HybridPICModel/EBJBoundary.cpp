@@ -833,7 +833,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 void warpx::hybrid::FoldEBDepositToNodalScalar (
     amrex::MultiFab& field,
     amrex::MultiFab const& distance_to_eb,
-    amrex::Geometry const& geom)
+    amrex::Geometry const& geom,
+    bool pec_images)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -855,6 +856,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
     // deposit shape functions reach one cell past the surface; fold targets
     // mirror that reach on the fluid side
     amrex::Real const fold_band = 1.5_rt * h_max;
+    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
 
     // covered-side ghosts must hold the guard-summed deposit
     field.FillBoundary(geom.periodicity());
@@ -920,12 +922,13 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
                 xm, stag0, plo, dxi, n);
 
             // PEC image charge has the opposite sign (matches the domain
-            // treatment in PEC::ApplyReflectiveBoundarytoRhofield)
-            f(i, j, k, n) -= v*w;
+            // treatment in PEC::ApplyReflectiveBoundarytoRhofield); the
+            // reflecting-wall parity adds the deposit back instead
+            f(i, j, k, n) += fold_sign*v*w;
         });
     }
 #else
-    amrex::ignore_unused(field, distance_to_eb, geom);
+    amrex::ignore_unused(field, distance_to_eb, geom, pec_images);
 #endif
 }
 
@@ -934,7 +937,8 @@ void warpx::hybrid::FoldEBDepositToField (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
-    EBFillStatus* status_cache)
+    EBFillStatus* status_cache,
+    bool pec_images)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -955,6 +959,7 @@ void warpx::hybrid::FoldEBDepositToField (
     amrex::Real const d_band = h_max;
     amrex::Real const d_img_min = 0.5_rt * h_max;
     amrex::Real const fold_band = 1.5_rt * h_max;
+    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
 
     std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> stag{};
     for (int c = 0; c < 3; ++c) {
@@ -1036,13 +1041,14 @@ void warpx::hybrid::FoldEBDepositToField (
                 amrex::Real const g_e = (c == 0) ? gx : ((c == 1) ? gy : gz);
 
                 // PEC image current: normal part added, tangential part
-                // subtracted (matches PEC::ApplyReflectiveBoundarytoJfield)
-                Jc(i, j, k, n) += ndotg*e_dot_n - (g_e - ndotg*e_dot_n);
+                // subtracted (matches PEC::ApplyReflectiveBoundarytoJfield);
+                // the reflecting-wall parities are the exact opposite
+                Jc(i, j, k, n) += fold_sign*((g_e - ndotg*e_dot_n) - ndotg*e_dot_n);
             });
         }
     }
 #else
-    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache);
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache, pec_images);
 #endif
 }
 

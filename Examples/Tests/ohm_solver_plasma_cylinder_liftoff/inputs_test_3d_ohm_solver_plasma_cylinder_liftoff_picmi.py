@@ -104,6 +104,8 @@ def setup_simulation(
     eta_power=ETA_POWER,
     eta_ntrans=N_TRANSITION_FRAC,
     f_t_ci=F_T_CI,
+    r_outer=R_OUTER,
+    wall_supported=False,
 ):
     """Create the PICMI simulation object.
 
@@ -188,6 +190,8 @@ def setup_simulation(
         plasma_hyper_resistivity=eta_hyper,
         substeps=SUBSTEPS,
         holmstrom_vacuum_region=True if holmstrom else None,
+        eb_deposit_fold="reflect" if wall_supported else None,
+        eb_rho_dirichlet=False if wall_supported else None,
         use_rkf45=True,
         substep_rtol=1.0e-3,
         substep_atol=1.0e-8,
@@ -211,7 +215,7 @@ def setup_simulation(
     # Annular column carrying the inventory of a full column of radius
     # R_PART at N_I, plus a low-density interior fill (no plasma between the
     # annulus and the wall)
-    n_annulus = N_I * R_PART**2 / (R_OUTER**2 - R_INNER**2)
+    n_annulus = N_I * R_PART**2 / (r_outer**2 - R_INNER**2)
     n_fill = 2.0 * n_floor
     r_expr = "sqrt(x*x+y*y)"
     ions = picmi.Species(
@@ -228,7 +232,7 @@ def setup_simulation(
             n_a=n_annulus,
             n_f=n_fill,
             R_in=R_INNER,
-            R_out=R_OUTER,
+            R_out=r_outer,
         ),
     )
     sim.add_species(
@@ -309,6 +313,20 @@ def main():
         default=F_T_CI,
     )
     parser.add_argument(
+        "--r-outer",
+        help="outer radius of the annular column (set near R_WALL=0.8 for a "
+        "wall-supported start)",
+        type=float,
+        default=R_OUTER,
+    )
+    parser.add_argument(
+        "--wall-supported",
+        help="treat the embedded boundary as a supporting wall: reflecting "
+        "deposit fold (mass conserving) and Neumann density mirror instead "
+        "of the PEC image fold and Dirichlet-0 density",
+        action="store_true",
+    )
+    parser.add_argument(
         "--holmstrom",
         help="zero the Ohm's-law E in vacuum regions (Holmstrom treatment): "
         "suppresses the floor-density Hall amplification in the gap between "
@@ -353,6 +371,8 @@ def main():
         args.eta_power,
         args.eta_ntrans,
         args.f_tci,
+        args.r_outer,
+        args.wall_supported,
     )
     sim.step()
 

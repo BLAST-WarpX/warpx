@@ -266,7 +266,7 @@ void init_WarpX (py::module& m)
             "field Bfield_fp."
         )
         .def("hybrid_fold_eb_deposit_to_edge_field",
-            [](WarpX& wx, std::string const& name, int const lev) {
+            [](WarpX& wx, std::string const& name, int const lev, bool const pec) {
                 using warpx::fields::FieldType;
                 auto* hybrid = wx.get_pointer_HybridPICModel();
                 if (!EB::enabled() || hybrid == nullptr) {
@@ -286,15 +286,16 @@ void init_WarpX (py::module& m)
                     wx.GetEBUpdateEFlag()[lev],
                     *wx.m_fields.get(FieldType::distance_to_eb, lev),
                     wx.Geom(lev),
-                    &hybrid->m_eb_bc_status_E[lev]);
+                    &hybrid->m_eb_bc_status_E[lev],
+                    pec);
             },
-            py::arg("name"), py::arg("lev") = 0,
+            py::arg("name"), py::arg("lev") = 0, py::arg("pec") = true,
             "Fold the deposit collected by covered points of the registered "
             "edge vector field current_fp back across the embedded surface "
             "with the PEC image parities (tangential subtracted, normal added)."
         )
         .def("hybrid_fold_eb_deposit_to_nodal_scalar",
-            [](WarpX& wx, std::string const& name, int const lev) {
+            [](WarpX& wx, std::string const& name, int const lev, bool const pec) {
                 using warpx::fields::FieldType;
                 if (!EB::enabled()) {
                     throw std::runtime_error(
@@ -308,9 +309,10 @@ void init_WarpX (py::module& m)
                 warpx::hybrid::FoldEBDepositToNodalScalar(
                     *wx.m_fields.get(FieldType::rho_fp, lev),
                     *wx.m_fields.get(FieldType::distance_to_eb, lev),
-                    wx.Geom(lev));
+                    wx.Geom(lev),
+                    pec);
             },
-            py::arg("name"), py::arg("lev") = 0,
+            py::arg("name"), py::arg("lev") = 0, py::arg("pec") = true,
             "Fold the deposit collected by covered points of the registered "
             "nodal scalar field rho_fp back across the embedded surface with "
             "the PEC image parity (subtracted: image charge of opposite sign)."

@@ -156,8 +156,12 @@ namespace warpx::hybrid
      * deposit reach of the surface gathers the covered-side deposit at its
      * mirror-image position inside the conductor (raw masked interpolation:
      * fluid stencil points contribute nothing) and SUBTRACTS it (image
-     * charge of the opposite sign). In the planar limit this reproduces the
-     * domain fold exactly and conserves the folded amount.
+     * charge of the opposite sign). With \c pec_images = false the
+     * reflecting-wall parity is used instead and the deposit is ADDED
+     * (mass-conserving fold for a wall-supported column, matching the
+     * reflecting/thermal-particle branch of the domain treatment). In the
+     * planar limit this reproduces the domain fold exactly and conserves
+     * the folded amount.
      *
      * Call after the deposit (including guard-cell sums) and before
      * ApplyEBBoundaryToNodalScalar.
@@ -169,7 +173,8 @@ namespace warpx::hybrid
     void FoldEBDepositToNodalScalar (
         amrex::MultiFab& field,
         amrex::MultiFab const& distance_to_eb,
-        amrex::Geometry const& geom);
+        amrex::Geometry const& geom,
+        bool pec_images = true);
 
     /** \brief Fold the deposit collected by covered points of a staggered
      * vector field (the deposited ion current) back across the embedded
@@ -180,7 +185,8 @@ namespace warpx::hybrid
      * the covered-side deposit gathered at the mirror image of each
      * near-surface fluid point is folded with the image-current parities:
      * the tangential part is SUBTRACTED (image current antiparallel) and the
-     * normal part is ADDED. Covered points are identified by the fill
+     * normal part is ADDED. With \c pec_images = false the reflecting-wall
+     * parities are used instead (tangential added, normal subtracted). Covered points are identified by the fill
      * classification (the write set of ApplyPECBoundaryToField with
      * \c fill_covered_centers), so cut edges with covered centers fold too.
      *
@@ -199,7 +205,8 @@ namespace warpx::hybrid
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
         amrex::MultiFab const& distance_to_eb,
         amrex::Geometry const& geom,
-        EBFillStatus* status_cache = nullptr);
+        EBFillStatus* status_cache = nullptr,
+        bool pec_images = true);
 }
 
 #endif // WARPX_EBJBOUNDARY_H_
