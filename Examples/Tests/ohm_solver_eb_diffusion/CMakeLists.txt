@@ -39,6 +39,18 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
+        test_3d_ohm_solver_eb_diffusion_seam_picmi  # name
+        3  # dims
+        2  # nprocs
+        "inputs_test_3d_ohm_solver_eb_diffusion_picmi.py --test -n 32 --conformal --split-z"  # inputs
+        "analysis_seam.py --path diags/diag1000200 --ref ../test_3d_ohm_solver_eb_diffusion_conformal_picmi/diags/diag1000200"  # analysis
+        OFF  # checksum
+        test_3d_ohm_solver_eb_diffusion_conformal_picmi  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
         test_3d_ohm_solver_eb_diffusion_conformal_hr_picmi  # name
         3  # dims
         2  # nprocs

@@ -3777,15 +3777,15 @@ Maxwell solver: kinetic-fluid hybrid
     uncovered face area, and faces that are too small to be stable at the full time step are enlarged
     into their neighbors, avoiding any time-step reduction. This makes the field solution near embedded
     boundaries second-order accurate instead of first-order. Requires embedded boundaries and a
-    3D Cartesian staggered grid (not compatible with collocated grids, RZ geometry, or PML boundaries).
-    Known limitation (inherited from the ``ect`` Maxwell solver, also present there): the
-    enlarged-cell face borrowing is local to each grid box and does not communicate across box
-    boundaries, so cut faces whose stabilizing neighbors live in another box are handled
-    inconsistently (deterministically, but with locally reduced accuracy at the box seam).
-    Single-box (e.g. single-GPU) runs are unaffected. For multi-box runs, decompose the domain
-    such that box boundaries do not cross cut cells where possible (e.g. split only along the
-    extrusion direction of the embedded boundary). Making the borrowing ghost-aware is planned
-    follow-up work.
+    3D or 2D (XZ) Cartesian staggered grid (not compatible with collocated grids, RZ geometry, or
+    PML boundaries).
+    The enlarged-cell face borrowing communicates across grid boxes: borrowing decisions are made
+    once per physical face (by its owner copy) and the lent areas, intruded marks and enlarged-cell
+    accumulator contributions are reduced across box seams, so multi-box (and periodic) layouts whose
+    seams cross cut cells produce the same fields as an equivalent single-box run up to communication
+    roundoff. Single-box non-periodic runs take the historical communication-free path bit-for-bit;
+    layouts with seam-adjacent cut faces pay a thin per-stage exchange of the face EMF ghosts and the
+    enlarged-cell accumulator.
 
     With embedded boundaries the hybrid solver also enforces the PEC boundary condition on the
     Ampere/plasma current (including the external-current subtraction), on the deposited ion current,
@@ -3917,11 +3917,14 @@ Maxwell solver: kinetic-fluid hybrid
 
     Where in the field advance the Marder correction is applied. ``all_substeps`` corrects
     the substep E field inside every RK/RKF45 stage, before the Faraday curl, so the B
-    integration sees the cleaned field (most effective; runs once per stage evaluation,
-    which with RKF45 can dominate the solve cost - mitigate with
-    :pp:param:`hybrid_pic_model.marder_substep_interval`). ``half_steps`` corrects E once
-    after each half B push. ``full_steps`` corrects only the final E field used for the
-    particle push.
+    integration sees the cleaned field (runs once per stage evaluation, which with RKF45
+    substepping can dominate the solve cost: measured ~6x wall time on a wall-loaded
+    theta-pinch testbed - mitigate with
+    :pp:param:`hybrid_pic_model.marder_substep_interval` or the cheaper levels).
+    ``half_steps`` corrects E once after each half B push and ``full_steps`` corrects only
+    the final E field used for the particle push; both add negligible cost. The correction
+    cleans the transition-band divergence and preserves the plasma flux; it is not by
+    itself a remedy for RKF45 substep-stiffness aborts.
 
 .. pp:param:: hybrid_pic_model.marder_max_iterations
     :type: ``int``

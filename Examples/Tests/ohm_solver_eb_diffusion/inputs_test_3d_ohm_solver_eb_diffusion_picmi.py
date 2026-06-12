@@ -57,7 +57,9 @@ PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 TOL_PE_NEUMANN = 0.06
 
 
-def setup_simulation(resolution, substeps, use_conformal_eb, pec_j, verbose):
+def setup_simulation(
+    resolution, substeps, use_conformal_eb, pec_j, verbose, split_z=False
+):
     """Create the PICMI simulation object.
 
     Parameters
@@ -95,17 +97,25 @@ def setup_simulation(resolution, substeps, use_conformal_eb, pec_j, verbose):
             warpx_blocking_factor=8,
         )
     else:
-        # Thin periodic y; split MPI domains only along y so that the
-        # conformal face borrowing, which acts within x-z planes, never
-        # crosses a box boundary
+        # Thin periodic y. The default split is along y only, so the conformal
+        # face borrowing (acting within x-z planes) stays inside each box;
+        # split_z instead forces box seams across the borrowing planes to
+        # exercise the cross-box reduction of the face-extension passes.
         n_cell = [resolution, 8, resolution]
         y_extent = 0.2
-        decomposition = dict(
-            warpx_max_grid_size=2048,
-            warpx_max_grid_size_y=4,
-            warpx_blocking_factor=8,
-            warpx_blocking_factor_y=4,
-        )
+        if split_z:
+            decomposition = dict(
+                warpx_max_grid_size=2048,
+                warpx_max_grid_size_z=max(resolution // 2, 8),
+                warpx_blocking_factor=8,
+            )
+        else:
+            decomposition = dict(
+                warpx_max_grid_size=2048,
+                warpx_max_grid_size_y=4,
+                warpx_blocking_factor=8,
+                warpx_blocking_factor_y=4,
+            )
 
     grid = picmi.Cartesian3DGrid(
         number_of_cells=n_cell,
@@ -321,6 +331,12 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--split-z",
+        help="decompose along z so box seams cross the conformal borrowing "
+        "planes (cross-box seam test)",
+        action="store_true",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -331,7 +347,12 @@ def main():
     sys.argv = sys.argv[:1] + left
 
     sim = setup_simulation(
-        args.resolution, args.substeps, args.conformal, args.pec_j, args.verbose
+        args.resolution,
+        args.substeps,
+        args.conformal,
+        args.pec_j,
+        args.verbose,
+        args.split_z,
     )
     sim.step()
 

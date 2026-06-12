@@ -157,6 +157,17 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
         amrex::ignore_unused(Ey, Rhox, Rhoz, ly);
 #endif
     }
+
+    // With cut cells at fab seams the enlarged-cell gather in the B push
+    // reads neighbor face EMFs across boxes: refresh one ghost layer so
+    // those reads see the owner-computed circulations
+    auto& warpx = WarpX::GetInstance();
+    if (warpx.ECTNeedsSeamSync()) {
+        const auto& period = warpx.Geom(lev).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            ECTRhofield[idim]->FillBoundary(0, 1, amrex::IntVect(1), period);
+        }
+    }
 #else
     amrex::ignore_unused(Efield, edge_lengths, face_areas, ECTRhofield, lev);
 #endif

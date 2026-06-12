@@ -164,6 +164,8 @@ public:
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag() { return m_eb_update_B; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetECTFaceOwnerMask() { return m_ect_face_owner_mask; }
+    [[nodiscard]] bool ECTNeedsSeamSync () const { return m_ect_needs_seam_sync; }
     /** \brief True when the conformal (enlarged-cell technique) embedded-boundary
      * field update is active: ECT Maxwell solver, or hybrid-PIC solver with
      * hybrid_pic_model.use_conformal_eb = 1. */
@@ -936,13 +938,21 @@ public:
     */
     void ComputeFaceExtensions();
     /**
-    * \brief Do the one-way extension
+    * \brief Do the one-way extension. Borrowing decisions are made only by the
+    * owner copy of each face; the area each lender gave away and the intruded
+    * marks recorded toward faces of other fabs are accumulated per direction
+    * for the cross-box reduction in ComputeFaceExtensions.
     */
-    void ComputeOneWayExtensions();
+    void ComputeOneWayExtensions (
+        std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area,
+        std::array< std::unique_ptr<amrex::iMultiFab>, 3 >& intruded_mark);
     /**
-    * \brief Do the eight-ways extension
+    * \brief Do the eight-ways extension (same cross-box bookkeeping as the
+    * one-way pass).
     */
-    void ComputeEightWaysExtensions();
+    void ComputeEightWaysExtensions (
+        std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area,
+        std::array< std::unique_ptr<amrex::iMultiFab>, 3 >& intruded_mark);
 
 #ifdef WARPX_USE_FFT
     auto&  get_spectral_solver_fp (int lev) {return *spectral_solver_fp[lev];}
@@ -1251,6 +1261,19 @@ private:
      * contains the info of which neighbors are being intruded (and the amount of borrowed area).
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::LayoutData<FaceInfoBox> >, 3 > > m_borrowing;
+
+    /** EB/ECT: per-direction face owner masks (amrex::OwnerMask precedence: the
+     * fab with the smallest global box index owns a shared face). The borrowing
+     * decisions of the face-extension passes are made only by the owner copy of
+     * each face, so faces on shared nodal planes are decided exactly once and
+     * the cross-box consequences can be reduced to the owner afterwards. */
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_ect_face_owner_mask;
+    /** EB/ECT: true when any unstable or intruded face sits within one cell of
+     * a fab boundary (or on a shared nodal plane), i.e. when the conformal
+     * B push must synchronize the enlarged-cell accumulator (Venl) across
+     * boxes. False for single-box non-periodic layouts: the legacy
+     * communication-free path is then taken and stays bit-identical. */
+    bool m_ect_needs_seam_sync = false;
 
     // Copy of the coarse aux
     amrex::Vector<std::unique_ptr<amrex::iMultiFab> > current_buffer_masks;

@@ -550,6 +550,7 @@ WarpX::ComputeFaceExtensions ()
         throw std::runtime_error("ComputeFaceExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
+    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, maxLevel());
@@ -562,7 +563,64 @@ WarpX::ComputeFaceExtensions ()
 
     const auto Bfield = m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel());
     ::init_borrowing(m_borrowing[maxLevel()], Bfield);
-    ComputeOneWayExtensions();
+
+    // Cross-box bookkeeping: each fab decides borrowing only for the faces it
+    // owns, but its lenders (and the faces it marks as intruded) can live in
+    // ghost entries or in non-owned copies of shared nodal planes. The area
+    // each lender gave away (lent_area) and the intruded marks
+    // (intruded_mark) are therefore accumulated alongside the direct writes
+    // and reduced to the owners between/after the passes. Single-box
+    // non-periodic layouts skip every reduction and keep the historical
+    // communication-free behavior bit-identically.
+    const bool multi_box = (boxArray(maxLevel()).size() > 1)
+        || Geom(maxLevel()).isAnyPeriodic();
+    m_ect_needs_seam_sync = multi_box;
+
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > lent_area;
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > intruded_mark;
+    for (int idim = 0; idim < 3; ++idim) {
+        auto const& Bmf = *m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel());
+        lent_area[idim] = std::make_unique<amrex::MultiFab>(
+            Bmf.boxArray(), Bmf.DistributionMap(), 1, amrex::IntVect(1));
+        lent_area[idim]->setVal(0.0);
+        intruded_mark[idim] = std::make_unique<amrex::iMultiFab>(
+            Bmf.boxArray(), Bmf.DistributionMap(), 1, amrex::IntVect(1));
+        intruded_mark[idim]->setVal(0);
+    }
+
+    // Reduce the lent-area records to the owners: apply only the remote part
+    // (total minus this fab's own records, which were already subtracted
+    // directly), then make all copies of area_mod owner-consistent and
+    // ghost-fresh for the next pass.
+    auto const sync_lent_areas = [&] () {
+        if (!multi_box) { return; }
+        const auto& period = Geom(maxLevel()).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            auto& lent = *lent_area[idim];
+            amrex::MultiFab lent_local(lent.boxArray(), lent.DistributionMap(), 1,
+                                       amrex::IntVect(0));
+            amrex::MultiFab::Copy(lent_local, lent, 0, 0, 1, 0);
+            lent.SumBoundary(0, 1, lent.nGrowVect(), amrex::IntVect(0), period);
+            auto* S_mod_mf = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel());
+            for (amrex::MFIter mfi(lent); mfi.isValid(); ++mfi) {
+                const amrex::Box bx = mfi.validbox();
+                auto const& tot = lent.const_array(mfi);
+                auto const& loc = lent_local.const_array(mfi);
+                auto const& S_mod = S_mod_mf->array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                    const amrex::Real rem = tot(i, j, k) - loc(i, j, k);
+                    // only-touch-if-changed keeps untouched faces bit-identical
+                    if (rem != amrex::Real(0.)) { S_mod(i, j, k) -= rem; }
+                });
+            }
+            S_mod_mf->OverrideSync(period);
+            S_mod_mf->FillBoundary(period);
+            lent.setVal(0.0);
+        }
+    };
+
+    ComputeOneWayExtensions(lent_area, intruded_mark);
+    sync_lent_areas();
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
@@ -575,7 +633,34 @@ WarpX::ComputeFaceExtensions ()
             ablastr::warn_manager::WarnPriority::low
     );
 
-    ComputeEightWaysExtensions();
+    ComputeEightWaysExtensions(lent_area, intruded_mark);
+    sync_lent_areas();
+
+    // Reduce the intruded marks to the owners and make the flag fields
+    // owner-consistent before the BCK correction reads them. Marks only ever
+    // target faces with flag 1 or 2 (both lendable), so deferring this to
+    // after the second pass does not change any availability decision.
+    if (multi_box) {
+        const auto& period = Geom(maxLevel()).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            auto& marks = *intruded_mark[idim];
+            marks.SumBoundary(0, 1, marks.nGrowVect(), amrex::IntVect(0), period);
+            auto* info_mf = m_flag_info_face[maxLevel()][idim].get();
+            for (amrex::MFIter mfi(marks); mfi.isValid(); ++mfi) {
+                const amrex::Box bx = mfi.validbox();
+                auto const& mk = marks.const_array(mfi);
+                auto const& info = info_mf->array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                    if (mk(i, j, k) > 0 && info(i, j, k) == 1) { info(i, j, k) = 2; }
+                });
+            }
+            info_mf->OverrideSync(period);
+            info_mf->FillBoundary(period);
+            m_flag_ext_face[maxLevel()][idim]->OverrideSync(period);
+            m_flag_ext_face[maxLevel()][idim]->FillBoundary(period);
+        }
+    }
+
     ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
@@ -631,8 +716,11 @@ WarpX::ComputeFaceExtensions ()
 }
 
 void
-WarpX::ComputeOneWayExtensions ()
+WarpX::ComputeOneWayExtensions (
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area,
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 >& intruded_mark)
 {
+    amrex::ignore_unused(lent_area, intruded_mark);
     if (!EB::enabled()) {
         throw std::runtime_error("ComputeOneWayExtensions only works when EBs are enabled at runtime");
     }
@@ -675,6 +763,10 @@ WarpX::ComputeOneWayExtensions ()
 
             auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
 
+            auto const &owner = m_ect_face_owner_mask[maxLevel()][idim]->const_array(mfi);
+            auto const &lent = lent_area[idim]->array(mfi);
+            auto const &intruded = intruded_mark[idim]->array(mfi);
+
             const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
             const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
             const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
@@ -685,6 +777,11 @@ WarpX::ComputeOneWayExtensions ()
                 const int i = cell.x;
                 const int j = cell.y;
                 const int k = cell.z;
+                // Only the owner copy of a face decides its borrowing (faces
+                // on shared nodal planes exist in two fabs)
+                if (owner(i, j, k) == 0) {
+                    return 0;
+                }
                 // If the face doesn't need to be extended break the loop
                 if (!flag_ext_face(i, j, k)) {
                     return 0;
@@ -750,6 +847,12 @@ WarpX::ComputeOneWayExtensions ()
                                     borrowing_area[ps] = S_ext;
 
                                     ::SetNeighbor(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    // Record the lent area and the intruded mark for the
+                                    // cross-box reduction (the lender may live in a ghost
+                                    // entry or a non-owned copy of a shared nodal plane)
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                        ::GetNeighborPtr(lent, i, j, k, i_n, j_n, idim), S_ext);
+                                    ::SetNeighbor(intruded, 1, i, j, k, i_n, j_n, idim);
                                     // Add the area to the intruding face.
                                     S_mod(i, j, k) = S(i, j, k) + S_ext;
                                     flag_ext_face(i, j, k) = false;
@@ -777,8 +880,11 @@ WarpX::ComputeOneWayExtensions ()
 
 
 void
-WarpX::ComputeEightWaysExtensions ()
+WarpX::ComputeEightWaysExtensions (
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area,
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 >& intruded_mark)
 {
+    amrex::ignore_unused(lent_area, intruded_mark);
     if (!EB::enabled()) {
         throw std::runtime_error("ComputeEightWaysExtensions only works when EBs are enabled at runtime");
     }
@@ -822,6 +928,10 @@ WarpX::ComputeEightWaysExtensions ()
 
             auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
 
+            auto const &owner = m_ect_face_owner_mask[maxLevel()][idim]->const_array(mfi);
+            auto const &lent = lent_area[idim]->array(mfi);
+            auto const &intruded = intruded_mark[idim]->array(mfi);
+
             const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
             const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
             const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
@@ -832,6 +942,10 @@ WarpX::ComputeEightWaysExtensions ()
                 const int i = cell.x;
                 const int j = cell.y;
                 const int k = cell.z;
+                // Only the owner copy of a face decides its borrowing
+                if (owner(i, j, k) == 0) {
+                    return 0;
+                }
                 // If the face doesn't need to be extended break the loop
                 if (!flag_ext_face(i, j, k)) {
                     return 0;
@@ -939,6 +1053,11 @@ WarpX::ComputeEightWaysExtensions ()
                                     borrowing_area[ps + count] = patch;
 
                                     ::SetNeighbor(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    // Record the lent area and the intruded mark for the
+                                    // cross-box reduction
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                        ::GetNeighborPtr(lent, i, j, k, i_n, j_n, idim), patch);
+                                    ::SetNeighbor(intruded, 1, i, j, k, i_n, j_n, idim);
 
                                     S_mod(i, j, k) += patch;
                                     count +=1;
