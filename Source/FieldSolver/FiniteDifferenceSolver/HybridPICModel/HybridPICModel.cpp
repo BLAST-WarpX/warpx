@@ -99,9 +99,10 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("use_conformal_eb", m_use_conformal_eb);
 
     if (m_use_conformal_eb) {
-#if !defined(WARPX_DIM_3D)
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
         WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.use_conformal_eb is only supported in 3D Cartesian geometry");
+            "hybrid_pic_model.use_conformal_eb is only supported in 3D and 2D (XZ) "
+            "Cartesian geometry");
 #endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
             "hybrid_pic_model.use_conformal_eb requires embedded boundaries to be enabled");
@@ -166,10 +167,10 @@ void HybridPICModel::ReadParameters ()
     }
 
     if (m_marder_alpha != 0.0_rt) {
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_RZ)
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_XZ)
         WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.marder_alpha > 0 is only supported in 3D "
-            "Cartesian and RZ geometry");
+            "hybrid_pic_model.marder_alpha > 0 is only supported in 3D Cartesian, "
+            "2D Cartesian (XZ) and RZ geometry");
 #endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_marder_alpha > 0.0_rt && m_marder_alpha <= 0.1_rt,

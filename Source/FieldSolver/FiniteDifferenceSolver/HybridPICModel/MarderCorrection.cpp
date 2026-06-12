@@ -78,7 +78,7 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     std::optional<MarderTarget> target,
     const bool allow_target_cache) const
 {
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
     using namespace ablastr::coarsen::sample;
 
     const Real alpha_v = alpha.value_or(m_marder_alpha);
@@ -317,6 +317,28 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                     const Real enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
                     Etz(i, j, 0) = (enE_z - grad_Pe)/rho_lim;
                 });
+#elif defined(WARPX_DIM_XZ)
+            amrex::ParallelFor(tex, tey, tez,
+                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                    const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, 0, 0);
+                    const Real rho_lim = std::max(rho_val, rho_floor);
+                    const Real grad_Pe = (Pe(i+1, j, 0) - Pe(i, j, 0))*inv_dx[0];
+                    const Real enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, 0, 0);
+                    Etx(i, j, 0) = (enE_x - grad_Pe)/rho_lim;
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                    const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, 0, 0);
+                    const Real rho_lim = std::max(rho_val, rho_floor);
+                    const Real enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, 0, 1);
+                    Ety(i, j, 0) = enE_y/rho_lim;  // out-of-plane: no y pressure gradient
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+                    const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
+                    const Real rho_lim = std::max(rho_val, rho_floor);
+                    const Real grad_Pe = (Pe(i, j+1, 0) - Pe(i, j, 0))*inv_dx[1];
+                    const Real enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
+                    Etz(i, j, 0) = (enE_z - grad_Pe)/rho_lim;
+                });
 #endif
         }
 
@@ -444,7 +466,10 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
                     Ez(i, j, k) += alpha_scaled*(derr(i, j, k+1) - derr(i, j, k))*inv_dx[2];
                 });
-#elif defined(WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
+            // In-plane components only: the out-of-plane component (Etheta
+            // for RZ m=0, Ey for XZ) has no divergence contribution and
+            // receives no correction.
             amrex::ignore_unused(Ey, update_Ey_arr, tey);
             amrex::ParallelFor(tex, tez,
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
@@ -489,8 +514,8 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     amrex::ignore_unused(Efield, Jfield, Bfield, rhofield, eb_update_E, lev,
         alpha, max_iterations, rtol, atol, target);
     WARPX_ABORT_WITH_MESSAGE(
-        "The transitional Marder correction is only supported in 3D Cartesian "
-        "and RZ geometry");
+        "The transitional Marder correction is only supported in 3D Cartesian, "
+        "2D Cartesian (XZ) and RZ geometry");
     return {0, 0.0_rt};
 #endif
 }
