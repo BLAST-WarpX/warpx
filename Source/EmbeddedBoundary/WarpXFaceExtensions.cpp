@@ -273,7 +273,7 @@ namespace
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr
     T
-    GetNeigh(const amrex::Array4<T>& arr,
+    GetNeighbor(const amrex::Array4<T>& arr,
             const int i, const int j, const int k,
             const int i_n, const int j_n, const int dim){
 
@@ -293,14 +293,14 @@ namespace
         }
     #else
         else if(dim == 1){
-            amrex::Abort("GetNeigh: Only implemented in 2D3V and 3D3V");
+            amrex::Abort("GetNeighbor: Only implemented in 2D3V and 3D3V");
         }
         else if(dim == 2){
             return arr(i + i_n, j + j_n, k);
         }
     #endif
 
-        amrex::Abort("GetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("GetNeighbor: dim must be 0, 1 or 2");
 
         return -1;
     }
@@ -362,7 +362,7 @@ namespace
 
     /**
     * \brief Get the address of the value of arr in the neighbor (i_n, j_n) on
-    * the plane with normal 'dim' (same indexing convention as GetNeigh), for
+    * the plane with normal 'dim' (same indexing convention as GetNeighbor), for
     * atomic updates of the neighbor's value.
     *
     * \param[in] arr data to be accessed
@@ -375,7 +375,7 @@ namespace
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr
     T*
-    GetNeighPtr(const amrex::Array4<T>& arr,
+    GetNeighborPtr(const amrex::Array4<T>& arr,
             const int i, const int j, const int k,
             const int i_n, const int j_n, const int dim){
 
@@ -395,14 +395,14 @@ namespace
         }
     #else
         else if(dim == 1){
-            amrex::Abort("GetNeighPtr: Only implemented in 2D3V and 3D3V");
+            amrex::Abort("GetNeighborPtr: Only implemented in 2D3V and 3D3V");
         }
         else if(dim == 2){
             return &arr(i + i_n, j + j_n, k);
         }
     #endif
 
-        amrex::Abort("GetNeighPtr: dim must be 0, 1 or 2");
+        amrex::Abort("GetNeighborPtr: dim must be 0, 1 or 2");
 
         return nullptr;
     }
@@ -444,9 +444,9 @@ namespace
                     // has given away already some area, so we use Sz_red rather than Sz.
                     // If no face is available we don't do anything and we will need to use the
                     // multi-face extensions.
-                    if (GetNeigh(S_red, i, j, k, i_n, j_n, idim) > S_ext
-                        && (GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
-                        || GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
+                    if (GetNeighbor(S_red, i, j, k, i_n, j_n, idim) > S_ext
+                        && (GetNeighbor(flag_info_face, i, j, k, i_n, j_n, idim) == 1
+                        || GetNeighbor(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
                         && flag_ext_face(i, j, k) && ! stop) {
                         n_borrow += 1;
                         stop = true;
@@ -486,19 +486,19 @@ namespace
 
         for(int i_loc = 0; i_loc <= 2; i_loc++){
             for(int j_loc = 0; j_loc <= 2; j_loc++){
-                const int flag = GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
+                const int flag = GetNeighbor(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
                 local_avail(i_loc, j_loc) = flag == 1 || flag == 2;
             }
         }
 
-        amrex::Real denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                            local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                            local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                            local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                            local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                            local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                            local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                            local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+        amrex::Real denom = local_avail(0, 1) * GetNeighbor(S, i, j, k, -1, 0, idim) +
+                            local_avail(2, 1) * GetNeighbor(S, i, j, k, 1, 0, idim) +
+                            local_avail(1, 0) * GetNeighbor(S, i, j, k, 0, -1, idim) +
+                            local_avail(1, 2) * GetNeighbor(S, i, j, k, 0, 1, idim) +
+                            local_avail(0, 0) * GetNeighbor(S, i, j, k, -1, -1, idim) +
+                            local_avail(2, 0) * GetNeighbor(S, i, j, k, 1, -1, idim) +
+                            local_avail(0, 2) * GetNeighbor(S, i, j, k, -1, 1, idim) +
+                            local_avail(2, 2) * GetNeighbor(S, i, j, k, 1, 1, idim);
 
         bool neg_face = true;
 
@@ -507,8 +507,8 @@ namespace
             for (int i_n = -1; i_n < 2; i_n++) {
                 for (int j_n = -1; j_n < 2; j_n++) {
                     if(local_avail(i_n + 1, j_n + 1)){
-                        const amrex::Real patch = S_ext * GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
-                        if(GetNeigh(S_red, i, j, k, i_n, j_n, idim) - patch <= 0) {
+                        const amrex::Real patch = S_ext * GetNeighbor(S, i, j, k, i_n, j_n, idim) / denom;
+                        if(GetNeighbor(S_red, i, j, k, i_n, j_n, idim) - patch <= 0) {
                             neg_face = true;
                             local_avail(i_n + 1, j_n + 1) = false;
                         }
@@ -516,14 +516,14 @@ namespace
                 }
             }
 
-            denom = local_avail(0, 1) * GetNeigh(S, i, j, k, -1, 0, idim) +
-                    local_avail(2, 1) * GetNeigh(S, i, j, k, 1, 0, idim) +
-                    local_avail(1, 0) * GetNeigh(S, i, j, k, 0, -1, idim) +
-                    local_avail(1, 2) * GetNeigh(S, i, j, k, 0, 1, idim) +
-                    local_avail(0, 0) * GetNeigh(S, i, j, k, -1, -1, idim) +
-                    local_avail(2, 0) * GetNeigh(S, i, j, k, 1, -1, idim) +
-                    local_avail(0, 2) * GetNeigh(S, i, j, k, -1, 1, idim) +
-                    local_avail(2, 2) * GetNeigh(S, i, j, k, 1, 1, idim);
+            denom = local_avail(0, 1) * GetNeighbor(S, i, j, k, -1, 0, idim) +
+                    local_avail(2, 1) * GetNeighbor(S, i, j, k, 1, 0, idim) +
+                    local_avail(1, 0) * GetNeighbor(S, i, j, k, 0, -1, idim) +
+                    local_avail(1, 2) * GetNeighbor(S, i, j, k, 0, 1, idim) +
+                    local_avail(0, 0) * GetNeighbor(S, i, j, k, -1, -1, idim) +
+                    local_avail(2, 0) * GetNeighbor(S, i, j, k, 1, -1, idim) +
+                    local_avail(0, 2) * GetNeighbor(S, i, j, k, -1, 1, idim) +
+                    local_avail(2, 2) * GetNeighbor(S, i, j, k, 1, 1, idim);
         }
 
         // We count the number of entries in local_avail which are still True, this is the number of
@@ -731,12 +731,12 @@ WarpX::ComputeOneWayExtensions ()
                                 // face give the same area away more than once (issue #2257;
                                 // equivalent to the fix proposed in PR #2298)
                                 const bool borrowed = amrex::Gpu::Atomic::If(
-                                    ::GetNeighPtr(S_mod, i, j, k, i_n, j_n, idim),
+                                    ::GetNeighborPtr(S_mod, i, j, k, i_n, j_n, idim),
                                     S_ext, amrex::Minus<amrex::Real>(),
                                     [=] (amrex::Real rem) {
                                         return rem > amrex::Real(0.)
-                                            && (::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 1
-                                                || ::GetNeigh(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
+                                            && (::GetNeighbor(flag_info_face, i, j, k, i_n, j_n, idim) == 1
+                                                || ::GetNeighbor(flag_info_face, i, j, k, i_n, j_n, idim) == 2)
                                             && flag_ext_face(i, j, k);
                                     });
 
@@ -871,19 +871,19 @@ WarpX::ComputeEightWaysExtensions ()
                     amrex::Array2D<amrex::Real, 0, 2, 0, 2> local_avail{};
                     for(int i_loc = 0; i_loc <= 2; i_loc++){
                         for(int j_loc = 0; j_loc <= 2; j_loc++){
-                            auto const flag = ::GetNeigh(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
+                            auto const flag = ::GetNeighbor(flag_info_face, i, j, k, i_loc - 1, j_loc - 1, idim);
                             local_avail(i_loc, j_loc) = flag == 1 || flag == 2;
                         }
                     }
 
-                    amrex::Real denom = local_avail(0, 1) * ::GetNeigh(S, i, j, k, -1, 0, idim) +
-                                        local_avail(2, 1) * ::GetNeigh(S, i, j, k, 1, 0, idim) +
-                                        local_avail(1, 0) * ::GetNeigh(S, i, j, k, 0, -1, idim) +
-                                        local_avail(1, 2) * ::GetNeigh(S, i, j, k, 0, 1, idim) +
-                                        local_avail(0, 0) * ::GetNeigh(S, i, j, k, -1, -1, idim) +
-                                        local_avail(2, 0) * ::GetNeigh(S, i, j, k, 1, -1, idim) +
-                                        local_avail(0, 2) * ::GetNeigh(S, i, j, k, -1, 1, idim) +
-                                        local_avail(2, 2) * ::GetNeigh(S, i, j, k, 1, 1, idim);
+                    amrex::Real denom = local_avail(0, 1) * ::GetNeighbor(S, i, j, k, -1, 0, idim) +
+                                        local_avail(2, 1) * ::GetNeighbor(S, i, j, k, 1, 0, idim) +
+                                        local_avail(1, 0) * ::GetNeighbor(S, i, j, k, 0, -1, idim) +
+                                        local_avail(1, 2) * ::GetNeighbor(S, i, j, k, 0, 1, idim) +
+                                        local_avail(0, 0) * ::GetNeighbor(S, i, j, k, -1, -1, idim) +
+                                        local_avail(2, 0) * ::GetNeighbor(S, i, j, k, 1, -1, idim) +
+                                        local_avail(0, 2) * ::GetNeighbor(S, i, j, k, -1, 1, idim) +
+                                        local_avail(2, 2) * ::GetNeighbor(S, i, j, k, 1, 1, idim);
 
                     bool neg_face = true;
 
@@ -892,8 +892,8 @@ WarpX::ComputeEightWaysExtensions ()
                         for (int i_n = -1; i_n < 2; i_n++) {
                             for (int j_n = -1; j_n < 2; j_n++) {
                                 if (local_avail(i_n + 1, j_n + 1) != 0_rt){
-                                    const amrex::Real patch = S_ext * ::GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
-                                    if(::GetNeigh(S_mod, i, j, k, i_n, j_n, idim) - patch <= 0) {
+                                    const amrex::Real patch = S_ext * ::GetNeighbor(S, i, j, k, i_n, j_n, idim) / denom;
+                                    if(::GetNeighbor(S_mod, i, j, k, i_n, j_n, idim) - patch <= 0) {
                                         neg_face = true;
                                         local_avail(i_n + 1, j_n + 1) = false;
                                     }
@@ -901,14 +901,14 @@ WarpX::ComputeEightWaysExtensions ()
                             }
                         }
 
-                        denom = local_avail(0, 1) * ::GetNeigh(S, i, j, k, -1, 0, idim) +
-                                local_avail(2, 1) * ::GetNeigh(S, i, j, k, 1, 0, idim) +
-                                local_avail(1, 0) * ::GetNeigh(S, i, j, k, 0, -1, idim) +
-                                local_avail(1, 2) * ::GetNeigh(S, i, j, k, 0, 1, idim) +
-                                local_avail(0, 0) * ::GetNeigh(S, i, j, k, -1, -1, idim) +
-                                local_avail(2, 0) * ::GetNeigh(S, i, j, k, 1, -1, idim) +
-                                local_avail(0, 2) * ::GetNeigh(S, i, j, k, -1, 1, idim) +
-                                local_avail(2, 2) * ::GetNeigh(S, i, j, k, 1, 1, idim);
+                        denom = local_avail(0, 1) * ::GetNeighbor(S, i, j, k, -1, 0, idim) +
+                                local_avail(2, 1) * ::GetNeighbor(S, i, j, k, 1, 0, idim) +
+                                local_avail(1, 0) * ::GetNeighbor(S, i, j, k, 0, -1, idim) +
+                                local_avail(1, 2) * ::GetNeighbor(S, i, j, k, 0, 1, idim) +
+                                local_avail(0, 0) * ::GetNeighbor(S, i, j, k, -1, -1, idim) +
+                                local_avail(2, 0) * ::GetNeighbor(S, i, j, k, 1, -1, idim) +
+                                local_avail(0, 2) * ::GetNeighbor(S, i, j, k, -1, 1, idim) +
+                                local_avail(2, 2) * ::GetNeighbor(S, i, j, k, 1, 1, idim);
                     }
 
                     if(denom >= S_ext){
@@ -918,13 +918,13 @@ WarpX::ComputeEightWaysExtensions ()
                         for (int i_n = -1; i_n < 2; i_n++) {
                             for (int j_n = -1; j_n < 2; j_n++) {
                                 if(local_avail(i_n + 1, j_n + 1) != 0_rt && count < nborrow){
-                                    const amrex::Real patch = S_ext * ::GetNeigh(S, i, j, k, i_n, j_n, idim) / denom;
+                                    const amrex::Real patch = S_ext * ::GetNeighbor(S, i, j, k, i_n, j_n, idim) / denom;
                                     // Atomic test-and-subtract, for the same reason as in
                                     // ComputeOneWayExtensions: an intruded face shared by
                                     // concurrently extended faces must not give the same
                                     // area away more than once (issue #2257, PR #2298)
                                     const bool borrowed = amrex::Gpu::Atomic::If(
-                                        ::GetNeighPtr(S_mod, i, j, k, i_n, j_n, idim),
+                                        ::GetNeighborPtr(S_mod, i, j, k, i_n, j_n, idim),
                                         patch, amrex::Minus<amrex::Real>(),
                                         [=] (amrex::Real rem) {
                                             return rem > amrex::Real(0.);
