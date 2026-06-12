@@ -179,11 +179,11 @@ public:
     enum class MarderSite { Substep, HalfStep, FullStep };
 
     /**
-     * \brief Cadence-gated, multi-level wrapper of the transitional Marder
+     * \brief Cadence-gated, all-levels wrapper of the transitional Marder
      * correction: applies ApplyMarderCorrection on every level when
-     * marder_alpha > 0 and `site` matches marder_correction_level (the
+     * marder_alpha > 0 and `site` matches marder_correction_level. The
      * Substep site additionally honors marder_substep_interval through a
-     * counter that is reset at the start of every hybrid field advance).
+     * counter that is reset at the start of every hybrid field advance.
      *
      * \param[in,out] Efield      E field to correct
      * \param[in] Jfield          ion current density (same J the Ohm solve used)
@@ -202,20 +202,23 @@ public:
 
     /**
      * \brief Transitional Marder divergence cleaning of the Ohm's-law E
-     * field (port of the Phoenix explicit-branch correction). Iteratively
+     * field (matches the Phoenix explicit-branch correction). Iteratively
      * applies
      *
      *     E += alpha * min(dx)^2 * mask * grad( div(E) - div_target )
      *
      * restricted to the low-density transition band
-     * (0 < rho <= n_floor * q_e); dense plasma and true vacuum are left
-     * unchanged. div_target is, per marder_target: the divergence of the
-     * bare Hall/pressure Ohm's-law field (JxB - grad Pe)/(n e) ("ohm"), of
-     * the pressure term only -grad(Pe)/(n e) ("grad_pe_only"), or zero
+     * (0 < rho <= n_floor * q_e); dense plasma, true vacuum, and
+     * embedded-boundary masked edges are left unchanged. div_target is,
+     * per marder_target: the divergence of the bare Hall/pressure
+     * Ohm's-law field ((J - J_i) x B - grad Pe) / max(rho, n_floor * q_e)
+     * ("ohm", with J the Ampere plasma current), of the pressure term only
+     * -grad(Pe) over the same floored rho ("grad_pe_only"), or zero
      * ("zero"). The masked L2 norm of the divergence error controls
      * convergence: the loop exits when resid < atol or
      * resid < rtol * resid(first iteration). After every update the domain
-     * and embedded-boundary E conditions are re-applied.
+     * and embedded-boundary E conditions are re-applied. Only supported in
+     * 3D Cartesian and RZ geometry (aborts otherwise).
      *
      * \param[in,out] Efield   E field to correct (single level)
      * \param[in] Jfield       ion current density
@@ -228,6 +231,9 @@ public:
      * \param[in] rtol         override of marder_rtol
      * \param[in] atol         override of marder_atol
      * \param[in] target       override of marder_target
+     * \param[in] allow_target_cache  if false, bypass the per-level
+     *            grad_pe_only target cache (Python unit tests modify Pe
+     *            without bumping the field epoch)
      *
      * \return pair of (number of iterations executed, masked divergence
      * error L2 norm measured at the top of the last executed iteration)
@@ -328,15 +334,17 @@ public:
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
 
-    /** Relative residual tolerance of the embedded-boundary PEC field
-     *  boundary-condition band relaxation (applied to J and E) */
+    /** Relative residual tolerance of the Jacobi band relaxation of the
+     *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill
+     *  is false) */
     amrex::Real m_eb_bc_rtol = 1.e-4;
-    /** Maximum number of Jacobi sweeps for the embedded-boundary PEC field
-     *  boundary-condition band relaxation (applied to J and E) */
+    /** Sweep cap of the embedded-boundary PEC field fills: maximum Jacobi
+     *  iterations of the band relaxation, and maximum cascade sweeps over
+     *  ill-posed targets in the direct fill */
     int m_eb_bc_max_iters = 10;
-    /** If true (default), fill the embedded-boundary PEC boundary condition
-     *  with a single-pass mirrored interpolation over unmasked
-     *  (solution-domain) values instead of the Jacobi band relaxation */
+    /** If true (default), the embedded-boundary PEC field fills use a
+     *  single-pass mirrored interpolation over unmasked (solution-domain)
+     *  values; if false, the iterative Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
     /** Image parity of the embedded-boundary deposit fold: true (default)
      *  folds with the PEC image signs (charge and tangential current

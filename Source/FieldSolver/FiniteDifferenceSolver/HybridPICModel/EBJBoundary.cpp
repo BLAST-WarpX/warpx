@@ -33,8 +33,8 @@ namespace
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     /** Trilinear (bilinear in 2D) gather of component n of a staggered field
-     *  at an arbitrary position (grid coordinates), clamping the stencil to
-     *  the array bounds (constant extrapolation past the available ghosts). */
+     *  at an arbitrary position (physical coordinates), clamping the stencil
+     *  to the array bounds (constant extrapolation past the available ghosts). */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real gather_staggered (
         amrex::Array4<amrex::Real const> const& a,
@@ -300,10 +300,9 @@ namespace
                     auto const g = ::mirror_geom(i, j, k, stag_own, phi,
                         plo, dxi, dx_arr, d_band, d_img_min, h_max);
                     if (mask(i, j, k) != 0) {
-                        // updated by the solver; with fill_covered_centers,
-                        // cut points whose centers are on or inside the
-                        // surface are fill targets anyway (the solver
-                        // evaluates them at their covered centers)
+                        // Updated by the solver. With fill_covered_centers, cut
+                        // points whose centers are on or inside the surface are
+                        // fill targets anyway (the solver evaluates them there).
                         stat(i, j, k) = (fill_covered_centers && g.s <= 0._rt)
                             ? (g.band ? S_FILL : S_DEEP) : S_SOLUTION;
                     } else {
@@ -411,7 +410,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     amrex::Real const d_band = h_max;
     amrex::Real const d_img_min = 0.5_rt * h_max;
 
-    // Staggering offsets in grid coordinates for each J component (0.5 in
+    // Staggering offsets in grid coordinates for each field component (0.5 in
     // directions where the component is cell-centered)
     std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> stag{};
     for (int c = 0; c < 3; ++c) {
@@ -433,14 +432,13 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             field[c]->FillBoundary(geom.periodicity());
         }
 
-        // Whether the cascade below runs (the status arrays are only mutated
-        // when locked values must be distinguished from pending ones)
+        // The cascade runs only when ill-posed targets exist; it is the only
+        // path that mutates (and afterwards restores) the cached status arrays.
         bool const cascade = (st.n_pending > 0);
 
         // Direct pass: deterministic mirror fill of the well-posed targets,
-        // gathering only from solution-domain values (so neither other fill
-        // targets nor covered-center cut points contaminate the image);
-        // deep points are zeroed
+        // gathering only from solution-domain values so that no stale fill
+        // or covered point contaminates the image; deep points are zeroed.
         for (int c = 0; c < 3; ++c) {
             auto const stag_own = stag[c];
             auto const stag_x = stag[0];
@@ -474,7 +472,6 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     auto const g = ::mirror_geom(i, j, k, stag_own, phi,
                         plo, dxi, dx_arr, d_band, d_img_min, h_max);
 
-                    // field vector at the image point from solution values
                     auto const in_sol_x =
                         [&] (int ig, int jg, int kg) { return stat_x(ig, jg, kg) == S_SOLUTION; };
                     auto const in_sol_y =
@@ -571,8 +568,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                             };
 
                             int const ncomp_l = ncomp;
-                            // require every component stencil to reach at
-                            // least one locked value
+                            // Fill only once every component stencil reaches a
+                            // locked value; the weights do not depend on n, so
+                            // probing n = 0 suffices.
                             bool reached = true;
                             {
                                 auto const [v0x, w0x] = gather_staggered_pred(Jx_l, locked_x, g.xim, stag_x, plo, dxi, 0);
@@ -610,7 +608,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 int n_done = amrex::get<0>(sweep_result);
                 amrex::ParallelDescriptor::ReduceIntSum(n_done);
 
-                // promote this sweep's results to locked values
+                // Promote this sweep's results to locked values only now, so
+                // pending points never gather from values of the same sweep.
                 for (int c = 0; c < 3; ++c) {
                     for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                         amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
@@ -627,8 +626,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             }
 
             if (n_left > 0) {
-                // fully enclosed by other pending points: no meaningful
-                // mirror value exists, zero them
+                // Targets still pending are fully enclosed by other pending
+                // points; no meaningful mirror value exists, so zero them.
                 for (int c = 0; c < 3; ++c) {
                     for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                         amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
@@ -684,10 +683,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                                   field[c]->nComp(), field[c]->nGrowVect());
         }
 
-        // Track both the largest change and the largest band value so that
-        // convergence is measured relative to the boundary-band field
-        // magnitude (a per-edge relative criterion can never be met by edges
-        // holding near-zero values)
+        // Track the largest change and the largest band value so convergence
+        // is measured relative to the boundary-band field magnitude; a per-edge
+        // relative criterion can never be met by edges holding near-zero values.
         amrex::ReduceOps<amrex::ReduceOpMax, amrex::ReduceOpMax> reduce_op;
         amrex::ReduceData<amrex::Real, amrex::Real> reduce_data(reduce_op);
         using ReduceTuple = typename decltype(reduce_data)::Type;
@@ -714,7 +712,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 {
                     if (mask(i, j, k) != 0) { return {0._rt, 0._rt}; }
 
-                    // edge-center position in grid coordinates
+                    // edge-center position in physical coordinates
                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
 #if defined(WARPX_DIM_3D)
                     xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
@@ -739,7 +737,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     amrex::Real const v_old = Jc(i, j, k, n);
 
                     if (s < -d_band) {
-                        // deep inside the conductor: no volume current
+                        // deep inside the conductor: the field vanishes
                         Jc(i, j, k, n) = 0._rt;
                         return {std::abs(v_old), 0._rt};
                     }
@@ -759,11 +757,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
                     DistanceToEB::normalize(nv);
 
-                    // Image point in the plasma, at least one cell away from
-                    // this edge so that the interpolation stencil decouples
-                    // from the boundary band (the Jacobi relaxation then
-                    // converges quickly); d_im is its distance from the
-                    // surface, used for the linear tangential profile
+                    // Image point at least one cell into the plasma so its
+                    // stencil decouples from the boundary band (fast Jacobi
+                    // convergence); d_im is its distance from the surface.
                     amrex::Real const offset =
                         amrex::max(amrex::max(std::abs(s), d_img_min) - s, h_max);
                     amrex::Real const d_im = s + offset;
@@ -772,7 +768,6 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                         xim[d] = xe[d] + offset*nv[d];
                     }
 
-                    // full current vector at the image point
                     amrex::Real const Jx_im = gather_staggered(Jx_o, xim, stag_x, plo, dxi, n);
                     amrex::Real const Jy_im = gather_staggered(Jy_o, xim, stag_y, plo, dxi, n);
                     amrex::Real const Jz_im = gather_staggered(Jz_o, xim, stag_z, plo, dxi, n);
@@ -1096,20 +1091,17 @@ void warpx::hybrid::ApplyEBBoundaryToNodalScalar (
         amrex::ParallelFor(tb, ncomp,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
         {
-            // The level set is collocated with the field, so the signed
-            // distance at this node is just the nodal value (< 0 in the
-            // conductor). Fluid nodes are never modified; on-surface nodes
+            // The nodal level set gives the signed distance directly (< 0 in
+            // the conductor). Fluid nodes are never modified; on-surface nodes
             // (s == 0) are written so the odd parity pins them to zero.
             amrex::Real const s = phi(i, j, k);
             if (s > 0._rt) { return; }
 
             if (s < -d_band) {
-                // deep inside the conductor
                 f(i, j, k, n) = 0._rt;
                 return;
             }
 
-            // node position
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
 #if defined(WARPX_DIM_3D)
             xe[0] = plo[0] + i*dx_arr[0];
@@ -1142,11 +1134,9 @@ void warpx::hybrid::ApplyEBBoundaryToNodalScalar (
             }
             DistanceToEB::normalize(nv);
 
-            // image point in the plasma at the exact mirror distance
-            // (regularized very close to the surface so the interpolation
-            // stencil retains fluid nodes); unlike the staggered vector
-            // fill, the gather below never touches written nodes, so the
-            // image needs no additional decoupling offset
+            // Image point at the exact mirror distance, regularized near the
+            // surface so the stencil retains fluid nodes; the gather never
+            // reads written nodes, so no decoupling offset is needed.
             amrex::Real const d_im = amrex::max(std::abs(s), d_img_min);
             amrex::Real const offset = d_im - s;
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim;

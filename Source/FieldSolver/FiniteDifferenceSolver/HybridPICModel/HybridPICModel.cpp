@@ -121,12 +121,9 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
 
-    // embedded-boundary treatment of the deposited density: image parity of
-    // the deposit fold ("pec": image charge of the opposite sign, density
-    // vanishes at the wall; "reflect": deposit folded back with its own
-    // sign, mass-conserving for a wall-supported column) and the parity of
-    // the rho mirror fill (Dirichlet 0 by default, Neumann when the wall
-    // supports the column)
+    // Image parity of charge deposited beyond the embedded boundary: "pec" folds it back
+    // with opposite sign (density vanishes at the wall), "reflect" folds it back with its
+    // own sign (mass-conserving when the wall supports the plasma column).
     std::string fold = "pec";
     pp_hybrid.query("eb_deposit_fold", fold);
     if (fold == "pec") { m_eb_fold_pec = true; }
@@ -135,11 +132,12 @@ void HybridPICModel::ReadParameters ()
         WARPX_ABORT_WITH_MESSAGE(
             "hybrid_pic_model.eb_deposit_fold must be 'pec' or 'reflect'");
     }
+    // Parity of the rho mirror fill across the wall: Dirichlet 0 (odd) by default,
+    // Neumann (even) when the wall supports the column.
     pp_hybrid.query("eb_rho_dirichlet", m_eb_rho_dirichlet);
 
-    // transitional Marder divergence cleaning of the Ohm's-law E field in
-    // the low-density transition band (0 < rho <= n_floor*q_e); disabled by
-    // default (marder_alpha = 0)
+    // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
+    // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
     utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);
     utils::parser::queryWithParser(pp_hybrid, "marder_max_iterations", m_marder_max_iterations);
     utils::parser::queryWithParser(pp_hybrid, "marder_rtol", m_marder_rtol);
@@ -513,14 +511,10 @@ void HybridPICModel::HybridPICSolveE (
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
 
-    // Unlike the EM solvers, where E is integrated from the conformally
-    // updated B and is therefore self-consistent at embedded boundaries, the
-    // Ohm's-law E is algebraic, so the PEC condition must be enforced on the
-    // masked edges directly (tangential E vanishes at the surface, normal E
-    // has zero normal gradient, zero deep inside the conductor), including
-    // cut edges whose centers are on or inside the surface (Ohm's law
-    // evaluates them at the covered centers, where the interpolated density
-    // collapses to the floor and the result is spurious)
+    // The Ohm's-law E is algebraic rather than integrated from B, so the PEC condition
+    // (tangential E zero at the surface, normal E with zero normal gradient, zero deep in
+    // the conductor) must be imposed directly on the masked edges, including cut edges with
+    // covered centers, where the floored interpolated density makes Ohm's law spurious.
     if (EB::enabled()) {
         if (static_cast<int>(m_eb_bc_status_E.size()) <= lev) { m_eb_bc_status_E.resize(lev+1); }
         warpx::hybrid::ApplyPECBoundaryToField(
@@ -555,11 +549,10 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *electron_pressure_fp,
         *rho_fp
     );
-    // The conducting wall supports the plasma back-pressure: reflect the
-    // pressure evenly across the embedded boundary (zero normal gradient)
-    // so that the pressure-gradient stencils straddling the wall see
-    // boundary-consistent values instead of the equation of state evaluated
-    // on the mirrored (nonpositive) charge density inside the conductor
+    // The conducting wall supports the plasma back-pressure, so reflect Pe evenly (zero
+    // normal gradient) across the embedded boundary; grad(Pe) stencils straddling the wall
+    // must not see the equation of state evaluated on the nonpositive mirrored density
+    // inside the conductor.
     if (EB::enabled()) {
         warpx::hybrid::ApplyEBBoundaryToNodalScalar(
             *electron_pressure_fp,
@@ -1257,16 +1250,16 @@ void HybridPICModel::FieldPush (
         warpx.FillBoundaryE(ng, nodal_sync);
     }
 
-    // Transitional Marder cleanup of the substep E before curl(E), so the
-    // Faraday push integrates the corrected field (cadence-gated; no-op
-    // unless marder_correction_level = all_substeps)
+    // Apply the Marder cleanup to the substep E before curl(E) so the Faraday push
+    // integrates the corrected field. No-op unless marder_correction_level = all_substeps;
+    // the cadence is set by marder_substep_interval.
     MarderCorrectE(Efield, Jfield, Bfield, rhofield, eb_update_E,
                    MarderSite::Substep);
 
 #ifdef AMREX_USE_EB
     // With the conformal embedded-boundary update, recompute the face-centered
     // electromotive-force density (ECTRhofield) from the new E-field so that
-    // the following Faraday push uses circulations consistent with Ohm's law
+    // the following Faraday push uses circulations consistent with Ohm's law.
     if (m_use_conformal_eb) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
             warpx.get_pointer_fdtd_solver_fp(lev)->EvolveECTRho(

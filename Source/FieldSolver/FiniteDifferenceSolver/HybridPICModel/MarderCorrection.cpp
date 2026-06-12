@@ -50,8 +50,8 @@ void HybridPICModel::MarderCorrectE (
     if (!site_matches) { return; }
 
     if (site == MarderSite::Substep) {
-        // reduced cadence: apply only every marder_substep_interval substep
-        // E evaluations (the counter is reset at the start of each step)
+        // Reduced cadence: apply only on every m_marder_substep_interval-th
+        // substep E evaluation. The counter is reset at the start of each step.
         ++m_marder_substep_counter;
         if (m_marder_substep_counter % m_marder_substep_interval != 0) { return; }
     }
@@ -94,8 +94,8 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     const Real rho_floor = m_n_floor * PhysConst::q_e;
 
     // The discrete grad(div) operator scales as 1/min(dx)^2, so the
-    // dimensionless user alpha is multiplied by the grid-scale factor to
-    // give a CFL-like stable damping factor
+    // dimensionless user alpha is scaled by h_min^2 to give a CFL-like
+    // stable damping factor.
     Real h_min = dx[0];
     for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_min = std::min(h_min, dx[d]); }
     const Real alpha_scaled = alpha_v * h_min * h_min;
@@ -115,9 +115,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 
     auto* fdtd = warpx.get_pointer_fdtd_solver_fp(lev);
 
-    // nodal scratch: divergence target and masked divergence error (rho is
-    // nodal, so its BoxArray is the nodal one; no ghost cells needed - the
-    // edge update at a valid edge only reads valid nodal values)
+    // Nodal scratch for the divergence target and the masked divergence
+    // error. No ghost cells are needed: the edge update at a valid edge
+    // reads only valid nodal values.
     auto const& nodal_ba = amrex::convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab div_target(nodal_ba, rhofield.DistributionMap(), 1, IntVect::TheZeroVector());
     MultiFab div_err(nodal_ba, rhofield.DistributionMap(), 1, IntVect::TheZeroVector());
@@ -125,12 +125,11 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     // ---------------------------------------------------------------------
     // Assemble the divergence target
     // ---------------------------------------------------------------------
-    // The grad_pe_only target depends only on Pe and the rho the call site
-    // passes, both of which are constant across all the substep E
-    // evaluations between two field-epoch bumps of the hybrid advance, so
-    // its assembly is cached per level. The ohm target reads J and B, which
-    // change every stage, and is never cached. The Python unit-test binding
-    // disables the cache (allow_target_cache=false) since it pokes Pe
+    // The grad_pe_only target depends only on Pe and the rho passed by the
+    // call site, both constant between field-epoch bumps of the hybrid
+    // advance, so its assembly is cached per level. The ohm target reads J
+    // and B, which change every stage, and is never cached. The Python
+    // unit-test binding passes allow_target_cache=false since it pokes Pe
     // directly through the field wrappers.
     const bool use_cache = allow_target_cache
         && (target_v == MarderTarget::GradPeOnly);
@@ -150,7 +149,7 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     }
 
     if (cache_hit) {
-        // div_target already holds the cached grad_pe_only assembly
+        // div_target already holds the cached grad_pe_only assembly.
     } else if (target_v == MarderTarget::Zero) {
         div_target.setVal(0.0_rt);
     } else {
@@ -182,7 +181,7 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
         amrex::GpuArray<int, 3> const& By_stag = By_IndexType;
         amrex::GpuArray<int, 3> const& Bz_stag = Bz_IndexType;
 
-        // nodal (J_plasma - J_i) x B (zero for grad_pe_only)
+        // Nodal (J_plasma - J_i) x B; zero for the grad_pe_only target.
         MultiFab enE_nodal_mf(nodal_ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
         if (!with_jxb) {
             enE_nodal_mf.setVal(0.0_rt);
@@ -238,8 +237,8 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
             }
         }
 
-        // E_target on the E staggering (same ghosts as E so the EB fill and
-        // the divergence stencil have what they need)
+        // E_target on the E staggering, with the same ghosts as E so the EB
+        // fill and the divergence stencil have the layers they need.
         std::array<MultiFab, 3> E_target_mf;
         ablastr::fields::VectorField E_target;
         for (int c = 0; c < 3; ++c) {
@@ -303,7 +302,7 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                     Etx(i, j, 0) = (enE_r - grad_Pe)/rho_lim;
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    // Etheta is nodal in r; m=0: keep the axis row at zero
+                    // Etheta is nodal in r; for m=0 the axis row must stay zero.
                     const Real r = rmin + i*dr;
                     if (r < 0.5_rt*dr) { Ety(i, j, 0) = 0.0_rt; return; }
                     const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, 0, 0);
@@ -321,10 +320,10 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 #endif
         }
 
-        // boundary-consistent target before taking its divergence: enforce
-        // the embedded-boundary PEC condition on the target itself (local
-        // classification; the persistent status cache belongs to Efield)
-        // and fill the box ghosts
+        // Make the target boundary-consistent before taking its divergence:
+        // enforce the embedded-boundary PEC condition on the target itself
+        // and fill the box ghosts. No status cache is passed because the
+        // persistent one belongs to Efield.
         if (eb_enabled) {
             warpx::hybrid::ApplyPECBoundaryToField(
                 E_target, eb_update_E, *phi_mf, geom,
@@ -349,9 +348,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
         }
     }
 
-    // owner mask for the residual norm: nodal points shared between boxes
+    // Owner mask for the residual norm: nodal points shared between boxes
     // must be counted once (same semantics as MultiFab::norm2 with
-    // periodicity); built once per application, reused every iteration
+    // periodicity). It is built once per application and reused every iteration.
     auto owner_mask = amrex::OwnerMask(div_err, geom.periodicity());
 
     // ---------------------------------------------------------------------
@@ -362,7 +361,7 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     Real final_resid = std::numeric_limits<Real>::infinity();
 
     for (n_iter = 1; n_iter <= max_iters_v; ++n_iter) {
-        // the nodal divergence at box faces reads one E ghost layer
+        // The nodal divergence at box faces reads one E ghost layer.
         for (int c = 0; c < 3; ++c) {
             ablastr::utils::communication::FillBoundary(
                 *Efield[c], IntVect(1),
@@ -371,10 +370,10 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 
         fdtd->ComputeDivE(Efield, div_err);
 
-        // restrict the error to the transition band (0 < rho <= rho_floor),
+        // Restrict the error to the transition band (0 < rho <= rho_floor),
         // excluding nodes inside the conductor (the mirrored rho can be
         // positive there when the Neumann rho fill is selected), and
-        // accumulate the owner-masked L2 residual in the same sweep
+        // accumulate the owner-masked L2 residual in the same sweep.
         amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
         amrex::ReduceData<Real> reduce_data(reduce_op);
         for (MFIter mfi(div_err, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
@@ -402,7 +401,8 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
         final_resid = resid;
         if (resid < atol_v || resid < rtol_v*resid0) { break; }
 
-        // staggered update restricted to transition-band solution edges
+        // Staggered update, restricted to edges that lie in the transition
+        // band and that the EB mask flags as solution edges.
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -462,9 +462,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 #endif
         }
 
-        // re-apply the domain and embedded-boundary E conditions so the next
+        // Re-apply the domain and embedded-boundary E conditions so the next
         // iteration's stencils (and the consumer of the corrected E) read
-        // boundary-consistent values
+        // boundary-consistent values.
         const Real time = warpx.gett_old(0) + warpx.getdt(0);
         warpx.ApplyEfieldBoundary(lev, PatchType::fine, time);
         if (eb_enabled) {

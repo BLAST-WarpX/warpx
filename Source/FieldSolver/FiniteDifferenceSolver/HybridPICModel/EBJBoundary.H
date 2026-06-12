@@ -20,17 +20,17 @@
 
 namespace warpx::hybrid
 {
-    /** \brief Cached classification of the embedded-boundary fill for a
-     * staggered vector field: for every point of each component, whether it
-     * belongs to the solution domain, is a fill target (mirror band or a cut
-     * point with covered center), is a fill target whose mirror-image
-     * interpolation is ill-posed (resolved by a locked cascade after the
-     * direct pass), or lies deep inside the conductor (zeroed).
+    /** \brief Cached per-point classification of the embedded-boundary fill
+     * for a staggered vector field: solution domain, fill target (mirror
+     * band or covered-center cut point), fill target whose mirror-image
+     * interpolation is ill-posed, or deep conductor interior (zeroed).
      *
-     * The classification depends only on the embedded-boundary geometry and
-     * the update masks: callers own the cache and must reset() it whenever
-     * the grids change (regrid / load balance). An empty cache passed to
-     * ApplyPECBoundaryToField is built on first use.
+     * The classification depends on the embedded-boundary geometry, the
+     * update masks, and the \c fill_covered_centers mode, so a cache must
+     * not be shared between calls with different modes. Callers own the
+     * cache and must reset() it whenever the grids change (regrid / load
+     * balance). An empty cache passed to ApplyPECBoundaryToField or
+     * FoldEBDepositToField is built on first use.
      */
     struct EBFillStatus
     {
@@ -66,13 +66,12 @@ namespace warpx::hybrid
      * are classified ill-posed (once, in the cached \c EBFillStatus) and are
      * instead resolved after the direct pass by a deterministic cascade:
      * each sweep fills the pending points whose stencils reach already
-     * locked values (direct-pass results or earlier sweeps), and points
-     * that remain enclosed by other pending points after \c max_iters
-     * sweeps are zeroed. Without \c direct_fill the band is relaxed with
-     * Jacobi sweeps (each preceded by a ghost-cell exchange) until the
-     * largest change, measured relative to the largest field magnitude in
-     * the band, drops below \c rtol or \c max_iters sweeps have been
-     * performed.
+     * locked values (direct-pass results or earlier sweeps); points still
+     * pending when the cascade stalls or reaches \c max_iters sweeps are
+     * zeroed. Without \c direct_fill the band is relaxed with Jacobi sweeps
+     * (each preceded by a ghost-cell exchange) until the largest change,
+     * measured relative to the largest field magnitude in the band, drops
+     * below \c rtol or \c max_iters sweeps have been performed.
      *
      * With \c fill_covered_centers (used for the algebraic Ohm's-law E and
      * the current density), unmasked cut edges whose centers lie on or
@@ -91,9 +90,8 @@ namespace warpx::hybrid
      *            ill-posed resolution cascade of the direct fill)
      * \param[in] direct_fill use the single-pass masked-stencil fill instead
      *            of the Jacobi relaxation
-     * \param[in] normal_odd reflect the normal component oddly and the
-     *            tangential part evenly (magnetic-field parity) instead of
-     *            the converse (electric-field/current parity)
+     * \param[in] normal_odd use the magnetic-field parities (normal odd,
+     *            tangential even) instead of the edge-field parities
      * \param[in] fill_covered_centers also fill unmasked points whose
      *            centers are on or inside the embedded surface
      * \param[in,out] status_cache caller-owned fill classification, built on
@@ -134,8 +132,7 @@ namespace warpx::hybrid
      * \param[in,out] field nodal scalar field
      * \param[in] distance_to_eb nodal signed-distance function to the boundary
      * \param[in] geom level geometry
-     * \param[in] odd reflect oddly (Dirichlet 0 at the surface) instead of
-     *            evenly (zero normal gradient)
+     * \param[in] odd reflect oddly (Dirichlet 0) instead of evenly (Neumann)
      */
     void ApplyEBBoundaryToNodalScalar (
         amrex::MultiFab& field,
@@ -169,6 +166,8 @@ namespace warpx::hybrid
      * \param[in,out] field nodal scalar field holding the raw deposit
      * \param[in] distance_to_eb nodal signed-distance function to the boundary
      * \param[in] geom level geometry
+     * \param[in] pec_images fold with the PEC image parity (subtract)
+     *            instead of the reflecting-wall parity (add)
      */
     void FoldEBDepositToNodalScalar (
         amrex::MultiFab& field,
@@ -186,9 +185,10 @@ namespace warpx::hybrid
      * near-surface fluid point is folded with the image-current parities:
      * the tangential part is SUBTRACTED (image current antiparallel) and the
      * normal part is ADDED. With \c pec_images = false the reflecting-wall
-     * parities are used instead (tangential added, normal subtracted). Covered points are identified by the fill
-     * classification (the write set of ApplyPECBoundaryToField with
-     * \c fill_covered_centers), so cut edges with covered centers fold too.
+     * parities are used instead (tangential added, normal subtracted).
+     * Covered points are identified by the fill classification (the write
+     * set of ApplyPECBoundaryToField with \c fill_covered_centers), so cut
+     * edges with covered centers fold too.
      *
      * Call after the deposit (including guard-cell sums) and before
      * ApplyPECBoundaryToField.
@@ -199,6 +199,8 @@ namespace warpx::hybrid
      * \param[in] geom level geometry
      * \param[in,out] status_cache caller-owned fill classification (see
      *            ApplyPECBoundaryToField); may be nullptr
+     * \param[in] pec_images fold with the PEC image parities instead of the
+     *            reflecting-wall parities
      */
     void FoldEBDepositToField (
         ablastr::fields::VectorField const& field,

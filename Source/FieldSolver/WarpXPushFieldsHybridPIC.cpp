@@ -43,10 +43,9 @@ void WarpX::HybridPICEvolveFields ()
     // Get flag to include external fields.
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
 
-    // Reset the Marder substep cadence counter so the reduced-cadence
-    // application pattern is deterministic per step and across restarts,
-    // and invalidate the cached Marder target (the deposition below
-    // changes rho)
+    // Reset the Marder substep cadence counter so the reduced-cadence pattern
+    // is deterministic per step and across restarts, and bump the epoch since
+    // the deposition below changes rho, which stales the cached Marder target.
     m_hybrid_pic_model->m_marder_substep_counter = 0;
     ++m_hybrid_pic_model->m_marder_field_epoch;
 
@@ -134,8 +133,8 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
-    // Transitional Marder cleanup of E after the first half B push
-    // (no-op unless marder_correction_level = half_steps)
+    // Transitional Marder cleanup of E after the first half B push; this is
+    // a no-op unless marder_correction_level = half_steps.
     m_hybrid_pic_model->MarderCorrectE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,
@@ -154,7 +153,7 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt, *m_fields.get(FieldType::rho_fp, lev), 0, 0, 1, rho_fp_temp[lev]->nGrowVect()
         );
     }
-    // rho_fp_temp changed: invalidate the cached Marder target
+    // rho_fp_temp changed, so the cached Marder target must be invalidated.
     ++m_hybrid_pic_model->m_marder_field_epoch;
 
     if (add_external_fields) {
@@ -193,8 +192,8 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
-    // Transitional Marder cleanup of E after the second half B push
-    // (no-op unless marder_correction_level = half_steps)
+    // Transitional Marder cleanup of E after the second half B push; this is
+    // a no-op unless marder_correction_level = half_steps.
     m_hybrid_pic_model->MarderCorrectE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
@@ -226,8 +225,8 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1 (changes Pe: invalidate the
-    // cached Marder target)
+    // Calculate the electron pressure at t=n+1; Pe changes here, so the
+    // cached Marder target must be invalidated.
     m_hybrid_pic_model->CalculateElectronPressure();
     ++m_hybrid_pic_model->m_marder_field_epoch;
 
@@ -242,8 +241,8 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
 
-    // Transitional Marder cleanup of the t^{n+1} E gathered by the
-    // particles (no-op unless marder_correction_level = full_steps)
+    // Transitional Marder cleanup of the t^{n+1} E that the particles gather;
+    // this is a no-op unless marder_correction_level = full_steps.
     m_hybrid_pic_model->MarderCorrectE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,
@@ -351,12 +350,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
         }
     }
 
-    // At the embedded boundary: first fold the deposit collected by covered
-    // points back across the surface with the PEC image parities (matching
-    // the domain treatment; otherwise the shape-function charge and current
-    // of wall-adjacent particles is discarded), then enforce the PEC current
-    // boundary condition on the deposited ion current and the Dirichlet
-    // condition on the deposited charge density
+    // Fold the deposit collected by covered points back across the embedded
+    // surface before the boundary-condition fills overwrite it; without the
+    // fold, the shape-function charge and current of wall-adjacent particles
+    // would be discarded. The image parities follow eb_deposit_fold.
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             if (static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size()) <= lev) {
