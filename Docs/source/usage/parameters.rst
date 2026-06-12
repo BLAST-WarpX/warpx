@@ -3868,6 +3868,88 @@ Maxwell solver: kinetic-fluid hybrid
     edge). If ``false``, it is mirrored evenly (Neumann: zero normal gradient, for a column
     supported by the wall; combine with ``hybrid_pic_model.eb_deposit_fold = reflect``).
 
+.. pp:param:: hybrid_pic_model.marder_alpha
+    :type: ``float``
+    :default: ``0.``
+    :optional:
+
+    Dimensionless damping factor of the transitional Marder divergence cleaning of the
+    Ohm's-law E field; ``0`` (the default) disables the correction. When enabled, the
+    correction iteratively applies
+
+    .. math::
+
+        \vec{E} \mathrel{+}= \alpha\,\min(\Delta x)^2\,\vec{\nabla}\left(\vec{\nabla}\cdot\vec{E} - D_\mathrm{target}\right)
+
+    restricted to the low-density transition band :math:`0 < \rho \leq n_\mathrm{floor} q_e`
+    (the same band classification used by :pp:param:`hybrid_pic_model.n_floor`); dense plasma
+    and true vacuum are never modified, and points inside embedded boundaries are excluded.
+    The discrete :math:`\vec{\nabla}(\vec{\nabla}\cdot)` update is CFL-limited, so values
+    above ``0.1`` are rejected. After every update the domain and embedded-boundary E
+    conditions are re-applied. Supported in 3D Cartesian and RZ (m=0) geometry.
+
+.. pp:param:: hybrid_pic_model.marder_target
+    :type: ``string``
+    :default: ``ohm``
+    :optional:
+
+    Divergence target :math:`D_\mathrm{target}` of the Marder correction. ``ohm`` drives
+    :math:`\vec{\nabla}\cdot\vec{E}` toward the divergence of the bare Hall/pressure
+    Ohm's-law field :math:`(\vec{J}\times\vec{B} - \vec{\nabla}P_e)/(n e)` evaluated from
+    the same fields the Ohm solve used (the Phoenix explicit-branch behavior).
+    ``grad_pe_only`` uses the pressure term only, :math:`-\vec{\nabla}P_e/(n e)`, dropping
+    the :math:`\vec{J}\times\vec{B}` term. ``zero`` smooths
+    :math:`\vec{\nabla}\cdot\vec{E}` toward zero. Note that with
+    :pp:param:`hybrid_pic_model.holmstrom_vacuum_region` enabled the Ohm solve zeroes the
+    Hall and pressure terms in the band while the ``ohm`` target is deliberately not gated
+    (Phoenix parity); ``grad_pe_only`` or ``zero`` are the more self-consistent companions
+    to the Holmstrom treatment, since the Hall term is exactly what it drops.
+
+.. pp:param:: hybrid_pic_model.marder_correction_level
+    :type: ``string``
+    :default: ``all_substeps``
+    :optional:
+
+    Where in the field advance the Marder correction is applied. ``all_substeps`` corrects
+    the substep E field inside every RK/RKF45 stage, before the Faraday curl, so the B
+    integration sees the cleaned field (most effective; runs once per stage evaluation,
+    which with RKF45 can dominate the solve cost - mitigate with
+    :pp:param:`hybrid_pic_model.marder_substep_interval`). ``half_steps`` corrects E once
+    after each half B push. ``full_steps`` corrects only the final E field used for the
+    particle push.
+
+.. pp:param:: hybrid_pic_model.marder_max_iterations
+    :type: ``int``
+    :default: ``50``
+    :optional:
+
+    Maximum number of fixed-point iterations per Marder application.
+
+.. pp:param:: hybrid_pic_model.marder_rtol
+    :type: ``float``
+    :default: ``1e-3``
+    :optional:
+
+    Relative tolerance on the masked divergence-error L2 norm: the iteration exits when the
+    residual falls below ``marder_rtol`` times the first-iteration residual.
+
+.. pp:param:: hybrid_pic_model.marder_atol
+    :type: ``float``
+    :default: ``1e-30``
+    :optional:
+
+    Absolute tolerance on the masked divergence-error L2 norm.
+
+.. pp:param:: hybrid_pic_model.marder_substep_interval
+    :type: ``int``
+    :default: ``1``
+    :optional:
+
+    Apply the correction only every N substep E evaluations (only meaningful at
+    ``marder_correction_level = all_substeps``). Note that with RKF45 a value above 1 makes
+    the right-hand side stage-history dependent, which can mildly bias the embedded error
+    estimate of the adaptive stepper.
+
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
     :default: ``false``

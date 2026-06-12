@@ -33,6 +33,7 @@
 #include <AMReX_DistributionMapping.H>
 
 #include <optional>
+#include <utility>
 
 /**
  * \brief This class contains the parameters needed to evaluate hybrid field
@@ -170,6 +171,80 @@ public:
         amrex::Real dt, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
+    /** Divergence target of the transitional Marder correction */
+    enum class MarderTarget { Ohm, GradPeOnly, Zero };
+    /** Cadence at which the transitional Marder correction is applied */
+    enum class MarderLevel { AllSubsteps, HalfSteps, FullSteps };
+    /** Where in the field advance a Marder application is requested */
+    enum class MarderSite { Substep, HalfStep, FullStep };
+
+    /**
+     * \brief Cadence-gated, multi-level wrapper of the transitional Marder
+     * correction: applies ApplyMarderCorrection on every level when
+     * marder_alpha > 0 and `site` matches marder_correction_level (the
+     * Substep site additionally honors marder_substep_interval through a
+     * counter that is reset at the start of every hybrid field advance).
+     *
+     * \param[in,out] Efield      E field to correct
+     * \param[in] Jfield          ion current density (same J the Ohm solve used)
+     * \param[in] Bfield          magnetic field (same B the Ohm solve used)
+     * \param[in] rhofield        nodal charge density (same rho the Ohm solve used)
+     * \param[in] eb_update_E     embedded-boundary solution masks for E
+     * \param[in] site            which call site this is
+     */
+    void MarderCorrectE (
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        MarderSite site);
+
+    /**
+     * \brief Transitional Marder divergence cleaning of the Ohm's-law E
+     * field (port of the Phoenix explicit-branch correction). Iteratively
+     * applies
+     *
+     *     E += alpha * min(dx)^2 * mask * grad( div(E) - div_target )
+     *
+     * restricted to the low-density transition band
+     * (0 < rho <= n_floor * q_e); dense plasma and true vacuum are left
+     * unchanged. div_target is, per marder_target: the divergence of the
+     * bare Hall/pressure Ohm's-law field (JxB - grad Pe)/(n e) ("ohm"), of
+     * the pressure term only -grad(Pe)/(n e) ("grad_pe_only"), or zero
+     * ("zero"). The masked L2 norm of the divergence error controls
+     * convergence: the loop exits when resid < atol or
+     * resid < rtol * resid(first iteration). After every update the domain
+     * and embedded-boundary E conditions are re-applied.
+     *
+     * \param[in,out] Efield   E field to correct (single level)
+     * \param[in] Jfield       ion current density
+     * \param[in] Bfield       magnetic field
+     * \param[in] rhofield     nodal charge density
+     * \param[in] eb_update_E  embedded-boundary solution masks for E
+     * \param[in] lev          mesh refinement level
+     * \param[in] alpha        override of marder_alpha (Python unit tests)
+     * \param[in] max_iterations override of marder_max_iterations
+     * \param[in] rtol         override of marder_rtol
+     * \param[in] atol         override of marder_atol
+     * \param[in] target       override of marder_target
+     *
+     * \return pair of (number of iterations executed, masked divergence
+     * error L2 norm measured at the top of the last executed iteration)
+     */
+    std::pair<int, amrex::Real> ApplyMarderCorrection (
+        ablastr::fields::VectorField const& Efield,
+        ablastr::fields::VectorField const& Jfield,
+        ablastr::fields::VectorField const& Bfield,
+        amrex::MultiFab const& rhofield,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
+        int lev,
+        std::optional<amrex::Real> alpha = std::nullopt,
+        std::optional<int> max_iterations = std::nullopt,
+        std::optional<amrex::Real> rtol = std::nullopt,
+        std::optional<amrex::Real> atol = std::nullopt,
+        std::optional<MarderTarget> target = std::nullopt) const;
+
     /**
      * \brief
      * Function to calculate the electron pressure using the simulation charge
@@ -271,6 +346,28 @@ public:
      *  the odd reflection (Dirichlet 0 at the wall); false is the even
      *  reflection (Neumann: the wall supports the column) */
     bool m_eb_rho_dirichlet = true;
+
+    /** Dimensionless damping factor of the transitional Marder divergence
+     *  cleaning; 0 (default) disables the correction. The discrete grad(div)
+     *  operator scales as 1/min(dx)^2, so the applied factor is
+     *  alpha * min(dx)^2 (CFL-like stability cap at 0.1). */
+    amrex::Real m_marder_alpha = 0.0;
+    /** Maximum number of fixed-point iterations per Marder application */
+    int m_marder_max_iterations = 50;
+    /** Relative tolerance on the masked divergence-error L2 norm */
+    amrex::Real m_marder_rtol = 1.e-3;
+    /** Absolute tolerance on the masked divergence-error L2 norm */
+    amrex::Real m_marder_atol = 1.e-30;
+    /** Apply the correction every N substep E evaluations (only at
+     *  marder_correction_level = all_substeps) */
+    int m_marder_substep_interval = 1;
+    /** Divergence target of the Marder correction */
+    MarderTarget m_marder_target = MarderTarget::Ohm;
+    /** Cadence at which the Marder correction is applied */
+    MarderLevel m_marder_level = MarderLevel::AllSubsteps;
+    /** Substep E-evaluation counter for the interval cadence; reset at the
+     *  start of every hybrid field advance */
+    int m_marder_substep_counter = 0;
 
     /** Cached embedded-boundary fill classification for the edge fields
      *  (current density and Ohm's-law E), one entry per level; reset on

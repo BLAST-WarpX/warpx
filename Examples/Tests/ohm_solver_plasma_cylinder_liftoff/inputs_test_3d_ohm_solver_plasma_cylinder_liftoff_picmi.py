@@ -106,6 +106,7 @@ def setup_simulation(
     f_t_ci=F_T_CI,
     r_outer=R_OUTER,
     wall_supported=False,
+    marder=False,
 ):
     """Create the PICMI simulation object.
 
@@ -192,6 +193,11 @@ def setup_simulation(
         holmstrom_vacuum_region=True if holmstrom else None,
         eb_deposit_fold="reflect" if wall_supported else None,
         eb_rho_dirichlet=False if wall_supported else None,
+        marder_alpha=0.05 if marder else None,
+        marder_target="grad_pe_only" if marder else None,
+        marder_correction_level="all_substeps" if marder else None,
+        marder_max_iterations=20 if marder else None,
+        marder_rtol=1.0e-3 if marder else None,
         use_rkf45=True,
         substep_rtol=1.0e-3,
         substep_atol=1.0e-8,
@@ -334,6 +340,13 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--marder",
+        help="enable the transitional Marder divergence cleaning of the "
+        "substep E in the low-density band (0 < rho <= n_floor*q_e), with "
+        "the pressure-only target (a natural companion to --holmstrom)",
+        action="store_true",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -373,6 +386,7 @@ def main():
         args.f_tci,
         args.r_outer,
         args.wall_supported,
+        args.marder,
     )
     sim.step()
 

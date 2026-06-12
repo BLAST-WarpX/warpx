@@ -515,6 +515,226 @@ def run_cylinder_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Transitional Marder battery (planar wall; ports the four Phoenix
+# transitional-Marder unit tests plus a target-mode consistency check)
+# ----------------------------------------------------------------------------
+def run_marder_battery(sim):
+    wx = sim.extension.warpx
+    ck = CheckSet()
+
+    q_e = constants.q_e
+    N_FLOOR = 1.0e16  # matches the solver n_floor
+    RHO_FLOOR = N_FLOOR * q_e
+    RHO_DENSE = 1.0e18 * q_e
+    RHO_TRANS = 0.5e16 * q_e  # strictly inside (0, RHO_FLOOR]
+    P0 = 1.0
+
+    # x-aligned bands by node index: dense | transition | vacuum | wall
+    I_DENSE_END = 8
+    I_TRANS_END = 16
+
+    rho_prof = np.zeros(N_XY + 1)
+    rho_prof[:I_DENSE_END] = RHO_DENSE
+    rho_prof[I_DENSE_END:I_TRANS_END] = RHO_TRANS
+    # Pe falls smoothly to zero at the vacuum boundary (zero slope there)
+    pe_prof = np.zeros(N_XY + 1)
+    i_nodes = np.arange(I_TRANS_END + 1)
+    pe_prof[: I_TRANS_END + 1] = P0 * np.cos(np.pi * i_nodes / (2 * I_TRANS_END)) ** 2
+
+    rho = fields.RhoFPWrapper()
+    pe = fields.ElectronPressureFPWrapper()
+    r = np.asarray(rho[...])
+    bcast = (
+        (slice(None), None, None, None) if r.ndim == 4 else (slice(None), None, None)
+    )
+    rho[...] = np.broadcast_to(rho_prof[bcast], r.shape)
+    pe[...] = np.broadcast_to(pe_prof[bcast], np.asarray(pe[...]).shape)
+
+    Ex = fields.ExFPWrapper()
+    Ey = fields.EyFPWrapper()
+    Ez = fields.EzFPWrapper()
+    Bx = fields.BxFPWrapper()
+    By = fields.ByFPWrapper()
+    Bz = fields.BzFPWrapper()
+    Jx = fields.JxFPWrapper()
+    Jy = fields.JyFPWrapper()
+    Jz = fields.JzFPWrapper()
+    for w in (Bx, By, Bz, Jx, Jy, Jz):
+        w[...] = 0.0
+
+    # numpy mirrors of the kernel's 2-point stencils and masks ------------
+    # x-edge (cell-centered in x) interpolated rho and the closed-form
+    # pressure-only target Ex = -grad(Pe)/max(rho, floor); Ey = Ez = 0
+    rho_xedge = 0.5 * (rho_prof[:-1] + rho_prof[1:])
+    rho_lim_x = np.maximum(rho_xedge, RHO_FLOOR)
+    ex_target = -(np.diff(pe_prof) / H) / rho_lim_x
+
+    # update/mask bands
+    band_xedge = (rho_xedge > 0.0) & (rho_xedge <= RHO_FLOOR)  # Ex rows
+    band_node = (rho_prof > 0.0) & (rho_prof <= RHO_FLOOR)  # nodal rows
+    dense_xedge = rho_xedge > RHO_FLOOR
+    # interior vacuum x-edge rows, clear of the wall fill band and the
+    # domain boundary
+    vac_rows = [i for i in range(N_XY) if rho_xedge[i] <= 0.0 and 17 <= i <= 21]
+    dense_rows = [i for i in range(1, N_XY) if dense_xedge[i]]
+    band_rows = [i for i in range(N_XY) if band_xedge[i]]
+
+    def divergence(ex, ey, ez):
+        """Nodal divergence with the kernel's downward stencils. Yee global
+        shapes: ex (N, N+1, Nz+1), ey (N+1, N, Nz+1), ez (N+1, N+1, Nz);
+        result is nodal (N+1, N+1, Nz+1) with periodic wrap in y and z and
+        one-sided x boundary nodes left at zero."""
+        nx, ny, nz = N_XY + 1, N_XY + 1, N_Z + 1
+        div = np.zeros((nx, ny, nz))
+        div[1:-1, :, :] += (ex[1:, :, :] - ex[:-1, :, :]) / H
+        dvy = (ey - np.roll(ey, 1, axis=1)) / H  # at j = 0..N-1, j=0 wraps
+        div[:, :-1, :] += dvy
+        div[:, -1, :] += dvy[:, 0, :]  # duplicated periodic node row
+        dvz = (ez - np.roll(ez, 1, axis=2)) / H
+        div[:, :, :-1] += dvz
+        div[:, :, -1] += dvz[:, :, 0]
+        return div
+
+    def masked_err_norm(div, div_target_1d):
+        err = div - div_target_1d[:, None, None]
+        err[~band_node, :, :] = 0.0
+        err[[0, -1], :, :] = 0.0  # one-sided boundary nodes excluded
+        return float(np.sqrt(np.sum(err**2)))
+
+    def set_baseline(noise_amp, seed):
+        rng = np.random.RandomState(seed)
+        ex0 = np.broadcast_to(
+            ex_target[:, None, None], np.asarray(Ex[...]).shape
+        ).copy()
+        ey0 = np.zeros(np.asarray(Ey[...]).shape)
+        ez0 = np.zeros(np.asarray(Ez[...]).shape)
+        scale = noise_amp * np.max(np.abs(ex_target))
+        ex0[band_rows, :, :] += scale * (rng.rand(len(band_rows), *ex0.shape[1:]) - 0.5)
+        i_bnode = [i for i in range(1, N_XY) if band_node[i]]
+        ey0[i_bnode, :, :] += scale * (rng.rand(len(i_bnode), *ey0.shape[1:]) - 0.5)
+        ez0[i_bnode, :, :] += scale * (rng.rand(len(i_bnode), *ez0.shape[1:]) - 0.5)
+        Ex[...] = ex0
+        Ey[...] = ey0
+        Ez[...] = ez0
+
+    # the divergence target of the "ohm"/"grad_pe_only" modes with J = B = 0
+    div_target = divergence(
+        np.broadcast_to(ex_target[:, None, None], np.asarray(Ex[...]).shape),
+        np.zeros(np.asarray(Ey[...]).shape),
+        np.zeros(np.asarray(Ez[...]).shape),
+    )[:, 0, 0]
+
+    # --- 1) cleans divergence error (Phoenix test_cleans_divergence_error)
+    set_baseline(0.3, seed=42)
+    err_before = masked_err_norm(
+        divergence(np.asarray(Ex[...]), np.asarray(Ey[...]), np.asarray(Ez[...])),
+        div_target,
+    )
+    n_iter, resid = wx.hybrid_marder_correct_e(
+        0, alpha=0.1, max_iterations=500, rtol=1e-2
+    )
+    err_after = masked_err_norm(
+        divergence(np.asarray(Ex[...]), np.asarray(Ey[...]), np.asarray(Ez[...])),
+        div_target,
+    )
+    ck.expect(
+        "marder: converged before the iteration cap",
+        n_iter < 500,
+        f"n_iter={n_iter}",
+    )
+    ck.expect(
+        "marder: cleans the divergence error in the band",
+        err_after < 0.15 * err_before,
+        f"before={err_before:.3e} after={err_after:.3e}",
+    )
+
+    # --- 2+3) modifies the transition band only; vacuum untouched ---------
+    Ex[...] = 1.0e5
+    Ey[...] = 2.0e5
+    Ez[...] = 0.0
+    before = np.array(Ex[...])
+    wx.hybrid_marder_correct_e(0, alpha=0.1, max_iterations=50, rtol=0.0)
+    ex = np.asarray(Ex[...])
+    ck.close(
+        "marder: dense plasma core bit-identical",
+        ex[dense_rows, :, :],
+        before[dense_rows, :, :],
+        0.0,
+    )
+    d_band = np.max(np.abs(ex[band_rows, :, :] - before[band_rows, :, :]))
+    ck.expect(
+        "marder: transition band is modified", d_band > 0.0, f"max|dE|={d_band:.3e}"
+    )
+    ck.close(
+        "marder: vacuum gap bit-identical",
+        ex[vac_rows, :, :],
+        before[vac_rows, :, :],
+        0.0,
+    )
+
+    # --- 4) monotone convergence (single-iteration calls; the returned
+    # residual is measured before each update, Phoenix semantics) ----------
+    set_baseline(0.5, seed=123)
+    residuals = []
+    for _ in range(20):
+        _, resid = wx.hybrid_marder_correct_e(
+            0, alpha=0.1, max_iterations=1, rtol=0.0, atol=0.0
+        )
+        residuals.append(resid)
+    residuals = np.array(residuals)
+    n_increase = int(np.sum(residuals[1:] > residuals[:-1] * (1.0 + 1.0e-10)))
+    ck.expect(
+        "marder: residual decreases monotonically",
+        n_increase <= 2,
+        f"increases={n_increase} residuals[0]={residuals[0]:.3e} "
+        f"residuals[-1]={residuals[-1]:.3e}",
+    )
+    ck.expect(
+        "marder: residual at least halved over 20 sweeps",
+        residuals[-1] < 0.5 * residuals[0],
+        f"ratio={residuals[-1] / residuals[0]:.3f}",
+    )
+
+    # --- 5) grad_pe_only: identical to ohm when J = B = 0, different once
+    # a JxB drive exists -----------------------------------------------------
+    set_baseline(0.3, seed=7)
+    e0 = [np.array(w[...]) for w in (Ex, Ey, Ez)]
+    wx.hybrid_marder_correct_e(0, alpha=0.1, max_iterations=5, rtol=0.0, target="ohm")
+    e_ohm = [np.array(w[...]) for w in (Ex, Ey, Ez)]
+    for w, e in zip((Ex, Ey, Ez), e0):
+        w[...] = e
+    wx.hybrid_marder_correct_e(
+        0, alpha=0.1, max_iterations=5, rtol=0.0, target="grad_pe_only"
+    )
+    e_gpe = [np.array(w[...]) for w in (Ex, Ey, Ez)]
+    for name, a, b2 in zip("xyz", e_ohm, e_gpe):
+        ck.close(f"marder: grad_pe_only == ohm for J=B=0 (E{name})", a, b2, 0.0)
+
+    # turn on a uniform JxB drive: enE_x = -Jy*Bz / rho(x) varies across the
+    # band, so the two targets must now differ
+    Jy[...] = 1.0e3
+    Bz[...] = 0.1
+    for w, e in zip((Ex, Ey, Ez), e0):
+        w[...] = e
+    wx.hybrid_marder_correct_e(0, alpha=0.1, max_iterations=5, rtol=0.0, target="ohm")
+    ex_ohm2 = np.asarray(Ex[...])
+    for w, e in zip((Ex, Ey, Ez), e0):
+        w[...] = e
+    wx.hybrid_marder_correct_e(
+        0, alpha=0.1, max_iterations=5, rtol=0.0, target="grad_pe_only"
+    )
+    ex_gpe2 = np.asarray(Ex[...])
+    d_t = np.max(np.abs(ex_ohm2[band_rows, :, :] - ex_gpe2[band_rows, :, :]))
+    ck.expect(
+        "marder: ohm and grad_pe_only differ under a JxB drive",
+        d_t > 0.0,
+        f"max|dE|={d_t:.3e}",
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -523,11 +743,20 @@ def main():
         default="plane",
         help="conducting-wall geometry of the battery",
     )
+    parser.add_argument(
+        "--battery",
+        choices=["eb", "marder"],
+        default="eb",
+        help="which unit battery to run (eb fills/folds or the transitional "
+        "Marder correction)",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
     sim = setup_simulation(args.geometry)
-    if args.geometry == "plane":
+    if args.battery == "marder":
+        run_marder_battery(sim)
+    elif args.geometry == "plane":
         run_plane_battery(sim)
     else:
         run_cylinder_battery(sim)

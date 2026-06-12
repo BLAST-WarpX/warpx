@@ -19,7 +19,13 @@ import yt
 # Defaults matching the simulation script
 R_INNER = 0.6
 R_OUTER = 0.7
+R_WALL = 0.8
 BZ_BIAS = -0.1
+BZ_REV = 1.5
+TAU_RAMP = 4.0e-6
+N_I = 1.0e20
+N_FLOOR_FRAC = 1.0e-4
+Q_E = 1.602176634e-19
 
 # Azimuthal nonuniformity tolerances at the early-time CI checkpoint
 # (calibrated at resolution 32 with 4 ppc: the rho spectrum sits at the
@@ -52,6 +58,12 @@ def ring_spectrum(f, r0, lo, h):
     return np.abs(np.fft.rfft(v)) / N_THETA
 
 
+def bz_external(t):
+    """Hermite-smoothstep external Bz ramp of the simulation script."""
+    s = np.clip(t / TAU_RAMP, 0.0, 1.0)
+    return BZ_BIAS + (BZ_REV - BZ_BIAS) * s * s * (3.0 - 2.0 * s)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", required=True, help="plotfile to analyze")
@@ -65,6 +77,12 @@ def main():
         "--no-assert",
         action="store_true",
         help="report the mode spectra only (for probing long runs)",
+    )
+    parser.add_argument(
+        "--marder",
+        action="store_true",
+        help="additionally probe plasma-flux conservation and the band "
+        "divergence error (for runs with the transitional Marder cleaning)",
     )
     args = parser.parse_args()
 
@@ -103,6 +121,49 @@ def main():
         rel[name] = c[1 : N_MODES + 1] / max(abs(c[0]), 1e-300)
         modes = "  ".join(f"m{m + 1}={a:.4f}" for m, a in enumerate(rel[name]))
         print(f"  {name:3s}: m0 = {c[0]:+.4e}  {modes}")
+
+    if args.marder:
+        # 1) plasma-flux conservation: the self-consistent axial flux inside
+        # the conducting wall (total Bz minus the uniform external ramp at
+        # this time) must stay near its initial value of zero - the Marder
+        # band cleaning must not pump net flux (port of the Phoenix
+        # marder-plus-RK45 flux-conservation test)
+        t_now = float(ds.current_time)
+        inside = R < R_WALL
+        phi_plasma = float(np.sum((bz[inside] - bz_external(t_now)))) * h * h
+        phi_scale = np.pi * R_WALL**2 * abs(BZ_REV)
+        print(
+            f"plasma axial flux inside the wall: {phi_plasma:.4e} Wb "
+            f"({abs(phi_plasma) / phi_scale:.2e} of pi*R_w^2*|B_rev|)"
+        )
+
+        # 2) band divergence error: rms cell-centered div(E) in the
+        # transition band (0 < rho <= n_floor*q_e) vs the plasma bulk - the
+        # cleaned band must not be noisier than the bulk
+        ex3, ey3, ez3 = fields["Ex"], fields["Ey"], fields["Ez"]
+        dive = (
+            np.gradient(ex3, h, axis=0)
+            + np.gradient(ey3, h, axis=1)
+            + np.gradient(ez3, h, axis=2)
+        )
+        rho3 = fields["rho"]
+        rho_floor = N_FLOOR_FRAC * N_I * Q_E
+        band3 = (rho3 > 0.0) & (rho3 <= rho_floor) & (R[:, :, None] < R_WALL - 2 * h)
+        bulk3 = (rho3 > rho_floor) & (R[:, :, None] < R_WALL - 2 * h)
+        rms_band = float(np.sqrt(np.mean(dive[band3] ** 2))) if band3.any() else 0.0
+        rms_bulk = float(np.sqrt(np.mean(dive[bulk3] ** 2))) if bulk3.any() else 1.0
+        ratio = rms_band / max(rms_bulk, 1e-300)
+        print(f"div(E) rms: band={rms_band:.4e} bulk={rms_bulk:.4e} ratio={ratio:.3f}")
+
+        if not args.no_assert:
+            assert abs(phi_plasma) < 1.0e-3 * phi_scale, (
+                f"plasma axial flux {phi_plasma:.3e} Wb exceeds 1e-3 of "
+                f"pi*R_w^2*|B_rev| - the Marder cleaning is pumping flux"
+            )
+            assert ratio < 1.0, (
+                f"band div(E) rms is {ratio:.2f}x the bulk - the Marder "
+                "cleaning is not suppressing the band divergence noise"
+            )
 
     if args.no_assert:
         return

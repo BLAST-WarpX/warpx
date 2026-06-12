@@ -50,6 +50,7 @@
 #if defined(AMREX_DEBUG) || defined(DEBUG)
 #   include <cstdio>
 #endif
+#include <optional>
 #include <string>
 
 
@@ -344,6 +345,52 @@ void init_WarpX (py::module& m)
             "Apply the embedded-boundary mirror fill to a registered nodal "
             "scalar field (rho_fp or hybrid_electron_pressure_fp): odd "
             "(Dirichlet 0 at the surface) or even (Neumann)."
+        )
+        .def("hybrid_marder_correct_e",
+            [](WarpX& wx, int const lev,
+               std::optional<amrex::Real> const alpha,
+               std::optional<int> const max_iterations,
+               std::optional<amrex::Real> const rtol,
+               std::optional<amrex::Real> const atol,
+               std::optional<std::string> const& target) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_marder_correct_e requires the hybrid solver");
+                }
+                std::optional<HybridPICModel::MarderTarget> target_v;
+                if (target) {
+                    if (*target == "ohm") {
+                        target_v = HybridPICModel::MarderTarget::Ohm;
+                    } else if (*target == "grad_pe_only") {
+                        target_v = HybridPICModel::MarderTarget::GradPeOnly;
+                    } else if (*target == "zero") {
+                        target_v = HybridPICModel::MarderTarget::Zero;
+                    } else {
+                        throw std::runtime_error(
+                            "hybrid_marder_correct_e: target must be 'ohm', "
+                            "'grad_pe_only' or 'zero'");
+                    }
+                }
+                auto const result = hybrid->ApplyMarderCorrection(
+                    wx.m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    wx.m_fields.get_alldirs(FieldType::current_fp, lev),
+                    wx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    *wx.m_fields.get(FieldType::rho_fp, lev),
+                    wx.GetEBUpdateEFlag()[lev], lev,
+                    alpha, max_iterations, rtol, atol, target_v);
+                return py::make_tuple(result.first, result.second);
+            },
+            py::arg("lev") = 0, py::arg("alpha") = py::none(),
+            py::arg("max_iterations") = py::none(), py::arg("rtol") = py::none(),
+            py::arg("atol") = py::none(), py::arg("target") = py::none(),
+            "Run the transitional Marder divergence cleaning on Efield_fp in "
+            "the low-density band (0 < rho <= n_floor*q_e), using the "
+            "registered rho_fp, hybrid_electron_pressure_fp, "
+            "hybrid_current_fp_plasma, current_fp and Bfield_fp; parameters "
+            "default to the hybrid_pic_model.marder_* values; returns "
+            "(n_iter, final_resid)."
         )
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",

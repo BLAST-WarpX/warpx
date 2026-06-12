@@ -136,6 +136,57 @@ void HybridPICModel::ReadParameters ()
             "hybrid_pic_model.eb_deposit_fold must be 'pec' or 'reflect'");
     }
     pp_hybrid.query("eb_rho_dirichlet", m_eb_rho_dirichlet);
+
+    // transitional Marder divergence cleaning of the Ohm's-law E field in
+    // the low-density transition band (0 < rho <= n_floor*q_e); disabled by
+    // default (marder_alpha = 0)
+    utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);
+    utils::parser::queryWithParser(pp_hybrid, "marder_max_iterations", m_marder_max_iterations);
+    utils::parser::queryWithParser(pp_hybrid, "marder_rtol", m_marder_rtol);
+    utils::parser::queryWithParser(pp_hybrid, "marder_atol", m_marder_atol);
+    utils::parser::queryWithParser(pp_hybrid, "marder_substep_interval", m_marder_substep_interval);
+
+    std::string marder_target = "ohm";
+    pp_hybrid.query("marder_target", marder_target);
+    if (marder_target == "ohm") { m_marder_target = MarderTarget::Ohm; }
+    else if (marder_target == "grad_pe_only") { m_marder_target = MarderTarget::GradPeOnly; }
+    else if (marder_target == "zero") { m_marder_target = MarderTarget::Zero; }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.marder_target must be 'ohm', 'grad_pe_only' or 'zero'");
+    }
+
+    std::string marder_level = "all_substeps";
+    pp_hybrid.query("marder_correction_level", marder_level);
+    if (marder_level == "all_substeps") { m_marder_level = MarderLevel::AllSubsteps; }
+    else if (marder_level == "half_steps") { m_marder_level = MarderLevel::HalfSteps; }
+    else if (marder_level == "full_steps") { m_marder_level = MarderLevel::FullSteps; }
+    else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.marder_correction_level must be 'all_substeps', "
+            "'half_steps' or 'full_steps'");
+    }
+
+    if (m_marder_alpha != 0.0_rt) {
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_RZ)
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.marder_alpha > 0 is only supported in 3D "
+            "Cartesian and RZ geometry");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_marder_alpha > 0.0_rt && m_marder_alpha <= 0.1_rt,
+            "hybrid_pic_model.marder_alpha must be in (0, 0.1] (the explicit "
+            "grad(div) update is CFL-limited)");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_marder_max_iterations > 0,
+            "hybrid_pic_model.marder_max_iterations must be positive");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_marder_substep_interval >= 1,
+            "hybrid_pic_model.marder_substep_interval must be >= 1");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::grid_type != ablastr::utils::enums::GridType::Collocated,
+            "hybrid_pic_model.marder_alpha requires a staggered grid");
+    }
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -1205,6 +1256,12 @@ void HybridPICModel::FieldPush (
     if (Bz_IndexType[0] == Ez_IndexType[0]) {
         warpx.FillBoundaryE(ng, nodal_sync);
     }
+
+    // Transitional Marder cleanup of the substep E before curl(E), so the
+    // Faraday push integrates the corrected field (cadence-gated; no-op
+    // unless marder_correction_level = all_substeps)
+    MarderCorrectE(Efield, Jfield, Bfield, rhofield, eb_update_E,
+                   MarderSite::Substep);
 
 #ifdef AMREX_USE_EB
     // With the conformal embedded-boundary update, recompute the face-centered

@@ -43,6 +43,10 @@ void WarpX::HybridPICEvolveFields ()
     // Get flag to include external fields.
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
 
+    // Reset the Marder substep cadence counter so the reduced-cadence
+    // application pattern is deterministic per step and across restarts
+    m_hybrid_pic_model->m_marder_substep_counter = 0;
+
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
         // Get the external fields
@@ -127,6 +131,15 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
+    // Transitional Marder cleanup of E after the first half B push
+    // (no-op unless marder_correction_level = half_steps)
+    m_hybrid_pic_model->MarderCorrectE(
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        current_fp_temp,
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        rho_fp_temp,
+        m_eb_update_E, HybridPICModel::MarderSite::HalfStep);
+
     // Average rho^{n} and rho^{n+1} to get rho^{n+1/2} in rho_fp_temp
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -175,6 +188,15 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
+    // Transitional Marder cleanup of E after the second half B push
+    // (no-op unless marder_correction_level = half_steps)
+    m_hybrid_pic_model->MarderCorrectE(
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        rho_fp_temp,
+        m_eb_update_E, HybridPICModel::MarderSite::HalfStep);
+
     // Extrapolate the ion current density to t=n+1 using
     // J_i^{n+1} = 1/2 * J_i^{n-1/2} + 3/2 * J_i^{n+1/2}, and recalling that
     // now current_fp_temp = J_i^{n} = 1/2 * (J_i^{n-1/2} + J_i^{n+1/2})
@@ -212,6 +234,16 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
+
+    // Transitional Marder cleanup of the t^{n+1} E gathered by the
+    // particles (no-op unless marder_correction_level = full_steps)
+    m_hybrid_pic_model->MarderCorrectE(
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        current_fp_temp,
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+        m_eb_update_E, HybridPICModel::MarderSite::FullStep);
+
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
     // Handle field splitting for Hybrid field push

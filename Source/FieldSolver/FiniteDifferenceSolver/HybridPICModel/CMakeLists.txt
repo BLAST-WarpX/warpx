@@ -5,5 +5,6 @@ foreach(D IN LISTS WarpX_DIMS)
       EBJBoundary.cpp
       HybridPICModel.cpp
       ExternalVectorPotential.cpp
+      MarderCorrection.cpp
     )
 endforeach()
