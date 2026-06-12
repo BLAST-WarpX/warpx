@@ -55,15 +55,6 @@
     "particle_momentum_z": 2.2136915789630448e-16,
     "particle_weight": 8e+21
   },
-  "maxwell_juttner_parser": {
-    "particle_position_x": 255968.3598214828,
-    "particle_position_y": 256025.7059180694,
-    "particle_position_z": 256028.15734086224,
-    "particle_momentum_x": 3.2435853097025176e-16,
-    "particle_momentum_y": 3.250526809939864e-16,
-    "particle_momentum_z": 3.2462807472769755e-16,
-    "particle_weight": 8e+21
-  },
   "temperature_from_file": {
     "particle_position_x": 255955.3833611564,
     "particle_position_y": 255949.3893817396,
