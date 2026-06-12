@@ -520,7 +520,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     }
 
     // Loop over the particles and update their momentum
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -878,7 +878,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     }
 
     // Loop over the particles and update their momentum
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -1040,11 +1040,21 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
                     const amrex::Real rhop = 2.0_rt*wq_invvol*gaminv; // approximation when neglecting MM coupling terms
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    const amrex::Real rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
+                                                     + std::sqrt(xp_n*xp_n + yp_n*yp_n));
+                    const amrex::Real costh = (rp_mid > 0._rt ? xp/rp_mid : 1._rt);
+                    const amrex::Real sinth = (rp_mid > 0._rt ? yp/rp_mid : 0._rt);
+#endif
+
                     // Set the Mass Matrices kernels
                     amrex::ParticleReal fpxx, fpxy, fpxz;
                     amrex::ParticleReal fpyx, fpyy, fpyz;
                     amrex::ParticleReal fpzx, fpzy, fpzz;
                     setMassMatricesKernels(q, mass, dt_suborbit, rhop,
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                                           costh, sinth,
+#endif
                                            ux[ip], uy[ip], uz[ip],
                                            Bxp, Byp, Bzp,
                                            fpxx, fpxy, fpxz,

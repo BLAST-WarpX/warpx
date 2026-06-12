@@ -86,8 +86,8 @@ add_warpx_test(
     3  # dims
     1  # nprocs
     inputs_test_3d_collision_xyz  # inputs
-    "analysis_collision_3d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150"  # checksum
+    "analysis_collision_3d.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 
@@ -108,6 +108,26 @@ add_warpx_test(
     inputs_test_1d_collision_z_Bremsstrahlung  # inputs
     "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_1d_collision_z_inverse_Bremsstrahlung  # name
+    1  # dims
+    1  # nprocs
+    inputs_test_1d_collision_z_inverse_Bremsstrahlung  # inputs
+    "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_charge_exchange_dsmc  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_charge_exchange_dsmc  # inputs
+    "analysis_test_2d_collisions_split_momentum_push.py --path diags/reducedfiles/"  # analysis
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
 

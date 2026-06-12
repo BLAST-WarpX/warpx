@@ -70,13 +70,13 @@ struct PIdx
     enum                          { x ,  z ,  w ,  ux ,  uy ,  uz,                 nattribs};
     static constexpr auto names = {"x", "z", "w", "ux", "uy", "uz"};
 #elif defined(WARPX_DIM_RZ)
-    enum                          { x ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
+    enum                          { r ,  z ,  w ,  ux ,  uy ,  uz ,  theta,        nattribs};
     static constexpr auto names = {"r", "z", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RCYLINDER)
-    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
+    enum                          { r ,  w ,  ux ,  uy ,  uz ,  theta,             nattribs};
     static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta"};
 #elif defined(WARPX_DIM_RSPHERE)
-    enum                          { x ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
+    enum                          { r ,  w ,  ux ,  uy ,  uz ,  theta ,  phi,      nattribs};
     static constexpr auto names = {"r", "w", "ux", "uy", "uz", "theta", "phi"};
 #elif defined(WARPX_DIM_3D)
     enum                          { x ,  y,   z,   w,   ux,   uy,   uz,            nattribs};
@@ -207,7 +207,7 @@ public:
     // DiagnosticParticleData (see above) on this tile.
     using DiagnosticParticles = amrex::Vector<std::map<std::pair<int, int>, DiagnosticParticleData> >;
 
-    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies);
+    WarpXParticleContainer (amrex::AmrCore* amr_core, int ispecies, const std::string& name);
     ~WarpXParticleContainer() override = default;
 
     // Move and copy operations
@@ -236,6 +236,24 @@ public:
                          PositionPushType position_push_type=PositionPushType::Full,
                          MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
+
+    /**
+     * \brief Finish the implicit particle update at the end of a time step.
+     *
+     * The default implementation extrapolates position and momentum from
+     * time n+1/2 to n+1, which is appropriate for physical and laser particles.
+     *
+     * Photon particles override this to instead perform a full explicit
+     * push over the step (without deposition).
+     *
+     * \param fields  field register
+     * \param lev     AMR level
+     * \param t       time at end of the step (n+1)
+     * \param dt      step size on this level
+     */
+    virtual void FinishImplicitParticleUpdate (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev, amrex::Real t, amrex::Real dt);
 
     /**
      * \brief virtual function to deposit mass matrices for charged particles
@@ -394,13 +412,15 @@ public:
         [[maybe_unused]]const warpx::particles::deposition::TemperatureDepositionPass pass)
     {}
 
-    void DepositTotalNGPTemperature (amrex::MultiFab* temperature, int lev);
-    std::unique_ptr<amrex::MultiFab> GetAverageNGPTemperature (int lev);
+    void DepositTotalNGPTemperature (int lev);
+    void CalculateNuei(amrex::MultiFab & species_nuei,
+                       WarpXParticleContainer const & electron_species, int lev);
+    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
 
     void DepositNumberDensity (amrex::MultiFab* number_density, int lev);
     std::unique_ptr<amrex::MultiFab> GetNumberDensity (int lev);
 
-    std::unique_ptr<amrex::MultiFab> GetDebyeLength (int lev);
+    std::unique_ptr<amrex::MultiFab> GetPlasmaFrequency (int lev);
 
     void DepositMassMatrices (WarpXParIter& pti,
                         const RealVector& wp,
@@ -460,6 +480,18 @@ public:
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
     amrex::ParticleReal maxParticleVelocity(bool local = false);
+
+    /**
+     * \brief Map the momentum of the particles to and from the curvilinear frame.
+     *        This is equivalent to mapping to the X-axis, i.e. theta = 0
+     *        cylinderical and theta = phi = 0 for spherical. This mapping is used
+     *        for binary collisions to put the colliding particles in a spatially local
+     *        frame.
+     *
+     * \param[in] forward When true, maps to the frame, when false maps from the frame
+     *            to the original location
+     */
+    void TransformMomentumToCurvilinear (bool forward);
 
     /**
      * \brief Adds n particles to the simulation
@@ -546,7 +578,7 @@ public:
         return m_do_back_transformed_particles;
     }
 
-    amrex::ParticleReal getCharge () const {return charge;}
+    amrex::ParticleReal getCharge () const {return m_charge;}
 
     amrex::ParticleReal getMass () const {return m_mass;}
 
@@ -617,10 +649,13 @@ public:
         return (pos != int_names.end());
     }
 
+    std::string const & getName() { return species_name; }
+
 protected:
     int species_id;
+    std::string species_name;
 
-    amrex::ParticleReal charge;
+    amrex::ParticleReal m_charge;
     amrex::ParticleReal m_mass;
     PhysicalSpecies physical_species = PhysicalSpecies::unspecified;
 
