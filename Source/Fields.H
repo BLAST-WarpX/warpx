@@ -65,7 +65,7 @@ namespace warpx::fields
         distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
         edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
         face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
-        area_mod,
+        area_mod,       /**< ECT solver: face area modified by the enlarged-cell borrowing (S_mod in the kernels: own area plus borrowed minus lent) */
         pml_E_fp,
         pml_B_fp,
         pml_j_fp,
@@ -90,8 +90,8 @@ namespace warpx::fields
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
         MassMatrices_PC, // Stores reduced mass matrix elements for the implicit solver preconditioner (PC)
         curl2_BC_mask,   // Masks used to incorporate boundary conditions into the curl curl matrix
-        ECTRhofield,
-        Venl,
+        ECTRhofield,     // ECT solver: face-centered electromotive-force density (curl-E circulation over the face)
+        Venl,            // ECT solver: enlarged-cell EMF accumulator (borrowing-weighted sums of ECTRhofield)
         global_debye_length,
         effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );

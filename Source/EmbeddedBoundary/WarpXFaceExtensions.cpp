@@ -224,11 +224,11 @@ namespace
                 borrowing_dir.size.resize(box);
                 borrowing_dir.size.setVal<amrex::RunOn::Device>(0);
                 const amrex::Long ncells = box.numPts();
-                // inds, neigh_faces and area are extended to their largest possible size here, but they are
+                // inds, neighbor_faces and area are extended to their largest possible size here, but they are
                 // resized to a much smaller size later on, based on the actual number of neighboring
                 // intruded faces for each unstable face.
                 borrowing_dir.inds.resize(8*ncells);
-                borrowing_dir.neigh_faces.resize(8*ncells);
+                borrowing_dir.neighbor_faces.resize(8*ncells);
                 borrowing_dir.area.resize(8*ncells);
             }
         }
@@ -247,7 +247,7 @@ namespace
             for (amrex::MFIter mfi(*Bfield[idim]); mfi.isValid(); ++mfi){
                 auto& borrowing_dir = (*borrowing[idim])[mfi];
                 borrowing_dir.inds.resize(borrowing_dir.vecs_size);
-                borrowing_dir.neigh_faces.resize(borrowing_dir.vecs_size);
+                borrowing_dir.neighbor_faces.resize(borrowing_dir.vecs_size);
                 borrowing_dir.area.resize(borrowing_dir.vecs_size);
             }
         }
@@ -324,7 +324,7 @@ namespace
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     constexpr
     void
-    SetNeigh(const amrex::Array4<T>& arr, const T val,
+    SetNeighbor(const amrex::Array4<T>& arr, const T val,
             const int i, const int j, const int k,
             const int i_n, const int j_n, const int dim){
 
@@ -348,7 +348,7 @@ namespace
         }
     #else
         else if(dim == 1){
-            amrex::Abort("SetNeigh: Only implemented in 2D3V and 3D3V");
+            amrex::Abort("SetNeighbor: Only implemented in 2D3V and 3D3V");
         }
         else if(dim == 2){
             arr(i + i_n, j + j_n, k) = val;
@@ -356,7 +356,7 @@ namespace
         }
     #endif
 
-        amrex::Abort("SetNeigh: dim must be 0, 1 or 2");
+        amrex::Abort("SetNeighbor: dim must be 0, 1 or 2");
     }
 
 
@@ -669,7 +669,7 @@ WarpX::ComputeOneWayExtensions ()
             auto const &borrowing_size = borrowing.size.array();
             amrex::Long const ncells = box.numPts();
             int* borrowing_inds = borrowing.inds.data();
-            FaceInfoBox::Neighbours* borrowing_neigh_faces = borrowing.neigh_faces.data();
+            FaceInfoBox::Neighbours* borrowing_neighbor_faces = borrowing.neighbor_faces.data();
             amrex::Real* borrowing_area = borrowing.area.data();
             int& vecs_size = borrowing.vecs_size;
 
@@ -746,10 +746,10 @@ WarpX::ComputeOneWayExtensions ()
                                     // Store the information about the intruded face in the dataset of the
                                     // faces which are borrowing area
                                     FaceInfoBox::addConnectedNeighbor(i_n, j_n, ps,
-                                                                      borrowing_neigh_faces);
+                                                                      borrowing_neighbor_faces);
                                     borrowing_area[ps] = S_ext;
 
-                                    ::SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    ::SetNeighbor(flag_info_face, 2, i, j, k, i_n, j_n, idim);
                                     // Add the area to the intruding face.
                                     S_mod(i, j, k) = S(i, j, k) + S_ext;
                                     flag_ext_face(i, j, k) = false;
@@ -816,7 +816,7 @@ WarpX::ComputeEightWaysExtensions ()
             auto const &borrowing_size = borrowing.size.array();
             amrex::Long const ncells = box.numPts();
             int* borrowing_inds = borrowing.inds.data();
-            FaceInfoBox::Neighbours* borrowing_neigh_faces = borrowing.neigh_faces.data();
+            FaceInfoBox::Neighbours* borrowing_neighbor_faces = borrowing.neighbor_faces.data();
             amrex::Real* borrowing_area = borrowing.area.data();
             int& vecs_size = borrowing.vecs_size;
 
@@ -935,10 +935,10 @@ WarpX::ComputeEightWaysExtensions ()
                                     }
                                     borrowing_inds[ps + count] = ps + count;
                                     FaceInfoBox::addConnectedNeighbor(i_n, j_n, ps + count,
-                                                                      borrowing_neigh_faces);
+                                                                      borrowing_neighbor_faces);
                                     borrowing_area[ps + count] = patch;
 
-                                    ::SetNeigh(flag_info_face, 2, i, j, k, i_n, j_n, idim);
+                                    ::SetNeighbor(flag_info_face, 2, i, j, k, i_n, j_n, idim);
 
                                     S_mod(i, j, k) += patch;
                                     count +=1;

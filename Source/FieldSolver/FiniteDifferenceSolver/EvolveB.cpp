@@ -273,7 +273,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             amrex::Array4<Real> const &S_mod = area_mod[idim]->array(mfi);
 
             auto & borrowing_dim = (*borrowing[idim])[mfi];
-            auto * borrowing_dim_neigh_faces = borrowing_dim.neigh_faces.data();
+            auto * borrowing_dim_neighbor_faces = borrowing_dim.neighbor_faces.data();
             auto * borrowing_dim_area = borrowing_dim.area.data();
 
             auto const &borrowing_inds = (*borrowing[idim])[mfi].inds.data();
@@ -296,7 +296,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                 // First we compute the rho of the enlarged face
                 for (int offset = 0; offset<borrowing_size(i, j, k); offset++) {
                     int const ind = borrowing_inds[*borrowing_inds_pointer(i, j, k) + offset];
-                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neigh_faces[ind]);
+                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neighbor_faces[ind]);
                     int ip, jp, kp;
                     if (idim == 0) {
                         ip = i;
@@ -328,7 +328,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 for (int offset = 0; offset < borrowing_size(i, j, k); offset++) {
                     int const ind = borrowing_inds[*borrowing_inds_pointer(i, j, k) + offset];
-                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neigh_faces[ind]);
+                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neighbor_faces[ind]);
                     int ip, jp, kp;
                     if (idim == 0) {
                         ip = i;
