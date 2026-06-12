@@ -23,8 +23,8 @@ R_WALL = 0.8
 BZ_BIAS = -0.1
 BZ_REV = 1.5
 TAU_RAMP = 4.0e-6
-N_I = 1.0e20
-N_FLOOR_FRAC = 1.0e-4
+N_I = 1.5e20
+N_FLOOR_FRAC = 0.03
 Q_E = 1.602176634e-19
 
 # Azimuthal nonuniformity tolerances at the early-time CI checkpoint

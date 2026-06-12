@@ -107,6 +107,11 @@ def setup_simulation(
     r_outer=R_OUTER,
     wall_supported=False,
     marder=False,
+    marder_alpha=0.05,
+    marder_target="grad_pe_only",
+    marder_level="all_substeps",
+    marder_interval=1,
+    n_floor_frac=N_FLOOR_FRAC,
 ):
     """Create the PICMI simulation object.
 
@@ -125,7 +130,7 @@ def setup_simulation(
         WarpX verbosity.
     """
     m_i = M_AMU * constants.m_p
-    n_floor = N_FLOOR_FRAC * N_I
+    n_floor = n_floor_frac * N_I
     vth = np.sqrt(constants.q_e * T_I0 / m_i)
 
     # cell sizes (cubic cells; thin z slab centered on the z = 5 m midplane)
@@ -193,11 +198,12 @@ def setup_simulation(
         holmstrom_vacuum_region=True if holmstrom else None,
         eb_deposit_fold="reflect" if wall_supported else None,
         eb_rho_dirichlet=False if wall_supported else None,
-        marder_alpha=0.05 if marder else None,
-        marder_target="grad_pe_only" if marder else None,
-        marder_correction_level="all_substeps" if marder else None,
+        marder_alpha=marder_alpha if marder else None,
+        marder_target=marder_target if marder else None,
+        marder_correction_level=marder_level if marder else None,
         marder_max_iterations=20 if marder else None,
         marder_rtol=1.0e-3 if marder else None,
+        marder_substep_interval=marder_interval if marder else None,
         use_rkf45=True,
         substep_rtol=1.0e-3,
         substep_atol=1.0e-8,
@@ -208,7 +214,7 @@ def setup_simulation(
             ETA_PLASMA,
             ETA_VAC_FRAC * eta_max,
             eta_power,
-            N_FLOOR_FRAC,
+            n_floor_frac,
             eta_ntrans,
             N_I,
         ),
@@ -347,6 +353,38 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--marder-alpha",
+        help="Marder damping factor (with --marder)",
+        type=float,
+        default=0.05,
+    )
+    parser.add_argument(
+        "--marder-target",
+        help="Marder divergence target (with --marder)",
+        choices=["ohm", "grad_pe_only", "zero"],
+        default="grad_pe_only",
+    )
+    parser.add_argument(
+        "--marder-level",
+        help="Marder application cadence (with --marder)",
+        choices=["all_substeps", "half_steps", "full_steps"],
+        default="all_substeps",
+    )
+    parser.add_argument(
+        "--marder-interval",
+        help="apply every N substep E evaluations (with --marder, all_substeps level)",
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        "--n-floor-frac",
+        help="vacuum density floor as a fraction of N_I (sets the "
+        "vacuum/transition classification of the holmstrom, Marder and "
+        "resistivity-ramp treatments; lower is stiffer)",
+        type=float,
+        default=N_FLOOR_FRAC,
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -387,6 +425,11 @@ def main():
         args.r_outer,
         args.wall_supported,
         args.marder,
+        args.marder_alpha,
+        args.marder_target,
+        args.marder_level,
+        args.marder_interval,
+        args.n_floor_frac,
     )
     sim.step()
 
