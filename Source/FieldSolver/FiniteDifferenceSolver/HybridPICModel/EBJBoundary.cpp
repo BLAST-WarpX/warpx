@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 
 using namespace amrex;
 
@@ -856,6 +857,24 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
     // covered-side ghosts must hold the guard-summed deposit
     field.FillBoundary(geom.periodicity());
 
+    // The mirror gather reaches up to 2*fold_band past the surface plus one
+    // stencil cell, which can exceed the field's own ghost width at box
+    // seams near the wall (the stencil clamp would then silently read the
+    // wrong cells). Gather from ghost-extended scratch copies instead; the
+    // level-set scratch is initialized to a large positive (fluid) value so
+    // unfilled physical-boundary ghosts never enter the covered set.
+    int const ng_gather = 4;
+    amrex::MultiFab f_src(field.boxArray(), field.DistributionMap(), field.nComp(),
+                          amrex::IntVect(ng_gather));
+    f_src.setVal(0.0_rt);
+    amrex::MultiFab::Copy(f_src, field, 0, 0, field.nComp(), 0);
+    f_src.FillBoundary(geom.periodicity());
+    amrex::MultiFab phi_src(distance_to_eb.boxArray(), distance_to_eb.DistributionMap(),
+                            1, amrex::IntVect(ng_gather));
+    phi_src.setVal(std::numeric_limits<amrex::Real>::max());
+    amrex::MultiFab::Copy(phi_src, distance_to_eb, 0, 0, 1, 0);
+    phi_src.FillBoundary(geom.periodicity());
+
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const stag0{};
 
     for (amrex::MFIter mfi(field, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
@@ -863,8 +882,9 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
         int const ncomp = field.nComp();
 
         auto const& f = field.array(mfi);
-        auto const& f_r = field.const_array(mfi);
+        auto const& f_r = f_src.const_array(mfi);
         auto const& phi = distance_to_eb.const_array(mfi);
+        auto const& phi_g = phi_src.const_array(mfi);
 
         amrex::ParallelFor(tb, ncomp,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -913,7 +933,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
             // actually landed on covered points is folded
             auto const [v, w] = gather_staggered_pred(
                 f_r,
-                [&] (int ig, int jg, int kg) { return phi(ig, jg, kg) <= 0._rt; },
+                [&] (int ig, int jg, int kg) { return phi_g(ig, jg, kg) <= 0._rt; },
                 xm, stag0, plo, dxi, n);
 
             // PEC image charge has the opposite sign (matches the domain
@@ -978,6 +998,27 @@ void warpx::hybrid::FoldEBDepositToField (
         field[c]->FillBoundary(geom.periodicity());
     }
 
+    // Ghost-extended scratch copies for the mirror gather (its reach can
+    // exceed the field/status ghost widths at box seams near the wall; the
+    // stencil clamp would then silently read the wrong cells). The status
+    // scratch is initialized to S_SOLUTION so unfilled physical-boundary
+    // ghosts never enter the covered set.
+    int const ng_gather = 4;
+    std::array<amrex::MultiFab, 3> J_src;
+    std::array<amrex::iMultiFab, 3> stat_src;
+    for (int c = 0; c < 3; ++c) {
+        J_src[c].define(field[c]->boxArray(), field[c]->DistributionMap(),
+                        field[c]->nComp(), amrex::IntVect(ng_gather));
+        J_src[c].setVal(0.0_rt);
+        amrex::MultiFab::Copy(J_src[c], *field[c], 0, 0, field[c]->nComp(), 0);
+        J_src[c].FillBoundary(geom.periodicity());
+        stat_src[c].define(st.status[c]->boxArray(), st.status[c]->DistributionMap(),
+                           1, amrex::IntVect(ng_gather));
+        stat_src[c].setVal(S_SOLUTION);
+        amrex::iMultiFab::Copy(stat_src[c], *st.status[c], 0, 0, 1, 0);
+        stat_src[c].FillBoundary(geom.periodicity());
+    }
+
     for (int c = 0; c < 3; ++c) {
         auto const stag_own = stag[c];
         auto const stag_x = stag[0];
@@ -989,13 +1030,13 @@ void warpx::hybrid::FoldEBDepositToField (
             int const ncomp = field[c]->nComp();
 
             auto const& Jc = field[c]->array(mfi);
-            auto const& Jx_l = field[0]->const_array(mfi);
-            auto const& Jy_l = field[1]->const_array(mfi);
-            auto const& Jz_l = field[2]->const_array(mfi);
+            auto const& Jx_l = J_src[0].const_array(mfi);
+            auto const& Jy_l = J_src[1].const_array(mfi);
+            auto const& Jz_l = J_src[2].const_array(mfi);
             auto const& stat = st.status[c]->const_array(mfi);
-            auto const& stat_x = st.status[0]->const_array(mfi);
-            auto const& stat_y = st.status[1]->const_array(mfi);
-            auto const& stat_z = st.status[2]->const_array(mfi);
+            auto const& stat_x = stat_src[0].const_array(mfi);
+            auto const& stat_y = stat_src[1].const_array(mfi);
+            auto const& stat_z = stat_src[2].const_array(mfi);
             auto const& phi = distance_to_eb.const_array(mfi);
 
             amrex::ParallelFor(tb, ncomp,
