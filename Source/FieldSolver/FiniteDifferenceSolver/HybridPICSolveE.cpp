@@ -936,10 +936,14 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         if (r > 0.5_rt*dr) {
                             nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                         } else {
-                            // Special handling of the hyper-resistivity term on axis to avoid division by zero
-                            // and ensure that Jz remains well-behaved on axis for m=0 mode
-                            // This works since there is a symmetry condition on axis that cancels the geometric 1/r term
-                            nabla2Jz += T_Algo::Drr(Jz, coefs_r, n_coefs_r, i, j, 0, 0);
+                            // On axis the geometric term does not cancel: by
+                            // L'Hopital, (1/r) d/dr(r dJz/dr) -> 2 d2Jz/dr2
+                            // as r -> 0 (dJz/dr vanishes on axis for m=0), so
+                            // the radial part is twice the second derivative.
+                            // The even axis parity Jz(-dr) = Jz(dr) gives the
+                            // ghost-free form 2 * 2*(Jz(dr) - Jz(0))/dr^2.
+                            const Real inv_dr2 = coefs_r[0]*coefs_r[0];
+                            nabla2Jz += 4.0_rt*(Jz(i+1, j, 0) - Jz(i, j, 0))*inv_dr2;
                         }
 
                         Ez(i, j, 0) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
@@ -977,6 +981,70 @@ void FiniteDifferenceSolver::HybridPICSolveESpherical (
 }
 #else
 
+namespace
+{
+    /** Isotropic discrete Laplacian for the hyper-resistivity term.
+     *
+     *  The cross stencil Dxx+Dyy+Dzz has a leading truncation error whose
+     *  angular dependence is cos(4*theta): the damping rate of a mode at
+     *  finite kh differs between the grid axes and the diagonals, which
+     *  imprints fourfold "squaring" on diffusing structures. The Mehrstellen
+     *  9-point (2D) and Patra-Karttunen 27-point (3D) stencils cancel that
+     *  term: their leading error is proportional to the isotropic
+     *  biharmonic. They are written here as the cross stencil plus compact
+     *  cross-derivative corrections, which stays consistent (2nd order) on
+     *  non-cubic cells; the error is fully isotropic for cubic cells.
+     */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real LaplacianIsotropic (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2)
+    {
+        using namespace amrex::literals;
+#if defined(WARPX_DIM_3D)
+        amrex::Real const d2x = F(i+1,j,k) - 2._rt*F(i,j,k) + F(i-1,j,k);
+        amrex::Real const d2y = F(i,j+1,k) - 2._rt*F(i,j,k) + F(i,j-1,k);
+        amrex::Real const d2z = F(i,j,k+1) - 2._rt*F(i,j,k) + F(i,j,k-1);
+
+        // undivided cross differences delta_a^2 delta_b^2 F
+        auto const cxy_at = [&] (int kk) {
+            return F(i+1,j+1,kk) + F(i+1,j-1,kk) + F(i-1,j+1,kk) + F(i-1,j-1,kk)
+                 - 2._rt*(F(i+1,j,kk) + F(i-1,j,kk) + F(i,j+1,kk) + F(i,j-1,kk))
+                 + 4._rt*F(i,j,kk);
+        };
+        amrex::Real const cxy = cxy_at(k);
+        amrex::Real const cxz =
+              F(i+1,j,k+1) + F(i+1,j,k-1) + F(i-1,j,k+1) + F(i-1,j,k-1)
+            - 2._rt*(F(i+1,j,k) + F(i-1,j,k) + F(i,j,k+1) + F(i,j,k-1))
+            + 4._rt*F(i,j,k);
+        amrex::Real const cyz =
+              F(i,j+1,k+1) + F(i,j+1,k-1) + F(i,j-1,k+1) + F(i,j-1,k-1)
+            - 2._rt*(F(i,j+1,k) + F(i,j-1,k) + F(i,j,k+1) + F(i,j,k-1))
+            + 4._rt*F(i,j,k);
+        amrex::Real const txyz = cxy_at(k+1) - 2._rt*cxy_at(k) + cxy_at(k-1);
+
+        return d2x*inv_h2[0] + d2y*inv_h2[1] + d2z*inv_h2[2]
+             + ((h2[0] + h2[1])/12._rt)*cxy*inv_h2[0]*inv_h2[1]
+             + ((h2[0] + h2[2])/12._rt)*cxz*inv_h2[0]*inv_h2[2]
+             + ((h2[1] + h2[2])/12._rt)*cyz*inv_h2[1]*inv_h2[2]
+             + ((h2[0]*h2[1] + h2[1]*h2[2] + h2[0]*h2[2])/90._rt)
+               *txyz*inv_h2[0]*inv_h2[1]*inv_h2[2];
+#else
+        // 2D XZ: Mehrstellen 9-point (j is the z index)
+        amrex::Real const d2x = F(i+1,j,k) - 2._rt*F(i,j,k) + F(i-1,j,k);
+        amrex::Real const d2z = F(i,j+1,k) - 2._rt*F(i,j,k) + F(i,j-1,k);
+        amrex::Real const cxz =
+              F(i+1,j+1,k) + F(i+1,j-1,k) + F(i-1,j+1,k) + F(i-1,j-1,k)
+            - 2._rt*(F(i+1,j,k) + F(i-1,j,k) + F(i,j+1,k) + F(i,j-1,k))
+            + 4._rt*F(i,j,k);
+        return d2x*inv_h2[0] + d2z*inv_h2[1]
+             + ((h2[0] + h2[1])/12._rt)*cxz*inv_h2[0]*inv_h2[1];
+#endif
+    }
+}
+
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECartesian (
     ablastr::fields::VectorField const& Efield,
@@ -1005,6 +1073,18 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+
+    // isotropized hyper-resistivity Laplacian (Mehrstellen / Patra-Karttunen)
+    const bool iso_hyper = hybrid_model->m_isotropic_hyper_resistivity;
+    amrex::GpuArray<amrex::Real, 3> h2{};
+    amrex::GpuArray<amrex::Real, 3> inv_h2{};
+    {
+        const auto dx_lev = WarpX::GetInstance().Geom(lev).CellSizeArray();
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            h2[d] = dx_lev[d]*dx_lev[d];
+            inv_h2[d] = 1._rt/h2[d];
+        }
+    }
 
     auto & warpx = WarpX::GetInstance();
     const amrex::Real t_new = warpx.gett_new(lev);
@@ -1234,9 +1314,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
+                    const Real nabla2Jx = iso_hyper
+                        ? ::LaplacianIsotropic(Jx, i, j, k, h2, inv_h2)
+                        : T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                          + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                          + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
 
                     Ex(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jx;
                 }
@@ -1302,9 +1384,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
+                    const Real nabla2Jy = iso_hyper
+                        ? ::LaplacianIsotropic(Jy, i, j, k, h2, inv_h2)
+                        : T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                          + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                          + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
 
                     Ey(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jy;
                 }
@@ -1370,9 +1454,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
-                        + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
-                        + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+                    const Real nabla2Jz = iso_hyper
+                        ? ::LaplacianIsotropic(Jz, i, j, k, h2, inv_h2)
+                        : T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                          + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                          + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
 
                     Ez(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
                 }

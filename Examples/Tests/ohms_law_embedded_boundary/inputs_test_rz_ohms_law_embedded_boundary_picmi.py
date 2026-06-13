@@ -79,7 +79,7 @@ RATIO_FILL_FIRST = vector_ratio(0.3 * H)  # = +3/13
 RATIO_FILL_BAND = -(0.6 * RATIO_FILL_FIRST + 0.4)  # = -7/13
 
 
-def setup_simulation(geometry):
+def setup_simulation(geometry, hyper=False):
     grid = picmi.CylindricalGrid(
         number_of_cells=[N_R, N_Z],
         lower_bound=[0.0, Z_LO],
@@ -99,7 +99,10 @@ def setup_simulation(geometry):
         # clamped in-place gathers of the original implementation this seam
         # delivered -c instead of -0.4c for the rho fold and nothing for the
         # J folds).
-        warpx_max_grid_size_y=24,
+        # (the hyper battery needs a single box: the species-free deck
+        # allocates the plasma current with zero ghost cells, so the
+        # hyper-resistivity stencil must not straddle a box seam)
+        warpx_max_grid_size_y=2048 if hyper else 24,
         warpx_blocking_factor=8,
     )
 
@@ -119,7 +122,10 @@ def setup_simulation(geometry):
         Te=0.0,
         n0=1.0e18,
         n_floor=1.0e16,
-        plasma_resistivity=1.0e-6,
+        # the hyper battery isolates the hyper-resistive term:
+        # Ez = -eta_h * [ (1/r) d/dr(r dJz/dr) + d2Jz/dz2 ]
+        plasma_resistivity=0.0 if hyper else 1.0e-6,
+        plasma_hyper_resistivity=1.0 if hyper else None,
         substeps=4,
     )
 
@@ -613,6 +619,65 @@ def run_cone_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Hyper-resistivity axis battery: the cylindrical radial operator applied to
+# the parabola Jz = C0 - C2*r^2 is exactly -4*C2 at every radius, INCLUDING
+# the axis, where (1/r) d/dr(r dJz/dr) -> 2 d2Jz/dr2 by L'Hopital (the
+# geometric term doubles the second derivative rather than cancelling).
+# The discrete operator is exact on the parabola, so the check is round-off
+# tight; the historical axis branch (a bare, ghost-dependent d2/dr2) returned
+# half the correct value there.
+# ----------------------------------------------------------------------------
+def run_hyper_battery(sim):
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    ETA_H = 1.0
+    C0, C2 = 2.0, 3.0
+
+    rho = fields.RhoFPWrapper()
+    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
+    for w in (
+        fields.BxFPWrapper(),
+        fields.ByFPWrapper(),
+        fields.BzFPWrapper(),
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+        fields.JxFPPlasmaWrapper(),
+        fields.JyFPPlasmaWrapper(),
+        fields.JzFPPlasmaWrapper(),
+    ):
+        w[...] = 0.0
+
+    Jpz = fields.JzFPPlasmaWrapper()
+    Ez = fields.EzFPWrapper()
+
+    # Jz/Ez are nodal in r: r_i = i*H
+    shape = np.asarray(Jpz[...]).shape
+    r = (np.arange(shape[0]) * H)[:, None]
+    Jpz[...] = np.broadcast_to(C0 - C2 * r**2, shape)
+    wx.hybrid_solve_e(True)
+    ez = np.asarray(Ez[...])
+
+    # interior: away from the z wall (node 24.3), the z domain rows and the
+    # outer-r domain row; the axis row i=0 is the point of the test
+    interior = (slice(0, N_R - 1), slice(2, 20))
+    ck.close(
+        "hyper RZ: parabola gives -4*C2 at every radius (axis included)",
+        ez[interior],
+        ETA_H * 4.0 * C2,
+        1e-9,
+    )
+    ck.close(
+        "hyper RZ: axis row carries the L'Hopital factor of two",
+        ez[0, 2:20],
+        ETA_H * 4.0 * C2,
+        1e-9,
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -621,11 +686,20 @@ def main():
         default="plane",
         help="conducting-wall geometry of the battery",
     )
+    parser.add_argument(
+        "--battery",
+        choices=["eb", "hyper"],
+        default="eb",
+        help="which unit battery to run (eb fills/folds or the cylindrical "
+        "hyper-resistivity axis operator)",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    sim = setup_simulation(args.geometry)
-    if args.geometry == "plane":
+    sim = setup_simulation(args.geometry, hyper=(args.battery == "hyper"))
+    if args.battery == "hyper":
+        run_hyper_battery(sim)
+    elif args.geometry == "plane":
         run_plane_battery(sim)
     else:
         run_cone_battery(sim)

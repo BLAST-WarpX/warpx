@@ -49,6 +49,8 @@ X_WALL = LO + (X_WALL_NODE + X_WALL_OFFSET) * H
 
 R_WALL = 0.8  # cylinder variant
 
+ETA_H = 1.0  # constant hyper-resistivity of the stencil battery
+
 # mirror geometry of the fill operators (EBJBoundary.cpp)
 D_IMG_MIN = 0.5 * H
 
@@ -64,7 +66,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(geometry):
+def setup_simulation(geometry, hyper=False):
     grid = picmi.Cartesian3DGrid(
         number_of_cells=[N_XY, N_XY, N_Z],
         lower_bound=[LO, LO, -N_Z * H / 2],
@@ -74,7 +76,10 @@ def setup_simulation(geometry):
         lower_boundary_conditions_particles=["absorbing", "periodic", "periodic"],
         upper_boundary_conditions_particles=["absorbing", "periodic", "periodic"],
         warpx_max_grid_size=2048,
-        warpx_max_grid_size_x=N_XY // 2,
+        # the hyper battery needs a single box: the species-free deck
+        # allocates the plasma current with zero ghost cells, so the
+        # hyper-resistivity stencil must not straddle a box seam
+        warpx_max_grid_size_x=2048 if hyper else N_XY // 2,
         warpx_blocking_factor=8,
     )
 
@@ -93,7 +98,10 @@ def setup_simulation(geometry):
         Te=0.0,
         n0=1.0e18,
         n_floor=1.0e16,
-        plasma_resistivity=1.0e-6,
+        # the hyper battery isolates the hyper-resistive term:
+        # E = -eta_h * nabla^2(J_plasma) with everything else zero
+        plasma_resistivity=0.0 if hyper else 1.0e-6,
+        plasma_hyper_resistivity=ETA_H if hyper else None,
         substeps=4,
         use_conformal_eb=True,
     )
@@ -735,6 +743,141 @@ def run_marder_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Hyper-resistivity stencil battery: validates the isotropized Laplacian
+# (Patra-Karttunen 27-point) against its closed form and demonstrates the
+# isotropization of the damping rate (the cross stencil's cos(4*theta)
+# anisotropy is cancelled). The solver is configured so that the Faraday
+# E solve reduces to E = -eta_h * nabla^2(J_plasma) exactly (B = 0, ion
+# current = 0, eta = 0, rho far above the floor).
+# ----------------------------------------------------------------------------
+def run_hyper_battery(sim):
+    wx = sim.extension.warpx
+    ck = CheckSet()
+
+    rho = fields.RhoFPWrapper()
+    r = np.asarray(rho[...])
+    rho[...] = np.full(r.shape, 100.0 * 1.0e16 * constants.q_e)
+    for w in (
+        fields.BxFPWrapper(),
+        fields.ByFPWrapper(),
+        fields.BzFPWrapper(),
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+        fields.JxFPPlasmaWrapper(),
+        fields.JyFPPlasmaWrapper(),
+        fields.JzFPPlasmaWrapper(),
+    ):
+        w[...] = 0.0
+
+    Jpz = fields.JzFPPlasmaWrapper()
+    Ez = fields.EzFPWrapper()
+
+    # numpy mirrors of the two stencils (y and z are periodic, so np.roll is
+    # exact there; comparisons stay on an interior x slab away from the wall)
+    def d2(a, ax):
+        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
+
+    def lap_cross(a):
+        return (d2(a, 0) + d2(a, 1) + d2(a, 2)) / H**2
+
+    def lap_iso(a):
+        cxy = d2(d2(a, 0), 1)
+        cxz = d2(d2(a, 0), 2)
+        cyz = d2(d2(a, 1), 2)
+        txyz = d2(cxy, 2)
+        return lap_cross(a) + (cxy + cxz + cyz) / (6.0 * H**2) + txyz / (30.0 * H**2)
+
+    interior = (slice(4, 21), slice(2, 31), slice(None))
+
+    # --- 1) stencil exactness on a random field ---------------------------
+    rng = np.random.RandomState(2024)
+    jz = rng.rand(*np.asarray(Jpz[...]).shape) - 0.5
+    Jpz[...] = jz
+    wx.hybrid_solve_e(True)
+    ez = np.asarray(Ez[...])
+    expected = -ETA_H * lap_iso(jz)
+    scale = float(np.max(np.abs(expected[interior])))
+    ck.close(
+        "hyper: solver matches the 27-point Patra-Karttunen closed form",
+        ez[interior] / scale,
+        expected[interior] / scale,
+        1e-12,
+    )
+    d_cross = float(
+        np.max(np.abs(ez[interior] + ETA_H * lap_cross(jz)[interior])) / scale
+    )
+    ck.expect(
+        "hyper: result differs from the cross stencil (teeth)",
+        d_cross > 1e-3,
+        f"rel dev from cross = {d_cross:.3e}",
+    )
+
+    # --- 2) consistency: exact on quadratics (laplacian of x^2 is 2) ------
+    # (x only: the periodic y/z ghost wrap would corrupt y^2/z^2 stencils)
+    shape = np.asarray(Jpz[...]).shape
+    xn = LO + np.arange(shape[0]) * H
+    yn = LO + np.arange(shape[1]) * H
+    zc = (np.arange(shape[2]) + 0.5) * H - N_Z * H / 2
+    X, Y, Z = np.meshgrid(xn, yn, zc, indexing="ij")
+    Jpz[...] = X**2
+    wx.hybrid_solve_e(True)
+    ez = np.asarray(Ez[...])
+    ck.close(
+        "hyper: exact on quadratics (laplacian of x^2 is 2)",
+        ez[interior],
+        -ETA_H * 2.0,
+        1e-9,
+    )
+
+    # --- 3) isotropization demonstration: plane-wave damping rates --------
+    # cos(k.x) is an exact eigenfunction of every translation-invariant
+    # stencil, so the discrete damping rate lambda(k) = -L(F)/F is read off
+    # pointwise with no quadrature. The cross stencil's rate differs between
+    # axis-aligned and diagonal k of equal magnitude at O((kh)^2) - the
+    # cos(4*theta) anisotropy that squares diffusing fields - while the
+    # isotropic stencil cancels that term.
+    kmag = 1.0 / H  # kh = 1
+
+    def solver_rate(j_field):
+        Jpz[...] = j_field
+        wx.hybrid_solve_e(True)
+        lam = (np.asarray(Ez[...]) / (ETA_H * j_field))[interior]
+        return float(np.median(lam[np.abs(j_field[interior]) > 0.5]))
+
+    def stencil_rate(lap, j_field):
+        lam = (-lap(j_field) / j_field)[interior]
+        return float(np.median(lam[np.abs(j_field[interior]) > 0.5]))
+
+    j_axis = np.cos(kmag * X)
+    j_diag = np.cos(kmag * (X + Y) / np.sqrt(2.0))
+
+    lam_axis = solver_rate(j_axis)
+    lam_diag = solver_rate(j_diag)
+    aniso_iso = abs(lam_axis - lam_diag) / kmag**2
+    aniso_cross = (
+        abs(stencil_rate(lap_cross, j_axis) - stencil_rate(lap_cross, j_diag)) / kmag**2
+    )
+    aniso_iso_np = (
+        abs(stencil_rate(lap_iso, j_axis) - stencil_rate(lap_iso, j_diag)) / kmag**2
+    )
+    ratio = aniso_iso / max(aniso_cross, 1e-300)
+    ck.expect(
+        "hyper: solver anisotropy equals the isotropic closed form",
+        abs(aniso_iso - aniso_iso_np) <= 1e-10,
+        f"|solver - numpy| = {abs(aniso_iso - aniso_iso_np):.3e}",
+    )
+    ck.expect(
+        "hyper: axis/diagonal damping anisotropy suppressed (>= 4x at kh=1)",
+        ratio < 0.25,
+        f"aniso(iso)/aniso(cross) = {ratio:.4f} "
+        f"(cross = {aniso_cross:.4f} k^2, iso = {aniso_iso:.5f} k^2)",
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -745,16 +888,18 @@ def main():
     )
     parser.add_argument(
         "--battery",
-        choices=["eb", "marder"],
+        choices=["eb", "marder", "hyper"],
         default="eb",
-        help="which unit battery to run (eb fills/folds or the transitional "
-        "Marder correction)",
+        help="which unit battery to run (eb fills/folds, the transitional "
+        "Marder correction, or the isotropized hyper-resistivity stencil)",
     )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    sim = setup_simulation(args.geometry)
-    if args.battery == "marder":
+    sim = setup_simulation(args.geometry, hyper=(args.battery == "hyper"))
+    if args.battery == "hyper":
+        run_hyper_battery(sim)
+    elif args.battery == "marder":
         run_marder_battery(sim)
     elif args.geometry == "plane":
         run_plane_battery(sim)

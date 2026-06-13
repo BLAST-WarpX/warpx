@@ -314,6 +314,11 @@ public:
     amrex::ParserExecutor<2> m_eta_h;
     bool m_include_hyper_resistivity_term = false;
     bool m_hyper_resistivity_has_B_dependence = false;
+    /** If true (default), evaluate the hyper-resistivity Laplacian with the
+     *  isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of
+     *  the cross stencil, removing the cos(4*theta) anisotropy of its
+     *  damping rate (fully isotropic on cubic cells; Cartesian only). */
+    bool m_isotropic_hyper_resistivity = true;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";

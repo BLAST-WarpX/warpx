@@ -3873,6 +3873,21 @@ Maxwell solver: kinetic-fluid hybrid
     edge). If ``false``, it is mirrored evenly (Neumann: zero normal gradient, for a column
     supported by the wall; combine with ``hybrid_pic_model.eb_deposit_fold = reflect``).
 
+.. pp:param:: hybrid_pic_model.isotropic_hyper_resistivity
+    :type: ``bool``
+    :default: ``true``
+    :optional:
+
+    If ``true`` (default), the hyper-resistivity Laplacian of the hybrid Ohm's law is evaluated
+    with the isotropic Mehrstellen 9-point (2D XZ) or Patra-Karttunen 27-point (3D) stencil
+    instead of the cross stencil. The cross stencil's leading truncation error modulates the
+    hyper-resistive damping rate as :math:`\cos 4\theta` between the grid axes and the
+    diagonals, which imprints fourfold structure on diffusing fields at grid-scale wavenumbers;
+    the isotropic stencils cancel that term (their leading error is proportional to the
+    isotropic biharmonic; fully isotropic on cubic cells, consistent on non-cubic cells).
+    Cartesian geometries only; in RZ the standard cylindrical operator is used (with the
+    on-axis radial term carrying its L'Hopital factor of two).
+
 .. pp:param:: hybrid_pic_model.marder_alpha
     :type: ``float``
     :default: ``0.``

@@ -2268,6 +2268,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Apply the correction only every N substep E evaluations (only at
         ``marder_correction_level='all_substeps'``).
 
+    isotropic_hyper_resistivity: bool, default=True
+        Evaluate the hyper-resistivity Laplacian with the isotropic
+        Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
+        cross stencil, removing the fourfold (cos 4*theta) anisotropy of
+        its damping rate (fully isotropic on cubic cells; Cartesian
+        geometries).
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
@@ -2336,6 +2343,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         marder_rtol=None,
         marder_atol=None,
         marder_substep_interval=None,
+        isotropic_hyper_resistivity=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2376,6 +2384,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.marder_rtol = marder_rtol
         self.marder_atol = marder_atol
         self.marder_substep_interval = marder_substep_interval
+        self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2440,6 +2449,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.marder_rtol = self.marder_rtol
         pywarpx.hybridpicmodel.marder_atol = self.marder_atol
         pywarpx.hybridpicmodel.marder_substep_interval = self.marder_substep_interval
+        pywarpx.hybridpicmodel.isotropic_hyper_resistivity = (
+            self.isotropic_hyper_resistivity
+        )
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
