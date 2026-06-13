@@ -1043,6 +1043,102 @@ namespace
              + ((h2[0] + h2[1])/12._rt)*cxz*inv_h2[0]*inv_h2[1];
 #endif
     }
+
+    // Corner-curl correction that isotropizes the in-plane resistive
+    // diffusion of the out-of-plane B component (Bz in 3D, By in 2D XZ).
+    //
+    // The resistive E (eta*curl(B)/mu0) advanced by Faraday produces, for
+    // divergence-free B, the cross-stencil in-plane Laplacian of the
+    // out-of-plane B, whose leading error is cos(4*theta) anisotropic and
+    // drives a grid m=4 mode. Adding the corrections below to the two
+    // in-plane E components makes the standard Faraday curl emit the missing
+    // Mehrstellen corner term (h^2/6) d2a d2b B, i.e. the in-plane isotropic
+    // Laplacian. The correction enters only through E, so the Faraday curl is
+    // unchanged and div(B) stays exactly zero. Returned values already carry
+    // 1/mu0 (matching the resistive current); multiply by eta at the call.
+    //
+    // Coefficient: the in-plane Mehrstellen corner is
+    // ((h2a+h2b)/12) * (d2a d2b B) * inv_h2a * inv_h2b. It is split
+    // antisymmetrically between the two E components (half each), with each
+    // half pre-differenced (backward) along the in-plane axis so that the
+    // Faraday upward difference completes a centered second difference.
+#if defined(WARPX_DIM_3D)
+    // 3D: Bz corner delivered through Ex and Ey (curl_z). a=x, b=y.
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEx_3D (
+        amrex::Array4<amrex::Real const> const& Bz,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // half the corner coefficient, times dy (undone by Faraday UpwardDy)
+        amrex::Real const cf = 0.5_rt*((h2[0]+h2[1])/12._rt)*inv_h2[0]*inv_h2[1]
+                             * dx[1] * inv_mu0;
+        auto const d2x = [&] (int jj) {
+            return Bz(i+1,jj,k) - 2._rt*Bz(i,jj,k) + Bz(i-1,jj,k);
+        };
+        // backward y-difference of d2x(Bz); UpwardDy in Faraday -> d2y d2x Bz
+        return cf * (d2x(j) - d2x(j-1));
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEy_3D (
+        amrex::Array4<amrex::Real const> const& Bz,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        amrex::Real const cf = -0.5_rt*((h2[0]+h2[1])/12._rt)*inv_h2[0]*inv_h2[1]
+                             * dx[0] * inv_mu0;
+        auto const d2y = [&] (int ii) {
+            return Bz(ii,j+1,k) - 2._rt*Bz(ii,j,k) + Bz(ii,j-1,k);
+        };
+        // backward x-difference of d2y(Bz); UpwardDx in Faraday -> d2x d2y Bz
+        return cf * (d2y(i) - d2y(i-1));
+    }
+#elif defined(WARPX_DIM_XZ)
+    // 2D XZ: By corner delivered through Ex and Ez (curl_y). a=x, b=z (j index).
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEx_XZ (
+        amrex::Array4<amrex::Real const> const& By,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // curl_y = UpwardDz(Ex) - UpwardDx(Ez); this half goes via UpwardDz
+        amrex::Real const cf = -0.5_rt*((h2[0]+h2[1])/12._rt)*inv_h2[0]*inv_h2[1]
+                             * dx[1] * inv_mu0;
+        auto const d2x = [&] (int jj) {
+            return By(i+1,jj,k) - 2._rt*By(i,jj,k) + By(i-1,jj,k);
+        };
+        return cf * (d2x(j) - d2x(j-1));
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEz_XZ (
+        amrex::Array4<amrex::Real const> const& By,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        amrex::Real const cf = 0.5_rt*((h2[0]+h2[1])/12._rt)*inv_h2[0]*inv_h2[1]
+                             * dx[0] * inv_mu0;
+        auto const d2z = [&] (int ii) {
+            return By(ii,j+1,k) - 2._rt*By(ii,j,k) + By(ii,j-1,k);
+        };
+        return cf * (d2z(i) - d2z(i-1));
+    }
+#endif
 }
 
 template<typename T_Algo>
@@ -1076,11 +1172,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
     // isotropized hyper-resistivity Laplacian (Mehrstellen / Patra-Karttunen)
     const bool iso_hyper = hybrid_model->m_isotropic_hyper_resistivity;
+    // isotropized resistive diffusion (corner-curl E correction)
+    const bool iso_resistivity = hybrid_model->m_isotropic_resistivity;
+    const amrex::Real inv_mu0 = 1._rt/PhysConst::mu0;
+    amrex::GpuArray<amrex::Real, 3> dx_arr{};
     amrex::GpuArray<amrex::Real, 3> h2{};
     amrex::GpuArray<amrex::Real, 3> inv_h2{};
     {
         const auto dx_lev = WarpX::GetInstance().Geom(lev).CellSizeArray();
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            dx_arr[d] = dx_lev[d];
             h2[d] = dx_lev[d]*dx_lev[d];
             inv_h2[d] = 1._rt/h2[d];
         }
@@ -1322,6 +1423,20 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     Ex(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jx;
                 }
+
+                // Isotropize the in-plane resistive diffusion of the
+                // out-of-plane B (Bz in 3D, By in 2D XZ) via the corner-curl
+                // correction; div(B) preserved (added through E).
+                if (iso_resistivity) {
+                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+#if defined(WARPX_DIM_3D)
+                    Ex(i, j, k) += eta_val
+                        * ::CornerResistiveEx_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+#elif defined(WARPX_DIM_XZ)
+                    Ex(i, j, k) += eta_val
+                        * ::CornerResistiveEx_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+#endif
+                }
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1392,6 +1507,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     Ey(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jy;
                 }
+
+                // Bz corner-curl correction, second (Ey) half (3D only; in
+                // 2D XZ the out-of-plane corner is delivered via Ex and Ez).
+#if defined(WARPX_DIM_3D)
+                if (iso_resistivity) {
+                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+                    Ey(i, j, k) += eta_val
+                        * ::CornerResistiveEy_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                }
+#endif
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {
@@ -1462,6 +1587,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     Ez(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
                 }
+
+                // By corner-curl correction, second (Ez) half (2D XZ only;
+                // in 3D the axial Bz corner is delivered via Ex and Ey).
+#if defined(WARPX_DIM_XZ)
+                if (iso_resistivity) {
+                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+                    Ez(i, j, k) += eta_val
+                        * ::CornerResistiveEz_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                }
+#endif
             }
 
             if (include_external_fields && (rho_val >= rho_floor)) {

@@ -140,6 +140,10 @@ void HybridPICModel::ReadParameters ()
     // isotropized hyper-resistivity Laplacian (Cartesian geometries)
     pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
 
+    // isotropized resistive diffusion via the corner-curl E correction
+    // (Cartesian geometries; suppresses the grid m=4 from the resistive term)
+    pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
+
     // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
     // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
     utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);

@@ -2275,6 +2275,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         its damping rate (fully isotropic on cubic cells; Cartesian
         geometries).
 
+    isotropic_resistivity: bool, default=True
+        Add an isotropizing corner-curl correction to the resistive electric
+        field so the emergent in-plane diffusion of the out-of-plane magnetic
+        field uses the isotropic (Mehrstellen) Laplacian instead of the cross
+        stencil, removing the cos 4*theta anisotropy that drives a grid m=4
+        mode. Applied through E, so the Faraday curl is unchanged and div(B)
+        stays exactly zero (Cartesian geometries; the RZ resistive operator
+        is axisymmetric and has no such anisotropy).
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
@@ -2344,6 +2353,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         marder_atol=None,
         marder_substep_interval=None,
         isotropic_hyper_resistivity=None,
+        isotropic_resistivity=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2385,6 +2395,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.marder_atol = marder_atol
         self.marder_substep_interval = marder_substep_interval
         self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
+        self.isotropic_resistivity = isotropic_resistivity
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2452,6 +2463,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.isotropic_hyper_resistivity = (
             self.isotropic_hyper_resistivity
         )
+        pywarpx.hybridpicmodel.isotropic_resistivity = self.isotropic_resistivity
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(

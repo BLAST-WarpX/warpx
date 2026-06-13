@@ -69,7 +69,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(hyper=False):
+def setup_simulation(hyper=False, resistive=False):
     grid = picmi.Cartesian2DGrid(
         number_of_cells=[N_X, N_Z],
         lower_bound=[LO, LO],
@@ -85,7 +85,7 @@ def setup_simulation(hyper=False):
         # single box for the hyper battery: the species-free deck allocates
         # the plasma current with zero ghost cells, so the hyper-resistivity
         # stencil must not straddle a box seam
-        warpx_max_grid_size_x=2048 if hyper else N_X // 2,
+        warpx_max_grid_size_x=2048 if (hyper or resistive) else N_X // 2,
         warpx_blocking_factor=8,
     )
 
@@ -106,10 +106,12 @@ def setup_simulation(hyper=False):
         Te=0.0,
         n0=1.0e18,
         n_floor=1.0e16,
-        # the hyper battery isolates the hyper-resistive term:
-        # E = -eta_h * nabla^2(J_plasma) with everything else zero
-        plasma_resistivity=0.0 if hyper else 1.0e-6,
+        # the hyper battery isolates the hyper-resistive term
+        # (E = -eta_h*nabla^2 J); the resistive battery isolates the resistive
+        # term (E = eta*J) with the corner-curl isotropization on.
+        plasma_resistivity=(1.0 if resistive else (0.0 if hyper else 1.0e-6)),
         plasma_hyper_resistivity=1.0 if hyper else None,
+        isotropic_resistivity=resistive,
         substeps=4,
         use_conformal_eb=True,
     )
@@ -840,11 +842,129 @@ def run_hyper_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Resistive isotropization battery (2D XZ): the corner-curl correction makes
+# the Faraday curl emit the in-plane (xz) Mehrstellen Laplacian of the
+# out-of-plane B (By), cancelling the cross-stencil cos(4*theta) anisotropy.
+# Validated by isolating the correction (ion current zero): the Faraday curl
+# of E reproduces -(eta/mu0)*corner(By) to round-off, the emergent operator
+# is isotropic, and the correction vanishes on quadratics.
+# ----------------------------------------------------------------------------
+def run_resistive_battery(sim):
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    mu0 = constants.mu0
+    ETA_R = 1.0
+    h = H
+
+    rho = fields.RhoFPWrapper()
+    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
+    for w in (
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+        fields.JxFPPlasmaWrapper(),
+        fields.JyFPPlasmaWrapper(),
+        fields.JzFPPlasmaWrapper(),
+        fields.BxFPWrapper(),
+        fields.BzFPWrapper(),
+        fields.ExFPWrapper(),
+        fields.EyFPWrapper(),
+        fields.EzFPWrapper(),
+    ):
+        w[...] = 0.0
+
+    By = fields.ByFPWrapper()
+    bshp = np.asarray(By[...]).shape
+    NC = (N_X, N_Z)
+
+    def crop(a):
+        return np.asarray(a)[: NC[0], : NC[1]]
+
+    def d2(a, ax):
+        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
+
+    def upx(F):
+        return (np.roll(F, -1, 0) - F) / h
+
+    def upz(F):
+        return (np.roll(F, -1, 1) - F) / h
+
+    ii = (slice(4, 22), slice(4, 28))  # stay left of the x-wall (node 24.3)
+
+    # --- 1) the correction's Faraday curl is the in-plane (xz) corner -------
+    rng = np.random.RandomState(11)
+    by = rng.rand(NC[0], NC[1]) - 0.5
+    By[...] = np.broadcast_to(
+        by.reshape(NC[0], NC[1])[: bshp[0], : bshp[1]], bshp
+    ).copy()
+    wx.hybrid_solve_e(True)
+    Ex = crop(fields.ExFPWrapper()[...])
+    Ez = crop(fields.EzFPWrapper()[...])
+    corner = (1.0 / (6.0 * h * h)) * d2(d2(by, 0), 1)
+    curly = upz(Ex) - upx(Ez)  # curl_up(E)_y
+    expected = -(ETA_R / mu0) * corner
+    scale = float(np.max(np.abs(expected[ii])))
+    ck.close(
+        "resistive 2D: Faraday curl of the correction is the in-plane corner",
+        curly[ii] / scale,
+        expected[ii] / scale,
+        1e-12,
+    )
+
+    # --- 2) emergent operator isotropic; teeth ------------------------------
+    lap_cross = (d2(by, 0) + d2(by, 1)) / h**2
+    lap_iso = lap_cross + corner
+    emergent = lap_cross - (mu0 / ETA_R) * curly
+    ck.close(
+        "resistive 2D: emergent operator equals the isotropic Laplacian",
+        emergent[ii],
+        lap_iso[ii],
+        1e-9 * float(np.max(np.abs(lap_iso[ii]))),
+    )
+
+    # --- 3) plane-wave anisotropy suppressed --------------------------------
+    xc = (np.arange(NC[0]) + 0.5) * h + LO
+    zc = (np.arange(NC[1]) + 0.5) * h + LO
+    X, Z = np.meshgrid(xc, zc, indexing="ij")
+    kmag = 1.0 / h
+
+    def aniso(lap_fn):
+        ja = np.cos(kmag * X)
+        jd = np.cos(kmag * (X + Z) / np.sqrt(2.0))
+        la = (-lap_fn(ja) / ja)[ii]
+        ld = (-lap_fn(jd) / jd)[ii]
+        return abs(float(np.median(la)) - float(np.median(ld))) / kmag**2
+
+    a_cross = aniso(lambda a: (d2(a, 0) + d2(a, 1)) / h**2)
+    a_iso = aniso(
+        lambda a: (d2(a, 0) + d2(a, 1)) / h**2 + (1.0 / (6.0 * h * h)) * d2(d2(a, 0), 1)
+    )
+    ck.expect(
+        "resistive 2D: axis/diagonal anisotropy suppressed (>= 4x at kh=1)",
+        a_iso < 0.25 * a_cross,
+        f"aniso(iso)/aniso(cross)={a_iso / max(a_cross, 1e-300):.4f}",
+    )
+
+    # --- 4) pure truncation canceller ---------------------------------------
+    By[...] = np.broadcast_to((X**2)[: bshp[0], : bshp[1]], bshp).copy()
+    wx.hybrid_solve_e(True)
+    ex = crop(fields.ExFPWrapper()[...])
+    ck.close(
+        "resistive 2D: correction vanishes on quadratics",
+        ex[ii],
+        0.0,
+        1e-9 * float(np.max(np.abs(ex))) + 1e-12,
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--battery",
-        choices=["eb", "marder", "hyper"],
+        choices=["eb", "marder", "hyper", "resistive"],
         default="eb",
         help="which unit battery to run (eb fills/folds, the transitional "
         "Marder correction, or the isotropized hyper-resistivity stencil)",
@@ -852,8 +972,12 @@ def main():
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    sim = setup_simulation(hyper=(args.battery == "hyper"))
-    if args.battery == "hyper":
+    sim = setup_simulation(
+        hyper=(args.battery == "hyper"), resistive=(args.battery == "resistive")
+    )
+    if args.battery == "resistive":
+        run_resistive_battery(sim)
+    elif args.battery == "hyper":
         run_hyper_battery(sim)
     elif args.battery == "marder":
         run_marder_battery(sim)

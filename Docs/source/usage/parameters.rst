@@ -3888,6 +3888,23 @@ Maxwell solver: kinetic-fluid hybrid
     Cartesian geometries only; in RZ the standard cylindrical operator is used (with the
     on-axis radial term carrying its L'Hopital factor of two).
 
+.. pp:param:: hybrid_pic_model.isotropic_resistivity
+    :type: ``bool``
+    :default: ``true``
+    :optional:
+
+    If ``true`` (default), a corner-curl correction is added to the resistive electric field so
+    that, after the (unchanged) Faraday curl, the emergent in-plane resistive diffusion of the
+    out-of-plane magnetic field (:math:`B_z` in 3D, :math:`B_y` in 2D XZ) uses the isotropic
+    Mehrstellen Laplacian rather than the cross stencil. The plain resistive term
+    :math:`\eta\,\vec{J}` advanced by Faraday produces, for divergence-free :math:`\vec{B}`, the
+    cross-stencil Laplacian, whose :math:`\cos 4\theta` damping anisotropy drives a grid m=4 mode
+    (visible inside conducting cavities where :math:`\eta` is large). Because the correction
+    enters only through :math:`\vec{E}`, the Faraday curl is untouched and :math:`\nabla\cdot\vec{B}`
+    is preserved exactly; it is a pure O(h^2) truncation-error canceller (zero for fields of
+    degree :math:`\leq 3`). Cartesian geometries only; the RZ resistive operator is axisymmetric
+    and has no such anisotropy.
+
 .. pp:param:: hybrid_pic_model.marder_alpha
     :type: ``float``
     :default: ``0.``

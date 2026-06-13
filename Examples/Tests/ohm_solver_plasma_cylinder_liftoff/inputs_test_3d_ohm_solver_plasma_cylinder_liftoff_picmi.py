@@ -112,6 +112,7 @@ def setup_simulation(
     marder_level="all_substeps",
     marder_interval=1,
     n_floor_frac=N_FLOOR_FRAC,
+    isotropic_resistivity=True,
 ):
     """Create the PICMI simulation object.
 
@@ -204,6 +205,7 @@ def setup_simulation(
         marder_max_iterations=20 if marder else None,
         marder_rtol=1.0e-3 if marder else None,
         marder_substep_interval=marder_interval if marder else None,
+        isotropic_resistivity=isotropic_resistivity,
         use_rkf45=True,
         substep_rtol=1.0e-3,
         substep_atol=1.0e-8,
@@ -353,6 +355,14 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--no-isotropic-resistivity",
+        dest="isotropic_resistivity",
+        action="store_false",
+        help="disable the corner-curl isotropization of the resistive "
+        "diffusion (on by default; A/B the grid m=4 mode amplitude)",
+    )
+    parser.set_defaults(isotropic_resistivity=True)
+    parser.add_argument(
         "--marder-alpha",
         help="Marder damping factor (with --marder)",
         type=float,
@@ -430,6 +440,7 @@ def main():
         args.marder_level,
         args.marder_interval,
         args.n_floor_frac,
+        args.isotropic_resistivity,
     )
     sim.step()
 

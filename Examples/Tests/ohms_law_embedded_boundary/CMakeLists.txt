@@ -99,6 +99,30 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
+        test_3d_ohms_law_resistivity_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery resistive"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_2d_ohms_law_resistivity_picmi  # name
+        2  # dims
+        1  # nprocs
+        "inputs_test_2d_ohms_law_embedded_boundary_picmi.py --battery resistive"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
         test_2d_ohms_law_hyper_resistivity_picmi  # name
         2  # dims
         1  # nprocs

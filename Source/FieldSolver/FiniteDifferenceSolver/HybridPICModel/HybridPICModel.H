@@ -319,6 +319,14 @@ public:
      *  the cross stencil, removing the cos(4*theta) anisotropy of its
      *  damping rate (fully isotropic on cubic cells; Cartesian only). */
     bool m_isotropic_hyper_resistivity = true;
+    /** If true (default), add an isotropizing corner-curl correction to the
+     *  resistive electric field so the emergent in-plane B diffusion uses the
+     *  isotropic (Mehrstellen) Laplacian instead of the cross stencil. This
+     *  removes the cos(4*theta) modulation of the resistive damping rate that
+     *  drives a grid m=4 mode. Applied through E, so the standard Faraday
+     *  curl is unchanged and div(B) stays exactly zero. Cartesian only (the
+     *  RZ resistive operator is axisymmetric and has no such anisotropy). */
+    bool m_isotropic_resistivity = true;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
