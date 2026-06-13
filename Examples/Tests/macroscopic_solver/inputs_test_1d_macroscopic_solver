@@ -1,0 +1,51 @@
+# 1D regression test for the macroscopic (dielectric) electromagnetic solver.
+#
+# A standing electromagnetic cavity mode is set up between two PEC walls along z.
+# The mode is initialized through the external magnetic field By(z) = cos(k z),
+# with E = 0 at t = 0, where k = p*pi/L is the cavity wavenumber. In a
+# non-dispersive dielectric (epsilon_r = 1.5, mu = mu0, sigma = 0) the mode
+# oscillates as By(z, t) = cos(k z) cos(omega t) with the reduced frequency
+# omega = c * k / sqrt(epsilon_r).
+#
+# This exercises the 1D macroscopic E-update. It is a regression guard for the
+# 1D MacroscopicProperties setup: a previous bug left the transverse index-type
+# and coarsening-ratio components uninitialized in 1D, which corrupted the
+# interpolation of sigma/epsilon/mu in the macroscopic E-update.
+
+max_step = 200
+
+amr.n_cell = 128
+amr.max_grid_size = 128
+amr.max_level = 0
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+warpx.cfl = 1.0
+warpx.abort_on_warning_threshold = medium
+
+boundary.field_lo = pec
+boundary.field_hi = pec
+
+# Macroscopic (dielectric) solver: non-dispersive, lossless medium
+algo.em_solver_medium = macroscopic
+macroscopic.epsilon = 1.5*epsilon0
+macroscopic.mu      = mu0
+macroscopic.sigma   = 0
+
+# Initialize the p = 1 cavity mode through the external magnetic field (E = 0).
+my_constants.L  = 1.0
+my_constants.p  = 1
+my_constants.kz = p*pi/L
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = 0.0
+warpx.By_external_grid_function(x,y,z) = cos(kz*z)
+warpx.Bz_external_grid_function(x,y,z) = 0.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals  = 200
+diag1.diag_type  = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz

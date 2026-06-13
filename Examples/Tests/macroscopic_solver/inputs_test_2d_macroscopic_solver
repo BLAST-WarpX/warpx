@@ -1,0 +1,54 @@
+# 2D regression test for the macroscopic (dielectric) electromagnetic solver.
+#
+# A standing electromagnetic cavity mode is set up in a PEC box in the (x, z)
+# plane. The mode is initialized through the out-of-plane magnetic field
+# By(x, z) = cos(kx x) cos(kz z), with E = 0 at t = 0, where kx = m*pi/Lx and
+# kz = p*pi/Lz are the cavity wavenumbers. In a non-dispersive dielectric
+# (epsilon_r = 1.5, mu = mu0, sigma = 0) the mode oscillates as
+#     By(x, z, t) = cos(kx x) cos(kz z) cos(omega t)
+# with the reduced frequency omega = c * sqrt(kx^2 + kz^2) / sqrt(epsilon_r).
+#
+# Companion to inputs_test_1d_macroscopic_solver: there was previously no 1D nor
+# 2D automated coverage for the macroscopic solver (only the 3D embedded-boundary
+# cube test).
+
+max_step = 100
+
+amr.n_cell = 64 64
+amr.max_grid_size = 32
+amr.max_level = 0
+
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 1.0 1.0
+
+warpx.cfl = 0.999
+warpx.abort_on_warning_threshold = medium
+
+boundary.field_lo = pec pec
+boundary.field_hi = pec pec
+
+# Macroscopic (dielectric) solver: non-dispersive, lossless medium
+algo.em_solver_medium = macroscopic
+macroscopic.epsilon = 1.5*epsilon0
+macroscopic.mu      = mu0
+macroscopic.sigma   = 0
+
+# Initialize the (m, p) = (1, 1) cavity mode through the external B field (E = 0).
+my_constants.Lx = 1.0
+my_constants.Lz = 1.0
+my_constants.m  = 1
+my_constants.p  = 1
+my_constants.kx = m*pi/Lx
+my_constants.kz = p*pi/Lz
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = 0.0
+warpx.By_external_grid_function(x,y,z) = cos(kx*x)*cos(kz*z)
+warpx.Bz_external_grid_function(x,y,z) = 0.0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals  = 100
+diag1.diag_type  = Full
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz
