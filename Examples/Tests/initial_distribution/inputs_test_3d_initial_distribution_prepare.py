@@ -21,10 +21,9 @@ ux_std_data = 0.2 * abs(z)
 uy_std_data = 0.21 * abs(z)
 uz_std_data = 0.22 * abs(z)
 
-
-ux_mean_data = np.zeros_like(x, dtype=np.float64)
-uy_mean_data = 0.2 * (z + 1.0) / 2.0
-uz_mean_data = np.zeros_like(x, dtype=np.float64)
+ux_mean_data = 0.1 * z
+uy_mean_data = 0.12 * z
+uz_mean_data = 0.14 * z
 
 grid_spacing = np.array(
     [

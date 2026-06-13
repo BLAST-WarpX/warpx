@@ -29,7 +29,7 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser velocity_from_file temperature_from_file uniform gaussian_parser
+particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser gaussian_momentum_from_file
 particles.rigid_injected_species = beam
 
 gaussian.charge                     = -q_e
@@ -141,35 +141,6 @@ velocity_parser.ux_mean_function(x,y,z) = "0"
 velocity_parser.uy_mean_function(x,y,z) ="(0.2 - 0.4 * heaviside(z,0)) / sqrt(1 - (0.2 - 0.4 * heaviside(z,0))^2)"
 velocity_parser.uz_mean_function(x,y,z)= "0"
 
-velocity_from_file.charge                     = -q_e
-velocity_from_file.mass                       = m_e
-velocity_from_file.injection_style            = "NRandomPerCell"
-velocity_from_file.num_particles_per_cell     = 1000
-velocity_from_file.profile                    = constant
-velocity_from_file.density                    = 1.0e21
-velocity_from_file.momentum_distribution_type = "maxwellian"
-velocity_from_file.maxwellian_u_std_distribution_type = "constant"
-velocity_from_file.ux_std = 3.1622776601683795e-05
-velocity_from_file.uy_std = 3.1622776601683795e-05
-velocity_from_file.uz_std = 3.1622776601683795e-05
-velocity_from_file.maxwellian_u_mean_distribution_type = "read_from_file"
-velocity_from_file.read_u_mean_from_path = "../test_3d_initial_distribution_prepare/example-u-mean.h5"
-
-temperature_from_file.charge                     = -q_e
-temperature_from_file.mass                       = m_e
-temperature_from_file.injection_style            = "NRandomPerCell"
-temperature_from_file.num_particles_per_cell     = 1000
-temperature_from_file.profile                    = constant
-temperature_from_file.density                    = 1.0e21
-temperature_from_file.momentum_distribution_type = "maxwellian"
-temperature_from_file.maxwellian_u_std_distribution_type = "read_from_file"
-temperature_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
-temperature_from_file.maxwellian_u_mean_distribution_type = "parser"
-temperature_from_file.ux_mean_function(x,y,z) = "0.1*z"
-temperature_from_file.uy_mean_function(x,y,z) = "0.12*z"
-temperature_from_file.uz_mean_function(x,y,z) = "0.14*z"
-
-
 uniform.charge                     = q_e
 uniform.mass                       = m_e
 uniform.injection_style            = "NRandomPerCell"
@@ -199,6 +170,18 @@ gaussian_parser.maxwellian_u_std_distribution_type= "parser"
 gaussian_parser.ux_std_function(x,y,z) = "0.2*abs(z)"
 gaussian_parser.uy_std_function(x,y,z) = "0.21*abs(z)"
 gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
+
+gaussian_momentum_from_file.charge                     = -q_e
+gaussian_momentum_from_file.mass                       = m_e
+gaussian_momentum_from_file.injection_style            = "NRandomPerCell"
+gaussian_momentum_from_file.num_particles_per_cell     = 1000
+gaussian_momentum_from_file.profile                    = constant
+gaussian_momentum_from_file.density                    = 1.0e21
+gaussian_momentum_from_file.momentum_distribution_type = "maxwellian"
+gaussian_momentum_from_file.maxwellian_u_mean_distribution_type= "read_from_file"
+gaussian_momentum_from_file.read_u_mean_from_path = "../test_3d_initial_distribution_prepare/example-u-mean.h5"
+gaussian_momentum_from_file.maxwellian_u_std_distribution_type = "read_from_file"
+gaussian_momentum_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
 
 #################################
 ########## DIAGNOSTIC ###########

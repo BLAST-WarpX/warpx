@@ -358,39 +358,41 @@ print("Maxwellian parser velocity difference:", f7_error)
 
 assert f7_error < tolerance
 
+
 # ==============================================
-# maxwellian with bulk velocity from openpmd file
+# maxwellian with bulk velocity and thermal velocity from openpmd file
 # ==============================================
+def check_standard_normal(u, mean_ref, std_ref, tolerance):
+    r = (u - mean_ref) / std_ref
+    r_mean = np.mean(r)
+    r_std = np.std(r)
+    assert abs(r_mean) < tolerance
+    assert abs(r_std - 1.0) < tolerance
+
+
+z_array = np.linspace(-1.0, 1.0, 8)
+
 ts = OpenPMDTimeSeries("./diags/diag1")
 
-for iteration in ts.iterations:
-    uy, z = ts.get_particle(
-        ["uy", "z"], species="velocity_from_file", iteration=iteration
-    )
+ux, uy, uz, z = ts.get_particle(
+    ["ux", "uy", "uz", "z"],
+    species="gaussian_momentum_from_file",
+    iteration=0,
+)
 
-    uy_theory = 0.2 * (z + 1) / 2
-    norm = np.max(np.abs(uy_theory))
-    rel_err = np.abs(uy - uy_theory) / norm
+ux_mean_interp = np.interp(z, z_array, 0.1 * z_array)
+uy_mean_interp = np.interp(z, z_array, 0.12 * z_array)
+uz_mean_interp = np.interp(z, z_array, 0.14 * z_array)
 
-    assert np.all(rel_err < 1e-3)
+ux_std_interp = np.interp(z, z_array, 0.2 * np.abs(z_array))
+uy_std_interp = np.interp(z, z_array, 0.21 * np.abs(z_array))
+uz_std_interp = np.interp(z, z_array, 0.22 * np.abs(z_array))
 
-# ==============================================
-# maxwellian with thermal velocity spread from openpmd file
-# ==============================================
-ts = OpenPMDTimeSeries("./diags/diag1")
+standard_normal_tolerance = 1e-2
 
-for iteration in ts.iterations:
-    ux, uy, uz, z = ts.get_particle(
-        ["ux", "uy", "uz", "z"], species="temperature_from_file", iteration=iteration
-    )
-
-for u, u_theory in [
-    (ux, 0.2 * np.abs(z)),
-    (uy, 0.21 * np.abs(z)),
-    (uz, 0.22 * np.abs(z)),
-]:
-    rel_err = np.abs(u - u_theory) / np.max(np.abs(u_theory))
-    assert np.all(rel_err < 1e-3)
+check_standard_normal(ux, ux_mean_interp, ux_std_interp, standard_normal_tolerance)
+check_standard_normal(uy, uy_mean_interp, uy_std_interp, standard_normal_tolerance)
+check_standard_normal(uz, uz_mean_interp, uz_std_interp, standard_normal_tolerance)
 
 # ============================================
 # Cuboid distribution in momentum space
