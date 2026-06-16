@@ -44,7 +44,7 @@ computePhiIGF ( amrex::MultiFab const & rho,
     //   Note: we intentionally do NOT grow by phi.nGrowVect() here.
     //   Guard/ghost values of phi are filled by the caller later on,
     //   e.g., in FillBoundary.
-    amrex::Box domain = rho.boxArray().minimalBox();
+    amrex::Box const domain = rho.boxArray().minimalBox();
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
