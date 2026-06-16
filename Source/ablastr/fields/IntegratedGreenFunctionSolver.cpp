@@ -40,9 +40,11 @@ computePhiIGF ( amrex::MultiFab const & rho,
 
     BL_PROFILE("ablastr::fields::computePhiIGF");
 
-    // Define box that encompasses the full domain
+    // Define box that encompasses the valid (nodal) domain of the source.
+    //   Note: we intentionally do NOT grow by phi.nGrowVect() here.
+    //   Guard/ghost values of phi are filled by the caller later on,
+    //   e.g., in FillBoundary.
     amrex::Box domain = rho.boxArray().minimalBox();
-    domain.grow( phi.nGrowVect() ); // include guard cells
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
     {
