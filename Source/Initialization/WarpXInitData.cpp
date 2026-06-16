@@ -1309,8 +1309,9 @@ WarpX::InitLevelData (int lev, Real /*time*/)
 
 #ifdef AMREX_USE_EB
         if (eb_enabled) {
-            // We initialize ECTRhofield consistently with the Efield
-            if (WarpX::UseConformalEBSolve()) {
+            // We initialize ECTRhofield consistently with the Efield (ECT is staggered-only;
+            // the collocated conformal solver has no ECT face circulations).
+            if (WarpX::UseConformalEBSolve() && grid_type != GridType::Collocated) {
                 m_fdtd_solver_fp[lev]->EvolveECTRho(
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
                     m_fields.get_alldirs(FieldType::edge_lengths, lev),
@@ -1337,8 +1338,9 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 lev, PatchType::coarse, m_eb_update_E);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
-                if (WarpX::UseConformalEBSolve()) {
-                    // We initialize ECTRhofield consistently with the Efield
+                if (WarpX::UseConformalEBSolve() && grid_type != GridType::Collocated) {
+                    // We initialize ECTRhofield consistently with the Efield (ECT is
+                    // staggered-only; collocated has no ECT face circulations).
                     m_fdtd_solver_cp[lev]->EvolveECTRho(
                         m_fields.get_alldirs(FieldType::Efield_cp, lev),
                         m_fields.get_alldirs(FieldType::edge_lengths, lev),
@@ -1592,11 +1594,17 @@ void WarpX::InitializeEBGridData (int lev)
 
         auto const eb_fact = fieldEBFactory(lev);
 
+        // Compute the nodal signed distance to the embedded boundary up front: the
+        // collocated conformal mask below is keyed off it, and it is also used by the
+        // level-set field boundary conditions and the particle scrapers. It does not
+        // depend on the (staggered) ECT geometry, so it is valid for every grid type.
+        ComputeDistanceToEB();
+
         if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
         {
             using warpx::fields::FieldType;
 
-            if (WarpX::UseConformalEBSolve()) {
+            if (WarpX::UseConformalEBSolve() && grid_type != GridType::Collocated) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
                 warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
@@ -1633,6 +1641,21 @@ void WarpX::InitializeEBGridData (int lev)
                 // Mark on which grid points B should be updated
                 warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 
+            } else if (WarpX::UseConformalEBSolve()) {
+
+                // Collocated conformal embedded boundary: there are no Yee cut edges/faces,
+                // so the update masks are keyed directly off the nodal signed level set.
+                // The ECT geometry (edge_lengths/face_areas/face extensions) is intrinsically
+                // staggered and is neither computed nor needed here.
+                warpx::embedded_boundary::MarkUpdateCellsNodalLevelSet(
+                    m_eb_update_E[lev],
+                    *m_fields.get(FieldType::distance_to_eb, lev),
+                    Geom(lev).periodicity() );
+                warpx::embedded_boundary::MarkUpdateCellsNodalLevelSet(
+                    m_eb_update_B[lev],
+                    *m_fields.get(FieldType::distance_to_eb, lev),
+                    Geom(lev).periodicity() );
+
             } else {
                 // Mark on which grid points E should be updated (stair-case approximation)
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
@@ -1648,7 +1671,6 @@ void WarpX::InitializeEBGridData (int lev)
 
         }
 
-        ComputeDistanceToEB();
         warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
 
     }

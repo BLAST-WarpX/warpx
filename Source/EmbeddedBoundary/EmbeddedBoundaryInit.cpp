@@ -339,6 +339,45 @@ web::MarkUpdateBCellsECT (
 }
 
 void
+web::MarkUpdateCellsNodalLevelSet (
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update,
+    amrex::MultiFab const& distance_to_eb,
+    const amrex::Periodicity& periodicity )
+{
+    using namespace amrex::literals;
+
+    // Collocated conformal embedded-boundary mask. On a fully-nodal grid every field
+    // component lives at the mesh node, so there is no Yee notion of a fully-covered
+    // cut edge/face. Instead we deactivate exactly the nodes inside the conductor,
+    // keyed off the nodal signed level set (distance_to_eb < 0 in the conductor, 0 on
+    // the surface), and leave every fluid-side node active so the level-set mirror
+    // boundary condition (EBJBoundary) can refine the near-wall values to sub-cell
+    // accuracy. This is the collocated analogue of MarkUpdate{E,B}CellsECT; unlike the
+    // staircase routine, it does not deactivate the whole near-wall band.
+    for (int idim = 0; idim < 3; ++idim) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*eb_update[idim], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+            const amrex::Box& box = mfi.tilebox();
+            amrex::Array4<int> const & eb_update_arr = eb_update[idim]->array(mfi);
+            amrex::Array4<amrex::Real const> const & dist_arr = distance_to_eb.const_array(mfi);
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                // Do not update the field on nodes inside the conductor; those values
+                // are set instead by the level-set mirror boundary condition.
+                eb_update_arr(i, j, k) = (dist_arr(i, j, k) <= 0._rt)? 0 : 1;
+            });
+
+        }
+        // Populate guard cells
+        eb_update[idim]->FillBoundary(periodicity);
+    }
+}
+
+void
 web::MarkExtensionCells (
     const std::array<amrex::Real,3>& cell_size,
     std::array< std::unique_ptr<amrex::iMultiFab>, 3 > & flag_info_face,

@@ -114,6 +114,13 @@ def setup_simulation(
     n_floor_frac=N_FLOOR_FRAC,
     isotropic_resistivity=True,
     isotropic_hyper=True,
+    substeps=SUBSTEPS,
+    substep_rtol=1.0e-3,
+    te=T_E0,
+    bz_rev=BZ_REV,
+    bz_bias=BZ_BIAS,
+    nz=NZ,
+    grid_type="staggered",
 ):
     """Create the PICMI simulation object.
 
@@ -135,13 +142,13 @@ def setup_simulation(
     n_floor = n_floor_frac * N_I
     vth = np.sqrt(constants.q_e * T_I0 / m_i)
 
-    # cell sizes (cubic cells; thin z slab centered on the z = 5 m midplane)
+    # cell sizes (cubic cells; z slab centered on the z = 5 m midplane)
     dx = 2.0 / resolution
-    lz = NZ * dx
+    lz = nz * dx
     zmin, zmax = 5.0 - lz / 2.0, 5.0 + lz / 2.0
 
     # time step from the reversed-field ion cyclotron period
-    w_ci = constants.q_e * abs(BZ_REV) / m_i
+    w_ci = constants.q_e * abs(bz_rev) / m_i
     t_ci = 2.0 * np.pi / w_ci
     dt = f_t_ci * t_ci
 
@@ -149,13 +156,13 @@ def setup_simulation(
     # Chacon-style hyper-resistivity floor; CFL-limited vacuum resistivity
     w_pi = np.sqrt(constants.q_e**2 * N_I / (constants.ep0 * m_i))
     l_i = constants.c / w_pi
-    vA = abs(BZ_REV) / np.sqrt(constants.mu0 * N_I * m_i)
+    vA = abs(bz_rev) / np.sqrt(constants.mu0 * N_I * m_i)
     dL2 = 1.0 / (2.0 / dx**2 + 1.0 / dx**2)  # 1/(1/dx^2+1/dy^2+1/dz^2), cubic
     eta_max = constants.mu0 * dL2 / (2.0 * dt)
     eta_hyper = constants.mu0 * 0.2 * l_i * vA * dL2
 
     grid = picmi.Cartesian3DGrid(
-        number_of_cells=[resolution, resolution, NZ],
+        number_of_cells=[resolution, resolution, nz],
         lower_bound=[-1.0, -1.0, zmin],
         upper_bound=[1.0, 1.0, zmax],
         lower_boundary_conditions=["dirichlet", "dirichlet", "periodic"],
@@ -174,7 +181,7 @@ def setup_simulation(
         verbose=verbose,
     )
     sim.current_deposition_algo = "direct"
-    sim.grid_type = "staggered"
+    sim.grid_type = grid_type
 
     # External reversal field: uniform Bz through A = (-y/2, x/2, 0) * f(t),
     # with the Hermite ramp from the bias to the reversed field in f(t)
@@ -184,7 +191,7 @@ def setup_simulation(
             "Ay_external_function": "0.5*x",
             "Az_external_function": "0",
             "A_time_external_function": hermite_ramp_expression(
-                BZ_BIAS, BZ_REV, TAU_RAMP
+                bz_bias, bz_rev, TAU_RAMP
             ),
         },
     }
@@ -192,11 +199,11 @@ def setup_simulation(
     sim.solver = picmi.HybridPICSolver(
         grid=grid,
         gamma=5.0 / 3.0,
-        Te=T_E0,
+        Te=te,
         n0=N_I,
         n_floor=n_floor,
         plasma_hyper_resistivity=eta_hyper,
-        substeps=SUBSTEPS,
+        substeps=substeps,
         holmstrom_vacuum_region=True if holmstrom else None,
         eb_deposit_fold="reflect" if wall_supported else None,
         eb_rho_dirichlet=False if wall_supported else None,
@@ -209,7 +216,7 @@ def setup_simulation(
         isotropic_resistivity=isotropic_resistivity,
         isotropic_hyper_resistivity=isotropic_hyper,
         use_rkf45=True,
-        substep_rtol=1.0e-3,
+        substep_rtol=substep_rtol,
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
         use_conformal_eb=True,
@@ -373,6 +380,54 @@ def main():
     )
     parser.set_defaults(isotropic_hyper=True)
     parser.add_argument(
+        "--nz",
+        dest="nz",
+        help="number of axial (z) cells in the periodic slab (default 8 = thin "
+        "2D slab; larger lets the liftoff interface relieve axially, closer to "
+        "a full 3D run). Stays one z-box for the conformal EB.",
+        type=int,
+        default=NZ,
+    )
+    parser.add_argument(
+        "--bz-rev",
+        dest="bz_rev",
+        help="reversed (target) external Bz in Tesla (default 1.5; lower = "
+        "gentler compression / less stiff)",
+        type=float,
+        default=BZ_REV,
+    )
+    parser.add_argument(
+        "--bz-bias",
+        dest="bz_bias",
+        help="initial bias external Bz in Tesla (default -0.1)",
+        type=float,
+        default=BZ_BIAS,
+    )
+    parser.add_argument(
+        "--te",
+        dest="te",
+        help="electron temperature in eV (electron pressure / grad-Pe term; "
+        "0 = none, the slab default. A finite Te provides back-pressure that "
+        "stabilizes the compression near stagnation, as in production runs)",
+        type=float,
+        default=T_E0,
+    )
+    parser.add_argument(
+        "--substeps",
+        help="number of RKF45 B-field substeps per ion step (more substeps "
+        "shrink dt_B and relieve the whistler/resistive stiffness that the "
+        "adaptive solver otherwise hits near stagnation)",
+        type=int,
+        default=SUBSTEPS,
+    )
+    parser.add_argument(
+        "--substep-rtol",
+        dest="substep_rtol",
+        help="relative tolerance of the RKF45 substep error controller",
+        type=float,
+        default=1.0e-3,
+    )
+    parser.add_argument(
         "--marder-alpha",
         help="Marder damping factor (with --marder)",
         type=float,
@@ -411,6 +466,13 @@ def main():
         type=int,
         default=0,
     )
+    parser.add_argument(
+        "--grid-type",
+        help="field grid staggering: 'staggered' (Yee, enlarged-cell conformal "
+        "EB) or 'collocated' (nodal, level-set conformal EB)",
+        choices=["staggered", "collocated"],
+        default="staggered",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -423,7 +485,7 @@ def main():
         resolution = args.resolution
         nppc = args.nppc
         m_i = M_AMU * constants.m_p
-        t_ci = 2.0 * np.pi * m_i / (constants.q_e * abs(BZ_REV))
+        t_ci = 2.0 * np.pi * m_i / (constants.q_e * abs(args.bz_rev))
         dt = args.f_tci * t_ci
         max_steps = (
             args.steps if args.steps is not None else int((TAU_RAMP + t_ci) / dt)
@@ -452,6 +514,13 @@ def main():
         args.n_floor_frac,
         args.isotropic_resistivity,
         args.isotropic_hyper,
+        args.substeps,
+        args.substep_rtol,
+        args.te,
+        args.bz_rev,
+        args.bz_bias,
+        args.nz,
+        grid_type=args.grid_type,
     )
     sim.step()
 

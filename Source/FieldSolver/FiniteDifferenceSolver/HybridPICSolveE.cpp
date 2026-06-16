@@ -25,6 +25,8 @@
 
 #include <ablastr/coarsen/sample.H>
 
+#include <type_traits>
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
@@ -1101,6 +1103,48 @@ namespace
         // backward x-difference of d2y(Bz); UpwardDx in Faraday -> d2x d2y Bz
         return cf * (d2y(i) - d2y(i-1));
     }
+
+    // Collocated (nodal) analogues. On a collocated grid the Faraday UpwardD is a
+    // wide centered difference (CartesianNodalAlgorithm), so the uncorrected
+    // resistive diffusion of the out-of-plane B is the WIDE cross stencil
+    // -(sin^2(kx hx) + sin^2(ky hy))/h^2, whose leading cos(4*theta) anisotropy is
+    // (h^2/3)(kx^4+ky^4) -- four times the compact-cross value. The Yee
+    // backward-pre-difference trick does not apply (UpwardD is no longer one-sided),
+    // so the corner is delivered as a compact 2nd difference along one in-plane axis
+    // followed by the nodal centered difference along the other; the wide Faraday
+    // UpwardD then completes the corner. A half (coefficient 1/3) goes through each
+    // in-plane E component, which reproduces the (hxa^2+hxb^2)/3 corner for any cell
+    // aspect ratio (isotropic for cubic cells, consistent otherwise). Returned values
+    // carry 1/mu0; multiply by eta at the call. Validated to round-off by the
+    // collocated --battery resistive unit test.
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEx_3D_Nodal (
+        amrex::Array4<amrex::Real const> const& Bz,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // dEx = (1/3)(1/mu0) Dn_y( d2x(Bz) ); Dn_y is the nodal centered difference.
+        auto const d2x = [&] (int jj) {
+            return Bz(i+1,jj,k) - 2._rt*Bz(i,jj,k) + Bz(i-1,jj,k);
+        };
+        return (inv_mu0/3._rt) * (0.5_rt/dx[1]) * (d2x(j+1) - d2x(j-1));
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEy_3D_Nodal (
+        amrex::Array4<amrex::Real const> const& Bz,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // dEy = -(1/3)(1/mu0) Dn_x( d2y(Bz) )
+        auto const d2y = [&] (int ii) {
+            return Bz(ii,j+1,k) - 2._rt*Bz(ii,j,k) + Bz(ii,j-1,k);
+        };
+        return -(inv_mu0/3._rt) * (0.5_rt/dx[0]) * (d2y(i+1) - d2y(i-1));
+    }
 #elif defined(WARPX_DIM_XZ)
     // 2D XZ: By corner delivered through Ex and Ez (curl_y). a=x, b=z (j index).
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -1138,6 +1182,39 @@ namespace
         };
         return cf * (d2z(i) - d2z(i-1));
     }
+
+    // Collocated (nodal) analogues for 2D XZ (out-of-plane By, in-plane x and z).
+    // Same wide-Faraday reasoning as the 3D nodal pair; the in-plane axes are x (i)
+    // and z (j). Sign convention matches the Yee XZ pair (Ex half negative, Ez half
+    // positive), set by the curl_y topology dBy/dt = UpwardDx(Ez) - UpwardDz(Ex).
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEx_XZ_Nodal (
+        amrex::Array4<amrex::Real const> const& By,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // dEx = -(1/3)(1/mu0) Dn_z( d2x(By) ); the -UpwardDz(Ex) in Faraday -> +corner
+        auto const d2x = [&] (int jj) {
+            return By(i+1,jj,k) - 2._rt*By(i,jj,k) + By(i-1,jj,k);
+        };
+        return -(inv_mu0/3._rt) * (0.5_rt/dx[1]) * (d2x(j+1) - d2x(j-1));
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CornerResistiveEz_XZ_Nodal (
+        amrex::Array4<amrex::Real const> const& By,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& dx,
+        amrex::Real const inv_mu0)
+    {
+        using namespace amrex::literals;
+        // dEz = +(1/3)(1/mu0) Dn_x( d2z(By) ); the +UpwardDx(Ez) in Faraday -> +corner
+        auto const d2z = [&] (int ii) {
+            return By(ii,j+1,k) - 2._rt*By(ii,j,k) + By(ii,j-1,k);
+        };
+        return (inv_mu0/3._rt) * (0.5_rt/dx[0]) * (d2z(i+1) - d2z(i-1));
+    }
 #endif
 }
 
@@ -1170,9 +1247,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
-    // isotropized hyper-resistivity Laplacian (Mehrstellen / Patra-Karttunen)
+    // isotropized hyper-resistivity Laplacian (Mehrstellen / Patra-Karttunen).
+    // LaplacianIsotropic is a centered compact stencil keyed off the field's own
+    // neighbours, so it is correct for both the Yee (edge-centered) and the
+    // collocated (nodal) staggerings with no change.
     const bool iso_hyper = hybrid_model->m_isotropic_hyper_resistivity;
-    // isotropized resistive diffusion (corner-curl E correction)
+    // isotropized resistive diffusion (corner-curl E correction). Two stencils:
+    // the Yee corner (one-sided Faraday UpwardD) and the nodal corner (wide centered
+    // Faraday UpwardD); the call sites below select via T_Algo. Both isotropize the
+    // in-plane resistive diffusion of the out-of-plane B and preserve div(B) exactly.
     const bool iso_resistivity = hybrid_model->m_isotropic_resistivity;
     const amrex::Real inv_mu0 = 1._rt/PhysConst::mu0;
     amrex::GpuArray<amrex::Real, 3> dx_arr{};
@@ -1429,12 +1512,28 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // correction; div(B) preserved (added through E).
                 if (iso_resistivity) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+                    // Runtime if (not if constexpr): nvcc forbids an extended
+                    // __device__ lambda from first-capturing a variable inside a
+                    // constexpr-if. The condition is still compile-time constant,
+                    // so the dead branch is pruned.
+                    const bool nodal_grid =
+                        std::is_same_v<T_Algo, CartesianNodalAlgorithm>;
 #if defined(WARPX_DIM_3D)
-                    Ex(i, j, k) += eta_val
-                        * ::CornerResistiveEx_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    if (nodal_grid) {
+                        Ex(i, j, k) += eta_val
+                            * ::CornerResistiveEx_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0);
+                    } else {
+                        Ex(i, j, k) += eta_val
+                            * ::CornerResistiveEx_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    }
 #elif defined(WARPX_DIM_XZ)
-                    Ex(i, j, k) += eta_val
-                        * ::CornerResistiveEx_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    if (nodal_grid) {
+                        Ex(i, j, k) += eta_val
+                            * ::CornerResistiveEx_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0);
+                    } else {
+                        Ex(i, j, k) += eta_val
+                            * ::CornerResistiveEx_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    }
 #endif
                 }
             }
@@ -1513,8 +1612,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 #if defined(WARPX_DIM_3D)
                 if (iso_resistivity) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
-                    Ey(i, j, k) += eta_val
-                        * ::CornerResistiveEy_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
+                        Ey(i, j, k) += eta_val
+                            * ::CornerResistiveEy_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0);
+                    } else {
+                        Ey(i, j, k) += eta_val
+                            * ::CornerResistiveEy_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    }
                 }
 #endif
             }
@@ -1593,8 +1697,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 #if defined(WARPX_DIM_XZ)
                 if (iso_resistivity) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
-                    Ez(i, j, k) += eta_val
-                        * ::CornerResistiveEz_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
+                        Ez(i, j, k) += eta_val
+                            * ::CornerResistiveEz_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0);
+                    } else {
+                        Ez(i, j, k) += eta_val
+                            * ::CornerResistiveEz_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
+                    }
                 }
 #endif
             }

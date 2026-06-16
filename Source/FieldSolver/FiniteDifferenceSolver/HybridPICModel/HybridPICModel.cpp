@@ -106,9 +106,10 @@ void HybridPICModel::ReadParameters ()
 #endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
             "hybrid_pic_model.use_conformal_eb requires embedded boundaries to be enabled");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            WarpX::grid_type != ablastr::utils::enums::GridType::Collocated,
-            "hybrid_pic_model.use_conformal_eb requires a staggered grid");
+        // Both grid types are supported: a staggered grid uses the enlarged-cell (ECT)
+        // Faraday update on Yee cut faces/edges, while a collocated grid uses the masked
+        // nodal Faraday update with the level-set mirror boundary condition. The nodal
+        // path is keyed off the signed level set rather than the (staggered) ECT geometry.
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::field_boundary_lo[idim] != FieldBoundaryType::PML &&
@@ -189,9 +190,14 @@ void HybridPICModel::ReadParameters ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_marder_substep_interval >= 1,
             "hybrid_pic_model.marder_substep_interval must be >= 1");
+#if defined(WARPX_DIM_RZ)
+        // The collocated Marder stencils (centered node-to-node grad/div) are
+        // derived and validated for Cartesian geometry only; RZ keeps the
+        // staggered requirement.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             WarpX::grid_type != ablastr::utils::enums::GridType::Collocated,
-            "hybrid_pic_model.marder_alpha requires a staggered grid");
+            "hybrid_pic_model.marder_alpha requires a staggered grid in RZ geometry");
+#endif
     }
 }
 
@@ -1265,10 +1271,13 @@ void HybridPICModel::FieldPush (
                    MarderSite::Substep);
 
 #ifdef AMREX_USE_EB
-    // With the conformal embedded-boundary update, recompute the face-centered
-    // electromotive-force density (ECTRhofield) from the new E-field so that
-    // the following Faraday push uses circulations consistent with Ohm's law.
-    if (m_use_conformal_eb) {
+    // With the conformal embedded-boundary update on a staggered grid, recompute the
+    // face-centered electromotive-force density (ECTRhofield) from the new E-field so
+    // that the following Faraday push uses circulations consistent with Ohm's law. The
+    // collocated conformal path uses the masked nodal Faraday curl instead (no ECT
+    // circulations), so this staggered-only precompute is skipped there.
+    if (m_use_conformal_eb &&
+        WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
             warpx.get_pointer_fdtd_solver_fp(lev)->EvolveECTRho(
                 Efield[lev],
@@ -1283,4 +1292,31 @@ void HybridPICModel::FieldPush (
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);
     warpx.FillBoundaryB(ng, nodal_sync);
+
+#ifdef AMREX_USE_EB
+    // On the collocated conformal path there is no enlarged-cell (ECT) extension to
+    // impose the wall condition on B during the Faraday push -- EvolveBCartesianECT
+    // does that on the staggered grid, whereas the collocated push is the unmasked
+    // nodal curl. Enforce the PEC condition on the freshly pushed B directly from the
+    // level set, with the magnetic parity (normal odd / tangential even, flux-excluding
+    // PEC), so the masked covered nodes are wall-consistent for the next substep's
+    // curl(B) plasma current. (The FillBoundaryB above gives the mirror gather valid
+    // ghost values; a second exchange below propagates the filled covered values.)
+    if (m_use_conformal_eb &&
+        WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        auto const& eb_update_B = warpx.GetEBUpdateBFlag();
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
+            warpx::hybrid::ApplyPECBoundaryToField(
+                warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                eb_update_B[lev],
+                *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+                warpx.Geom(lev),
+                m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
+                /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                &m_eb_bc_status_B[lev]);
+        }
+        warpx.FillBoundaryB(ng, nodal_sync);
+    }
+#endif
 }

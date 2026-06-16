@@ -93,12 +93,25 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
     const auto dx = geom.CellSizeArray();
     const Real rho_floor = m_n_floor * PhysConst::q_e;
 
-    // The discrete grad(div) operator scales as 1/min(dx)^2, so the
-    // dimensionless user alpha is scaled by h_min^2 to give a CFL-like
-    // stable damping factor.
+    // On a collocated (nodal) grid every field component lives at the mesh node,
+    // so the discrete grad(Pe) building E_target and the grad(div_err) of the
+    // fixed-point update are centered node-to-node differences rather than the
+    // one-sided node-to-edge differences of the Yee staggering. ComputeDivE
+    // already selects the centered nodal divergence for this grid type, and the
+    // centered gradient is its adjoint, so grad(div) stays a convergent Laplacian.
+    const bool nodal_grid =
+        (WarpX::grid_type == ablastr::utils::enums::GridType::Collocated);
+
+    // The explicit grad(div) update is CFL-limited by the largest eigenvalue of
+    // the discrete operator. The Yee compact Laplacian peaks at 4*D/h^2 while the
+    // collocated centered (wide) Laplacian peaks at D/h^2 -- four times smaller --
+    // so the nodal grid admits (and needs, for the same damping per sweep) four
+    // times the step. Scaling alpha_scaled by that ratio makes the user's
+    // marder_alpha mean the same fraction of the CFL limit on both grids.
     Real h_min = dx[0];
     for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_min = std::min(h_min, dx[d]); }
-    const Real alpha_scaled = alpha_v * h_min * h_min;
+    const Real alpha_scaled =
+        alpha_v * h_min * h_min * (nodal_grid ? 4.0_rt : 1.0_rt);
 
     amrex::GpuArray<Real, AMREX_SPACEDIM> inv_dx{};
     for (int d = 0; d < AMREX_SPACEDIM; ++d) { inv_dx[d] = 1.0_rt/dx[d]; }
@@ -115,12 +128,15 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
 
     auto* fdtd = warpx.get_pointer_fdtd_solver_fp(lev);
 
-    // Nodal scratch for the divergence target and the masked divergence
-    // error. No ghost cells are needed: the edge update at a valid edge
-    // reads only valid nodal values.
+    // Nodal scratch for the divergence target and the masked divergence error.
+    // The Yee edge update at a valid edge reads only valid nodal values, so it
+    // needs no ghosts; the collocated update is a centered node-to-node gradient
+    // that reaches one node past a box boundary, so div_err carries one ghost
+    // layer (filled below) on a collocated grid.
+    const IntVect div_err_ng = nodal_grid ? IntVect(1) : IntVect::TheZeroVector();
     auto const& nodal_ba = amrex::convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab div_target(nodal_ba, rhofield.DistributionMap(), 1, IntVect::TheZeroVector());
-    MultiFab div_err(nodal_ba, rhofield.DistributionMap(), 1, IntVect::TheZeroVector());
+    MultiFab div_err(nodal_ba, rhofield.DistributionMap(), 1, div_err_ng);
 
     // ---------------------------------------------------------------------
     // Assemble the divergence target
@@ -274,21 +290,27 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
                     const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i+1, j, k) - Pe(i, j, k))*inv_dx[0];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i+1, j, k) - Pe(i-1, j, k))*(0.5_rt*inv_dx[0])
+                        : (Pe(i+1, j, k) - Pe(i, j, k))*inv_dx[0];
                     const Real enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
                     Etx(i, j, k) = (enE_x - grad_Pe)/rho_lim;
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
                     const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i, j+1, k) - Pe(i, j, k))*inv_dx[1];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i, j+1, k) - Pe(i, j-1, k))*(0.5_rt*inv_dx[1])
+                        : (Pe(i, j+1, k) - Pe(i, j, k))*inv_dx[1];
                     const Real enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
                     Ety(i, j, k) = (enE_y - grad_Pe)/rho_lim;
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
                     const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i, j, k+1) - Pe(i, j, k))*inv_dx[2];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i, j, k+1) - Pe(i, j, k-1))*(0.5_rt*inv_dx[2])
+                        : (Pe(i, j, k+1) - Pe(i, j, k))*inv_dx[2];
                     const Real enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
                     Etz(i, j, k) = (enE_z - grad_Pe)/rho_lim;
                 });
@@ -313,7 +335,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                     const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i, j+1, 0) - Pe(i, j, 0))*inv_dx[1];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i, j+1, 0) - Pe(i, j-1, 0))*(0.5_rt*inv_dx[1])
+                        : (Pe(i, j+1, 0) - Pe(i, j, 0))*inv_dx[1];
                     const Real enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
                     Etz(i, j, 0) = (enE_z - grad_Pe)/rho_lim;
                 });
@@ -322,7 +346,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                     const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, 0, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i+1, j, 0) - Pe(i, j, 0))*inv_dx[0];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i+1, j, 0) - Pe(i-1, j, 0))*(0.5_rt*inv_dx[0])
+                        : (Pe(i+1, j, 0) - Pe(i, j, 0))*inv_dx[0];
                     const Real enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, 0, 0);
                     Etx(i, j, 0) = (enE_x - grad_Pe)/rho_lim;
                 },
@@ -335,7 +361,9 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                     const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
                     const Real rho_lim = std::max(rho_val, rho_floor);
-                    const Real grad_Pe = (Pe(i, j+1, 0) - Pe(i, j, 0))*inv_dx[1];
+                    const Real grad_Pe = nodal_grid
+                        ? (Pe(i, j+1, 0) - Pe(i, j-1, 0))*(0.5_rt*inv_dx[1])
+                        : (Pe(i, j+1, 0) - Pe(i, j, 0))*inv_dx[1];
                     const Real enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, 0, 2);
                     Etz(i, j, 0) = (enE_z - grad_Pe)/rho_lim;
                 });
@@ -423,8 +451,16 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
         final_resid = resid;
         if (resid < atol_v || resid < rtol_v*resid0) { break; }
 
-        // Staggered update, restricted to edges that lie in the transition
-        // band and that the EB mask flags as solution edges.
+        // The collocated update's centered grad(div_err) reads one node past a
+        // box boundary, so propagate the masked error into the ghost layer.
+        if (nodal_grid) {
+            ablastr::utils::communication::FillBoundary(
+                div_err, div_err_ng, WarpX::do_single_precision_comms,
+                geom.periodicity());
+        }
+
+        // Update restricted to nodes/edges that lie in the transition band and
+        // that the EB mask flags as solution points.
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -452,19 +488,25 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                     if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
                     const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
-                    Ex(i, j, k) += alpha_scaled*(derr(i+1, j, k) - derr(i, j, k))*inv_dx[0];
+                    Ex(i, j, k) += nodal_grid
+                        ? alpha_scaled*(derr(i+1, j, k) - derr(i-1, j, k))*(0.5_rt*inv_dx[0])
+                        : alpha_scaled*(derr(i+1, j, k) - derr(i, j, k))*inv_dx[0];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
                     if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
                     const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
-                    Ey(i, j, k) += alpha_scaled*(derr(i, j+1, k) - derr(i, j, k))*inv_dx[1];
+                    Ey(i, j, k) += nodal_grid
+                        ? alpha_scaled*(derr(i, j+1, k) - derr(i, j-1, k))*(0.5_rt*inv_dx[1])
+                        : alpha_scaled*(derr(i, j+1, k) - derr(i, j, k))*inv_dx[1];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
                     if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
                     const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
-                    Ez(i, j, k) += alpha_scaled*(derr(i, j, k+1) - derr(i, j, k))*inv_dx[2];
+                    Ez(i, j, k) += nodal_grid
+                        ? alpha_scaled*(derr(i, j, k+1) - derr(i, j, k-1))*(0.5_rt*inv_dx[2])
+                        : alpha_scaled*(derr(i, j, k+1) - derr(i, j, k))*inv_dx[2];
                 });
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
             // In-plane components only: the out-of-plane component (Etheta
@@ -476,13 +518,17 @@ std::pair<int, amrex::Real> HybridPICModel::ApplyMarderCorrection (
                     if (update_Ex_arr && update_Ex_arr(i, j, 0) == 0) { return; }
                     const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, 0, 0);
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
-                    Ex(i, j, 0) += alpha_scaled*(derr(i+1, j, 0) - derr(i, j, 0))*inv_dx[0];
+                    Ex(i, j, 0) += nodal_grid
+                        ? alpha_scaled*(derr(i+1, j, 0) - derr(i-1, j, 0))*(0.5_rt*inv_dx[0])
+                        : alpha_scaled*(derr(i+1, j, 0) - derr(i, j, 0))*inv_dx[0];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
                     if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
                     const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
                     if (rho_val <= 0.0_rt || rho_val > rho_floor) { return; }
-                    Ez(i, j, 0) += alpha_scaled*(derr(i, j+1, 0) - derr(i, j, 0))*inv_dx[1];
+                    Ez(i, j, 0) += nodal_grid
+                        ? alpha_scaled*(derr(i, j+1, 0) - derr(i, j-1, 0))*(0.5_rt*inv_dx[1])
+                        : alpha_scaled*(derr(i, j+1, 0) - derr(i, j, 0))*inv_dx[1];
                 });
 #endif
         }

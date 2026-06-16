@@ -154,3 +154,53 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+# Collocated (nodal) conformal-EB batteries: the masked nodal Faraday update with
+# the level-set mirror BC, and the nodal isotropization stencils.
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_embedded_boundary_collocated_picmi  # name
+        3  # dims
+        2  # nprocs
+        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_marder_collocated_picmi  # name
+        3  # dims
+        2  # nprocs
+        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery marder --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_hyper_resistivity_collocated_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery hyper --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_resistivity_collocated_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery resistive --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()

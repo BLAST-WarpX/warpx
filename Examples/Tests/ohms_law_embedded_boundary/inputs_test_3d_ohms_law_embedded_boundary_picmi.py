@@ -67,7 +67,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(geometry, hyper=False, resistive=False):
+def setup_simulation(geometry, hyper=False, resistive=False, grid_type="staggered"):
     # The hyper and resistive batteries need a single box: the species-free
     # deck allocates the plasma current with zero ghost cells, so the
     # isotropization stencils must not straddle a box seam.
@@ -92,7 +92,7 @@ def setup_simulation(geometry, hyper=False, resistive=False):
         verbose=0,
     )
     sim.current_deposition_algo = "direct"
-    sim.grid_type = "staggered"
+    sim.grid_type = grid_type
 
     sim.solver = picmi.HybridPICSolver(
         grid=grid,
@@ -1054,6 +1054,414 @@ def run_resistive_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Collocated (nodal) batteries. On a collocated grid every field component lives
+# at the mesh node, so the conformal embedded boundary uses the masked nodal
+# Faraday update with the level-set mirror BC, and the isotropization operators
+# use their nodal (centered, "wide") stencils. These batteries mirror the Yee
+# ones above but with the nodal closed forms.
+# ----------------------------------------------------------------------------
+def run_eb_collocated_battery(sim):
+    """Planar-wall level-set mirror BC on a fully-nodal E field: tangential odd,
+    normal even, deep-interior zero, fluid untouched."""
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    c = 2.0
+    x_node = LO + np.arange(N_XY + 1) * H
+    s_node = X_WALL - x_node  # > 0 fluid, < 0 conductor; every component is nodal
+
+    def node_rows(lo, hi):
+        return [i for i in range(N_XY + 1) if lo < s_node[i] / H <= hi]
+
+    Ex = fields.ExFPWrapper()
+    Ey = fields.EyFPWrapper()
+    Ez = fields.EzFPWrapper()
+
+    # tangential Ey: odd mirror
+    Ex[...] = 0.0
+    Ez[...] = 0.0
+    Ey[...] = c
+    wx.hybrid_apply_eb_boundary_to_edge_field("Efield_fp", 0)
+    ey = np.asarray(Ey[...])
+    ck.close(
+        "nodal E tangential: fluid untouched", ey[node_rows(0.05, 50.0), :, :], c, 0.0
+    )
+    for i in node_rows(-1.0, -0.05):
+        ck.close(
+            f"nodal E tangential: odd mirror at s={s_node[i] / H:+.2f}h",
+            ey[i, :, :],
+            vector_ratio(s_node[i]) * c,
+            1e-12,
+        )
+    ck.close(
+        "nodal E tangential: deep interior zero",
+        ey[node_rows(-100.0, -1.0), :, :],
+        0.0,
+        0.0,
+    )
+
+    # normal Ex: even mirror (poke junk into covered near-wall nodes first)
+    Ex[...] = c
+    Ey[...] = 0.0
+    Ez[...] = 0.0
+    for i in node_rows(-1.0, -0.05):
+        Ex[i, :, :] = 1.0e6
+    wx.hybrid_apply_eb_boundary_to_edge_field("Efield_fp", 0)
+    ex = np.asarray(Ex[...])
+    ck.close("nodal E normal: fluid untouched", ex[node_rows(0.05, 50.0), :, :], c, 0.0)
+    for i in node_rows(-1.0, -0.05):
+        ck.close(
+            f"nodal E normal: even mirror reproduces c at s={s_node[i] / H:+.2f}h",
+            ex[i, :, :],
+            c,
+            1e-12,
+        )
+    ck.close(
+        "nodal E normal: deep interior zero",
+        ex[node_rows(-100.0, -1.0), :, :],
+        0.0,
+        0.0,
+    )
+
+    # selectivity: a spatially varying field is bit-identical in the fluid
+    shape = np.asarray(Ey[...]).shape
+    ii, jj, kk = np.meshgrid(
+        np.arange(shape[0]), np.arange(shape[1]), np.arange(shape[2]), indexing="ij"
+    )
+    Ey[...] = 1.0 + 0.17 * ii + 0.11 * jj + 0.013 * kk
+    Ex[...] = 0.0
+    Ez[...] = 0.0
+    before = np.array(Ey[...])
+    wx.hybrid_apply_eb_boundary_to_edge_field("Efield_fp", 0)
+    after = np.asarray(Ey[...])
+    i_fluid = node_rows(0.05, 50.0)
+    ck.close(
+        "nodal selectivity: varying field bit-identical in fluid",
+        after[i_fluid, :, :],
+        before[i_fluid, :, :],
+        0.0,
+    )
+
+    ck.finish()
+
+
+def _nodal_interior_z():
+    # nodal z is periodic with a duplicate node (node N_Z == node 0); restrict
+    # the z comparison to interior nodes whose stencil never reaches it
+    return slice(2, max(3, N_Z - 1))
+
+
+def run_hyper_collocated_battery(sim):
+    """Nodal iso-hyper: E == -eta_h*lap_iso(Jz) (27-pt Patra-Karttunen) to
+    round-off, differs from the cross stencil, axis/diagonal anisotropy killed."""
+    wx = sim.extension.warpx
+    ck = CheckSet()
+
+    rho = fields.RhoFPWrapper()
+    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
+    for w in (
+        fields.BxFPWrapper(),
+        fields.ByFPWrapper(),
+        fields.BzFPWrapper(),
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+        fields.JxFPPlasmaWrapper(),
+        fields.JyFPPlasmaWrapper(),
+        fields.JzFPPlasmaWrapper(),
+    ):
+        w[...] = 0.0
+    Jpz = fields.JzFPPlasmaWrapper()
+    Ez = fields.EzFPWrapper()
+
+    def d2(a, ax):
+        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
+
+    def lap_cross(a):
+        return (d2(a, 0) + d2(a, 1) + d2(a, 2)) / H**2
+
+    def lap_iso(a):
+        cxy = d2(d2(a, 0), 1)
+        cxz = d2(d2(a, 0), 2)
+        cyz = d2(d2(a, 1), 2)
+        txyz = d2(cxy, 2)
+        return lap_cross(a) + (cxy + cxz + cyz) / (6.0 * H**2) + txyz / (30.0 * H**2)
+
+    interior = (slice(4, 21), slice(2, 31), _nodal_interior_z())
+    rng = np.random.RandomState(2024)
+    jz = rng.rand(*np.asarray(Jpz[...]).shape) - 0.5
+    Jpz[...] = jz
+    wx.hybrid_solve_e(True)
+    ez = np.asarray(Ez[...])
+    expected = -ETA_H * lap_iso(jz)
+    scale = float(np.max(np.abs(expected[interior])))
+    ck.close(
+        "nodal hyper: matches 27-pt Patra-Karttunen closed form",
+        ez[interior] / scale,
+        expected[interior] / scale,
+        1e-12,
+    )
+    d_cross = float(
+        np.max(np.abs(ez[interior] + ETA_H * lap_cross(jz)[interior])) / scale
+    )
+    ck.expect(
+        "nodal hyper: differs from the cross stencil (teeth)",
+        d_cross > 1e-3,
+        f"rel dev = {d_cross:.3e}",
+    )
+
+    # plane-wave anisotropy suppression
+    shape = np.asarray(Jpz[...]).shape
+    xn = LO + np.arange(shape[0]) * H
+    yn = LO + np.arange(shape[1]) * H
+    zc = (np.arange(shape[2]) + 0.5) * H - N_Z * H / 2
+    X, Y, Z = np.meshgrid(xn, yn, zc, indexing="ij")
+    kmag = 1.0 / H
+
+    def solver_rate(jf):
+        Jpz[...] = jf
+        wx.hybrid_solve_e(True)
+        lam = (np.asarray(Ez[...]) / (ETA_H * jf))[interior]
+        return float(np.median(lam[np.abs(jf[interior]) > 0.5]))
+
+    def stencil_rate(lap, jf):
+        lam = (-lap(jf) / jf)[interior]
+        return float(np.median(lam[np.abs(jf[interior]) > 0.5]))
+
+    ja = np.cos(kmag * X)
+    jd = np.cos(kmag * (X + Y) / np.sqrt(2.0))
+    aniso_iso = abs(solver_rate(ja) - solver_rate(jd)) / kmag**2
+    aniso_cross = (
+        abs(stencil_rate(lap_cross, ja) - stencil_rate(lap_cross, jd)) / kmag**2
+    )
+    ck.expect(
+        "nodal hyper: axis/diagonal damping anisotropy suppressed (>= 4x at kh=1)",
+        aniso_iso < 0.25 * aniso_cross,
+        f"aniso(iso)/aniso(cross) = {aniso_iso / max(aniso_cross, 1e-300):.4f}",
+    )
+
+    ck.finish()
+
+
+def run_resistive_collocated_battery(sim):
+    """Nodal iso-resistivity corner-curl: with all currents zero the solver E is
+    only the corner correction; it matches the derived nodal stencil to round-off,
+    the emergent operator is isotropic, and it vanishes on quadratics."""
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    mu0 = constants.mu0
+
+    rho = fields.RhoFPWrapper()
+    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
+    for w in (
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+        fields.JxFPPlasmaWrapper(),
+        fields.JyFPPlasmaWrapper(),
+        fields.JzFPPlasmaWrapper(),
+        fields.BxFPWrapper(),
+        fields.ByFPWrapper(),
+        fields.ExFPWrapper(),
+        fields.EyFPWrapper(),
+        fields.EzFPWrapper(),
+    ):
+        w[...] = 0.0
+    Bz = fields.BzFPWrapper()
+    shp = np.asarray(Bz[...]).shape
+
+    def set_bz(prof2d):
+        Bz[...] = np.broadcast_to(prof2d[:, :, None], shp).copy()
+
+    def Dn(F, ax):
+        return (np.roll(F, -1, ax) - np.roll(F, 1, ax)) / (2.0 * H)
+
+    def d2(F, ax):
+        return np.roll(F, -1, ax) - 2.0 * F + np.roll(F, 1, ax)
+
+    ii = (slice(5, 20), slice(5, 28), _nodal_interior_z())
+
+    rng = np.random.RandomState(7)
+    bz2 = rng.rand(shp[0], shp[1]) - 0.5
+    set_bz(bz2)
+    wx.hybrid_solve_e(True)
+    Ex = np.asarray(fields.ExFPWrapper()[...])
+    Ey = np.asarray(fields.EyFPWrapper()[...])
+    bz3 = np.broadcast_to(bz2[:, :, None], shp)
+    Ex_expect = ETA_R * (1.0 / mu0) * (1.0 / 3.0) * Dn(d2(bz3, 0), 1)
+    Ey_expect = -ETA_R * (1.0 / mu0) * (1.0 / 3.0) * Dn(d2(bz3, 1), 0)
+    sx = float(np.max(np.abs(Ex_expect[ii]))) + 1e-300
+    sy = float(np.max(np.abs(Ey_expect[ii]))) + 1e-300
+    ck.close(
+        "nodal resistive: Ex matches the derived corner stencil",
+        Ex[ii] / sx,
+        Ex_expect[ii] / sx,
+        1e-12,
+    )
+    ck.close(
+        "nodal resistive: Ey matches the derived corner stencil",
+        Ey[ii] / sy,
+        Ey_expect[ii] / sy,
+        1e-12,
+    )
+
+    # emergent operator (wide cross + corner) isotropic vs the uncorrected cross
+    xs = np.arange(shp[0]) * H
+    ys = np.arange(shp[1]) * H
+    X, Y = np.meshgrid(xs, ys, indexing="ij")
+    kmag = 1.0 / H
+
+    def wide_cross(F):
+        return Dn(Dn(F, 0), 0) + Dn(Dn(F, 1), 1)
+
+    def emergent_rate(prof2d):
+        set_bz(prof2d)
+        wx.hybrid_solve_e(True)
+        ex = np.asarray(fields.ExFPWrapper()[...])
+        ey = np.asarray(fields.EyFPWrapper()[...])
+        b3 = np.broadcast_to(prof2d[:, :, None], shp)
+        op = wide_cross(b3) + (mu0 / ETA_R) * (Dn(ex, 1) - Dn(ey, 0))
+        lam = (op / b3)[ii]
+        return float(np.median(lam[np.abs(b3[ii]) > 0.5]))
+
+    def wide_rate(prof2d):
+        b3 = np.broadcast_to(prof2d[:, :, None], shp)
+        lam = (wide_cross(b3) / b3)[ii]
+        return float(np.median(lam[np.abs(b3[ii]) > 0.5]))
+
+    ja = np.cos(kmag * X)
+    jd = np.cos(kmag * (X + Y) / np.sqrt(2.0))
+    aniso_iso = abs(emergent_rate(ja) - emergent_rate(jd)) / kmag**2
+    aniso_cross = abs(wide_rate(ja) - wide_rate(jd)) / kmag**2
+    ck.expect(
+        "nodal resistive: axis/diagonal anisotropy suppressed (>= 4x at kh=1)",
+        aniso_iso < 0.25 * aniso_cross,
+        f"aniso(iso)/aniso(cross) = {aniso_iso / max(aniso_cross, 1e-300):.4f}",
+    )
+
+    set_bz(X**2)
+    wx.hybrid_solve_e(True)
+    ex = np.asarray(fields.ExFPWrapper()[...])
+    ck.close(
+        "nodal resistive: correction vanishes on quadratics",
+        ex[ii],
+        0.0,
+        1e-9 * float(np.max(np.abs(ex))) + 1e-12,
+    )
+
+    ck.finish()
+
+
+def run_marder_collocated_battery(sim):
+    """Nodal Marder: the centered grad/div port converges, modifies only the
+    transition band, and decreases the residual monotonically."""
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    q_e = constants.q_e
+    RHO_FLOOR = 1.0e16 * q_e
+    RHO_DENSE = 1.0e18 * q_e
+    RHO_TRANS = 0.5e16 * q_e
+    I_DENSE_END, I_TRANS_END = 8, 16
+
+    rho_prof = np.zeros(N_XY + 1)
+    rho_prof[:I_DENSE_END] = RHO_DENSE
+    rho_prof[I_DENSE_END:I_TRANS_END] = RHO_TRANS
+    pe_prof = np.zeros(N_XY + 1)
+    i_nodes = np.arange(I_TRANS_END + 1)
+    pe_prof[: I_TRANS_END + 1] = np.cos(np.pi * i_nodes / (2 * I_TRANS_END)) ** 2
+
+    rho = fields.RhoFPWrapper()
+    pe = fields.ElectronPressureFPWrapper()
+    r = np.asarray(rho[...])
+    bcast = (
+        (slice(None), None, None, None) if r.ndim == 4 else (slice(None), None, None)
+    )
+    rho[...] = np.broadcast_to(rho_prof[bcast], r.shape)
+    pe[...] = np.broadcast_to(pe_prof[bcast], np.asarray(pe[...]).shape)
+
+    Ex = fields.ExFPWrapper()
+    Ey = fields.EyFPWrapper()
+    Ez = fields.EzFPWrapper()
+    for w in (
+        fields.BxFPWrapper(),
+        fields.ByFPWrapper(),
+        fields.BzFPWrapper(),
+        fields.JxFPWrapper(),
+        fields.JyFPWrapper(),
+        fields.JzFPWrapper(),
+    ):
+        w[...] = 0.0
+
+    band_node = (rho_prof > 0.0) & (rho_prof <= RHO_FLOOR)
+    band_rows = [i for i in range(N_XY + 1) if band_node[i]]
+    dense_rows = [i for i in range(1, N_XY) if rho_prof[i] > RHO_FLOOR]
+    vac_rows = [i for i in range(N_XY) if rho_prof[i] <= 0.0 and 17 <= i <= 21]
+
+    def set_baseline(amp, seed):
+        rng = np.random.RandomState(seed)
+        for w in (Ex, Ey, Ez):
+            a = np.zeros(np.asarray(w[...]).shape)
+            a[band_rows, :, :] += amp * (rng.rand(len(band_rows), *a.shape[1:]) - 0.5)
+            w[...] = a
+
+    set_baseline(1.0, seed=42)
+    n_iter, resid = wx.hybrid_marder_correct_e(
+        0, alpha=0.1, max_iterations=500, rtol=1e-2
+    )
+    ck.expect(
+        "nodal marder: converges before the iteration cap",
+        n_iter < 500,
+        f"n_iter={n_iter}",
+    )
+
+    Ex[...] = 1.0e5
+    Ey[...] = 2.0e5
+    Ez[...] = 0.0
+    before = np.array(Ex[...])
+    wx.hybrid_marder_correct_e(0, alpha=0.1, max_iterations=50, rtol=0.0)
+    ex = np.asarray(Ex[...])
+    ck.close(
+        "nodal marder: dense plasma core bit-identical",
+        ex[dense_rows, :, :],
+        before[dense_rows, :, :],
+        0.0,
+    )
+    d_band = float(np.max(np.abs(ex[band_rows, :, :] - before[band_rows, :, :])))
+    ck.expect(
+        "nodal marder: transition band is modified",
+        d_band > 0.0,
+        f"max|dE|={d_band:.3e}",
+    )
+    ck.close(
+        "nodal marder: vacuum gap bit-identical",
+        ex[vac_rows, :, :],
+        before[vac_rows, :, :],
+        0.0,
+    )
+
+    set_baseline(1.0, seed=123)
+    residuals = []
+    for _ in range(20):
+        _, resid = wx.hybrid_marder_correct_e(
+            0, alpha=0.1, max_iterations=1, rtol=0.0, atol=0.0
+        )
+        residuals.append(resid)
+    residuals = np.array(residuals)
+    n_increase = int(np.sum(residuals[1:] > residuals[:-1] * (1.0 + 1e-10)))
+    ck.expect(
+        "nodal marder: residual decreases monotonically",
+        n_increase <= 2,
+        f"increases={n_increase}",
+    )
+    ck.expect(
+        "nodal marder: residual at least halved over 20 sweeps",
+        residuals[-1] < 0.5 * residuals[0],
+        f"ratio={residuals[-1] / residuals[0]:.3f}",
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1070,6 +1478,14 @@ def main():
         "correction, the isotropized hyper-resistivity stencil, or the "
         "isotropized resistive-diffusion corner-curl)",
     )
+    parser.add_argument(
+        "--grid-type",
+        choices=["staggered", "collocated"],
+        default="staggered",
+        help="grid staggering; the collocated batteries exercise the nodal "
+        "conformal-EB path (masked nodal Faraday + level-set BC) and the nodal "
+        "isotropization stencils",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -1077,7 +1493,22 @@ def main():
         args.geometry,
         hyper=(args.battery == "hyper"),
         resistive=(args.battery == "resistive"),
+        grid_type=args.grid_type,
     )
+
+    if args.grid_type == "collocated":
+        # Collocated batteries use the nodal closed forms (the planar wall makes
+        # the level-set geometry analytic; the isotropization checks are interior).
+        if args.battery == "resistive":
+            run_resistive_collocated_battery(sim)
+        elif args.battery == "hyper":
+            run_hyper_collocated_battery(sim)
+        elif args.battery == "marder":
+            run_marder_collocated_battery(sim)
+        else:
+            run_eb_collocated_battery(sim)
+        return
+
     if args.battery == "resistive":
         run_resistive_battery(sim)
     elif args.battery == "hyper":
