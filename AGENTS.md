@@ -4,6 +4,10 @@
 
 WarpX is a massively parallel electromagnetic Particle-In-Cell (PIC) code built on top of AMReX (adaptive mesh refinement framework). It supports multiple dimensionalities (1D, 2D, 3D, RZ cylindrical) and compute backends (CPU/OpenMP, CUDA, HIP, SYCL).
 
+## Domain Context
+
+Reference `Docs/source/glossary.rst` as context for WarpX terminology, acronyms, and physics concepts.
+
 ## Development Environment
 
 If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
