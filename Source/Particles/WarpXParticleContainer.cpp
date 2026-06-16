@@ -604,7 +604,30 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
         }
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Esirkepov algorithm");
+            WARPX_PROFILE_VAR_START(esirkepov_current_dep_kernel);
+            if        (WarpX::nox == 1){
+                doEsirkepovDepositionSharedShapeN<1>(
+                    GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                    uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                    jx_fab, jy_fab, jz_fab, np_to_deposit, dt, relative_time, dx,
+                    xyzmin, lo, q, WarpX::n_rz_azimuthal_modes,
+                    bins, box, geom, max_tbox_size);
+            } else if (WarpX::nox == 2){
+                doEsirkepovDepositionSharedShapeN<2>(
+                    GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                    uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                    jx_fab, jy_fab, jz_fab, np_to_deposit, dt, relative_time, dx,
+                    xyzmin, lo, q, WarpX::n_rz_azimuthal_modes,
+                    bins, box, geom, max_tbox_size);
+            } else if (WarpX::nox == 3){
+                doEsirkepovDepositionSharedShapeN<3>(
+                    GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                    uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev,
+                    jx_fab, jy_fab, jz_fab, np_to_deposit, dt, relative_time, dx,
+                    xyzmin, lo, q, WarpX::n_rz_azimuthal_modes,
+                    bins, box, geom, max_tbox_size);
+            }
+            WARPX_PROFILE_VAR_STOP(esirkepov_current_dep_kernel);
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Villasenor algorithm");
