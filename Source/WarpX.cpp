@@ -45,6 +45,7 @@
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Utils/TextMsg.H"
+#include "Utils/SystemMemoryGuard.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXUtil.H"
@@ -325,6 +326,7 @@ WarpX::WarpX ()
                        // indirectly used in WarpX constructor.
 
     warpx::initialization::initialize_warning_manager();
+    warpx::utils::system_memory_guard::ReadParameters();
 
     ReadParameters();
 

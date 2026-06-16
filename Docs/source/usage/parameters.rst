@@ -5586,6 +5586,29 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
     It is mainly intended for debug purposes, and is best used with
     :pp:param:`warpx.always_warn_immediately = 1`.
 
+.. pp:param:: warpx.max_system_memory_fraction
+    :type: ``Real``
+    :default: ``0.0``
+
+    The default value ``0.0`` disables the guard and preserves the default
+    behavior. If set to a value in the range ``(0, 1)``, WarpX checks
+    host/node physical memory pressure and collectively aborts when used memory
+    exceeds this fraction of host/node physical memory. Negative, non-finite,
+    or values ``>= 1`` abort during startup (a fraction of ``1.0`` could never
+    trip, since used memory cannot exceed total).
+
+    This guard does not account for scheduler, cgroup, or container memory
+    limits in this PR. Those limits can be lower than host/node physical memory
+    and may be handled by a follow-up change.
+
+.. pp:param:: warpx.system_memory_check_interval
+    :type: positive integer
+    :default: ``1``
+
+    The number of time steps between checks of
+    :pp:param:`warpx.max_system_memory_fraction`. WarpX also checks once at the
+    start of each ``Evolve`` call when the guard is enabled.
+
 .. pp:param:: amrex.abort_on_unused_inputs
     :type: ``0`` or ``1``
     :default: ``0`` for false

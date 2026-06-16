@@ -31,6 +31,7 @@
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
+#include "Utils/SystemMemoryGuard.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
@@ -163,6 +164,8 @@ WarpX::Evolve (int numsteps)
     static Real evolve_time = 0;
 
     const int step_begin = istep[0];
+    warpx::utils::system_memory_guard::Check(step_begin);
+
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
         ABLASTR_PROFILE("WarpX::Evolve::step");
@@ -170,6 +173,7 @@ WarpX::Evolve (int numsteps)
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
         SignalHandling::CheckSignals();
+        warpx::utils::system_memory_guard::CheckIfDue(step + 1, step_begin);
 
         multi_diags->NewIteration();
 
