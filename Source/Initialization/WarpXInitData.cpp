@@ -647,61 +647,63 @@ WarpX::PrintMainPICparameters ()
     else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC){
       amrex::Print() << "Maxwell Solver:       | Hybrid-PIC (Ohm's law) \n";
     }
-  #ifdef WARPX_USE_FFT
-    // Print PSATD solver's configuration
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
-      amrex::Print() << "Maxwell Solver:       | PSATD \n";
-      }
-    if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-      amrex::Print() << "                      | - Galilean \n" <<
-      "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
-                              m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
-      }
-    if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
-      amrex::Print() << "                      | - comoving \n" <<
-      "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
-                              m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
-      }
-    if (WarpX::update_with_rho) {
-      amrex::Print() << "                      | - update with rho is ON \n";
-      }
-    if (current_correction) {
-      amrex::Print() << "                      | - current correction is ON \n";
-        }
-    if (WarpX::do_dive_cleaning) {
-      amrex::Print() << "                      | - div(E) cleaning is ON \n";
-      }
-    if (WarpX::do_divb_cleaning) {
-      amrex::Print() << "                      | - div(B) cleaning is ON \n";
-      }
-    if (m_JRhom == 1){
-      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
-      amrex::Print() << "                      |   - m_JRhom_subintervals = "
-                                        << WarpX::m_JRhom_subintervals << "\n";
-      if (time_dependency_J == TimeDependencyJ::Linear){
-        amrex::Print() << "                      |   - time_dependency_J = linear \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Constant){
-        amrex::Print() << "                      |   - time_dependency_J = constant \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
-      }
-      if (time_dependency_rho == TimeDependencyRho::Linear){
-        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Constant){
-        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
-      }
-    }
-    if (fft_do_time_averaging){
-      amrex::Print()<<"                      | - time-averaged is ON \n";
-    }
-  #endif // WARPX_USE_FFT
+    #ifdef WARPX_USE_FFT
+        // All FFT/PSATD-related prints only when PSATD is selected at runtime
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
+            amrex::Print() << "Maxwell Solver:       | PSATD \n";
 
+            if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
+                amrex::Print() << "                      | - Galilean \n" <<
+                "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
+                                                                m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
+            }
+            if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
+                amrex::Print() << "                      | - comoving \n" <<
+                "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
+                                                                m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
+            }
+            if (WarpX::update_with_rho) {
+                amrex::Print() << "                      | - update with rho is ON \n";
+            }
+            if (current_correction) {
+                amrex::Print() << "                      | - current correction is ON \n";
+            }
+            if (m_JRhom == 1){
+                amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+                amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                                                                    << WarpX::m_JRhom_subintervals << "\n";
+                if (time_dependency_J == TimeDependencyJ::Linear){
+                    amrex::Print() << "                      |   - time_dependency_J = linear \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Constant){
+                    amrex::Print() << "                      |   - time_dependency_J = constant \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Quadratic){
+                    amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
+                }
+            }
+
+            if (time_dependency_rho == TimeDependencyRho::Linear){
+                amrex::Print() << "                      |   - time_dependency_rho = linear \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Constant){
+                amrex::Print() << "                      |   - time_dependency_rho = constant \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Quadratic){
+                amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
+            }
+
+            if (fft_do_time_averaging){
+                amrex::Print()<<"                      | - time-averaged is ON \n";
+            }
+        }
+    #endif // WARPX_USE_FFT
+  if (WarpX::do_dive_cleaning) {
+    amrex::Print() << "                      | - div(E) cleaning is ON \n";
+        }
+  if (WarpX::do_divb_cleaning) {
+    amrex::Print() << "                      | - div(B) cleaning is ON \n";
+        }
   if (grid_type == GridType::Collocated){
     amrex::Print() << "                      | - collocated grid \n";
   }
@@ -967,6 +969,8 @@ WarpX::AddExternalFields (int const lev)
             amrex::MultiFab::Add(*Efield_fp[lev][1], *m_fields.get(FieldType::Efield_fp_external, Direction{1}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
             amrex::MultiFab::Add(*Efield_fp[lev][2], *m_fields.get(FieldType::Efield_fp_external, Direction{2}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
         }
+        // Apply E-field boundary such that the initial field satisfies the expected boundary conditions
+        ApplyEfieldBoundary(lev, PatchType::fine, 0.0);
     }
     if (m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::default_zero) {
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);
@@ -980,6 +984,8 @@ WarpX::AddExternalFields (int const lev)
             amrex::MultiFab::Add(*Bfield_fp[lev][1], *m_fields.get(FieldType::Bfield_fp_external, Direction{1}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
             amrex::MultiFab::Add(*Bfield_fp[lev][2], *m_fields.get(FieldType::Bfield_fp_external, Direction{2}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
         }
+        // Apply B-field boundary such that the initial field satisfies the expected boundary conditions
+        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::FirstHalf, 0.0);
     }
 }
 

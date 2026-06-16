@@ -47,11 +47,11 @@
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/ParticleThermalizer/ParticleThermalizer.H"
 #include "Utils/export.H"
-#include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -141,7 +141,7 @@ public:
     //
     void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
-    void FinishImplicitParticleUpdate ();
+    void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
@@ -329,7 +329,7 @@ public:
     static bool do_dynamic_scheduling;
     static bool refine_plasma;
 
-    static utils::parser::IntervalsParser sort_intervals;
+    static ablastr::utils::text::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
@@ -541,7 +541,7 @@ public:
 
     /** \brief returns the load balance interval
      */
-    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
+    [[nodiscard]] ablastr::utils::text::IntervalsParser get_load_balance_intervals () const
     {
         return load_balance_intervals;
     }
@@ -570,6 +570,11 @@ public:
     void ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx,
                                                     amrex::MultiFab* Jy,
                                                     amrex::MultiFab* Jz,
+                                                    int lev) const;
+
+    void ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx,
+                                                    amrex::MultiFab* Syy,
+                                                    amrex::MultiFab* Szz,
                                                     int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
@@ -1165,7 +1170,8 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    // How often to update the timestep when using adaptive timestepping
+    ablastr::utils::text::IntervalsParser m_dt_update_interval;
     std::string m_dt_update_diagnostic_file;
 
     bool m_safe_guard_cells = false;
@@ -1307,7 +1313,7 @@ private:
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
      * for getting steps at which load balancing is performed */
-    utils::parser::IntervalsParser load_balance_intervals;
+    ablastr::utils::text::IntervalsParser load_balance_intervals;
     /** Collection of LayoutData to keep track of weights used in load balancing
      * routines. Contains timer-based or heuristic-based costs depending on input option */
     amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > > costs;
@@ -1340,7 +1346,7 @@ private:
     amrex::Real costs_heuristic_particles_wt = amrex::Real(0);
 
     // Determines timesteps for override sync
-    utils::parser::IntervalsParser override_sync_intervals;
+    ablastr::utils::text::IntervalsParser override_sync_intervals;
 
     // Other runtime parameters
     int verbose = 1;
