@@ -36,6 +36,12 @@ You can follow the status of recent runs on the `GitLab jobs page <https://gitla
 
 To re-run the GPU tests after pushing new commits, remove and re-add the label.
 
+Who can add the label?
+----------------------
+
+Anyone in the `warpx-contributors team <https://github.com/orgs/BLAST-WarpX/teams/warpx-contributors>`__ on GitHub can add the ``bot: run GPU`` label.
+Membership in this team is restricted to vetted, known contributors (real, identified people) and is granted by members of the WarpX :ref:`Technical Committee <governance>`.
+
 .. warning::
 
    Adding the ``bot: run GPU`` label causes the pull request's code to be **built and executed on shared GPU CI hardware**.
