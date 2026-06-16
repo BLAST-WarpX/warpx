@@ -7,10 +7,7 @@
 # oscillates as By(z, t) = cos(k z) cos(omega t) with the reduced frequency
 # omega = c * k / sqrt(epsilon_r).
 #
-# This exercises the 1D macroscopic E-update. It is a regression guard for the
-# 1D MacroscopicProperties setup: a previous bug left the transverse index-type
-# and coarsening-ratio components uninitialized in 1D, which corrupted the
-# interpolation of sigma/epsilon/mu in the macroscopic E-update.
+# This exercises the 1D macroscopic E-update.
 
 max_step = 200
 

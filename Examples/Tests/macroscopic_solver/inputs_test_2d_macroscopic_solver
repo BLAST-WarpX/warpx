@@ -7,10 +7,6 @@
 # (epsilon_r = 1.5, mu = mu0, sigma = 0) the mode oscillates as
 #     By(x, z, t) = cos(kx x) cos(kz z) cos(omega t)
 # with the reduced frequency omega = c * sqrt(kx^2 + kz^2) / sqrt(epsilon_r).
-#
-# Companion to inputs_test_1d_macroscopic_solver: there was previously no 1D nor
-# 2D automated coverage for the macroscopic solver (only the 3D embedded-boundary
-# cube test).
 
 max_step = 100
 
