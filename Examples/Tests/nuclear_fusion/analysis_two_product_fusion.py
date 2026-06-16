@@ -12,6 +12,9 @@ import numpy as np
 import scipy.constants as scc
 import yt
 
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
+
 ## This script performs various checks for the fusion module. The simulation
 ## that we check is made of 2 different tests, each with different reactant and product species.
 ##
@@ -52,10 +55,8 @@ barn_to_square_meter = 1.0e-28
 ## Checks whether this is the 2D or the 3D test
 with open("./warpx_used_inputs", "r") as f:
     warpx_used_inputs = f.read()
-if re.search("geometry.dims = RZ", warpx_used_inputs):
-    is_RZ = True
-else:
-    is_RZ = False
+input_dict = parse_input_file("./warpx_used_inputs")
+is_RZ = input_has_value(input_dict, "geometry.dims", "RZ")
 
 ## Check which kind of test we are doing: D+T or D+D
 # Define reactants and products
