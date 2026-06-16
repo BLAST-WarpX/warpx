@@ -3038,13 +3038,19 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``strings`` separated by spaces
 
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, ``twoproduct_reaction`` and ``charge_exchange``
-    for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
+    included. Available options are ``elastic``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
+    for ions and ``elastic``, ``excitationX`` and ``ionization`` for electrons.
     Multiple excitation events can be included for electrons corresponding to
     excitation to different levels, the ``X`` above can be changed to a unique
     identifier for each excitation process. For each scattering process specified
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
+
+    The angular distribution of a particle-conserving process (such as ``elastic``) is
+    controlled by the per-process :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model`
+    argument. The legacy process names ``forward`` and ``back`` are deprecated: they are still
+    accepted (with a deprecation warning) and are equivalent to specifying ``elastic`` together
+    with ``<collision_name>.elastic_scattering_angle_model = forward`` or ``= backward``, respectively.
 
 .. pp:param:: <collision_name>.<scattering_process>_cross_section
     :type: ``string``
@@ -3060,6 +3066,20 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
     ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
+
+.. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
+    :type: ``string``
+    :default: ``isotropic``
+    :optional:
+
+    Only for ``dsmc`` and ``background_mcc``, and only for particle-conserving processes
+    (such as ``elastic``). The model used to determine the scattering angle of the products
+    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
+    With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
+    With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
+    as the incident particle (in the center of mass frame).
+    With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
+    the opposite direction of the incident particle (in the center of mass frame).
 
 .. pp:param:: <collision_name>.ionization_species
     :type: ``float``

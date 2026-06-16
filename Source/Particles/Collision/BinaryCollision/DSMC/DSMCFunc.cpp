@@ -30,38 +30,24 @@ DSMCFunc::DSMCFunc (
     amrex::Vector<std::string> scattering_process_names;
     pp_collision_name.queryarr("scattering_processes", scattering_process_names);
 
-    // create a vector of ScatteringProcess objects from each scattering
-    // process name
+    // Build the ScatteringProcess objects. This shared helper parses the per-process
+    // cross-section, energy and scattering angle model, and translates the legacy
+    // `back`/`forward` process names. The same helper is used by SplitAndScatterFunc so
+    // that both functors agree on the process ordering, type and angle model.
+    m_scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
+
+    // Validate the processes (in the same order as the input list)
     bool reaction_produces_new_species = false;
-    for (const auto& scattering_process : scattering_process_names) {
-        const std::string kw_cross_section = scattering_process + "_cross_section";
-        std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section, cross_section_file);
+    for (int i = 0; i < static_cast<int>(m_scattering_processes.size()); ++i) {
+        const auto& scattering_process = scattering_process_names[i];
+        const auto process_type = m_scattering_processes[i].type();
 
-        // if the scattering process is excitation, ionization, forward or
-        // two-product reaction get the energy associated with that process
-        // (note that this allows forward scattering to be used both with and
-        // without a fixed energy loss)
-        amrex::ParticleReal energy = 0._prt;
-        if (scattering_process.find("excitation") != std::string::npos ||
-            scattering_process.find("ionization") != std::string::npos ||
-            scattering_process.find("forward") != std::string::npos ||
-            scattering_process.find("two_product_reaction") != std::string::npos ) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-
-        ScatteringProcess process(scattering_process, cross_section_file, energy);
-
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::EXCITATION,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process_type != ScatteringProcessType::EXCITATION,
                                         "Excitation collisions are not yet supported in DSMC");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::FORWARD,
-                                        "Forward scattering collisions are not yet supported in DSMC");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process_type != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::TWOPRODUCT_REACTION) {
+        if (process_type == ScatteringProcessType::IONIZATION || process_type == ScatteringProcessType::TWOPRODUCT_REACTION) {
             // Only one ionization process is currently supported as part of a given
             // collision set.
             if (reaction_produces_new_species) {
@@ -108,8 +94,6 @@ DSMCFunc::DSMCFunc (
              "  " + collision_name + ".product_species = " + product_species_name[1] + " " + product_species_name[0]
             );
         }
-
-        m_scattering_processes.push_back(std::move(process));
     }
 
     // Store ScatteringProcess::Executor(s).

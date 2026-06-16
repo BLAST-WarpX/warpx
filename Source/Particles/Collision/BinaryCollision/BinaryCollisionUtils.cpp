@@ -7,8 +7,13 @@
 
 #include "BinaryCollisionUtils.H"
 
+#include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
@@ -99,6 +104,69 @@ namespace BinaryCollisionUtils{
             return CollisionType::LinearCompton;
         }
         return CollisionType::Undefined;
+    }
+
+    amrex::Vector<ScatteringProcess>
+    parse_scattering_processes (const std::string& collision_name)
+    {
+        using namespace amrex::literals;
+
+        const amrex::ParmParse pp_collision_name(collision_name);
+
+        amrex::Vector<std::string> scattering_process_names;
+        pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+
+        amrex::Vector<ScatteringProcess> scattering_processes;
+        for (const auto& scattering_process : scattering_process_names) {
+            const std::string kw_cross_section = scattering_process + "_cross_section";
+            std::string cross_section_file;
+            pp_collision_name.query(kw_cross_section, cross_section_file);
+
+            // The energy cost (penalty) of the process, in eV. It is required for the
+            // inelastic processes that produce new species or change the internal state
+            // (excitation, ionization, two-product reaction), and optional otherwise (e.g.
+            // an elastic channel with a fixed energy loss, or forward scattering with a loss).
+            amrex::ParticleReal energy = 0._prt;
+            const std::string kw_energy = scattering_process + "_energy";
+            if (scattering_process.find("excitation") != std::string::npos ||
+                scattering_process.find("ionization") != std::string::npos ||
+                scattering_process.find("two_product_reaction") != std::string::npos ) {
+                utils::parser::getWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            } else {
+                utils::parser::queryWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            }
+
+            // Determine the effective process name and the scattering angle model.
+            // The angular behavior of a particle-conserving process is controlled by the
+            // per-process `<process>_scattering_angle_model` argument. The legacy process
+            // names `back` and `forward` are still accepted and are translated to `elastic`
+            // with the corresponding angle model (`backward` and `forward`, respectively).
+            std::string effective_process = scattering_process;
+            auto scattering_angle_model = ScatteringAngleModel::Default;
+            if (scattering_process == "back") {
+                effective_process = "elastic";
+                scattering_angle_model = ScatteringAngleModel::Backward;
+                ablastr::warn_manager::WMRecordWarning("Collisions",
+                    "The scattering process name 'back' is deprecated. Use 'elastic' with '"
+                    + collision_name + ".elastic_scattering_angle_model = backward' instead.");
+            } else if (scattering_process == "forward") {
+                effective_process = "elastic";
+                scattering_angle_model = ScatteringAngleModel::Forward;
+                ablastr::warn_manager::WMRecordWarning("Collisions",
+                    "The scattering process name 'forward' is deprecated. Use 'elastic' with '"
+                    + collision_name + ".elastic_scattering_angle_model = forward' instead.");
+            }
+            // Allow the angle model to be specified (or overridden) explicitly for any process.
+            pp_collision_name.query_enum_sloppy(
+                scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
+
+            scattering_processes.push_back(ScatteringProcess(
+                effective_process, cross_section_file, energy, scattering_angle_model));
+        }
+
+        return scattering_processes;
     }
 
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,

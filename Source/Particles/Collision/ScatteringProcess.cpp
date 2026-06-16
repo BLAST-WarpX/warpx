@@ -13,12 +13,13 @@
 ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
                         const std::string& cross_section_file,
-                        const amrex::ParticleReal energy )
+                        const amrex::ParticleReal energy,
+                        const ScatteringAngleModel scattering_angle_model )
 {
     // read the cross-section data file into memory
     readCrossSectionFile(cross_section_file, m_energies, m_sigmas_h);
 
-    init(scattering_process, energy);
+    init(scattering_process, energy, scattering_angle_model);
 }
 
 template <typename InputVector>
@@ -26,16 +27,18 @@ ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
                         const InputVector&& energies,
                         const InputVector&& sigmas,
-                        const amrex::ParticleReal energy )
+                        const amrex::ParticleReal energy,
+                        const ScatteringAngleModel scattering_angle_model )
 {
     m_energies.insert(m_energies.begin(), std::begin(energies), std::end(energies));
     m_sigmas_h.insert(m_sigmas_h.begin(), std::begin(sigmas),   std::end(sigmas));
 
-    init(scattering_process, energy);
+    init(scattering_process, energy, scattering_angle_model);
 }
 
 void
-ScatteringProcess::init (const std::string& scattering_process, const amrex::ParticleReal energy)
+ScatteringProcess::init (const std::string& scattering_process, const amrex::ParticleReal energy,
+                         const ScatteringAngleModel scattering_angle_model)
 {
     using namespace amrex::literals;
     m_exe_h.m_sigmas_data = m_sigmas_h.data();
@@ -49,6 +52,7 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_h.m_dE = (m_exe_h.m_energy_hi - m_exe_h.m_energy_lo)/(m_grid_size - 1._prt);
     m_exe_h.m_energy_penalty = energy;
     m_exe_h.m_type = parseProcessType(scattering_process);
+    m_exe_h.m_scattering_angle_model = scattering_angle_model;
 
     // sanity check cross-section energy grid
     sanityCheckEnergyGrid(m_energies, m_exe_h.m_dE);
@@ -76,7 +80,10 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 ScatteringProcessType
 ScatteringProcess::parseProcessType(const std::string& scattering_process)
 {
-    if (scattering_process == "elastic") {
+    if (scattering_process.find("elastic") != std::string::npos) {
+        // `elastic` is matched as a prefix (like `excitationX`) so that several distinct
+        // elastic channels (e.g. with different cross-sections and/or scattering angle
+        // models) can be included in the same collision under unique names.
         return ScatteringProcessType::ELASTIC;
     } else if (scattering_process == "back") {
         return ScatteringProcessType::BACK;

@@ -17,6 +17,27 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
     {
         const amrex::ParmParse pp_collision_name(collision_name);
 
+        // Build the ScatteringProcess objects using the same shared helper as DSMCFunc, so
+        // that the process ordering matches the indices encoded in the per-pair mask. The
+        // scatter kernel uses these to look up the process type, scattering angle model and
+        // energy penalty for each colliding pair.
+        m_scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::HostVector<ScatteringProcess::Executor> h_scattering_processes_exe;
+        for (auto const& p : m_scattering_processes) {
+            h_scattering_processes_exe.push_back(p.executor());
+        }
+        m_scattering_processes_exe.resize(h_scattering_processes_exe.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_scattering_processes_exe.begin(),
+                              h_scattering_processes_exe.end(), m_scattering_processes_exe.begin());
+        amrex::Gpu::streamSynchronize();
+#else
+        for (auto const& p : m_scattering_processes) {
+            m_scattering_processes_exe.push_back(p.executor());
+        }
+#endif
+        m_scattering_processes_data = m_scattering_processes_exe.data();
+
         // Check if the scattering processes include reactions that produce macroparticles in new species
         // (i.e. not in the incident species list), i.e. if it contains ionization, charge exchange or two-product reaction
         amrex::Vector<std::string> scattering_processes;

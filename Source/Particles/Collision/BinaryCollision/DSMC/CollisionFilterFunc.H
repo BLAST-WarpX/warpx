@@ -26,7 +26,8 @@
  * @param[in] dV is the volume of the corresponding cell.
  * @param[in] pair_index is the index of the colliding pair.
  * @param[out] p_mask is a mask that will be set to a non-zero integer if a
- *             collision occurs. The integer encodes the scattering process.
+ *             collision occurs. The integer is the index of the selected scattering
+ *             process plus one (0 means no collision).
  * @param[out] p_pair_reaction_weight stores the weight of the product particles.
  * @param[in] multiplier factor by which the collision probability is increased to
  *            account for all other possible binary collision partners.
@@ -76,11 +77,9 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
     // the total collision probability.
     // The size of the arrays below is a compile-time constant (template parameter)
     // for performance reasons: it avoids dynamic memory allocation on the GPU.
-    int coll_type[max_process_count] = {0};
     amrex::ParticleReal sigma_sums[max_process_count] = {0._prt};
     for (int ii = 0; ii < process_count; ii++) {
         auto const& scattering_process = scattering_processes[ii];
-        coll_type[ii] = int(scattering_process.m_type);
         const amrex::ParticleReal sigma = scattering_process.getCrossSection(E_coll);
         sigma_sums[ii] = sigma + ((ii == 0) ? 0._prt : sigma_sums[ii-1]);
     }
@@ -105,7 +104,11 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
         for (int ii = 0; ii < process_count; ii++) {
             if (random_number <= sigma_sums[ii] / sigma_tot)
             {
-                p_mask[pair_index] = coll_type[ii];
+                // Store the selected process index (+1) in the mask; 0 means "no collision".
+                // SplitAndScatterFunc looks up the process (type, angle model, energy penalty)
+                // from this index. Encoding the index rather than the process type allows the
+                // post-collision kinematics to depend on the per-process scattering angle model.
+                p_mask[pair_index] = static_cast<index_type>(ii + 1);
                 p_pair_reaction_weight[pair_index] = w_min;
                 break;
             }

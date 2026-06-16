@@ -7,12 +7,13 @@
 #include "BackgroundMCCCollision.H"
 
 #include "ImpactIonization.H"
-#include "Particles/Algorithms/KineticEnergy.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
@@ -98,25 +99,46 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
         std::string cross_section_file;
         pp_collision_name.query(kw_cross_section, cross_section_file);
 
+        // The energy cost (penalty) of the process, in eV. It is required for excitation
+        // and ionization, and optional otherwise (e.g. an elastic channel with a fixed
+        // energy loss, or forward scattering with a loss).
         amrex::ParticleReal energy = 0.0;
-        // if the scattering process is excitation or ionization get the
-        // energy associated with that process
+        const std::string kw_energy = scattering_process + "_energy";
         if (scattering_process.find("excitation") != std::string::npos ||
             scattering_process.find("ionization") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
-        // if the scattering process is forward scattering get the energy
-        // associated with the process if it is given (this allows forward
-        // scattering to be used both with and without a fixed energy loss)
-        else if (scattering_process.find("forward") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
+        else {
             utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
-        ScatteringProcess process(scattering_process, cross_section_file, energy);
+        // Determine the effective process name and the scattering angle model.
+        // The angular behavior of a particle-conserving process is controlled by the
+        // per-process `<process>_scattering_angle_model` argument. The legacy process
+        // names `back` and `forward` are still accepted and are translated to `elastic`
+        // with the corresponding angle model (`backward` and `forward`, respectively).
+        std::string effective_process = scattering_process;
+        auto scattering_angle_model = ScatteringAngleModel::Default;
+        if (scattering_process == "back") {
+            effective_process = "elastic";
+            scattering_angle_model = ScatteringAngleModel::Backward;
+            ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                "The scattering process name 'back' is deprecated. Use 'elastic' with '"
+                + collision_name + ".elastic_scattering_angle_model = backward' instead.");
+        } else if (scattering_process == "forward") {
+            effective_process = "elastic";
+            scattering_angle_model = ScatteringAngleModel::Forward;
+            ablastr::warn_manager::WMRecordWarning("BackgroundMCC Collisions",
+                "The scattering process name 'forward' is deprecated. Use 'elastic' with '"
+                + collision_name + ".elastic_scattering_angle_model = forward' instead.");
+        }
+        // Allow the angle model to be specified (or overridden) explicitly for any process.
+        pp_collision_name.query_enum_sloppy(
+            scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
+
+        ScatteringProcess process(effective_process, cross_section_file, energy, scattering_angle_model);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                          "Cannot add an unknown scattering process type");
@@ -346,9 +368,6 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
     auto const m = m_mass1;
     auto const M = m_background_mass;
 
-    // precalculate often used value
-    auto const mc2 = m*PhysConst::c2;
-
     // we need particle positions in order to calculate the local density
     // and temperature
     auto GetPosition = GetParticlePosition<PIdx>(pti);
@@ -374,7 +393,6 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                               amrex::ParticleReal v_coll, v_coll2, sigma_E, nu_i = 0;
                               double gamma, E_coll;
                               amrex::ParticleReal ua_x, ua_y, ua_z, vx, vy, vz;
-                              amrex::ParticleReal uCOM_x, uCOM_y, uCOM_z;
                               const amrex::ParticleReal col_select = amrex::Random(engine);
 
                               // get velocities of gas particles from a Maxwellian distribution
@@ -422,48 +440,33 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                       break;
                                   }
 
-                                  // At this point the given particle has been chosen for a collision
-                                  // and so we perform the needed calculations to transform to the
-                                  // COM frame.
-                                  uCOM_x = static_cast<amrex::ParticleReal>(m * vx / (gamma * m + M));
-                                  uCOM_y = static_cast<amrex::ParticleReal>(m * vy / (gamma * m + M));
-                                  uCOM_z = static_cast<amrex::ParticleReal>(m * vz / (gamma * m + M));
+                                  // At this point the given particle has been chosen for a
+                                  // collision with a background-gas particle of velocity
+                                  // (ua_x, ua_y, ua_z). Compute the post-collision momentum of
+                                  // the projectile using conservation of energy and momentum.
+                                  // The angular distribution in the center-of-mass frame is set
+                                  // by the process's scattering angle model, and any inelastic
+                                  // energy loss is passed as the (released) reaction energy.
+                                  // The background particle is treated as a reservoir: its recoil
+                                  // is computed as the second product but discarded.
+                                  amrex::ParticleReal u1x_out, u1y_out, u1z_out;
+                                  amrex::ParticleReal u2x_out, u2y_out, u2z_out;
+                                  TwoProductComputeProductMomenta(
+                                      ux[ip], uy[ip], uz[ip], m,
+                                      ua_x, ua_y, ua_z, M,
+                                      u1x_out, u1y_out, u1z_out, m,
+                                      u2x_out, u2y_out, u2z_out, M,
+                                      -scattering_process.m_energy_penalty*PhysConst::q_e,
+                                      // TwoProductComputeProductMomenta expects the *released* energy here, hence
+                                      // the negative sign; the energy penalty is also converted from eV to Joules.
+                                      scattering_process.m_scattering_angle_model,
+                                      engine);
 
-                                  // subtract any energy penalty of the collision from the
-                                  // projectile energy
-                                  if (scattering_process.m_energy_penalty > 0.0_prt) {
-                                      constexpr auto eV = PhysConst::q_e;
-                                      E_coll = (Algorithms::KineticEnergy<double>(vx, vy, vz, m) - scattering_process.m_energy_penalty*eV);
-                                      const auto scale_fac = static_cast<amrex::ParticleReal>(
-                                        std::sqrt(E_coll * (E_coll + 2.0_prt*mc2) * PhysConst::inv_c2) / m / v_coll);
-                                      vx *= scale_fac;
-                                      vy *= scale_fac;
-                                      vz *= scale_fac;
-                                  }
-
-                                  // transform to COM frame
-                                  ParticleUtils::doLorentzTransform(vx, vy, vz, uCOM_x, uCOM_y, uCOM_z);
-
-                                  if ((scattering_process.m_type == ScatteringProcessType::ELASTIC)
-                                      || (scattering_process.m_type == ScatteringProcessType::EXCITATION)) {
-                                      ParticleUtils::RandomizeVelocity(
-                                          vx, vy, vz, sqrt(vx*vx + vy*vy + vz*vz), engine
-                                      );
-                                  }
-                                  else if (scattering_process.m_type == ScatteringProcessType::BACK) {
-                                      // elastic scattering with cos(chi) = -1 (i.e. 180 degrees)
-                                      vx *= -1.0_prt;
-                                      vy *= -1.0_prt;
-                                      vz *= -1.0_prt;
-                                  }
-
-                                  // transform back to scattering frame
-                                  ParticleUtils::doLorentzTransform(vx, vy, vz, -uCOM_x, -uCOM_y, -uCOM_z);
-
-                                  // update particle velocity with new components in labframe
-                                  ux[ip] = vx + ua_x;
-                                  uy[ip] = vy + ua_y;
-                                  uz[ip] = vz + ua_z;
+                                  // update projectile velocity with new components in labframe
+                                  // (the background-gas recoil u2*_out is discarded)
+                                  ux[ip] = u1x_out;
+                                  uy[ip] = u1y_out;
+                                  uz[ip] = u1z_out;
                                   break;
                               }
                           }

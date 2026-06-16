@@ -10,9 +10,11 @@
 
 #include <string>
 
+#include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
 
 #include <AMReX_Math.H>
+#include <AMReX_Vector.H>
 
 enum struct CollisionType { DeuteriumTritiumToNeutronHeliumFusion,
                             DeuteriumDeuteriumToProtonTritiumFusion,
@@ -45,6 +47,22 @@ namespace BinaryCollisionUtils{
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
+
+    /**
+     * \brief Parse the `scattering_processes` of a DSMC collision and build the
+     * corresponding ScatteringProcess objects (in the same order as the input list).
+     *
+     * This centralizes the per-process parsing that must be shared between the
+     * collision functor (which evaluates cross-sections) and the split-and-scatter
+     * functor (which performs the post-collision kinematics), so that both agree on
+     * the process ordering, type, energy penalty and scattering angle model.
+     *
+     * It also parses the per-process `<process>_scattering_angle_model` argument and
+     * translates the legacy process names `back` and `forward` into `elastic` with the
+     * `backward` and `forward` angle models respectively (with a deprecation warning).
+     */
+    amrex::Vector<ScatteringProcess>
+    parse_scattering_processes (const std::string& collision_name);
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type)
