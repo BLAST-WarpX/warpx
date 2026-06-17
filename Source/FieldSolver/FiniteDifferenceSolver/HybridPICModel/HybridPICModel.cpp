@@ -244,7 +244,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     // Below we set all the unused dimensions to have nodal values for J, B & E
     // since these values will be interpolated onto a nodal grid - if this is
     // not done the Interp function returns nonsense values.
-#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_1D_Z) || \
+    defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     Jx_IndexType[2]    = 1;
     Jy_IndexType[2]    = 1;
     Jz_IndexType[2]    = 1;
@@ -255,7 +256,7 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     Ey_IndexType[2]    = 1;
     Ez_IndexType[2]    = 1;
 #endif
-#if defined(WARPX_DIM_1D_Z)
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     Jx_IndexType[1]    = 1;
     Jy_IndexType[1]    = 1;
     Jz_IndexType[1]    = 1;
