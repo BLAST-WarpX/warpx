@@ -346,6 +346,15 @@ public:
      *  instead of the stair-step approximation. Requires embedded boundaries
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
+    /** Collocated conformal magnetic-field wall treatment: false (default) uses
+     *  the collocated-ECT finite-volume conformal correction (isotropic); true
+     *  reverts to the pointwise level-set mirror fill. For A/B comparison. */
+    bool m_conformal_b_mirror = false;
+    /** If true, skip the collocated conformal magnetic-field wall treatment
+     *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
+     *  This reproduces the pre-treatment baseline and isolates the wall fill as
+     *  the source of the grid-locked m = 4 perturbation. For A/B comparison. */
+    bool m_conformal_b_off = false;
 
     /** Relative residual tolerance of the Jacobi band relaxation of the
      *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill

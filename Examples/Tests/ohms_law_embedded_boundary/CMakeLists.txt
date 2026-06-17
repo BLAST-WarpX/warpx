@@ -1,6 +1,46 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+# Embedded-boundary current FOLD + FILL for an azimuthal (J_theta) band near a
+# cylindrical conducting wall: validates the binding against an exact numpy
+# replica of the fill operator, the method-of-images reference (convergence
+# variant), and the C4 symmetry of the source.
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_eb_image_current_collocated_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_eb_image_current_picmi.py --mode operator --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_eb_image_current_staggered_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_eb_image_current_picmi.py --mode operator --grid-type staggered"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohms_law_eb_image_current_convergence_picmi  # name
+        3  # dims
+        1  # nprocs
+        "inputs_test_3d_ohms_law_eb_image_current_picmi.py --mode convergence --grid-type collocated"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
 if(WarpX_EB)
     add_warpx_test(
         test_3d_ohms_law_embedded_boundary_cylinder_picmi  # name

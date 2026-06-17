@@ -38,31 +38,31 @@ constants = picmi.constants
 # ----------------------------------------------------------------------------
 M_AMU = 2  # deuterium
 N_I = 1.5e20  # reference ion density (m^-3)
-N_FLOOR_FRAC = 0.03
+N_FLOOR_FRAC = 0.05
 T_I0 = 5.0  # ion temperature (eV)
-T_E0 = 0.0  # electron temperature (eV): no electron pressure
+T_E0 = 5.0  # electron temperature (eV): no electron pressure
 
 # Annular column (radii in m) and low-density interior fill
-R_INNER = 0.6
-R_OUTER = 0.7
-R_PART = 0.7  # the annulus carries the inventory of a full column of this radius
+R_INNER = 0.7
+R_OUTER = 0.8
+R_PART = 0.6  # the annulus carries the inventory of a full column of this radius
 R_WALL = 0.8  # conducting wall radius (embedded boundary)
 
 # External field ramp: Hermite smoothstep from the bias field to the
 # (reversed) main field over TAU_RAMP
-BZ_BIAS = -0.1  # T
-BZ_REV = 1.5  # T
-TAU_RAMP = 4.0e-6  # s
+BZ_BIAS = -0.025  # T
+BZ_REV = 0.85  # T
+TAU_RAMP = 8.0e-6  # s
 
 # Resistivity (density-scaled power law) and hyper-resistivity
 ETA_PLASMA = 1.0e-6  # Ohm m, bulk plasma
 ETA_VAC_FRAC = 5.0e-2  # vacuum resistivity as a fraction of the CFL limit
-ETA_POWER = 2.0
-N_TRANSITION_FRAC = 0.7
+ETA_POWER = 3.0
+N_TRANSITION_FRAC = 0.4
 
 # Time stepping
 F_T_CI = 0.01  # dt as a fraction of the (reversed-field) ion cyclotron period
-SUBSTEPS = 16  # initial RKF45 substep count
+SUBSTEPS = 256  # initial RKF45 substep count
 
 NZ = 8  # one blocking factor of cells: thin periodic slab
 
@@ -105,11 +105,11 @@ def setup_simulation(
     eta_ntrans=N_TRANSITION_FRAC,
     f_t_ci=F_T_CI,
     r_outer=R_OUTER,
-    wall_supported=False,
-    marder=False,
-    marder_alpha=0.05,
+    wall_supported=True,
+    marder=True,
+    marder_alpha=0.1,
     marder_target="grad_pe_only",
-    marder_level="all_substeps",
+    marder_level="half_steps",
     marder_interval=1,
     n_floor_frac=N_FLOOR_FRAC,
     isotropic_resistivity=True,
@@ -120,7 +120,7 @@ def setup_simulation(
     bz_rev=BZ_REV,
     bz_bias=BZ_BIAS,
     nz=NZ,
-    grid_type="staggered",
+    grid_type="collocated",
 ):
     """Create the PICMI simulation object.
 
@@ -205,12 +205,12 @@ def setup_simulation(
         plasma_hyper_resistivity=eta_hyper,
         substeps=substeps,
         holmstrom_vacuum_region=True if holmstrom else None,
-        eb_deposit_fold="reflect" if wall_supported else None,
-        eb_rho_dirichlet=False if wall_supported else None,
+        eb_deposit_fold="pec" if wall_supported else None,
+        eb_rho_dirichlet=True if wall_supported else None,
         marder_alpha=marder_alpha if marder else None,
         marder_target=marder_target if marder else None,
         marder_correction_level=marder_level if marder else None,
-        marder_max_iterations=20 if marder else None,
+        marder_max_iterations=10 if marder else None,
         marder_rtol=1.0e-3 if marder else None,
         marder_substep_interval=marder_interval if marder else None,
         isotropic_resistivity=isotropic_resistivity,
@@ -271,7 +271,7 @@ def setup_simulation(
     sim.collisions = [ion_ion_coulomb]
 
     field_diag = picmi.FieldDiagnostic(
-        name="diag1",
+        name="field_diag",
         grid=grid,
         period=diag_period,
         data_list=["B", "E", "rho", "J"],
@@ -295,13 +295,13 @@ def main():
         "--resolution",
         help="number of cells along x and y",
         type=int,
-        default=128,
+        default=72,
     )
     parser.add_argument(
         "--nppc",
         help="macroparticles per cell",
         type=int,
-        default=16,
+        default=500,
     )
     parser.add_argument(
         "--steps",
@@ -431,7 +431,7 @@ def main():
         "--marder-alpha",
         help="Marder damping factor (with --marder)",
         type=float,
-        default=0.05,
+        default=0.01,
     )
     parser.add_argument(
         "--marder-target",
@@ -443,7 +443,7 @@ def main():
         "--marder-level",
         help="Marder application cadence (with --marder)",
         choices=["all_substeps", "half_steps", "full_steps"],
-        default="all_substeps",
+        default="half_steps",
     )
     parser.add_argument(
         "--marder-interval",
@@ -464,14 +464,14 @@ def main():
         "--verbose",
         help="WarpX verbosity",
         type=int,
-        default=0,
+        default=1,
     )
     parser.add_argument(
         "--grid-type",
         help="field grid staggering: 'staggered' (Yee, enlarged-cell conformal "
         "EB) or 'collocated' (nodal, level-set conformal EB)",
         choices=["staggered", "collocated"],
-        default="staggered",
+        default="collocated",
     )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left

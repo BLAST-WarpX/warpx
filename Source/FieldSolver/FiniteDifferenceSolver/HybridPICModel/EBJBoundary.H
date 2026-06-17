@@ -110,6 +110,65 @@ namespace warpx::hybrid
         bool fill_covered_centers = false,
         EBFillStatus* status_cache = nullptr);
 
+    /** \brief Apply the collocated-ECT (C-ECT) conformal correction to the
+     * freshly nodal-pushed magnetic field on a collocated grid, so a curved
+     * embedded boundary is honored with a finite-volume Faraday update instead
+     * of a pointwise level-set mirror fill (which imprints a grid-locked m = 4
+     * on circular walls).
+     *
+     * The core nodal Faraday push (warpx.EvolveB) has already advanced every
+     * node by the wide-centered EvolveBCartesian curl
+     *   dB_nodal_c = dt*(UpwardD_b(E_a) - UpwardD_a(E_b))
+     * with (a, b) the in-plane axes of component c (Bx: (y,z), By: (z,x),
+     * Bz: (x,y)); e.g. Bx: dt*(UpwardDz(Ey) - UpwardDy(Ez)). This routine ADDS
+     * the per-node correction
+     *   dB_corr_c = dB_fv_c - dB_nodal_c,
+     * so the net increment is the FV value dB_fv_c on near-wall band nodes and
+     * is bit-identically unchanged in the interior.
+     *
+     * For each node the dual face (+/- h/2 about the node in the (a, b) plane,
+     * at the node's c-index) is cut by the nodal level set. Sampling the four
+     * dual-face corners of the level set (each the bilinear cell-center average
+     * of the four nodal \c distance_to_eb values bracketing it in the (a, b)
+     * plane) classifies the node:
+     *
+     * - all four corners in the fluid (phi > 0): INTERIOR, no correction;
+     * - all four corners in the conductor (phi <= 0): DEEP, B_c set to 0;
+     * - mixed: BAND, the FV correction is applied.
+     *
+     * On a band node the cut dual cell has edge-lengths l = h*(phi>0 fraction)
+     * (linear root t = phi_pos/(phi_pos - phi_neg)), cut area S_cut from a
+     * Sutherland-Hodgman clip of the dual square against {phi >= 0} (shoelace),
+     * ECT stable area S^stb = 0.5*h*max(l), and effective area
+     * S_eff = max(S_cut, S^stb) (bounds dt*V/S, no small-cut blow-up). The cut
+     * circulation V_cut sums the midpoint-averaged in-plane E along the cut
+     * edges, oriented per component so the full-cell limit (l = h,
+     * S_eff = h^2) reduces dB_fv_c to dB_nodal_c exactly:
+     *   V_cut = E_a^top*l_top - E_a^bot*l_bot + E_b^left*l_left - E_b^right*l_right,
+     *   dB_fv_c = dt*V_cut/S_eff.
+     *
+     * 2D XZ applies the correction only to the out-of-plane component By (whose
+     * in-plane curl is circ(Ez, Ex)); the in-plane Bx, Bz are left to the core
+     * nodal push (their Faraday curl uses the out-of-plane Ey through a 1-D
+     * derivative). RZ and 1D are no-ops (the caller keeps the legacy path).
+     *
+     * The level set must carry at least two valid ghost cells (the caller
+     * FillBoundary's it). This routine writes only band/deep nodes; the caller
+     * is responsible for the following FillBoundaryB.
+     *
+     * \param[in,out] Bfield collocated (nodal) magnetic field (all 3 components)
+     * \param[in] Efield collocated (nodal) electric field (all 3 components)
+     * \param[in] distance_to_eb nodal signed-distance function to the boundary
+     * \param[in] geom level geometry
+     * \param[in] dt time step of the Faraday push
+     */
+    void ApplyConformalBCorrection (
+        ablastr::fields::VectorField const& Bfield,
+        ablastr::fields::VectorField const& Efield,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom,
+        amrex::Real dt);
+
     /** \brief Enforce an embedded-boundary condition on a nodal scalar field
      * (the hybrid solver's ion charge density and electron pressure).
      *

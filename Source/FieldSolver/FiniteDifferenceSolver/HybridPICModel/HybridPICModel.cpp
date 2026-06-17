@@ -122,6 +122,12 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
+    // Collocated conformal B wall treatment: collocated-ECT correction (default)
+    // or the pointwise level-set mirror fill (for A/B comparison).
+    pp_hybrid.query("conformal_b_mirror", m_conformal_b_mirror);
+    // Optionally disable the collocated conformal B wall treatment entirely (no
+    // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
+    pp_hybrid.query("conformal_b_off", m_conformal_b_off);
 
     // Image parity of charge deposited beyond the embedded boundary: "pec" folds it back
     // with opposite sign (density vanishes at the wall), "reflect" folds it back with its
@@ -1297,15 +1303,17 @@ void HybridPICModel::FieldPush (
     // On the collocated conformal path there is no enlarged-cell (ECT) extension to
     // impose the wall condition on B during the Faraday push -- EvolveBCartesianECT
     // does that on the staggered grid, whereas the collocated push is the unmasked
-    // nodal curl. Enforce the PEC condition on the freshly pushed B directly from the
-    // level set, with the magnetic parity (normal odd / tangential even, flux-excluding
-    // PEC), so the masked covered nodes are wall-consistent for the next substep's
-    // curl(B) plasma current. (The FillBoundaryB above gives the mirror gather valid
-    // ghost values; a second exchange below propagates the filled covered values.)
-    if (m_use_conformal_eb &&
+    // nodal curl. Impose the wall condition on the freshly pushed B directly from the
+    // level set so the masked covered nodes are wall-consistent for the next substep's
+    // curl(B) plasma current. (The FillBoundaryB above gives the gather/cut stencils
+    // valid ghost values; a second exchange below propagates the band/covered values.)
+    if (m_use_conformal_eb && !m_conformal_b_off &&
         WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
-        auto const& eb_update_B = warpx.GetEBUpdateBFlag();
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+#if defined(WARPX_DIM_RZ)
+            // RZ keeps the pointwise level-set mirror fill with the magnetic
+            // parity (normal odd / tangential even, flux-excluding PEC).
+            auto const& eb_update_B = warpx.GetEBUpdateBFlag();
             if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
             warpx::hybrid::ApplyPECBoundaryToField(
                 warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
@@ -1315,6 +1323,34 @@ void HybridPICModel::FieldPush (
                 m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
                 &m_eb_bc_status_B[lev]);
+#else
+            if (m_conformal_b_mirror) {
+                // A/B fallback: the pointwise level-set mirror fill (magnetic
+                // parity, normal odd / tangential even).
+                auto const& eb_update_B = warpx.GetEBUpdateBFlag();
+                if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
+                warpx::hybrid::ApplyPECBoundaryToField(
+                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    eb_update_B[lev],
+                    *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+                    warpx.Geom(lev),
+                    m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
+                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                    &m_eb_bc_status_B[lev]);
+            } else {
+                // 3D / 2D-XZ default: the collocated-ECT conformal correction, a
+                // finite-volume Faraday update on the level-set-cut dual cells. It
+                // replaces the pointwise mirror (which imprints a grid-locked m = 4
+                // on curved walls), reduces bit-identically to the nodal push away
+                // from the wall, and zeros the deep-interior covered nodes.
+                warpx::hybrid::ApplyConformalBCorrection(
+                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+                    warpx.Geom(lev),
+                    dt);
+            }
+#endif
         }
         warpx.FillBoundaryB(ng, nodal_sync);
     }
