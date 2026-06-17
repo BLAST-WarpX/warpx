@@ -2970,6 +2970,23 @@ Details about the collision models can be found in the :ref:`theory section <mul
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant.
 
+.. pp:param:: <collision_name>.create_products
+    :type: ``bool``
+    :default: ``1``
+    :optional:
+
+    Only for ``nuclearfusion``. When true, the product particles are created, otherwise not.
+
+.. pp:param:: <collision_name>.save_particle_production
+    :type: ``bool``
+    :default: ``0``
+    :optional:
+
+    Only for ``nuclearfusion``.
+    When true, the integrated product particle density is saved in a MultiFab with the name ``<collision_name>_particle_production``.
+    The data can be written out by adding that name to the ``<diag_name>.fields_to_plot`` input parameter.
+    The option can be used in conjuction with <collision_name>.save_particle_production to save only the product density and not create particles.
+
 .. pp:param:: <collision_name>.background_density
     :type: ``float``
 
