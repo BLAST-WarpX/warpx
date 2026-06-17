@@ -493,17 +493,21 @@ void HybridPICModel::BfieldEvolve (
     IntVect ng, std::optional<bool> nodal_sync )
 {
     amrex::ignore_unused(step);
-    const bool use_rkf45 = m_use_rkf45; // use step to get use_rkf45 with intervals
+    bool use_rkf45 = m_use_rkf45; // use step to get use_rkf45 with intervals
     // Make copies of the current B-field multifabs (at t = n) since the
-    // starting B-field is needed for the integration logic
+    // starting B-field is needed for the integration logic.
+    // We also store the initial B-field from the start of this integration step
+    // (i.e., a static copy) in case we need to fully reset the Bfield (needed
+    // for RK4).
     std::array< MultiFab, 3 > B_old;
     for (int ii = 0; ii < 3; ii++)
     {
         B_old[ii] = MultiFab(
-            Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 1,
-            Bfield[lev][ii]->nGrowVect()
+            Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 2, ng
         );
         MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+        // the values at index 1 will be kept static through the integration steps
+        MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 1, 1, ng);
     }
 
     amrex::Real dt_sub = dt_half / (m_substeps / 2._rt);
@@ -514,8 +518,8 @@ void HybridPICModel::BfieldEvolve (
     while (t < dt_half)
     {
         if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
-        bool step_succeeded;
-        amrex::Real step_change_factor;
+        bool step_succeeded = true;
+        amrex::Real step_change_factor = 1.0_rt;
 
         if (use_rkf45) {
             const amrex::Real error = BfieldEvolveRKF45(
@@ -532,9 +536,21 @@ void HybridPICModel::BfieldEvolve (
                 dt_sub, lev, subcycling_half, ng, nodal_sync
             );
 
-            // TODO: check to make sure B-field doesn't have any NaN values
-            step_succeeded = true;
-            step_change_factor = 1.0_rt; // do not adjust substep size
+            // Check that the B-field does not have nan or inf values
+            for (int idim = 0; idim < 3; ++idim) {
+                step_succeeded = step_succeeded && Bfield[lev][idim]->is_finite();
+            }
+
+            if (!step_succeeded) {
+                // restart this full step and this time use RKF45
+                t = 0._rt;
+                n_accepted = 0;
+                // reset B_old to original one
+                for (int ii = 0; ii < 3; ii++) {
+                    MultiFab::Copy(B_old[ii], B_old[ii], 1, 0, 1, ng);
+                }
+                use_rkf45 = true;
+            }
         }
 
         if (step_succeeded) {
