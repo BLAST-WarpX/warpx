@@ -73,9 +73,12 @@ class PlasmaCylinderCompression(object):
             / (1.0 + np.exp((r - self.R_p) / self.delta_p))
         )
 
-    def __init__(self, test, verbose):
+    def __init__(self, test, verbose, conformal=False):
         self.test = test
         self.verbose = verbose or self.test
+        # Use the conformal (level-set) embedded-boundary treatment of the
+        # collocated hybrid solver instead of the stair-case approximation.
+        self.conformal = conformal
 
         self.Lx = self.LX
         self.Ly = self.LY
@@ -288,6 +291,7 @@ class PlasmaCylinderCompression(object):
             A_external=A_ext,
             tau_ramp=20e-6,
             t0_ramp=5e-6,
+            use_conformal_eb=True if self.conformal else None,
         )
         simulation.solver = self.solver
 
@@ -403,8 +407,16 @@ parser.add_argument(
     help="Verbose output",
     action="store_true",
 )
+parser.add_argument(
+    "--conformal",
+    help="use the conformal (level-set) embedded-boundary treatment instead of "
+    "the stair-case approximation (collocated grid)",
+    action="store_true",
+)
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
-run = PlasmaCylinderCompression(test=args.test, verbose=args.verbose)
+run = PlasmaCylinderCompression(
+    test=args.test, verbose=args.verbose, conformal=args.conformal
+)
 simulation.step()

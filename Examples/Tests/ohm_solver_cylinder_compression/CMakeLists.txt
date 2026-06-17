@@ -12,6 +12,19 @@ add_warpx_test(
 )
 label_warpx_test(test_3d_ohm_solver_cylinder_compression_picmi slow)
 
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_ohm_solver_cylinder_compression_conformal_collocated_picmi  # name
+        3  # dims
+        2  # nprocs
+        "inputs_test_3d_ohm_solver_cylinder_compression_picmi.py --test --conformal"  # inputs
+        "analysis_conformal_collocated.py --path diags/diag1000010"  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+    label_warpx_test(test_3d_ohm_solver_cylinder_compression_conformal_collocated_picmi slow)
+endif()
+
 add_warpx_test(
     test_rz_ohm_solver_cylinder_compression_picmi  # name
     RZ  # dims
