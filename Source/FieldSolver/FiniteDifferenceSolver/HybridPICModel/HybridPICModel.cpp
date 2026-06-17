@@ -518,7 +518,7 @@ void HybridPICModel::BfieldEvolve (
         amrex::Real step_change_factor;
 
         if (use_rkf45) {
-            amrex::Real error = BfieldEvolveRKF45(
+            const amrex::Real error = BfieldEvolveRKF45(
                 Bfield, Efield, Jfield, rhofield, eb_update_E, B_old,
                 dt_sub, lev, subcycling_half, ng, nodal_sync
             );
@@ -565,7 +565,7 @@ void HybridPICModel::BfieldEvolve (
     m_substeps = 2*n_accepted;
 
     if (WarpX::GetInstance().Verbose()) {
-        amrex::Print() << "RKF45 "
+        amrex::Print() << "B-field update "
             << (subcycling_half == SubcyclingHalf::FirstHalf ? "1st" : "2nd") << " half"
             << ": " << n_accepted << " accepted, "
             << (n_attempts - n_accepted) << " rejected substeps"
