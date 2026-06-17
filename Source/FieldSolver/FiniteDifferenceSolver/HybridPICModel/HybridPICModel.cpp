@@ -478,7 +478,7 @@ void HybridPICModel::BfieldEvolve (
     {
         BfieldEvolve(
             Bfield, Efield, Jfield, rhofield, eb_update_E,
-            dt_half, lev, subcycling_half, ng, nodal_sync
+            step, dt_half, lev, subcycling_half, ng, nodal_sync
         );
     }
 }
@@ -492,6 +492,7 @@ void HybridPICModel::BfieldEvolve (
     int step, amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
+    amrex::ignore_unused(step);
     const bool use_rkf45 = m_use_rkf45; // use step to get use_rkf45 with intervals
     // Make copies of the current B-field multifabs (at t = n) since the
     // starting B-field is needed for the integration logic
