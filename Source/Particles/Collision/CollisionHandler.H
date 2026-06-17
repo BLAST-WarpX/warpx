@@ -25,6 +25,9 @@ class CollisionHandler
 public:
     explicit CollisionHandler (const MultiParticleContainer*  mypc);
 
+    /* Allocate data needed for collision */
+    void AllocData ();
+
     /* Perform all of the collisions */
     void doCollisions (int step, amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc);
 

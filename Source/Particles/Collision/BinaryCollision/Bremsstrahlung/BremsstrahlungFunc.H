@@ -8,6 +8,7 @@
 #ifndef WARPX_BREMSSTRAHLUNG_FUNC_H_
 #define WARPX_BREMSSTRAHLUNG_FUNC_H_
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -31,6 +32,7 @@
  *  effectively created in the particle creation functor.
  */
 class BremsstrahlungFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -96,6 +98,7 @@ public:
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* AMREX_RESTRICT p_product_data,
+            int const /*i_cell*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT weight1 = soa_1.m_rdata[PIdx::w];
@@ -406,7 +409,7 @@ public:
 
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 

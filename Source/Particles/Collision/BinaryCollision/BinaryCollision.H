@@ -168,6 +168,11 @@ public:
     BinaryCollision ( BinaryCollision&& )                  = delete;
     BinaryCollision& operator= ( BinaryCollision&& )       = delete;
 
+    void AllocData () override
+    {
+        m_binary_collision_functor.AllocData();
+    }
+
     /** Perform the collisions
      *
      * @param cur_time Current time
@@ -287,7 +292,7 @@ public:
 
         ABLASTR_PROFILE("BinaryCollision::doCollisionsWithinTile");
 
-        const auto& binary_collision_functor = m_binary_collision_functor.executor();
+        const auto& binary_collision_functor = m_binary_collision_functor.executor(mfi);
         const bool have_product_species = m_have_product_species;
 
         // Store product species data in vectors
@@ -690,7 +695,7 @@ public:
                         n1, n1, T1, T1, global_lamdb,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
-                        p_pair_reaction_weight, p_product_data, engine);
+                        p_pair_reaction_weight, p_product_data, i_cell, engine);
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
@@ -1295,7 +1300,7 @@ public:
                         n1, n2, T1, T2, global_lamdb,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, p_mask, p_pair_indices_1, p_pair_indices_2,
-                        p_pair_reaction_weight, p_product_data, engine);
+                        p_pair_reaction_weight, p_product_data, i_cell, engine);
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);

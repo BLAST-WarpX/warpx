@@ -918,6 +918,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+        } else if ( warpx.m_fields.has(m_varnames[comp], lev) ) {
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], lev), lev, m_crse_ratio);
         } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error on component " + m_varnames[comp] + ": "

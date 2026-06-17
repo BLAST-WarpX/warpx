@@ -10,6 +10,7 @@
 
 #include "SingleNuclearFusionEvent.H"
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -33,6 +34,7 @@
  *  This functor also reads and contains the fusion multiplier.
  */
 class NuclearFusionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -77,11 +79,39 @@ public:
             pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
+        bool create_products = true;
+        utils::parser::queryWithParser(
+            pp_collision_name, "create_products", create_products);
+        utils::parser::queryWithParser(
+            pp_collision_name, "save_particle_production", m_save_particle_production);
+
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
         m_exe.m_fusion_type = m_fusion_type;
         m_exe.m_isSameSpecies = m_isSameSpecies;
+        m_exe.m_create_products = create_products;
+
+        if (m_save_particle_production) {
+            m_particle_production_mf_name = collision_name + "_particle_production";
+        }
+    }
+
+    void AllocData () override {
+        if (m_save_particle_production) {
+            WarpX & warpx = WarpX::GetInstance();
+
+            int const level = 0;
+            amrex::BoxArray const & ba = warpx.boxArray(level);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(level);
+            int const ncomps = 1;
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            amrex::Real const initial_value = 0.;
+            bool const remake = true;
+            bool const redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(m_particle_production_mf_name, level, ba, dmap, ncomps, ng,
+                                      initial_value, remake, redistribute_on_remake);
+        }
     }
 
     struct Executor {
@@ -140,6 +170,7 @@ public:
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* /*p_product_data*/,
+            int const i_cell,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -189,7 +220,10 @@ public:
                         m_fusion_multiplier, multiplier_ratio,
                         m_probability_threshold,
                         m_probability_target_value,
-                        m_fusion_type, engine);
+                        m_fusion_type, engine,
+                        m_create_products,
+                        i_cell,
+                        m_particle_production);
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {
@@ -217,9 +251,20 @@ public:
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
         bool m_isSameSpecies;
+
+        bool m_create_products = true;
+        amrex::Real * m_particle_production = nullptr;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (amrex::MFIter const& mfi) {
+        if (m_save_particle_production) {
+            WarpX & warpx = WarpX::GetInstance();
+            int const level = 0;
+            amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, level);
+            m_exe.m_particle_production = particle_production_mf->array(mfi).dataPtr();
+        }
+        return m_exe;
+    }
 
     bool use_global_debye_length() { return false; }
 
@@ -237,6 +282,9 @@ private:
     amrex::ParticleReal m_probability_target_value;
     NuclearFusionType m_fusion_type;
     bool m_isSameSpecies;
+
+    bool m_save_particle_production = false;
+    std::string m_particle_production_mf_name;
 
     Executor m_exe;
 };

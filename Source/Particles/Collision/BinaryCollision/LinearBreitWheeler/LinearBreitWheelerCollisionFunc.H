@@ -10,6 +10,7 @@
 
 #include "SingleLinearBreitWheelerCollisionEvent.H"
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -33,6 +34,7 @@
  *  This functor also reads and stores the event multiplier.
  */
 class LinearBreitWheelerCollisionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -150,6 +152,7 @@ public:
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* /*p_product_data*/,
+            int const /*i_cell*/,
             amrex::RandomEngine const& engine) const
         {
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
@@ -224,7 +227,7 @@ public:
         bool m_need_product_data = false;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     bool use_global_debye_length() { return false; }
 

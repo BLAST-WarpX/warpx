@@ -121,15 +121,19 @@ DTF1.species = deuterium_1 tritium_1
 DTF1.product_species = helium4_1 neutron_1
 DTF1.type = nuclearfusion
 DTF1.event_multiplier = 1.e50
+DTF1.create_products = 1
+DTF1.save_particle_production = 1
 
 DTF2.species = deuterium_2 tritium_2
 DTF2.product_species = helium4_2 neutron_2
 DTF2.type = nuclearfusion
 DTF2.event_multiplier = 1.e15
 DTF2.probability_target_value = 0.02
+DTF2.create_products = 1
+DTF2.save_particle_production = 1
 
 # Diagnostics
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = rho
+diag1.fields_to_plot = rho DTF1_particle_production DTF2_particle_production

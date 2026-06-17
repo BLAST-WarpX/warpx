@@ -64,6 +64,7 @@ if re.search("tritium", warpx_used_inputs):
     reaction_type = "DT"
     reactant_species = ["deuterium", "tritium"]
     product_species = ["helium4", "neutron"]
+    collision_names = ["DTF1", "DTF2"]
     ntests = 2
     E_fusion = 17.58929696 * MeV_to_Joule
 else:
@@ -71,6 +72,7 @@ else:
     reaction_type = "DD"
     reactant_species = ["deuterium", "hydrogen2"]
     product_species = ["helium3", "neutron"]
+    collision_names = ["DDNHeF1"]
     ntests = 1
     E_fusion = 3.26891111e6 * MeV_to_Joule
 
@@ -398,6 +400,17 @@ def check_macroparticle_number(
         atol=5.0 * std_macroparticle_number,
     )
 
+    if 'particle_production' in data:
+        w_sum = data[product_species[0] + "_w_end"].sum()
+        n_sum = data['particle_production'].sum()
+        tolerance = 0.001
+        print('Check particle production diagnostic:')
+        print(f'from particles  = {w_sum}')
+        print(f'from diagnostic = {n_sum}')
+        print(f'error = {np.abs(w_sum - n_sum)/w_sum}')
+        print(f'tolerance = {tolerance}')
+        assert is_close(w_sum, n_sum, rtol=tolerance)
+
     ## used in subsequent function
     return expected_fusion_number
 
@@ -543,6 +556,10 @@ def main():
 
         # General checks that are performed for all tests
         generic_check(data)
+
+        product_production_name = f"{collision_names[i-1]}_particle_production"
+        if (("boxlib", product_production_name) in ds_end.field_list):
+            data["particle_production"] = field_data_end["boxlib", product_production_name].to_ndarray()
 
         # Checks that are specific to test number i
         eval("specific_check" + str(i) + "(data, dt)")
