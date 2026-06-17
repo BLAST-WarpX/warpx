@@ -19,12 +19,12 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
-#include "Utils/Parser/IntervalsParser.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -199,7 +199,7 @@ public:
     int m_substeps = 10;
 
     /** Intervals to use RKF45 integrator and to update substeps parameter */
-    utils::parser::IntervalsParser m_rkf45_intervals;
+    ablastr::utils::text::IntervalsParser m_rkf45_intervals;
     /** Relative tolerance for RKF45 adaptive substep error control */
     amrex::Real m_substep_rtol = 1.e-4;
     /** Absolute tolerance for RKF45 adaptive substep error control */

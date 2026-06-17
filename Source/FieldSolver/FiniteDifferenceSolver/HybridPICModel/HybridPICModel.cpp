@@ -48,7 +48,7 @@ void HybridPICModel::ReadParameters ()
     // read rkf45 intervals
     std::vector<std::string> rkf45_intervals_string_vec = {"0"};
     pp_hybrid.queryarr("use_rkf45", rkf45_intervals_string_vec);
-    m_rkf45_intervals = utils::parser::IntervalsParser(rkf45_intervals_string_vec);
+    m_rkf45_intervals = ablastr::utils::text::IntervalsParser(rkf45_intervals_string_vec);
     utils::parser::queryWithParser(pp_hybrid, "substep_rtol", m_substep_rtol);
     utils::parser::queryWithParser(pp_hybrid, "substep_atol", m_substep_atol);
     utils::parser::queryWithParser(pp_hybrid, "substep_safety", m_substep_safety);
