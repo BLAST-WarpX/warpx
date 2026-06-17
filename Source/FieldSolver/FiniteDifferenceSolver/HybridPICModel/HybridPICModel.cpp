@@ -1079,12 +1079,11 @@ void HybridPICModel::BfieldEvolveRKF45 (
     // The adjustment is made to jump to more required substeps or slowly decrease
     // if m_substeps is too large (using 95% of the current m_substeps value and
     // 5% of the lower, new value).
-    if (m_substeps < 2*n_accepted) {
-        m_substeps = 2*n_accepted;
+    if (m_substeps < 2*n_attempts) {
+        m_substeps = 2*n_attempts;
     } else {
-        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_accepted));
+        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_attempts));
     }
-
 
     if (WarpX::GetInstance().Verbose()) {
         amrex::Print() << "RKF45 "

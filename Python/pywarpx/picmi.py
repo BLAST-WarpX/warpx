@@ -2151,13 +2151,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         When ``use_rkf45`` is active (True or a non-empty interval string),
         this is instead used only as the initial substep count estimate for
         the adaptive solver. After each timestep on which ``use_rkf45`` is
-        active, this value is updated based on ``n_accepted``, the number of
-        accepted RKF45 sub-steps taken in the most recent half-step: if the
-        current value is less than ``2 * n_accepted``, it jumps immediately to
-        ``2 * n_accepted``; otherwise it decays slowly toward that target via
-        exponential smoothing (95% old, 5% of ``2 * n_accepted``). This
-        warm-start guess also carries over to RK4 steps on timesteps where
-        ``use_rkf45`` is not active.
+        active, this value is updated based on ``n_attempts``, the total number
+        of RKF45 sub-step attempts (accepted and rejected) taken in the most
+        recent half-step: if the current value is less than ``2 * n_attempts``,
+        it jumps immediately to ``2 * n_attempts``; otherwise it decays slowly
+        toward that target via exponential smoothing (95% old, 5% of
+        ``2 * n_attempts``). This warm-start guess also carries over to
+        RK4 steps on timesteps where ``use_rkf45`` is not active.
 
     use_rkf45: bool or str, default=False
         If True (or the WarpX time-interval string ``"::"``), use the
