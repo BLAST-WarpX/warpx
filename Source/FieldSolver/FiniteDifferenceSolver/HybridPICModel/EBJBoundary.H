@@ -96,7 +96,14 @@ namespace warpx::hybrid
      *            centers are on or inside the embedded surface
      * \param[in,out] status_cache caller-owned fill classification, built on
      *            first use and reusable until the grids change (may be
-     *            nullptr to classify locally on every call)
+     *            nullptr to classify locally on every call). Because the
+     *            classification depends on \c band_cells, a cache must not be
+     *            shared between calls with different band widths.
+     * \param[in] band_cells width of the mirror-fill band in cells (default 1,
+     *            the axis-aligned face reach). A field whose downstream stencil
+     *            is isotropic (reaches the diagonal/corner neighbors) passes
+     *            sqrt(AMREX_SPACEDIM) so the corner edges are mirror-filled
+     *            instead of left in the zeroed deep interior.
      */
     void ApplyPECBoundaryToField (
         ablastr::fields::VectorField const& field,
@@ -108,7 +115,8 @@ namespace warpx::hybrid
         bool direct_fill,
         bool normal_odd = false,
         bool fill_covered_centers = false,
-        EBFillStatus* status_cache = nullptr);
+        EBFillStatus* status_cache = nullptr,
+        amrex::Real band_cells = 1.0);
 
     /** \brief Apply the collocated-ECT (C-ECT) conformal correction to the
      * freshly nodal-pushed magnetic field on a collocated grid, so a curved

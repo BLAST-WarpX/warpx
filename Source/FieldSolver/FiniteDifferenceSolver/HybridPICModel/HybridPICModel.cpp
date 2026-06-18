@@ -151,6 +151,15 @@ void HybridPICModel::ReadParameters ()
     // (Cartesian geometries; suppresses the grid m=4 from the resistive term)
     pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
 
+    // The isotropic hyper-resistivity Laplacian reads the plasma current at its
+    // diagonal/corner neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D cube
+    // corner). Widen the plasma-current EB mirror-fill band to that corner reach
+    // so the diagonal edges near a curved wall are mirror-filled rather than left
+    // in the zeroed deep interior (which would inject a spurious nabla^2 J there).
+    m_eb_fill_band_cells = m_isotropic_hyper_resistivity
+        ? std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM))
+        : amrex::Real(1.0);
+
     // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
     // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
     utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);
@@ -457,14 +466,19 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // current is evaluated at the covered centers and is not meaningful
     // there).
     if (EB::enabled()) {
-        if (static_cast<int>(m_eb_bc_status_E.size()) <= lev) { m_eb_bc_status_E.resize(lev+1); }
+        // The plasma current uses its own (wider-band) fill classification when
+        // the isotropic hyper-resistivity Laplacian is enabled: that stencil
+        // reads diagonal/corner edges, so the band is widened to m_eb_fill_band_cells
+        // (see ReadParameters). Kept separate from m_eb_bc_status_E, whose
+        // one-cell band is shared with the deposit fold and the Ohm's-law E fill.
+        if (static_cast<int>(m_eb_bc_status_Jplasma.size()) <= lev) { m_eb_bc_status_Jplasma.resize(lev+1); }
         warpx::hybrid::ApplyPECBoundaryToField(
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
-            &m_eb_bc_status_E[lev]);
+            &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells);
     }
 }
 

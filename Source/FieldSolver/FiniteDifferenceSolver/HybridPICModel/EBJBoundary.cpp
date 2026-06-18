@@ -505,7 +505,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     bool direct_fill,
     bool normal_odd,
     bool fill_covered_centers,
-    EBFillStatus* status_cache)
+    EBFillStatus* status_cache,
+    amrex::Real band_cells)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -523,11 +524,16 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #else
     amrex::Real const h_max = std::max(dx_arr[0], dx_arr[1]);
 #endif
-    // Mirror-fill masked edges within one cell of the surface (the only ones
-    // reached by stencils that straddle the wall) and zero everything deeper.
-    // The minimum image distance keeps the interpolation point in the plasma
-    // for edges that sit very close to the surface.
-    amrex::Real const d_band = h_max;
+    // Mirror-fill masked edges within band_cells of the surface and zero
+    // everything deeper. The default one-cell band (band_cells = 1) covers the
+    // axis-aligned stencils that straddle the wall; an isotropic stencil also
+    // reaches the diagonal neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D
+    // cube corner), so a consumer of those stencils widens the band to
+    // sqrt(AMREX_SPACEDIM) so the corner edges are mirror-filled rather than
+    // left in the zeroed deep interior. The minimum image distance keeps the
+    // interpolation point in the plasma for edges that sit very close to the
+    // surface.
+    amrex::Real const d_band = band_cells * h_max;
     amrex::Real const d_img_min = 0.5_rt * h_max;
 
     // Staggering offsets in grid coordinates for each field component (0.5 in

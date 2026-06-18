@@ -418,6 +418,18 @@ public:
     /** Cached embedded-boundary fill classification for the recovered
      *  magnetic field, one entry per level; reset on regrid */
     mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_B;
+    /** Cached EB fill classification for the Ampere plasma current, one entry
+     *  per level; reset on regrid. Separate from m_eb_bc_status_E because the
+     *  isotropic hyper-resistivity Laplacian reads the plasma current at its
+     *  diagonal/corner neighbors, so this fill widens the mirror band
+     *  (m_eb_fill_band_cells) -- a wider classification than the edge-field
+     *  cache, which must stay at the one-cell band shared with the deposit
+     *  fold. Only used when isotropic hyper-resistivity is enabled. */
+    mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_Jplasma;
+    /** Mirror-fill band width (in cells) for the plasma-current EB fill:
+     *  sqrt(AMREX_SPACEDIM) when the isotropic hyper-resistivity Laplacian is
+     *  enabled (so its diagonal corners are filled, not zeroed), else 1. */
+    amrex::Real m_eb_fill_band_cells = 1.0;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

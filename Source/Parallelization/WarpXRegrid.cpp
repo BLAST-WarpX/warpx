@@ -220,6 +220,9 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
             if (lev < static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_B.size())) {
                 m_hybrid_pic_model->m_eb_bc_status_B[lev].reset();
             }
+            if (lev < static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_Jplasma.size())) {
+                m_hybrid_pic_model->m_eb_bc_status_Jplasma[lev].reset();
+            }
         }
 
         if (eb_enabled) {
