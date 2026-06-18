@@ -48,6 +48,9 @@
  * to determine by how much the fusion multiplier is reduced
  * @param[in] fusion_type the physical fusion process to model
  * @param[in] engine the random engine.
+ * @param[in] create_products flags whether or not to create particles
+ * @param[in] i_cell the grid cell where the collision is taking place
+ * @param[in] particle_production the pointer to where the particle production result is to be added
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
