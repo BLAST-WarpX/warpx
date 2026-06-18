@@ -609,10 +609,10 @@ WarpX::OneStep_nosub (
             // vacuum medium
             EvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
-            // Inject prescribed current into current_fp before the E-solve
-            if (m_current_injection) {
-                InjectPrescribedCurrent(a_cur_time);
-            }
+            // Prescribed current injection is now deposited through the standard
+            // particle current-deposition path (PrescribedCurrentParticleContainer,
+            // run in PushParticlesandDeposit above), so no explicit injection into
+            // current_fp is needed here.
             // macroscopic medium
             MacroscopicEvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else {

@@ -40,6 +40,7 @@
 #include "Initialization/WarpXInit.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/PrescribedCurrentParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
@@ -448,9 +449,11 @@ WarpX::WarpX ()
         const ParmParse pp_warpx("warpx");
         pp_warpx.query("current_injection", m_current_injection);
         if (m_current_injection) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                m_em_solver_medium == MediumForEM::Macroscopic,
-                "warpx.current_injection requires algo.em_solver_medium = macroscopic");
+            // NOTE: prescribed current injection is now realized by
+            // PrescribedCurrentParticleContainer, which deposits through the
+            // standard particle current path (works with the macroscopic *and*
+            // vacuum solvers, and is visible in the Jx/Jy/Jz diagnostics). The
+            // legacy parse below is retained but no longer drives the solver.
 
             // Helper: load a two-column waveform file into (time, current) vectors.
             auto load_waveform = [](const std::string& path,
@@ -1587,7 +1590,8 @@ WarpX::ReadParameters ()
 
         std::vector<std::string> sort_intervals_string_vec = {"-1"};
         int particle_shape;
-        if (!species_names.empty() || !lasers_names.empty()) {
+        if (!species_names.empty() || !lasers_names.empty()
+            || PrescribedCurrentParticleContainer::is_enabled()) {
             if (utils::parser::queryWithParser(pp_algo, "particle_shape", particle_shape)){
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     (particle_shape >= 1) && (particle_shape <=4),
