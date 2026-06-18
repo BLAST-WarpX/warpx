@@ -29,18 +29,27 @@
  * diagnostics and (b) is handled identically by the explicit and implicit
  * field solvers.
  *
- * Each filled cell carries a +/- weight particle pair (charge=1). The two
- * partners move in opposite directions, so the pair deposits a net current
- * with **zero net charge** -- no explicit "return" face is required to keep
- * the source charge-neutral. Particle positions are reset every step, so the
- * antenna does not drift even for a sustained unidirectional waveform.
+ * Each filled cell carries a single charge=1 particle of signed weight; with
+ * DIRECT current deposition the antenna deposits only J (no charge), so it
+ * reproduces the current_fp box injection exactly. Particle positions are
+ * reset every step, so the antenna does not drift for a sustained waveform.
  *
- * Configured via the public `warpx.current_injection.*` input block.
+ * NOTE: this does NOT remove the need for a closed current path. The injected
+ * J is localized, so div(J) != 0 at the box faces and charge conservation
+ * still forces a return (locally, via displacement current / the nearest
+ * conductor). Prescribed current injection only sustains a current along a
+ * conductor when the circuit is closed -- a ring/coil (div J = 0 around the
+ * loop) or an explicit drive + return face pair.
  *
- * Current scope (first port of PR #6766's public feature): all drive boxes
- * share a single current direction `dir`, sign = +1, and a single global
- * waveform file. Return faces / sign = -1 / mixed directions abort with a
- * message (these need per-particle metadata and are a follow-up).
+ * Configured via the public `warpx.current_injection.*` input block:
+ * n_pairs drive faces, each with a box, area A, sign (+/-1), and an optional
+ * per-pair waveform file (pair_N.file) that overrides the global
+ * current_injection.file. A "return" is just a drive face with sign = -1, so
+ * no dedicated return block exists. Single global current direction `dir`.
+ * Requires algo.particle_shape >= 1. Works with algo.current_deposition =
+ * direct or a charge-conserving scheme (esirkepov/villasenor): positions are
+ * pushed by v*dt before deposition (then reset), so the displacement yields
+ * J = q w v either way.
  */
 class PrescribedCurrentParticleContainer
     : public WarpXParticleContainer
@@ -84,25 +93,27 @@ public:
     static bool is_enabled ();
 
 private:
-    //! One axis-aligned drive box.
+    //! One axis-aligned drive box with its own waveform.
     struct Face {
         amrex::Real lo[3] = {0.,0.,0.};
         amrex::Real hi[3] = {0.,0.,0.};
         amrex::Real A     = 1.;   //!< Face area perpendicular to dir [m^2]
         int dir           = 0;    //!< Current component: 0=Jx, 1=Jy, 2=Jz
-        int sign          = 1;    //!< Current sign (only +1 supported for now)
+        int sign          = 1;    //!< Current sign: +1 or -1 (J = sign*I(t)/A)
+        //! Per-face waveform (from pair_N.file if given, else the global file).
+        std::vector<amrex::Real> t;   //!< sample times [s]
+        std::vector<amrex::Real> I;   //!< currents [A]
     };
 
-    std::vector<Face>        m_faces;
-    std::vector<amrex::Real> m_time;     //!< waveform sample times [s]
-    std::vector<amrex::Real> m_current;  //!< waveform currents [A]
+    std::vector<Face> m_faces;
 
     int        m_dir        = 0;   //!< Common current direction of all faces
     amrex::Real m_vel_coeff = 0.;  //!< C such that speed = C * I(t) [m/s/A]
     bool       m_enabled    = true;
 
-    //! Linear interpolation of the waveform; returns 0 outside the table.
-    [[nodiscard]] amrex::Real interpolate_current (amrex::Real t) const;
+    //! Linear interpolation of a (t,I) table; returns 0 outside the table.
+    [[nodiscard]] static amrex::Real interpolate (
+        const std::vector<amrex::Real>& t, const std::vector<amrex::Real>& I, amrex::Real tt);
 };
 
 #endif // WARPX_PrescribedCurrentParticleContainer_H_
