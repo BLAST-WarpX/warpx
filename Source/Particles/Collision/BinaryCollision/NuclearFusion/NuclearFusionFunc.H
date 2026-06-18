@@ -108,7 +108,7 @@ public:
             const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
             amrex::Real const initial_value = 0.;
             bool const remake = true;
-            bool const redistribute_on_remake = false;
+            bool const redistribute_on_remake = true;
             warpx.m_fields.alloc_init(m_particle_production_mf_name, level, ba, dmap, ncomps, ng,
                                       initial_value, remake, redistribute_on_remake);
         }
