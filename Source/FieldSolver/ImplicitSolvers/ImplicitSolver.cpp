@@ -236,9 +236,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
             Jbz.grow(J[2]->nGrowVect());
 
             // Use same box for E as for J (requires ngE >= ngJ)
-            amrex::Box Ebx = Jbx;
-            amrex::Box Eby = Jby;
-            amrex::Box Ebz = Jbz;
+            const amrex::Box Ebx = Jbx;
+            const amrex::Box Eby = Jby;
+            const amrex::Box Ebz = Jbz;
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -266,9 +266,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xx[0],
-                                   + ncomp_xx[0]*( jj+offset_xx[1] ),
-                                   + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xx[0],
+                                         + ncomp_xx[0]*( jj+offset_xx[1] ),
+                                         + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
                             SxxdEx += Sxx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -284,9 +284,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xy[0],
-                                   + ncomp_xy[0]*( jj+offset_xy[1] ),
-                                   + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xy[0],
+                                         + ncomp_xy[0]*( jj+offset_xy[1] ),
+                                         + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
                             SxydEy += Sxy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                    - Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -302,9 +302,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_xz[0],
-                                   + ncomp_xz[0]*( jj+offset_xz[1] ),
-                                   + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_xz[0],
+                                         + ncomp_xz[0]*( jj+offset_xz[1] ),
+                                         + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
                             SxzdEz += Sxz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                    - Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -329,9 +329,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yx[0],
-                                   + ncomp_yx[0]*( jj+offset_yx[1] ),
-                                   + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yx[0],
+                                         + ncomp_yx[0]*( jj+offset_yx[1] ),
+                                         + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
                             SyxdEx += Syx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -347,9 +347,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yy[0],
-                                   + ncomp_yy[0]*( jj+offset_yy[1] ),
-                                   + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yy[0],
+                                         + ncomp_yy[0]*( jj+offset_yy[1] ),
+                                         + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
                             SyydEy += Syy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                   -  Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -365,9 +365,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_yz[0],
-                                   + ncomp_yz[0]*( jj+offset_yz[1] ),
-                                   + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_yz[0],
+                                         + ncomp_yz[0]*( jj+offset_yz[1] ),
+                                         + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
                             SyzdEz += Syz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                   -  Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -392,9 +392,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zx[0],
-                                   + ncomp_zx[0]*( jj+offset_zx[1] ),
-                                   + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zx[0],
+                                         + ncomp_zx[0]*( jj+offset_zx[1] ),
+                                         + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
                             SzxdEx += Szx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
                                                   -  Ex0(i+ii,j+jj,k+kk,n) );
                         }
@@ -410,9 +410,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zy[0],
-                                   + ncomp_zy[0]*( jj+offset_zy[1] ),
-                                   + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zy[0],
+                                         + ncomp_zy[0]*( jj+offset_zy[1] ),
+                                         + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
                             SzydEy += Szy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
                                                   -  Ey0(i+ii,j+jj,k+kk,n) );
                         }
@@ -428,9 +428,9 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            int Nc = AMREX_D_TERM( ii+offset_zz[0],
-                                   + ncomp_zz[0]*( jj+offset_zz[1] ),
-                                   + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
+                            const int Nc = AMREX_D_TERM( ii+offset_zz[0],
+                                         + ncomp_zz[0]*( jj+offset_zz[1] ),
+                                         + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
                             SzzdEz += Szz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
                                                   -  Ez0(i+ii,j+jj,k+kk,n) );
                         }
@@ -491,29 +491,19 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             pp.query("mass_matrices_pc_width", m_mass_matrices_pc_width);
 #endif
         }
-#if defined(WARPX_DIM_RCYLINDER)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RCYLINDER!");
-#endif
 #if defined(WARPX_DIM_RSPHERE)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSHERE!");
-#endif
-#if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RZ");
+            "Using mass matrices is not setup for DIM = RSPHERE!");
 #endif
 #if defined(WARPX_DIM_3D)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_use_mass_matrices_jacobian,
             "Using mass matrices for jacobian can not be used for DIM = 3");
 #endif
-        if ( (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
-              m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
-             (m_WarpX->nox < 2) ) {
+        if ( (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+              WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
+             (WarpX::nox < 2) ) {
             std::stringstream warningMsg;
             warningMsg << "Particle-suppressed JFNK (e.g., theta-implicit evolve with newton nonlinear solver) ";
             warningMsg << "is being used with a charge-conserving deposition (esirkepov or villasenor) and particle_shape = 1.\n";
@@ -527,6 +517,19 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             "invalid nonlinear_solver specified. Valid options are picard and newton.");
     }
 
+}
+
+void ImplicitSolver::SaveEoldMultifab ()
+{
+    using warpx::fields::FieldType;
+    // E_old multifab is needed for diagnostics and saving at checkpoints
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
+        }
+    }
 }
 
 void ImplicitSolver::InitializeMassMatrices ()
@@ -555,7 +558,7 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const int shape = m_WarpX->nox;
+    const int shape = WarpX::nox;
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 
@@ -578,7 +581,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 "to be at least as many as those for J.");
         }
 
-        if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Direct) {
+        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct) {
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 m_ncomp_xx[dir] = 1 + 2*shape;
                 m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
@@ -601,9 +604,9 @@ void ImplicitSolver::InitializeMassMatrices ()
                 Nc_tot_zz *= m_ncomp_zz[dir];
             }
         }
-        else if (m_WarpX->current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
 #ifndef WARPX_DIM_3D
-            int max_crossings = ngJ[0] - shape + 1;
+            const int max_crossings = ngJ[0] - shape + 1;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings == m_WarpX->particle_max_grid_crossings,
@@ -786,8 +789,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     using warpx::fields::FieldType;
 
-    if (m_WarpX->use_filter) {
-        int finest_level = 0;
+    if (WarpX::use_filter) {
+        const int finest_level = 0;
         m_WarpX->ApplyFilterMF(m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), 0);
     }
 
@@ -905,6 +908,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
             amrex::MultiFab::Add(*MM_PC[2], *MM_zz, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_zz[0], MM_zz->nGrowVect());
         }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 
     // Do addOp Exchange on MassMatrices_PC
@@ -932,7 +938,7 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     // The pc_type petsc already has the one from the curl curl operator
     // Note: This should be done after Sync/communication has been called
 
-    const amrex::Real pc_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+    const amrex::Real pc_factor = PhysConst::c2 * PhysConst::mu0 * a_theta_dt;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
         amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);

@@ -35,7 +35,7 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
     const ParmParse pp_species_name(species_name);
     SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser, geom);
     SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
-        ux_parser, uy_parser, uz_parser, ux_th_parser, uy_th_parser, uz_th_parser, h_mom_temp, h_mom_vel);
+        ux_parser, uy_parser, uz_parser, h_mom_temp, h_mom_vel);
     if (h_inj_rho) {
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
@@ -587,9 +587,9 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     amrex::Real Uz = (NUz_arr(i, j, k) / N_arr(i,j,k));
 
                     // Compute useful quantities for J
-                    const amrex::Real c_sq = clight*clight;
-                    const amrex::Real gamma = std::sqrt(1.0_rt + (Ux*Ux + Uy*Uy + Uz*Uz)/(c_sq) );
-                    const amrex::Real inv_c2_gamma3 = 1._rt/(c_sq*gamma*gamma*gamma);
+                   constexpr amrex::Real c2 = PhysConst::c2;
+                    const amrex::Real gamma = std::sqrt(1.0_rt + (Ux*Ux + Uy*Uy + Uz*Uz)/c2 );
+                    const amrex::Real inv_c2_gamma3 = 1._rt/(c2*gamma*gamma*gamma);
 
                     // J represents are 4x4 matrices that show up in the advection
                     // equations written as a function of U = {N, Ux, Uy, Uz}:
@@ -598,7 +598,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     const amrex::Real Vx = Ux/gamma;
                     // Compute the non-zero element of Jx
                     const amrex::Real J00x = Vx;
-                    const amrex::Real J01x = N_arr(i,j,k)*(1/gamma)*(1-Vx*Vx/c_sq);
+                    const amrex::Real J01x = N_arr(i,j,k)*(1/gamma)*(1-Vx*Vx/c2);
                     const amrex::Real J02x = -N_arr(i,j,k)*Uy*Ux*inv_c2_gamma3;
                     const amrex::Real J03x = -N_arr(i,j,k)*Uz*Ux*inv_c2_gamma3;
                     const amrex::Real J11x = Vx;
@@ -620,7 +620,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     // Compute the non-zero element of Jy
                     const amrex::Real J00y = Vy;
                     const amrex::Real J01y = -N_arr(i,j,k)*Ux*Uy*inv_c2_gamma3;
-                    const amrex::Real J02y = N_arr(i,j,k)*(1/gamma)*(1-Vy*Vy/c_sq);
+                    const amrex::Real J02y = N_arr(i,j,k)*(1/gamma)*(1-Vy*Vy/c2);
                     const amrex::Real J03y = -N_arr(i,j,k)*Uz*Uy*inv_c2_gamma3;
                     const amrex::Real J11y = Vy;
                     const amrex::Real J22y = Vy;
@@ -640,7 +640,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
                     const amrex::Real J00z = Vz;
                     const amrex::Real J01z = -N_arr(i,j,k)*Ux*Uz*inv_c2_gamma3;
                     const amrex::Real J02z = -N_arr(i,j,k)*Uy*Uz*inv_c2_gamma3;
-                    const amrex::Real J03z = N_arr(i,j,k)*(1/gamma)*(1-Vz*Vz/c_sq);
+                    const amrex::Real J03z = N_arr(i,j,k)*(1/gamma)*(1-Vz*Vz/c2);
                     const amrex::Real J11z = Vz;
                     const amrex::Real J22z = Vz;
                     const amrex::Real J33z = Vz;
@@ -1443,7 +1443,7 @@ void WarpXFluidContainer::DepositCurrent(
     amrex::MultiFab tmp_jy_fluid(fields.get(name_mf_N, lev)->boxArray(), fields.get(name_mf_N, lev)->DistributionMap(), 1, 0);
     amrex::MultiFab tmp_jz_fluid(fields.get(name_mf_N, lev)->boxArray(), fields.get(name_mf_N, lev)->DistributionMap(), 1, 0);
 
-    const amrex::Real inv_clight_sq = 1.0_prt / PhysConst::c / PhysConst::c;
+    const amrex::Real inv_c2 = PhysConst::inv_c2;
     const amrex::Real q = getCharge();
 
     // Prepare interpolation of current components to cell center
@@ -1493,7 +1493,7 @@ void WarpXFluidContainer::DepositCurrent(
                     Ux = NUx_arr(i, j, k)/N_arr(i, j, k);
                     Uy = NUy_arr(i, j, k)/N_arr(i, j, k);
                     Uz = NUz_arr(i, j, k)/N_arr(i, j, k);
-                    gamma = std::sqrt(1.0_rt + ( Ux*Ux + Uy*Uy + Uz*Uz) * inv_clight_sq ) ;
+                    gamma = std::sqrt(1.0_rt + ( Ux*Ux + Uy*Uy + Uz*Uz) * inv_c2 ) ;
                 }
                 tmp_jx_fluid_arr(i, j, k) = q * (NUx_arr(i, j, k) / gamma);
                 tmp_jy_fluid_arr(i, j, k) = q * (NUy_arr(i, j, k) / gamma);

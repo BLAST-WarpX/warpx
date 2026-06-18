@@ -118,8 +118,7 @@ using namespace amrex;
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int ispecies,
                                                       const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
-      species_name(name)
+    : WarpXParticleContainer(amr_core, ispecies, name)
 {
     BackwardCompatibility();
 
@@ -150,7 +149,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     for (auto const& plasma_injector : plasma_injectors) {
         // For now, use the last value for charge and mass that is found.
         // A check could be added for consistency of multiple values, but it'll probably never be needed
-        charge_from_source |= plasma_injector->queryCharge(charge);
+        charge_from_source |= plasma_injector->queryCharge(m_charge);
         mass_from_source |= plasma_injector->queryMass(m_mass);
     }
 
@@ -161,12 +160,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
             physical_species_s + " does not exist!");
         physical_species = physical_species_from_string.value();
-        charge = species::get_charge( physical_species );
+        m_charge = species::get_charge( physical_species );
         m_mass = species::get_mass( physical_species );
     }
 
     // parse charge and mass (overriding values above)
-    const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", charge);
+    const bool charge_is_specified = utils::parser::queryWithParser(pp_species_name, "charge", m_charge);
     const bool mass_is_specified = utils::parser::queryWithParser(pp_species_name, "mass", m_mass);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE (
@@ -208,7 +207,9 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
-    pp_species_name.query("random_theta", m_rz_random_theta);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    pp_species_name.query("random_theta", m_random_theta);
+#endif
 
     // Initialize splitting
     pp_species_name.query("do_splitting", do_splitting);
@@ -216,6 +217,13 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("do_not_deposit", do_not_deposit);
     pp_species_name.query("do_not_gather", do_not_gather);
     pp_species_name.query("do_not_push", do_not_push);
+
+    if (m_charge == 0._prt) {
+        do_not_deposit = true;
+        if (m_mass > 0._prt) {
+            do_not_gather = true;
+        }
+    }
 
     pp_species_name.query("do_continuous_injection", do_continuous_injection);
     pp_species_name.query("initialize_self_fields", initialize_self_fields);
@@ -276,6 +284,9 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     if (m_do_qed_virtual_photons) {
         pp_species_name.query("qed_virtual_photon_species_name", m_qed_virtual_photon_species_name);
     }
+
+    pp_species_name.query("qed_virtual_photons_do_beam_size_effect", m_qed_virtual_photons_do_beam_size_effect);
+
 #endif
 
     // User-defined integer attributes
@@ -375,7 +386,7 @@ PhysicalParticleContainer::AllocData ()
             }
         }
 
-        ablastr::fields::MultiLevelVectorField T_vf =
+        const ablastr::fields::MultiLevelVectorField T_vf =
             warpx.m_fields.get_mr_levels_alldirs(T_field_name, warpx.finestLevel());
 
         // Allocate Accumulation Arrays
@@ -385,7 +396,7 @@ PhysicalParticleContainer::AllocData ()
 }
 
 PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core)
-    : WarpXParticleContainer(amr_core, 0)
+    : WarpXParticleContainer(amr_core, 0, "")
 {
 }
 
@@ -1146,7 +1157,7 @@ PhysicalParticleContainer::SplitParticles (int lev)
 
     amrex::Vector<amrex::Vector<ParticleReal>> attr;
     attr.push_back(wp);
-    const amrex::Vector<amrex::Vector<int>> attr_int;
+    const amrex::Vector<amrex::Vector<int>> attr_int{};
     pctmp_split.AddNParticles(lev,
                               np_split_to_add,
                               xp,
@@ -1239,7 +1250,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             }
 
             // Loop over the particles and update their momentum
-            const amrex::ParticleReal q = this->charge;
+            const amrex::ParticleReal q = this->m_charge;
             const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -1433,7 +1444,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 
     // local copies for device lambda capture
-    const amrex::ParticleReal q = this->charge;
+    const amrex::ParticleReal q = this->m_charge;
     const amrex::ParticleReal mass = this->m_mass;
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
@@ -1442,6 +1453,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const auto do_sync = m_do_qed_quantum_sync;
     amrex::Real t_chi_max = 0.0;
     if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
 
     QuantumSynchrotronEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
@@ -1550,11 +1563,12 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
         [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
         [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
+        [[maybe_unused]] auto foo_qed_dt = qed_dt;
         if constexpr (qed_control == has_qed) {
             if (local_has_quantum_sync) {
                 evolve_opt(ux[ip], uy[ip], uz[ip],
                            Exp, Eyp, Ezp,Bxp, Byp, Bzp,
-                           dt, p_optical_depth_QSR[ip]);
+                           qed_dt, p_optical_depth_QSR[ip]);
             }
         }
 #else
@@ -1568,12 +1582,12 @@ PhysicalParticleContainer::InitIonizationModule ()
 {
     if (!do_field_ionization) { return; }
     const ParmParse pp_species_name(species_name);
-    if (charge != PhysConst::q_e){
+    if (m_charge != PhysConst::q_e){
         ablastr::warn_manager::WMRecordWarning("Species",
             "charge != q_e for ionizable species '" +
             species_name + "':" +
             "overriding user value and setting charge = q_e.");
-        charge = PhysConst::q_e;
+        m_charge = PhysConst::q_e;
     }
     utils::parser::queryWithParser(pp_species_name, "do_adk_correction", do_adk_correction);
 
@@ -1604,7 +1618,7 @@ PhysicalParticleContainer::InitIonizationModule ()
     constexpr auto a3 = PhysConst::alpha*PhysConst::alpha*PhysConst::alpha;
     constexpr auto a4 = a3 * PhysConst::alpha;
     constexpr Real wa = a3 * PhysConst::c / PhysConst::r_e;
-    constexpr Real Ea = PhysConst::m_e * PhysConst::c*PhysConst::c /PhysConst::q_e *
+    constexpr Real Ea = PhysConst::m_e * PhysConst::c2 /PhysConst::q_e *
         a4/PhysConst::r_e;
     constexpr Real UH = utils::physics::table_ionization_energies[0];
     const Real l_eff = std::sqrt(UH/h_ionization_energies[0]) - 1._rt;
@@ -1763,6 +1777,11 @@ bool PhysicalParticleContainer::has_virtual_photons () const
     return m_do_qed_virtual_photons;
 }
 
+bool PhysicalParticleContainer::has_virtual_photons_beam_size_effect () const
+{
+    return m_qed_virtual_photons_do_beam_size_effect;
+}
+
 int PhysicalParticleContainer::getVirtualPhotonSpeciesIndex() const{
     return m_qed_virtual_photon_species;
 }
@@ -1857,7 +1876,7 @@ PhysicalParticleContainer::DepositTemperature (
     // Number of guard cells for local deposition of J
     const WarpX& warpx = WarpX::GetInstance();
 
-    amrex::IntVect ng_J = warpx.get_ng_depos_J();
+    const amrex::IntVect ng_J = warpx.get_ng_depos_J();
 
     // Extract deposition order and check that particles shape fits within the guard cells.
     // NOTE: In specific situations where the staggering of J and the current deposition algorithm
@@ -2119,47 +2138,50 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
 
 
-            bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (nx_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wx_arr(i,j,k);
-                        amrex::Real sumwv = vxbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nx_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wx_arr(i,j,k);
+                        const amrex::Real sumwv = vxbar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(nx_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vxbar_arr(i,j,k) = sumwv/sumw;
                         varx_arr(i,j,k) = norm*w2x_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             varx_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (ny_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wy_arr(i,j,k);
-                        amrex::Real sumwv = vybar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(ny_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wy_arr(i,j,k);
+                        const amrex::Real sumwv = vybar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(ny_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vybar_arr(i,j,k) = sumwv/sumw;
                         vary_arr(i,j,k) = norm*w2y_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass){
                             vary_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                     if (nz_arr(i,j,k) > 1) {
-                        amrex::Real sumw = wz_arr(i,j,k);
-                        amrex::Real sumwv = vzbar_arr(i,j,k);
-                        amrex::Real n = static_cast<amrex::Real>(nz_arr(i,j,k));
-                        amrex::Real norm = n/((n-1._rt)*sumw);
+                        const amrex::Real sumw = wz_arr(i,j,k);
+                        const amrex::Real sumwv = vzbar_arr(i,j,k);
+                        const auto n = static_cast<amrex::Real>(nz_arr(i,j,k));
+                        const amrex::Real norm = n/((n-1._rt)*sumw);
 
                         vzbar_arr(i,j,k) = sumwv/sumw;
                         varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
-                        if (single_pass)
+                        if (single_pass) {
                             varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        }
                     }
                 });
 
@@ -2168,7 +2190,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::Gpu::streamSynchronize();
 
         // Multiply variance by species mass over the Boltzmann constant to convert to temperature in K
-        amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
+        const amrex::Real Tnorm = this->getMass()/ablastr::constant::SI::kb;
 
         // Sum boundaries for accumulation MFs, apply normalization, and filter to end up with
         // temperature in K in T_vf

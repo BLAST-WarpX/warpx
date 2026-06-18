@@ -16,6 +16,7 @@ include $(WARPX_HOME)/Source/Particles/Deposition/Make.package
 include $(WARPX_HOME)/Source/Particles/Gather/Make.package
 include $(WARPX_HOME)/Source/Particles/Sorting/Make.package
 include $(WARPX_HOME)/Source/Particles/ParticleCreation/Make.package
+include $(WARPX_HOME)/Source/Particles/ParticleThermalizer/Make.package
 include $(WARPX_HOME)/Source/Particles/ElementaryProcess/Make.package
 include $(WARPX_HOME)/Source/Particles/Collision/Make.package
 include $(WARPX_HOME)/Source/Particles/Filter/Make.package

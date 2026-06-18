@@ -81,9 +81,9 @@ PrescribedCurrentParticleContainer::is_enabled ()
 
 PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
     AmrCore* amr_core, int ispecies)
-    : WarpXParticleContainer(amr_core, ispecies)
+    : WarpXParticleContainer(amr_core, ispecies, "prescribed_current")
 {
-    charge = 1.0;
+    m_charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
 
     const ParmParse pp_warpx("warpx");

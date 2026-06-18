@@ -111,6 +111,7 @@ namespace
                        injection_style.begin(),
                        ::tolower);
 
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (injection_style == "singleparticle") {
             nppc = 1;
         } else if (injection_style == "multipleparticles") {
@@ -422,19 +423,24 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             auto w = ParReduce(TypeList<ReduceOpSum>{}, TypeList<Real>{}, rho,
                               [=] AMREX_GPU_DEVICE (int b, int i, int j, int k)
             {
-                Real x = 0, y = 0, z = 0;
 #if defined(WARPX_DIM_1D_Z)
-                z = problo[0] + (i+Real(0.5))*dx[0];
+                const auto x = 0.0_rt;
+                const auto y = 0.0_rt;
+                const auto z = problo[0] + (i+Real(0.5))*dx[0];
 #elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
-                x = problo[0] + (i+Real(0.5))*dx[0];
-                z = problo[1] + (j+Real(0.5))*dx[1];
+                const auto x = problo[0] + (i+Real(0.5))*dx[0];
+                const auto y = 0.0_rt;
+                const auto z = problo[1] + (j+Real(0.5))*dx[1];
 #else
-                AMREX_D_TERM(x = problo[0] + (i+Real(0.5))*dx[0];,
-                             y = problo[1] + (j+Real(0.5))*dx[1];,
-                             z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_TERM(const auto x = problo[0] + (i+Real(0.5))*dx[0];,
+                             const auto y = problo[1] + (j+Real(0.5))*dx[1];,
+                             const auto z = problo[2] + (k+Real(0.5))*dx[2]);
+                AMREX_D_PICK(const auto y = 0.0_rt; const auto z = 0.0_rt;,
+                             const auto z = 0.0_rt;,
+                             /*x,y,z already defined*/);
 #endif
-                Real v = density_exe(x,y,z);
-                Real r = (v >= density_min) ? nppc : Real(0);
+                const Real v = density_exe(x,y,z);
+                const Real r = (v >= density_min) ? nppc : Real(0);
                 rhoma[b](i,j,k) += r;
                 return r;
             });
@@ -468,11 +474,11 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                         // threshold, we split this Box in its longest
                         // direction.
                         int dir;
-                        int len = bx.longside(dir); // longest side of the box
+                        const int len = bx.longside(dir); // longest side of the box
                         if (len <= split_high_density_boxes_min_box_size) { // Box is already very small.
                             new_boxes.push_back(bx);
                         } else {
-                            int chop_pnt = bx.smallEnd(dir) + len/2;
+                            const int chop_pnt = bx.smallEnd(dir) + len/2;
                             auto bx2 = bx.chop(dir, chop_pnt);
                             // bx is now chopped into bx and bx2.
                             test_boxes.push_back(bx);
@@ -490,7 +496,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
             if (new_boxes.size() > ba0.size()) {
                 // If the size is the same as before, we don't need to build
                 // a new BoxArray.
-                ba0 = BoxArray(new_boxes.data(), new_boxes.size());
+                ba0 = BoxArray(new_boxes.data(), static_cast<int>(new_boxes.size()));
             }
         }
     }
@@ -641,61 +647,63 @@ WarpX::PrintMainPICparameters ()
     else if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC){
       amrex::Print() << "Maxwell Solver:       | Hybrid-PIC (Ohm's law) \n";
     }
-  #ifdef WARPX_USE_FFT
-    // Print PSATD solver's configuration
-    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
-      amrex::Print() << "Maxwell Solver:       | PSATD \n";
-      }
-    if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-      amrex::Print() << "                      | - Galilean \n" <<
-      "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
-                              m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
-      }
-    if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
-      amrex::Print() << "                      | - comoving \n" <<
-      "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
-                              m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
-      }
-    if (WarpX::update_with_rho) {
-      amrex::Print() << "                      | - update with rho is ON \n";
-      }
-    if (current_correction) {
-      amrex::Print() << "                      | - current correction is ON \n";
-        }
-    if (WarpX::do_dive_cleaning) {
-      amrex::Print() << "                      | - div(E) cleaning is ON \n";
-      }
-    if (WarpX::do_divb_cleaning) {
-      amrex::Print() << "                      | - div(B) cleaning is ON \n";
-      }
-    if (m_JRhom == 1){
-      amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
-      amrex::Print() << "                      |   - m_JRhom_subintervals = "
-                                        << WarpX::m_JRhom_subintervals << "\n";
-      if (time_dependency_J == TimeDependencyJ::Linear){
-        amrex::Print() << "                      |   - time_dependency_J = linear \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Constant){
-        amrex::Print() << "                      |   - time_dependency_J = constant \n";
-      }
-      else if (time_dependency_J == TimeDependencyJ::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
-      }
-      if (time_dependency_rho == TimeDependencyRho::Linear){
-        amrex::Print() << "                      |   - time_dependency_rho = linear \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Constant){
-        amrex::Print() << "                      |   - time_dependency_rho = constant \n";
-      }
-      else if (time_dependency_rho == TimeDependencyRho::Quadratic){
-        amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
-      }
-    }
-    if (fft_do_time_averaging){
-      amrex::Print()<<"                      | - time-averaged is ON \n";
-    }
-  #endif // WARPX_USE_FFT
+    #ifdef WARPX_USE_FFT
+        // All FFT/PSATD-related prints only when PSATD is selected at runtime
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD){
+            amrex::Print() << "Maxwell Solver:       | PSATD \n";
 
+            if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
+                amrex::Print() << "                      | - Galilean \n" <<
+                "                      |  - v_galilean = (" << m_v_galilean[0] << "," <<
+                                                                m_v_galilean[1] << "," << m_v_galilean[2] << ")\n";
+            }
+            if ((m_v_comoving[0]!=0) or (m_v_comoving[1]!=0) or (m_v_comoving[2]!=0)) {
+                amrex::Print() << "                      | - comoving \n" <<
+                "                      |  - v_comoving = (" << m_v_comoving[0] << "," <<
+                                                                m_v_comoving[1] << "," << m_v_comoving[2] << ")\n";
+            }
+            if (WarpX::update_with_rho) {
+                amrex::Print() << "                      | - update with rho is ON \n";
+            }
+            if (current_correction) {
+                amrex::Print() << "                      | - current correction is ON \n";
+            }
+            if (m_JRhom == 1){
+                amrex::Print() << "                      | - PSATD-JRhom deposition is ON \n";
+                amrex::Print() << "                      |   - m_JRhom_subintervals = "
+                                                                                    << WarpX::m_JRhom_subintervals << "\n";
+                if (time_dependency_J == TimeDependencyJ::Linear){
+                    amrex::Print() << "                      |   - time_dependency_J = linear \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Constant){
+                    amrex::Print() << "                      |   - time_dependency_J = constant \n";
+                }
+                else if (time_dependency_J == TimeDependencyJ::Quadratic){
+                    amrex::Print() << "                      |   - time_dependency_J = quadratic \n";
+                }
+            }
+
+            if (time_dependency_rho == TimeDependencyRho::Linear){
+                amrex::Print() << "                      |   - time_dependency_rho = linear \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Constant){
+                amrex::Print() << "                      |   - time_dependency_rho = constant \n";
+            }
+            else if (time_dependency_rho == TimeDependencyRho::Quadratic){
+                amrex::Print() << "                      |   - time_dependency_rho = quadratic \n";
+            }
+
+            if (fft_do_time_averaging){
+                amrex::Print()<<"                      | - time-averaged is ON \n";
+            }
+        }
+    #endif // WARPX_USE_FFT
+  if (WarpX::do_dive_cleaning) {
+    amrex::Print() << "                      | - div(E) cleaning is ON \n";
+        }
+  if (WarpX::do_divb_cleaning) {
+    amrex::Print() << "                      | - div(B) cleaning is ON \n";
+        }
   if (grid_type == GridType::Collocated){
     amrex::Print() << "                      | - collocated grid \n";
   }
@@ -886,7 +894,7 @@ WarpX::InitData ()
         for (auto const& species : *mypc) {
             has_initialize_self_fields |= species->initialize_self_fields;
         }
-        bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
+        const bool has_boundary_potential = m_electrostatic_solver->m_poisson_boundary_handler->m_boundary_potential_specified;
         if( (electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
              has_initialize_self_fields ||
              has_boundary_potential)
@@ -961,6 +969,8 @@ WarpX::AddExternalFields (int const lev)
             amrex::MultiFab::Add(*Efield_fp[lev][1], *m_fields.get(FieldType::Efield_fp_external, Direction{1}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
             amrex::MultiFab::Add(*Efield_fp[lev][2], *m_fields.get(FieldType::Efield_fp_external, Direction{2}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
         }
+        // Apply E-field boundary such that the initial field satisfies the expected boundary conditions
+        ApplyEfieldBoundary(lev, PatchType::fine, 0.0);
     }
     if (m_p_ext_field_params->B_ext_grid_type != ExternalFieldType::default_zero) {
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);
@@ -974,6 +984,8 @@ WarpX::AddExternalFields (int const lev)
             amrex::MultiFab::Add(*Bfield_fp[lev][1], *m_fields.get(FieldType::Bfield_fp_external, Direction{1}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
             amrex::MultiFab::Add(*Bfield_fp[lev][2], *m_fields.get(FieldType::Bfield_fp_external, Direction{2}, lev), 0, 0, 1, guard_cells.ng_alloc_EB);
         }
+        // Apply B-field boundary such that the initial field satisfies the expected boundary conditions
+        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::FirstHalf, 0.0);
     }
 }
 
@@ -992,7 +1004,7 @@ WarpX::InitFromScratch ()
 
     if (m_implicit_solver) {
 
-        m_implicit_solver->Define(this);
+        m_implicit_solver->Define(this,/*from_restart=*/false);
         m_implicit_solver->CreateParticleAttributes();
     }
 
@@ -1787,8 +1799,8 @@ WarpX::ReadExternalFieldFromFile (
     }
 
     // Read external field openPMD data
-    Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
-    bool distributed = true;
+    const Box pbox = amrex::grow(mf->boxArray().minimalBox(), mf->nGrowVect());
+    const bool distributed = true;
     ExternalFieldReader external_field_reader(read_fields_from_path, F_name, F_component,
                                               problo, dx, pbox, distributed);
     external_field_reader.prepare(mf->boxArray(), mf->DistributionMap(),
@@ -1824,10 +1836,10 @@ WarpX::ReadExternalFieldFromFile (
                 // Physical coordinates of the grid point
                 // 0,1,2 denote x,y,z in 3D xyz.
                 // 0,1 denote r,z in 2D rz.
-                amrex::RealVect pos
-                    (AMREX_D_DECL(problo[0] + ii*dx[0],
+                const auto pos = amrex::RealVect{
+                    AMREX_D_DECL(problo[0] + ii*dx[0],
                                   problo[1] + j *dx[1],
-                                  problo[2] + k *dx[2]));
+                                  problo[2] + k *dx[2])};
                 mffab(i,j,k, dest_comp) = external_field_view(pos);
             }
 

@@ -168,7 +168,7 @@ bool WarpX::use_filter_compensation = false;
 bool WarpX::serialize_initial_conditions = false;
 bool WarpX::refine_plasma     = false;
 
-utils::parser::IntervalsParser WarpX::sort_intervals;
+ablastr::utils::text::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
 bool WarpX::do_dynamic_scheduling = true;
@@ -699,7 +699,7 @@ WarpX::ReadParameters ()
         std::vector<std::string> override_sync_intervals_string_vec = {"1"};
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
-            utils::parser::IntervalsParser(override_sync_intervals_string_vec);
+            ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
@@ -825,13 +825,24 @@ WarpX::ReadParameters ()
         // Read timestepping options
         utils::parser::queryWithParser(pp_warpx, "const_dt", m_const_dt);
         utils::parser::queryWithParser(pp_warpx, "max_dt", m_max_dt);
+        utils::parser::queryWithParser(pp_warpx, "max_omegap_dt", m_max_omegap_dt);
+        utils::parser::queryWithParser(pp_warpx, "max_omegac_dt", m_max_omegac_dt);
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+        m_dt_update_interval = ablastr::utils::text::IntervalsParser(dt_interval_vec);
         if (m_dt_update_interval.isActivated()) {
+            pp_warpx.query("dt_update_diagnostic_file", m_dt_update_diagnostic_file);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 !m_const_dt.has_value(),
                 "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_max_omegap_dt.has_value() || m_max_omegap_dt > 0.,
+                "The max_omegap_dt must be greater than zero"
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_max_omegac_dt.has_value() || m_max_omegac_dt > 0.,
+                "The max_omegac_dt must be greater than zero"
             );
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
@@ -957,7 +968,7 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "quantum_xi", quantum_xi_tmp);
         if (quantum_xi_is_specified) {
             double const quantum_xi = quantum_xi_tmp;
-            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c * PhysConst::c);
+            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c2);
         }
 
         const auto at_least_one_boundary_is_pml =
@@ -1418,7 +1429,7 @@ WarpX::ReadParameters ()
         // Load balancing parameters
         std::vector<std::string> load_balance_intervals_string_vec = {"0"};
         pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
-        load_balance_intervals = utils::parser::IntervalsParser(
+        load_balance_intervals = ablastr::utils::text::IntervalsParser(
             load_balance_intervals_string_vec);
         pp_algo.query("load_balance_with_sfc", load_balance_with_sfc);
         // Knapsack factor only used with non-SFC strategy
@@ -1502,7 +1513,7 @@ WarpX::ReadParameters ()
 
         const amrex::ParmParse pp_warpx("warpx");
         pp_warpx.queryarr("sort_intervals", sort_intervals_string_vec);
-        sort_intervals = utils::parser::IntervalsParser(sort_intervals_string_vec);
+        sort_intervals = ablastr::utils::text::IntervalsParser(sort_intervals_string_vec);
 
         Vector<int> vect_sort_bin_size(AMREX_SPACEDIM,1);
         const bool sort_bin_size_is_specified =
@@ -1938,8 +1949,7 @@ WarpX::ReadParameters ()
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
     pp_collisions.queryarr("collision_names", collision_names);
-    bool const collisions = (static_cast<int>(collision_names.size()) == 0) ? false : true;
-    if (collisions) {
+    if (!collision_names.empty()) {
         if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;
         }
@@ -1972,7 +1982,6 @@ int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
 {
     return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
 }
-
 
 void
 WarpX::BackwardCompatibility ()
@@ -2207,6 +2216,15 @@ WarpX::BackwardCompatibility ()
         std::vector<amrex::Real> backward_vel;
         std::stringstream ssspecies;
 
+        std::string mom_dist_type;
+        if (pp_species.query("momentum_distribution_type", mom_dist_type)) {
+            if (mom_dist_type == "maxwell_boltzmann" || mom_dist_type == "gaussian_parse_momentum_function") {
+                WARPX_ABORT_WITH_MESSAGE (
+                    "The momentum distribution type '" + mom_dist_type + "' is not supported anymore. "
+                    "Please use the 'maxwellian' momentum distribution instead."
+                );
+            }
+        }
         ssspecies << "'" << speciesiter << ".multiple_particles_vel_<x,y,z>'";
         ssspecies << " are not supported anymore. ";
         ssspecies << "Please use the renamed variables ";
@@ -2518,6 +2536,13 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                             amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{2}, lev,
                             amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+
+        m_fields.alloc_init(FieldType::E_old, Direction{0}, lev,
+                            amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{1}, lev,
+                            amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{2}, lev,
+                            amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
     if (do_current_centering)
@@ -3609,7 +3634,7 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
         // high density boxes until the next load balance is
         // performed. Thus, we are going building SFC assuming every boxes
         // have the same weight.
-        amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
+        const amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
         return amrex::DistributionMapping::makeSFC(wgt, ba, false);
     } else {
         return amrex::AmrCore::MakeDistributionMap(lev, ba);

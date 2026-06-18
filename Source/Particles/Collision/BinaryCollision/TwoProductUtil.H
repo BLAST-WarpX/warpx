@@ -9,6 +9,7 @@
 #define WARPX_TWO_PRODUCT_UTIL_H
 
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Math.H>
@@ -42,10 +43,7 @@ namespace {
      * @param[out] u2z_out normalized momentum of the second product macroparticles along z (in m.s^-1)
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
-     * @param[in] isotropic_scattering flag to indicate whether the particles are scattered isotropically.
-     * If true, the particles are scattered isotropically in the center-of-mass frame.
-     * If false, the particles momentum do not change direction, in the center-of-mass frame.
-     * (but the magnitude of the momentum may change, esp. if E_reaction is non-zero)
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -67,18 +65,18 @@ namespace {
                             amrex::ParticleReal& u2z_out,
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
-                            const bool isotropic_scattering,
+                            ScatteringAngleModel scattering_angle_model,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
         using namespace amrex::Math;
 
-        constexpr amrex::ParticleReal c_sq = PhysConst::c * PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( c_sq );
+        constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         // Rest energy of incident particles
-        const amrex::ParticleReal E_rest_in = (m1_in + m2_in)*c_sq;
+        const amrex::ParticleReal E_rest_in = (m1_in + m2_in)*c2;
         // Rest energy of products
-        const amrex::ParticleReal E_rest_out = (m1_out + m2_out)*c_sq;
+        const amrex::ParticleReal E_rest_out = (m1_out + m2_out)*c2;
 
         // Compute momenta
         // Note: for massless particles, the momentum is normalized to the electron mass
@@ -92,9 +90,9 @@ namespace {
 
         // Compute 0th component of the 4-momentum of the incident particles
         const amrex::ParticleReal p1t_in = std::sqrt(
-            m1_in*m1_in*c_sq + p1x_in*p1x_in + p1y_in*p1y_in + p1z_in*p1z_in);
+            m1_in*m1_in*c2 + p1x_in*p1x_in + p1y_in*p1y_in + p1z_in*p1z_in);
         const amrex::ParticleReal p2t_in = std::sqrt(
-            m2_in*m2_in*c_sq + p2x_in*p2x_in + p2y_in*p2y_in + p2z_in*p2z_in);
+            m2_in*m2_in*c2 + p2x_in*p2x_in + p2y_in*p2y_in + p2z_in*p2z_in);
 
         // Square norm of the total (sum between the two particles) momenta in the lab frame
         const amrex::ParticleReal p_total_sq =  powi<2>(p1x_in+p2x_in) +
@@ -105,7 +103,7 @@ namespace {
         const amrex::ParticleReal E_lab = (p1t_in + p2t_in) * PhysConst::c;
         // Total energy squared of the reactants in the center of mass frame, calculated using the
         // Lorentz invariance of the four-momentum norm
-        const amrex::ParticleReal E_star_sq = E_lab*E_lab - c_sq*p_total_sq;
+        const amrex::ParticleReal E_star_sq = E_lab*E_lab - c2*p_total_sq;
         // Total energy squared of the products in the center of mass frame
         // In principle, the term - E_rest_in + E_rest_out + E_reaction is not needed and equal to
         // zero (i.e. the energy liberated during the reaction is equal to the mass difference). However,
@@ -119,9 +117,9 @@ namespace {
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const amrex::ParticleReal E_ratio = std::sqrt(E_star_f_sq)/((m1_out + m2_out)*c_sq);
-        const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c_sq * ( powi<2>(E_ratio) - 1._prt )
-                + powi<2>(m1_out - m2_out)*c_sq*0.25_prt * powi<2>( E_ratio - 1._prt/E_ratio );
+        const amrex::ParticleReal E_ratio = std::sqrt(E_star_f_sq)/((m1_out + m2_out)*c2);
+        const amrex::ParticleReal p_star_f_sq = m1_out*m2_out*c2 * ( powi<2>(E_ratio) - 1._prt )
+                + powi<2>(m1_out - m2_out)*c2*0.25_prt * powi<2>( E_ratio - 1._prt/E_ratio );
 
         // Preliminary calculation: compute center of mass velocity
         const amrex::ParticleReal pt = p1t_in + p2t_in;
@@ -129,19 +127,21 @@ namespace {
         const amrex::ParticleReal vcy    = (p1y_in+p2y_in) * PhysConst::c / pt;
         const amrex::ParticleReal vcz    = (p1z_in+p2z_in) * PhysConst::c / pt;
         const amrex::ParticleReal vc_sq   = vcx*vcx + vcy*vcy + vcz*vcz;
-        const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_csq );
+        const amrex::ParticleReal gc = 1._prt / std::sqrt( 1._prt - vc_sq*inv_c2 );
 
         // Compute momentum of first product in the center of mass frame
-        amrex::ParticleReal px_star_out, py_star_out, pz_star_out;
-        if (isotropic_scattering) {
-            // Assume isotropic scattering in the center-of-mass frame
+        amrex::ParticleReal px_star_out = 0.0_prt;
+        amrex::ParticleReal py_star_out = 0.0_prt;
+        amrex::ParticleReal pz_star_out = 0.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
             ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
                                              engine);
         }
-        else {
-            // Assume that the momentum of the products has the same direction
-            // as that of the incident particle in the center of mass frame
-
+        else if (scattering_angle_model == ScatteringAngleModel::Forward ||
+                 scattering_angle_model == ScatteringAngleModel::Backward) {
+            // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
+            // Backward scattering: the products have the opposite direction of the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
             {
@@ -160,11 +160,14 @@ namespace {
                 p1y_star_in = p1y_in;
                 p1z_star_in = p1z_in;
             }
-            amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
+            const amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
 
             // Momentum of the first product in the center of mass frame:
-            // same direction as the incident, but scaled to have the magnitude sqrt(p_star_f_sq)
-            amrex::ParticleReal scaling = std::sqrt(p_star_f_sq)/p1_star_in;
+            // same (forward) or opposite (backward) direction as the incident, scaled to have
+            // the magnitude sqrt(p_star_f_sq)
+            const amrex::ParticleReal sign = (scattering_angle_model == ScatteringAngleModel::Backward)
+                                             ? -1._prt : 1._prt;
+            const amrex::ParticleReal scaling = sign*std::sqrt(p_star_f_sq)/p1_star_in;
             px_star_out = p1x_star_in * scaling;
             py_star_out = p1y_star_in * scaling;
             pz_star_out = p1z_star_in * scaling;
@@ -176,7 +179,7 @@ namespace {
         // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
         {
-            const amrex::ParticleReal p1t_out = std::sqrt(m1_out*m1_out*c_sq + p_star_f_sq);
+            const amrex::ParticleReal p1t_out = std::sqrt(m1_out*m1_out*c2 + p_star_f_sq);
             const amrex::ParticleReal vcDps = vcx*px_star_out + vcy*py_star_out + vcz*pz_star_out;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
             const amrex::ParticleReal factor = factor0*vcDps + p1t_out*gc/PhysConst::c;
