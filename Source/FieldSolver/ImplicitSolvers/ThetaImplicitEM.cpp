@@ -121,6 +121,14 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) {
+        std::stringstream solverMsg;
+        solverMsg << "Nonlinear solver failed to converge."
+                  << "Exit status = " << exit_status;
+        WARPX_ABORT_WITH_MESSAGE(solverMsg.str());
+    }
+
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
     UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
