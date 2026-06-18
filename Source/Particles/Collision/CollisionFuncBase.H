@@ -12,6 +12,9 @@ class CollisionFuncBase
 {
 public:
 
+    virtual ~CollisionFuncBase () = default;
+
+    //! Optional hook to allocate additional data structures.
     virtual void AllocData () {}
 
 };
