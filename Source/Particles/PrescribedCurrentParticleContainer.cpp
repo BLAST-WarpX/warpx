@@ -113,18 +113,20 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
         utils::parser::getWithParser(pp_warpx, (base + ".drive.zlo").c_str(), f.lo[2]);
         utils::parser::getWithParser(pp_warpx, (base + ".drive.zhi").c_str(), f.hi[2]);
         utils::parser::getWithParser(pp_warpx, (base + ".drive.A").c_str(),   f.A);
-        pp_warpx.query((base + ".drive.dir").c_str(),  f.dir);
-        pp_warpx.query((base + ".drive.sign").c_str(), f.sign);
+        pp_warpx.query(base + ".drive.dir",  f.dir);
+        pp_warpx.query(base + ".drive.sign", f.sign);
 
         // Per-pair waveform file overrides the global one.
         std::string pair_file;
-        if (pp_warpx.query((base + ".file").c_str(), pair_file)) {
+        if (pp_warpx.query(base + ".file", pair_file)) {
             load_waveform(pair_file, f.t, f.I);
         } else {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                has_global_file,
-                "warpx.current_injection: " + base + " needs " + base +
-                ".file (or set the global warpx.current_injection.file).");
+            std::string msg = "warpx.current_injection: ";
+            msg += base;
+            msg += " needs ";
+            msg += base;
+            msg += ".file (or set the global warpx.current_injection.file).";
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(has_global_file, msg);
             f.t = global_t; f.I = global_I;
         }
 
