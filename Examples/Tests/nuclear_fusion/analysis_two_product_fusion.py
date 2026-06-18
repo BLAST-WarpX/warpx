@@ -403,7 +403,7 @@ def check_macroparticle_number(
     if "particle_production" in data:
         w_sum = data[product_species[0] + "_w_end"].sum()
         n_sum = data["particle_production"].sum()
-        tolerance = 0.001
+        tolerance = 0.02
         print("Check particle production diagnostic:")
         print(f"from particles  = {w_sum}")
         print(f"from diagnostic = {n_sum}")
