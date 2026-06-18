@@ -2720,49 +2720,59 @@ Maxwell solver: prescribed current injection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Prescribed current injection allows a user-defined, time-varying current waveform to be
-imposed on one or more rectangular faces of the simulation domain.  This is typically used
-to drive a macroscopic conductor (e.g. a coil or transmission line) from an external circuit.
-It requires ``algo.em_solver_medium = macroscopic``.
+imposed on one or more rectangular boxes of the simulation domain.  This is typically used
+to drive a macroscopic conductor (e.g. a coil) from an external circuit, while keeping
+WarpX agnostic to the circuit model.
 
-The waveform is read from a plain-text two-column file (time [s], current [A]).
-At each time step the injected current density :math:`J = I(t) / A` is deposited uniformly
-over the specified face area.
+The current is injected by an artificial antenna species
+(``PrescribedCurrentParticleContainer``) that deposits :math:`J = I(t)/A` through the
+standard particle current-deposition path.  As a result the imposed current works with
+both the explicit and implicit field solvers and with the ``vacuum`` and ``macroscopic``
+media, and it appears in the ``jx/jy/jz`` diagnostics.  A particle shape and a current
+deposition algorithm must therefore be set: ``algo.particle_shape >= 1`` and
+``algo.current_deposition`` (``direct`` or a charge-conserving scheme).
+
+The waveform is read from a plain-text two-column file (time [s], current [A]) with linear
+interpolation in time.
+
+.. note::
+
+   Prescribed current injection only sustains a current along a conductor when the current
+   path is closed, e.g. a ring/coil whose conducting body is present in the domain via
+   ``macroscopic.sigma_function``.  Driving an open conductor with widely separated
+   terminals does not work (the current cannot establish across the conductor on EM-PIC
+   time scales), independent of how the current is injected.
 
 * ``warpx.current_injection`` (`bool`, optional, default: ``0``)
     Enable prescribed current injection.  Must be ``1`` to activate all parameters below.
 
-* ``warpx.current_injection.file`` (`string`)
-    Path to a plain-text waveform file with two columns: ``t [s]`` and ``I [A]``.
-    Linear interpolation is used between tabulated time points.
+* ``warpx.current_injection.file`` (`string`, optional)
+    Path to a global plain-text waveform file with two columns: ``t [s]`` and ``I [A]``,
+    used by every drive face that does not specify its own file.  May be omitted only if
+    every drive face sets ``pair_N.file``.
 
 * ``warpx.current_injection.n_pairs`` (`integer`, optional, default: ``1``)
-    Number of drive/return face pairs.  At least one pair must be defined.
+    Number of drive faces.  At least one must be defined.
 
-For each pair index ``N`` (starting from 0), the following parameters define the **drive face**
-(required) and the optional **return face**:
+For each index ``N`` (starting from 0):
+
+* ``warpx.current_injection.pair_N.file`` (`string`, optional)
+    Per-face waveform file, overriding the global ``warpx.current_injection.file``.
 
 * ``warpx.current_injection.pair_N.drive.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`)
-    Bounding box of the drive injection face in physical coordinates [m].
-    The box must be thin in the current direction (one cell wide is typical).
+    Bounding box of the drive injection box in physical coordinates [m].
 
 * ``warpx.current_injection.pair_N.drive.A`` (`float`)
     Cross-sectional area of the drive face [m²] used to convert total current :math:`I(t)`
     to current density :math:`J = I(t)/A`.
 
-* ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``)
+* ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
     Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
+    All faces must share the same direction.
 
-* ``warpx.current_injection.pair_N.return.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`, optional)
-    Bounding box of the return face.  If ``return.xlo`` is absent the return face is disabled.
-    **For coil simulations where the conductor body is present in the domain via**
-    ``macroscopic.sigma_function``, **omit the return face**; the macroscopic solver carries
-    the return current automatically.
-
-* ``warpx.current_injection.pair_N.return.A`` (`float`, optional)
-    Cross-sectional area of the return face [m²].  Required when a return face is specified.
-
-* ``warpx.current_injection.pair_N.return.dir`` (`integer`, optional)
-    Current direction for the return face.  Defaults to ``drive.dir``.
+* ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
+    Sign of the injected current: :math:`J = \mathrm{sign}\, I(t)/A`.  Use ``-1`` to define a
+    return face that injects the opposite current.
 
 .. _running-cpp-parameters-hybrid-model:
 

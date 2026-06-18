@@ -609,10 +609,6 @@ WarpX::OneStep_nosub (
             // vacuum medium
             EvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else if (m_em_solver_medium == MediumForEM::Macroscopic) {
-            // Prescribed current injection is now deposited through the standard
-            // particle current-deposition path (PrescribedCurrentParticleContainer,
-            // run in PushParticlesandDeposit above), so no explicit injection into
-            // current_fp is needed here.
             // macroscopic medium
             MacroscopicEvolveE(dt[0], a_cur_time); // We now have E^{n+1}
         } else {
@@ -1490,71 +1486,3 @@ WarpX::HandleSignals()
     }
 }
 
-void
-WarpX::InjectPrescribedCurrent (amrex::Real t)
-{
-    using namespace amrex;
-    using warpx::fields::FieldType;
-
-    // Each pair has its own waveform (populated from the global file by default,
-    // or overridden by warpx.current_injection.pair_N.file).
-    // Perform linear interpolation per pair, so pairs with different waveforms
-    // are handled correctly.
-    using ablastr::fields::Direction;
-    const auto& geom0  = Geom(0);
-    const auto prob_lo = geom0.ProbLoArray();
-    const auto dx      = geom0.CellSizeArray();
-
-    // Host-side helper: add J_inj to all cells inside the CIFace bounding box.
-    auto inject_face = [&](const CIFace& face, Real J_inj) {
-        auto* J_mf = m_fields.get(FieldType::current_fp,
-                                   Direction{face.dir}, 0);
-        const Real xlo = face.xlo, xhi = face.xhi;
-        const Real ylo = face.ylo, yhi = face.yhi;
-        const Real zlo = face.zlo, zhi = face.zhi;
-        const amrex::IntVect iv = J_mf->ixType().toIntVect();
-        const int iv0 = iv[0], iv1 = iv[1], iv2 = iv[2];
-
-        for (amrex::MFIter mfi(*J_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            const amrex::Box& tbx = mfi.tilebox(iv);
-            amrex::Array4<amrex::Real> const& J_arr = J_mf->array(mfi);
-
-            amrex::ParallelFor(tbx,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                {
-                    const Real fac_x = (1 - iv0) * dx[0] * 0.5_rt;
-                    const Real fac_y = (1 - iv1) * dx[1] * 0.5_rt;
-                    const Real fac_z = (1 - iv2) * dx[2] * 0.5_rt;
-                    const Real x = i * dx[0] + prob_lo[0] + fac_x;
-                    const Real y = j * dx[1] + prob_lo[1] + fac_y;
-                    const Real z = k * dx[2] + prob_lo[2] + fac_z;
-
-                    if (x >= xlo && x < xhi && y >= ylo && y < yhi && z >= zlo && z < zhi) {
-                        J_arr(i,j,k) += J_inj;
-                    }
-                });
-        }
-    };
-
-    for (const auto& pair : m_ci_pairs) {
-        // Linear interpolation for this pair's waveform.
-        // Skip pair if t is outside its time range (I = 0 for this pair).
-        const auto& t_pts = pair.time;
-        const auto& I_pts = pair.current;
-
-        if (t <= t_pts.front() || t >= t_pts.back()) { continue; }
-
-        const auto it  = std::lower_bound(t_pts.begin(), t_pts.end(), t);
-        const auto idx = static_cast<std::size_t>(std::distance(t_pts.begin(), it));
-        const Real t0 = t_pts[idx - 1],  t1 = t_pts[idx];
-        const Real I0 = I_pts[idx - 1],  I1 = I_pts[idx];
-        const Real I_t = I0 + (I1 - I0) * (t - t0) / (t1 - t0);
-
-        if (I_t == 0._rt) { continue; }   // nothing to inject for this pair
-
-        inject_face(pair.drive, static_cast<Real>(pair.drive.sign) * I_t / pair.drive.A);
-        if (pair.has_return) {
-            inject_face(pair.ret, static_cast<Real>(pair.ret.sign) * I_t / pair.ret.A);
-        }
-    }
-}

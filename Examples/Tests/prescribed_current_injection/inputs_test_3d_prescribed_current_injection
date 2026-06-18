@@ -29,6 +29,10 @@ max_step            = 50        # smoke test: just verify no crash
 
 algo.em_solver_medium           = macroscopic
 algo.macroscopic_sigma_method   = backwardeuler
+# Prescribed current injection deposits through the particle current path,
+# so a particle shape and a deposition algorithm must be set.
+algo.particle_shape             = 1
+algo.current_deposition         = direct
 
 # --- Physical constants ---
 my_constants.sigma_cu   = 6.0e7   # S/m  copper conductivity

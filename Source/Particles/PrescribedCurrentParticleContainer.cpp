@@ -228,10 +228,12 @@ PrescribedCurrentParticleContainer::InitData ()
     AddNParticles(lev, np, xs, ys, zs, ux, uy, uz,
                   1, attr, 0, attr_int, 1);
 
-    amrex::Print() << "[CurrentInjection] PrescribedCurrentParticleContainer: "
-                   << TotalNumberOfParticles() << " antenna particles over "
-                   << m_faces.size() << " face(s), I_peak=" << I_peak
-                   << " A, peak speed=" << u_max << " m/s.\n";
+    if (Verbose()) {
+        amrex::Print() << Utils::TextMsg::Info(
+            "PrescribedCurrentParticleContainer: "
+            + std::to_string(TotalNumberOfParticles()) + " antenna particles over "
+            + std::to_string(m_faces.size()) + " drive face(s)");
+    }
 
     if (TotalNumberOfParticles() == 0) {
         ablastr::warn_manager::WMRecordWarning("CurrentInjection",
